@@ -8,7 +8,9 @@ import shutil
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+
 from urllib.parse import parse_qs, urlparse
+
 from uuid import uuid4
 
 import yaml
@@ -19,6 +21,7 @@ from ..db.models import Document, Passage
 from .chunking import chunk_text, chunk_transcript, Chunk
 from .osis import DetectedOsis, detect_osis_references
 from .parsers import TranscriptSegment, load_transcript, parse_pdf, read_text_file
+
 
 class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
@@ -48,6 +51,7 @@ def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
 
 def _parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:
     content = read_text_file(path)
+
     if path.suffix.lower() in {".md", ".markdown"}:
         fm, body = _parse_frontmatter_from_markdown(content)
         return body, fm
@@ -76,7 +80,8 @@ def _detect_source_type(path: Path, frontmatter: dict[str, Any]) -> str:
         return "transcript"
     if ext == ".docx":
         return "docx"
-    return "file"
+
+      return "file"
 
 
 def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -94,6 +99,7 @@ def _normalise_passage_meta(
     chunker_version: str,
     chunk_index: int,
     speakers: list[str] | None = None,
+
 ) -> dict[str, Any]:
     osis_all: list[str] = []
     if hints:
@@ -112,6 +118,7 @@ def _normalise_passage_meta(
         meta["primary_osis"] = detected.primary
     if speakers:
         meta["speakers"] = speakers
+
     return meta
 
 
@@ -135,7 +142,6 @@ def _ensure_list(value: Any) -> list[str] | None:
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
-
 
 def _resolve_fixtures_dir(settings) -> Path | None:
     root = getattr(settings, "fixtures_root", None)
@@ -280,7 +286,6 @@ def _prepare_transcript_chunks(
     )
     return chunks, "transcript", "0.3.0"
 
-
 def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, Any] | None = None) -> Document:
     """Execute the file ingestion pipeline synchronously."""
 
@@ -312,6 +317,7 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
         frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
         chunks, parser, parser_version = _prepare_text_chunks(text_content, settings=settings)
 
+
     document = Document(
         id=str(uuid4()),
         title=frontmatter.get("title") or path.stem,
@@ -331,6 +337,7 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     session.flush()
 
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
+
     passages: list[Passage] = []
     for chunk in chunks:
         detected = detect_osis_references(chunk.text)
@@ -398,7 +405,6 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     session.commit()
 
     return document
-
 
 def run_pipeline_for_url(
     session: Session,
@@ -518,3 +524,4 @@ def run_pipeline_for_url(
     session.commit()
 
     return document
+

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 from typing import Iterable, Iterator, List
 
 from .parsers import TranscriptSegment
+
 
 
 @dataclass(slots=True)
@@ -20,6 +22,7 @@ class Chunk:
     t_start: float | None = None
     t_end: float | None = None
     speakers: list[str] | None = None
+
 
 
 @dataclass(slots=True)
@@ -204,3 +207,4 @@ def chunk_transcript(
 
     flush()
     return chunks
+

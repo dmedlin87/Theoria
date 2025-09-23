@@ -21,6 +21,7 @@ class UrlIngestRequest(APIModel):
     frontmatter: dict[str, Any] | None = None
 
 
+
 class DocumentSummary(APIModel):
     id: str
     title: str | None = None

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+
 from fastapi.testclient import TestClient
 
 from theo.services.api.app.main import app
@@ -63,6 +64,7 @@ def test_ingest_and_search_roundtrip() -> None:
         assert first_passage["meta"]["parser"] == "plain_text"
 
 
+
 def test_document_listing_and_paginated_passages() -> None:
     with TestClient(app) as client:
         doc_id = _ingest_markdown(client, suffix="Unique content about Psalms 23:1.")
@@ -106,7 +108,6 @@ This paragraph cites Romans 8:1 as well.
         ).json()
         assert mentions_collection["total"] == mentions_all["total"]
 
-
 def test_pdf_ingestion_includes_page_numbers() -> None:
     with TestClient(app) as client:
         pdf_path = Path("fixtures/pdf/sample_article.pdf")
@@ -145,3 +146,4 @@ def test_youtube_url_ingestion_uses_fixture_transcript() -> None:
 
         search = client.get("/search", params={"osis": "John.1.1-5"}).json()
         assert any(result["document_id"] == document_id for result in search["results"])
+
