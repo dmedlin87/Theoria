@@ -62,7 +62,6 @@ def test_ingest_and_search_roundtrip() -> None:
         assert first_passage["meta"]["chunker_version"] == "0.3.0"
         assert first_passage["meta"]["parser"] == "plain_text"
 
-
 def test_document_listing_and_paginated_passages() -> None:
     with TestClient(app) as client:
         doc_id = _ingest_markdown(client, suffix="Unique content about Psalms 23:1.")
@@ -105,7 +104,6 @@ This paragraph cites Romans 8:1 as well.
             params={"collection": "Gospels"},
         ).json()
         assert mentions_collection["total"] == mentions_all["total"]
-
 
 def test_pdf_ingestion_includes_page_numbers() -> None:
     with TestClient(app) as client:

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+
 from pdfminer.high_level import extract_text
 import webvtt
 
@@ -54,12 +55,14 @@ def parse_transcript_vtt(path: Path) -> list[TranscriptSegment]:
         text = " ".join(entry.text.split())
         if not text:
             continue
+
         speaker: str | None = None
         if ":" in text:
             potential, remainder = text.split(":", 1)
             if potential.strip().istitle() or potential.strip().startswith("Speaker") or potential.strip().endswith("Narrator"):
                 speaker = potential.strip()
                 text = remainder.strip()
+
         segments.append(
             TranscriptSegment(
                 text=text,

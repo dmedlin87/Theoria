@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     doc_max_pages: int = Field(default=5000)
     transcript_max_window: float = Field(default=40.0)
     fixtures_root: Path | None = Field(default=None, description="Optional fixtures path for offline resources")
+
     user_agent: str = Field(default="TheoEngine/1.0")
 
 @lru_cache
@@ -34,6 +35,7 @@ def get_settings() -> Settings:
         candidate = Path(__file__).resolve().parents[5] / "fixtures"
         if candidate.exists():
             settings.fixtures_root = candidate
+
     settings.storage_root.mkdir(parents=True, exist_ok=True)
     return settings
 

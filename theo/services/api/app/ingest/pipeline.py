@@ -9,6 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+
 from uuid import uuid4
 
 import yaml
@@ -76,7 +77,9 @@ def _detect_source_type(path: Path, frontmatter: dict[str, Any]) -> str:
         return "transcript"
     if ext == ".docx":
         return "docx"
+
     return "file"
+
 
 
 def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -94,6 +97,7 @@ def _normalise_passage_meta(
     chunker_version: str,
     chunk_index: int,
     speakers: list[str] | None = None,
+
 ) -> dict[str, Any]:
     osis_all: list[str] = []
     if hints:
@@ -135,7 +139,6 @@ def _ensure_list(value: Any) -> list[str] | None:
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
-
 
 def _resolve_fixtures_dir(settings) -> Path | None:
     root = getattr(settings, "fixtures_root", None)
@@ -263,7 +266,6 @@ def _prepare_transcript_chunks(
     )
     return chunks, "transcript", "0.3.0"
 
-
 def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, Any] | None = None) -> Document:
     """Execute the file ingestion pipeline synchronously."""
 
@@ -381,7 +383,6 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     session.commit()
 
     return document
-
 
 def run_pipeline_for_url(
     session: Session,
