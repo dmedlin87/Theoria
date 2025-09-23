@@ -8,7 +8,6 @@ import shutil
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
-
 from urllib.parse import parse_qs, urlparse
 
 from uuid import uuid4
@@ -21,7 +20,6 @@ from ..db.models import Document, Passage
 from .chunking import chunk_text, chunk_transcript, Chunk
 from .osis import DetectedOsis, detect_osis_references
 from .parsers import TranscriptSegment, load_transcript, parse_pdf, read_text_file
-
 
 class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
@@ -51,7 +49,6 @@ def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
 
 def _parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:
     content = read_text_file(path)
-
     if path.suffix.lower() in {".md", ".markdown"}:
         fm, body = _parse_frontmatter_from_markdown(content)
         return body, fm
@@ -81,7 +78,8 @@ def _detect_source_type(path: Path, frontmatter: dict[str, Any]) -> str:
     if ext == ".docx":
         return "docx"
 
-      return "file"
+    return "file"
+
 
 
 def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -118,7 +116,6 @@ def _normalise_passage_meta(
         meta["primary_osis"] = detected.primary
     if speakers:
         meta["speakers"] = speakers
-
     return meta
 
 
@@ -170,32 +167,15 @@ def _load_youtube_transcript(settings, video_id: str) -> tuple[list[TranscriptSe
     else:
         try:
             from youtube_transcript_api import YouTubeTranscriptApi  # type: ignore
-            from youtube_transcript_api import _errors as yt_errors  # type: ignore
         except ImportError as exc:  # pragma: no cover - defensive fallback
             raise UnsupportedSourceError(
                 "youtube-transcript-api not installed and no transcript fixture found"
             ) from exc
 
-        handled_errors: tuple[type[Exception], ...] = tuple(
-            getattr(yt_errors, name)
-            for name in (
-                "NoTranscriptFound",
-                "TranscriptsDisabled",
-                "VideoUnavailable",
-                "TooManyRequests",
-                "CouldNotRetrieveTranscript",
-            )
-            if hasattr(yt_errors, name)
-        )
-
         try:
             transcript = YouTubeTranscriptApi.get_transcript(video_id)
         except Exception as exc:  # pragma: no cover - network failure fallback
-            if handled_errors and isinstance(exc, handled_errors):
-                raise UnsupportedSourceError(
-                    f"Unable to fetch transcript for video {video_id}"
-                ) from exc
-            raise
+            raise UnsupportedSourceError(f"Unable to fetch transcript for video {video_id}") from exc
 
         for item in transcript:
             text = str(item.get("text") or "").strip()
@@ -317,7 +297,6 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
         frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
         chunks, parser, parser_version = _prepare_text_chunks(text_content, settings=settings)
 
-
     document = Document(
         id=str(uuid4()),
         title=frontmatter.get("title") or path.stem,
@@ -337,7 +316,6 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     session.flush()
 
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
-
     passages: list[Passage] = []
     for chunk in chunks:
         detected = detect_osis_references(chunk.text)
@@ -524,4 +502,3 @@ def run_pipeline_for_url(
     session.commit()
 
     return document
-

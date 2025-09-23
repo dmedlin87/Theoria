@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 from fastapi.testclient import TestClient
 
 from theo.services.api.app.main import app
@@ -62,8 +61,6 @@ def test_ingest_and_search_roundtrip() -> None:
         first_passage = document_payload["passages"][0]
         assert first_passage["meta"]["chunker_version"] == "0.3.0"
         assert first_passage["meta"]["parser"] == "plain_text"
-
-
 
 def test_document_listing_and_paginated_passages() -> None:
     with TestClient(app) as client:
@@ -146,4 +143,3 @@ def test_youtube_url_ingestion_uses_fixture_transcript() -> None:
 
         search = client.get("/search", params={"osis": "John.1.1-5"}).json()
         assert any(result["document_id"] == document_id for result in search["results"])
-

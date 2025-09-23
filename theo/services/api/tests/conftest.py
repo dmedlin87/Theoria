@@ -25,7 +25,6 @@ def configure_test_environment(tmp_path_factory: pytest.TempPathFactory) -> None
     os.environ["STORAGE_ROOT"] = str(storage_root)
     os.environ["FIXTURES_ROOT"] = str(PROJECT_ROOT / "fixtures")
 
-
     from theo.services.api.app.core import settings as settings_module
     from theo.services.api.app.core.database import Base, configure_engine
 

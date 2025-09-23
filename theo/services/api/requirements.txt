@@ -13,4 +13,3 @@ click==8.1.7
 pdfminer.six==20231228
 webvtt-py==0.5.1
 youtube-transcript-api==0.6.2
-

@@ -20,8 +20,6 @@ class UrlIngestRequest(APIModel):
     source_type: str | None = None
     frontmatter: dict[str, Any] | None = None
 
-
-
 class DocumentSummary(APIModel):
     id: str
     title: str | None = None

@@ -14,7 +14,6 @@ from ..core.database import get_session
 from ..models.documents import DocumentIngestResponse, UrlIngestRequest
 from ..ingest.pipeline import UnsupportedSourceError, run_pipeline_for_file, run_pipeline_for_url
 
-
 router = APIRouter()
 
 
@@ -73,4 +72,3 @@ async def ingest_url(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     return DocumentIngestResponse(document_id=document.id, status="processed")
-

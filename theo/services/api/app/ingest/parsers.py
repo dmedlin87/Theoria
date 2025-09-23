@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
+
 
 from pdfminer.high_level import extract_text
 import webvtt
@@ -23,36 +24,6 @@ class TranscriptSegment:
     start: float
     end: float
     speaker: str | None = None
-
-_SPEAKER_PATTERN = re.compile(
-    r"^\s*(?P<label>[\w .,'\"-]{1,50}?)(?:\s*\([^)]*\))?\s*:\s*(?P<body>.+)$"
-)
-
-
-def _extract_speaker(text: str) -> tuple[str | None, str]:
-    """Split a transcript line into speaker + remaining text if it resembles dialogue."""
-
-    match = _SPEAKER_PATTERN.match(text)
-    if not match:
-        return None, text
-
-    candidate = match.group("label").strip()
-    remainder = match.group("body").strip()
-    if not candidate:
-        return None, text
-
-    alpha_chars = sum(1 for ch in candidate if ch.isalpha())
-    uppercase_chars = sum(1 for ch in candidate if ch.isupper())
-
-    lowered = candidate.lower()
-    if lowered.startswith(("speaker", "narrator", "host", "moderator")):
-        return candidate, remainder
-    if alpha_chars and uppercase_chars / alpha_chars >= 0.6:
-        return candidate, remainder
-    if candidate.istitle():
-        return candidate, remainder
-
-    return None, text
 
 
 def read_text_file(path: Path) -> str:
@@ -84,8 +55,14 @@ def parse_transcript_vtt(path: Path) -> list[TranscriptSegment]:
         text = " ".join(entry.text.split())
         if not text:
             continue
-        speaker: str | None
-        speaker, text = _extract_speaker(text)
+
+        speaker: str | None = None
+        if ":" in text:
+            potential, remainder = text.split(":", 1)
+            if potential.strip().istitle() or potential.strip().startswith("Speaker") or potential.strip().endswith("Narrator"):
+                speaker = potential.strip()
+                text = remainder.strip()
+
         segments.append(
             TranscriptSegment(
                 text=text,
