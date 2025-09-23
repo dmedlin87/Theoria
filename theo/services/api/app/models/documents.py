@@ -35,3 +35,18 @@ class DocumentDetailResponse(DocumentSummary):
     passages: list[Passage] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class DocumentListResponse(APIModel):
+    items: list[DocumentSummary]
+    total: int
+    limit: int
+    offset: int
+
+
+class DocumentPassagesResponse(APIModel):
+    document_id: str
+    passages: list[Passage]
+    total: int
+    limit: int
+    offset: int

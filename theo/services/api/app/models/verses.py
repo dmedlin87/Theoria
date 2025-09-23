@@ -12,6 +12,13 @@ class VerseMention(APIModel):
     context_snippet: str = Field(description="Relevant text around the verse reference")
 
 
+class VerseMentionsFilters(APIModel):
+    source_type: str | None = None
+    collection: str | None = None
+    author: str | None = None
+
+
 class VerseMentionsResponse(APIModel):
     osis: str
     mentions: list[VerseMention]
+    total: int

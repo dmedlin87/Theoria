@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from theo.services.api.app.main import app
 
 
-def _ingest_markdown(client: TestClient) -> str:
-    content = """---
+def _ingest_markdown(client: TestClient, *, suffix: str = "") -> str:
+    content = f"""---
 title: "Test Sermon"
 authors:
   - "Jane Doe"
@@ -17,6 +17,7 @@ collection: "Gospels"
 
 In the beginning was the Word (John 1:1-5), and the Word was with God.
 Later we reflect on Genesis 1:1 in passing.
+{suffix}
 """
     response = client.post(
         "/ingest/file",
@@ -29,7 +30,7 @@ Later we reflect on Genesis 1:1 in passing.
 
 def test_ingest_and_search_roundtrip() -> None:
     with TestClient(app) as client:
-        document_id = _ingest_markdown(client)
+        document_id = _ingest_markdown(client, suffix="Additional reflection on John 3:16.")
 
         search_response = client.get("/search", params={"q": "Word"})
         assert search_response.status_code == 200
@@ -45,11 +46,59 @@ def test_ingest_and_search_roundtrip() -> None:
 
         verse_response = client.get("/verses/John.1.1/mentions")
         assert verse_response.status_code == 200
-        mentions = verse_response.json()["mentions"]
+        verse_payload = verse_response.json()
+        mentions = verse_payload["mentions"]
         assert mentions, "Expected verse mentions"
+        assert verse_payload["total"] == len(mentions)
 
         document_response = client.get(f"/documents/{document_id}")
         assert document_response.status_code == 200
         document_payload = document_response.json()
         assert document_payload["id"] == document_id
         assert document_payload["passages"], "Document should contain passages"
+        first_passage = document_payload["passages"][0]
+        assert first_passage["meta"]["chunker_version"] == "0.2.0"
+
+
+def test_document_listing_and_paginated_passages() -> None:
+    with TestClient(app) as client:
+        doc_id = _ingest_markdown(client, suffix="Unique content about Psalms 23:1.")
+
+        list_response = client.get("/documents", params={"limit": 5})
+        assert list_response.status_code == 200
+        listing = list_response.json()
+        assert any(item["id"] == doc_id for item in listing["items"])
+        assert listing["total"] >= 1
+
+        passages_response = client.get(f"/documents/{doc_id}/passages", params={"limit": 1})
+        assert passages_response.status_code == 200
+        passages_payload = passages_response.json()
+        assert passages_payload["document_id"] == doc_id
+        assert passages_payload["passages"], "Expected at least one passage"
+        assert passages_payload["total"] >= len(passages_payload["passages"])
+
+
+def test_verse_mentions_filters() -> None:
+    with TestClient(app) as client:
+        doc_id = _ingest_markdown(
+            client,
+            suffix="""
+
+This paragraph cites Romans 8:1 as well.
+""",
+        )
+
+        mentions_all = client.get("/verses/John.1.1/mentions").json()
+        assert mentions_all["total"] >= 1
+
+        mentions_filtered = client.get(
+            "/verses/John.1.1/mentions",
+            params={"collection": "Nonexistent"},
+        ).json()
+        assert mentions_filtered["total"] == 0
+
+        mentions_collection = client.get(
+            "/verses/John.1.1/mentions",
+            params={"collection": "Gospels"},
+        ).json()
+        assert mentions_collection["total"] == mentions_all["total"]

@@ -4,22 +4,50 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from ..db.models import Passage
+from ..db.models import Document, Passage
 from ..ingest.osis import osis_intersects
 from ..models.base import Passage as PassageSchema
-from ..models.verses import VerseMention
+from ..models.verses import VerseMention, VerseMentionsFilters
 
 
-def get_mentions_for_osis(session: Session, osis: str) -> list[VerseMention]:
+def _snippet(text: str, max_length: int = 280) -> str:
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - 3].rstrip() + "..."
+
+
+def get_mentions_for_osis(
+    session: Session,
+    osis: str,
+    filters: VerseMentionsFilters | None = None,
+) -> list[VerseMention]:
     """Return passages whose OSIS reference intersects the requested range."""
 
-    rows = session.query(Passage).all()
+    query = session.query(Passage, Document).join(Document)
+    if filters:
+        if filters.source_type:
+            query = query.filter(Document.source_type == filters.source_type)
+        if filters.collection:
+            query = query.filter(Document.collection == filters.collection)
+
     mentions: list[VerseMention] = []
-    for passage in rows:
+    for passage, document in query.all():
         if not passage.osis_ref:
             continue
         if not osis_intersects(passage.osis_ref, osis):
             continue
+
+        if filters and filters.author:
+            authors = document.authors or []
+            if filters.author not in authors:
+                continue
+
+        base_meta = passage.meta.copy() if passage.meta else {}
+        if document.title:
+            base_meta.setdefault("document_title", document.title)
+        if document.source_type:
+            base_meta.setdefault("source_type", document.source_type)
+
         passage_schema = PassageSchema(
             id=passage.id,
             document_id=passage.document_id,
@@ -28,12 +56,17 @@ def get_mentions_for_osis(session: Session, osis: str) -> list[VerseMention]:
             page_no=passage.page_no,
             t_start=passage.t_start,
             t_end=passage.t_end,
-            meta=passage.meta,
+            meta=base_meta or None,
             score=None,
         )
-        context = passage.text
-        mention = VerseMention(passage=passage_schema, context_snippet=context)
+        mention = VerseMention(passage=passage_schema, context_snippet=_snippet(passage.text))
         mentions.append(mention)
 
-    mentions.sort(key=lambda item: item.passage.page_no or 0)
+    mentions.sort(
+        key=lambda item: (
+            item.passage.meta.get("document_title") if item.passage.meta else "",
+            item.passage.page_no or 0,
+            item.passage.t_start or 0.0,
+        )
+    )
     return mentions

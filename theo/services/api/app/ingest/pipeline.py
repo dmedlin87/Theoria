@@ -75,15 +75,31 @@ def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str
     return combined
 
 
-def _normalise_passage_meta(detected: DetectedOsis, hints: list[str] | None) -> dict[str, Any] | None:
+def _normalise_passage_meta(
+    detected: DetectedOsis,
+    hints: list[str] | None,
+    *,
+    parser: str,
+    parser_version: str,
+    chunker_version: str,
+    chunk_index: int,
+) -> dict[str, Any]:
     osis_all: list[str] = []
     if hints:
         osis_all.extend(hints)
     osis_all.extend(detected.all)
-    if not osis_all:
-        return None
     deduped = sorted({ref for ref in osis_all if ref})
-    return {"osis_refs_all": deduped}
+    meta: dict[str, Any] = {
+        "parser": parser,
+        "parser_version": parser_version,
+        "chunker_version": chunker_version,
+        "chunk_index": chunk_index,
+    }
+    if deduped:
+        meta["osis_refs_all"] = deduped
+    if detected.primary:
+        meta["primary_osis"] = detected.primary
+    return meta
 
 
 def _coerce_date(value: Any) -> date | None:
@@ -142,7 +158,14 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     passages: list[Passage] = []
     for chunk in chunks:
         detected = detect_osis_references(chunk.text)
-        meta = _normalise_passage_meta(detected, chunk_hints)
+        meta = _normalise_passage_meta(
+            detected,
+            chunk_hints,
+            parser="plain_text",
+            parser_version="0.1.0",
+            chunker_version="0.2.0",
+            chunk_index=chunk.index or 0,
+        )
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
