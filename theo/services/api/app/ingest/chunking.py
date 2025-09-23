@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List
+
+from typing import Iterable, Iterator, List
+
+from .parsers import TranscriptSegment
+
 
 
 @dataclass(slots=True)
@@ -15,6 +19,10 @@ class Chunk:
     end_char: int
     page_no: int | None = None
     index: int | None = None
+    t_start: float | None = None
+    t_end: float | None = None
+    speakers: list[str] | None = None
+
 
 
 @dataclass(slots=True)
@@ -144,3 +152,59 @@ def chunk_text(
         )
 
     return chunks
+
+
+def chunk_transcript(
+    segments: Iterable[TranscriptSegment],
+    *,
+    max_tokens: int = 900,
+    hard_cap: int = 1200,
+    max_window_seconds: float = 40.0,
+) -> List[Chunk]:
+    """Chunk transcript segments while preserving temporal anchors."""
+
+    chunks: list[Chunk] = []
+    buffer: list[TranscriptSegment] = []
+    token_count = 0
+    char_cursor = 0
+
+    def flush() -> None:
+        nonlocal buffer, token_count, char_cursor
+        if not buffer:
+            return
+        text = " ".join(seg.text for seg in buffer)
+        start_time = buffer[0].start
+        end_time = buffer[-1].end
+        speakers = sorted({seg.speaker for seg in buffer if seg.speaker}) or None
+        chunk = Chunk(
+            text=text,
+            start_char=char_cursor,
+            end_char=char_cursor + len(text),
+            index=len(chunks),
+            t_start=start_time,
+            t_end=end_time,
+            speakers=speakers,
+        )
+        chunks.append(chunk)
+        char_cursor += len(text) + 1
+        buffer = []
+        token_count = 0
+
+    for segment in segments:
+        tokens = len(_tokenise(segment.text))
+        if buffer:
+            window = segment.end - buffer[0].start
+            if token_count >= max_tokens or window > max_window_seconds:
+                flush()
+        if token_count and token_count + tokens > hard_cap:
+            flush()
+
+        buffer.append(segment)
+        token_count += tokens
+
+        if token_count >= hard_cap:
+            flush()
+
+    flush()
+    return chunks
+

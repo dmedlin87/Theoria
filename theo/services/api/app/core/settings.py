@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     embedding_dim: int = Field(default=1024)
     max_chunk_tokens: int = Field(default=900)
     doc_max_pages: int = Field(default=5000)
+    transcript_max_window: float = Field(default=40.0)
+    fixtures_root: Path | None = Field(default=None, description="Optional fixtures path for offline resources")
+
     user_agent: str = Field(default="TheoEngine/1.0")
 
 @lru_cache
@@ -28,6 +31,11 @@ def get_settings() -> Settings:
     """Return a cached Settings instance."""
 
     settings = Settings()
+    if settings.fixtures_root is None:
+        candidate = Path(__file__).resolve().parents[5] / "fixtures"
+        if candidate.exists():
+            settings.fixtures_root = candidate
+
     settings.storage_root.mkdir(parents=True, exist_ok=True)
     return settings
 

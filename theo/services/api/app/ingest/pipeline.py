@@ -8,6 +8,9 @@ import shutil
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+
+from urllib.parse import parse_qs, urlparse
+
 from uuid import uuid4
 
 import yaml
@@ -15,8 +18,10 @@ from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
 from ..db.models import Document, Passage
-from .chunking import chunk_text
+from .chunking import chunk_text, chunk_transcript, Chunk
 from .osis import DetectedOsis, detect_osis_references
+from .parsers import TranscriptSegment, load_transcript, parse_pdf, read_text_file
+
 
 class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
@@ -45,7 +50,8 @@ def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
 
 
 def _parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:
-    content = path.read_text(encoding="utf-8")
+    content = read_text_file(path)
+
     if path.suffix.lower() in {".md", ".markdown"}:
         fm, body = _parse_frontmatter_from_markdown(content)
         return body, fm
@@ -66,7 +72,16 @@ def _detect_source_type(path: Path, frontmatter: dict[str, Any]) -> str:
         return "markdown"
     if ext == ".txt":
         return "txt"
-    return "file"
+    if ext == ".pdf":
+        return "pdf"
+    if ext in {".vtt", ".webvtt", ".srt"}:
+        return "transcript"
+    if ext == ".json":
+        return "transcript"
+    if ext == ".docx":
+        return "docx"
+
+      return "file"
 
 
 def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -83,6 +98,8 @@ def _normalise_passage_meta(
     parser_version: str,
     chunker_version: str,
     chunk_index: int,
+    speakers: list[str] | None = None,
+
 ) -> dict[str, Any]:
     osis_all: list[str] = []
     if hints:
@@ -99,6 +116,9 @@ def _normalise_passage_meta(
         meta["osis_refs_all"] = deduped
     if detected.primary:
         meta["primary_osis"] = detected.primary
+    if speakers:
+        meta["speakers"] = speakers
+
     return meta
 
 
@@ -123,6 +143,148 @@ def _ensure_list(value: Any) -> list[str] | None:
         return [str(item) for item in value]
     return [str(value)]
 
+def _resolve_fixtures_dir(settings) -> Path | None:
+    root = getattr(settings, "fixtures_root", None)
+    if not root:
+        return None
+    path = Path(root)
+    if not path.exists():
+        return None
+    return path
+
+
+def _load_youtube_transcript(settings, video_id: str) -> tuple[list[TranscriptSegment], Path | None]:
+    fixtures_dir = _resolve_fixtures_dir(settings)
+    transcript_path: Path | None = None
+    if fixtures_dir:
+        base = fixtures_dir / "youtube"
+        for suffix in (".vtt", ".webvtt", ".json", ".srt"):
+            candidate = base / f"{video_id}{suffix}"
+            if candidate.exists():
+                transcript_path = candidate
+                break
+
+    segments: list[TranscriptSegment] = []
+    if transcript_path:
+        segments = load_transcript(transcript_path)
+    else:
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi  # type: ignore
+            from youtube_transcript_api import _errors as yt_errors  # type: ignore
+        except ImportError as exc:  # pragma: no cover - defensive fallback
+            raise UnsupportedSourceError(
+                "youtube-transcript-api not installed and no transcript fixture found"
+            ) from exc
+
+        handled_errors: tuple[type[Exception], ...] = tuple(
+            getattr(yt_errors, name)
+            for name in (
+                "NoTranscriptFound",
+                "TranscriptsDisabled",
+                "VideoUnavailable",
+                "TooManyRequests",
+                "CouldNotRetrieveTranscript",
+            )
+            if hasattr(yt_errors, name)
+        )
+
+        try:
+            transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        except Exception as exc:  # pragma: no cover - network failure fallback
+            if handled_errors and isinstance(exc, handled_errors):
+                raise UnsupportedSourceError(
+                    f"Unable to fetch transcript for video {video_id}"
+                ) from exc
+            raise
+
+        for item in transcript:
+            text = str(item.get("text") or "").strip()
+            if not text:
+                continue
+            start = float(item.get("start", 0.0))
+            duration = float(item.get("duration", 0.0))
+            segments.append(
+                TranscriptSegment(
+                    text=text,
+                    start=start,
+                    end=start + duration,
+                )
+            )
+
+    if not segments:
+        raise UnsupportedSourceError(f"No transcript segments found for {video_id}")
+    return segments, transcript_path
+
+
+def _load_youtube_metadata(settings, video_id: str) -> dict[str, Any]:
+    fixtures_dir = _resolve_fixtures_dir(settings)
+    if not fixtures_dir:
+        return {}
+    meta_path = fixtures_dir / "youtube" / f"{video_id}.meta.json"
+    if not meta_path.exists():
+        return {}
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def _extract_youtube_video_id(url: str) -> str:
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+    if "youtube" in host:
+        if parsed.path == "/watch":
+            qs = parse_qs(parsed.query)
+            vid = qs.get("v", [None])[0]
+            if vid:
+                return vid
+        elif parsed.path.startswith("/shorts/"):
+            return parsed.path.split("/shorts/")[1].split("/")[0]
+        elif parsed.path.startswith("/") and len(parsed.path.strip("/")) > 0:
+            return parsed.path.strip("/")
+    if "youtu.be" in host:
+        return parsed.path.strip("/")
+    raise UnsupportedSourceError(f"Unsupported URL for ingestion: {url}")
+
+
+def _prepare_text_chunks(text: str, *, settings) -> tuple[list[Chunk], str, str]:
+    chunks = chunk_text(text, max_tokens=settings.max_chunk_tokens)
+    return chunks, "plain_text", "0.1.0"
+
+
+def _prepare_pdf_chunks(path: Path, *, settings) -> tuple[list[Chunk], str, str]:
+    pages = parse_pdf(path, max_pages=settings.doc_max_pages)
+    if not pages:
+        raise UnsupportedSourceError("PDF contained no extractable text")
+    chunks: list[Chunk] = []
+    index = 0
+    cursor = 0
+    for page in pages:
+        page_chunks = chunk_text(page.text, max_tokens=settings.max_chunk_tokens)
+        for chunk in page_chunks:
+            chunk.page_no = page.page_no
+            chunk.index = index
+            chunk.start_char += cursor
+            chunk.end_char += cursor
+            chunks.append(chunk)
+            index += 1
+        cursor += len(page.text) + 1
+    return chunks, "pdfminer", "0.2.0"
+
+
+def _prepare_transcript_chunks(
+    segments: list[TranscriptSegment],
+    *,
+    settings,
+) -> tuple[list[Chunk], str, str]:
+    if not segments:
+        raise UnsupportedSourceError("Transcript file contained no segments")
+    chunks = chunk_transcript(
+        segments,
+        max_tokens=settings.max_chunk_tokens,
+        max_window_seconds=getattr(settings, "transcript_max_window", 40.0),
+    )
+    return chunks, "transcript", "0.3.0"
 
 def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, Any] | None = None) -> Document:
     """Execute the file ingestion pipeline synchronously."""
@@ -131,9 +293,30 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     raw_bytes = path.read_bytes()
     sha256 = hashlib.sha256(raw_bytes).hexdigest()
 
-    text, parsed_frontmatter = _parse_text_file(path)
-    frontmatter = _merge_metadata(parsed_frontmatter, _load_frontmatter(frontmatter))
+    frontmatter = _merge_metadata({}, _load_frontmatter(frontmatter))
     source_type = _detect_source_type(path, frontmatter)
+
+    parser = "plain_text"
+    parser_version = "0.1.0"
+    text_content = ""
+    chunks: list[Chunk]
+
+    if source_type in {"markdown", "txt", "file", "docx"}:
+        text_content, parsed_frontmatter = _parse_text_file(path)
+        frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
+        chunks, parser, parser_version = _prepare_text_chunks(text_content, settings=settings)
+    elif source_type == "pdf":
+        text_content = ""
+        chunks, parser, parser_version = _prepare_pdf_chunks(path, settings=settings)
+    elif source_type == "transcript":
+        segments = load_transcript(path)
+        chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
+        text_content = " ".join(chunk.text for chunk in chunks)
+    else:
+        text_content, parsed_frontmatter = _parse_text_file(path)
+        frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
+        chunks, parser, parser_version = _prepare_text_chunks(text_content, settings=settings)
+
 
     document = Document(
         id=str(uuid4()),
@@ -154,26 +337,30 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     session.flush()
 
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
-    chunks = chunk_text(text, max_tokens=settings.max_chunk_tokens)
+
     passages: list[Passage] = []
     for chunk in chunks:
         detected = detect_osis_references(chunk.text)
         meta = _normalise_passage_meta(
             detected,
             chunk_hints,
-            parser="plain_text",
-            parser_version="0.1.0",
-            chunker_version="0.2.0",
+            parser=parser,
+            parser_version=parser_version,
+            chunker_version="0.3.0",
             chunk_index=chunk.index or 0,
+            speakers=chunk.speakers,
         )
+        osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
+            t_start=chunk.t_start,
+            t_end=chunk.t_end,
             start_char=chunk.start_char,
             end_char=chunk.end_char,
             text=chunk.text,
             tokens=len(chunk.text.split()),
-            osis_ref=detected.primary or (chunk_hints[0] if chunk_hints else None),
+            osis_ref=osis_value,
             lexeme=chunk.text.lower(),
             meta=meta,
         )
@@ -201,6 +388,9 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
                 "id": passage.id,
                 "text": passage.text,
                 "osis_ref": passage.osis_ref,
+                "page_no": passage.page_no,
+                "t_start": passage.t_start,
+                "t_end": passage.t_end,
                 "meta": passage.meta,
             }
             for passage in passages
@@ -216,8 +406,122 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
 
     return document
 
+def run_pipeline_for_url(
+    session: Session,
+    url: str,
+    source_type: str | None = None,
+    frontmatter: dict[str, Any] | None = None,
+) -> Document:
+    """Ingest supported URLs (currently YouTube) into the document store."""
 
-def run_pipeline_for_url(session: Session, url: str, source_type: str | None = None) -> Document:
-    """Placeholder for URL ingestion. Currently unsupported in the synchronous pipeline."""
+    settings = get_settings()
+    resolved_source_type = source_type or "youtube"
+    if resolved_source_type != "youtube":
+        raise UnsupportedSourceError(f"Unsupported source type for URL ingestion: {resolved_source_type}")
 
-    raise UnsupportedSourceError(f"URL ingestion not yet implemented for {url}")
+    video_id = _extract_youtube_video_id(url)
+    metadata = _load_youtube_metadata(settings, video_id)
+    frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+
+    segments, transcript_path = _load_youtube_transcript(settings, video_id)
+    chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
+
+    sha_payload = "\n".join(chunk.text for chunk in chunks).encode("utf-8")
+    sha256 = hashlib.sha256(sha_payload).hexdigest()
+
+    document = Document(
+        id=str(uuid4()),
+        title=frontmatter.get("title") or f"YouTube Video {video_id}",
+        authors=_ensure_list(frontmatter.get("authors")),
+        source_url=url,
+        source_type="youtube",
+        collection=frontmatter.get("collection"),
+        channel=frontmatter.get("channel"),
+        video_id=video_id,
+        duration_seconds=frontmatter.get("duration_seconds"),
+        bib_json=frontmatter.get("bib_json"),
+        sha256=sha256,
+    )
+
+    session.add(document)
+    session.flush()
+
+    chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
+    passages: list[Passage] = []
+    for chunk in chunks:
+        detected = detect_osis_references(chunk.text)
+        meta = _normalise_passage_meta(
+            detected,
+            chunk_hints,
+            parser=parser,
+            parser_version=parser_version,
+            chunker_version="0.3.0",
+            chunk_index=chunk.index or 0,
+            speakers=chunk.speakers,
+        )
+        osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
+        passage = Passage(
+            document_id=document.id,
+            t_start=chunk.t_start,
+            t_end=chunk.t_end,
+            start_char=chunk.start_char,
+            end_char=chunk.end_char,
+            text=chunk.text,
+            tokens=len(chunk.text.split()),
+            osis_ref=osis_value,
+            lexeme=chunk.text.lower(),
+            meta=meta,
+        )
+        session.add(passage)
+        passages.append(passage)
+
+    session.commit()
+
+    storage_dir = settings.storage_root / document.id
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    normalized_payload = {
+        "document": {
+            "id": document.id,
+            "title": document.title,
+            "source_type": document.source_type,
+            "channel": document.channel,
+            "video_id": document.video_id,
+            "sha256": document.sha256,
+        },
+        "passages": [
+            {
+                "id": passage.id,
+                "text": passage.text,
+                "osis_ref": passage.osis_ref,
+                "t_start": passage.t_start,
+                "t_end": passage.t_end,
+                "meta": passage.meta,
+            }
+            for passage in passages
+        ],
+    }
+
+    if transcript_path and transcript_path.exists():
+        dest = storage_dir / transcript_path.name
+        shutil.copy(transcript_path, dest)
+    else:
+        transcript_json = [
+            {
+                "text": passage.text,
+                "start": passage.t_start,
+                "end": passage.t_end,
+                "speakers": passage.meta.get("speakers") if passage.meta else None,
+            }
+            for passage in passages
+        ]
+        (storage_dir / "transcript.json").write_text(json.dumps(transcript_json, indent=2), encoding="utf-8")
+
+    normalized_path = storage_dir / "normalized.json"
+    normalized_path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
+
+    document.storage_path = str(storage_dir)
+    session.add(document)
+    session.commit()
+
+    return document
+

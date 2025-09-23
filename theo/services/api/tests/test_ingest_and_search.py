@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+
 from fastapi.testclient import TestClient
 
 from theo.services.api.app.main import app
@@ -57,7 +60,9 @@ def test_ingest_and_search_roundtrip() -> None:
         assert document_payload["id"] == document_id
         assert document_payload["passages"], "Document should contain passages"
         first_passage = document_payload["passages"][0]
-        assert first_passage["meta"]["chunker_version"] == "0.2.0"
+        assert first_passage["meta"]["chunker_version"] == "0.3.0"
+        assert first_passage["meta"]["parser"] == "plain_text"
+
 
 
 def test_document_listing_and_paginated_passages() -> None:
@@ -102,3 +107,43 @@ This paragraph cites Romans 8:1 as well.
             params={"collection": "Gospels"},
         ).json()
         assert mentions_collection["total"] == mentions_all["total"]
+
+def test_pdf_ingestion_includes_page_numbers() -> None:
+    with TestClient(app) as client:
+        pdf_path = Path("fixtures/pdf/sample_article.pdf")
+        with pdf_path.open("rb") as handle:
+            response = client.post(
+                "/ingest/file",
+                files={"file": (pdf_path.name, handle, "application/pdf")},
+            )
+        assert response.status_code == 200
+        document_id = response.json()["document_id"]
+
+        doc_response = client.get(f"/documents/{document_id}")
+        assert doc_response.status_code == 200
+        payload = doc_response.json()
+        assert payload["source_type"] == "pdf"
+        assert any(passage["page_no"] == 1 for passage in payload["passages"])
+
+        verse_mentions = client.get("/verses/John.1.1/mentions").json()
+        assert verse_mentions["total"] >= 1
+
+
+def test_youtube_url_ingestion_uses_fixture_transcript() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/ingest/url",
+            json={"url": "https://www.youtube.com/watch?v=sample_video"},
+        )
+        assert response.status_code == 200, response.text
+        document_id = response.json()["document_id"]
+
+        document = client.get(f"/documents/{document_id}").json()
+        assert document["source_type"] == "youtube"
+        assert document["video_id"] == "sample_video"
+        assert document["channel"] == "Theo Channel"
+        assert any(passage["t_start"] is not None for passage in document["passages"])
+
+        search = client.get("/search", params={"osis": "John.1.1-5"}).json()
+        assert any(result["document_id"] == document_id for result in search["results"])
+

@@ -15,6 +15,13 @@ class DocumentIngestResponse(APIModel):
     status: str
 
 
+class UrlIngestRequest(APIModel):
+    url: str
+    source_type: str | None = None
+    frontmatter: dict[str, Any] | None = None
+
+
+
 class DocumentSummary(APIModel):
     id: str
     title: str | None = None

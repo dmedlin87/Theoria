@@ -11,8 +11,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
-from ..models.documents import DocumentIngestResponse
-from ..ingest.pipeline import UnsupportedSourceError, run_pipeline_for_file
+from ..models.documents import DocumentIngestResponse, UrlIngestRequest
+from ..ingest.pipeline import UnsupportedSourceError, run_pipeline_for_file, run_pipeline_for_url
+
 
 router = APIRouter()
 
@@ -57,5 +58,19 @@ async def ingest_file(
 
 
 @router.post("/url", response_model=DocumentIngestResponse)
-async def ingest_url() -> DocumentIngestResponse:
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="URL ingestion not implemented")
+async def ingest_url(
+    payload: UrlIngestRequest,
+    session: Session = Depends(get_session),
+) -> DocumentIngestResponse:
+    try:
+        document = run_pipeline_for_url(
+            session,
+            payload.url,
+            source_type=payload.source_type,
+            frontmatter=payload.frontmatter,
+        )
+    except UnsupportedSourceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return DocumentIngestResponse(document_id=document.id, status="processed")
+
