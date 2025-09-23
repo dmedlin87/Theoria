@@ -1,0 +1,52 @@
+"""Document schemas for API responses."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import ConfigDict, Field
+
+from .base import APIModel, Passage
+
+
+class DocumentIngestResponse(APIModel):
+    document_id: str
+    status: str
+
+
+class DocumentSummary(APIModel):
+    id: str
+    title: str | None = None
+    source_type: str | None = None
+    collection: str | None = None
+    authors: list[str] | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DocumentDetailResponse(DocumentSummary):
+    source_url: str | None = None
+    channel: str | None = None
+    video_id: str | None = None
+    duration_seconds: int | None = None
+    storage_path: str | None = None
+    metadata: dict[str, Any] | None = Field(default=None, alias="meta")
+    passages: list[Passage] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class DocumentListResponse(APIModel):
+    items: list[DocumentSummary]
+    total: int
+    limit: int
+    offset: int
+
+
+class DocumentPassagesResponse(APIModel):
+    document_id: str
+    passages: list[Passage]
+    total: int
+    limit: int
+    offset: int
