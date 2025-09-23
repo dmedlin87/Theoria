@@ -129,6 +129,11 @@ def combine_references(references: Sequence[NormalizedReference]) -> NormalizedR
         return references[0]
 
     verse_ids = sorted(set(verse_ids))
+
+    # Only combine references that form one continuous range.
+    for previous, current in zip(verse_ids, verse_ids[1:]):
+        if current != previous + 1:
+            return None
     start_ref = pb.convert_verse_ids_to_references([verse_ids[0]])[0]
     end_ref = pb.convert_verse_ids_to_references([verse_ids[-1]])[0]
     return NormalizedReference(
