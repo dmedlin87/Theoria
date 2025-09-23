@@ -1,0 +1,15 @@
+fastapi[all]==0.115.2
+uvicorn[standard]==0.30.6
+psycopg[binary]==3.1.18
+SQLAlchemy==2.0.31
+pgvector==0.3.3
+pydantic==2.7.4
+python-multipart==0.0.9
+celery==5.3.6
+redis==5.0.4
+pythonbible==0.13.1
+PyYAML==6.0.2
+click==8.1.7
+pdfminer.six==20231228
+webvtt-py==0.5.1
+youtube-transcript-api==0.6.2
