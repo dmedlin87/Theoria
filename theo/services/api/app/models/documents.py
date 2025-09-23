@@ -1,32 +1,37 @@
-from datetime import datetime
-from uuid import UUID, uuid4
+"""Document schemas for API responses."""
 
-from pydantic import BaseModel, Field
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import ConfigDict, Field
 
 from .base import APIModel, Passage
 
 
-class DocumentStatus(str):
-    RECEIVED = "received"
-    PROCESSING = "processing"
-    READY = "ready"
-    FAILED = "failed"
-
-
-class Document(APIModel):
-    document_id: UUID = Field(default_factory=uuid4)
-    title: str | None = None
-    source_type: str
-    status: str = DocumentStatus.RECEIVED
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    metadata: dict[str, str] | None = None
-
-
 class DocumentIngestResponse(APIModel):
-    document_id: UUID
+    document_id: str
     status: str
 
 
-class DocumentDetailResponse(Document):
-    passages: list[Passage] = []
+class DocumentSummary(APIModel):
+    id: str
+    title: str | None = None
+    source_type: str | None = None
+    collection: str | None = None
+    authors: list[str] | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DocumentDetailResponse(DocumentSummary):
+    source_url: str | None = None
+    channel: str | None = None
+    video_id: str | None = None
+    duration_seconds: int | None = None
+    storage_path: str | None = None
+    metadata: dict[str, Any] | None = Field(default=None, alias="meta")
+    passages: list[Passage] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True)

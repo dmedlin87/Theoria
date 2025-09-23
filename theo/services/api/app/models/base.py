@@ -1,22 +1,31 @@
-from datetime import datetime
-from uuid import UUID
+"""Shared Pydantic schemas used across API responses."""
 
-from pydantic import BaseModel, Field
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class APIModel(BaseModel):
-    """Base API schema with shared configuration."""
+    """Base schema configuration enabling ORM compatibility."""
 
-    class Config:
-        orm_mode = True
-        json_encoders = {datetime: lambda dt: dt.isoformat(), UUID: str}
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TimestampedModel(APIModel):
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime | None = Field(default=None)
 
 
 class Passage(APIModel):
-    id: UUID
-    document_id: UUID
-    osis_refs: list[str]
+    id: str
+    document_id: str
     text: str
-    source_anchor: str | None = Field(default=None, description="Page or timestamp anchor")
-    score: float | None = None
-    metadata: dict[str, str] | None = None
+    osis_ref: str | None = None
+    page_no: int | None = None
+    t_start: float | None = None
+    t_end: float | None = None
+    score: float | None = Field(default=None, description="Optional retrieval score")
+    meta: dict[str, Any] | None = None

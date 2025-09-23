@@ -1,5 +1,11 @@
-from fastapi import APIRouter
+"""Document endpoints."""
 
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from ..core.database import get_session
 from ..models.documents import DocumentDetailResponse
 from ..retriever.documents import get_document
 
@@ -7,7 +13,10 @@ router = APIRouter()
 
 
 @router.get("/{document_id}", response_model=DocumentDetailResponse)
-async def document_detail(document_id: str):
+def document_detail(document_id: str, session: Session = Depends(get_session)) -> DocumentDetailResponse:
     """Fetch a document with its metadata and passages."""
-    document = get_document(document_id)
-    return document
+
+    try:
+        return get_document(session, document_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

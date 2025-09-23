@@ -1,9 +1,14 @@
-"""Celery task queue definitions."""
+"""Celery tasks for asynchronous ingestion."""
+
+from __future__ import annotations
+
+from pathlib import Path
 
 from celery import Celery
-from fastapi import BackgroundTasks, UploadFile
+from sqlalchemy.orm import Session
 
-from ..models.documents import Document
+from ..core.database import get_engine
+from ..ingest.pipeline import run_pipeline_for_file
 
 celery = Celery(
     "theo-workers",
@@ -14,21 +19,13 @@ celery = Celery(
 
 @celery.task(name="tasks.process_file")
 def process_file(doc_id: str, path: str, frontmatter: dict | None = None) -> None:
-    """Placeholder pipeline entrypoint for file ingestion."""
+    """Process a file in the background via the ingestion pipeline."""
+
+    engine = get_engine()
+    with Session(engine) as session:
+        run_pipeline_for_file(session, Path(path), frontmatter)
 
 
 @celery.task(name="tasks.process_url")
 def process_url(doc_id: str, url: str, source_type: str | None = None) -> None:
-    """Placeholder pipeline entrypoint for URL ingestion."""
-
-
-def queue_file_ingest(background: BackgroundTasks, file: UploadFile) -> Document:
-    document = Document(source_type="upload")
-    background.add_task(process_file.delay, str(document.document_id), file.filename, None)
-    return document
-
-
-def queue_url_ingest(background: BackgroundTasks, url: str) -> Document:
-    document = Document(source_type="url")
-    background.add_task(process_url.delay, str(document.document_id), url, None)
-    return document
+    raise NotImplementedError("URL ingestion worker not yet implemented")

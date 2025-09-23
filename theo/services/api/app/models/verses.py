@@ -1,3 +1,7 @@
+"""Schemas for verse aggregation responses."""
+
+from __future__ import annotations
+
 from pydantic import Field
 
 from .base import APIModel, Passage
