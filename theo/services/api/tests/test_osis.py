@@ -15,3 +15,12 @@ def test_osis_intersection_logic() -> None:
     assert osis_intersects("John.1.1-5", "John.1.3")
     assert osis_intersects("John.1.1-5", "John.1.1-2")
     assert not osis_intersects("John.1.1", "John.2.1")
+
+
+def test_non_contiguous_references_do_not_merge() -> None:
+    text = "References to John 1:1 and John 1:3 are not contiguous."
+
+    detected = detect_osis_references(text)
+
+    assert detected.primary == "John.1.1"
+    assert detected.all == ["John.1.1", "John.1.3"]
