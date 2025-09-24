@@ -13,9 +13,6 @@ from ..core.settings import get_settings
 from .types import TSVectorType, VectorType
 
 
-settings = get_settings()
-
-
 class Document(Base):
     """Source artifact ingested into the system."""
 
@@ -72,7 +69,7 @@ class Passage(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     embedding: Mapped[list[float] | None] = mapped_column(
-        VectorType(settings.embedding_dim), nullable=True
+        VectorType(get_settings().embedding_dim), nullable=True
     )
     lexeme: Mapped[str | None] = mapped_column(TSVectorType(), nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)

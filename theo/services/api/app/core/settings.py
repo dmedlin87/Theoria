@@ -36,8 +36,4 @@ def get_settings() -> Settings:
         if candidate.exists():
             settings.fixtures_root = candidate
 
-    settings.storage_root.mkdir(parents=True, exist_ok=True)
     return settings
-
-
-settings = get_settings()
