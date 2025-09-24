@@ -20,6 +20,9 @@ class HybridSearchRequest(APIModel):
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     k: int = 10
+    cursor: str | None = None
+    limit: int | None = None
+    mode: str = Field(default="results", description="Search export mode (results or mentions)")
 
 
 class HybridSearchResult(Passage):

@@ -43,6 +43,7 @@ class DocumentDetailResponse(DocumentSummary):
     abstract: str | None = None
     topics: dict[str, Any] | list[str] | None = None
     enrichment_version: int | None = None
+    primary_topic: str | None = None
     metadata: dict[str, Any] | None = Field(default=None, alias="meta")
     passages: list[Passage] = Field(default_factory=list)
 

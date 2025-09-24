@@ -3,16 +3,26 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Iterator
+from pathlib import Path
+from typing import Iterator, Sequence
 
 import click
 from sqlalchemy.orm import Session
 
 from ..api.app.core.database import get_engine
-from ..api.app.models.export import DocumentExportFilters
+from ..api.app.export.formatters import (
+    build_document_export,
+    build_search_export,
+    generate_export_id,
+    render_bundle,
+)
+from ..api.app.models.export import DocumentExportFilters, ExportManifest
 from ..api.app.models.search import HybridSearchFilters, HybridSearchRequest
 from ..api.app.retriever.export import export_documents, export_search_results
+
+STATE_DIR = Path(".export_state")
 
 
 @contextmanager
@@ -22,15 +32,59 @@ def _session_scope() -> Iterator[Session]:
         yield session
 
 
-def _write_json(obj: object, file) -> None:
-    json.dump(obj, file, indent=2, ensure_ascii=False)
-    file.write("\n")
+def _parse_fields(fields: str | None) -> set[str] | None:
+    if not fields:
+        return None
+    parsed = {item.strip() for item in fields.split(",") if item.strip()}
+    return parsed or None
 
 
-def _write_ndjson(records: list[dict[str, object]], file) -> None:
+def _state_path(export_id: str) -> Path:
+    return STATE_DIR / f"{export_id}.json"
+
+
+def _load_saved_cursor(export_id: str) -> str | None:
+    path = _state_path(export_id)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text("utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return data.get("next_cursor")
+
+
+def _persist_state(manifest: ExportManifest) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    path = _state_path(manifest.export_id)
+    with path.open("w", encoding="utf-8") as fh:
+        json.dump(manifest.model_dump(mode="json"), fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+
+
+def _flatten_passages(records: Sequence[OrderedDict[str, object]]) -> list[OrderedDict[str, object]]:
+    flattened: list[OrderedDict[str, object]] = []
     for record in records:
-        file.write(json.dumps(record, ensure_ascii=False))
-        file.write("\n")
+        passages = record.get("passages") if isinstance(record, dict) else None
+        if not passages:
+            continue
+        for passage in passages:
+            entry = OrderedDict()
+            entry["kind"] = "passage"
+            entry["document_id"] = record.get("document_id")
+            entry["title"] = record.get("title")
+            entry["collection"] = record.get("collection")
+            entry["source_type"] = record.get("source_type")
+            entry["passage_id"] = passage.get("id")
+            entry["osis_ref"] = passage.get("osis_ref")
+            entry["page_no"] = passage.get("page_no")
+            entry["t_start"] = passage.get("t_start")
+            entry["t_end"] = passage.get("t_end")
+            if "text" in passage:
+                entry["text"] = passage.get("text")
+            entry["meta"] = passage.get("meta")
+            flattened.append(entry)
+    return flattened
 
 
 @click.group()
@@ -44,16 +98,43 @@ def export() -> None:
 @click.option("--collection", type=str, default=None, help="Filter results to a collection.")
 @click.option("--author", type=str, default=None, help="Filter results by author.")
 @click.option("--source-type", type=str, default=None, help="Restrict to a source type.")
-@click.option("--limit", "k", type=click.IntRange(1, 1000), default=100, show_default=True, help="Number of results to export.")
+@click.option("--limit", type=click.IntRange(1, 1000), default=100, show_default=True, help="Number of results to export.")
+@click.option("--cursor", type=str, default=None, help="Resume from this passage identifier.")
+@click.option("--fields", type=str, default=None, help="Comma separated list of fields to include.")
+@click.option(
+    "--include-text/--no-include-text",
+    default=False,
+    show_default=True,
+    help="Include full passage text in each result row.",
+)
+@click.option(
+    "--mode",
+    type=click.Choice(["results", "mentions"], case_sensitive=False),
+    default="results",
+    show_default=True,
+    help="Export regular results or verse mentions.",
+)
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["json", "ndjson"], case_sensitive=False),
-    default="json",
+    type=click.Choice(["json", "ndjson", "csv"], case_sensitive=False),
+    default="ndjson",
     show_default=True,
     help="Output format.",
 )
-@click.option("--output", type=click.File("w", encoding="utf-8"), default="-", help="File to write to (defaults to stdout).")
+@click.option("--export-id", type=str, default=None, help="Identifier for resumable exports.")
+@click.option(
+    "--metadata-only/--no-metadata-only",
+    default=False,
+    show_default=True,
+    help="Write only the manifest without any result rows.",
+)
+@click.option(
+    "--output",
+    type=click.File("w", encoding="utf-8"),
+    default="-",
+    help="File to write to (defaults to stdout).",
+)
 def export_search_command(
     *,
     q: str | None,
@@ -61,36 +142,55 @@ def export_search_command(
     collection: str | None,
     author: str | None,
     source_type: str | None,
-    k: int,
+    limit: int,
+    cursor: str | None,
+    fields: str | None,
+    include_text: bool,
+    mode: str,
     output_format: str,
+    export_id: str | None,
+    metadata_only: bool,
     output,
 ) -> None:
     """Export search results with their document metadata."""
 
+    if mode.lower() == "mentions" and not osis:
+        raise click.ClickException("mode=mentions requires an --osis argument")
+
+    export_identifier = export_id or generate_export_id()
+    if cursor is None and export_identifier:
+        saved_cursor = _load_saved_cursor(export_identifier)
+        if saved_cursor:
+            cursor = saved_cursor
+
     request = HybridSearchRequest(
         query=q,
         osis=osis,
-        k=k,
+        k=limit,
+        limit=limit,
+        cursor=cursor,
+        mode=mode.lower(),
         filters=HybridSearchFilters(collection=collection, author=author, source_type=source_type),
     )
     with _session_scope() as session:
         response = export_search_results(session, request)
 
-    payload = response.model_dump(mode="json")
-    if output_format.lower() == "json":
-        _write_json(payload, output)
-    else:
-        header = {
-            "kind": "metadata",
-            "query": response.query,
-            "osis": response.osis,
-            "filters": response.filters.model_dump(mode="json"),
-            "total_results": response.total_results,
-        }
-        rows = [header]
-        for row in response.results:
-            rows.append({"kind": "result", **row.model_dump(mode="json")})
-        _write_ndjson(rows, output)
+    manifest, records = build_search_export(
+        response,
+        include_text=include_text,
+        fields=_parse_fields(fields),
+        export_id=export_identifier,
+    )
+
+    if metadata_only:
+        records = []
+        manifest.totals["returned"] = 0
+
+    body, _ = render_bundle(manifest, records, output_format=output_format)
+    output.write(body)
+    if not body.endswith("\n"):
+        output.write("\n")
+    _persist_state(manifest)
 
 
 @export.command("documents")
@@ -105,14 +205,40 @@ def export_search_command(
     help="Include passages for each document.",
 )
 @click.option(
+    "--include-text/--no-include-text",
+    default=False,
+    show_default=True,
+    help="Include passage text when passages are exported.",
+)
+@click.option("--cursor", type=str, default=None, help="Resume from this document identifier.")
+@click.option("--fields", type=str, default=None, help="Comma separated list of fields to include.")
+@click.option(
     "--format",
     "output_format",
     type=click.Choice(["json", "ndjson"], case_sensitive=False),
-    default="json",
+    default="ndjson",
     show_default=True,
     help="Output format.",
 )
-@click.option("--output", type=click.File("w", encoding="utf-8"), default="-", help="File to write to (defaults to stdout).")
+@click.option("--export-id", type=str, default=None, help="Identifier for resumable exports.")
+@click.option(
+    "--metadata-only/--no-metadata-only",
+    default=False,
+    show_default=True,
+    help="Export only document metadata (no passages).",
+)
+@click.option(
+    "--passages-only/--no-passages-only",
+    default=False,
+    show_default=True,
+    help="Emit only passage rows for each document.",
+)
+@click.option(
+    "--output",
+    type=click.File("w", encoding="utf-8"),
+    default="-",
+    help="File to write to (defaults to stdout).",
+)
 def export_documents_command(
     *,
     collection: str | None,
@@ -120,33 +246,54 @@ def export_documents_command(
     source_type: str | None,
     limit: int | None,
     include_passages: bool,
+    include_text: bool,
+    cursor: str | None,
+    fields: str | None,
     output_format: str,
+    export_id: str | None,
+    metadata_only: bool,
+    passages_only: bool,
     output,
 ) -> None:
     """Export documents and optionally their passages."""
 
+    if metadata_only:
+        include_passages = False
+    if passages_only and not include_passages:
+        raise click.ClickException("--passages-only requires passages to be included")
+    export_identifier = export_id or generate_export_id()
+    if cursor is None and export_identifier:
+        saved_cursor = _load_saved_cursor(export_identifier)
+        if saved_cursor:
+            cursor = saved_cursor
+
     filters = DocumentExportFilters(collection=collection, author=author, source_type=source_type)
     with _session_scope() as session:
-        response = export_documents(session, filters, include_passages=include_passages, limit=limit)
+        response = export_documents(
+            session,
+            filters,
+            include_passages=include_passages,
+            limit=limit,
+            cursor=cursor,
+        )
 
-    payload = response.model_dump(mode="json")
-    if output_format.lower() == "json":
-        _write_json(payload, output)
-    else:
-        header = {
-            "kind": "metadata",
-            "filters": response.filters.model_dump(mode="json"),
-            "include_passages": response.include_passages,
-            "limit": response.limit,
-            "total_documents": response.total_documents,
-            "total_passages": response.total_passages,
-        }
-        rows = [header]
-        for document in response.documents:
-            rows.append({"kind": "document", **document.model_dump(mode="json")})
-        _write_ndjson(rows, output)
+    manifest, records = build_document_export(
+        response,
+        include_passages=include_passages,
+        include_text=include_text,
+        fields=_parse_fields(fields),
+        export_id=export_identifier,
+    )
+
+    if passages_only:
+        records = _flatten_passages(records)
+
+    body, _ = render_bundle(manifest, records, output_format=output_format)
+    output.write(body)
+    if not body.endswith("\n"):
+        output.write("\n")
+    _persist_state(manifest)
 
 
 if __name__ == "__main__":
     export()
-
