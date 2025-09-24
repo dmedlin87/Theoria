@@ -49,3 +49,33 @@ Queue files for background processing instead of running the API synchronously:
 ```bash
 python -m theo.services.cli.ingest_folder ./archive --mode worker
 ```
+
+## Export utilities
+
+Bulk exports are available via `theo.services.cli.export_data`.
+
+### Search exports
+
+Run a hybrid search and save the results to an NDJSON file:
+
+```bash
+python -m theo.services.cli.export_data search \
+  --query "forgiveness" \
+  --collection sermons \
+  --format ndjson \
+  --output search-results.ndjson
+```
+
+### Document exports
+
+Fetch all documents in the `sermons` collection, including passages, and write
+them to JSON:
+
+```bash
+python -m theo.services.cli.export_data documents \
+  --collection sermons \
+  --output sermons.json
+```
+
+Pass `--no-include-passages` to export metadata only, or `--limit N` to cap the
+number of returned documents.

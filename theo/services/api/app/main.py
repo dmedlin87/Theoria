@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .core.database import Base, get_engine
-from .routes import documents, ingest, jobs, search, verses
+from .routes import documents, export, ingest, jobs, search, verses
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
     app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
     app.include_router(search.router, prefix="/search", tags=["search"])
+    app.include_router(export.router, prefix="/export", tags=["export"])
     app.include_router(verses.router, prefix="/verses", tags=["verses"])
     app.include_router(documents.router, prefix="/documents", tags=["documents"])
 

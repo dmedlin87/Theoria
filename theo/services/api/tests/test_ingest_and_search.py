@@ -158,6 +158,41 @@ def test_hybrid_search_combines_keyword_and_osis_filters() -> None:
         )
         assert any(result["document_id"] == document_id for result in results)
 
+
+def test_export_endpoints_return_bulk_payloads() -> None:
+    with TestClient(app) as client:
+        document_id = _ingest_markdown(client, suffix="Additional passage content for export testing.")
+
+        search_export = client.get("/export/search", params={"q": "Word", "k": 5})
+        assert search_export.status_code == 200, search_export.text
+        search_payload = search_export.json()
+        assert search_payload["results"], "Expected exported search results"
+        first_row = search_payload["results"][0]
+        assert "document" in first_row
+        assert first_row["document"]["id"]
+        assert first_row["passage"]["text"].strip()
+
+        docs_export = client.get(
+            "/export/documents",
+            params={"collection": "Gospels", "limit": 10},
+        )
+        assert docs_export.status_code == 200, docs_export.text
+        docs_payload = docs_export.json()
+        assert docs_payload["documents"], "Expected exported documents"
+        exported_ids = {doc["id"] for doc in docs_payload["documents"]}
+        assert document_id in exported_ids
+        exported_doc = next(doc for doc in docs_payload["documents"] if doc["id"] == document_id)
+        assert exported_doc["passages"], "Passages should be included by default"
+
+        docs_without_passages = client.get(
+            "/export/documents",
+            params={"collection": "Gospels", "include_passages": "false"},
+        )
+        assert docs_without_passages.status_code == 200
+        payload_without = docs_without_passages.json()
+        assert payload_without["total_passages"] == 0
+        assert all(not doc["passages"] for doc in payload_without["documents"])
+
 def test_document_listing_and_paginated_passages() -> None:
     with TestClient(app) as client:
         doc_id = _ingest_markdown(client, suffix="Unique content about Psalms 23:1.")
