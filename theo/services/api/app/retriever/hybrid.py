@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import heapq
 from typing import Iterable
 
 from sqlalchemy import func, literal, select
@@ -63,11 +64,22 @@ def _apply_common_filters(stmt, request: HybridSearchRequest):
 
 def _fallback_search(session: Session, request: HybridSearchRequest) -> list[HybridSearchResult]:
     query_tokens = _tokenise(request.query or "")
-    stmt = session.query(Passage, Document).join(Document)
-    candidates: list[tuple[Passage, Document]] = list(stmt)
 
-    results: list[tuple[HybridSearchResult, float]] = []
-    for passage, document in candidates:
+    stmt = select(Passage, Document).join(Document)
+    stmt = _apply_common_filters(stmt, request)
+    if request.query:
+        stmt = stmt.where(Passage.text.ilike(f"%{request.query}%"))
+    if request.osis:
+        stmt = stmt.where(Passage.osis_ref.isnot(None))
+
+    limit = max(request.k * 10, 100)
+    stmt = stmt.limit(limit)
+
+    rows = session.execute(stmt).all()
+
+    heap: list[tuple[float, int, HybridSearchResult]] = []
+    counter = 0
+    for passage, document in rows:
         if not _passes_author_filter(document, request.filters.author):
             continue
 
@@ -103,12 +115,15 @@ def _fallback_search(session: Session, request: HybridSearchRequest) -> list[Hyb
             rank=0,
             highlights=None,
         )
-        results.append((result, score))
 
-    results.sort(key=lambda item: item[1], reverse=True)
-    limited = results[: request.k]
+        heapq.heappush(heap, (score, counter, result))
+        if len(heap) > limit:
+            heapq.heappop(heap)
+        counter += 1
+
+    sorted_results = sorted(heap, key=lambda item: item[0], reverse=True)[: request.k]
     final: list[HybridSearchResult] = []
-    for idx, (result, score) in enumerate(limited, start=1):
+    for idx, (score, _counter, result) in enumerate(sorted_results, start=1):
         result.rank = idx
         result.score = score
         final.append(result)

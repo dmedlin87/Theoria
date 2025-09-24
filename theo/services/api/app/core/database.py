@@ -65,7 +65,3 @@ def get_session() -> Generator[Session, None, None]:
     finally:
         session.close()
 
-
-# Ensure the engine is created when the module is imported so that metadata operations
-# (e.g., Base.metadata.create_all) work during application startup.
-get_engine()

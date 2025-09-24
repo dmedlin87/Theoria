@@ -24,6 +24,7 @@ from ..db.models import Document, Passage
 
 from .chunking import Chunk, chunk_text, chunk_transcript
 
+from .embeddings import get_embedding_service, lexical_representation
 from .osis import DetectedOsis, detect_osis_references
 from .parsers import (
     ParserResult,
@@ -535,9 +536,160 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     if parser_result is None:
         raise UnsupportedSourceError(f"Unable to parse source type {source_type}")
 
-    chunks = parser_result.chunks
-    parser = parser_result.parser
-    parser_version = parser_result.parser_version
+    if source_type == "transcript":
+        return _persist_transcript_document(
+            session,
+            chunks=parser_result.chunks,
+            parser=parser_result.parser,
+            parser_version=parser_result.parser_version,
+            frontmatter=frontmatter,
+            settings=settings,
+            sha256=sha256,
+            source_type="transcript",
+            title=frontmatter.get("title") or path.stem,
+            source_url=frontmatter.get("source_url"),
+            transcript_path=path,
+        )
+
+    return _persist_text_document(
+        session,
+        chunks=parser_result.chunks,
+        parser=parser_result.parser,
+        parser_version=parser_result.parser_version,
+        frontmatter=frontmatter,
+        settings=settings,
+        sha256=sha256,
+        source_type=source_type,
+        title=frontmatter.get("title") or path.stem,
+        source_url=frontmatter.get("source_url"),
+        text_content=text_content,
+        original_path=path,
+    )
+
+
+def _persist_text_document(
+    session: Session,
+    *,
+    chunks: list[Chunk],
+    parser: str,
+    parser_version: str,
+    frontmatter: dict[str, Any],
+    settings,
+    sha256: str,
+    source_type: str,
+    title: str | None,
+    source_url: str | None,
+    text_content: str,
+    original_path: Path | None = None,
+    raw_content: str | None = None,
+    raw_filename: str | None = None,
+) -> Document:
+    document = Document(
+        id=str(uuid4()),
+        title=title or frontmatter.get("title") or "Document",
+        authors=_ensure_list(frontmatter.get("authors")),
+        doi=frontmatter.get("doi"),
+        source_url=source_url or frontmatter.get("source_url"),
+        source_type=source_type,
+        collection=frontmatter.get("collection"),
+        pub_date=_coerce_date(frontmatter.get("date")),
+        year=_coerce_int(frontmatter.get("year") or frontmatter.get("pub_year")),
+        venue=frontmatter.get("venue"),
+        abstract=frontmatter.get("abstract"),
+        topics=_normalise_topics_field(
+            frontmatter.get("topics"),
+            frontmatter.get("concepts"),
+        ),
+        channel=frontmatter.get("channel"),
+        video_id=frontmatter.get("video_id"),
+        duration_seconds=_coerce_int(frontmatter.get("duration_seconds")),
+        bib_json=frontmatter.get("bib_json"),
+        sha256=sha256,
+    )
+
+    session.add(document)
+    session.flush()
+
+    chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
+    embedding_service = get_embedding_service()
+    embeddings = embedding_service.embed([chunk.text for chunk in chunks])
+
+    passages: list[Passage] = []
+    for idx, chunk in enumerate(chunks):
+        detected = detect_osis_references(chunk.text)
+        meta = _normalise_passage_meta(
+            detected,
+            chunk_hints,
+            parser=parser,
+            parser_version=parser_version,
+            chunker_version="0.3.0",
+            chunk_index=chunk.index or 0,
+            speakers=chunk.speakers,
+        )
+        osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
+        embedding = embeddings[idx] if idx < len(embeddings) else None
+        passage = Passage(
+            document_id=document.id,
+            page_no=chunk.page_no,
+            t_start=chunk.t_start,
+            t_end=chunk.t_end,
+            start_char=chunk.start_char,
+            end_char=chunk.end_char,
+            text=chunk.text,
+            tokens=len(chunk.text.split()),
+            osis_ref=osis_value,
+            embedding=embedding,
+            lexeme=lexical_representation(session, chunk.text),
+            meta=meta,
+        )
+        session.add(passage)
+        passages.append(passage)
+
+    session.commit()
+
+    storage_dir = settings.storage_root / document.id
+    storage_dir.mkdir(parents=True, exist_ok=True)
+
+    if original_path and original_path.exists():
+        dest_path = storage_dir / original_path.name
+        shutil.copy(original_path, dest_path)
+
+    (storage_dir / "content.txt").write_text(text_content, encoding="utf-8")
+
+    if raw_content is not None:
+        raw_name = raw_filename or "source.html"
+        (storage_dir / raw_name).write_text(raw_content, encoding="utf-8")
+
+    normalized_payload = {
+        "document": {
+            "id": document.id,
+            "title": document.title,
+            "source_type": document.source_type,
+            "source_url": document.source_url,
+            "sha256": document.sha256,
+        },
+        "passages": [
+            {
+                "id": passage.id,
+                "text": passage.text,
+                "osis_ref": passage.osis_ref,
+                "page_no": passage.page_no,
+                "t_start": passage.t_start,
+                "t_end": passage.t_end,
+                "meta": passage.meta,
+            }
+            for passage in passages
+        ],
+    }
+
+    normalized_path = storage_dir / "normalized.json"
+    normalized_path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
+
+    document.storage_path = str(storage_dir)
+    session.add(document)
+    session.commit()
+
+    return document
 
 
 def _persist_transcript_document(
@@ -701,120 +853,34 @@ def run_pipeline_for_url(
     if resolved_source_type == "youtube":
         video_id = _extract_youtube_video_id(url)
         metadata = _load_youtube_metadata(settings, video_id)
-        frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+        merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
 
         segments, transcript_path = _load_youtube_transcript(settings, video_id)
-        chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
-
-        sha_payload = "\n".join(chunk.text for chunk in chunks).encode("utf-8")
+        parser_result = _prepare_transcript_chunks(segments, settings=settings)
+        sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
         sha256 = hashlib.sha256(sha_payload).hexdigest()
 
-        document = Document(
-            id=str(uuid4()),
-            title=frontmatter.get("title") or f"YouTube Video {video_id}",
-            authors=_ensure_list(frontmatter.get("authors")),
-            doi=frontmatter.get("doi"),
-            source_url=frontmatter.get("source_url") or url,
-            source_type="youtube",
-            collection=frontmatter.get("collection"),
-            pub_date=_coerce_date(frontmatter.get("date")),
-            year=_coerce_int(frontmatter.get("year") or frontmatter.get("pub_year")),
-            venue=frontmatter.get("venue"),
-            abstract=frontmatter.get("abstract"),
-        topics=_normalise_topics_field(
-            frontmatter.get("topics"),
-            frontmatter.get("concepts"),
-        ),
-            channel=frontmatter.get("channel"),
-            video_id=video_id,
-            duration_seconds=frontmatter.get("duration_seconds"),
-            bib_json=frontmatter.get("bib_json"),
+        return _persist_transcript_document(
+            session,
+            chunks=parser_result.chunks,
+            parser=parser_result.parser,
+            parser_version=parser_result.parser_version,
+            frontmatter=merged_frontmatter,
+            settings=settings,
             sha256=sha256,
+            source_type="youtube",
+            title=
+                merged_frontmatter.get("title")
+                or metadata.get("title")
+                or f"YouTube Video {video_id}",
+            source_url=merged_frontmatter.get("source_url") or url,
+            channel=merged_frontmatter.get("channel") or metadata.get("channel"),
+            video_id=video_id,
+            duration_seconds=
+                merged_frontmatter.get("duration_seconds")
+                or metadata.get("duration_seconds"),
+            transcript_path=transcript_path,
         )
-
-        session.add(document)
-        session.flush()
-
-        chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
-        passages: list[Passage] = []
-        for chunk in chunks:
-            detected = detect_osis_references(chunk.text)
-            meta = _normalise_passage_meta(
-                detected,
-                chunk_hints,
-                parser=parser,
-                parser_version=parser_version,
-                chunker_version="0.3.0",
-                chunk_index=chunk.index or 0,
-                speakers=chunk.speakers,
-            )
-            osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
-            passage = Passage(
-                document_id=document.id,
-                t_start=chunk.t_start,
-                t_end=chunk.t_end,
-                start_char=chunk.start_char,
-                end_char=chunk.end_char,
-                text=chunk.text,
-                tokens=len(chunk.text.split()),
-                osis_ref=osis_value,
-                lexeme=chunk.text.lower(),
-                meta=meta,
-            )
-            session.add(passage)
-            passages.append(passage)
-
-        session.commit()
-
-        storage_dir = settings.storage_root / document.id
-        storage_dir.mkdir(parents=True, exist_ok=True)
-        normalized_payload = {
-            "document": {
-                "id": document.id,
-                "title": document.title,
-                "source_type": document.source_type,
-                "channel": document.channel,
-                "video_id": document.video_id,
-                "sha256": document.sha256,
-            },
-            "passages": [
-                {
-                    "id": passage.id,
-                    "text": passage.text,
-                    "osis_ref": passage.osis_ref,
-                    "t_start": passage.t_start,
-                    "t_end": passage.t_end,
-                    "meta": passage.meta,
-                }
-                for passage in passages
-            ],
-        }
-
-        if transcript_path and transcript_path.exists():
-            dest = storage_dir / transcript_path.name
-            shutil.copy(transcript_path, dest)
-        else:
-            transcript_json = [
-                {
-                    "text": passage.text,
-                    "start": passage.t_start,
-                    "end": passage.t_end,
-                    "speakers": passage.meta.get("speakers") if passage.meta else None,
-                }
-                for passage in passages
-            ]
-            (storage_dir / "transcript.json").write_text(
-                json.dumps(transcript_json, indent=2), encoding="utf-8"
-            )
-
-        normalized_path = storage_dir / "normalized.json"
-        normalized_path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
-
-        document.storage_path = str(storage_dir)
-        session.add(document)
-        session.commit()
-
-        return document
 
     if resolved_source_type not in {"web_page", "html", "website"}:
         raise UnsupportedSourceError(
@@ -826,113 +892,28 @@ def run_pipeline_for_url(
     if not text_content:
         raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
 
-    frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
-
-    chunks, parser, parser_version = _prepare_text_chunks(text_content, settings=settings)
-    sha_payload = "\n".join(chunk.text for chunk in chunks).encode("utf-8")
-
+    merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+    parser_result = _prepare_text_chunks(text_content, settings=settings)
+    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
     sha256 = hashlib.sha256(sha_payload).hexdigest()
 
-
-    document = Document(
-        id=str(uuid4()),
-        title=frontmatter.get("title") or metadata.get("title") or url,
-        authors=_ensure_list(frontmatter.get("authors")),
-        doi=frontmatter.get("doi"),
-        source_url=frontmatter.get("source_url") or metadata.get("canonical_url") or url,
-        source_type="web_page",
-        collection=frontmatter.get("collection"),
-        pub_date=_coerce_date(frontmatter.get("date")),
-        year=_coerce_int(frontmatter.get("year") or frontmatter.get("pub_year")),
-        venue=frontmatter.get("venue"),
-        abstract=frontmatter.get("abstract"),
-        topics=_normalise_topics_field(
-            frontmatter.get("topics"),
-            frontmatter.get("concepts"),
-        ),
-        channel=frontmatter.get("channel"),
-        duration_seconds=frontmatter.get("duration_seconds"),
-        bib_json=frontmatter.get("bib_json"),
+    return _persist_text_document(
+        session,
+        chunks=parser_result.chunks,
+        parser=parser_result.parser,
+        parser_version=parser_result.parser_version,
+        frontmatter=merged_frontmatter,
+        settings=settings,
         sha256=sha256,
+        source_type="web_page",
+        title=merged_frontmatter.get("title") or metadata.get("title") or url,
+        source_url=merged_frontmatter.get("source_url")
+        or metadata.get("canonical_url")
+        or url,
+        text_content=parser_result.text,
+        raw_content=html,
+        raw_filename="source.html",
     )
-
-    session.add(document)
-    session.flush()
-
-    chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
-    embedding_service = get_embedding_service()
-    embeddings = embedding_service.embed([chunk.text for chunk in chunks])
-
-    passages: list[Passage] = []
-    for chunk in parser_result.chunks:
-
-        detected = detect_osis_references(chunk.text)
-        meta = _normalise_passage_meta(
-            detected,
-            chunk_hints,
-            parser=parser_result.parser,
-            parser_version=parser_result.parser_version,
-            chunker_version="0.3.0",
-            chunk_index=chunk.index or 0,
-        )
-        osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
-        embedding = embeddings[idx] if idx < len(embeddings) else None
-        passage = Passage(
-            document_id=document.id,
-            page_no=chunk.page_no,
-            t_start=chunk.t_start,
-            t_end=chunk.t_end,
-            start_char=chunk.start_char,
-            end_char=chunk.end_char,
-            text=chunk.text,
-            tokens=len(chunk.text.split()),
-            osis_ref=osis_value,
-            embedding=embedding,
-            lexeme=lexical_representation(session, chunk.text),
-            meta=meta,
-        )
-        session.add(passage)
-        passages.append(passage)
-
-    session.commit()
-
-    storage_dir = settings.storage_root / document.id
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    dest_path = storage_dir / path.name
-    shutil.copy(path, dest_path)
-
-    normalized_payload = {
-        "document": {
-            "id": document.id,
-            "title": document.title,
-            "source_type": document.source_type,
-            "source_url": document.source_url,
-            "sha256": document.sha256,
-        },
-        "passages": [
-            {
-                "id": passage.id,
-                "text": passage.text,
-                "osis_ref": passage.osis_ref,
-
-                "page_no": passage.page_no,
-                "t_start": passage.t_start,
-                "t_end": passage.t_end,
-                "meta": passage.meta,
-            }
-            for passage in passages
-        ],
-    }
-
-    (storage_dir / "content.txt").write_text(text_content, encoding="utf-8")
-    normalized_path = storage_dir / "normalized.json"
-    normalized_path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
-
-    document.storage_path = str(storage_dir)
-    session.add(document)
-    session.commit()
-
-    return document
 
 
 def run_pipeline_for_transcript(
@@ -975,42 +956,3 @@ def run_pipeline_for_transcript(
     )
 
 
-def run_pipeline_for_url(
-    session: Session,
-    url: str,
-    source_type: str | None = None,
-    frontmatter: dict[str, Any] | None = None,
-) -> Document:
-    """Ingest supported URLs (currently YouTube) into the document store."""
-
-    settings = get_settings()
-    resolved_source_type = source_type or "youtube"
-    if resolved_source_type != "youtube":
-        raise UnsupportedSourceError(f"Unsupported source type for URL ingestion: {resolved_source_type}")
-
-    video_id = _extract_youtube_video_id(url)
-    metadata = _load_youtube_metadata(settings, video_id)
-    frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
-
-    segments, transcript_path = _load_youtube_transcript(settings, video_id)
-    chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
-
-    sha_payload = "\n".join(chunk.text for chunk in chunks).encode("utf-8")
-    sha256 = hashlib.sha256(sha_payload).hexdigest()
-
-    return _persist_transcript_document(
-        session,
-        chunks=chunks,
-        parser=parser,
-        parser_version=parser_version,
-        frontmatter=frontmatter,
-        settings=settings,
-        sha256=sha256,
-        source_type="youtube",
-        title=frontmatter.get("title") or f"YouTube Video {video_id}",
-        source_url=url,
-        channel=frontmatter.get("channel"),
-        video_id=video_id,
-        duration_seconds=frontmatter.get("duration_seconds"),
-        transcript_path=transcript_path,
-    )
