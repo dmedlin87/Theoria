@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import "./globals.css";
 
@@ -6,14 +7,38 @@ export const metadata = {
   description: "Research engine for theology",
 };
 
+const NAV_LINKS = [
+  { href: "/search", label: "Search" },
+  { href: "/upload", label: "Upload" },
+  { href: "/verse/John.1.1", label: "Verse explorer" },
+];
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <header>
-          <h1>Theo Engine</h1>
+      <body className="app-shell">
+        <header className="site-header">
+          <div className="container site-header__content">
+            <Link href="/" className="brand">
+              Theo Engine
+            </Link>
+            <nav className="site-nav" aria-label="Primary">
+              {NAV_LINKS.map((item) => (
+                <Link key={item.href} href={item.href} className="nav-link">
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
         </header>
-        <main>{children}</main>
+        <main className="site-main">
+          <div className="container">{children}</div>
+        </main>
+        <footer className="site-footer">
+          <div className="container">
+            <p>Built to help researchers explore theological corpora faster.</p>
+          </div>
+        </footer>
       </body>
     </html>
   );
