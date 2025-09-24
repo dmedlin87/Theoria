@@ -226,3 +226,81 @@ and `offset` parameters as the document list endpoint and responds with
   "offset": 0
 }
 ```
+
+## Export
+
+Export endpoints provide bulk-friendly payloads that combine metadata and
+content for downstream workflows.
+
+### `GET /export/search`
+
+Runs the hybrid search pipeline and returns up to 1,000 ranked passages as an
+export payload. Query parameters mirror `/search` with an additional `k`
+parameter (default 100) controlling the number of rows.
+
+Response:
+
+```json
+{
+  "query": "grace",
+  "osis": null,
+  "filters": {
+    "collection": "sermons",
+    "author": null,
+    "source_type": null
+  },
+  "total_results": 2,
+  "results": [
+    {
+      "rank": 1,
+      "score": 0.91,
+      "passage": {
+        "id": "passage-1",
+        "document_id": "doc-1",
+        "text": "..."
+      },
+      "document": {
+        "id": "doc-1",
+        "title": "Sermon on Grace",
+        "collection": "sermons",
+        "authors": ["Jane Pastor"],
+        "source_type": "markdown"
+      }
+    }
+  ]
+}
+```
+
+### `GET /export/documents`
+
+Returns documents that match optional `collection`, `author`, or `source_type`
+filters. Set `include_passages=false` to omit passage payloads and use `limit`
+to cap the number of returned documents (default is unlimited, maximum 1,000).
+
+Response:
+
+```json
+{
+  "filters": {
+    "collection": "sermons",
+    "author": null,
+    "source_type": null
+  },
+  "include_passages": true,
+  "limit": null,
+  "total_documents": 1,
+  "total_passages": 12,
+  "documents": [
+    {
+      "id": "doc-1",
+      "title": "Sermon on Grace",
+      "collection": "sermons",
+      "source_type": "markdown",
+      "authors": ["Jane Pastor"],
+      "passages": [
+        { "id": "passage-1", "text": "..." }
+      ]
+    }
+  ]
+}
+```
