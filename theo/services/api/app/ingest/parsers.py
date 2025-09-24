@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import re
+import wave
+import zipfile
+from dataclasses import dataclass, field
+from html.parser import HTMLParser
+from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, TYPE_CHECKING
+from xml.etree import ElementTree as ET
 
 
 from pdfminer.high_level import extract_text
 import webvtt
+
+if TYPE_CHECKING:  # pragma: no cover - import-cycle guard
+    from .chunking import Chunk
 
 
 @dataclass(slots=True)
@@ -24,6 +33,17 @@ class TranscriptSegment:
     start: float
     end: float
     speaker: str | None = None
+
+
+@dataclass(slots=True)
+class ParserResult:
+    """Normalized parser output consumed by the pipeline."""
+
+    text: str
+    chunks: list["Chunk"]
+    parser: str
+    parser_version: str
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def read_text_file(path: Path) -> str:
@@ -128,3 +148,336 @@ def load_transcript(path: Path) -> list[TranscriptSegment]:
     if suffix == ".json":
         return parse_transcript_json(path)
     raise ValueError(f"Unsupported transcript format: {suffix}")
+
+
+def _package_version(distribution: str, fallback: str) -> str:
+    try:
+        return importlib_metadata.version(distribution)
+    except importlib_metadata.PackageNotFoundError:
+        return fallback
+    except Exception:  # pragma: no cover - defensive
+        return fallback
+
+
+def _docling_extract_text(path: Path) -> tuple[str, dict[str, Any]] | None:
+    try:
+        from docling.document_converter import DocumentConverter
+    except Exception:  # pragma: no cover - dependency optional
+        return None
+
+    try:
+        converter = DocumentConverter()
+        result = converter.convert(str(path))
+    except Exception:  # pragma: no cover - runtime safety
+        return None
+
+    document = getattr(result, "document", None)
+    if document is None:
+        return None
+
+    text = ""
+    for attr in ("export_to_markdown", "export_to_text", "as_text"):
+        exporter = getattr(document, attr, None)
+        if callable(exporter):
+            try:
+                text = exporter()
+            except Exception:  # pragma: no cover - safety guard
+                continue
+            if text:
+                break
+
+    if not text:
+        text = str(document)
+
+    return text, {}
+
+
+def _extract_docx_metadata(docx: zipfile.ZipFile) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    try:
+        core = docx.read("docProps/core.xml")
+    except KeyError:
+        return metadata
+
+    try:
+        root = ET.fromstring(core)
+    except ET.ParseError:
+        return metadata
+
+    ns = {
+        "cp": "http://schemas.openxmlformats.org/package/2006/metadata/core-properties",
+        "dc": "http://purl.org/dc/elements/1.1/",
+    }
+    title_node = root.find("dc:title", ns)
+    if title_node is not None and title_node.text:
+        metadata["title"] = title_node.text.strip()
+
+    creator_node = root.find("dc:creator", ns)
+    if creator_node is not None and creator_node.text:
+        metadata["authors"] = [creator_node.text.strip()]
+
+    return metadata
+
+
+def _fallback_docx_text(path: Path) -> tuple[str, dict[str, Any]]:
+    try:
+        with zipfile.ZipFile(path) as handle:
+            try:
+                xml_bytes = handle.read("word/document.xml")
+            except KeyError:
+                return read_text_file(path), {}
+
+            try:
+                root = ET.fromstring(xml_bytes)
+            except ET.ParseError:
+                return read_text_file(path), {}
+
+            ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            paragraphs: list[str] = []
+            for paragraph in root.findall(".//w:p", ns):
+                texts = [node.text for node in paragraph.findall(".//w:t", ns) if node.text]
+                if texts:
+                    paragraphs.append("".join(texts))
+
+            metadata = _extract_docx_metadata(handle)
+            text_content = "\n\n".join(paragraphs).strip()
+            return text_content, metadata
+    except zipfile.BadZipFile:
+        pass
+    except OSError:
+        pass
+
+    return read_text_file(path), {}
+
+
+def parse_docx_document(path: Path, *, max_tokens: int) -> ParserResult:
+    from .chunking import chunk_text
+
+    docling_payload = _docling_extract_text(path)
+    if docling_payload:
+        text, metadata = docling_payload
+        parser = "docling"
+        parser_version = _package_version("docling", "2.x")
+    else:
+        text, metadata = _fallback_docx_text(path)
+        parser = "docx_fallback"
+        parser_version = "0.1.0"
+
+    chunks = chunk_text(text, max_tokens=max_tokens)
+    return ParserResult(text=text, chunks=chunks, parser=parser, parser_version=parser_version, metadata=metadata)
+
+
+class _HTMLExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._current_title = False
+        self._title_chunks: list[str] = []
+        self._body_chunks: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs):  # type: ignore[override]
+        if tag.lower() == "title":
+            self._current_title = True
+        if tag.lower() in {"p", "br", "div", "section", "article", "li", "h1", "h2", "h3", "h4", "h5", "h6"}:
+            self._body_chunks.append("\n")
+
+    def handle_endtag(self, tag: str):  # type: ignore[override]
+        if tag.lower() == "title":
+            self._current_title = False
+        if tag.lower() in {"p", "div", "section", "article", "li"}:
+            self._body_chunks.append("\n")
+
+    def handle_data(self, data: str):  # type: ignore[override]
+        stripped = data.strip()
+        if not stripped:
+            return
+        if self._current_title:
+            self._title_chunks.append(stripped)
+        self._body_chunks.append(stripped)
+
+    def result(self) -> tuple[str, dict[str, Any]]:
+        text = re.sub(r"\s+", " ", " ".join(self._body_chunks)).strip()
+        metadata: dict[str, Any] = {}
+        if self._title_chunks:
+            metadata["title"] = " ".join(self._title_chunks)
+        return text, metadata
+
+
+def _parse_html_with_unstructured(path: Path) -> tuple[str, dict[str, Any]] | None:
+    try:
+        from unstructured.partition.html import partition_html
+    except Exception:  # pragma: no cover - optional dependency
+        return None
+
+    try:
+        elements = partition_html(filename=str(path))
+    except Exception:  # pragma: no cover - runtime guard
+        return None
+
+    text_chunks: list[str] = []
+    metadata: dict[str, Any] = {}
+    for element in elements:
+        text = getattr(element, "text", None)
+        if isinstance(text, str) and text.strip():
+            text_chunks.append(text.strip())
+        meta = getattr(element, "metadata", None)
+        title = getattr(meta, "title", None) if meta else None
+        if title and "title" not in metadata:
+            metadata["title"] = title
+
+    combined = "\n\n".join(text_chunks).strip()
+    return combined, metadata
+
+
+def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
+    from .chunking import chunk_text
+
+    parsed = _parse_html_with_unstructured(path)
+    if parsed:
+        text, metadata = parsed
+        parser = "unstructured"
+        parser_version = _package_version("unstructured", "0.15.x")
+    else:
+        extractor = _HTMLExtractor()
+        try:
+            extractor.feed(read_text_file(path))
+        except Exception:
+            extractor = _HTMLExtractor()
+        text, metadata = extractor.result()
+        parser = "html_fallback"
+        parser_version = "0.1.0"
+
+    chunks = chunk_text(text, max_tokens=max_tokens)
+    return ParserResult(text=text, chunks=chunks, parser=parser, parser_version=parser_version, metadata=metadata)
+
+
+def parse_pdf_document(path: Path, *, max_pages: int | None, max_tokens: int) -> ParserResult:
+    from .chunking import chunk_text
+
+    pages = parse_pdf(path, max_pages=max_pages)
+    if not pages:
+        return ParserResult(text="", chunks=[], parser="pdfminer", parser_version="0.2.0")
+
+    chunks: list["Chunk"] = []
+    index = 0
+    cursor = 0
+    text_parts: list[str] = []
+    for page in pages:
+        text_parts.append(page.text)
+        page_chunks = chunk_text(page.text, max_tokens=max_tokens)
+        for chunk in page_chunks:
+            chunk.page_no = page.page_no
+            chunk.index = index
+            chunk.start_char += cursor
+            chunk.end_char += cursor
+            chunks.append(chunk)
+            index += 1
+        cursor += len(page.text) + 1
+
+    full_text = "\n".join(text_parts)
+    return ParserResult(text=full_text, chunks=chunks, parser="pdfminer", parser_version="0.2.0")
+
+
+def parse_audio_document(
+    path: Path,
+    *,
+    max_tokens: int,
+    settings,
+    frontmatter: dict[str, Any] | None,
+) -> ParserResult:
+    from .chunking import Chunk, chunk_text, chunk_transcript
+
+    transcript_segments: list[TranscriptSegment] | None = None
+    transcript_text: str | None = None
+    metadata: dict[str, Any] = {}
+
+    if frontmatter:
+        maybe_segments = frontmatter.get("transcript_segments")
+        if isinstance(maybe_segments, list):
+            segments: list[TranscriptSegment] = []
+            for item in maybe_segments:
+                if not isinstance(item, dict):
+                    continue
+                text = str(item.get("text") or "").strip()
+                if not text:
+                    continue
+                start = float(item.get("start", 0.0))
+                end = float(item.get("end", start))
+                speaker = item.get("speaker")
+                segments.append(TranscriptSegment(text=text, start=start, end=end, speaker=speaker))
+            if segments:
+                transcript_segments = segments
+
+        maybe_text = frontmatter.get("transcript")
+        if isinstance(maybe_text, str) and maybe_text.strip():
+            transcript_text = maybe_text.strip()
+
+        transcript_path = frontmatter.get("transcript_path")
+        if isinstance(transcript_path, str) and not transcript_segments and not transcript_text:
+            candidate = Path(transcript_path)
+            if not candidate.is_absolute():
+                fixtures_root = getattr(settings, "fixtures_root", None)
+                if fixtures_root:
+                    candidate = Path(fixtures_root) / candidate
+                else:
+                    candidate = path.parent / candidate
+            if candidate.exists():
+                suffix = candidate.suffix.lower()
+                if suffix in {".vtt", ".webvtt", ".srt", ".json"}:
+                    transcript_segments = load_transcript(candidate)
+                else:
+                    transcript_text = candidate.read_text(encoding="utf-8").strip()
+
+    if path.suffix.lower() == ".wav":
+        try:
+            with wave.open(str(path), "rb") as wav_file:
+                frames = wav_file.getnframes()
+                rate = wav_file.getframerate() or 1
+                duration = frames / rate if rate else 0.0
+                if duration:
+                    metadata.setdefault("duration_seconds", int(duration))
+        except wave.Error:
+            pass
+        except FileNotFoundError:  # pragma: no cover - defensive
+            pass
+
+    if transcript_segments:
+        chunks = chunk_transcript(
+            transcript_segments,
+            max_tokens=max_tokens,
+            max_window_seconds=getattr(settings, "transcript_max_window", 40.0),
+        )
+        text = " ".join(segment.text for segment in transcript_segments)
+        return ParserResult(
+            text=text,
+            chunks=chunks,
+            parser="transcript",
+            parser_version="0.3.0",
+            metadata=metadata,
+        )
+
+    if transcript_text:
+        chunks = chunk_text(transcript_text, max_tokens=max_tokens)
+        return ParserResult(
+            text=transcript_text,
+            chunks=chunks,
+            parser="audio_transcript_text",
+            parser_version="0.1.0",
+            metadata=metadata,
+        )
+
+    placeholder = "Transcription pending for audio source."
+    chunk = Chunk(
+        text=placeholder,
+        start_char=0,
+        end_char=len(placeholder),
+        index=0,
+        t_start=0.0,
+        t_end=0.0,
+    )
+    return ParserResult(
+        text=placeholder,
+        chunks=[chunk],
+        parser="audio_pending",
+        parser_version="0.1.0",
+        metadata=metadata,
+    )
