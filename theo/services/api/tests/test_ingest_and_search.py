@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import json
+from io import BytesIO
 from pathlib import Path
+import wave
+import zipfile
+from xml.sax.saxutils import escape
 
 from fastapi.testclient import TestClient
 
@@ -28,6 +33,63 @@ Later we reflect on Genesis 1:1 in passing.
     assert response.status_code == 200, response.text
     payload = response.json()
     return payload["document_id"]
+
+
+def _build_docx(paragraphs: list[str]) -> bytes:
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+""",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+""",
+        )
+        body = "".join(
+            f"<w:p><w:r><w:t>{escape(paragraph)}</w:t></w:r></w:p>" for paragraph in paragraphs
+        )
+        archive.writestr(
+            "word/document.xml",
+            f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>{body}</w:body>
+</w:document>
+""",
+        )
+        archive.writestr(
+            "docProps/core.xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <dc:title>Docx Sermon</dc:title>
+  <dc:creator>John Wordsmith</dc:creator>
+</cp:coreProperties>
+""",
+        )
+    buffer.seek(0)
+    return buffer.read()
+
+
+def _build_wav(duration_seconds: float = 1.0, sample_rate: int = 8000) -> bytes:
+    buffer = BytesIO()
+    frame_count = int(duration_seconds * sample_rate)
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(b"\x00\x00" * frame_count)
+    buffer.seek(0)
+    return buffer.read()
 
 
 def test_ingest_and_search_roundtrip() -> None:
@@ -143,3 +205,85 @@ def test_youtube_url_ingestion_uses_fixture_transcript() -> None:
 
         search = client.get("/search", params={"osis": "John.1.1-5"}).json()
         assert any(result["document_id"] == document_id for result in search["results"])
+
+
+def test_docx_ingestion_uses_doc_parser() -> None:
+    with TestClient(app) as client:
+        payload = _build_docx(
+            [
+                "Docx sermons often cite John 1:1 to begin.",
+                "They may also mention Genesis 1:1 for context.",
+            ]
+        )
+        response = client.post(
+            "/ingest/file",
+            files={
+                "file": (
+                    "sermon.docx",
+                    BytesIO(payload),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+        assert response.status_code == 200, response.text
+        document_id = response.json()["document_id"]
+
+        document = client.get(f"/documents/{document_id}").json()
+        assert document["source_type"] == "docx"
+        assert document["title"] == "Docx Sermon"
+        assert any("Genesis 1:1" in passage["text"] for passage in document["passages"])
+
+
+def test_html_ingestion_extracts_title() -> None:
+    with TestClient(app) as client:
+        html = """<!doctype html><html><head><title>HTML Homily</title></head><body><h1>Intro</h1><p>The message references John 1:1-5 clearly.</p><p>We also note Psalm 23:1.</p></body></html>"""
+        response = client.post(
+            "/ingest/file",
+            files={"file": ("homily.html", html, "text/html")},
+        )
+        assert response.status_code == 200, response.text
+        document_id = response.json()["document_id"]
+
+        document = client.get(f"/documents/{document_id}").json()
+        assert document["source_type"] == "html"
+        assert document["title"] == "HTML Homily"
+        assert any("Psalm 23:1" in passage["text"] for passage in document["passages"])
+
+
+def test_audio_ingestion_with_inline_transcript() -> None:
+    with TestClient(app) as client:
+        wav_bytes = _build_wav()
+        frontmatter = {
+            "title": "Audio Sermon",
+            "transcript_segments": [
+                {
+                    "text": "Welcome to the reflection on John 1:1.",
+                    "start": 0.0,
+                    "end": 2.0,
+                    "speaker": "Host",
+                },
+                {
+                    "text": "We remember Genesis 1:1 as well.",
+                    "start": 2.0,
+                    "end": 4.0,
+                },
+            ],
+        }
+
+        response = client.post(
+            "/ingest/file",
+            data={"frontmatter": json.dumps(frontmatter)},
+            files={"file": ("sermon.wav", BytesIO(wav_bytes), "audio/wav")},
+        )
+        assert response.status_code == 200, response.text
+        document_id = response.json()["document_id"]
+
+        document = client.get(f"/documents/{document_id}").json()
+        assert document["source_type"] == "audio"
+        assert any(passage["t_start"] is not None for passage in document["passages"])
+        assert any(
+            passage["meta"].get("speakers") == ["Host"] for passage in document["passages"] if passage["meta"]
+        )
+
+        mentions = client.get("/verses/John.1.1/mentions").json()
+        assert any(item["passage"]["document_id"] == document_id for item in mentions["mentions"])

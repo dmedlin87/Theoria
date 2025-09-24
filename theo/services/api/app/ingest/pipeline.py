@@ -19,7 +19,16 @@ from ..core.settings import get_settings
 from ..db.models import Document, Passage
 from .chunking import chunk_text, chunk_transcript, Chunk
 from .osis import DetectedOsis, detect_osis_references
-from .parsers import TranscriptSegment, load_transcript, parse_pdf, read_text_file
+from .parsers import (
+    ParserResult,
+    TranscriptSegment,
+    load_transcript,
+    parse_audio_document,
+    parse_docx_document,
+    parse_html_document,
+    parse_pdf_document,
+    read_text_file,
+)
 
 class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
@@ -71,12 +80,16 @@ def _detect_source_type(path: Path, frontmatter: dict[str, Any]) -> str:
         return "txt"
     if ext == ".pdf":
         return "pdf"
+    if ext in {".html", ".htm", ".xhtml"}:
+        return "html"
     if ext in {".vtt", ".webvtt", ".srt"}:
         return "transcript"
     if ext == ".json":
         return "transcript"
     if ext == ".docx":
         return "docx"
+    if ext in {".mp3", ".wav", ".m4a"}:
+        return "audio"
 
     return "file"
 
@@ -227,36 +240,27 @@ def _extract_youtube_video_id(url: str) -> str:
     raise UnsupportedSourceError(f"Unsupported URL for ingestion: {url}")
 
 
-def _prepare_text_chunks(text: str, *, settings) -> tuple[list[Chunk], str, str]:
+def _prepare_text_chunks(text: str, *, settings) -> ParserResult:
     chunks = chunk_text(text, max_tokens=settings.max_chunk_tokens)
-    return chunks, "plain_text", "0.1.0"
+    return ParserResult(text=text, chunks=chunks, parser="plain_text", parser_version="0.1.0")
 
 
-def _prepare_pdf_chunks(path: Path, *, settings) -> tuple[list[Chunk], str, str]:
-    pages = parse_pdf(path, max_pages=settings.doc_max_pages)
-    if not pages:
+def _prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
+    result = parse_pdf_document(
+        path,
+        max_pages=settings.doc_max_pages,
+        max_tokens=settings.max_chunk_tokens,
+    )
+    if not result.chunks:
         raise UnsupportedSourceError("PDF contained no extractable text")
-    chunks: list[Chunk] = []
-    index = 0
-    cursor = 0
-    for page in pages:
-        page_chunks = chunk_text(page.text, max_tokens=settings.max_chunk_tokens)
-        for chunk in page_chunks:
-            chunk.page_no = page.page_no
-            chunk.index = index
-            chunk.start_char += cursor
-            chunk.end_char += cursor
-            chunks.append(chunk)
-            index += 1
-        cursor += len(page.text) + 1
-    return chunks, "pdfminer", "0.2.0"
+    return result
 
 
 def _prepare_transcript_chunks(
     segments: list[TranscriptSegment],
     *,
     settings,
-) -> tuple[list[Chunk], str, str]:
+) -> ParserResult:
     if not segments:
         raise UnsupportedSourceError("Transcript file contained no segments")
     chunks = chunk_transcript(
@@ -264,7 +268,8 @@ def _prepare_transcript_chunks(
         max_tokens=settings.max_chunk_tokens,
         max_window_seconds=getattr(settings, "transcript_max_window", 40.0),
     )
-    return chunks, "transcript", "0.3.0"
+    text = " ".join(segment.text for segment in segments)
+    return ParserResult(text=text, chunks=chunks, parser="transcript", parser_version="0.3.0")
 
 def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, Any] | None = None) -> Document:
     """Execute the file ingestion pipeline synchronously."""
@@ -276,26 +281,48 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     frontmatter = _merge_metadata({}, _load_frontmatter(frontmatter))
     source_type = _detect_source_type(path, frontmatter)
 
-    parser = "plain_text"
-    parser_version = "0.1.0"
+    parser_result: ParserResult | None = None
     text_content = ""
-    chunks: list[Chunk]
 
-    if source_type in {"markdown", "txt", "file", "docx"}:
+    if source_type in {"markdown", "txt", "file"}:
         text_content, parsed_frontmatter = _parse_text_file(path)
         frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
-        chunks, parser, parser_version = _prepare_text_chunks(text_content, settings=settings)
+        parser_result = _prepare_text_chunks(text_content, settings=settings)
+    elif source_type == "docx":
+        parser_result = parse_docx_document(path, max_tokens=settings.max_chunk_tokens)
+        frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
+        text_content = parser_result.text
+    elif source_type == "html":
+        parser_result = parse_html_document(path, max_tokens=settings.max_chunk_tokens)
+        frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
+        text_content = parser_result.text
     elif source_type == "pdf":
-        text_content = ""
-        chunks, parser, parser_version = _prepare_pdf_chunks(path, settings=settings)
+        parser_result = _prepare_pdf_chunks(path, settings=settings)
+        text_content = parser_result.text
     elif source_type == "transcript":
         segments = load_transcript(path)
-        chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
-        text_content = " ".join(chunk.text for chunk in chunks)
+        parser_result = _prepare_transcript_chunks(segments, settings=settings)
+        text_content = parser_result.text
+    elif source_type == "audio":
+        parser_result = parse_audio_document(
+            path,
+            max_tokens=settings.max_chunk_tokens,
+            settings=settings,
+            frontmatter=frontmatter,
+        )
+        frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
+        text_content = parser_result.text
     else:
         text_content, parsed_frontmatter = _parse_text_file(path)
         frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
-        chunks, parser, parser_version = _prepare_text_chunks(text_content, settings=settings)
+        parser_result = _prepare_text_chunks(text_content, settings=settings)
+
+    if parser_result is None:
+        raise UnsupportedSourceError(f"Unable to parse source type {source_type}")
+
+    chunks = parser_result.chunks
+    parser = parser_result.parser
+    parser_version = parser_result.parser_version
 
     document = Document(
         id=str(uuid4()),
@@ -402,9 +429,9 @@ def run_pipeline_for_url(
     frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
 
     segments, transcript_path = _load_youtube_transcript(settings, video_id)
-    chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
+    parser_result = _prepare_transcript_chunks(segments, settings=settings)
 
-    sha_payload = "\n".join(chunk.text for chunk in chunks).encode("utf-8")
+    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
     sha256 = hashlib.sha256(sha_payload).hexdigest()
 
     document = Document(
@@ -426,13 +453,13 @@ def run_pipeline_for_url(
 
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
     passages: list[Passage] = []
-    for chunk in chunks:
+    for chunk in parser_result.chunks:
         detected = detect_osis_references(chunk.text)
         meta = _normalise_passage_meta(
             detected,
             chunk_hints,
-            parser=parser,
-            parser_version=parser_version,
+            parser=parser_result.parser,
+            parser_version=parser_result.parser_version,
             chunker_version="0.3.0",
             chunk_index=chunk.index or 0,
             speakers=chunk.speakers,
