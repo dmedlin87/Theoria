@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Any, Iterable, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 from xml.etree import ElementTree as ET
 
 

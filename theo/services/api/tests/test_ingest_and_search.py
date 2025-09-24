@@ -178,7 +178,7 @@ def test_document_listing_and_paginated_passages() -> None:
 
 def test_verse_mentions_filters() -> None:
     with TestClient(app) as client:
-        doc_id = _ingest_markdown(
+        _ingest_markdown(
             client,
             suffix="""
 

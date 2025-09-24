@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing import Iterable, Iterator, List
+from typing import Iterable
 
 from .parsers import TranscriptSegment
 
@@ -96,7 +96,7 @@ def chunk_text(
     max_tokens: int = 900,
     min_tokens: int = 500,
     hard_cap: int = 1200,
-) -> List[Chunk]:
+) -> list[Chunk]:
     """Chunk text by paragraphs while respecting token budgets."""
 
     if not text.strip():
@@ -160,7 +160,7 @@ def chunk_transcript(
     max_tokens: int = 900,
     hard_cap: int = 1200,
     max_window_seconds: float = 40.0,
-) -> List[Chunk]:
+) -> list[Chunk]:
     """Chunk transcript segments while preserving temporal anchors."""
 
     chunks: list[Chunk] = []
