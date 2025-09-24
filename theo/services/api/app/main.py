@@ -5,10 +5,11 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 
 from .core.database import Base, get_engine
-from .routes import ai, documents, export, ingest, jobs, search, verses
 
+from .routes import ai, documents, export, ingest, jobs, search, verses
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -27,9 +28,11 @@ def create_app() -> FastAPI:
     app.include_router(export.router, prefix="/export", tags=["export"])
     app.include_router(verses.router, prefix="/verses", tags=["verses"])
     app.include_router(documents.router, prefix="/documents", tags=["documents"])
+
     app.include_router(ai.router, prefix="/ai", tags=["ai"])
 
     return app
 
 
 app = create_app()
+

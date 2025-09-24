@@ -304,3 +304,26 @@ Response:
   ]
 }
 ```
+
+## Features
+
+Feature discovery allows clients (CLI, Web UI) to enable or disable UI flows
+without hard-coding environment variables. All feature flags are boolean.
+
+### `GET /features`
+
+Lists currently enabled features.
+
+Response:
+
+```json
+{
+  "gpt5_codex_preview": true
+}
+```
+
+Fields:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `gpt5_codex_preview` | bool | GPT-5-Codex (Preview) endpoints and UI unlocked for all clients. |

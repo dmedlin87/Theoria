@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     doc_max_pages: int = Field(default=5000)
     transcript_max_window: float = Field(default=40.0)
     fixtures_root: Path | None = Field(default=None, description="Optional fixtures path for offline resources")
-
     user_agent: str = Field(default="TheoEngine/1.0")
     llm_default_model: str | None = Field(default=None, description="Default model identifier for generative features")
     llm_models: dict[str, dict[str, object]] = Field(
@@ -32,6 +31,7 @@ class Settings(BaseSettings):
     )
     openai_api_key: str | None = Field(default=None, description="Optional OpenAI API key")
     openai_base_url: str | None = Field(default=None, description="Override base URL for OpenAI-compatible APIs")
+
 
 @lru_cache
 def get_settings() -> Settings:
