@@ -10,3 +10,36 @@ theo/services/web/node_modules/
 theo/services/web/.next/
 theo/services/web/test-results/
 .DS_Store
+
+# Python virtual environments
+.venv/
+venv/
+
+# Environment variables (keep an .env.example checked in if needed)
+.env
+.env.*
+!.env.example
+
+# Python caches and tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.python-version
+
+# Coverage outputs
+.coverage
+coverage.xml
+htmlcov/
+
+# Build/distribution artifacts
+dist/
+build/
+
+# Node/Next/Playwright artifacts (generic)
+**/.next/
+**/test-results/
+**/playwright-report/
+**/blob-report/
+
+# OS-specific
+Thumbs.db
