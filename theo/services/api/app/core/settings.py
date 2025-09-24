@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     fixtures_root: Path | None = Field(default=None, description="Optional fixtures path for offline resources")
 
     user_agent: str = Field(default="TheoEngine/1.0")
+    gpt5_codex_preview_enabled: bool = Field(
+        default=True,
+        description="Feature flag: expose GPT-5-Codex (Preview) capabilities to all clients",
+    )
 
 @lru_cache
 def get_settings() -> Settings:

@@ -398,6 +398,7 @@ Response:
 }
 ```
 
+
 ### `POST /export/deliverable`
 
 Creates sermon/lesson/Q&A deliverables backed by AI syntheses and deterministic retrieval. Request body:
@@ -432,3 +433,27 @@ When the job completes the assets live under `STORAGE_ROOT/exports/{export_id}/`
 - One file per requested format (`sermon.md`, `sermon.ndjson`, `sermon.csv`).
 
 Clients may poll `GET /export/deliverable/{export_id}` to retrieve signed download URLs.
+
+## Features
+
+Feature discovery allows clients (CLI, Web UI) to enable or disable UI flows
+without hard-coding environment variables. All feature flags are boolean.
+
+### `GET /features`
+
+Lists currently enabled features.
+
+Response:
+
+```json
+{
+  "gpt5_codex_preview": true
+}
+```
+
+Fields:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `gpt5_codex_preview` | bool | GPT-5-Codex (Preview) endpoints and UI unlocked for all clients. |
+
