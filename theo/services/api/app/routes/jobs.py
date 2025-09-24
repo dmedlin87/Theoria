@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_session
 from ..db.models import Document
+from ..workers.tasks import enrich_document as enqueue_enrich_task
 from ..workers.tasks import process_file
 
 router = APIRouter()
@@ -56,4 +57,22 @@ def enqueue_reparse_job(
 
     process_file.delay(document.id, str(source_file), None)
 
+    return {"document_id": document.id, "status": "queued"}
+
+
+@router.post("/enrich/{document_id}", status_code=status.HTTP_202_ACCEPTED)
+def enqueue_enrichment_job(
+    document_id: str,
+    session: Session = Depends(get_session),
+) -> dict[str, str]:
+    """Queue a metadata enrichment job for an existing document."""
+
+    document = session.get(Document, document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    enqueue_enrich_task.delay(document.id)
     return {"document_id": document.id, "status": "queued"}

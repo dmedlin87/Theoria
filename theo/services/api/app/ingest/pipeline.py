@@ -160,6 +160,23 @@ def _ensure_list(value: Any) -> list[str] | None:
     return [str(value)]
 
 
+def _normalise_topics_field(*candidates: Any) -> dict | None:
+    values: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        items = _ensure_list(candidate) or []
+        for item in items:
+            cleaned = item.strip()
+            if not cleaned:
+                continue
+            if cleaned not in seen:
+                seen.add(cleaned)
+                values.append(cleaned)
+    if not values:
+        return None
+    return {"primary": values[0], "all": values}
+
+
 def _coerce_int(value: Any) -> int | None:
     if value is None:
         return None
@@ -545,10 +562,18 @@ def _persist_transcript_document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Transcript",
         authors=_ensure_list(frontmatter.get("authors")),
+        doi=frontmatter.get("doi"),
         source_url=source_url or frontmatter.get("source_url"),
         source_type=source_type,
         collection=frontmatter.get("collection"),
         pub_date=_coerce_date(frontmatter.get("date")),
+        year=_coerce_int(frontmatter.get("year") or frontmatter.get("pub_year")),
+        venue=frontmatter.get("venue"),
+        abstract=frontmatter.get("abstract"),
+        topics=_normalise_topics_field(
+            frontmatter.get("topics"),
+            frontmatter.get("concepts"),
+        ),
         channel=channel or frontmatter.get("channel"),
         video_id=video_id or frontmatter.get("video_id"),
         duration_seconds=_coerce_int(duration_seconds)
@@ -688,9 +713,18 @@ def run_pipeline_for_url(
             id=str(uuid4()),
             title=frontmatter.get("title") or f"YouTube Video {video_id}",
             authors=_ensure_list(frontmatter.get("authors")),
+            doi=frontmatter.get("doi"),
             source_url=frontmatter.get("source_url") or url,
             source_type="youtube",
             collection=frontmatter.get("collection"),
+            pub_date=_coerce_date(frontmatter.get("date")),
+            year=_coerce_int(frontmatter.get("year") or frontmatter.get("pub_year")),
+            venue=frontmatter.get("venue"),
+            abstract=frontmatter.get("abstract"),
+        topics=_normalise_topics_field(
+            frontmatter.get("topics"),
+            frontmatter.get("concepts"),
+        ),
             channel=frontmatter.get("channel"),
             video_id=video_id,
             duration_seconds=frontmatter.get("duration_seconds"),
@@ -804,10 +838,18 @@ def run_pipeline_for_url(
         id=str(uuid4()),
         title=frontmatter.get("title") or metadata.get("title") or url,
         authors=_ensure_list(frontmatter.get("authors")),
+        doi=frontmatter.get("doi"),
         source_url=frontmatter.get("source_url") or metadata.get("canonical_url") or url,
         source_type="web_page",
         collection=frontmatter.get("collection"),
         pub_date=_coerce_date(frontmatter.get("date")),
+        year=_coerce_int(frontmatter.get("year") or frontmatter.get("pub_year")),
+        venue=frontmatter.get("venue"),
+        abstract=frontmatter.get("abstract"),
+        topics=_normalise_topics_field(
+            frontmatter.get("topics"),
+            frontmatter.get("concepts"),
+        ),
         channel=frontmatter.get("channel"),
         duration_seconds=frontmatter.get("duration_seconds"),
         bib_json=frontmatter.get("bib_json"),

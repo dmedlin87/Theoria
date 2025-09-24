@@ -56,3 +56,43 @@ def test_process_url_ingests_fixture_url(tmp_path) -> None:
     assert document.title == "Custom Theo Title"
     assert document.collection == "Custom Collection"
     assert document.channel == "Theo Channel"
+
+
+def test_enrich_document_populates_metadata(tmp_path) -> None:
+    """Metadata enrichment hydrates bibliographic fields from fixtures."""
+
+    db_path = tmp_path / "enrich.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        document = Document(
+            title="Theo Engine Sample Work",
+            source_type="pdf",
+            source_url="https://doi.org/10.1234/sample",
+            sha256="sample-sha",
+        )
+        session.add(document)
+        session.commit()
+        document_id = document.id
+
+    tasks.enrich_document.run(document_id)
+
+    with Session(engine) as session:
+        enriched = session.get(Document, document_id)
+
+    assert enriched is not None
+    assert enriched.doi == "10.1234/sample"
+    assert enriched.authors == ["Alice Example", "Bob Example"]
+    assert enriched.venue == "Journal of Theo Research"
+    assert enriched.year == 2022
+    assert enriched.abstract == "theo engine research"
+    assert enriched.topics == {
+        "primary": "Theology",
+        "all": ["Theology", "Information Retrieval"],
+    }
+    assert enriched.enrichment_version == 1
+    assert isinstance(enriched.bib_json, dict)
+    assert enriched.bib_json.get("enrichment", {}).get("openalex", {}).get("id") == "https://openalex.org/W123456789"
+    assert enriched.bib_json.get("primary_topic") == "Theology"

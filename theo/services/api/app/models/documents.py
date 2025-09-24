@@ -26,8 +26,12 @@ class DocumentSummary(APIModel):
     source_type: str | None = None
     collection: str | None = None
     authors: list[str] | None = None
+    doi: str | None = None
+    venue: str | None = None
+    year: int | None = None
     created_at: datetime
     updated_at: datetime
+    provenance_score: int | None = None
 
 
 class DocumentDetailResponse(DocumentSummary):
@@ -36,6 +40,9 @@ class DocumentDetailResponse(DocumentSummary):
     video_id: str | None = None
     duration_seconds: int | None = None
     storage_path: str | None = None
+    abstract: str | None = None
+    topics: dict[str, Any] | list[str] | None = None
+    enrichment_version: int | None = None
     metadata: dict[str, Any] | None = Field(default=None, alias="meta")
     passages: list[Passage] = Field(default_factory=list)
 
