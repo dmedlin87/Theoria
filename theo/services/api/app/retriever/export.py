@@ -53,7 +53,7 @@ def export_search_results(session: Session, request: HybridSearchRequest) -> Sea
         document = documents.get(result.document_id)
         summary = ExportedDocumentSummary(
             id=result.document_id,
-            title=result.document_title if result.document_title is not None else getattr(document, "title", None),
+            title=result.document_title or getattr(document, "title", None),
             source_type=getattr(document, "source_type", None),
             collection=getattr(document, "collection", None),
             authors=getattr(document, "authors", None),
