@@ -47,6 +47,28 @@ def get_mentions_for_osis(
             base_meta.setdefault("document_title", document.title)
         if document.source_type:
             base_meta.setdefault("source_type", document.source_type)
+        if document.collection:
+            base_meta.setdefault("collection", document.collection)
+        if document.authors:
+            base_meta.setdefault("authors", document.authors)
+        if document.doi:
+            base_meta.setdefault("doi", document.doi)
+        if document.venue:
+            base_meta.setdefault("venue", document.venue)
+        if document.year:
+            base_meta.setdefault("year", document.year)
+        if document.source_url:
+            base_meta.setdefault("source_url", document.source_url)
+        if document.topics is not None:
+            base_meta.setdefault("topics", document.topics)
+        if document.enrichment_version is not None:
+            base_meta.setdefault("enrichment_version", document.enrichment_version)
+        if document.provenance_score is not None:
+            base_meta.setdefault("provenance_score", document.provenance_score)
+        if document.bib_json and isinstance(document.bib_json, dict):
+            primary_topic = document.bib_json.get("primary_topic")
+            if primary_topic is not None:
+                base_meta.setdefault("primary_topic", primary_topic)
 
         passage_schema = PassageSchema(
             id=passage.id,
