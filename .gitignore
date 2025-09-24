@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+playwright.db
+storage/
+theo.db
+.theo.db
+*.sqlite3
+node_modules/
+theo/services/web/node_modules/
+theo/services/web/.next/
+theo/services/web/test-results/
+.DS_Store
