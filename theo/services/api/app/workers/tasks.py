@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..core.database import get_engine
 from ..core.settings import get_settings
 from ..db.models import Document
+from ..analytics.topics import generate_topic_digest, store_topic_digest
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
 
@@ -85,3 +87,18 @@ def enrich_document(document_id: str) -> None:
             session.rollback()
             logger.exception("Failed to enrich document", extra={"document_id": document_id})
             raise
+
+
+@celery.task(name="tasks.generate_topic_digest")
+def topic_digest(hours: int = 168) -> None:
+    """Generate and persist a topical digest for recently ingested works."""
+
+    engine = get_engine()
+    with Session(engine) as session:
+        since = datetime.now(UTC) - timedelta(hours=hours)
+        digest = generate_topic_digest(session, since)
+        store_topic_digest(session, digest)
+        logger.info(
+            "Generated topic digest",
+            extra={"topics": [cluster.topic for cluster in digest.topics], "since": since.isoformat()},
+        )

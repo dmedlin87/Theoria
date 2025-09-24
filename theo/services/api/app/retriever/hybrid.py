@@ -67,7 +67,7 @@ def _fallback_search(session: Session, request: HybridSearchRequest) -> list[Hyb
 
     stmt = select(Passage, Document).join(Document)
     stmt = _apply_common_filters(stmt, request)
-    if request.query:
+    if request.query and not request.osis:
         token_clauses = [Passage.text.ilike(f"%{token}%") for token in query_tokens]
         if token_clauses:
             stmt = stmt.where(and_(*token_clauses))

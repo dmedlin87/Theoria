@@ -77,4 +77,22 @@ class Passage(Base):
     document: Mapped[Document] = relationship("Document", back_populates="passages")
 
 
-__all__ = ["Document", "Passage"]
+class AppSetting(Base):
+    """Simple key/value store for application-level configuration."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[dict | list | str | int | float | bool | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
+__all__ = ["Document", "Passage", "AppSetting"]
