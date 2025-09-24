@@ -20,6 +20,8 @@ Minimal web UI: Upload, Search, Verse, Document.
 
 Generative answers (RAG) are out of scope for MVP. Keep hooks ready for later.
 
+> **Post-MVP extension:** See §18–§21 for the grounded generative copilot, export deliverables, batch enrichments, and topic monitoring layers that build on top of the MVP primitives.
+
 ## 1) Repo Layout (monorepo)
 
 theo/
@@ -456,3 +458,72 @@ Keep embeddings L2-normalized; consistent preprocessing (lowercase/strip) before
 Implement a robust range-intersect for OSIS to avoid false misses.
 
 Respect robots/ToS for URL/YouTube fetching; cache transcripts; expose a manual “upload transcript” path.
+
+## 18) AI Copilot Layer (ChatGPT 5-ready)
+
+The MVP hooks now power a grounded generative layer that stays tethered to Theo’s corpus.
+
+### 18.1) Provider & Model Registry
+
+- **Settings store:** Extend `core/settings.py` with a persistent `ai_providers` map stored in Postgres (`settings` table) and cached in Redis. Keys: `provider`, `api_key`, `base_url`, `default_model`, `extra_headers`.
+- **Supported providers:** OpenAI, Azure OpenAI, Anthropic, Google Vertex adapters, local vLLM endpoints. Provider schemas inherit from a `BaseProviderSettings` Pydantic model.
+- **Model catalog:** `/settings/ai/models` endpoint allows admins to register named presets, e.g. `"gpt-4o-mini@openai"` → provider, model id, max output tokens, citation guardrails (boolean), cost metadata.
+- **Key rotation:** Settings API supports PUT/PATCH to rotate keys. Keys are encrypted at rest via Fernet using `SETTINGS_SECRET_KEY`.
+
+### 18.2) Guarded Response Flow
+
+- **Pipeline:** Request → Retrieve passages (hybrid search) → Build prompt (system instructions enforce OSIS citations) → Invoke selected model → Validate citations.
+- **Citation validator:** Every answer must include at least one OSIS reference per claim. Validator checks that referenced OSIS ranges exist in the retrieved bundle and that passage anchors (page/time offsets) are present. Responses without support are rejected with a 422 and logged for review.
+- **Caching:** Responses are stored in Redis with a composite key (`user`, `prompt_hash`, `model_preset`, `retrieval_hash`).
+
+### 18.3) Chat Surfaces & Use Cases
+
+All generative entry points share the same grounding policies but tailor prompt templates to the workflow. ChatGPT 5 can be swapped for any registered provider/model.
+
+1. **Verse-Linked Research Copilot** – Highlight a verse in the Verse Aggregator to receive a synthesis citing every relevant passage, with follow-up prompts that pivot across patristic vs. contemporary commentary.
+2. **Context-Aware Sermon/Teaching Prep** – Summarize packeted sources into outlines, liturgy elements, reflection questions, respecting denominational guardrails supplied via filters and metadata.
+3. **Scholarly Comparative Analysis** – Compare authors (e.g., Augustine vs. Calvin vs. Barth on Romans 8) with answers linking to each source and auto-generating CSL-JSON bibliography stubs stored as `ai_summary` documents.
+4. **Multimedia Insight Extraction** – Derive timecoded Q&A digests, highlight reels, and cross-modal “study packs” by pairing podcast snippets with related PDFs.
+5. **Guided Personal Devotion & Discipleship** – Craft daily devotionals, prayers, and catechesis flows that cite OSIS verses and honour doctrinal constraints.
+6. **Corpus Maintenance & Curation Assistant** – Auto-summarize new ingests, flag duplicates via SHA-256, suggest metadata normalizations, and translate Celery/Redis status into natural-language admin digests.
+7. **Research Collaboration Layer** – Support shared annotations, consensus drafts, and change summaries when new documents land, all grounded in the authoritative sources.
+
+### 18.4) API Surface
+
+- `POST /ai/chat`: accepts `model_preset`, `messages`, optional `retrieval_filters`. Requires the client to select from registered presets.
+- `GET /ai/models`: lists available presets with cost/tokens metadata.
+- `PUT /settings/ai/providers/{provider}`: upserts credentials. Only accessible to admin roles.
+- All responses include `citations` array (`osis`, `document_id`, `anchor_type`, `anchor_value`).
+
+## 19) Export-Ready Deliverables
+
+Sermon/lesson prep and Q&A transcripts now surface export pipelines.
+
+- **Formats:** Markdown (teaching outline + citations), NDJSON (one item per segment with provenance), CSV (tabular Q&A with OSIS refs).
+- **Manifest:** Each export includes `manifest.json` with `export_id` (ULID), `schema_version`, `filters`, `git_sha`, `generated_at`, and `model_preset` when AI content is present.
+- **API:** `POST /export/deliverable` accepts `{ "type": "sermon" | "qa", "source_ids": [], "model_preset": "...", "format": ["md","ndjson","csv"] }` and returns signed URLs. Jobs run via Celery, writing assets under `STORAGE_ROOT/exports/{export_id}/`.
+- **UI Hooks:** Verse Aggregator and document detail pages expose “Export sermon packet” and “Export Q&A digest” buttons that queue the Celery job and notify the user when ready.
+
+## 20) CLI Batch Intelligence
+
+Extend `theo.services.cli.ingest_folder` with a `--post-batch` flag to trigger enrichers immediately after ingest:
+
+- `summaries` – calls `/ai/chat` with the “Corpus Maintenance” prompt to create `ai_summary` documents stored alongside originals.
+- `tags` – hits the metadata enrichment endpoint to refresh topics/subjects.
+- `biblio` – generates CSL-JSON stubs when missing and persists them via `documents/{id}/bibliography`.
+
+The CLI writes enrichments back into the corpus using the API, logging each export manifest path. Batch jobs respect the same citation guardrails as interactive chats.
+
+## 21) Automated Alerts & Topic Monitoring
+
+- **OpenAlex integration:** After each ingest window, run `jobs/topic_digest` Celery task. It fetches OpenAlex topics for new documents (via DOI/title lookup) and clusters passages by `primary_topic` + top-N topics.
+- **Under-represented themes:** The job identifies topics whose document count increased this week or remain below a configured threshold and emits a digest summary.
+- **Delivery:** Weekly digests are emailed/slacked to admins and stored as `digest` documents with links to the underlying passages and exports.
+- **Dashboard:** `/admin/digests` UI lists digests, cluster stats, and quick actions to start AI analyses using the registered model presets.
+
+## 22) Grounded RAG Guardrails
+
+- **Mandatory citations:** All AI-generated text must include OSIS references with anchors. Missing citations cause the response to be rejected and the model output stored for debugging.
+- **Source packet limitation:** Prompts include only the retrieved passages. The application never permits free-form generations.
+- **Evaluation:** Nightly Celery task `jobs/validate_citations` replays a sample of conversations, checking citation integrity and logging drift.
+- **Audit trail:** Responses store `retrieval_snapshot` (passage IDs, embeddings hash) to make exports reproducible and auditable.
