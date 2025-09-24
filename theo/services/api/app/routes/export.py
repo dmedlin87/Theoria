@@ -70,10 +70,11 @@ def export_search(
         raise HTTPException(status_code=400, detail="mode=mentions requires an osis parameter")
     field_set = _parse_fields(fields)
     limit_value = limit or k
+    fetch_k = limit_value + 1 if limit_value is not None else k
     search_request = HybridSearchRequest(
         query=q,
         osis=osis,
-        k=max(k, limit_value),
+        k=max(k, fetch_k),
         limit=limit_value,
         cursor=cursor,
         mode=mode,

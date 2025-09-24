@@ -163,10 +163,11 @@ def export_search_command(
         if saved_cursor:
             cursor = saved_cursor
 
+    fetch_k = limit + 1 if limit is not None else None
     request = HybridSearchRequest(
         query=q,
         osis=osis,
-        k=limit,
+        k=fetch_k if fetch_k is not None else limit,
         limit=limit,
         cursor=cursor,
         mode=mode.lower(),

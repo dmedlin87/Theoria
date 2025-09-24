@@ -178,6 +178,33 @@ def test_search_export_cli_csv_includes_manifest(tmp_path: Path, monkeypatch: py
     assert saved_manifest["next_cursor"] == "passage-1"
 
 
+def test_search_export_cli_requests_extra_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, int | None] = {}
+
+    def _capture_request(session, request: HybridSearchRequest) -> SearchExportResponse:
+        captured["k"] = request.k
+        captured["limit"] = request.limit
+        return _build_search_export()
+
+    monkeypatch.setattr(cli, "export_search_results", _capture_request)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.export,
+        [
+            "search",
+            "--query",
+            "grace",
+            "--limit",
+            "25",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["limit"] == 25
+    assert captured["k"] == 26
+
+
 def test_document_export_cli_ndjson_contains_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         cli,
