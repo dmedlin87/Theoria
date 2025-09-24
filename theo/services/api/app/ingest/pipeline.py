@@ -17,7 +17,9 @@ from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
 from ..db.models import Document, Passage
+
 from .chunking import Chunk, chunk_text, chunk_transcript
+
 from .osis import DetectedOsis, detect_osis_references
 from .parsers import TranscriptSegment, load_transcript, parse_pdf, read_text_file
 
@@ -322,8 +324,11 @@ def _persist_transcript_document(
     session.flush()
 
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
+    embedding_service = get_embedding_service()
+    embeddings = embedding_service.embed([chunk.text for chunk in chunks])
+
     passages: list[Passage] = []
-    for chunk in chunks:
+    for idx, chunk in enumerate(chunks):
         detected = detect_osis_references(chunk.text)
         meta = _normalise_passage_meta(
             detected,
@@ -335,6 +340,7 @@ def _persist_transcript_document(
             speakers=chunk.speakers,
         )
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
+        embedding = embeddings[idx] if idx < len(embeddings) else None
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
@@ -345,7 +351,8 @@ def _persist_transcript_document(
             text=chunk.text,
             tokens=len(chunk.text.split()),
             osis_ref=osis_value,
-            lexeme=chunk.text.lower(),
+            embedding=embedding,
+            lexeme=lexical_representation(session, chunk.text),
             meta=meta,
         )
         session.add(passage)
@@ -467,8 +474,11 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
     session.flush()
 
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
+    embedding_service = get_embedding_service()
+    embeddings = embedding_service.embed([chunk.text for chunk in chunks])
+
     passages: list[Passage] = []
-    for chunk in chunks:
+    for idx, chunk in enumerate(chunks):
         detected = detect_osis_references(chunk.text)
         meta = _normalise_passage_meta(
             detected,
@@ -480,6 +490,7 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
             speakers=chunk.speakers,
         )
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
+        embedding = embeddings[idx] if idx < len(embeddings) else None
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
@@ -490,7 +501,8 @@ def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, A
             text=chunk.text,
             tokens=len(chunk.text.split()),
             osis_ref=osis_value,
-            lexeme=chunk.text.lower(),
+            embedding=embedding,
+            lexeme=lexical_representation(session, chunk.text),
             meta=meta,
         )
         session.add(passage)
