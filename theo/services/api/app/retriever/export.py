@@ -153,7 +153,6 @@ def export_documents(
         )
 
     if not include_passages:
-        total_passages = 0
 
     return DocumentExportResponse(
         filters=filters,
