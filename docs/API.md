@@ -1,36 +1,228 @@
 # Theo Engine API
 
-This document describes the planned API endpoints for the Theo Engine MVP. Each
-endpoint is represented in the FastAPI application located at
-`theo/services/api/app`.
+Theo Engine exposes a FastAPI application located at
+`theo/services/api/app`. The service is designed around JSON responses and
+multipart uploads for binary content.
+
+- **Base URL:** `/` (all paths below are relative to the FastAPI root)
+- **Content type:** `application/json` unless noted otherwise
+- **Authentication:** not required (the MVP runs in trusted environments)
+- **Error format:** errors follow FastAPI's default structure:
+  
+  ```json
+  {
+    "detail": "Human readable message"
+  }
+  ```
+
+The sections below describe each resource group, required inputs, and response
+payloads.
 
 ## Ingestion
 
-### POST /ingest/file
+Ingestion endpoints create or update documents that are later available for
+search and verse lookups. Successful requests return a
+`DocumentIngestResponse`:
 
-Upload a binary document. The API stores the binary and queues a worker task to
-parse, chunk, and index the file.
+```json
+{
+  "document_id": "uuid",
+  "status": "processed"
+}
+```
 
-### POST /ingest/url
+All ingestion endpoints may return **400 Bad Request** when the source is
+unsupported or when frontmatter cannot be parsed.
 
-Submit a canonical URL (web page or YouTube). The system fetches the resource
-and schedules downstream parsing.
+### `POST /ingest/file`
+
+Accepts binary uploads via `multipart/form-data`.
+
+| Field        | Type            | Required | Notes                                   |
+| ------------ | --------------- | -------- | --------------------------------------- |
+| `file`       | File            | ✅       | Any supported document (PDF, DOCX, etc) |
+| `frontmatter`| Text (JSON str) | ❌       | Optional metadata overrides              |
+
+The uploaded file is stored temporarily, parsed synchronously, and indexed.
+
+### `POST /ingest/url`
+
+Accepts a JSON body matching `UrlIngestRequest`:
+
+```json
+{
+  "url": "https://example.com/article",
+  "source_type": "web",
+  "frontmatter": {
+    "title": "Example Article",
+    "authors": ["Author"]
+  }
+}
+```
+
+`source_type` and `frontmatter` are optional. The backend fetches the resource
+and processes it with the same pipeline as uploaded files.
+
+### `POST /ingest/transcript`
+
+Uploads pre-generated transcripts, optionally paired with the original audio.
+The request uses `multipart/form-data` with the following fields:
+
+| Field         | Type            | Required | Notes                                           |
+| ------------- | --------------- | -------- | ----------------------------------------------- |
+| `transcript`  | File            | ✅       | Transcript file (WebVTT, plain text, etc.)      |
+| `audio`       | File            | ❌       | Optional audio/video binary for reference       |
+| `frontmatter` | Text (JSON str) | ❌       | Optional metadata overrides                     |
+
+The pipeline parses the transcript and indexes generated passages. Audio, when
+provided, is stored long enough to support downstream enrichments.
+
+## Background jobs
+
+Background job endpoints enqueue asynchronous work to reprocess existing
+documents. They return **202 Accepted** with `{ "document_id": "...", "status": "queued" }`.
+
+- **404 Not Found** – the requested document does not exist.
+- **400 Bad Request** – the document is missing required source artifacts.
+
+### `POST /jobs/reparse/{document_id}`
+
+Replays the ingestion pipeline for a previously stored document. The service
+locates the original source file and schedules a background worker to reparse
+it.
+
+### `POST /jobs/enrich/{document_id}`
+
+Queues a metadata enrichment task that re-hydrates topics, provenance score, and
+other derived metadata.
 
 ## Search
 
-### GET /search
+### `GET /search`
 
-Hybrid search endpoint combining vector similarity and lexical ranking. Supports
-optional `q` (keywords) and `osis` (Bible reference) parameters.
+Runs hybrid retrieval (vector + lexical) over the indexed passages. Query
+parameters:
 
-## Verses
+| Parameter     | Type   | Description                                   |
+| ------------- | ------ | --------------------------------------------- |
+| `q`           | str    | Keyword query                                  |
+| `osis`        | str    | Normalized OSIS Bible reference                |
+| `collection`  | str    | Restrict results to a specific collection      |
+| `author`      | str    | Filter by canonical author                     |
+| `source_type` | str    | Filter by document source type                 |
+| `k`           | int    | Number of results to return (1 – 50, default 10)|
 
-### GET /verses/{osis}/mentions
+Example response:
 
-Return all passages referencing the requested OSIS verse across the corpus.
+```json
+{
+  "query": "grace and forgiveness",
+  "osis": null,
+  "results": [
+    {
+      "id": "passage-1",
+      "document_id": "doc-1",
+      "document_title": "Sermon on Grace",
+      "text": "...",
+      "snippet": "...",
+      "rank": 1,
+      "score": 0.92,
+      "highlights": ["grace", "forgiveness"]
+    }
+  ],
+  "debug": null
+}
+```
+
+## Verse mentions
+
+### `GET /verses/{osis}/mentions`
+
+Returns passages that reference a specific verse. Optional query parameters
+mirror the search filters: `source_type`, `collection`, and `author`.
+
+Response:
+
+```json
+{
+  "osis": "John.3.16",
+  "total": 2,
+  "mentions": [
+    {
+      "passage": {
+        "id": "passage-1",
+        "document_id": "doc-1",
+        "text": "...",
+        "osis_ref": "John.3.16",
+        "score": null
+      },
+      "context_snippet": "..."
+    }
+  ]
+}
+```
 
 ## Documents
 
-### GET /documents/{document_id}
+Document endpoints expose indexed content and metadata.
 
-Return a document with normalized metadata and all associated passages.
+### `GET /documents/`
+
+Lists documents with pagination.
+
+| Parameter | Type | Description                        |
+| --------- | ---- | ---------------------------------- |
+| `limit`   | int  | Page size (1 – 100, default 20)    |
+| `offset`  | int  | Zero-based result offset (default 0)|
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "id": "doc-1",
+      "title": "Sermon on Grace",
+      "source_type": "transcript",
+      "collection": "Grace Series",
+      "authors": ["Jane Pastor"],
+      "created_at": "2024-04-01T12:00:00Z",
+      "updated_at": "2024-04-01T12:05:00Z",
+      "provenance_score": 85
+    }
+  ],
+  "total": 125,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+### `GET /documents/{document_id}`
+
+Retrieves a single document with its normalized metadata and associated
+passages. The response includes extended fields such as `source_url`, `topics`,
+`metadata` (aliased as `meta`), and the embedded `passages` array. A **404 Not
+Found** error is returned when the identifier is unknown.
+
+### `GET /documents/{document_id}/passages`
+
+Returns paginated passages for a specific document. Supports the same `limit`
+and `offset` parameters as the document list endpoint and responds with
+`DocumentPassagesResponse`:
+
+```json
+{
+  "document_id": "doc-1",
+  "passages": [
+    {
+      "id": "passage-1",
+      "text": "...",
+      "osis_ref": null,
+      "page_no": 1
+    }
+  ],
+  "total": 32,
+  "limit": 20,
+  "offset": 0
+}
+```
