@@ -1,0 +1,30 @@
+{
+  "id": "https://openalex.org/W123456789",
+  "display_name": "Theo Engine Sample Work",
+  "doi": "https://doi.org/10.1234/sample",
+  "authorships": [
+    {
+      "author": {
+        "display_name": "Alice Example"
+      }
+    },
+    {
+      "author": {
+        "display_name": "Bob Example"
+      }
+    }
+  ],
+  "host_venue": {
+    "display_name": "Journal of Theo Research"
+  },
+  "publication_year": 2022,
+  "abstract_inverted_index": {
+    "theo": [0],
+    "engine": [1],
+    "research": [2]
+  },
+  "concepts": [
+    {"display_name": "Theology"},
+    {"display_name": "Information Retrieval"}
+  ]
+}

@@ -43,8 +43,12 @@ def list_documents(session: Session, *, limit: int = 20, offset: int = 0) -> Doc
             source_type=row.source_type,
             collection=row.collection,
             authors=row.authors,
+            doi=row.doi,
+            venue=row.venue,
+            year=row.year,
             created_at=row.created_at,
             updated_at=row.updated_at,
+            provenance_score=row.provenance_score,
         )
         for row in rows
     ]
@@ -74,6 +78,9 @@ def get_document(session: Session, document_id: str) -> DocumentDetailResponse:
         source_type=document.source_type,
         collection=document.collection,
         authors=document.authors,
+        doi=document.doi,
+        venue=document.venue,
+        year=document.year,
         created_at=document.created_at,
         updated_at=document.updated_at,
         source_url=document.source_url,
@@ -81,6 +88,10 @@ def get_document(session: Session, document_id: str) -> DocumentDetailResponse:
         video_id=document.video_id,
         duration_seconds=document.duration_seconds,
         storage_path=document.storage_path,
+        abstract=document.abstract,
+        topics=document.topics,
+        enrichment_version=document.enrichment_version,
+        provenance_score=document.provenance_score,
         metadata=document.bib_json,
         passages=passage_schemas,
     )
