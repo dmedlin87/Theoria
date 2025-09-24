@@ -9,6 +9,11 @@ from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String,
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
+from ..core.settings import get_settings
+from .types import TSVectorType, VectorType
+
+
+settings = get_settings()
 
 
 class Document(Base):
@@ -59,8 +64,10 @@ class Passage(Base):
     osis_ref: Mapped[str | None] = mapped_column(String, index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    embedding: Mapped[list[float] | None] = mapped_column(JSON, nullable=True)
-    lexeme: Mapped[str | None] = mapped_column(Text, nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        VectorType(settings.embedding_dim), nullable=True
+    )
+    lexeme: Mapped[str | None] = mapped_column(TSVectorType(), nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="passages")

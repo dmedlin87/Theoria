@@ -124,6 +124,29 @@ def test_ingest_and_search_roundtrip() -> None:
         assert first_passage["meta"]["chunker_version"] == "0.3.0"
         assert first_passage["meta"]["parser"] == "plain_text"
 
+
+def test_hybrid_search_combines_keyword_and_osis_filters() -> None:
+    with TestClient(app) as client:
+        document_id = _ingest_markdown(
+            client,
+            suffix="Keyword rich reflection mentioning John 1:1-5 repeatedly for emphasis.",
+        )
+
+        response = client.get(
+            "/search",
+            params={"q": "Keyword reflection", "osis": "John.1.1-5", "k": 5},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        results = payload["results"]
+        assert results, "Expected hybrid search results"
+        assert len({result["id"] for result in results}) == len(results)
+        assert all(
+            result["osis_ref"] and result["osis_ref"].startswith("John.1.1")
+            for result in results
+        )
+        assert any(result["document_id"] == document_id for result in results)
+
 def test_document_listing_and_paginated_passages() -> None:
     with TestClient(app) as client:
         doc_id = _ingest_markdown(client, suffix="Unique content about Psalms 23:1.")
