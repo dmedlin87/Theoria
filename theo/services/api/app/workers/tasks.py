@@ -10,16 +10,19 @@ from celery.utils.log import get_task_logger
 from sqlalchemy.orm import Session
 
 from ..core.database import get_engine
+from ..core.settings import get_settings
 from ..db.models import Document
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
 
 logger = get_task_logger(__name__)
 
+settings = get_settings()
+
 celery = Celery(
     "theo-workers",
-    broker="redis://redis:6379/0",
-    backend="redis://redis:6379/0",
+    broker=settings.redis_url,
+    backend=settings.redis_url,
 )
 
 

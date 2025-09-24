@@ -285,7 +285,7 @@ def _is_youtube_url(url: str) -> bool:
     return "youtube" in host or "youtu.be" in host
 
 
-def _prepare_text_chunks(text: str, *, settings) -> tuple[list[Chunk], str, str]:
+def _prepare_text_chunks(text: str, *, settings) -> ParserResult:
 
     chunks = chunk_text(text, max_tokens=settings.max_chunk_tokens)
     return ParserResult(text=text, chunks=chunks, parser="plain_text", parser_version="0.1.0")
@@ -929,9 +929,9 @@ def run_pipeline_for_transcript(
     frontmatter = _merge_metadata({}, _load_frontmatter(frontmatter))
 
     segments = load_transcript(transcript_path)
-    chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
+    parser_result = _prepare_transcript_chunks(segments, settings=settings)
 
-    sha_payload = "\n".join(chunk.text for chunk in chunks).encode("utf-8")
+    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
     sha256 = hashlib.sha256(sha_payload).hexdigest()
 
     source_type = str(frontmatter.get("source_type") or "transcript")
@@ -939,9 +939,9 @@ def run_pipeline_for_transcript(
 
     return _persist_transcript_document(
         session,
-        chunks=chunks,
-        parser=parser,
-        parser_version=parser_version,
+        chunks=parser_result.chunks,
+        parser=parser_result.parser,
+        parser_version=parser_result.parser_version,
         frontmatter=frontmatter,
         settings=settings,
         sha256=sha256,
