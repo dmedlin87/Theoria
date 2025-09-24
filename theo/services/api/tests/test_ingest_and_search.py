@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+import threading
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from theo.services.api.app.main import app
+
+
+def _start_static_server(directory: Path) -> tuple[ThreadingHTTPServer, threading.Thread]:
+    handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread
 
 
 def _ingest_markdown(client: TestClient, *, suffix: str = "") -> str:
@@ -143,3 +154,31 @@ def test_youtube_url_ingestion_uses_fixture_transcript() -> None:
 
         search = client.get("/search", params={"osis": "John.1.1-5"}).json()
         assert any(result["document_id"] == document_id for result in search["results"])
+
+
+def test_html_url_ingestion_and_searchable() -> None:
+    html_dir = Path("fixtures/html").resolve()
+    server, thread = _start_static_server(html_dir)
+    try:
+        with TestClient(app) as client:
+            url = f"http://127.0.0.1:{server.server_port}/sample_page.html"
+            response = client.post("/ingest/url", json={"url": url})
+            assert response.status_code == 200, response.text
+            document_id = response.json()["document_id"]
+
+            document = client.get(f"/documents/{document_id}").json()
+            assert document["source_type"] == "web_page"
+            assert document["source_url"] == "https://example.com/sample-sermon"
+            assert document["title"] == "Sample HTML Sermon"
+            assert any("John 1:1-5" in passage["text"] for passage in document["passages"])
+            assert all("ignore this script" not in passage["text"] for passage in document["passages"])
+
+            search = client.get("/search", params={"q": "reflection"}).json()
+            assert any(result["document_id"] == document_id for result in search["results"])
+
+            osis = client.get("/search", params={"osis": "John.1.1-5"}).json()
+            assert any(result["document_id"] == document_id for result in osis["results"])
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()

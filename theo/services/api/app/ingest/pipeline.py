@@ -6,9 +6,13 @@ import hashlib
 import json
 import shutil
 from datetime import date, datetime
+from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
+from urllib.request import Request, urlopen
 
 from uuid import uuid4
 
@@ -227,6 +231,11 @@ def _extract_youtube_video_id(url: str) -> str:
     raise UnsupportedSourceError(f"Unsupported URL for ingestion: {url}")
 
 
+def _is_youtube_url(url: str) -> bool:
+    host = urlparse(url).netloc.lower()
+    return "youtube" in host or "youtu.be" in host
+
+
 def _prepare_text_chunks(text: str, *, settings) -> tuple[list[Chunk], str, str]:
     chunks = chunk_text(text, max_tokens=settings.max_chunk_tokens)
     return chunks, "plain_text", "0.1.0"
@@ -265,6 +274,175 @@ def _prepare_transcript_chunks(
         max_window_seconds=getattr(settings, "transcript_max_window", 40.0),
     )
     return chunks, "transcript", "0.3.0"
+
+
+class _HTMLMetadataParser(HTMLParser):
+    """Parse minimal metadata from an HTML page."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.title: str | None = None
+        self.canonical_url: str | None = None
+        self._capture_title = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        name = tag.lower()
+        if name == "title":
+            self._capture_title = True
+            return
+
+        attr_map = {key.lower(): (value or "") for key, value in attrs}
+        if name == "link":
+            rel = attr_map.get("rel", "")
+            rel_values = {item.strip().lower() for item in rel.split() if item}
+            if "canonical" in rel_values and not self.canonical_url:
+                href = attr_map.get("href")
+                if href:
+                    self.canonical_url = href.strip()
+        elif name == "meta":
+            prop = attr_map.get("property") or attr_map.get("name") or ""
+            prop_lower = prop.lower()
+            content = attr_map.get("content")
+            if content:
+                content = content.strip()
+            if not content:
+                return
+            if prop_lower == "og:title" and not self.title:
+                self.title = content
+            if prop_lower in {"og:url", "twitter:url"} and not self.canonical_url:
+                self.canonical_url = content
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "title":
+            self._capture_title = False
+
+    def handle_data(self, data: str) -> None:
+        if not self._capture_title:
+            return
+        text = data.strip()
+        if text and not self.title:
+            self.title = text
+
+
+class _HTMLTextExtractor(HTMLParser):
+    """Convert HTML into a normalized text representation."""
+
+    _BLOCK_TAGS = {
+        "article",
+        "aside",
+        "blockquote",
+        "br",
+        "div",
+        "footer",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "li",
+        "main",
+        "nav",
+        "p",
+        "pre",
+        "section",
+        "summary",
+        "ul",
+        "ol",
+    }
+
+    _SKIP_TAGS = {"script", "style", "noscript"}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._parts: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        lower = tag.lower()
+        if lower in self._SKIP_TAGS:
+            self._skip_depth += 1
+            return
+        if lower == "br":
+            self._emit_newline()
+        elif lower in self._BLOCK_TAGS:
+            self._emit_paragraph_break()
+
+    def handle_endtag(self, tag: str) -> None:
+        lower = tag.lower()
+        if lower in self._SKIP_TAGS:
+            if self._skip_depth:
+                self._skip_depth -= 1
+            return
+        if lower in self._BLOCK_TAGS and lower != "br":
+            self._emit_paragraph_break()
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            return
+        text = unescape(data)
+        if not text.strip():
+            return
+        if self._parts and not self._parts[-1].endswith((" ", "\n")):
+            self._parts.append(" ")
+        self._parts.append(text.strip())
+
+    def _emit_newline(self) -> None:
+        if not self._parts or self._parts[-1].endswith("\n"):
+            return
+        self._parts.append("\n")
+
+    def _emit_paragraph_break(self) -> None:
+        if not self._parts:
+            return
+        if self._parts[-1].endswith("\n\n"):
+            return
+        if not self._parts[-1].endswith("\n"):
+            self._parts.append("\n")
+        self._parts.append("\n")
+
+    def get_text(self) -> str:
+        joined = "".join(self._parts)
+        lines = [line.strip() for line in joined.splitlines()]
+        filtered = [line for line in lines if line]
+        return "\n\n".join(filtered).strip()
+
+
+def _parse_html_metadata(html: str) -> dict[str, str | None]:
+    parser = _HTMLMetadataParser()
+    parser.feed(html)
+    parser.close()
+    return {"title": parser.title, "canonical_url": parser.canonical_url}
+
+
+def _html_to_text(html: str) -> str:
+    extractor = _HTMLTextExtractor()
+    extractor.feed(html)
+    extractor.close()
+    return extractor.get_text()
+
+
+def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]:
+    request = Request(url, headers={"User-Agent": settings.user_agent})
+    try:
+        with urlopen(request) as response:
+            final_url = response.geturl()
+            raw = response.read()
+            encoding = response.headers.get_content_charset() or "utf-8"
+            try:
+                html = raw.decode(encoding, errors="replace")
+            except LookupError:
+                html = raw.decode("utf-8", errors="replace")
+    except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+        raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
+
+    metadata = _parse_html_metadata(html)
+    metadata.setdefault("canonical_url", final_url)
+    metadata.setdefault("title", None)
+    metadata["source_url"] = metadata.get("canonical_url") or final_url
+    metadata["final_url"] = final_url
+    return html, metadata
 
 def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, Any] | None = None) -> Document:
     """Execute the file ingestion pipeline synchronously."""
@@ -390,32 +568,145 @@ def run_pipeline_for_url(
     source_type: str | None = None,
     frontmatter: dict[str, Any] | None = None,
 ) -> Document:
-    """Ingest supported URLs (currently YouTube) into the document store."""
+    """Ingest supported URLs into the document store."""
 
     settings = get_settings()
-    resolved_source_type = source_type or "youtube"
-    if resolved_source_type != "youtube":
-        raise UnsupportedSourceError(f"Unsupported source type for URL ingestion: {resolved_source_type}")
+    resolved_source_type = source_type or ("youtube" if _is_youtube_url(url) else "web_page")
 
-    video_id = _extract_youtube_video_id(url)
-    metadata = _load_youtube_metadata(settings, video_id)
+    if resolved_source_type == "youtube":
+        video_id = _extract_youtube_video_id(url)
+        metadata = _load_youtube_metadata(settings, video_id)
+        frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+
+        segments, transcript_path = _load_youtube_transcript(settings, video_id)
+        chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
+
+        sha_payload = "\n".join(chunk.text for chunk in chunks).encode("utf-8")
+        sha256 = hashlib.sha256(sha_payload).hexdigest()
+
+        document = Document(
+            id=str(uuid4()),
+            title=frontmatter.get("title") or f"YouTube Video {video_id}",
+            authors=_ensure_list(frontmatter.get("authors")),
+            source_url=frontmatter.get("source_url") or url,
+            source_type="youtube",
+            collection=frontmatter.get("collection"),
+            channel=frontmatter.get("channel"),
+            video_id=video_id,
+            duration_seconds=frontmatter.get("duration_seconds"),
+            bib_json=frontmatter.get("bib_json"),
+            sha256=sha256,
+        )
+
+        session.add(document)
+        session.flush()
+
+        chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
+        passages: list[Passage] = []
+        for chunk in chunks:
+            detected = detect_osis_references(chunk.text)
+            meta = _normalise_passage_meta(
+                detected,
+                chunk_hints,
+                parser=parser,
+                parser_version=parser_version,
+                chunker_version="0.3.0",
+                chunk_index=chunk.index or 0,
+                speakers=chunk.speakers,
+            )
+            osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
+            passage = Passage(
+                document_id=document.id,
+                t_start=chunk.t_start,
+                t_end=chunk.t_end,
+                start_char=chunk.start_char,
+                end_char=chunk.end_char,
+                text=chunk.text,
+                tokens=len(chunk.text.split()),
+                osis_ref=osis_value,
+                lexeme=chunk.text.lower(),
+                meta=meta,
+            )
+            session.add(passage)
+            passages.append(passage)
+
+        session.commit()
+
+        storage_dir = settings.storage_root / document.id
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        normalized_payload = {
+            "document": {
+                "id": document.id,
+                "title": document.title,
+                "source_type": document.source_type,
+                "channel": document.channel,
+                "video_id": document.video_id,
+                "sha256": document.sha256,
+            },
+            "passages": [
+                {
+                    "id": passage.id,
+                    "text": passage.text,
+                    "osis_ref": passage.osis_ref,
+                    "t_start": passage.t_start,
+                    "t_end": passage.t_end,
+                    "meta": passage.meta,
+                }
+                for passage in passages
+            ],
+        }
+
+        if transcript_path and transcript_path.exists():
+            dest = storage_dir / transcript_path.name
+            shutil.copy(transcript_path, dest)
+        else:
+            transcript_json = [
+                {
+                    "text": passage.text,
+                    "start": passage.t_start,
+                    "end": passage.t_end,
+                    "speakers": passage.meta.get("speakers") if passage.meta else None,
+                }
+                for passage in passages
+            ]
+            (storage_dir / "transcript.json").write_text(
+                json.dumps(transcript_json, indent=2), encoding="utf-8"
+            )
+
+        normalized_path = storage_dir / "normalized.json"
+        normalized_path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
+
+        document.storage_path = str(storage_dir)
+        session.add(document)
+        session.commit()
+
+        return document
+
+    if resolved_source_type not in {"web_page", "html", "website"}:
+        raise UnsupportedSourceError(
+            f"Unsupported source type for URL ingestion: {resolved_source_type}"
+        )
+
+    html, metadata = _fetch_web_document(settings, url)
+    text_content = _html_to_text(html)
+    if not text_content:
+        raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
+
     frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
 
-    segments, transcript_path = _load_youtube_transcript(settings, video_id)
-    chunks, parser, parser_version = _prepare_transcript_chunks(segments, settings=settings)
-
+    chunks, parser, parser_version = _prepare_text_chunks(text_content, settings=settings)
     sha_payload = "\n".join(chunk.text for chunk in chunks).encode("utf-8")
     sha256 = hashlib.sha256(sha_payload).hexdigest()
 
     document = Document(
         id=str(uuid4()),
-        title=frontmatter.get("title") or f"YouTube Video {video_id}",
+        title=frontmatter.get("title") or metadata.get("title") or url,
         authors=_ensure_list(frontmatter.get("authors")),
-        source_url=url,
-        source_type="youtube",
+        source_url=frontmatter.get("source_url") or metadata.get("canonical_url") or url,
+        source_type="web_page",
         collection=frontmatter.get("collection"),
+        pub_date=_coerce_date(frontmatter.get("date")),
         channel=frontmatter.get("channel"),
-        video_id=video_id,
         duration_seconds=frontmatter.get("duration_seconds"),
         bib_json=frontmatter.get("bib_json"),
         sha256=sha256,
@@ -435,13 +726,10 @@ def run_pipeline_for_url(
             parser_version=parser_version,
             chunker_version="0.3.0",
             chunk_index=chunk.index or 0,
-            speakers=chunk.speakers,
         )
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         passage = Passage(
             document_id=document.id,
-            t_start=chunk.t_start,
-            t_end=chunk.t_end,
             start_char=chunk.start_char,
             end_char=chunk.end_char,
             text=chunk.text,
@@ -462,8 +750,7 @@ def run_pipeline_for_url(
             "id": document.id,
             "title": document.title,
             "source_type": document.source_type,
-            "channel": document.channel,
-            "video_id": document.video_id,
+            "source_url": document.source_url,
             "sha256": document.sha256,
         },
         "passages": [
@@ -471,29 +758,13 @@ def run_pipeline_for_url(
                 "id": passage.id,
                 "text": passage.text,
                 "osis_ref": passage.osis_ref,
-                "t_start": passage.t_start,
-                "t_end": passage.t_end,
                 "meta": passage.meta,
             }
             for passage in passages
         ],
     }
 
-    if transcript_path and transcript_path.exists():
-        dest = storage_dir / transcript_path.name
-        shutil.copy(transcript_path, dest)
-    else:
-        transcript_json = [
-            {
-                "text": passage.text,
-                "start": passage.t_start,
-                "end": passage.t_end,
-                "speakers": passage.meta.get("speakers") if passage.meta else None,
-            }
-            for passage in passages
-        ]
-        (storage_dir / "transcript.json").write_text(json.dumps(transcript_json, indent=2), encoding="utf-8")
-
+    (storage_dir / "content.txt").write_text(text_content, encoding="utf-8")
     normalized_path = storage_dir / "normalized.json"
     normalized_path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
 
