@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import heapq
 from typing import Iterable
 
-from sqlalchemy import func, literal, select
+from sqlalchemy import and_, func, literal, select
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
@@ -68,7 +68,9 @@ def _fallback_search(session: Session, request: HybridSearchRequest) -> list[Hyb
     stmt = select(Passage, Document).join(Document)
     stmt = _apply_common_filters(stmt, request)
     if request.query:
-        stmt = stmt.where(Passage.text.ilike(f"%{request.query}%"))
+        token_clauses = [Passage.text.ilike(f"%{token}%") for token in query_tokens]
+        if token_clauses:
+            stmt = stmt.where(and_(*token_clauses))
     if request.osis:
         stmt = stmt.where(Passage.osis_ref.isnot(None))
 
