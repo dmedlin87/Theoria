@@ -1,0 +1,20 @@
+import { NextRequest, NextResponse } from "next/server";
+
+import { getApiBaseUrl } from "../../../lib/api";
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const payload = await request.json();
+  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/ingest/url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.text();
+  return new NextResponse(body, {
+    status: response.status,
+    headers: {
+      "content-type": response.headers.get("content-type") ?? "application/json",
+    },
+  });
+}
