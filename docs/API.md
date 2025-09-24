@@ -77,6 +77,86 @@ The request uses `multipart/form-data` with the following fields:
 The pipeline parses the transcript and indexes generated passages. Audio, when
 provided, is stored long enough to support downstream enrichments.
 
+## Settings & AI Providers
+
+### `GET /ai/models`
+
+Lists registered model presets. Responses include provider metadata, token limits, and guardrail flags:
+
+```json
+[
+  {
+    "id": "gpt-4o-mini@openai",
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "max_output_tokens": 2000,
+    "supports_citations": true,
+    "cost": {
+      "input_per_million": 5.0,
+      "output_per_million": 15.0
+    }
+  }
+]
+```
+
+### `POST /ai/chat`
+
+Initiates a grounded conversation using the selected preset. Request body:
+
+```json
+{
+  "model_preset": "gpt-4o-mini@openai",
+  "messages": [
+    { "role": "system", "content": "optional override" },
+    { "role": "user", "content": "Summarise John 1:1" }
+  ],
+  "retrieval_filters": {
+    "osis": "John.1.1-5",
+    "collection": "sermons"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "model_preset": "gpt-4o-mini@openai",
+  "answer": "In the beginning...",
+  "citations": [
+    {
+      "osis": "John.1.1",
+      "document_id": "doc-1",
+      "anchor_type": "page",
+      "anchor_value": "12"
+    }
+  ],
+  "retrieval_snapshot": {
+    "passage_ids": ["passage-1"],
+    "filters": { "osis": "John.1.1-5" }
+  }
+}
+```
+
+If a provider reply omits citations or references unsupported OSIS ranges the endpoint returns **422 Unprocessable Entity**.
+
+### `PUT /settings/ai/providers/{provider}`
+
+Upserts provider credentials. Example payload for OpenAI:
+
+```json
+{
+  "api_key": "sk-...",
+  "base_url": "https://api.openai.com/v1",
+  "default_model": "gpt-4o-mini",
+  "extra_headers": {
+    "OpenAI-Organization": "org-123"
+  }
+}
+```
+
+Keys are stored encrypted. The API responds with the provider id and masked metadata. Only admin-authenticated clients may call this endpoint.
+
 ## Background jobs
 
 Background job endpoints enqueue asynchronous work to reprocess existing
@@ -95,6 +175,19 @@ it.
 
 Queues a metadata enrichment task that re-hydrates topics, provenance score, and
 other derived metadata.
+
+### `POST /jobs/topic_digest`
+
+Generates the weekly OpenAlex-enhanced topic digest. Optional body parameters:
+
+```json
+{
+  "since": "2024-08-05T00:00:00Z",
+  "notify": ["alerts@theo.app"]
+}
+```
+
+The task clusters new documents by `primary_topic` + top-N topics and stores a `digest` document with summary paragraphs.
 
 ## Search
 
@@ -304,3 +397,38 @@ Response:
   ]
 }
 ```
+
+### `POST /export/deliverable`
+
+Creates sermon/lesson/Q&A deliverables backed by AI syntheses and deterministic retrieval. Request body:
+
+```json
+{
+  "type": "sermon",
+  "source_ids": ["doc-1", "doc-2"],
+  "model_preset": "gpt-4o-mini@openai",
+  "formats": ["md", "ndjson", "csv"],
+  "filters": {
+    "osis": "Romans.8",
+    "collection": "romans-series"
+  }
+}
+```
+
+The API immediately returns a job descriptor:
+
+```json
+{
+  "export_id": "01J2Y3A7Z8X4C6V0B7N9P",
+  "status": "queued",
+  "formats": ["md", "ndjson", "csv"],
+  "manifest_path": "/exports/01J2Y3A7Z8X4C6V0B7N9P/manifest.json"
+}
+```
+
+When the job completes the assets live under `STORAGE_ROOT/exports/{export_id}/` with:
+
+- `manifest.json` containing `export_id`, `schema_version`, `generated_at`, `filters`, `git_sha`, and `model_preset`.
+- One file per requested format (`sermon.md`, `sermon.ndjson`, `sermon.csv`).
+
+Clients may poll `GET /export/deliverable/{export_id}` to retrieve signed download URLs.
