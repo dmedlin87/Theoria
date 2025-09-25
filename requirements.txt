@@ -9,3 +9,4 @@ webvtt-py>=0.4.6,<1
 PyYAML>=6.0,<7
 httpx>=0.27,<0.28
 python-multipart>=0.0.7,<0.0.8
+pytest

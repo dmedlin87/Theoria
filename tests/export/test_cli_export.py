@@ -53,8 +53,8 @@ def _build_document_export() -> DocumentExportResponse:
         topics=["Theology", "Grace"],
         enrichment_version=2,
         primary_topic="Theology",
-        provenance_score=7,
-        metadata={"primary_topic": "Theology"},
+    provenance_score=7,
+    meta={"primary_topic": "Theology"},
         passages=[],
     )
     return DocumentExportResponse(

@@ -21,3 +21,61 @@ pip install -r requirements.txt
 ```
 
 After the dependencies are installed you can run `pytest` from the repository root to execute the automated test suite.
+
+## Running the Web UI (Next.js frontend)
+
+The Next.js application lives under `theo/services/web` (there is **no** `package.json` at the repository root). If you run `npm run dev` from the root you will see an error similar to:
+
+```text
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '.../TheoEngine/package.json'
+```
+
+Follow these steps instead:
+
+1. Open a terminal at the repo root (optional if you are already there):
+
+```powershell
+cd c:\Users\dmedl\Projects\TheoEngine
+```
+
+1. Start (or keep running) the API in another terminal (SQLite default):
+
+```powershell
+uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+1. In a new terminal start the web UI (point it at the API):
+
+```powershell
+cd .\theo\services\web
+$Env:NEXT_PUBLIC_API_BASE_URL = "http://127.0.0.1:8000"
+npm install   # first time only
+npm run dev
+```
+
+1. Open <http://localhost:3000> in your browser.
+
+### Docker alternative (Postgres + Redis + API + Web)
+
+```powershell
+cd infra
+docker compose up --build -d
+```
+
+Then visit <http://localhost:3000> (API docs at <http://localhost:8000/docs>). Use `make logs` for streaming logs and `docker compose down` to stop.
+
+### One-command local dev (API + Web without Docker)
+
+You can use the helper script to launch both services (FastAPI + Next.js) with one command:
+
+```powershell
+./scripts/dev.ps1
+```
+
+Options:
+
+```powershell
+./scripts/dev.ps1 -ApiPort 8010 -WebPort 3100 -BindHost 0.0.0.0
+```
+
+Stops with Ctrl+C (web) and automatically cleans up the API background job.
