@@ -1,0 +1,14 @@
+{
+  "John.1.1": [
+    {"position": 1, "surface": "\u1f18\u03bd", "lemma": "\u1f10\u03bd", "morph": "PREP", "gloss": "in"},
+    {"position": 2, "surface": "\u1f00\u03c1\u03c7\u1fc6", "lemma": "\u1f00\u03c1\u03c7\u1f74", "morph": "N-DSF", "gloss": "beginning"},
+    {"position": 3, "surface": "\u1f26\u03bd", "lemma": "\u03b5\u1fd6\u03bc\u03b9", "morph": "V-IXI-3S", "gloss": "was"},
+    {"position": 4, "surface": "\u1f41", "lemma": "\u1f41", "morph": "T-NSM", "gloss": "the"},
+    {"position": 5, "surface": "\u039b\u03cc\u03b3\u03bf\u03c2", "lemma": "\u03bb\u03cc\u03b3\u03bf\u03c2", "morph": "N-NSM", "gloss": "Word"}
+  ],
+  "Luke.2.1": [
+    {"position": 1, "surface": "\u1f08\u03bd\u03b5\u03b3\u03ad\u03bd\u03b5\u03c4\u03bf", "lemma": "\u03b3\u03af\u03bd\u03bf\u03bc\u03b1\u03b9", "morph": "V-API-3S", "gloss": "it happened"},
+    {"position": 2, "surface": "\u03b4\u1f70", "lemma": "\u03b4\u03ad", "morph": "CONJ", "gloss": "and"},
+    {"position": 3, "surface": "\u03b5\u03bd", "lemma": "\u1f10\u03bd", "morph": "PREP", "gloss": "in"}
+  ]
+}
