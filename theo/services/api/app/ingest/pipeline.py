@@ -117,6 +117,26 @@ def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str
     return combined
 
 
+def _serialise_frontmatter(frontmatter: dict[str, Any]) -> str:
+    """Render a frontmatter dictionary to JSON, normalising complex types."""
+
+    def _normalise(value: Any):
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        if isinstance(value, (date, datetime)):
+            return value.isoformat()
+        if isinstance(value, Path):
+            return str(value)
+        if isinstance(value, dict):
+            return {k: _normalise(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [_normalise(item) for item in value]
+        return str(value)
+
+    normalised = {key: _normalise(val) for key, val in frontmatter.items()}
+    return json.dumps(normalised, indent=2, ensure_ascii=False)
+
+
 def _normalise_passage_meta(
     detected: DetectedOsis,
     hints: list[str] | None,
@@ -944,6 +964,10 @@ def _persist_text_document(
     storage_dir = settings.storage_root / document.id
     storage_dir.mkdir(parents=True, exist_ok=True)
 
+    if frontmatter:
+        frontmatter_path = storage_dir / "frontmatter.json"
+        frontmatter_path.write_text(_serialise_frontmatter(frontmatter) + "\n", encoding="utf-8")
+
     if original_path and original_path.exists():
         dest_path = storage_dir / original_path.name
         shutil.copy(original_path, dest_path)
@@ -1188,6 +1212,10 @@ def _persist_transcript_document(
 
     storage_dir = settings.storage_root / document.id
     storage_dir.mkdir(parents=True, exist_ok=True)
+
+    if frontmatter:
+        frontmatter_path = storage_dir / "frontmatter.json"
+        frontmatter_path.write_text(_serialise_frontmatter(frontmatter) + "\n", encoding="utf-8")
 
     artifacts: dict[str, str] = {}
     if transcript_path and transcript_path.exists():
