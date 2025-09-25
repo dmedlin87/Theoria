@@ -26,6 +26,11 @@ class JobListResponse(APIModel):
     jobs: list[JobStatus]
 
 
+class JobQueuedResponse(APIModel):
+    document_id: str
+    status: str
+
+
 class JobUpdateRequest(APIModel):
     status: str | None = None
     error: str | None = None

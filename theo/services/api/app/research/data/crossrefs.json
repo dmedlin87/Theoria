@@ -1,0 +1,27 @@
+{
+  "John.1.1": [
+    {
+      "target": "Genesis.1.1",
+      "weight": 0.95,
+      "relation_type": "parallel",
+      "summary": "Creation language links the Logos to Genesis prologue.",
+      "dataset": "openbible"
+    },
+    {
+      "target": "Colossians.1.16",
+      "weight": 0.72,
+      "relation_type": "theme",
+      "summary": "Christ as agent of creation echoes Paul's hymn.",
+      "dataset": "openbible"
+    }
+  ],
+  "Luke.2.1": [
+    {
+      "target": "Acts.5.37",
+      "weight": 0.43,
+      "relation_type": "historical",
+      "summary": "Shares census backdrop referenced in Acts.",
+      "dataset": "openbible"
+    }
+  ]
+}

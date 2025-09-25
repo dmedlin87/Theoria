@@ -144,4 +144,92 @@ class IngestionJob(Base):
     document: Mapped[Document | None] = relationship("Document")
 
 
-__all__ = ["Document", "Passage", "AppSetting", "DocumentAnnotation", "IngestionJob"]
+class ResearchNote(Base):
+    """Structured study note anchored to an OSIS reference."""
+
+    __tablename__ = "research_notes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    osis: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    stance: Mapped[str | None] = mapped_column(String, nullable=True)
+    claim_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    evidences: Mapped[list["NoteEvidence"]] = relationship(
+        "NoteEvidence", back_populates="note", cascade="all, delete-orphan"
+    )
+
+
+class NoteEvidence(Base):
+    """Citation or supporting reference attached to a research note."""
+
+    __tablename__ = "note_evidence"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    note_id: Mapped[str] = mapped_column(
+        String, ForeignKey("research_notes.id", ondelete="CASCADE"), nullable=False
+    )
+    source_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    osis_refs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    citation: Mapped[str | None] = mapped_column(String, nullable=True)
+    snippet: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    note: Mapped[ResearchNote] = relationship("ResearchNote", back_populates="evidences")
+
+
+class CrossReference(Base):
+    """Graph edge linking two OSIS references together."""
+
+    __tablename__ = "cross_references"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    source_osis: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    target_osis: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    relation_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dataset: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
+__all__ = [
+    "Document",
+    "Passage",
+    "AppSetting",
+    "DocumentAnnotation",
+    "IngestionJob",
+    "ResearchNote",
+    "NoteEvidence",
+    "CrossReference",
+]

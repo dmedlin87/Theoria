@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from .core.database import Base, get_engine
 
-from .routes import ai, documents, export, features, ingest, jobs, search, verses
+from .routes import ai, documents, export, features, ingest, jobs, research, search, verses
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(verses.router, prefix="/verses", tags=["verses"])
     app.include_router(documents.router, prefix="/documents", tags=["documents"])
     app.include_router(features.router, prefix="/features", tags=["features"])
+    app.include_router(research.router, prefix="/research", tags=["research"])
 
     app.include_router(ai.router, prefix="/ai", tags=["ai"])
 

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_session
 from ..db.models import Document, IngestionJob
-from ..models.jobs import JobListResponse, JobStatus
+from ..models.jobs import JobListResponse, JobQueuedResponse, JobStatus
 from ..workers.tasks import enrich_document as enqueue_enrich_task
 from ..workers.tasks import process_file
 
@@ -79,7 +79,11 @@ def get_job(job_id: str, session: Session = Depends(get_session)) -> JobStatus:
     return _serialize_job(job)
 
 
-@router.post("/reparse/{document_id}", status_code=status.HTTP_202_ACCEPTED, response_model=JobStatus)
+@router.post(
+    "/reparse/{document_id}",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobQueuedResponse,
+)
 def enqueue_reparse_job(
     document_id: str,
     session: Session = Depends(get_session),
@@ -104,7 +108,11 @@ def enqueue_reparse_job(
     session.add(job)
     session.commit()
 
-    async_result = process_file.delay(document.id, str(source_file), None, job.id)
+    delay_callable = process_file.delay
+    try:
+        async_result = delay_callable(document.id, str(source_file), None, job.id)
+    except TypeError:
+        async_result = delay_callable(document.id, str(source_file), None)
     task_id = getattr(async_result, "id", None)
     if task_id:
         job.task_id = task_id
@@ -112,7 +120,7 @@ def enqueue_reparse_job(
         session.commit()
 
     session.refresh(job)
-    return _serialize_job(job)
+    return JobQueuedResponse(document_id=document.id, status=job.status)
 
 
 @router.post("/enrich/{document_id}", status_code=status.HTTP_202_ACCEPTED, response_model=JobStatus)
