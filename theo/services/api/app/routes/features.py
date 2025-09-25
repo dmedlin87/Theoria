@@ -18,3 +18,15 @@ def list_features() -> dict[str, bool]:
         "document_annotations": True,
         "ai_copilot": True,
     }
+
+
+@router.get("/discovery", summary="Structured discovery metadata")
+def discovery() -> dict[str, dict[str, bool]]:
+    settings = get_settings()
+    return {
+        "features": {
+            "research": True,
+            "contradictions": getattr(settings, "contradictions_enabled", False),
+            "geo": getattr(settings, "geo_enabled", False),
+        }
+    }

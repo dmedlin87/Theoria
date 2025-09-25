@@ -107,3 +107,31 @@ class ResearchNotesResponse(APIModel):
 
 class ResearchNoteResponse(APIModel):
     note: ResearchNote
+
+
+class ContradictionItem(APIModel):
+    id: str
+    osis_a: str
+    osis_b: str
+    summary: str | None = None
+    source: str | None = None
+    tags: list[str] | None = None
+    weight: float = 1.0
+
+
+class ContradictionSearchResponse(APIModel):
+    items: list[ContradictionItem] = Field(default_factory=list)
+
+
+class GeoPlaceItem(APIModel):
+    slug: str
+    name: str
+    lat: float | None = None
+    lng: float | None = None
+    confidence: float | None = None
+    aliases: list[str] | None = None
+    sources: dict[str, Any] | list[dict[str, Any]] | None = None
+
+
+class GeoPlaceSearchResponse(APIModel):
+    items: list[GeoPlaceItem] = Field(default_factory=list)

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from hashlib import sha256
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -10,11 +13,20 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_session
 from ..db.models import Document, IngestionJob
-from ..models.jobs import JobListResponse, JobQueuedResponse, JobStatus
+from ..models.jobs import (
+    JobEnqueueRequest,
+    JobEnqueueResponse,
+    JobListResponse,
+    JobQueuedResponse,
+    JobStatus,
+)
 from ..workers.tasks import enrich_document as enqueue_enrich_task
 from ..workers.tasks import process_file
+from ..workers.tasks import celery
 
 router = APIRouter()
+
+IDEMPOTENCY_TTL = timedelta(minutes=10)
 
 
 def _resolve_source_file(storage_path: str | None) -> Path:
@@ -154,3 +166,78 @@ def enqueue_enrichment_job(
 
     session.refresh(job)
     return _serialize_job(job)
+
+
+def _normalize_args(args: dict[str, object] | None) -> dict[str, object]:
+    return dict(args or {})
+
+
+def _hash_args(args: dict[str, object]) -> str:
+    encoded = json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return sha256(encoded.encode("utf-8")).hexdigest()
+
+
+@router.post("/enqueue", response_model=JobEnqueueResponse, status_code=status.HTTP_202_ACCEPTED)
+def enqueue_job(
+    payload: JobEnqueueRequest,
+    session: Session = Depends(get_session),
+) -> JobEnqueueResponse:
+    """Enqueue a task with deterministic, idempotent responses."""
+
+    args = _normalize_args(payload.args)
+    args_hash = _hash_args(args)
+    now = datetime.now(UTC)
+    cutoff = now - IDEMPOTENCY_TTL
+
+    existing = (
+        session.query(IngestionJob)
+        .filter(
+            IngestionJob.job_type == payload.task,
+            IngestionJob.args_hash == args_hash,
+            IngestionJob.created_at >= cutoff,
+        )
+        .order_by(IngestionJob.created_at.desc())
+        .first()
+    )
+    if existing is not None:
+        return JobEnqueueResponse(
+            job_id=existing.id,
+            task=existing.job_type,
+            args_hash=args_hash,
+            queued_at=existing.created_at,
+            schedule_at=existing.scheduled_at,
+            status_url=f"/jobs/{existing.id}",
+        )
+
+    schedule_at = payload.schedule_at
+    if schedule_at is not None and schedule_at.tzinfo is None:
+        schedule_at = schedule_at.replace(tzinfo=UTC)
+
+    job = IngestionJob(
+        job_type=payload.task,
+        status="queued",
+        payload={"args": args, "schedule_at": schedule_at.isoformat() if schedule_at else None},
+        args_hash=args_hash,
+        scheduled_at=schedule_at,
+    )
+    session.add(job)
+    session.flush()
+
+    send_kwargs = args.copy()
+    eta = schedule_at
+    result = celery.send_task(payload.task, kwargs=send_kwargs, eta=eta)  # type: ignore[arg-type]
+    task_id = getattr(result, "id", None)
+    if task_id:
+        job.task_id = task_id
+
+    session.commit()
+    session.refresh(job)
+
+    return JobEnqueueResponse(
+        job_id=job.id,
+        task=job.job_type,
+        args_hash=args_hash,
+        queued_at=job.created_at,
+        schedule_at=job.scheduled_at,
+        status_url=f"/jobs/{job.id}",
+    )

@@ -5,8 +5,10 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from sqlalchemy.orm import Session
 
 from .core.database import Base, get_engine
+from .db.seeds import seed_reference_data
 
 from .routes import ai, documents, export, features, ingest, jobs, research, search, verses
 
@@ -14,6 +16,8 @@ from .routes import ai, documents, export, features, ingest, jobs, research, sea
 async def lifespan(_: FastAPI):
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
+    with Session(engine) as session:
+        seed_reference_data(session)
     yield
 
 

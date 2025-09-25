@@ -37,3 +37,18 @@ class JobUpdateRequest(APIModel):
     document_id: str | None = None
     task_id: str | None = None
     payload: dict[str, Any] | None = Field(default=None)
+
+
+class JobEnqueueRequest(APIModel):
+    task: str
+    args: dict[str, Any] | None = Field(default_factory=dict)
+    schedule_at: datetime | None = None
+
+
+class JobEnqueueResponse(APIModel):
+    job_id: str
+    task: str
+    args_hash: str
+    queued_at: datetime
+    schedule_at: datetime | None = None
+    status_url: str

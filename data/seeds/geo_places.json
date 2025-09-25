@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "bethlehem",
+    "name": "Bethlehem",
+    "lat": 31.7054,
+    "lng": 35.2024,
+    "confidence": 0.95,
+    "aliases": ["Beth-lehem", "Bethlehem Ephrathah"],
+    "sources": {
+      "dataset": "OpenBible.info",
+      "license": "CC BY 3.0"
+    }
+  },
+  {
+    "slug": "nazareth",
+    "name": "Nazareth",
+    "lat": 32.6996,
+    "lng": 35.3035,
+    "confidence": 0.92,
+    "aliases": ["Nazaret"],
+    "sources": {
+      "dataset": "OpenBible.info",
+      "license": "CC BY 3.0"
+    }
+  }
+]
