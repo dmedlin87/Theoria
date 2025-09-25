@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,6 +15,9 @@ from ..retriever.hybrid import hybrid_search
 from ..core.version import get_git_sha
 from .clients import GenerationError
 from .registry import LLMRegistry, get_llm_registry
+
+if TYPE_CHECKING:  # pragma: no cover - hints only
+    from .trails import TrailRecorder
 
 
 class GuardrailError(GenerationError):
@@ -125,6 +128,7 @@ def _guarded_answer(
     results: Sequence[HybridSearchResult],
     registry: LLMRegistry,
     model_hint: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> RAGAnswer:
     citations = _build_citations(results)
     if not citations:
@@ -163,11 +167,33 @@ def _guarded_answer(
         prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
         prompt = "\n".join(prompt_parts)
         client = model.build_client()
+        llm_payload = {
+            "prompt": prompt,
+            "model": model.model,
+            "registry_name": model.name,
+        }
         try:
             completion = client.generate(prompt=prompt, model=model.model)
-        except GenerationError:
+        except GenerationError as exc:
+            if recorder:
+                recorder.log_step(
+                    tool="llm.generate",
+                    action="generate_grounded_answer",
+                    status="failed",
+                    input_payload=llm_payload,
+                    output_digest=str(exc),
+                    error_message=str(exc),
+                )
             completion = None
-        if completion:
+        else:
+            if recorder:
+                recorder.log_step(
+                    tool="llm.generate",
+                    action="generate_grounded_answer",
+                    input_payload=llm_payload,
+                    output_payload={"completion": completion},
+                    output_digest=f"{len(completion)} characters",
+                )
             sources_line = "; ".join(
                 f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
             )
@@ -175,6 +201,31 @@ def _guarded_answer(
                 completion = completion.strip() + f"\n\nSources: {sources_line}"
             model_output = completion
             model_name = model.name
+
+    if recorder:
+        recorder.log_step(
+            tool="rag.compose",
+            action="compose_answer",
+            input_payload={
+                "question": question,
+                "citations": [
+                    {
+                        "index": citation.index,
+                        "osis": citation.osis,
+                        "anchor": citation.anchor,
+                        "snippet": citation.snippet,
+                        "passage_id": citation.passage_id,
+                    }
+                    for citation in citations
+                ],
+            },
+            output_payload={
+                "summary": summary_text,
+                "model_name": model_name,
+                "model_output": model_output,
+            },
+            output_digest=f"{len(summary_lines)} summary lines",
+        )
 
     return RAGAnswer(summary=summary_text, citations=citations, model_name=model_name, model_output=model_output)
 
@@ -191,11 +242,42 @@ def generate_verse_brief(
     question: str | None = None,
     filters: HybridSearchFilters | None = None,
     model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> VerseCopilotResponse:
     filters = filters or HybridSearchFilters()
     results = _search(session, query=question or osis, osis=osis, filters=filters)
     registry = get_llm_registry(session)
-    answer = _guarded_answer(session, question=question, results=results, registry=registry, model_hint=model_name)
+    if recorder:
+        recorder.log_step(
+            tool="hybrid_search",
+            action="retrieve_passages",
+            input_payload={
+                "query": question or osis,
+                "osis": osis,
+                "filters": filters,
+            },
+            output_payload=[
+                {
+                    "id": result.id,
+                    "osis": result.osis_ref,
+                    "document_id": result.document_id,
+                    "score": getattr(result, "score", None),
+                    "snippet": result.snippet,
+                }
+                for result in results
+            ],
+            output_digest=f"{len(results)} passages",
+        )
+    answer = _guarded_answer(
+        session,
+        question=question,
+        results=results,
+        registry=registry,
+        model_hint=model_name,
+        recorder=recorder,
+    )
+    if recorder:
+        recorder.record_citations(answer.citations)
     follow_ups = [
         "Compare historical and contemporary commentary",
         "Trace how this verse links to adjacent passages",
@@ -211,12 +293,43 @@ def generate_sermon_prep_outline(
     osis: str | None = None,
     filters: HybridSearchFilters | None = None,
     model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> SermonPrepResponse:
     filters = filters or HybridSearchFilters()
     query = topic if not osis else f"{topic} {osis}"
     results = _search(session, query=query, osis=osis, filters=filters, k=10)
     registry = get_llm_registry(session)
-    answer = _guarded_answer(session, question=query, results=results, registry=registry, model_hint=model_name)
+    if recorder:
+        recorder.log_step(
+            tool="hybrid_search",
+            action="retrieve_passages",
+            input_payload={
+                "query": query,
+                "osis": osis,
+                "filters": filters,
+            },
+            output_payload=[
+                {
+                    "id": result.id,
+                    "osis": result.osis_ref,
+                    "document_id": result.document_id,
+                    "score": getattr(result, "score", None),
+                    "snippet": result.snippet,
+                }
+                for result in results
+            ],
+            output_digest=f"{len(results)} passages",
+        )
+    answer = _guarded_answer(
+        session,
+        question=query,
+        results=results,
+        registry=registry,
+        model_hint=model_name,
+        recorder=recorder,
+    )
+    if recorder:
+        recorder.record_citations(answer.citations)
     outline = [
         "Opening: situate the passage within the wider canon",
         "Exposition: unpack key theological moves in the passages",

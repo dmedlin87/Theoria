@@ -21,6 +21,7 @@ from .routes import (
     research,
     search,
     transcripts,
+    trails,
     verses,
 )
 
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(research.router, prefix="/research", tags=["research"])
     app.include_router(creators.router, prefix="/creators", tags=["creators"])
     app.include_router(transcripts.router, prefix="/transcripts", tags=["transcripts"])
+    app.include_router(trails.router, prefix="/trails", tags=["trails"])
 
     app.include_router(ai.router, prefix="/ai", tags=["ai"])
 
