@@ -509,6 +509,77 @@ Provides a structured capability map, including research sub-features. Example:
 Use `features.contradictions` and `features.geo` to decide whether to surface
 the corresponding panels in the research dock.
 
+## Research trails
+
+Research trails expose the persisted audit log for each agent workflow run.
+They capture the stored plan, ordered steps, source citations, and the final
+answer payload. Use these endpoints to inspect how a response was produced and
+to replay it against the current corpus.
+
+### `GET /trails/{trail_id}`
+
+Returns a full `AgentTrail` record, including steps and sources:
+
+```json
+{
+  "id": "01J3D9Q8PRX6M0T7V4Z2",
+  "workflow": "verse_copilot",
+  "status": "completed",
+  "plan_md": "- Retrieve relevant passages...",
+  "final_md": "[1] In the beginning...",
+  "steps": [
+    {
+      "step_index": 0,
+      "tool": "hybrid_search",
+      "output_digest": "8 passages"
+    },
+    {
+      "step_index": 1,
+      "tool": "llm.generate",
+      "output_digest": "628 characters"
+    }
+  ],
+  "sources": [
+    {
+      "source_type": "passage",
+      "reference": "passage-1",
+      "meta": {
+        "osis": "John.1.1",
+        "anchor": "page 1"
+      }
+    }
+  ]
+}
+```
+
+### `POST /trails/{trail_id}/replay`
+
+Replays the stored workflow with the saved inputs. Optional body:
+
+```json
+{ "model": "gpt-4o-mini" }
+```
+
+If `model` is omitted, the original configuration is reused. Response:
+
+```json
+{
+  "trail_id": "01J3D9Q8PRX6M0T7V4Z2",
+  "original_output": { "answer": { "summary": "..." } },
+  "replay_output": { "answer": { "summary": "..." } },
+  "diff": {
+    "changed": false,
+    "summary_changed": false,
+    "added_citations": [],
+    "removed_citations": []
+  }
+}
+```
+
+**Limitations:** token accounting (`tokens_in`, `tokens_out`) is currently left
+null, and replay does not overwrite the stored `output_payload`. Clients should
+persist their own comparison history if needed.
+
 ## Reference datasets & seeds
 
 Theo Engine bundles starter datasets to light up the research dock without

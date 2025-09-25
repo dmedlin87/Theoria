@@ -440,6 +440,95 @@ class ContradictionSeed(Base):
     )
 
 
+class AgentTrail(Base):
+    """Persisted record of an automated agent workflow."""
+
+    __tablename__ = "agent_trails"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    workflow: Mapped[str] = mapped_column(String, nullable=False)
+    mode: Mapped[str | None] = mapped_column(String, nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="running")
+    plan_md: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_md: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_payload: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    output_payload: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_replayed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    steps: Mapped[list["AgentStep"]] = relationship(
+        "AgentStep",
+        back_populates="trail",
+        cascade="all, delete-orphan",
+        order_by="AgentStep.step_index",
+    )
+    sources: Mapped[list["TrailSource"]] = relationship(
+        "TrailSource", back_populates="trail", cascade="all, delete-orphan"
+    )
+
+
+class AgentStep(Base):
+    """Ordered step executed during a trail run."""
+
+    __tablename__ = "agent_steps"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    trail_id: Mapped[str] = mapped_column(String, ForeignKey("agent_trails.id", ondelete="CASCADE"))
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    tool: Mapped[str] = mapped_column(String, nullable=False)
+    action: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="completed")
+    input_payload: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    output_payload: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    output_digest: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tokens_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    trail: Mapped[AgentTrail] = relationship("AgentTrail", back_populates="steps")
+
+
+class TrailSource(Base):
+    """Source reference used during a trail run."""
+
+    __tablename__ = "trail_sources"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    trail_id: Mapped[str] = mapped_column(String, ForeignKey("agent_trails.id", ondelete="CASCADE"))
+    source_type: Mapped[str] = mapped_column(String, nullable=False)
+    reference: Mapped[str] = mapped_column(String, nullable=False)
+    meta: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    trail: Mapped[AgentTrail] = relationship("AgentTrail", back_populates="sources")
+
+
 class GeoPlace(Base):
     """Normalized lookup table for biblical geography."""
 
@@ -470,5 +559,8 @@ __all__ = [
     "NoteEvidence",
     "CrossReference",
     "ContradictionSeed",
+    "AgentTrail",
+    "AgentStep",
+    "TrailSource",
     "GeoPlace",
 ]

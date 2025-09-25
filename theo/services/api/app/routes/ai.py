@@ -20,6 +20,7 @@ from ..ai import (
     run_research_reconciliation,
 )
 from ..ai.rag import GuardrailError
+from ..ai.trails import TrailService
 from ..core.database import get_session
 from ..models.ai import (
     CollaborationRequest,
@@ -37,20 +38,46 @@ from ..analytics.topics import TopicDigest, generate_topic_digest, load_topic_di
 
 router = APIRouter()
 
+VERSE_COPILOT_PLAN = "\n".join(
+    [
+        "- Retrieve relevant passages with hybrid search",
+        "- Generate a grounded answer with the configured LLM",
+        "- Return citations and recommended follow-up prompts",
+    ]
+)
+
+SERMON_PREP_PLAN = "\n".join(
+    [
+        "- Search for passages aligned to the sermon topic",
+        "- Summarise retrieved context into a guardrailed outline",
+        "- Surface key points and citations for sermon preparation",
+    ]
+)
+
 
 @router.post("/verse", response_model_exclude_none=True)
 def verse_copilot(
     payload: VerseCopilotRequest,
     session: Session = Depends(get_session),
 ):
+    trail_service = TrailService(session)
     try:
-        return generate_verse_brief(
-            session,
-            osis=payload.osis,
-            question=payload.question,
-            filters=payload.filters,
-            model_name=payload.model,
-        )
+        with trail_service.start_trail(
+            workflow="verse_copilot",
+            plan_md=VERSE_COPILOT_PLAN,
+            mode="verse_copilot",
+            input_payload=payload.model_dump(mode="json"),
+        ) as recorder:
+            response = generate_verse_brief(
+                session,
+                osis=payload.osis,
+                question=payload.question,
+                filters=payload.filters,
+                model_name=payload.model,
+                recorder=recorder,
+            )
+            recorder.finalize(final_md=response.answer.summary, output_payload=response)
+            return response
     except GuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -60,14 +87,24 @@ def sermon_prep(
     payload: SermonPrepRequest,
     session: Session = Depends(get_session),
 ):
+    trail_service = TrailService(session)
     try:
-        return generate_sermon_prep_outline(
-            session,
-            topic=payload.topic,
-            osis=payload.osis,
-            filters=payload.filters,
-            model_name=payload.model,
-        )
+        with trail_service.start_trail(
+            workflow="sermon_prep",
+            plan_md=SERMON_PREP_PLAN,
+            mode="sermon_prep",
+            input_payload=payload.model_dump(mode="json"),
+        ) as recorder:
+            response = generate_sermon_prep_outline(
+                session,
+                topic=payload.topic,
+                osis=payload.osis,
+                filters=payload.filters,
+                model_name=payload.model,
+                recorder=recorder,
+            )
+            recorder.finalize(final_md=response.answer.summary, output_payload=response)
+            return response
     except GuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
