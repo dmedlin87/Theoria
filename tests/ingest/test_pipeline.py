@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -60,6 +61,11 @@ def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
         assert (storage_dir / "content.txt").exists()
         assert (storage_dir / doc_path.name).exists()
         assert (storage_dir / "normalized.json").exists()
+        frontmatter_path = storage_dir / "frontmatter.json"
+        assert frontmatter_path.exists()
+        stored_frontmatter = json.loads(frontmatter_path.read_text("utf-8"))
+        assert stored_frontmatter["title"] == "Sample Doc"
+        assert stored_frontmatter["authors"] == ["Jane Doe"]
     finally:
         settings.storage_root = original_storage
 
@@ -101,5 +107,10 @@ def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
         assert (storage_dir / "content.txt").exists()
         assert (storage_dir / "source.html").exists()
         assert (storage_dir / "normalized.json").exists()
+        frontmatter_path = storage_dir / "frontmatter.json"
+        assert frontmatter_path.exists()
+        stored_frontmatter = json.loads(frontmatter_path.read_text("utf-8"))
+        assert stored_frontmatter["title"] == "Example"
+        assert stored_frontmatter["canonical_url"] == "https://example.com/foo"
     finally:
         settings.storage_root = original_storage
