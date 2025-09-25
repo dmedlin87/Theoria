@@ -495,6 +495,7 @@ All generative entry points share the same grounding policies but tailor prompt 
 5. **Guided Personal Devotion & Discipleship** – Craft daily devotionals, prayers, and catechesis flows that cite OSIS verses and honour doctrinal constraints.
 6. **Corpus Maintenance & Curation Assistant** – Auto-summarize new ingests, flag duplicates via SHA-256, suggest metadata normalizations, and translate Celery/Redis status into natural-language admin digests.
 7. **Research Collaboration Layer** – Support shared annotations, consensus drafts, and change summaries when new documents land, all grounded in the authoritative sources.
+8. **Export-Oriented Deliverables Assistant** – From any chat, let users trigger export jobs (Markdown, NDJSON, CSV) bundling cited passages into sermon packets or Q&A digests with manifest metadata for reproducibility.
 
 ### 18.4) API Surface
 
@@ -502,6 +503,33 @@ All generative entry points share the same grounding policies but tailor prompt 
 - `GET /ai/models`: lists available presets with cost/tokens metadata.
 - `PUT /settings/ai/providers/{provider}`: upserts credentials. Only accessible to admin roles.
 - All responses include `citations` array (`osis`, `document_id`, `anchor_type`, `anchor_value`).
+
+### 18.5) Guardrailed Conversation Pipeline
+
+- **Retrieval-first loop:** Every user turn first calls the hybrid retriever. Generation prompts are constructed solely from the retrieved passages plus system rails that enforce OSIS citations and anchor metadata.
+- **Refusal path:** If retrieval returns no eligible support, the rail layer short-circuits generation and sends a refusal template explaining the lack of grounded sources.
+- **Rail stack:** Adopt a policy framework such as NeMo Guardrails to encode prompt-injection filters, tool-use allowlists, and output sanitization aligned with OWASP LLM Top-10 mitigations.
+
+### 18.6) Citation Audit & Cache
+
+- **Justification record:** Persist `{conversation_id, turn_id, passage_ids, osis_ranges, retrieval_hash}` for each response so auditors can replay support.
+- **Nightly verifier:** Schedule a Celery job that re-scores cached answers against the latest embeddings and flags low-faithfulness items in an admin dashboard.
+- **Warm cache:** Supported answers are cached in Redis keyed by the justification record, allowing identical queries to reuse previously validated content.
+
+### 18.7) Workflow Panels
+
+- **Prompt presets:** Ship eight prompt/config panels (the roles above) that pre-select filters like author, era, and source type while pinning expected output formats (Markdown, NDJSON, CSV).
+- **UI wiring:** Panels live in the chatbot sidebar; selecting one seeds the system message, retrieval filters, and export hooks so users can run reproducible, OSIS-grounded workflows in a click.
+
+### 18.8) Provider Orchestration & Budgets
+
+- **Router service:** Introduce a lightweight router that maps task classes (summarization, comparative analysis, devotional drafting) to registered model presets and enforces latency/cost ceilings.
+- **Budget handling:** When projected spend exceeds limits, degrade gracefully by switching to faster presets or shortening responses, keeping guardrails active regardless of fallback.
+
+### 18.9) Telemetry & Red-Team Harness
+
+- **Metrics:** Instrument per-workflow telemetry for retrieval coverage, citation validation rates, refusals, and cache hits, storing aggregates in ClickHouse or Postgres for dashboarding.
+- **Red-team suite:** Maintain a prompt collection focused on OWASP LLM risks (prompt injection, insecure outputs, excessive autonomy). Run it in CI and on a schedule to evaluate guardrail effectiveness.
 
 ## 19) Export-Ready Deliverables
 
@@ -535,3 +563,9 @@ The CLI writes enrichments back into the corpus using the API, logging each expo
 - **Source packet limitation:** Prompts include only the retrieved passages. The application never permits free-form generations.
 - **Evaluation:** Nightly Celery task `jobs/validate_citations` replays a sample of conversations, checking citation integrity and logging drift.
 - **Audit trail:** Responses store `retrieval_snapshot` (passage IDs, embeddings hash) to make exports reproducible and auditable.
+
+## 23) Vector Search Tune-Up
+
+- **ANN acceleration:** Enable pgvector’s HNSW indexes on passage embeddings to speed hybrid retrieval bursts triggered by the conversation pipeline.
+- **Maintenance tasks:** Add a weekly `jobs/refresh_hnsw` task that rebuilds indexes after large ingests and tracks recall metrics against a held-out validation set.
+- **Observability:** Record HNSW latency/recall metrics alongside the telemetry stack so regressions surface in the AI copilot dashboards.
