@@ -67,15 +67,34 @@ async function fetchMentions(
 }
 
 export default async function VersePage({ params, searchParams }: VersePageProps) {
-  const data = await fetchMentions(params.osis, searchParams);
   const currentFilters = buildFilterQuery(searchParams);
+
+  let data: VerseMentionsResponse | null = null;
+  let error: string | null = null;
+
+  try {
+    data = await fetchMentions(params.osis, searchParams);
+  } catch (err) {
+    console.error("Failed to load verse mentions", err);
+    error = err instanceof Error ? err.message : "Unknown error";
+  }
+
+  const osis = data?.osis ?? params.osis;
+  const mentions = data?.mentions ?? [];
+  const total = data?.total ?? 0;
 
   return (
     <section>
       <h2>Verse Mentions</h2>
       <p>
-        Aggregated references for <strong>{data.osis}</strong>
+        Aggregated references for <strong>{osis}</strong>
       </p>
+
+      {error ? (
+        <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+          Unable to load mentions. {error}
+        </p>
+      ) : null}
 
       <form method="get" style={{ margin: "1rem 0", display: "grid", gap: "0.75rem", maxWidth: 480 }}>
         <label style={{ display: "block" }}>
@@ -114,14 +133,14 @@ export default async function VersePage({ params, searchParams }: VersePageProps
       </form>
 
       <p>
-        Showing {data.mentions.length} of {data.total} mentions
+        Showing {mentions.length} of {total} mentions
       </p>
 
-      {data.mentions.length === 0 ? (
+      {mentions.length === 0 ? (
         <p>No mentions found for the selected filters.</p>
       ) : (
         <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: "1rem" }}>
-          {data.mentions.map((mention) => {
+          {mentions.map((mention) => {
             const anchor = formatAnchor({
               page_no: mention.passage.page_no ?? undefined,
               t_start: mention.passage.t_start ?? undefined,
