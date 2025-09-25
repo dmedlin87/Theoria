@@ -344,6 +344,7 @@ sha256: "content hash"
 
 services/api/app/workers/tasks.py
 
+```python
 from celery import Celery
 celery = Celery(__name__, broker="redis://redis:6379/0", backend="redis://redis:6379/0")
 
@@ -354,21 +355,28 @@ def process_file(doc_id: str, path: str, frontmatter: dict = None):
 @celery.task(name="tasks.process_url")
 def process_url(doc_id: str, url: str, source_type: str | None = None):
     # fetch web/youtube -> normalize -> chunk -> osis -> embed -> upsert
+```
 
 services/api/app/ingest/pipeline.py (key steps)
 
+```python
 def run_pipeline_for_file(doc_id, path, fm):
     # 1) detect type by extension; parse (Docling/Unstructured)
     # 2) chunk by rules (paged vs transcript)
     # 3) detect OSIS -> normalize
     # 4) embed (BGE-M3) -> upsert passages + lexeme
 
+```
+
 services/api/app/retriever/hybrid.py
 
+```python
 def search(q: str, osis: str | None, filters: dict, k: int):
     # 1) if osis: pull all OSIS-matching passages (range intersect)
     # 2) dense topK + lexical topK
     # 3) rerank & dedupe; return merged list
+
+```
 
 ## 12) Definition of Done (MVP)
 

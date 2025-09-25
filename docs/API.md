@@ -77,86 +77,6 @@ The request uses `multipart/form-data` with the following fields:
 The pipeline parses the transcript and indexes generated passages. Audio, when
 provided, is stored long enough to support downstream enrichments.
 
-## Settings & AI Providers
-
-### `GET /ai/models`
-
-Lists registered model presets. Responses include provider metadata, token limits, and guardrail flags:
-
-```json
-[
-  {
-    "id": "gpt-4o-mini@openai",
-    "provider": "openai",
-    "model": "gpt-4o-mini",
-    "max_output_tokens": 2000,
-    "supports_citations": true,
-    "cost": {
-      "input_per_million": 5.0,
-      "output_per_million": 15.0
-    }
-  }
-]
-```
-
-### `POST /ai/chat`
-
-Initiates a grounded conversation using the selected preset. Request body:
-
-```json
-{
-  "model_preset": "gpt-4o-mini@openai",
-  "messages": [
-    { "role": "system", "content": "optional override" },
-    { "role": "user", "content": "Summarise John 1:1" }
-  ],
-  "retrieval_filters": {
-    "osis": "John.1.1-5",
-    "collection": "sermons"
-  }
-}
-```
-
-Response:
-
-```json
-{
-  "model_preset": "gpt-4o-mini@openai",
-  "answer": "In the beginning...",
-  "citations": [
-    {
-      "osis": "John.1.1",
-      "document_id": "doc-1",
-      "anchor_type": "page",
-      "anchor_value": "12"
-    }
-  ],
-  "retrieval_snapshot": {
-    "passage_ids": ["passage-1"],
-    "filters": { "osis": "John.1.1-5" }
-  }
-}
-```
-
-If a provider reply omits citations or references unsupported OSIS ranges the endpoint returns **422 Unprocessable Entity**.
-
-### `PUT /settings/ai/providers/{provider}`
-
-Upserts provider credentials. Example payload for OpenAI:
-
-```json
-{
-  "api_key": "sk-...",
-  "base_url": "https://api.openai.com/v1",
-  "default_model": "gpt-4o-mini",
-  "extra_headers": {
-    "OpenAI-Organization": "org-123"
-  }
-}
-```
-
-Keys are stored encrypted. The API responds with the provider id and masked metadata. Only admin-authenticated clients may call this endpoint.
-
 ## Background jobs
 
 Background job endpoints enqueue asynchronous work to reprocess existing
@@ -398,7 +318,6 @@ Response:
 }
 ```
 
-
 ### `POST /export/deliverable`
 
 Creates sermon/lesson/Q&A deliverables backed by AI syntheses and deterministic retrieval. Request body:
@@ -456,4 +375,3 @@ Fields:
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | `gpt5_codex_preview` | bool | GPT-5-Codex (Preview) endpoints and UI unlocked for all clients. |
-
