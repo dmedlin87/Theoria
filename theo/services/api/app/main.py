@@ -10,7 +10,19 @@ from sqlalchemy.orm import Session
 from .core.database import Base, get_engine
 from .db.seeds import seed_reference_data
 
-from .routes import ai, documents, export, features, ingest, jobs, research, search, verses
+from .routes import (
+    ai,
+    creators,
+    documents,
+    export,
+    features,
+    ingest,
+    jobs,
+    research,
+    search,
+    transcripts,
+    verses,
+)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -33,6 +45,8 @@ def create_app() -> FastAPI:
     app.include_router(documents.router, prefix="/documents", tags=["documents"])
     app.include_router(features.router, prefix="/features", tags=["features"])
     app.include_router(research.router, prefix="/research", tags=["research"])
+    app.include_router(creators.router, prefix="/creators", tags=["creators"])
+    app.include_router(transcripts.router, prefix="/transcripts", tags=["transcripts"])
 
     app.include_router(ai.router, prefix="/ai", tags=["ai"])
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
@@ -17,10 +17,19 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 import yaml
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
-from ..db.models import Document, Passage
+from ..db.models import (
+    Creator,
+    CreatorClaim,
+    Document,
+    Passage,
+    TranscriptQuote,
+    TranscriptSegment,
+    Video,
+)
 
 from .chunking import Chunk, chunk_text, chunk_transcript
 
@@ -28,7 +37,7 @@ from .embeddings import get_embedding_service, lexical_representation
 from .osis import DetectedOsis, detect_osis_references
 from .parsers import (
     ParserResult,
-    TranscriptSegment,
+    TranscriptSegment as ParsedTranscriptSegment,
     load_transcript,
     parse_audio_document,
     parse_docx_document,
@@ -153,12 +162,191 @@ def _coerce_date(value: Any) -> date | None:
         return None
 
 
+def _coerce_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value))
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
 def _ensure_list(value: Any) -> list[str] | None:
     if value is None:
         return None
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
+
+
+def _get_or_create_creator(
+    session: Session,
+    *,
+    name: str | None,
+    channel: str | None,
+    bio: str | None,
+    tags: list[str] | None,
+) -> Creator | None:
+    if not name:
+        return None
+    cleaned = name.strip()
+    if not cleaned:
+        return None
+
+    creator = (
+        session.query(Creator)
+        .filter(func.lower(Creator.name) == cleaned.lower())
+        .one_or_none()
+    )
+    if creator is None:
+        creator = Creator(name=cleaned, channel=channel, bio=bio, tags=tags or None)
+        session.add(creator)
+        session.flush()
+        return creator
+
+    updated = False
+    if channel and not creator.channel:
+        creator.channel = channel
+        updated = True
+    if bio and not creator.bio:
+        creator.bio = bio
+        updated = True
+    if tags:
+        existing = set(creator.tags or [])
+        merged = sorted(existing | {tag for tag in tags if tag})
+        if merged and merged != (creator.tags or []):
+            creator.tags = merged
+            updated = True
+    if updated:
+        session.add(creator)
+        session.flush()
+    return creator
+
+
+def _get_or_create_video(
+    session: Session,
+    *,
+    creator: Creator | None,
+    document: Document,
+    video_identifier: str | None,
+    title: str | None,
+    url: str | None,
+    published_at: Any,
+    duration_seconds: int | None,
+    license: str | None,
+    meta: Any,
+) -> Video | None:
+    if not video_identifier and not document:
+        return None
+
+    video: Video | None = None
+    if video_identifier:
+        video = (
+            session.query(Video)
+            .filter(Video.video_id == video_identifier)
+            .one_or_none()
+        )
+    if video is None:
+        video = (
+            session.query(Video)
+            .filter(Video.document_id == document.id)
+            .one_or_none()
+        )
+
+    published_dt = _coerce_datetime(published_at)
+    normalized_meta = meta if isinstance(meta, dict) else None
+
+    if video is None:
+        video = Video(
+            video_id=video_identifier,
+            creator_id=creator.id if creator else None,
+            document_id=document.id,
+            title=title,
+            url=url,
+            published_at=published_dt,
+            duration_seconds=duration_seconds,
+            license=license,
+            meta=normalized_meta,
+        )
+        session.add(video)
+        session.flush()
+        return video
+
+    changed = False
+    if creator and video.creator_id is None:
+        video.creator_id = creator.id
+        changed = True
+    if title and not video.title:
+        video.title = title
+        changed = True
+    if url and not video.url:
+        video.url = url
+        changed = True
+    if published_dt and not video.published_at:
+        video.published_at = published_dt
+        changed = True
+    if duration_seconds and not video.duration_seconds:
+        video.duration_seconds = duration_seconds
+        changed = True
+    if license and not video.license:
+        video.license = license
+        changed = True
+    if normalized_meta and not video.meta:
+        video.meta = normalized_meta
+        changed = True
+    if video_identifier and not video.video_id:
+        video.video_id = video_identifier
+        changed = True
+    if changed:
+        session.add(video)
+        session.flush()
+    if video.document_id is None:
+        video.document_id = document.id
+        session.add(video)
+        session.flush()
+    return video
+
+
+def _build_source_ref(video_identifier: str | None, source_url: str | None, t_start: float | None) -> str | None:
+    if video_identifier is None or t_start is None:
+        return None
+    prefix = "video"
+    if source_url:
+        lowered = source_url.lower()
+        if "youtube" in lowered or "youtu.be" in lowered:
+            prefix = "youtube"
+        elif "vimeo" in lowered:
+            prefix = "vimeo"
+    seconds = max(0, int(t_start))
+    minutes, remaining = divmod(seconds, 60)
+    return f"{prefix}:{video_identifier}#t={minutes:02d}:{remaining:02d}"
+
+
+def _truncate(text: str, limit: int = 280) -> str:
+    cleaned = text.strip()
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[: limit - 3].rstrip() + "..."
+
+
+def _collect_topics(document: Document, frontmatter: dict[str, Any]) -> list[str]:
+    topics: list[str] = []
+    doc_topics = document.topics
+    if isinstance(doc_topics, dict):
+        topics.extend(doc_topics.get("all") or [])
+    elif isinstance(doc_topics, list):
+        topics.extend(str(item) for item in doc_topics if item)
+    additional = _ensure_list(frontmatter.get("topics")) or []
+    for item in additional:
+        if item not in topics:
+            topics.append(item)
+    return [topic for topic in (topic.strip() for topic in topics) if topic]
 
 
 def _normalise_topics_field(*candidates: Any) -> dict | None:
@@ -203,7 +391,7 @@ def _resolve_fixtures_dir(settings) -> Path | None:
     return path
 
 
-def _load_youtube_transcript(settings, video_id: str) -> tuple[list[TranscriptSegment], Path | None]:
+def _load_youtube_transcript(settings, video_id: str) -> tuple[list[ParsedTranscriptSegment], Path | None]:
     fixtures_dir = _resolve_fixtures_dir(settings)
     transcript_path: Path | None = None
     if fixtures_dir:
@@ -214,7 +402,7 @@ def _load_youtube_transcript(settings, video_id: str) -> tuple[list[TranscriptSe
                 transcript_path = candidate
                 break
 
-    segments: list[TranscriptSegment] = []
+    segments: list[ParsedTranscriptSegment] = []
     if transcript_path:
         segments = load_transcript(transcript_path)
     else:
@@ -237,7 +425,7 @@ def _load_youtube_transcript(settings, video_id: str) -> tuple[list[TranscriptSe
             start = float(item.get("start", 0.0))
             duration = float(item.get("duration", 0.0))
             segments.append(
-                TranscriptSegment(
+                ParsedTranscriptSegment(
                     text=text,
                     start=start,
                     end=start + duration,
@@ -303,7 +491,7 @@ def _prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
 
 
 def _prepare_transcript_chunks(
-    segments: list[TranscriptSegment],
+    segments: list[ParsedTranscriptSegment],
     *,
     settings,
 ) -> ParserResult:
@@ -610,11 +798,34 @@ def _persist_text_document(
     session.add(document)
     session.flush()
 
+    creator_tags = _ensure_list(frontmatter.get("creator_tags"))
+    creator_profile = _get_or_create_creator(
+        session,
+        name=frontmatter.get("creator"),
+        channel=document.channel,
+        bio=frontmatter.get("creator_bio"),
+        tags=creator_tags,
+    )
+
+    video_record = _get_or_create_video(
+        session,
+        creator=creator_profile,
+        document=document,
+        video_identifier=document.video_id,
+        title=document.title,
+        url=document.source_url or frontmatter.get("url"),
+        published_at=frontmatter.get("published_at"),
+        duration_seconds=document.duration_seconds,
+        license=frontmatter.get("license") or frontmatter.get("video_license"),
+        meta=frontmatter.get("video_meta"),
+    )
+
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
     embedding_service = get_embedding_service()
     embeddings = embedding_service.embed([chunk.text for chunk in chunks])
 
     passages: list[Passage] = []
+    segments: list[TranscriptSegment] = []
     for idx, chunk in enumerate(chunks):
         detected = detect_osis_references(chunk.text)
         meta = _normalise_passage_meta(
@@ -644,6 +855,89 @@ def _persist_text_document(
         )
         session.add(passage)
         passages.append(passage)
+
+        osis_all: list[str] = []
+        if meta.get("osis_refs_all"):
+            osis_all.extend(meta["osis_refs_all"])
+        if osis_value:
+            osis_all.append(osis_value)
+        normalized_refs = sorted({ref for ref in osis_all if ref})
+
+        segment = TranscriptSegment(
+            document_id=document.id,
+            video_id=video_record.id if video_record else None,
+            t_start=chunk.t_start,
+            t_end=chunk.t_end,
+            text=chunk.text,
+            primary_osis=osis_value,
+            osis_refs=normalized_refs or None,
+            topics=None,
+            entities=None,
+        )
+        session.add(segment)
+        segments.append(segment)
+
+    session.flush()
+
+    topics = _collect_topics(document, frontmatter)
+    stance_overrides_raw = frontmatter.get("creator_stances") or {}
+    stance_overrides: dict[str, str] = {}
+    if isinstance(stance_overrides_raw, dict):
+        for key, value in stance_overrides_raw.items():
+            key_clean = str(key).strip().lower()
+            value_clean = str(value).strip()
+            if key_clean and value_clean:
+                stance_overrides[key_clean] = value_clean
+
+    confidence_default: float | None
+    try:
+        confidence_default = (
+            float(frontmatter.get("creator_confidence"))
+            if frontmatter.get("creator_confidence") is not None
+            else None
+        )
+    except (TypeError, ValueError):
+        confidence_default = None
+
+    quote_identifier = (
+        video_record.video_id
+        if video_record and video_record.video_id
+        else document.video_id
+    )
+    quote_source_url = (
+        (video_record.url if video_record else None)
+        or document.source_url
+        or frontmatter.get("url")
+    )
+
+    for segment in segments:
+        if segment.osis_refs:
+            quote = TranscriptQuote(
+                video_id=video_record.id if video_record else None,
+                segment_id=segment.id,
+                quote_md=_truncate(segment.text),
+                osis_refs=segment.osis_refs,
+                source_ref=_build_source_ref(quote_identifier, quote_source_url, segment.t_start),
+                salience=1.0,
+            )
+            session.add(quote)
+
+    if creator_profile and topics:
+        for segment in segments:
+            if not segment.osis_refs:
+                continue
+            for topic in topics:
+                stance = stance_overrides.get(topic.lower(), "unknown")
+                claim = CreatorClaim(
+                    creator_id=creator_profile.id,
+                    video_id=video_record.id if video_record else None,
+                    segment_id=segment.id,
+                    topic=topic,
+                    stance=stance,
+                    claim_md=_truncate(segment.text, limit=600),
+                    confidence=confidence_default if confidence_default is not None else 0.5,
+                )
+                session.add(claim)
 
     session.commit()
 
@@ -679,6 +973,17 @@ def _persist_text_document(
                 "meta": passage.meta,
             }
             for passage in passages
+        ],
+        "segments": [
+            {
+                "id": segment.id,
+                "text": segment.text,
+                "primary_osis": segment.primary_osis,
+                "osis_refs": segment.osis_refs,
+                "t_start": segment.t_start,
+                "t_end": segment.t_end,
+            }
+            for segment in segments
         ],
     }
 
@@ -738,11 +1043,34 @@ def _persist_transcript_document(
     session.add(document)
     session.flush()
 
+    creator_tags = _ensure_list(frontmatter.get("creator_tags"))
+    creator_profile = _get_or_create_creator(
+        session,
+        name=frontmatter.get("creator"),
+        channel=document.channel,
+        bio=frontmatter.get("creator_bio"),
+        tags=creator_tags,
+    )
+
+    video_record = _get_or_create_video(
+        session,
+        creator=creator_profile,
+        document=document,
+        video_identifier=document.video_id,
+        title=document.title,
+        url=document.source_url or frontmatter.get("url"),
+        published_at=frontmatter.get("published_at"),
+        duration_seconds=document.duration_seconds,
+        license=frontmatter.get("license") or frontmatter.get("video_license"),
+        meta=frontmatter.get("video_meta"),
+    )
+
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
     embedding_service = get_embedding_service()
     embeddings = embedding_service.embed([chunk.text for chunk in chunks])
 
     passages: list[Passage] = []
+    segments: list[TranscriptSegment] = []
     for idx, chunk in enumerate(chunks):
         detected = detect_osis_references(chunk.text)
         meta = _normalise_passage_meta(
@@ -772,6 +1100,89 @@ def _persist_transcript_document(
         )
         session.add(passage)
         passages.append(passage)
+
+        osis_all: list[str] = []
+        if meta.get("osis_refs_all"):
+            osis_all.extend(meta["osis_refs_all"])
+        if osis_value:
+            osis_all.append(osis_value)
+        normalized_refs = sorted({ref for ref in osis_all if ref})
+
+        segment = TranscriptSegment(
+            document_id=document.id,
+            video_id=video_record.id if video_record else None,
+            t_start=chunk.t_start,
+            t_end=chunk.t_end,
+            text=chunk.text,
+            primary_osis=osis_value,
+            osis_refs=normalized_refs or None,
+            topics=None,
+            entities=None,
+        )
+        session.add(segment)
+        segments.append(segment)
+
+    session.flush()
+
+    topics = _collect_topics(document, frontmatter)
+    stance_overrides_raw = frontmatter.get("creator_stances") or {}
+    stance_overrides: dict[str, str] = {}
+    if isinstance(stance_overrides_raw, dict):
+        for key, value in stance_overrides_raw.items():
+            key_clean = str(key).strip().lower()
+            value_clean = str(value).strip()
+            if key_clean and value_clean:
+                stance_overrides[key_clean] = value_clean
+
+    confidence_default: float | None
+    try:
+        confidence_default = (
+            float(frontmatter.get("creator_confidence"))
+            if frontmatter.get("creator_confidence") is not None
+            else None
+        )
+    except (TypeError, ValueError):
+        confidence_default = None
+
+    quote_identifier = (
+        video_record.video_id
+        if video_record and video_record.video_id
+        else document.video_id
+    )
+    quote_source_url = (
+        (video_record.url if video_record else None)
+        or document.source_url
+        or frontmatter.get("url")
+    )
+
+    for segment in segments:
+        if segment.osis_refs:
+            quote = TranscriptQuote(
+                video_id=video_record.id if video_record else None,
+                segment_id=segment.id,
+                quote_md=_truncate(segment.text),
+                osis_refs=segment.osis_refs,
+                source_ref=_build_source_ref(quote_identifier, quote_source_url, segment.t_start),
+                salience=1.0,
+            )
+            session.add(quote)
+
+    if creator_profile and topics:
+        for segment in segments:
+            if not segment.osis_refs:
+                continue
+            for topic in topics:
+                stance = stance_overrides.get(topic.lower(), "unknown")
+                claim = CreatorClaim(
+                    creator_id=creator_profile.id,
+                    video_id=video_record.id if video_record else None,
+                    segment_id=segment.id,
+                    topic=topic,
+                    stance=stance,
+                    claim_md=_truncate(segment.text, limit=600),
+                    confidence=confidence_default if confidence_default is not None else 0.5,
+                )
+                session.add(claim)
 
     session.commit()
 
@@ -824,6 +1235,17 @@ def _persist_transcript_document(
                 "meta": passage.meta,
             }
             for passage in passages
+        ],
+        "segments": [
+            {
+                "id": segment.id,
+                "text": segment.text,
+                "primary_osis": segment.primary_osis,
+                "osis_refs": segment.osis_refs,
+                "t_start": segment.t_start,
+                "t_end": segment.t_end,
+            }
+            for segment in segments
         ],
     }
 

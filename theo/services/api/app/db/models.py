@@ -5,7 +5,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -53,6 +63,13 @@ class Document(Base):
     )
     annotations: Mapped[list["DocumentAnnotation"]] = relationship(
         "DocumentAnnotation", back_populates="document", cascade="all, delete-orphan"
+    )
+    video: Mapped["Video | None"] = relationship(
+        "Video",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        uselist=False,
+        single_parent=True,
     )
 
 
@@ -200,6 +217,183 @@ class NoteEvidence(Base):
     )
 
     note: Mapped[ResearchNote] = relationship("ResearchNote", back_populates="evidences")
+
+
+class Creator(Base):
+    """Profile describing a recurring media creator or speaker."""
+
+    __tablename__ = "creators"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    channel: Mapped[str | None] = mapped_column(String, nullable=True)
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    videos: Mapped[list["Video"]] = relationship(
+        "Video", back_populates="creator", cascade="all, delete-orphan"
+    )
+    claims: Mapped[list["CreatorClaim"]] = relationship(
+        "CreatorClaim", back_populates="creator", cascade="all, delete-orphan"
+    )
+
+
+class Video(Base):
+    """Video or media asset linked to an ingested transcript."""
+
+    __tablename__ = "videos"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    creator_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("creators.id", ondelete="SET NULL"), nullable=True
+    )
+    document_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
+    video_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    license: Mapped[str | None] = mapped_column(String, nullable=True)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    creator: Mapped[Creator | None] = relationship("Creator", back_populates="videos")
+    document: Mapped[Document | None] = relationship("Document", back_populates="video")
+    segments: Mapped[list["TranscriptSegment"]] = relationship(
+        "TranscriptSegment", back_populates="video", cascade="all, delete-orphan"
+    )
+    claims: Mapped[list["CreatorClaim"]] = relationship(
+        "CreatorClaim", back_populates="video", cascade="all, delete-orphan"
+    )
+    quotes: Mapped[list["TranscriptQuote"]] = relationship(
+        "TranscriptQuote", back_populates="video", cascade="all, delete-orphan"
+    )
+
+
+class TranscriptSegment(Base):
+    """Time-coded transcript span enriched with metadata."""
+
+    __tablename__ = "transcript_segments"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    document_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    video_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("videos.id", ondelete="CASCADE"), nullable=True
+    )
+    t_start: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    t_end: Mapped[float | None] = mapped_column(Float, nullable=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    primary_osis: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
+    osis_refs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    topics: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    entities: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    video: Mapped[Video | None] = relationship("Video", back_populates="segments")
+    document: Mapped[Document | None] = relationship("Document")
+    quotes: Mapped[list["TranscriptQuote"]] = relationship(
+        "TranscriptQuote", back_populates="segment", cascade="all, delete-orphan"
+    )
+    claims: Mapped[list["CreatorClaim"]] = relationship(
+        "CreatorClaim", back_populates="segment", cascade="all, delete-orphan"
+    )
+
+
+class CreatorClaim(Base):
+    """Structured stance or claim derived from creator transcripts."""
+
+    __tablename__ = "creator_claims"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    creator_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("creators.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    video_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("videos.id", ondelete="SET NULL"), nullable=True
+    )
+    segment_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("transcript_segments.id", ondelete="SET NULL"), nullable=True
+    )
+    topic: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    stance: Mapped[str | None] = mapped_column(String, nullable=True)
+    claim_md: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    creator: Mapped[Creator | None] = relationship("Creator", back_populates="claims")
+    video: Mapped[Video | None] = relationship("Video", back_populates="claims")
+    segment: Mapped[TranscriptSegment | None] = relationship(
+        "TranscriptSegment", back_populates="claims"
+    )
+
+
+class TranscriptQuote(Base):
+    """Highlighted quote from a transcript segment with citation metadata."""
+
+    __tablename__ = "transcript_quotes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    video_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("videos.id", ondelete="SET NULL"), nullable=True
+    )
+    segment_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("transcript_segments.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    quote_md: Mapped[str] = mapped_column(Text, nullable=False)
+    osis_refs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    source_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    salience: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    video: Mapped[Video | None] = relationship("Video", back_populates="quotes")
+    segment: Mapped[TranscriptSegment | None] = relationship(
+        "TranscriptSegment", back_populates="quotes"
+    )
 
 
 class CrossReference(Base):
