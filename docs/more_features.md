@@ -1,27 +1,30 @@
-# TheoEngine: Deepâ€‘Research Bible Reader & Critical Analysis Agent
+# TheoEngine: Deep-Research Bible Reader & Critical Analysis Agent
 
-**Goal.** A verseâ€‘first Bible reader that turns every passage into a research workspace: textual variants, crossâ€‘references, morphology, historical context, contradiction/harmony checks, apologetic vs. skeptical notes, and citable evidenceâ€”on tap while you read.
+**Goal.** A verse-first Bible reader that turns every passage into a research workspace: textual variants, cross-references, morphology, historical context, contradiction/harmony checks, apologetic vs. skeptical notes, and citable evidence-on tap while you read.
 
-**Why this approach.** Open biblical corpora (OSIS references, open translations and morphology datasets), crossâ€‘reference and geocoding datasets, and open scholarly indexes (e.g., OpenAlex/Crossref) now make a serious research UX feasible. The agent stays retrievalâ€‘grounded, runs short planning steps, calls tools for deterministic data, and only then writes analysis with citations.
+**Why this approach.** Open biblical corpora (OSIS references, open translations and morphology datasets), cross-reference and geocoding datasets, and open scholarly indexes (e.g., OpenAlex/Crossref) now make a serious research UX feasible. The agent stays retrieval-grounded, runs short planning steps, calls tools for deterministic data, and only then writes analysis with citations.
 
 ---
 
 ## 1) Product pillars
 
-1. **Reader + Research Dock** (verseâ€‘anchored)
-   - Chips per verse/selection open panels: **Crossâ€‘References**, **Textual Variants**, **Morph & Interlinear**, **Historical Context**, **Contradictions & Harmonies**, **Commentaries & Perspectives**, and **Living Study Notes**.
+1. **Reader + Research Dock** (verse-anchored)
+   - Chips per verse/selection open panels: **Cross-References**, **Textual Variants**, **Morph & Interlinear**, **Historical Context**, **Contradictions & Harmonies**, **Commentaries & Perspectives**, and **Living Study Notes**.
    - Split view: pin any two passages with synchronized scrolling and highlight parallels.
-   - Command palette: â€œCompare translationsâ€, â€œOpen contradictionsâ€, â€œSearch papersâ€, â€œShow DSS linksâ€, etc.
+   - Command palette: "Compare translations", "Open contradictions", "Search papers", "Show DSS links", etc.
 
-2. **Agentic analysis (plan â†’ tool calls â†’ report)**
-   - ReActâ€‘style short plan â†’ retrieval/comparison tools â†’ twoâ€‘column summary (Apologetic vs Skeptical) with footnotes.
-   - Always â€œtools first, generation secondâ€ for auditability.
+2. **Agentic analysis (plan → tool calls → report)**
+   - ReAct-style short plan → retrieval/comparison tools → two-column summary (Apologetic vs Skeptical) with footnotes.
+   - Always "tools first, generation second" for auditability.
 
 3. **Living Notes (gets smarter as you study)**
-   - Structured **Claim Cards** (type/stance/confidence) + **Evidence Cards** (citations). Reuse raises a sourceâ€™s credibility weight across the app.
+   - Structured **Claim Cards** (type/stance/confidence) + **Evidence Cards** (citations). Reuse raises a source's credibility weight across the app.
 
-4. **Licensingâ€‘aware content**
+4. **Licensing-aware content**
    - Prefer open corpora first (e.g., SBLGNT licensing, MorphGNT, OSHB). Clearly badge licenses in the UI and respect redistribution limits for modern study notes (e.g., NET notes).
+
+5. **Creator & Media Profiles**
+   - First-class ingestion and retrieval over user-provided media transcripts (e.g., YouTube). Build creator/topic stances with time-coded quotes, link segments to OSIS verses, and surface them inline in the reader and Deep-Dive reports.
 
 ---
 
@@ -29,39 +32,42 @@
 
 - **OSIS** (canonical verse IDs): all notes, claims, and citations are keyed to OSIS (e.g., `Luke.2.1`), making them portable across translations.
 - **Bible modules**: SWORD/JSword modules for public translations and dictionaries (OSIS/TEI/ThML).
-- **Greek (NT)**: SBLGNT text + MorphGNT morphology (merge serverâ€‘side; observe licenses).
+- **Greek (NT)**: SBLGNT text + MorphGNT morphology (merge server-side; observe licenses).
 - **Hebrew (OT)**: OSHB (text + morphology) and allied lexica where permissible.
-- **Crossâ€‘references**: Open datasets (e.g., TSKâ€‘style / OpenBible crossâ€‘refs). 
+- **Cross-references**: Open datasets (e.g., TSK-style / OpenBible cross-refs). 
 - **Geocoding**: Open Bible atlas/places datasets with confidence scores.
 - **Scholarly discovery**: OpenAlex and Crossref APIs for papers/books (store IDs, DOIs, titles, venues, years).
 - **Dead Sea Scrolls links**: outward links to authoritative collections for relevant verses.
-- **Contradiction seeds**: community datasets (e.g., SAB/BibViz) clearly labeled as nonâ€‘peerâ€‘reviewed; balance with apologetic harmonizations.
+- **Contradiction seeds**: community datasets (e.g., SAB/BibViz) clearly labeled as non-peer-reviewed; balance with apologetic harmonizations.
 
 > All external datasets should be cached with provenance and licensing metadata. Show license badges per panel; block export of restricted content.
 
 ---
 
-## 3) UX blueprint (readerâ€‘first, researchâ€‘instant)
+## 3) UX blueprint (reader-first, research-instant)
 
 **Layout**
-- **Top bar**: translation dropdown, search, **Mode** toggle (Neutral / Skeptical / Apologetic), â€œDeepâ€‘Diveâ€ button.
-- **Reader** (center): OSISâ€‘anchored text; verse numbers show hover badge with quick actions.
+- **Top bar**: translation dropdown, search, **Mode** toggle (Neutral / Skeptical / Apologetic), "Deep-Dive" button.
+- **Reader** (center): OSIS-anchored text; verse numbers show hover badge with quick actions.
 - **Research Dock** (right): chips expand into panels.
 - **Split view**: pin two passages (e.g., Luke 2 vs Matt 2), sync scroll.
 
 **Panels**
-- **Crossâ€‘References** â€” ranked graph of related verses; open sideâ€‘byâ€‘side.
-- **Textual Variants** â€” base text, major variants; translation diffs; apparatus notes where available.
-- **Morph & Interlinear** â€” lemma, parsing, glosses.
-- **Historical Context** â€” timeline card (who/when/where), brief summaries, links to external sources; show DSS links when relevant.
-- **Contradictions & Harmonies** â€” known entries with citations, plus user/vetted notes.
-- **Commentaries & Perspectives** â€” tabs for â€œApologeticâ€ vs â€œCriticalâ€ (e.g., Bart D. Ehrman) with sideâ€‘byâ€‘side arguments.
-- **Study Notes (Living)** â€” your structured notes: claims, fallacies flagged, verdicts, sources; all OSISâ€‘anchored.
+- **Cross-References** - ranked graph of related verses; open side-by-side.
+- **Textual Variants** - base text, major variants; translation diffs; apparatus notes where available.
+- **Morph & Interlinear** - lemma, parsing, glosses.
+- **Historical Context** - timeline card (who/when/where), brief summaries, links to external sources; show DSS links when relevant.
+- **Contradictions & Harmonies** - known entries with citations, plus user/vetted notes.
+- **Commentaries & Perspectives** - tabs for "Apologetic" vs "Critical" (e.g., Bart D. Ehrman) with side-by-side arguments.
+- **Study Notes (Living)** - your structured notes: claims, fallacies flagged, verdicts, sources; all OSIS-anchored.
 
 **Ergonomics**
-- Hover actions on verse numbers; inline highlights where crossâ€‘refs or variants exist.
-- Command palette: oneâ€‘keystroke to open panels/actions.
-- Oneâ€‘click **Deepâ€‘Dive**: runs the agent workflow and opens a printable, citable report.
+- Hover actions on verse numbers; inline highlights where cross-refs or variants exist.
+- Command palette: one-keystroke to open panels/actions.
+- One-click **Deep-Dive**: runs the agent workflow and opens a printable, citable report.
+- **Creators chip (per verse):** shows a badge when any transcript segment mentions the verse; opens a list of time-coded quotes and links to the video timestamp.
+- **Search bar shortcuts:** e.g., "Wes Huff on baptism" → Creator Topic page with stance summary, top quotes, and linked verses.
+- **Creator Profile pages:** topic cloud, stance summaries, recent videos; quotes are copyable with timestamped links and OSIS anchors.
 
 ---
 
@@ -170,15 +176,43 @@
 
 ## 5) Agent workflows
 
-### A) Passage Deepâ€‘Dive
-**Prompt**: â€œDeepâ€‘dive Luke 2:1â€“7; show contradictions vs harmonies; add history on Quirinius/Herod.â€  
-**Plan**: `scripture_retrieve` â†’ `crossrefs_lookup` â†’ `variants_apparatus` â†’ `historicity_search` â†’ `contradiction_index` â†’ `report_build` (Apologetic vs Critical, footnoted).
+### A) Passage Deep-Dive
+**Prompt**: "Deep-dive Luke 2:1-7; show contradictions vs harmonies; add history on Quirinius/Herod."  
+**Plan**: `scripture_retrieve` → `crossrefs_lookup` → `variants_apparatus` → `historicity_search` → `contradiction_index` → `report_build` (Apologetic vs Critical, footnoted).
 
 ### B) Fallacy Audit (argument paragraph)
-Segment claims â†’ `fallacy_detect` â†’ check premises via `scripture_retrieve`/`variants_apparatus` â†’ report with labels & receipts.
+Segment claims → `fallacy_detect` → check premises via `scripture_retrieve`/`variants_apparatus` → report with labels & receipts.
 
-### C) Geoâ€‘Temporal Sanity Check
-Extract names/dates/places â†’ `geo_places` + timeline overlay â†’ flag infeasible legs; annotate assumptions.
+### C) Geo-Temporal Sanity Check
+Extract names/dates/places → `geo_places` + timeline overlay → flag infeasible legs; annotate assumptions.
+
+**Creator sync into Living Notes**
+1) On ingestion, segment text is scanned for Bible refs and topics; OSIS anchors and tags are saved on `transcript_segments`.
+2) As users ask "What does <Creator> think about <Topic>?", hybrid search retrieves segments; the agent proposes or updates `creator_claims` (stance + claim_md + confidence).
+3) When a claim is accepted, the app creates/updates a `note` (stance=apologetic|critical|neutral, claim_type=doctrinal|historical|textual|logical) and adds `evidence` rows that point to `transcript_quotes` with timestamped `source_ref`.
+4) Deep-Dive reports include these quotes automatically in the Evidence list for the relevant verses/topics.
+
+---
+
+## Research Trails & Auditability
+
+**Why:** Make every deep-dive reproducible and reviewable.
+
+**Scope**
+- Persist an *Agent Trail* object per run: prompt mode, plan, ordered tool calls (name + validated args), tool outputs digests, final answer, citations, and versioned references to datasets used.
+- Allow "replay with updates" to re-run the same trail against newer modules/datasets.
+
+**Schema additions (conceptual)**
+- `agent_trails (id, created_at, user_id, mode, plan_md, final_md)`
+- `agent_steps (trail_id, step_index, tool, args_json, output_digest, tokens_in, tokens_out)`
+- `trail_sources (trail_id, source_type, ref)`
+
+**API**
+- `GET /api/trails/:id`  → return full trail for audit
+- `POST /api/trails/:id/replay` → run the same plan with current data; mark diffs
+
+**Acceptance**
+- From a Deep-Dive, user can open the trail, see steps, tool args, source IDs, and costs; can replay and compare outputs.
 
 ---
 
@@ -224,6 +258,56 @@ lng double precision,
 sources jsonb
 ```
 
+#### creators
+- id (uuid, pk)
+- name (text, not null)
+- channel (text, optional)
+- bio (text, optional)
+- tags (text[], optional)
+- created_at (timestamptz)
+
+#### videos
+- id (uuid, pk)
+- creator_id (uuid → creators.id)
+- video_id (text, unique)          -- platform id
+- title (text)
+- url (text)
+- published_at (timestamptz)
+- duration_seconds (int)
+- license (text)
+- meta (jsonb)
+
+#### transcript_segments
+- id (uuid, pk)
+- video_id (uuid → videos.id on delete cascade)
+- t_start (real), t_end (real)
+- text (text)
+- topics (text[])
+- entities (jsonb)
+- osis_refs (text[])               -- e.g., ['Luke.2.1','Matt.28.19']
+
+#### creator_claims
+- id (uuid, pk)
+- creator_id (uuid → creators.id)
+- video_id (uuid → videos.id)
+- segment_id (uuid → transcript_segments.id)
+- topic (text)
+- stance ('for'|'against'|'nuanced'|'unknown')
+- claim_md (text)
+- confidence (real)
+- created_at (timestamptz)
+
+#### transcript_quotes
+- id (uuid, pk)
+- video_id (uuid → videos.id)
+- segment_id (uuid → transcript_segments.id)
+- quote_md (text <= 280 chars)
+- osis_refs (text[])
+- source_ref (text)                 -- youtube:ID#t=MM:SS
+- salience (real)
+
+Note: reuse the existing evidence table by allowing source_type='video' and storing source_ref pointing to transcript_quotes.
+
 ---
 
 ## 7) Minimal API surface
@@ -241,36 +325,69 @@ GET  /api/search/crossref?q=Quirinius%20census
 POST /api/agent/deep-dive  -- { osis, options }
 ```
 
+### Transcripts & Creator Profiles
+
+POST /api/transcripts/ingest
+Body: {
+  "creator": "Wes Huff",
+  "video_id": "YOUTUBE_ID",
+  "title": "Video Title",
+  "url": "https://youtu.be/...",
+  "published_at": "2024-05-12T00:00:00Z",
+  "duration_seconds": 3720,
+  "license": "user-provided/owned",
+  "transcript_format": "vtt|srt|json|text",
+  "transcript_payload": "<raw transcript or caption file contents>"
+}
+Result: { "ok": true, "video_uuid": "..." }
+
+GET /api/creators/search?name=wes%20huff
+Result: [{ "id":"...", "name":"Wes Huff" }]
+
+GET /api/creators/:id/topics?topic=baptism&limit=10
+Result: {
+  "creator":"Wes Huff",
+  "topic":"baptism",
+  "stance":"for|against|nuanced|unknown",
+  "confidence": 0.78,
+  "quotes":[
+    {"text":"...", "source_ref":"youtube:YOUTUBE_ID#t=12:34", "osis":["John.3.16"]}
+  ]
+}
+
+GET /api/transcripts/search?osis=Luke.2.1-Luke.2.7
+Result: [{ "video_id":"...", "segment_id":"...", "t_start":123.4, "text":"...", "source_ref":"youtube:ID#t=02:03" }]
+
 ---
 
-## 8) NEW: YouTube & Creator Transcript Ingestion (â€œWhat does Wes think about X?â€)
+## 8) NEW: YouTube & Creator Transcript Ingestion ("What does Wes think about X?")
 
 ### 8.1 Goals
-- Ingest YouTube (or any) transcripts that **you provide** into TheoEngineâ€™s resource DB.
-- Build **Creator Knowledge Profiles** (e.g., â€œWes Huffâ€) that summarize stances by topic and attach timeâ€‘coded quotes with citations.
+- Ingest YouTube (or any) transcripts that **you provide** into TheoEngine's resource DB.
+- Build **Creator Knowledge Profiles** (e.g., "Wes Huff") that summarize stances by topic and attach time-coded quotes with citations.
 - Link transcript content to **OSIS verses** (when verses are mentioned) and to **Claim/Evidence** nodes so it strengthens over time.
-- Enable natural queries: â€œWhat does Wes think about baptism?â€ â†’ concise stance summary + quotes + timestamps + video links; optionally compare with other creators.
+- Enable natural queries: "What does Wes think about baptism?" → concise stance summary + quotes + timestamps + video links; optionally compare with other creators.
 
 ### 8.2 Ingestion pipeline
 1. **Acquire transcript**
-   - Accept userâ€‘uploaded `.vtt`, `.srt`, `.json`, or raw text (plus the video URL and metadata you enter).
-   - Store the raw transcript and segment/timecodes; normalize to UTFâ€‘8.
+   - Accept user-uploaded `.vtt`, `.srt`, `.json`, or raw text (plus the video URL and metadata you enter).
+   - Store the raw transcript and segment/timecodes; normalize to UTF-8.
 2. **Metadata & provenance**
-   - Required: `creator`, `channel`, `video_id`, `title`, `published_at`, `url`, `license`/terms flag (userâ€‘supplied), `duration`.
+   - Required: `creator`, `channel`, `video_id`, `title`, `published_at`, `url`, `license`/terms flag (user-supplied), `duration`.
    - Keep a `source_ref` like `youtube:VIDEO_ID#t=MM:SS` for quotes.
 3. **Segmentation**
-   - Merge short captions into ~10â€“30â€‘second segments; keep original timecodes.
+   - Merge short captions into ~10-30-second segments; keep original timecodes.
 4. **Enrichment & linking**
    - **Reference detection**: run a Bible reference parser on segment text to detect `John 3:16`, etc.; add OSIS links.
-   - **Entity & topic tags**: extract people/places/doctrine terms (e.g., â€œbaptismâ€, â€œTrinityâ€, â€œcensus of Quiriniusâ€).
+   - **Entity & topic tags**: extract people/places/doctrine terms (e.g., "baptism", "Trinity", "census of Quirinius").
    - **Claim extraction (optional)**: detect declarative claims; store as structured `claims` linked to segments.
    - **Stance extraction (optional)**: per topic, try to infer stance (`for`, `against`, `nuanced`) and confidence; keep rationale text for transparency.
 5. **Indexing for retrieval**
    - Create dense vector embeddings for segments + optional BM25 index. Store vector, segment id, and metadata for fast hybrid search.
 6. **Quotes & highlights**
-   - Autoâ€‘summarize each video; mine â€œtop quotesâ€ (short spans with high relevance or rhetorical markers). Store quotes with timestamps, OSIS links (if any), and topics.
+   - Auto-summarize each video; mine "top quotes" (short spans with high relevance or rhetorical markers). Store quotes with timestamps, OSIS links (if any), and topics.
 7. **Creator profile aggregation**
-   - Nightly job rolls up perâ€‘creator stance summaries per topic across videos. Track versioning and recency, and show â€œlast updatedâ€.
+   - Nightly job rolls up per-creator stance summaries per topic across videos. Track versioning and recency, and show "last updated".
 
 ### 8.3 DB schema (additions)
 
@@ -360,7 +477,7 @@ salience real                   -- for ranking in UI
 ```json
 {
   "name":"creator_profile_query",
-  "description":"Query a creatorâ€™s stance and quotes about a topic, with timestamps and links.",
+  "description":"Query a creator's stance and quotes about a topic, with timestamps and links.",
   "parameters":{"type":"object","properties":{
     "creator":{"type":"string"},
     "topic":{"type":"string"},
@@ -374,49 +491,49 @@ salience real                   -- for ranking in UI
 
 ### 8.5 Query flows (examples)
 
-- **â€œWhat does Wes Huff think about baptism?â€**
+- **"What does Wes Huff think about baptism?"**
   1) Normalize topic = `baptism`.
   2) Retrieve `creator_claims` for Wes on `baptism` (sorted by recency/confidence).
   3) If sparse/old, run hybrid search over `transcript_segments` with topic filters; propose new claims.
-  4) Return: stance summary (`for/against/nuanced` with rationale), top 3 quotes with timestamps & links, and any OSISâ€‘linked verses he cited.
+  4) Return: stance summary (`for/against/nuanced` with rationale), top 3 quotes with timestamps & links, and any OSIS-linked verses he cited.
 
-- **â€œShow me where Wes talks about Luke 2:1â€“7.â€**
-  1) Search `transcript_segments.osis_refs` for `Luke.2.1â€‘Luke.2.7`.
-  2) Return segments and open them sideâ€‘byâ€‘side with the reader (seek video to `t_start`).
+- **"Show me where Wes talks about Luke 2:1-7."**
+  1) Search `transcript_segments.osis_refs` for `Luke.2.1-Luke.2.7`.
+  2) Return segments and open them side-by-side with the reader (seek video to `t_start`).
 
-- **â€œCompare Wes vs [Other Creator] on the Trinity.â€**
-  1) Fetch both creatorsâ€™ `creator_claims` on topic `Trinity`.
-  2) Show a twoâ€‘column comparison with quotes and timestamps; compute agreement score.
+- **"Compare Wes vs [Other Creator] on the Trinity."**
+  1) Fetch both creators' `creator_claims` on topic `Trinity`.
+  2) Show a two-column comparison with quotes and timestamps; compute agreement score.
 
 ### 8.6 UI integration
 
-- **Reader context chips**: when a verse is mentioned in any transcript, show a â€œCreatorsâ€ chip with a badge (e.g., â€œ3 mentionsâ€). Click â†’ timeâ€‘coded quotes list.
-- **Search bar**: type â€œWes on baptismâ€ â†’ navigates to a creator topic page with stance summary, quotes, and video list.
-- **Creator profile pages**: overview, topics cloud, stance summaries, recent videos; â€œevidenceâ€ section shows strongest quotes with citations.
-- **Quote cards**: copyâ€‘able citation string with timestamp link; add to a Living Note as evidence.
+- **Reader context chips**: when a verse is mentioned in any transcript, show a "Creators" chip with a badge (e.g., "3 mentions"). Click → time-coded quotes list.
+- **Search bar**: type "Wes on baptism" → navigates to a creator topic page with stance summary, quotes, and video list.
+- **Creator profile pages**: overview, topics cloud, stance summaries, recent videos; "evidence" section shows strongest quotes with citations.
+- **Quote cards**: copy-able citation string with timestamp link; add to a Living Note as evidence.
 
 ### 8.7 Legal, ethical, and quality notes
 
 - **Provenance**: only ingest transcripts you own or have rights to use; or that you, the user, explicitly provide to TheoEngine.
-- **Licensing**: Store userâ€‘declared license/terms with each video; respect takedown/optâ€‘out.
-- **Quoting**: Keep quotes short; provide timestamped links; prefer paraphrase + cite (fairâ€‘use friendly).
+- **Licensing**: Store user-declared license/terms with each video; respect takedown/opt-out.
+- **Quoting**: Keep quotes short; provide timestamped links; prefer paraphrase + cite (fair-use friendly).
 - **Attribution**: Always show creator name, video title, and URL with quotes.
 - **Drift & changes**: If a creator deletes or edits a video, mark entries as deprecated but keep audit trail.
 - **Quality**: Keep stance detection as *assistive*; always provide quotes for verification.
 
 ### 8.8 Storage & cost tips
 
-- **Transcript size**: ~150â€“170 words/minute â†’ ~9â€“10k words/hour (~7â€“8k tokens/hour). 
-- **Embeddings**: Index at the segment level (~15â€“30s windows). A 1â€‘hour video becomes ~120â€“240 segments to embed.
-- **Caching**: Cache perâ€‘creator/perâ€‘topic stance summaries; refresh nightly or on ingestion.
+- **Transcript size**: ~150-170 words/minute → ~9-10k words/hour (~7-8k tokens/hour). 
+- **Embeddings**: Index at the segment level (~15-30s windows). A 1-hour video becomes ~120-240 segments to embed.
+- **Caching**: Cache per-creator/per-topic stance summaries; refresh nightly or on ingestion.
 - **Budgeting**: For retrieval, use a small embedding model and hybrid search; reserve larger models for final synthesis when needed.
 
 ---
 
 ## 9) Modes (preset prompts)
 
-- **Skeptical**: â€œList contradictions first; prioritize secular scholarship; demand external corroboration; run fallacy audit on arguments.â€  
-- **Apologetic**: â€œPrefer harmonizations; include conservative scholarship; surface counterâ€‘arguments to contradictions.â€  
+- **Skeptical**: "List contradictions first; prioritize secular scholarship; demand external corroboration; run fallacy audit on arguments."  
+- **Apologetic**: "Prefer harmonizations; include conservative scholarship; surface counter-arguments to contradictions."  
 - **Neutral scholar**: balanced evidence; report uncertainty/confidence.
 
 Modes change prompts & panel defaults, not datasets.
@@ -425,30 +542,46 @@ Modes change prompts & panel defaults, not datasets.
 
 ## 10) Roadmap (phased)
 
-**Phase 1** â€” Reader + Dock basics  
-- OSISâ€‘keyed viewer (open translations), Crossâ€‘Refs, Morph panel, Notes CRUD, Command palette.
+**Phase 1** - Reader + Dock basics  
+- OSIS-keyed viewer (open translations), Cross-Refs, Morph panel, Notes CRUD, Command palette.
 
-**Phase 2** â€” Contradictions & Evidence  
-- Contradiction panel (seed dataset), Geocoding chip, Deepâ€‘Dive report export.
+**Phase 2** - Contradictions & Evidence  
+- Contradiction panel (seed dataset), Geocoding chip, Deep-Dive report export.
 
-**Phase 3** â€” Textual & Historical depth  
+**Phase 3** - Textual & Historical depth  
 - Variants/Apparatus panels, scholarly discovery cards, DSS links.
 
-**Phase 4** â€” Transcripts & Creator Profiles  
-- Transcript ingestion, creator profiles, stance/quote mining, â€œCreatorsâ€ chip in reader, creator comparison view.
+**Phase 4** - Transcripts & Creator Profiles  
+- Transcript ingestion, creator profiles, stance/quote mining, "Creators" chip in reader, creator comparison view.
 
-**Phase 5** â€” Fallacy detection & collaboration  
-- FallacyDetect model; mode presets; exportable â€œdebate packetsâ€; shared annotation & rating.
+**Phase 5** - Fallacy detection & collaboration
+- FallacyDetect model; mode presets; exportable "debate packets"; shared annotation & rating.
 
 ---
 
-## 11) Acceptance criteria (MVP for transcripts)
+## Argument Dossier Workspace
 
-- Upload a Wes Huff transcript (VTT).  
-- App segments, indexes, detects `John 3:16` mentions, and extracts 3 top quotes.  
-- Query: â€œWhat does Wes think about baptism?â€ returns a stance summary + 3 quotes with timestamps and links.  
-- From `John 3:16` in the reader, the â€œCreatorsâ€ chip shows Wesâ€™s mentions and opens the quotes pane.  
-- Add one quote as evidence to a Living Note; export a Deepâ€‘Dive report with that evidence attached.
+A workspace to assemble a debate packet on a claim or doctrine:
+- Two columns (Apologetic vs Critical), each with claims, strongest evidence, time-coded quotes, and OSIS citations.
+- Drag in verses, creator quotes, and papers; the agent suggests structure and summaries.
+- Export to Markdown/HTML/PDF with a manifest of sources and licenses.
+
+**Acceptance**
+- Create a dossier for "Census of Quirinius": contains Luke 2 / Matthew 2 passages, 2-3 scholarly refs, and 3 creator quotes; exports with citations.
+
+---
+
+## 11) Acceptance criteria
+
+- Typographic artifacts removed across the file; UTF-8 clean.
+- New "Creator & Media Profiles" pillar appears under Product pillars.
+- API lists transcript ingestion and creator/topic retrieval endpoints.
+- Data model tables for creators, videos, segments, creator_claims, transcript_quotes are documented.
+- Reader shows a "Creators" chip on verses that appear in transcripts; clicking shows quotes + timestamps.
+- Query "What does <Creator> think about <Topic>?" returns stance + 3 quotes with timestamps and OSIS refs.
+- Deep-Dive reports include transcript evidence automatically.
+- Research Trails section present; can view and replay an agent trail.
+- Argument Dossier section present; sample dossier criteria met.
 
 ---
 
