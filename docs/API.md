@@ -80,7 +80,9 @@ provided, is stored long enough to support downstream enrichments.
 ## Background jobs
 
 Background job endpoints enqueue asynchronous work to reprocess existing
-documents. They return **202 Accepted** with `{ "document_id": "...", "status": "queued" }`.
+documents. Legacy document-specific routes return **202 Accepted** with
+`{ "document_id": "...", "status": "queued" }`. The generic queue endpoint
+returns a deterministic descriptor that clients can cache for idempotency.
 
 - **404 Not Found** – the requested document does not exist.
 - **400 Bad Request** – the document is missing required source artifacts.
@@ -108,6 +110,36 @@ Generates the weekly OpenAlex-enhanced topic digest. Optional body parameters:
 ```
 
 The task clusters new documents by `primary_topic` + top-N topics and stores a `digest` document with summary paragraphs.
+
+### `POST /jobs/enqueue`
+
+Queues arbitrary Celery tasks by name. Body:
+
+```json
+{
+  "task": "research.enrich",
+  "args": {"document_id": "doc-123", "force": true},
+  "schedule_at": "2030-01-01T12:00:00Z"
+}
+```
+
+Response:
+
+```json
+{
+  "job_id": "018fa7c0-4c9c-7dd2-a0d1-4d53302ac160",
+  "task": "research.enrich",
+  "args_hash": "0ab4f5f4f33d1a9f0db13f8e4a2a77c748d9c9fdf09f9b282f2cf3bde6f84f16",
+  "queued_at": "2024-07-01T15:30:00Z",
+  "schedule_at": "2030-01-01T12:00:00Z",
+  "status_url": "/jobs/018fa7c0-4c9c-7dd2-a0d1-4d53302ac160"
+}
+```
+
+If the same `task` and normalized `args` are enqueued again within ~10 minutes,
+the API replays the original payload (same `job_id`, timestamps, and
+`args_hash`) and does **not** create a duplicate job. This makes retries safe
+for clients without additional coordination logic.
 
 ## Search
 
@@ -174,6 +206,93 @@ Response:
   ]
 }
 ```
+
+## Research dock
+
+Research endpoints power the study/reader dock. They respect feature flags
+surfaced via `/features/discovery` so clients can hide unavailable panels.
+
+### `GET /research/contradictions`
+
+Returns seeded contradiction or harmony claims anchored to OSIS references.
+
+Query parameters:
+
+| Parameter | Type   | Description                                      |
+| --------- | ------ | ------------------------------------------------ |
+| `osis`    | list   | One or more OSIS ranges (`osis=Luke.2.1-7`).     |
+| `topic`   | str    | Optional tag filter (e.g., `chronology`).        |
+| `limit`   | int    | Max number of items to return (default 25).      |
+
+Response (truncated):
+
+```json
+{
+  "items": [
+    {
+      "id": "018fa7be-0b67-7db4-8737-7ad63a17c377",
+      "osis_a": "Luke.2.1-7",
+      "osis_b": "Matthew.2.1-12",
+      "summary": "Luke situates Jesus' birth during the census of Quirinius while Matthew frames it around Herod's reign, creating a classic chronology tension.",
+      "source": "community",
+      "tags": ["chronology", "nativity"],
+      "weight": 0.9
+    }
+  ]
+}
+```
+
+When the feature flag is disabled the endpoint still returns **200 OK** with
+`{"items": []}` for compatibility.
+
+### `GET /research/geo/search`
+
+Performs fuzzy lookup of seeded biblical places.
+
+Query parameters:
+
+| Parameter | Type | Description                                  |
+| --------- | ---- | -------------------------------------------- |
+| `query`   | str  | Partial place name (e.g., `Bethlehem`).      |
+| `limit`   | int  | Max number of results (default 10).          |
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "slug": "bethlehem",
+      "name": "Bethlehem",
+      "lat": 31.7054,
+      "lng": 35.2024,
+      "confidence": 0.95,
+      "aliases": ["Beth-lehem", "Bethlehem Ephrathah"],
+      "sources": {
+        "dataset": "OpenBible.info",
+        "license": "CC BY 3.0"
+      }
+    }
+  ]
+}
+```
+
+### Feature discovery
+
+`GET /features/discovery` returns a nested feature map:
+
+```json
+{
+  "features": {
+    "research": true,
+    "contradictions": true,
+    "geo": true
+  }
+}
+```
+
+Clients should check `features.contradictions` and `features.geo` before
+rendering the corresponding panels.
 
 ## Documents
 
@@ -360,18 +479,49 @@ without hard-coding environment variables. All feature flags are boolean.
 
 ### `GET /features`
 
-Lists currently enabled features.
+Lists global boolean toggles.
 
 Response:
 
 ```json
 {
-  "gpt5_codex_preview": true
+  "gpt5_codex_preview": true,
+  "job_tracking": true,
+  "document_annotations": true,
+  "ai_copilot": true
 }
 ```
 
-Fields:
+### `GET /features/discovery`
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| `gpt5_codex_preview` | bool | GPT-5-Codex (Preview) endpoints and UI unlocked for all clients. |
+Provides a structured capability map, including research sub-features. Example:
+
+```json
+{
+  "features": {
+    "research": true,
+    "contradictions": false,
+    "geo": true
+  }
+}
+```
+
+Use `features.contradictions` and `features.geo` to decide whether to surface
+the corresponding panels in the research dock.
+
+## Reference datasets & seeds
+
+Theo Engine bundles starter datasets to light up the research dock without
+external dependencies:
+
+- `data/seeds/contradictions.json` – community-curated tensions/harmonies.
+  Entries are tagged with OSIS references (stored as-is) and tagged by topic.
+  Treat the dataset as non–peer-reviewed and supplement with your own notes.
+- `data/seeds/geo_places.json` – normalized place names sourced from
+  [OpenBible.info](https://www.openbible.info/geo/), licensed under CC BY 3.0.
+
+The application loads these seeds during startup using idempotent upserts, so
+re-running the loader is safe in every environment. Because contradictions are
+anchored to OSIS ranges, queries accept single verses or ranges and the service
+uses the same normalization logic as ingestion (`pythonbible`) to compute
+intersections.

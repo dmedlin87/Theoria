@@ -313,16 +313,16 @@ Note: reuse the existing evidence table by allowing source_type='video' and stor
 ## 7) Minimal API surface
 
 ```
-GET  /api/passage?osis=Luke.2.1-Luke.2.7&translation=SBLGNT
-GET  /api/crossrefs?osis=Luke.2.1
-GET  /api/variants?osis=Luke.2.2
-GET  /api/geo?place=Bethlehem
-GET  /api/notes?osis=Luke.2.1
-POST /api/notes        -- { osis, stance, claim_type, note_md, evidence[] }
-GET  /api/contradictions?osis=Luke.2
-GET  /api/search/openalex?q=Quirinius%20census
-GET  /api/search/crossref?q=Quirinius%20census
-POST /api/agent/deep-dive  -- { osis, options }
+GET  /research/scripture?osis=Luke.2.1-Luke.2.7&translation=SBLGNT
+GET  /research/crossrefs?osis=Luke.2.1
+GET  /research/contradictions?osis=Luke.2.1-7
+GET  /research/geo/search?query=Bethlehem
+GET  /research/notes?osis=Luke.2.1
+POST /research/notes      -- { osis, stance, claim_type, body, evidence[] }
+GET  /features/discovery
+GET  /search/openalex?q=Quirinius%20census
+GET  /search/crossref?q=Quirinius%20census
+POST /ai/agent/deep-dive  -- { osis, options }
 ```
 
 ### Transcripts & Creator Profiles

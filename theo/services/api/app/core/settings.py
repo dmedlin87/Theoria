@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     )
     openai_api_key: str | None = Field(default=None, description="Optional OpenAI API key")
     openai_base_url: str | None = Field(default=None, description="Override base URL for OpenAI-compatible APIs")
+    contradictions_enabled: bool = Field(
+        default=True, description="Toggle contradiction search endpoints"
+    )
+    geo_enabled: bool = Field(default=True, description="Toggle geography lookup endpoints")
 
 
 @lru_cache

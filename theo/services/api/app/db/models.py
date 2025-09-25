@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -131,6 +131,8 @@ class IngestionJob(Base):
     task_id: Mapped[str | None] = mapped_column(String, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    args_hash: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
@@ -223,6 +225,47 @@ class CrossReference(Base):
     )
 
 
+class ContradictionSeed(Base):
+    """Pre-seeded claims of harmony or tension between passages."""
+
+    __tablename__ = "contradiction_seeds"
+    __table_args__ = (
+        Index("ix_contradiction_seeds_osis_a", "osis_a"),
+        Index("ix_contradiction_seeds_osis_b", "osis_b"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    osis_a: Mapped[str] = mapped_column(String, nullable=False)
+    osis_b: Mapped[str] = mapped_column(String, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(String, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+
+class GeoPlace(Base):
+    """Normalized lookup table for biblical geography."""
+
+    __tablename__ = "geo_places"
+
+    slug: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    aliases: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    sources: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
 __all__ = [
     "Document",
     "Passage",
@@ -232,4 +275,6 @@ __all__ = [
     "ResearchNote",
     "NoteEvidence",
     "CrossReference",
+    "ContradictionSeed",
+    "GeoPlace",
 ]

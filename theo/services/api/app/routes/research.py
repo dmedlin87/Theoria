@@ -6,8 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
+from ..core.settings import get_settings
 from ..models.research import (
+    ContradictionSearchResponse,
     CrossReferenceResponse,
+    GeoPlaceSearchResponse,
     MorphologyResponse,
     ResearchNoteCreate,
     ResearchNoteResponse,
@@ -20,6 +23,8 @@ from ..research import (
     fetch_morphology,
     fetch_passage,
     get_notes_for_osis,
+    lookup_geo_places,
+    search_contradictions,
 )
 
 router = APIRouter()
@@ -127,3 +132,32 @@ def create_note(
         evidences=[e.model_dump() for e in payload.evidences or []],
     )
     return ResearchNoteResponse(note=note)
+
+
+@router.get("/contradictions", response_model=ContradictionSearchResponse)
+def list_contradictions(
+    osis: list[str] = Query(..., description="OSIS reference or list of references"),
+    topic: str | None = Query(default=None, description="Optional topic tag filter"),
+    limit: int = Query(default=25, ge=1, le=100),
+    session: Session = Depends(get_session),
+) -> ContradictionSearchResponse:
+    settings = get_settings()
+    if not getattr(settings, "contradictions_enabled", True):
+        return ContradictionSearchResponse(items=[])
+
+    items = search_contradictions(session, osis=osis, topic=topic, limit=limit)
+    return ContradictionSearchResponse(items=items)
+
+
+@router.get("/geo/search", response_model=GeoPlaceSearchResponse)
+def lookup_geo(
+    query: str = Query(..., description="Place name or alias"),
+    limit: int = Query(default=10, ge=1, le=50),
+    session: Session = Depends(get_session),
+) -> GeoPlaceSearchResponse:
+    settings = get_settings()
+    if not getattr(settings, "geo_enabled", True):
+        return GeoPlaceSearchResponse(items=[])
+
+    items = lookup_geo_places(session, query=query, limit=limit)
+    return GeoPlaceSearchResponse(items=items)
