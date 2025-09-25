@@ -5,13 +5,16 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..db.models import Document, Passage
+from ..db.models import Document, DocumentAnnotation, Passage
 from ..models.base import Passage as PassageSchema
 from ..models.documents import (
+    DocumentAnnotationCreate,
+    DocumentAnnotationResponse,
     DocumentDetailResponse,
     DocumentListResponse,
     DocumentPassagesResponse,
     DocumentSummary,
+    DocumentUpdateRequest,
 )
 
 
@@ -26,6 +29,16 @@ def _passage_to_schema(passage: Passage) -> PassageSchema:
         t_end=passage.t_end,
         score=None,
         meta=passage.meta,
+    )
+
+
+def _annotation_to_schema(annotation: DocumentAnnotation) -> DocumentAnnotationResponse:
+    return DocumentAnnotationResponse(
+        id=annotation.id,
+        document_id=annotation.document_id,
+        body=annotation.body,
+        created_at=annotation.created_at,
+        updated_at=annotation.updated_at,
     )
 
 
@@ -69,6 +82,12 @@ def get_document(session: Session, document_id: str) -> DocumentDetailResponse:
         .order_by(Passage.page_no.asc(), Passage.start_char.asc())
         .all()
     )
+    annotations = (
+        session.query(DocumentAnnotation)
+        .filter(DocumentAnnotation.document_id == document.id)
+        .order_by(DocumentAnnotation.created_at.asc())
+        .all()
+    )
 
     passage_schemas = [_passage_to_schema(passage) for passage in passages]
 
@@ -94,6 +113,7 @@ def get_document(session: Session, document_id: str) -> DocumentDetailResponse:
         provenance_score=document.provenance_score,
         metadata=document.bib_json,
         passages=passage_schemas,
+        annotations=[_annotation_to_schema(annotation) for annotation in annotations],
     )
 
 
@@ -125,3 +145,74 @@ def get_document_passages(
         limit=limit,
         offset=offset,
     )
+
+
+def update_document(
+    session: Session,
+    document_id: str,
+    payload: DocumentUpdateRequest,
+) -> DocumentDetailResponse:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    if payload.title is not None:
+        document.title = payload.title or None
+    if payload.collection is not None:
+        document.collection = payload.collection or None
+    if payload.authors is not None:
+        document.authors = payload.authors or None
+    if payload.source_type is not None:
+        document.source_type = payload.source_type or None
+    if payload.abstract is not None:
+        document.abstract = payload.abstract or None
+    if payload.metadata is not None:
+        document.bib_json = payload.metadata
+
+    session.add(document)
+    session.commit()
+    session.refresh(document)
+    return get_document(session, document_id)
+
+
+def list_annotations(session: Session, document_id: str) -> list[DocumentAnnotationResponse]:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    annotations = (
+        session.query(DocumentAnnotation)
+        .filter(DocumentAnnotation.document_id == document_id)
+        .order_by(DocumentAnnotation.created_at.asc())
+        .all()
+    )
+    return [_annotation_to_schema(annotation) for annotation in annotations]
+
+
+def create_annotation(
+    session: Session,
+    document_id: str,
+    payload: DocumentAnnotationCreate,
+) -> DocumentAnnotationResponse:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    annotation = DocumentAnnotation(document_id=document_id, body=payload.body)
+    session.add(annotation)
+    session.commit()
+    session.refresh(annotation)
+    return _annotation_to_schema(annotation)
+
+
+def delete_annotation(session: Session, document_id: str, annotation_id: str) -> None:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    annotation = session.get(DocumentAnnotation, annotation_id)
+    if annotation is None or annotation.document_id != document_id:
+        raise KeyError(f"Annotation {annotation_id} not found for document {document_id}")
+
+    session.delete(annotation)
+    session.commit()

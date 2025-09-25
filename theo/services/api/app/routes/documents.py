@@ -7,11 +7,22 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_session
 from ..models.documents import (
+    DocumentAnnotationCreate,
+    DocumentAnnotationResponse,
     DocumentDetailResponse,
     DocumentListResponse,
     DocumentPassagesResponse,
+    DocumentUpdateRequest,
 )
-from ..retriever.documents import get_document, get_document_passages, list_documents
+from ..retriever.documents import (
+    create_annotation,
+    delete_annotation,
+    get_document,
+    get_document_passages,
+    list_annotations,
+    list_documents,
+    update_document,
+)
 
 router = APIRouter()
 
@@ -48,5 +59,70 @@ def document_passages(
 
     try:
         return get_document_passages(session, document_id, limit=limit, offset=offset)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.patch("/{document_id}", response_model=DocumentDetailResponse)
+def update_document_metadata(
+    document_id: str,
+    payload: DocumentUpdateRequest,
+    session: Session = Depends(get_session),
+) -> DocumentDetailResponse:
+    """Update editable document metadata fields."""
+
+    try:
+        return update_document(session, document_id, payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get(
+    "/{document_id}/annotations",
+    response_model=list[DocumentAnnotationResponse],
+)
+def document_annotations(
+    document_id: str,
+    session: Session = Depends(get_session),
+) -> list[DocumentAnnotationResponse]:
+    """Return annotations attached to the document."""
+
+    try:
+        return list_annotations(session, document_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post(
+    "/{document_id}/annotations",
+    status_code=status.HTTP_201_CREATED,
+    response_model=DocumentAnnotationResponse,
+)
+def create_document_annotation(
+    document_id: str,
+    payload: DocumentAnnotationCreate,
+    session: Session = Depends(get_session),
+) -> DocumentAnnotationResponse:
+    """Create a new annotation for a document."""
+
+    try:
+        return create_annotation(session, document_id, payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.delete(
+    "/{document_id}/annotations/{annotation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_document_annotation(
+    document_id: str,
+    annotation_id: str,
+    session: Session = Depends(get_session),
+) -> None:
+    """Delete a document annotation."""
+
+    try:
+        delete_annotation(session, document_id, annotation_id)
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

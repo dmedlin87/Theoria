@@ -37,6 +37,40 @@ def _snippet(text: str, max_length: int = 240) -> str:
     return text[: max_length - 3].rstrip() + "..."
 
 
+def _build_highlights(text: str, query_tokens: list[str], *, window: int = 160, max_highlights: int = 3) -> list[str]:
+    if not query_tokens:
+        return []
+    lowered = text.lower()
+    highlights: list[str] = []
+    for token in query_tokens:
+        start = 0
+        while True:
+            index = lowered.find(token, start)
+            if index == -1:
+                break
+            clip_start = max(0, index - window // 3)
+            clip_end = min(len(text), index + len(token) + window // 3 * 2)
+            snippet = text[clip_start:clip_end].strip()
+            if snippet and snippet not in highlights:
+                prefix = "... " if clip_start > 0 else ""
+                suffix = " ..." if clip_end < len(text) else ""
+                highlights.append(f"{prefix}{snippet}{suffix}")
+                if len(highlights) >= max_highlights:
+                    return highlights
+            start = index + len(token)
+    return highlights
+
+
+def _apply_document_ranks(results: list[HybridSearchResult], doc_scores: dict[str, float], query_tokens: list[str]) -> list[HybridSearchResult]:
+    ordered = sorted(doc_scores.items(), key=lambda item: item[1], reverse=True)
+    doc_ranks = {doc_id: rank for rank, (doc_id, _score) in enumerate(ordered, start=1)}
+    for result in results:
+        result.document_score = doc_scores.get(result.document_id)
+        result.document_rank = doc_ranks.get(result.document_id)
+        result.highlights = _build_highlights(result.text, query_tokens)
+    return results
+
+
 @dataclass
 class _Candidate:
     passage: Passage
@@ -125,11 +159,14 @@ def _fallback_search(session: Session, request: HybridSearchRequest) -> list[Hyb
 
     sorted_results = sorted(heap, key=lambda item: item[0], reverse=True)[: request.k]
     final: list[HybridSearchResult] = []
+    doc_scores: dict[str, float] = {}
+    for score, _counter, result in sorted_results:
+        doc_scores[result.document_id] = max(doc_scores.get(result.document_id, float("-inf")), score)
     for idx, (score, _counter, result) in enumerate(sorted_results, start=1):
         result.rank = idx
         result.score = score
         final.append(result)
-    return final
+    return _apply_document_ranks(final, doc_scores, query_tokens)
 
 
 def _postgres_hybrid_search(session: Session, request: HybridSearchRequest) -> list[HybridSearchResult]:
@@ -261,7 +298,12 @@ def _postgres_hybrid_search(session: Session, request: HybridSearchRequest) -> l
         result.rank = idx
         result.score = score
         results.append(result)
-    return results
+
+    doc_scores: dict[str, float] = {}
+    for result in results:
+        doc_scores[result.document_id] = max(doc_scores.get(result.document_id, float("-inf")), result.score or 0.0)
+    query_tokens = _tokenise(request.query or "")
+    return _apply_document_ranks(results, doc_scores, query_tokens)
 
 
 def hybrid_search(session: Session, request: HybridSearchRequest) -> list[HybridSearchResult]:

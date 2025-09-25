@@ -51,6 +51,9 @@ class Document(Base):
     passages: Mapped[list["Passage"]] = relationship(
         "Passage", back_populates="document", cascade="all, delete-orphan"
     )
+    annotations: Mapped[list["DocumentAnnotation"]] = relationship(
+        "DocumentAnnotation", back_populates="document", cascade="all, delete-orphan"
+    )
 
 
 class Passage(Base):
@@ -95,4 +98,50 @@ class AppSetting(Base):
     )
 
 
-__all__ = ["Document", "Passage", "AppSetting"]
+class DocumentAnnotation(Base):
+    """Free-form annotations associated with a document."""
+
+    __tablename__ = "document_annotations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    document_id: Mapped[str] = mapped_column(String, ForeignKey("documents.id", ondelete="CASCADE"))
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    document: Mapped[Document] = relationship("Document", back_populates="annotations")
+
+
+class IngestionJob(Base):
+    """Track asynchronous ingestion and enrichment work."""
+
+    __tablename__ = "ingestion_jobs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    document_id: Mapped[str | None] = mapped_column(String, ForeignKey("documents.id"), nullable=True)
+    job_type: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="queued")
+    task_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    document: Mapped[Document | None] = relationship("Document")
+
+
+__all__ = ["Document", "Passage", "AppSetting", "DocumentAnnotation", "IngestionJob"]

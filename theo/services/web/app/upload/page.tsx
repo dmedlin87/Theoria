@@ -1,10 +1,23 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+
+import { getApiBaseUrl } from "../lib/api";
 
 type UploadStatus = {
   kind: "success" | "error" | "info";
   message: string;
+};
+
+type JobStatus = {
+  id: string;
+  document_id?: string | null;
+  job_type: string;
+  status: string;
+  task_id?: string | null;
+  error?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 async function uploadFile({
@@ -81,10 +94,51 @@ async function uploadUrl({
   };
 }
 
-export default function UploadPage() {
+function formatTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+  return date.toLocaleString();
+}
+
+export default function UploadPage(): JSX.Element {
   const [status, setStatus] = useState<UploadStatus | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isSubmittingUrl, setIsSubmittingUrl] = useState(false);
+  const [jobs, setJobs] = useState<JobStatus[]>([]);
+  const [jobError, setJobError] = useState<string | null>(null);
+
+  const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchJobs = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/jobs?limit=25`, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+        const payload = (await response.json()) as { jobs: JobStatus[] };
+        if (isMounted) {
+          setJobs(payload.jobs ?? []);
+          setJobError(null);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setJobError((error as Error).message || "Unable to load jobs");
+        }
+      }
+    };
+
+    fetchJobs();
+    const interval = window.setInterval(fetchJobs, 5000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [baseUrl]);
 
   const handleFileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -166,7 +220,7 @@ export default function UploadPage() {
             />
           </label>
           <button type="submit" style={{ marginTop: "1rem" }}>
-            {isUploadingFile ? "Uploading…" : "Upload file"}
+            {isUploadingFile ? "Uploading." : "Upload file"}
           </button>
         </fieldset>
       </form>
@@ -198,7 +252,7 @@ export default function UploadPage() {
             />
           </label>
           <button type="submit" style={{ marginTop: "1rem" }}>
-            {isSubmittingUrl ? "Submitting…" : "Submit URL"}
+            {isSubmittingUrl ? "Submitting." : "Submit URL"}
           </button>
         </fieldset>
       </form>
@@ -208,6 +262,47 @@ export default function UploadPage() {
           {status.message}
         </p>
       )}
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h3>Recent jobs</h3>
+        {jobError && (
+          <p role="alert" style={{ color: "crimson" }}>
+            {jobError}
+          </p>
+        )}
+        {jobs.length === 0 ? (
+          <p>No jobs queued yet.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 480 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #e2e8f0" }}>Type</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #e2e8f0" }}>Status</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #e2e8f0" }}>Document</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #e2e8f0" }}>Updated</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #e2e8f0" }}>Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <tr key={job.id}>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9" }}>{job.job_type}</td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9" }}>{job.status}</td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9" }}>
+                      {job.document_id ?? "�"}
+                    </td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9" }}>{formatTimestamp(job.updated_at)}</td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9", color: job.error ? "crimson" : "#475569" }}>
+                      {job.error ? job.error : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </section>
   );
 }

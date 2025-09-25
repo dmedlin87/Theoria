@@ -30,6 +30,8 @@ class HybridSearchResult(Passage):
     snippet: str
     rank: int
     highlights: list[str] | None = None
+    document_score: float | None = None
+    document_rank: int | None = None
 
 
 class HybridSearchResponse(APIModel):

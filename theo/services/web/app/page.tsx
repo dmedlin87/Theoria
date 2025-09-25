@@ -9,6 +9,12 @@ const FEATURES = [
     cta: "Open search",
   },
   {
+    title: "Grounded copilot",
+    description: "Run verse briefs, sermon prep, and comparative flows with OSIS-cited outputs.",
+    href: "/copilot",
+    cta: "Launch copilot",
+  },
+  {
     title: "Verse mentions explorer",
     description:
       "Trace how every verse is referenced across sermons, papers, and curated collections.",

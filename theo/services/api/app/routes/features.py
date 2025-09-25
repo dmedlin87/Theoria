@@ -14,4 +14,7 @@ def list_features() -> dict[str, bool]:
     settings = get_settings()
     return {
         "gpt5_codex_preview": settings.gpt5_codex_preview_enabled,
+        "job_tracking": True,
+        "document_annotations": True,
+        "ai_copilot": True,
     }

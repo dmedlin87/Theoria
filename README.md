@@ -8,6 +8,7 @@ Theo Engine now layers grounded generative workflows on top of the deterministic
 - Run verse-linked research, sermon prep, comparative analysis, multimedia insight extraction, devotional guides, corpus curation, and collaboration flows directly in the Verse Aggregator and search interfaces with strict OSIS-anchored citations.
 - Generate export-ready deliverables (Markdown, NDJSON, CSV) for sermons, lessons, and Q&A transcripts with reproducibility manifests, and trigger post-ingest batch enrichments from the CLI.
 - Monitor new theological topics via OpenAlex-enhanced clustering and receive weekly digests summarizing under-represented themes.
+- Track background ingestion jobs in real time, edit document metadata inline, and surface historian notes alongside the grounded copilot workflows in the web UI.
 
 For usage details run `python -m theo.services.cli.ingest_folder --help` or consult [the CLI guide](docs/CLI.md).
 

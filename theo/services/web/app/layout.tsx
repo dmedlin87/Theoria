@@ -10,6 +10,7 @@ export const metadata = {
 const NAV_LINKS = [
   { href: "/search", label: "Search" },
   { href: "/upload", label: "Upload" },
+  { href: "/copilot", label: "Copilot" },
   { href: "/verse/John.1.1", label: "Verse explorer" },
 ];
 

@@ -46,6 +46,7 @@ class DocumentDetailResponse(DocumentSummary):
     primary_topic: str | None = None
     metadata: dict[str, Any] | None = Field(default=None, alias="meta")
     passages: list[Passage] = Field(default_factory=list)
+    annotations: list["DocumentAnnotationResponse"] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -63,3 +64,26 @@ class DocumentPassagesResponse(APIModel):
     total: int
     limit: int
     offset: int
+
+
+class DocumentAnnotationResponse(APIModel):
+    id: str
+    document_id: str
+    body: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class DocumentAnnotationCreate(APIModel):
+    body: str
+
+
+class DocumentUpdateRequest(APIModel):
+    title: str | None = None
+    collection: str | None = None
+    authors: list[str] | None = None
+    source_type: str | None = None
+    abstract: str | None = None
+    metadata: dict[str, Any] | None = Field(default=None, alias="meta")
+
+DocumentDetailResponse.model_rebuild()
