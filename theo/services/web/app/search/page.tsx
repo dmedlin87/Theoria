@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { buildPassageLink, formatAnchor } from "../lib/api";
+import { usePersistentSort } from "../lib/usePersistentSort";
 import { sortDocumentGroups, SortableDocumentGroup } from "./groupSorting";
+import { SortControls } from "./SortControls";
 
 const SOURCE_OPTIONS = [
   { label: "Any source", value: "" },
@@ -72,6 +74,7 @@ export default function SearchPage(): JSX.Element {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [sortKey, setSortKey] = usePersistentSort();
 
   const filterChips = useMemo(() => {
     const chips: { label: string; value: string }[] = [];
@@ -129,7 +132,7 @@ export default function SearchPage(): JSX.Element {
         group.passages.push(result);
         grouped.set(result.document_id, group);
       }
-      const sortedGroups = sortDocumentGroups(Array.from(grouped.values()));
+      const sortedGroups = sortDocumentGroups(Array.from(grouped.values()), sortKey);
       setGroups(sortedGroups);
     } catch (fetchError) {
       setError((fetchError as Error).message);
@@ -138,6 +141,10 @@ export default function SearchPage(): JSX.Element {
       setIsSearching(false);
     }
   };
+
+  useEffect(() => {
+    setGroups((currentGroups) => sortDocumentGroups(currentGroups, sortKey));
+  }, [sortKey]);
 
   return (
     <section>
@@ -209,6 +216,10 @@ export default function SearchPage(): JSX.Element {
           {isSearching ? "Searching." : "Search"}
         </button>
       </form>
+
+      <div style={{ margin: "1.5rem 0" }}>
+        <SortControls value={sortKey} onChange={setSortKey} />
+      </div>
 
       {filterChips.length > 0 && (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
