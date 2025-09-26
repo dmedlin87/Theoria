@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Sequence
 
 import pythonbible as pb
@@ -241,14 +242,15 @@ def _osis_to_readable(reference: str) -> str:
     return _format_range_end(end_book, end_chapter, end_verse)
 
 
-def expand_osis_reference(reference: str) -> set[int]:
+@lru_cache(maxsize=256)
+def expand_osis_reference(reference: str) -> frozenset[int]:
     """Return the set of verse identifiers covered by the supplied OSIS reference."""
 
     normalized = pb.get_references(_osis_to_readable(reference))
     verse_ids: list[int] = []
     for entry in normalized:
         verse_ids.extend(pb.convert_reference_to_verse_ids(entry))
-    return set(verse_ids)
+    return frozenset(verse_ids)
 
 
 def osis_intersects(a: str, b: str) -> bool:
