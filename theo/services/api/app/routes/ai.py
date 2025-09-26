@@ -74,6 +74,11 @@ def verse_copilot(
             plan_md=VERSE_COPILOT_PLAN,
             mode="verse_copilot",
             input_payload=payload.model_dump(mode="json"),
+            user_id=(
+                payload.recorder_metadata.user_id
+                if payload.recorder_metadata
+                else None
+            ),
         ) as recorder:
             response = generate_verse_brief(
                 session,
@@ -101,6 +106,11 @@ def sermon_prep(
             plan_md=SERMON_PREP_PLAN,
             mode="sermon_prep",
             input_payload=payload.model_dump(mode="json"),
+            user_id=(
+                payload.recorder_metadata.user_id
+                if payload.recorder_metadata
+                else None
+            ),
         ) as recorder:
             response = generate_sermon_prep_outline(
                 session,

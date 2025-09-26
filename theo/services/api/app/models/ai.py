@@ -18,6 +18,13 @@ from ..models.search import HybridSearchFilters
 from .base import APIModel
 
 
+class RecorderMetadata(APIModel):
+    """Optional metadata supplied by clients when recording trails."""
+
+    user_id: str | None = None
+    source: str | None = None
+
+
 class LLMModelRequest(APIModel):
     name: str
     provider: str = Field(default="openai")
@@ -36,6 +43,7 @@ class VerseCopilotRequest(APIModel):
     question: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     model: str | None = None
+    recorder_metadata: RecorderMetadata | None = None
 
 
 class SermonPrepRequest(APIModel):
@@ -43,6 +51,7 @@ class SermonPrepRequest(APIModel):
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     model: str | None = None
+    recorder_metadata: RecorderMetadata | None = None
 
 
 class ComparativeAnalysisRequest(APIModel):
@@ -92,6 +101,7 @@ __all__ = [
     "CollaborationRequest",
     "ComparativeAnalysisRequest",
     "DevotionalRequest",
+    "RecorderMetadata",
     "LLMModelRequest",
     "LLMSettingsResponse",
     "MultimediaDigestRequest",

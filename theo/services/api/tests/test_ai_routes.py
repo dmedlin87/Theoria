@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from click.testing import CliRunner
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.core.database import get_engine
-from theo.services.api.app.db.models import Document, Passage
+from theo.services.api.app.db.models import AgentTrail, Document, Passage
 from theo.services.api.app.main import app
 from theo.services.cli.batch_intel import main as batch_intel_main
 
@@ -52,7 +53,7 @@ def _seed_corpus() -> None:
         session.commit()
 
 
-def test_verse_copilot_returns_citations() -> None:
+def test_verse_copilot_returns_citations_and_followups() -> None:
     _seed_corpus()
     with TestClient(app) as client:
         client.post(
@@ -60,13 +61,45 @@ def test_verse_copilot_returns_citations() -> None:
         )
         response = client.post(
             "/ai/verse",
-            json={"osis": "John.1.1", "question": "What is said?", "model": "echo"},
+            json={
+                "osis": "John.1.1",
+                "question": "What is said?",
+                "model": "echo",
+                "recorder_metadata": {"user_id": "user-123", "source": "pytest"},
+            },
         )
         assert response.status_code == 200
         payload = response.json()
         assert payload["answer"]["citations"], payload
         for citation in payload["answer"]["citations"]:
             assert citation["osis"] == "John.1.1"
+            assert citation["snippet"], citation
+        assert payload["follow_ups"], payload
+        with Session(get_engine()) as session:
+            trail = (
+                session.execute(
+                    select(AgentTrail)
+                    .where(
+                        AgentTrail.workflow == "verse_copilot",
+                        AgentTrail.status == "completed",
+                    )
+                    .order_by(AgentTrail.started_at.desc())
+                )
+                .scalars()
+                .first()
+            )
+            assert trail is not None
+            assert trail.user_id == "user-123"
+
+
+def test_verse_copilot_guardrails_when_no_citations() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        response = client.post(
+            "/ai/verse",
+            json={"osis": "Gen.99.1", "question": "Missing?"},
+        )
+        assert response.status_code == 422
 
 
 def test_sermon_prep_export_markdown() -> None:
@@ -81,6 +114,48 @@ def test_sermon_prep_export_markdown() -> None:
         body = response.text
         assert body.startswith("---\nexport_id:")
         assert "Sermon Prep" in body
+
+
+def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        response = client.post(
+            "/ai/sermon-prep",
+            json={
+                "topic": "Logos",
+                "osis": "John.1.1",
+                "recorder_metadata": {"user_id": "preacher-7"},
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["answer"]["citations"], payload
+        assert payload["key_points"], payload
+        with Session(get_engine()) as session:
+            trail = (
+                session.execute(
+                    select(AgentTrail)
+                    .where(
+                        AgentTrail.workflow == "sermon_prep",
+                        AgentTrail.status == "completed",
+                    )
+                    .order_by(AgentTrail.started_at.desc())
+                )
+                .scalars()
+                .first()
+            )
+            assert trail is not None
+            assert trail.user_id == "preacher-7"
+
+
+def test_sermon_prep_guardrails_when_no_results() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        response = client.post(
+            "/ai/sermon-prep",
+            json={"topic": "Unknown", "osis": "Rev.99.1"},
+        )
+        assert response.status_code == 422
 
 
 def test_transcript_export_csv() -> None:
