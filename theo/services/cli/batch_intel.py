@@ -9,6 +9,11 @@ import click
 from sqlalchemy.orm import Session
 
 from ..api.app.ai import run_corpus_curation
+from ..api.app.analytics.topics import (
+    generate_topic_digest,
+    store_topic_digest,
+    upsert_digest_document,
+)
 from ..api.app.core.database import get_engine
 from ..api.app.db.models import Document, Passage
 
@@ -96,6 +101,21 @@ def main(hours: int, dry_run: bool) -> None:
                 continue
             ai_doc = _persist_summary(session, document, summary, tags)
             click.echo(f"  Saved ai_summary document {ai_doc.id}")
+
+        click.echo("Generating weekly topic digest…")
+        digest = generate_topic_digest(session)
+        if dry_run:
+            click.echo(
+                f"Digest preview contains {len(digest.topics)} clusters since {digest.window_start.date()}"
+            )
+            return
+
+        digest_document = upsert_digest_document(session, digest)
+        session.commit()
+        store_topic_digest(session, digest)
+        click.echo(
+            f"Updated digest document {digest_document.id} covering {len(digest.topics)} clusters"
+        )
 
 
 if __name__ == "__main__":
