@@ -49,7 +49,9 @@ def fetch_passage(osis: str, translation: str | None = None) -> list[Verse]:
         book_chapter = start.rsplit(".", 1)[0]
         start_verse = int(start.split(".")[-1])
         end_verse = int(end.split(".")[-1])
-        verse_keys = [f"{book_chapter}.{idx}" for idx in range(start_verse, end_verse + 1)]
+        verse_keys = [
+            f"{book_chapter}.{idx}" for idx in range(start_verse, end_verse + 1)
+        ]
 
     verses: list[Verse] = []
     for key in verse_keys:

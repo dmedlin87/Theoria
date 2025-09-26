@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from hashlib import sha256
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -22,10 +22,13 @@ from ..models.jobs import (
     SummaryJobRequest,
     TopicDigestJobRequest,
 )
-from ..workers.tasks import enrich_document as enqueue_enrich_task
-from ..workers.tasks import generate_document_summary as summary_task
-from ..workers.tasks import process_file
-from ..workers.tasks import celery, topic_digest as topic_digest_task
+from ..workers.tasks import (
+    celery,
+    enrich_document as enqueue_enrich_task,
+    generate_document_summary as summary_task,
+    process_file,
+    topic_digest as topic_digest_task,
+)
 
 router = APIRouter()
 
@@ -73,8 +76,12 @@ def _serialize_job(job: IngestionJob) -> JobStatus:
 @router.get("/", response_model=JobListResponse)
 def list_jobs(
     limit: int = Query(default=25, ge=1, le=200),
-    document_id: str | None = Query(default=None, description="Filter jobs by document."),
-    status_filter: str | None = Query(default=None, alias="status", description="Filter by job status."),
+    document_id: str | None = Query(
+        default=None, description="Filter jobs by document."
+    ),
+    status_filter: str | None = Query(
+        default=None, alias="status", description="Filter by job status."
+    ),
     session: Session = Depends(get_session),
 ) -> JobListResponse:
     stmt = select(IngestionJob).order_by(IngestionJob.created_at.desc()).limit(limit)
@@ -90,7 +97,9 @@ def list_jobs(
 def get_job(job_id: str, session: Session = Depends(get_session)) -> JobStatus:
     job = session.get(IngestionJob, job_id)
     if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
     return _serialize_job(job)
 
 
@@ -138,7 +147,11 @@ def enqueue_reparse_job(
     return JobQueuedResponse(document_id=document.id, status=job.status)
 
 
-@router.post("/enrich/{document_id}", status_code=status.HTTP_202_ACCEPTED, response_model=JobStatus)
+@router.post(
+    "/enrich/{document_id}",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobStatus,
+)
 def enqueue_enrichment_job(
     document_id: str,
     session: Session = Depends(get_session),
@@ -183,7 +196,9 @@ def enqueue_summary_job(
 
     document = session.get(Document, payload.document_id)
     if document is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
 
     job = IngestionJob(
         document_id=document.id,
@@ -252,11 +267,15 @@ def _normalize_args(args: dict[str, object] | None) -> dict[str, object]:
 
 
 def _hash_args(args: dict[str, object]) -> str:
-    encoded = json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    encoded = json.dumps(
+        args, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
     return sha256(encoded.encode("utf-8")).hexdigest()
 
 
-@router.post("/enqueue", response_model=JobEnqueueResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/enqueue", response_model=JobEnqueueResponse, status_code=status.HTTP_202_ACCEPTED
+)
 def enqueue_job(
     payload: JobEnqueueRequest,
     session: Session = Depends(get_session),
@@ -295,7 +314,10 @@ def enqueue_job(
     job = IngestionJob(
         job_type=payload.task,
         status="queued",
-        payload={"args": args, "schedule_at": schedule_at.isoformat() if schedule_at else None},
+        payload={
+            "args": args,
+            "schedule_at": schedule_at.isoformat() if schedule_at else None,
+        },
         args_hash=args_hash,
         scheduled_at=schedule_at,
     )

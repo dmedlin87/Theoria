@@ -24,7 +24,9 @@ class CreatorTopicProfileData:
     claims: list[CreatorClaim]
 
 
-def search_creators(session: Session, *, query: str | None, limit: int) -> list[Creator]:
+def search_creators(
+    session: Session, *, query: str | None, limit: int
+) -> list[Creator]:
     """Return creators matching *query* ordered by name."""
 
     stmt = session.query(Creator)
@@ -59,7 +61,9 @@ def _average_confidence(claims: Iterable[CreatorClaim]) -> float | None:
     return float(sum(confidences) / len(confidences))
 
 
-def _collect_quotes(claims: Iterable[CreatorClaim], limit: int) -> list[TranscriptQuote]:
+def _collect_quotes(
+    claims: Iterable[CreatorClaim], limit: int
+) -> list[TranscriptQuote]:
     quotes: list[TranscriptQuote] = []
     seen: set[str] = set()
     for claim in claims:

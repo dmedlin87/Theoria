@@ -87,7 +87,9 @@ class MetadataEnricher:
         return queries
 
     # Provider lookups -----------------------------------------------------
-    def _try_openalex(self, queries: Sequence[tuple[str, str]]) -> EnrichmentResult | None:
+    def _try_openalex(
+        self, queries: Sequence[tuple[str, str]]
+    ) -> EnrichmentResult | None:
         for query_type, value in queries:
             data = self._fetch_openalex(query_type, value)
             if not data:
@@ -155,7 +157,9 @@ class MetadataEnricher:
             topics=topics or None,
         )
 
-    def _try_crossref(self, queries: Sequence[tuple[str, str]]) -> EnrichmentResult | None:
+    def _try_crossref(
+        self, queries: Sequence[tuple[str, str]]
+    ) -> EnrichmentResult | None:
         for query_type, value in queries:
             data = self._fetch_crossref(query_type, value)
             if not data:
@@ -217,8 +221,12 @@ class MetadataEnricher:
 
         abstract_raw = message.get("abstract")
         abstract = _clean_html(abstract_raw) if isinstance(abstract_raw, str) else None
-        subject_values = message.get("subject") if isinstance(message.get("subject"), list) else None
-        topics = _dedupe_preserve_order(subject_values or []) if subject_values else None
+        subject_values = (
+            message.get("subject") if isinstance(message.get("subject"), list) else None
+        )
+        topics = (
+            _dedupe_preserve_order(subject_values or []) if subject_values else None
+        )
         year = _extract_year_from_crossref(message)
 
         title_value = message.get("title")
@@ -272,7 +280,9 @@ class MetadataEnricher:
         document.bib_json = bib_copy
 
     # Utilities -----------------------------------------------------------
-    def _load_fixture(self, provider: str, query_type: str, value: str) -> dict[str, Any] | None:
+    def _load_fixture(
+        self, provider: str, query_type: str, value: str
+    ) -> dict[str, Any] | None:
         fixtures_root = getattr(self.settings, "fixtures_root", None)
         if not fixtures_root:
             return None
@@ -288,7 +298,13 @@ class MetadataEnricher:
         return None
 
     def _http_get_json(self, url: str) -> Any:
-        request = Request(url, headers={"User-Agent": self.settings.user_agent, "Accept": "application/json"})
+        request = Request(
+            url,
+            headers={
+                "User-Agent": self.settings.user_agent,
+                "Accept": "application/json",
+            },
+        )
         with urlopen(request, timeout=10) as response:
             charset = response.headers.get_content_charset() or "utf-8"
             data = response.read().decode(charset)
@@ -400,7 +416,9 @@ def _extract_authors_from_openalex(authorships: Any) -> list[str]:
                 continue
             author_data = authorship.get("author")
             if isinstance(author_data, dict):
-                name = author_data.get("display_name") or author_data.get("display_name_raw")
+                name = author_data.get("display_name") or author_data.get(
+                    "display_name_raw"
+                )
                 if isinstance(name, str) and name:
                     authors.append(name)
     return authors

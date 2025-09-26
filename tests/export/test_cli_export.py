@@ -1,17 +1,11 @@
 import csv
 import json
-import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
 import pytest
 from click.testing import CliRunner
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.models.base import Passage
 from theo.services.api.app.models.documents import DocumentDetailResponse
@@ -53,8 +47,8 @@ def _build_document_export() -> DocumentExportResponse:
         topics=["Theology", "Grace"],
         enrichment_version=2,
         primary_topic="Theology",
-    provenance_score=7,
-    meta={"primary_topic": "Theology"},
+        provenance_score=7,
+        meta={"primary_topic": "Theology"},
         passages=[],
     )
     return DocumentExportResponse(
@@ -121,8 +115,12 @@ def _patch_session(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli, "_session_scope", _dummy_session_scope)
 
 
-def test_search_export_cli_csv_includes_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "export_search_results", lambda session, request: _build_search_export())
+def test_search_export_cli_csv_includes_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        cli, "export_search_results", lambda session, request: _build_search_export()
+    )
 
     runner = CliRunner()
     result = runner.invoke(
@@ -205,7 +203,9 @@ def test_search_export_cli_requests_extra_row(monkeypatch: pytest.MonkeyPatch) -
     assert captured["k"] == 26
 
 
-def test_document_export_cli_ndjson_contains_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_document_export_cli_ndjson_contains_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         cli,
         "export_documents",

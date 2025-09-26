@@ -17,8 +17,12 @@ _SessionLocal: sessionmaker[Session] | None = None
 
 
 def _create_engine(database_url: str) -> Engine:
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(database_url, future=True, echo=False, connect_args=connect_args)
+    connect_args = (
+        {"check_same_thread": False} if database_url.startswith("sqlite") else {}
+    )
+    return create_engine(
+        database_url, future=True, echo=False, connect_args=connect_args
+    )
 
 
 def configure_engine(database_url: str | None = None) -> Engine:
@@ -64,4 +68,3 @@ def get_session() -> Generator[Session, None, None]:
         yield session
     finally:
         session.close()
-

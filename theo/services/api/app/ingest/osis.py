@@ -8,7 +8,6 @@ from typing import Sequence
 import pythonbible as pb
 from pythonbible import Book, NormalizedReference
 
-
 OSIS_BOOK_NAMES: dict[Book, str] = {
     Book.GENESIS: "Gen",
     Book.EXODUS: "Exod",
@@ -105,7 +104,9 @@ class DetectedOsis:
 def format_osis(reference: NormalizedReference) -> str:
     """Format a pythonbible NormalizedReference into OSIS notation."""
 
-    book_code = OSIS_BOOK_NAMES.get(reference.book, reference.book.name.title().replace("_", ""))
+    book_code = OSIS_BOOK_NAMES.get(
+        reference.book, reference.book.name.title().replace("_", "")
+    )
     start = f"{book_code}.{reference.start_chapter}.{reference.start_verse}"
     same_range = (
         reference.end_chapter == reference.start_chapter
@@ -120,7 +121,9 @@ def format_osis(reference: NormalizedReference) -> str:
     return f"{start}-{book_code}.{reference.end_chapter}.{reference.end_verse}"
 
 
-def combine_references(references: Sequence[NormalizedReference]) -> NormalizedReference | None:
+def combine_references(
+    references: Sequence[NormalizedReference],
+) -> NormalizedReference | None:
     """Return a minimal covering range for contiguous references in the same book."""
 
     if not references:
@@ -195,7 +198,9 @@ def _osis_to_readable(reference: str) -> str:
     if not end_parts:
         return text_value
 
-    def _format_range_end(end_book: str | None, end_chapter: str | None, end_verse: str | None) -> str:
+    def _format_range_end(
+        end_book: str | None, end_chapter: str | None, end_verse: str | None
+    ) -> str:
         target_book = end_book or book
         if end_chapter is None:
             return f"{text_value}-{target_book}"

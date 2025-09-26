@@ -7,13 +7,13 @@ from theo.services.api.app.ingest.osis import _osis_to_readable, osis_intersects
 from theo.services.api.app.transcripts.service import _matches_osis
 
 
-
 @pytest.fixture(autouse=True)
 def dispose_engine() -> None:
     try:
         yield
     finally:
         get_engine().dispose()
+
 
 @pytest.mark.parametrize(
     "reference, expected",

@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 
 from ..ai.trails import TrailService
 from ..core.database import get_session
-from ..models.trails import AgentTrail, TrailReplayDiff, TrailReplayRequest, TrailReplayResponse
+from ..models.trails import (
+    AgentTrail,
+    TrailReplayDiff,
+    TrailReplayRequest,
+    TrailReplayResponse,
+)
 
 router = APIRouter()
 
@@ -21,7 +26,11 @@ def get_trail(trail_id: str, session: Session = Depends(get_session)) -> AgentTr
     return AgentTrail.model_validate(trail)
 
 
-@router.post("/{trail_id}/replay", response_model=TrailReplayResponse, response_model_exclude_none=True)
+@router.post(
+    "/{trail_id}/replay",
+    response_model=TrailReplayResponse,
+    response_model_exclude_none=True,
+)
 def replay_trail(
     trail_id: str,
     payload: TrailReplayRequest | None = None,
@@ -48,4 +57,3 @@ def replay_trail(
 
 
 __all__ = ["router"]
-

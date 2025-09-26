@@ -7,13 +7,13 @@ import io
 import json
 from collections import OrderedDict
 from datetime import UTC, datetime
-from typing import Sequence
+from typing import Any, Literal, Mapping, Sequence
 from uuid import uuid4
 
 from ..core.version import get_git_sha
 from ..models.base import Passage
 from ..models.documents import DocumentDetailResponse
-from ..models.export import ExportManifest, DocumentExportResponse, SearchExportResponse
+from ..models.export import DocumentExportResponse, ExportManifest, SearchExportResponse
 
 SCHEMA_VERSION = "2024-07-01"
 DEFAULT_FILENAME_PREFIX = "theo_export"
@@ -83,9 +83,9 @@ def generate_export_id() -> str:
 
 def build_manifest(
     *,
-    export_type: str,
-    filters: dict,
-    totals: dict,
+    export_type: Literal["search", "documents"],
+    filters: Mapping[str, Any],
+    totals: Mapping[str, Any],
     cursor: str | None,
     next_cursor: str | None,
     mode: str | None,
@@ -100,8 +100,8 @@ def build_manifest(
         schema_version=SCHEMA_VERSION,
         created_at=datetime.now(UTC),
         type=export_type,
-        filters=filters,
-        totals=totals,
+        filters=dict(filters),
+        totals=dict(totals),
         app_git_sha=get_git_sha(),
         enrichment_version=enrichment_version,
         cursor=cursor,
@@ -110,7 +110,9 @@ def build_manifest(
     )
 
 
-def _filter_values(record: dict, allowed: set[str] | None, order: Sequence[str]) -> OrderedDict:
+def _filter_values(
+    record: dict, allowed: set[str] | None, order: Sequence[str]
+) -> OrderedDict:
     """Filter *record* to include only keys listed in *allowed* preserving order."""
 
     output: OrderedDict[str, object] = OrderedDict()
@@ -126,7 +128,9 @@ def _filter_values(record: dict, allowed: set[str] | None, order: Sequence[str])
     return output
 
 
-def _passage_to_dict(passage: Passage, include_text: bool, allowed: set[str] | None) -> OrderedDict:
+def _passage_to_dict(
+    passage: Passage, include_text: bool, allowed: set[str] | None
+) -> OrderedDict:
     record = {
         "id": passage.id,
         "document_id": passage.document_id,
@@ -260,7 +264,10 @@ def build_search_export(
 ) -> tuple[ExportManifest, list[OrderedDict[str, object]]]:
     records = _search_row_to_record(response, include_text=include_text, fields=fields)
     enrichment_values = [
-        row.get("enrichment_version") for row in records if row.get("enrichment_version") is not None
+        value
+        for row in records
+        if (value := row.get("enrichment_version")) is not None
+        if isinstance(value, int)
     ]
     enrichment_version = max(enrichment_values) if enrichment_values else None
     manifest = build_manifest(
@@ -298,7 +305,10 @@ def build_document_export(
         for document in response.documents
     ]
     enrichment_values = [
-        record.get("enrichment_version") for record in records if record.get("enrichment_version") is not None
+        value
+        for record in records
+        if (value := record.get("enrichment_version")) is not None
+        if isinstance(value, int)
     ]
     enrichment_version = max(enrichment_values) if enrichment_values else None
     manifest = build_manifest(
@@ -353,9 +363,15 @@ def render_bundle(
 ) -> tuple[str, str]:
     normalized = output_format.lower()
     if normalized == "json":
-        return render_json_bundle(manifest, [dict(row) for row in records]), "application/json"
+        return (
+            render_json_bundle(manifest, [dict(row) for row in records]),
+            "application/json",
+        )
     if normalized == "ndjson":
-        return render_ndjson_bundle(manifest, [dict(row) for row in records]), "application/x-ndjson"
+        return (
+            render_ndjson_bundle(manifest, [dict(row) for row in records]),
+            "application/x-ndjson",
+        )
     if normalized == "csv":
         csv_body = render_csv_bundle(records)
         body = manifest.model_dump_json() + "\n"

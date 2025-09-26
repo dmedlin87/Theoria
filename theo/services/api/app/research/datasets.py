@@ -11,7 +11,11 @@ _DATA_PACKAGE = "theo.services.api.app.research.data"
 
 
 def _load_json(filename: str) -> Any:
-    with resources.files(_DATA_PACKAGE).joinpath(filename).open("r", encoding="utf-8") as handle:
+    with (
+        resources.files(_DATA_PACKAGE)
+        .joinpath(filename)
+        .open("r", encoding="utf-8") as handle
+    ):
         return json.load(handle)
 
 

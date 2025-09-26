@@ -6,7 +6,6 @@ from typing import Sequence
 
 from pydantic import Field
 
-from .base import APIModel
 from ..ai.rag import (
     CollaborationResponse,
     ComparativeAnalysisResponse,
@@ -16,6 +15,7 @@ from ..ai.rag import (
     VerseCopilotResponse,
 )
 from ..models.search import HybridSearchFilters
+from .base import APIModel
 
 
 class LLMModelRequest(APIModel):
@@ -78,7 +78,14 @@ class TranscriptExportRequest(APIModel):
     format: str = Field(default="markdown")
 
 
-AIResponse = VerseCopilotResponse | SermonPrepResponse | ComparativeAnalysisResponse | MultimediaDigestResponse | DevotionalResponse | CollaborationResponse
+AIResponse = (
+    VerseCopilotResponse
+    | SermonPrepResponse
+    | ComparativeAnalysisResponse
+    | MultimediaDigestResponse
+    | DevotionalResponse
+    | CollaborationResponse
+)
 
 
 __all__ = [

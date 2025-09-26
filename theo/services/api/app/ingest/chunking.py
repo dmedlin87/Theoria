@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
 from typing import Iterable
 
 from .parsers import TranscriptSegment
-
 
 
 @dataclass(slots=True)
@@ -22,7 +20,6 @@ class Chunk:
     t_start: float | None = None
     t_end: float | None = None
     speakers: list[str] | None = None
-
 
 
 @dataclass(slots=True)
@@ -131,7 +128,11 @@ def chunk_text(
 
     for paragraph in paragraphs:
         para_tokens = paragraph.tokens
-        if buffer and token_count + para_tokens > max_tokens and token_count >= min_tokens:
+        if (
+            buffer
+            and token_count + para_tokens > max_tokens
+            and token_count >= min_tokens
+        ):
             flush()
 
         if token_count and token_count + para_tokens > hard_cap:
@@ -148,7 +149,13 @@ def chunk_text(
     if not chunks:
         stripped = text.strip()
         chunks.append(
-            Chunk(text=stripped, start_char=0, end_char=len(stripped), page_no=None, index=0)
+            Chunk(
+                text=stripped,
+                start_char=0,
+                end_char=len(stripped),
+                page_no=None,
+                index=0,
+            )
         )
 
     return chunks
@@ -207,4 +214,3 @@ def chunk_transcript(
 
     flush()
     return chunks
-

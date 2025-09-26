@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..core.version import get_git_sha
 from ..db.models import Document, Passage
 from ..models.base import APIModel
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from ..retriever.hybrid import hybrid_search
-from ..core.version import get_git_sha
 from .clients import GenerationError
 from .registry import LLMRegistry, get_llm_registry
 
@@ -132,7 +132,9 @@ def _guarded_answer(
 ) -> RAGAnswer:
     citations = _build_citations(results)
     if not citations:
-        raise GuardrailError("Retrieved passages lacked OSIS references; aborting generation")
+        raise GuardrailError(
+            "Retrieved passages lacked OSIS references; aborting generation"
+        )
 
     summary_lines = []
     for citation, result in zip(citations, results):
@@ -195,7 +197,8 @@ def _guarded_answer(
                     output_digest=f"{len(completion)} characters",
                 )
             sources_line = "; ".join(
-                f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
+                f"[{citation.index}] {citation.osis} ({citation.anchor})"
+                for citation in citations
             )
             if "Sources:" not in completion:
                 completion = completion.strip() + f"\n\nSources: {sources_line}"
@@ -227,10 +230,22 @@ def _guarded_answer(
             output_digest=f"{len(summary_lines)} summary lines",
         )
 
-    return RAGAnswer(summary=summary_text, citations=citations, model_name=model_name, model_output=model_output)
+    return RAGAnswer(
+        summary=summary_text,
+        citations=citations,
+        model_name=model_name,
+        model_output=model_output,
+    )
 
 
-def _search(session: Session, *, query: str | None, osis: str | None, filters: HybridSearchFilters, k: int = 8) -> list[HybridSearchResult]:
+def _search(
+    session: Session,
+    *,
+    query: str | None,
+    osis: str | None,
+    filters: HybridSearchFilters,
+    k: int = 8,
+) -> list[HybridSearchResult]:
     request = HybridSearchRequest(query=query, osis=osis, filters=filters, k=k)
     return hybrid_search(session, request)
 
@@ -283,7 +298,9 @@ def generate_verse_brief(
         "Trace how this verse links to adjacent passages",
         "Surface sermons that emphasise this verse",
     ]
-    return VerseCopilotResponse(osis=osis, question=question, answer=answer, follow_ups=follow_ups)
+    return VerseCopilotResponse(
+        osis=osis, question=question, answer=answer, follow_ups=follow_ups
+    )
 
 
 def generate_sermon_prep_outline(
@@ -336,8 +353,12 @@ def generate_sermon_prep_outline(
         "Application: connect the insights to contemporary discipleship",
         "Closing: invite response grounded in the cited witnesses",
     ]
-    key_points = [f"{citation.osis}: {citation.snippet}" for citation in answer.citations[:4]]
-    return SermonPrepResponse(topic=topic, osis=osis, outline=outline, key_points=key_points, answer=answer)
+    key_points = [
+        f"{citation.osis}: {citation.snippet}" for citation in answer.citations[:4]
+    ]
+    return SermonPrepResponse(
+        topic=topic, osis=osis, outline=outline, key_points=key_points, answer=answer
+    )
 
 
 def generate_comparative_analysis(
@@ -348,7 +369,9 @@ def generate_comparative_analysis(
     model_name: str | None = None,
 ) -> ComparativeAnalysisResponse:
     filters = HybridSearchFilters()
-    results = _search(session, query="; ".join(participants), osis=osis, filters=filters, k=12)
+    results = _search(
+        session, query="; ".join(participants), osis=osis, filters=filters, k=12
+    )
     registry = get_llm_registry(session)
     answer = _guarded_answer(
         session,
@@ -359,8 +382,15 @@ def generate_comparative_analysis(
     )
     comparisons = []
     for citation in answer.citations:
-        comparisons.append(f"{citation.document_title or citation.document_id}: {citation.snippet}")
-    return ComparativeAnalysisResponse(osis=osis, participants=list(participants), comparisons=comparisons, answer=answer)
+        comparisons.append(
+            f"{citation.document_title or citation.document_id}: {citation.snippet}"
+        )
+    return ComparativeAnalysisResponse(
+        osis=osis,
+        participants=list(participants),
+        comparisons=comparisons,
+        answer=answer,
+    )
 
 
 def generate_multimedia_digest(
@@ -369,12 +399,25 @@ def generate_multimedia_digest(
     collection: str | None = None,
     model_name: str | None = None,
 ) -> MultimediaDigestResponse:
-    filters = HybridSearchFilters(collection=collection, source_type="audio" if collection else None)
+    filters = HybridSearchFilters(
+        collection=collection, source_type="audio" if collection else None
+    )
     results = _search(session, query="highlights", osis=None, filters=filters, k=8)
     registry = get_llm_registry(session)
-    answer = _guarded_answer(session, question="What are the key audio/video insights?", results=results, registry=registry, model_hint=model_name)
-    highlights = [f"{citation.document_title or citation.document_id}: {citation.snippet}" for citation in answer.citations]
-    return MultimediaDigestResponse(collection=collection, highlights=highlights, answer=answer)
+    answer = _guarded_answer(
+        session,
+        question="What are the key audio/video insights?",
+        results=results,
+        registry=registry,
+        model_hint=model_name,
+    )
+    highlights = [
+        f"{citation.document_title or citation.document_id}: {citation.snippet}"
+        for citation in answer.citations
+    ]
+    return MultimediaDigestResponse(
+        collection=collection, highlights=highlights, answer=answer
+    )
 
 
 def generate_devotional_flow(
@@ -387,11 +430,25 @@ def generate_devotional_flow(
     filters = HybridSearchFilters()
     results = _search(session, query=focus, osis=osis, filters=filters, k=6)
     registry = get_llm_registry(session)
-    answer = _guarded_answer(session, question=f"Devotional focus: {focus}", results=results, registry=registry, model_hint=model_name)
-    reflection = "\n".join(f"Reflect on {citation.osis} ({citation.anchor}): {citation.snippet}" for citation in answer.citations[:3])
-    prayer_lines = [f"Spirit, help me embody {citation.snippet}" for citation in answer.citations[:2]]
+    answer = _guarded_answer(
+        session,
+        question=f"Devotional focus: {focus}",
+        results=results,
+        registry=registry,
+        model_hint=model_name,
+    )
+    reflection = "\n".join(
+        f"Reflect on {citation.osis} ({citation.anchor}): {citation.snippet}"
+        for citation in answer.citations[:3]
+    )
+    prayer_lines = [
+        f"Spirit, help me embody {citation.snippet}"
+        for citation in answer.citations[:2]
+    ]
     prayer = "\n".join(prayer_lines)
-    return DevotionalResponse(osis=osis, focus=focus, reflection=reflection, prayer=prayer, answer=answer)
+    return DevotionalResponse(
+        osis=osis, focus=focus, reflection=reflection, prayer=prayer, answer=answer
+    )
 
 
 def run_corpus_curation(
@@ -403,8 +460,12 @@ def run_corpus_curation(
         since = datetime.now(UTC) - timedelta(days=7)
     rows = (
         session.execute(
-            select(Document).where(Document.created_at >= since).order_by(Document.created_at.asc())
-        ).scalars().all()
+            select(Document)
+            .where(Document.created_at >= since)
+            .order_by(Document.created_at.asc())
+        )
+        .scalars()
+        .all()
     )
     summaries: list[str] = []
     for document in rows:
@@ -417,7 +478,9 @@ def run_corpus_curation(
         summaries.append(
             f"{document.title or document.id} — {topic_label} ({document.collection or 'general'})"
         )
-    return CorpusCurationReport(since=since, documents_processed=len(rows), summaries=summaries)
+    return CorpusCurationReport(
+        since=since, documents_processed=len(rows), summaries=summaries
+    )
 
 
 def run_research_reconciliation(
@@ -429,7 +492,9 @@ def run_research_reconciliation(
     model_name: str | None = None,
 ) -> CollaborationResponse:
     filters = HybridSearchFilters()
-    results = _search(session, query="; ".join(viewpoints), osis=osis, filters=filters, k=10)
+    results = _search(
+        session, query="; ".join(viewpoints), osis=osis, filters=filters, k=10
+    )
     registry = get_llm_registry(session)
     answer = _guarded_answer(
         session,
@@ -438,12 +503,18 @@ def run_research_reconciliation(
         registry=registry,
         model_hint=model_name,
     )
-    synthesis_lines = [f"{citation.osis}: {citation.snippet}" for citation in answer.citations]
+    synthesis_lines = [
+        f"{citation.osis}: {citation.snippet}" for citation in answer.citations
+    ]
     synthesized_view = "\n".join(synthesis_lines)
-    return CollaborationResponse(thread=thread, synthesized_view=synthesized_view, answer=answer)
+    return CollaborationResponse(
+        thread=thread, synthesized_view=synthesized_view, answer=answer
+    )
 
 
-def build_sermon_prep_package(response: SermonPrepResponse, *, format: str) -> tuple[str, str]:
+def build_sermon_prep_package(
+    response: SermonPrepResponse, *, format: str
+) -> tuple[str, str]:
     manifest = {
         "export_id": f"sermon-{response.answer.citations[0].document_id if response.answer.citations else 'unknown'}",
         "schema_version": "2024-07-01",
@@ -451,7 +522,11 @@ def build_sermon_prep_package(response: SermonPrepResponse, *, format: str) -> t
         "git_sha": get_git_sha(),
     }
     if format == "markdown":
-        lines = ["---", f"export_id: {manifest['export_id']}", f"schema_version: {manifest['schema_version']}"]
+        lines = [
+            "---",
+            f"export_id: {manifest['export_id']}",
+            f"schema_version: {manifest['schema_version']}",
+        ]
         lines.append(f"filters: {manifest['filters']}")
         lines.append("---\n")
         lines.append(f"# Sermon Prep — {response.topic}")
@@ -486,7 +561,9 @@ def build_sermon_prep_package(response: SermonPrepResponse, *, format: str) -> t
         import io
 
         buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=["osis", "anchor", "snippet", "document_id"])
+        writer = csv.DictWriter(
+            buffer, fieldnames=["osis", "anchor", "snippet", "document_id"]
+        )
         writer.writeheader()
         for citation in response.answer.citations:
             writer.writerow(
@@ -545,7 +622,11 @@ def build_transcript_package(
             }
         )
     if format == "markdown":
-        lines = ["---", f"export_id: {manifest['export_id']}", f"schema_version: {manifest['schema_version']}"]
+        lines = [
+            "---",
+            f"export_id: {manifest['export_id']}",
+            f"schema_version: {manifest['schema_version']}",
+        ]
         lines.append(f"filters: {manifest['filters']}")
         lines.append("---\n")
         lines.append(f"# Q&A Transcript — {document.title or document_id}")
@@ -565,7 +646,9 @@ def build_transcript_package(
         import io
 
         buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=list(rows[0].keys()) if rows else ["speaker", "text"])
+        writer = csv.DictWriter(
+            buffer, fieldnames=list(rows[0].keys()) if rows else ["speaker", "text"]
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow(row)

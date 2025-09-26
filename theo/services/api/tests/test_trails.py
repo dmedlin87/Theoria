@@ -1,9 +1,9 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.main import app
 from theo.services.api.app.core.database import get_engine
 from theo.services.api.app.db.models import AgentTrail, Document, Passage
+from theo.services.api.app.main import app
 
 
 def _seed_corpus() -> None:
@@ -32,7 +32,9 @@ def _seed_corpus() -> None:
 def test_trail_persistence_and_replay() -> None:
     _seed_corpus()
     with TestClient(app) as client:
-        client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
+        client.post(
+            "/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"}
+        )
         response = client.post(
             "/ai/verse",
             json={"osis": "John.1.1", "question": "What is declared?", "model": "echo"},
@@ -43,7 +45,9 @@ def test_trail_persistence_and_replay() -> None:
 
         engine = get_engine()
         with Session(engine) as session:
-            trail = session.query(AgentTrail).order_by(AgentTrail.created_at.desc()).first()
+            trail = (
+                session.query(AgentTrail).order_by(AgentTrail.created_at.desc()).first()
+            )
             assert trail is not None
             trail_id = trail.id
             assert trail.workflow == "verse_copilot"

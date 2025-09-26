@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 from theo.services.api.app.main import app
 
-
 SAMPLE_VTT = """WEBVTT
 
 00:00.000 --> 00:06.000

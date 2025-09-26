@@ -10,12 +10,11 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from xml.etree import ElementTree as ET
 
-
-from pdfminer.high_level import extract_text
 import webvtt
+from pdfminer.high_level import extract_text
 
 if TYPE_CHECKING:  # pragma: no cover - import-cycle guard
     from .chunking import Chunk
@@ -79,7 +78,11 @@ def parse_transcript_vtt(path: Path) -> list[TranscriptSegment]:
         speaker: str | None = None
         if ":" in text:
             potential, remainder = text.split(":", 1)
-            if potential.strip().istitle() or potential.strip().startswith("Speaker") or potential.strip().endswith("Narrator"):
+            if (
+                potential.strip().istitle()
+                or potential.strip().startswith("Speaker")
+                or potential.strip().endswith("Narrator")
+            ):
                 speaker = potential.strip()
                 text = remainder.strip()
 
@@ -235,7 +238,9 @@ def _fallback_docx_text(path: Path) -> tuple[str, dict[str, Any]]:
             ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
             paragraphs: list[str] = []
             for paragraph in root.findall(".//w:p", ns):
-                texts = [node.text for node in paragraph.findall(".//w:t", ns) if node.text]
+                texts = [
+                    node.text for node in paragraph.findall(".//w:t", ns) if node.text
+                ]
                 if texts:
                     paragraphs.append("".join(texts))
 
@@ -264,7 +269,13 @@ def parse_docx_document(path: Path, *, max_tokens: int) -> ParserResult:
         parser_version = "0.1.0"
 
     chunks = chunk_text(text, max_tokens=max_tokens)
-    return ParserResult(text=text, chunks=chunks, parser=parser, parser_version=parser_version, metadata=metadata)
+    return ParserResult(
+        text=text,
+        chunks=chunks,
+        parser=parser,
+        parser_version=parser_version,
+        metadata=metadata,
+    )
 
 
 class _HTMLExtractor(HTMLParser):
@@ -277,7 +288,20 @@ class _HTMLExtractor(HTMLParser):
     def handle_starttag(self, tag: str, attrs):  # type: ignore[override]
         if tag.lower() == "title":
             self._current_title = True
-        if tag.lower() in {"p", "br", "div", "section", "article", "li", "h1", "h2", "h3", "h4", "h5", "h6"}:
+        if tag.lower() in {
+            "p",
+            "br",
+            "div",
+            "section",
+            "article",
+            "li",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+        }:
             self._body_chunks.append("\n")
 
     def handle_endtag(self, tag: str):  # type: ignore[override]
@@ -347,15 +371,25 @@ def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
         parser_version = "0.1.0"
 
     chunks = chunk_text(text, max_tokens=max_tokens)
-    return ParserResult(text=text, chunks=chunks, parser=parser, parser_version=parser_version, metadata=metadata)
+    return ParserResult(
+        text=text,
+        chunks=chunks,
+        parser=parser,
+        parser_version=parser_version,
+        metadata=metadata,
+    )
 
 
-def parse_pdf_document(path: Path, *, max_pages: int | None, max_tokens: int) -> ParserResult:
+def parse_pdf_document(
+    path: Path, *, max_pages: int | None, max_tokens: int
+) -> ParserResult:
     from .chunking import chunk_text
 
     pages = parse_pdf(path, max_pages=max_pages)
     if not pages:
-        return ParserResult(text="", chunks=[], parser="pdfminer", parser_version="0.2.0")
+        return ParserResult(
+            text="", chunks=[], parser="pdfminer", parser_version="0.2.0"
+        )
 
     chunks: list["Chunk"] = []
     index = 0
@@ -374,7 +408,9 @@ def parse_pdf_document(path: Path, *, max_pages: int | None, max_tokens: int) ->
         cursor += len(page.text) + 1
 
     full_text = "\n".join(text_parts)
-    return ParserResult(text=full_text, chunks=chunks, parser="pdfminer", parser_version="0.2.0")
+    return ParserResult(
+        text=full_text, chunks=chunks, parser="pdfminer", parser_version="0.2.0"
+    )
 
 
 def parse_audio_document(
@@ -403,7 +439,9 @@ def parse_audio_document(
                 start = float(item.get("start", 0.0))
                 end = float(item.get("end", start))
                 speaker = item.get("speaker")
-                segments.append(TranscriptSegment(text=text, start=start, end=end, speaker=speaker))
+                segments.append(
+                    TranscriptSegment(text=text, start=start, end=end, speaker=speaker)
+                )
             if segments:
                 transcript_segments = segments
 
@@ -412,7 +450,11 @@ def parse_audio_document(
             transcript_text = maybe_text.strip()
 
         transcript_path = frontmatter.get("transcript_path")
-        if isinstance(transcript_path, str) and not transcript_segments and not transcript_text:
+        if (
+            isinstance(transcript_path, str)
+            and not transcript_segments
+            and not transcript_text
+        ):
             candidate = Path(transcript_path)
             if not candidate.is_absolute():
                 fixtures_root = getattr(settings, "fixtures_root", None)

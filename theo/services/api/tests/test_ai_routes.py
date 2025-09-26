@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
 from click.testing import CliRunner
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
-from theo.services.api.app.main import app
 from theo.services.api.app.core.database import get_engine
 from theo.services.api.app.db.models import Document, Passage
+from theo.services.api.app.main import app
 from theo.services.cli.batch_intel import main as batch_intel_main
-from sqlalchemy.orm import Session
 
 
 def _seed_corpus() -> None:
@@ -50,11 +50,18 @@ def _seed_corpus() -> None:
         transcript.passages.append(transcript_passage)
         session.add_all([doc, transcript])
         session.commit()
+
+
 def test_verse_copilot_returns_citations() -> None:
     _seed_corpus()
     with TestClient(app) as client:
-        client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
-        response = client.post("/ai/verse", json={"osis": "John.1.1", "question": "What is said?", "model": "echo"})
+        client.post(
+            "/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"}
+        )
+        response = client.post(
+            "/ai/verse",
+            json={"osis": "John.1.1", "question": "What is said?", "model": "echo"},
+        )
         assert response.status_code == 200
         payload = response.json()
         assert payload["answer"]["citations"], payload

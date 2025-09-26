@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from theo.services.api.app.main import app
 from theo.services.api.app.core import settings as settings_module
+from theo.services.api.app.main import app
 
 
 def test_scripture_endpoint_returns_range() -> None:
@@ -16,12 +16,17 @@ def test_scripture_endpoint_returns_range() -> None:
         payload = response.json()
         assert payload["translation"] == "ESV"
         assert payload["meta"]["count"] == 2
-        assert [verse["osis"] for verse in payload["verses"]] == ["John.1.1", "John.1.2"]
+        assert [verse["osis"] for verse in payload["verses"]] == [
+            "John.1.1",
+            "John.1.2",
+        ]
 
 
 def test_crossrefs_endpoint_returns_ranked_results() -> None:
     with TestClient(app) as client:
-        response = client.get("/research/crossrefs", params={"osis": "John.1.1", "limit": 1})
+        response = client.get(
+            "/research/crossrefs", params={"osis": "John.1.1", "limit": 1}
+        )
         assert response.status_code == 200
         payload = response.json()
         assert payload["total"] == 1
@@ -86,7 +91,11 @@ def test_contradictions_by_osis_returns_items_and_is_stable_shape() -> None:
         assert first["osis_a"] == "Luke.2.1-7"
         assert first["osis_b"] == "Matthew.2.1-12"
         assert first["tags"] == ["chronology", "nativity"]
-        assert first["weight"] >= payload["items"][1]["weight"] if len(payload["items"]) > 1 else True
+        assert (
+            first["weight"] >= payload["items"][1]["weight"]
+            if len(payload["items"]) > 1
+            else True
+        )
 
 
 def test_geo_lookup_returns_places_with_confidence_and_aliases() -> None:

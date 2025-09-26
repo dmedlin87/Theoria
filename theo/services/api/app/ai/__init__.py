@@ -1,6 +1,5 @@
 """AI and generative utilities for Theo Engine."""
 
-from .registry import LLMRegistry, get_llm_registry
 from .rag import (
     ComparativeAnalysisResponse,
     DevotionalResponse,
@@ -19,6 +18,7 @@ from .rag import (
     run_corpus_curation,
     run_research_reconciliation,
 )
+from .registry import LLMRegistry, get_llm_registry
 
 __all__ = [
     "LLMRegistry",

@@ -28,7 +28,9 @@ class Document(Base):
 
     __tablename__ = "documents"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     authors: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     doi: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -78,8 +80,12 @@ class Passage(Base):
 
     __tablename__ = "passages"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
-    document_id: Mapped[str] = mapped_column(String, ForeignKey("documents.id", ondelete="CASCADE"))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    document_id: Mapped[str] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="CASCADE")
+    )
     page_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
     t_start: Mapped[float | None] = mapped_column(Float, nullable=True)
     t_end: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -103,7 +109,9 @@ class AppSetting(Base):
     __tablename__ = "app_settings"
 
     key: Mapped[str] = mapped_column(String, primary_key=True)
-    value: Mapped[dict | list | str | int | float | bool | None] = mapped_column(JSON, nullable=True)
+    value: Mapped[dict | list | str | int | float | bool | None] = mapped_column(
+        JSON, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
@@ -120,8 +128,12 @@ class DocumentAnnotation(Base):
 
     __tablename__ = "document_annotations"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
-    document_id: Mapped[str] = mapped_column(String, ForeignKey("documents.id", ondelete="CASCADE"))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    document_id: Mapped[str] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="CASCADE")
+    )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
@@ -141,15 +153,21 @@ class IngestionJob(Base):
 
     __tablename__ = "ingestion_jobs"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
-    document_id: Mapped[str | None] = mapped_column(String, ForeignKey("documents.id"), nullable=True)
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    document_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("documents.id"), nullable=True
+    )
     job_type: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="queued")
     task_id: Mapped[str | None] = mapped_column(String, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     args_hash: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
@@ -168,7 +186,9 @@ class ResearchNote(Base):
 
     __tablename__ = "research_notes"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     osis: Mapped[str] = mapped_column(String, index=True, nullable=False)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     stance: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -196,7 +216,9 @@ class NoteEvidence(Base):
 
     __tablename__ = "note_evidence"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     note_id: Mapped[str] = mapped_column(
         String, ForeignKey("research_notes.id", ondelete="CASCADE"), nullable=False
     )
@@ -216,7 +238,9 @@ class NoteEvidence(Base):
         nullable=False,
     )
 
-    note: Mapped[ResearchNote] = relationship("ResearchNote", back_populates="evidences")
+    note: Mapped[ResearchNote] = relationship(
+        "ResearchNote", back_populates="evidences"
+    )
 
 
 class Creator(Base):
@@ -224,7 +248,9 @@ class Creator(Base):
 
     __tablename__ = "creators"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     channel: Mapped[str | None] = mapped_column(String, nullable=True)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -252,7 +278,9 @@ class Video(Base):
 
     __tablename__ = "videos"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     creator_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("creators.id", ondelete="SET NULL"), nullable=True
     )
@@ -262,7 +290,9 @@ class Video(Base):
     video_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     url: Mapped[str | None] = mapped_column(String, nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     license: Mapped[str | None] = mapped_column(String, nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -294,9 +324,14 @@ class TranscriptSegment(Base):
 
     __tablename__ = "transcript_segments"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     document_id: Mapped[str | None] = mapped_column(
-        String, ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True
+        String,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )
     video_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("videos.id", ondelete="CASCADE"), nullable=True
@@ -333,9 +368,14 @@ class CreatorClaim(Base):
 
     __tablename__ = "creator_claims"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     creator_id: Mapped[str | None] = mapped_column(
-        String, ForeignKey("creators.id", ondelete="SET NULL"), nullable=True, index=True
+        String,
+        ForeignKey("creators.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     video_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("videos.id", ondelete="SET NULL"), nullable=True
@@ -369,12 +409,17 @@ class TranscriptQuote(Base):
 
     __tablename__ = "transcript_quotes"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     video_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("videos.id", ondelete="SET NULL"), nullable=True
     )
     segment_id: Mapped[str | None] = mapped_column(
-        String, ForeignKey("transcript_segments.id", ondelete="CASCADE"), nullable=True, index=True
+        String,
+        ForeignKey("transcript_segments.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )
     quote_md: Mapped[str] = mapped_column(Text, nullable=False)
     osis_refs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
@@ -401,7 +446,9 @@ class CrossReference(Base):
 
     __tablename__ = "cross_references"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     source_osis: Mapped[str] = mapped_column(String, index=True, nullable=False)
     target_osis: Mapped[str] = mapped_column(String, index=True, nullable=False)
     relation_type: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -445,7 +492,9 @@ class AgentTrail(Base):
 
     __tablename__ = "agent_trails"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     workflow: Mapped[str] = mapped_column(String, nullable=False)
     mode: Mapped[str | None] = mapped_column(String, nullable=True)
     user_id: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -458,8 +507,12 @@ class AgentTrail(Base):
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_replayed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_replayed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
@@ -486,8 +539,12 @@ class AgentStep(Base):
 
     __tablename__ = "agent_steps"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
-    trail_id: Mapped[str] = mapped_column(String, ForeignKey("agent_trails.id", ondelete="CASCADE"))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    trail_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_trails.id", ondelete="CASCADE")
+    )
     step_index: Mapped[int] = mapped_column(Integer, nullable=False)
     tool: Mapped[str] = mapped_column(String, nullable=False)
     action: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -501,7 +558,9 @@ class AgentStep(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     trail: Mapped[AgentTrail] = relationship("AgentTrail", back_populates="steps")
 
@@ -511,8 +570,12 @@ class TrailSource(Base):
 
     __tablename__ = "trail_sources"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
-    trail_id: Mapped[str] = mapped_column(String, ForeignKey("agent_trails.id", ondelete="CASCADE"))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    trail_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_trails.id", ondelete="CASCADE")
+    )
     source_type: Mapped[str] = mapped_column(String, nullable=False)
     reference: Mapped[str] = mapped_column(String, nullable=False)
     meta: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -59,7 +58,9 @@ def test_transcript_search_filters_by_osis_ranges() -> None:
 
         payload = search_response.json()
         assert payload["total"] > 0
-        assert payload["segments"], "Expected at least one segment to match the OSIS range"
+        assert payload[
+            "segments"
+        ], "Expected at least one segment to match the OSIS range"
 
 
 def test_transcript_search_accepts_chapter_only_queries() -> None:
@@ -75,5 +76,9 @@ def test_transcript_search_accepts_chapter_only_queries() -> None:
         assert search_response.status_code == 200, search_response.text
 
         payload = search_response.json()
-        assert payload["segments"], "Expected chapter-level OSIS lookup to return results"
-        assert any(segment["primary_osis"] == "John.1.1" for segment in payload["segments"])
+        assert payload[
+            "segments"
+        ], "Expected chapter-level OSIS lookup to return results"
+        assert any(
+            segment["primary_osis"] == "John.1.1" for segment in payload["segments"]
+        )

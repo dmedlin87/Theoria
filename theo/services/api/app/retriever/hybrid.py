@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import heapq
+from dataclasses import dataclass
 from typing import Iterable
 
 from sqlalchemy import and_, func, literal, select
@@ -37,7 +37,9 @@ def _snippet(text: str, max_length: int = 240) -> str:
     return text[: max_length - 3].rstrip() + "..."
 
 
-def _build_highlights(text: str, query_tokens: list[str], *, window: int = 160, max_highlights: int = 3) -> list[str]:
+def _build_highlights(
+    text: str, query_tokens: list[str], *, window: int = 160, max_highlights: int = 3
+) -> list[str]:
     if not query_tokens:
         return []
     lowered = text.lower()
@@ -61,7 +63,11 @@ def _build_highlights(text: str, query_tokens: list[str], *, window: int = 160, 
     return highlights
 
 
-def _apply_document_ranks(results: list[HybridSearchResult], doc_scores: dict[str, float], query_tokens: list[str]) -> list[HybridSearchResult]:
+def _apply_document_ranks(
+    results: list[HybridSearchResult],
+    doc_scores: dict[str, float],
+    query_tokens: list[str],
+) -> list[HybridSearchResult]:
     ordered = sorted(doc_scores.items(), key=lambda item: item[1], reverse=True)
     doc_ranks = {doc_id: rank for rank, (doc_id, _score) in enumerate(ordered, start=1)}
     for result in results:
@@ -96,7 +102,9 @@ def _apply_common_filters(stmt, request: HybridSearchRequest):
     return stmt
 
 
-def _fallback_search(session: Session, request: HybridSearchRequest) -> list[HybridSearchResult]:
+def _fallback_search(
+    session: Session, request: HybridSearchRequest
+) -> list[HybridSearchResult]:
     query_tokens = _tokenise(request.query or "")
 
     stmt = select(Passage, Document).join(Document)
@@ -161,7 +169,9 @@ def _fallback_search(session: Session, request: HybridSearchRequest) -> list[Hyb
     final: list[HybridSearchResult] = []
     doc_scores: dict[str, float] = {}
     for score, _counter, result in sorted_results:
-        doc_scores[result.document_id] = max(doc_scores.get(result.document_id, float("-inf")), score)
+        doc_scores[result.document_id] = max(
+            doc_scores.get(result.document_id, float("-inf")), score
+        )
     for idx, (score, _counter, result) in enumerate(sorted_results, start=1):
         result.rank = idx
         result.score = score
@@ -169,7 +179,9 @@ def _fallback_search(session: Session, request: HybridSearchRequest) -> list[Hyb
     return _apply_document_ranks(final, doc_scores, query_tokens)
 
 
-def _postgres_hybrid_search(session: Session, request: HybridSearchRequest) -> list[HybridSearchResult]:
+def _postgres_hybrid_search(
+    session: Session, request: HybridSearchRequest
+) -> list[HybridSearchResult]:
     settings = get_settings()
     embedding_service = get_embedding_service()
     dialect = session.bind.dialect if session.bind is not None else None
@@ -185,8 +197,12 @@ def _postgres_hybrid_search(session: Session, request: HybridSearchRequest) -> l
     query_embedding: list[float] | None = None
     if request.query:
         query_embedding = embedding_service.embed([request.query])[0]
-        vector_param = literal(query_embedding, type_=VectorType(settings.embedding_dim))
-        distance = func.cosine_distance(Passage.embedding, vector_param).label("distance")
+        vector_param = literal(
+            query_embedding, type_=VectorType(settings.embedding_dim)
+        )
+        distance = func.cosine_distance(Passage.embedding, vector_param).label(
+            "distance"
+        )
         vector_score_expr = (1.0 - func.coalesce(distance, 1.0)).label("vector_score")
         vector_stmt = (
             base_stmt.add_columns(distance, vector_score_expr)
@@ -245,7 +261,9 @@ def _postgres_hybrid_search(session: Session, request: HybridSearchRequest) -> l
         for passage, document in session.execute(osis_stmt):
             if not _passes_author_filter(document, request.filters.author):
                 continue
-            if not (passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)):
+            if not (
+                passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)
+            ):
                 continue
             key = passage.id
             candidate = candidates.get(key)
@@ -271,7 +289,11 @@ def _postgres_hybrid_search(session: Session, request: HybridSearchRequest) -> l
             score += VECTOR_WEIGHT * candidate.vector_score
         if candidate.lexical_score:
             score += LEXICAL_WEIGHT * candidate.lexical_score
-        if request.query is None and candidate.lexical_score == 0.0 and candidate.vector_score == 0.0:
+        if (
+            request.query is None
+            and candidate.lexical_score == 0.0
+            and candidate.vector_score == 0.0
+        ):
             score = max(score, 0.1)
         if candidate.osis_match:
             score += OSIS_BONUS
@@ -301,12 +323,16 @@ def _postgres_hybrid_search(session: Session, request: HybridSearchRequest) -> l
 
     doc_scores: dict[str, float] = {}
     for result in results:
-        doc_scores[result.document_id] = max(doc_scores.get(result.document_id, float("-inf")), result.score or 0.0)
+        doc_scores[result.document_id] = max(
+            doc_scores.get(result.document_id, float("-inf")), result.score or 0.0
+        )
     query_tokens = _tokenise(request.query or "")
     return _apply_document_ranks(results, doc_scores, query_tokens)
 
 
-def hybrid_search(session: Session, request: HybridSearchRequest) -> list[HybridSearchResult]:
+def hybrid_search(
+    session: Session, request: HybridSearchRequest
+) -> list[HybridSearchResult]:
     """Perform hybrid search using pgvector when available."""
 
     bind = getattr(session, "bind", None)

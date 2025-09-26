@@ -42,7 +42,9 @@ def _annotation_to_schema(annotation: DocumentAnnotation) -> DocumentAnnotationR
     )
 
 
-def list_documents(session: Session, *, limit: int = 20, offset: int = 0) -> DocumentListResponse:
+def list_documents(
+    session: Session, *, limit: int = 20, offset: int = 0
+) -> DocumentListResponse:
     """Return a paginated set of document summaries."""
 
     query = session.query(Document).order_by(Document.created_at.desc())
@@ -135,7 +137,12 @@ def get_document_passages(
         .filter(Passage.document_id == document.id)
         .order_by(Passage.page_no.asc(), Passage.start_char.asc())
     )
-    total = session.query(func.count(Passage.id)).filter(Passage.document_id == document.id).scalar() or 0
+    total = (
+        session.query(func.count(Passage.id))
+        .filter(Passage.document_id == document.id)
+        .scalar()
+        or 0
+    )
     passages = passage_query.offset(offset).limit(limit).all()
 
     return DocumentPassagesResponse(
@@ -189,7 +196,9 @@ def update_document(
     return get_document(session, document_id)
 
 
-def list_annotations(session: Session, document_id: str) -> list[DocumentAnnotationResponse]:
+def list_annotations(
+    session: Session, document_id: str
+) -> list[DocumentAnnotationResponse]:
     document = session.get(Document, document_id)
     if document is None:
         raise KeyError(f"Document {document_id} not found")
@@ -226,7 +235,9 @@ def delete_annotation(session: Session, document_id: str, annotation_id: str) ->
 
     annotation = session.get(DocumentAnnotation, annotation_id)
     if annotation is None or annotation.document_id != document_id:
-        raise KeyError(f"Annotation {annotation_id} not found for document {document_id}")
+        raise KeyError(
+            f"Annotation {annotation_id} not found for document {document_id}"
+        )
 
     session.delete(annotation)
     session.commit()

@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from .core.database import Base, get_engine
 from .db.seeds import seed_reference_data
-
 from .routes import (
     ai,
     creators,
@@ -20,10 +19,11 @@ from .routes import (
     jobs,
     research,
     search,
-    transcripts,
     trails,
+    transcripts,
     verses,
 )
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -56,4 +56,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

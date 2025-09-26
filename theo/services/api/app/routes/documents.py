@@ -40,23 +40,31 @@ def document_list(
 
 
 @router.get("/digest", response_model=DocumentDetailResponse)
-def latest_digest_document(session: Session = Depends(get_session)) -> DocumentDetailResponse:
+def latest_digest_document(
+    session: Session = Depends(get_session),
+) -> DocumentDetailResponse:
     """Return the most recently generated topic digest document."""
 
     try:
         return get_latest_digest_document(session)
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get("/{document_id}", response_model=DocumentDetailResponse)
-def document_detail(document_id: str, session: Session = Depends(get_session)) -> DocumentDetailResponse:
+def document_detail(
+    document_id: str, session: Session = Depends(get_session)
+) -> DocumentDetailResponse:
     """Fetch a document with its metadata and passages."""
 
     try:
         return get_document(session, document_id)
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get("/{document_id}/passages", response_model=DocumentPassagesResponse)
@@ -71,7 +79,9 @@ def document_passages(
     try:
         return get_document_passages(session, document_id, limit=limit, offset=offset)
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.patch("/{document_id}", response_model=DocumentDetailResponse)
@@ -85,7 +95,9 @@ def update_document_metadata(
     try:
         return update_document(session, document_id, payload)
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get(
@@ -101,7 +113,9 @@ def document_annotations(
     try:
         return list_annotations(session, document_id)
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.post(
@@ -119,7 +133,9 @@ def create_document_annotation(
     try:
         return create_annotation(session, document_id, payload)
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.delete(
@@ -136,4 +152,6 @@ def delete_document_annotation(
     try:
         delete_annotation(session, document_id, annotation_id)
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

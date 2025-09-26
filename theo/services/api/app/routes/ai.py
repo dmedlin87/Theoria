@@ -20,26 +20,27 @@ from ..ai import (
     run_research_reconciliation,
 )
 from ..ai.rag import GuardrailError
-from ..ai.trails import TrailService
-from ..core.database import get_session
-from ..models.ai import (
-    CollaborationRequest,
-    ComparativeAnalysisRequest,
-    CorpusCurationRequest,
-    DevotionalRequest,
-    LLMSettingsResponse,
-    MultimediaDigestRequest,
-    SermonPrepRequest,
-    VerseCopilotRequest,
-)
-from ..models.ai import LLMModelRequest, TranscriptExportRequest
 from ..ai.registry import LLMModel, get_llm_registry, save_llm_registry
+from ..ai.trails import TrailService
 from ..analytics.topics import (
     TopicDigest,
     generate_topic_digest,
     load_topic_digest,
     store_topic_digest,
     upsert_digest_document,
+)
+from ..core.database import get_session
+from ..models.ai import (
+    CollaborationRequest,
+    ComparativeAnalysisRequest,
+    CorpusCurationRequest,
+    DevotionalRequest,
+    LLMModelRequest,
+    LLMSettingsResponse,
+    MultimediaDigestRequest,
+    SermonPrepRequest,
+    TranscriptExportRequest,
+    VerseCopilotRequest,
 )
 
 router = APIRouter()
@@ -142,7 +143,9 @@ def transcript_export(
 ) -> Response:
     normalized = payload.format.lower()
     try:
-        body, media_type = build_transcript_package(session, payload.document_id, format=normalized)
+        body, media_type = build_transcript_package(
+            session, payload.document_id, format=normalized
+        )
     except GuardrailError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -228,11 +231,15 @@ def corpus_curation(
         try:
             since_dt = datetime.fromisoformat(payload.since)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="since must be ISO formatted") from exc
+            raise HTTPException(
+                status_code=400, detail="since must be ISO formatted"
+            ) from exc
     return run_corpus_curation(session, since=since_dt)
 
 
-@router.get("/digest", response_model=TopicDigest | None, response_model_exclude_none=True)
+@router.get(
+    "/digest", response_model=TopicDigest | None, response_model_exclude_none=True
+)
 def get_topic_digest(session: Session = Depends(get_session)):
     digest = load_topic_digest(session)
     if digest is None:
@@ -267,7 +274,12 @@ def add_model(
 ) -> LLMSettingsResponse:
     registry = get_llm_registry(session)
     registry.add_model(
-        LLMModel(name=payload.name, provider=payload.provider, model=payload.model, config=dict(payload.config)),
+        LLMModel(
+            name=payload.name,
+            provider=payload.provider,
+            model=payload.model,
+            config=dict(payload.config),
+        ),
         make_default=payload.make_default,
     )
     save_llm_registry(session, registry)
@@ -275,10 +287,10 @@ def add_model(
 
 
 @router.delete("/llm/{name}", response_model=LLMSettingsResponse)
-def remove_model(name: str, session: Session = Depends(get_session)) -> LLMSettingsResponse:
+def remove_model(
+    name: str, session: Session = Depends(get_session)
+) -> LLMSettingsResponse:
     registry = get_llm_registry(session)
     registry.remove_model(name)
     save_llm_registry(session, registry)
     return LLMSettingsResponse(**registry.to_response())
-
-
