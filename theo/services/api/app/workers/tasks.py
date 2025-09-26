@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httpx
 from celery import Celery
 from celery.utils.log import get_task_logger
 from sqlalchemy.orm import Session
@@ -291,6 +292,43 @@ def send_topic_digest_notification(
             "context": context or {},
         },
     )
+
+    if not recipients:
+        logger.warning(
+            "Skipping topic digest notification with no recipients",
+            extra={"document_id": digest_document_id},
+        )
+        return
+
+    webhook_url = settings.notification_webhook_url
+    if not webhook_url:
+        logger.warning(
+            "Notification webhook URL not configured; skipping digest notification",
+            extra={"document_id": digest_document_id},
+        )
+        return
+
+    payload = {
+        "type": "topic_digest.ready",
+        "document_id": digest_document_id,
+        "recipients": recipients,
+        "context": context or {},
+    }
+
+    try:
+        response = httpx.post(
+            webhook_url,
+            json=payload,
+            headers=settings.notification_webhook_headers or None,
+            timeout=settings.notification_timeout_seconds,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError:
+        logger.exception(
+            "Failed to dispatch topic digest notification",
+            extra={"document_id": digest_document_id, "webhook_url": webhook_url},
+        )
+        raise
 
 
 @celery.task(name="tasks.generate_topic_digest")
