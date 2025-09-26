@@ -18,7 +18,7 @@ from theo.services.api.app.core.database import (  # noqa: E402  (import after p
     get_engine,
     get_settings,
 )
-from theo.services.api.app.db.models import Document, IngestionJob  # noqa: E402
+from theo.services.api.app.db.models import Document, IngestionJob, Passage  # noqa: E402
 from theo.services.api.app.workers import tasks  # noqa: E402
 
 
@@ -149,3 +149,52 @@ def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
     assert captured["recipients"] == ["alerts@example.com"]
     assert captured["document_id"] == digest_doc.id
     assert "Digest Topic" in captured["context"].get("topics", [])
+
+
+def test_generate_document_summary_creates_summary_document(tmp_path) -> None:
+    db_path = tmp_path / "summary.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        document = Document(
+            title="Creation Sermon",
+            source_type="markdown",
+            abstract="In the beginning was the Word.",
+            bib_json={"primary_topic": "Creation", "topics": ["John", "Logos"]},
+        )
+        session.add(document)
+        session.commit()
+        document_id = document.id
+
+        session.add(
+            Passage(
+                document_id=document_id,
+                page_no=1,
+                start_char=0,
+                end_char=120,
+                text="In the beginning God created the heavens and the earth.",
+            )
+        )
+        job = IngestionJob(job_type="summary", status="queued")
+        session.add(job)
+        session.commit()
+        job_id = job.id
+
+    tasks.generate_document_summary.run(document_id=document_id, job_id=job_id)
+
+    with Session(engine) as session:
+        summary_doc = (
+            session.query(Document)
+            .filter(Document.source_type == "ai_summary")
+            .order_by(Document.created_at.desc())
+            .first()
+        )
+        job_record = session.get(IngestionJob, job_id)
+
+    assert summary_doc is not None
+    assert summary_doc.bib_json["generated_from"] == document_id
+    assert summary_doc.topics == ["Creation", "John", "Logos"]
+    assert job_record is not None and job_record.status == "completed"
+    assert job_record.document_id == summary_doc.id

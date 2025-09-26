@@ -54,6 +54,10 @@ class JobEnqueueResponse(APIModel):
     status_url: str
 
 
+class SummaryJobRequest(APIModel):
+    document_id: str
+
+
 class TopicDigestJobRequest(APIModel):
     since: datetime | None = None
     notify: list[str] | None = None

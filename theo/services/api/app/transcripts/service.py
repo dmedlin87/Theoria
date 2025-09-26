@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..db.models import TranscriptSegment, Video
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference
 
 
 def _matches_osis(segment: TranscriptSegment, osis: str) -> bool:
@@ -18,9 +18,16 @@ def _matches_osis(segment: TranscriptSegment, osis: str) -> bool:
     if segment.osis_refs:
         references.extend(ref for ref in segment.osis_refs if ref)
 
+    try:
+        target_ids = expand_osis_reference(osis)
+    except Exception:  # pragma: no cover - defensive against malformed input
+        return False
+    if not target_ids:
+        return False
+
     for reference in references:
         try:
-            if osis_intersects(reference, osis):
+            if expand_osis_reference(reference) & target_ids:
                 return True
         except Exception:  # pragma: no cover - defensive against malformed data
             continue

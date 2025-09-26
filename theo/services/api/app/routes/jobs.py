@@ -19,9 +19,11 @@ from ..models.jobs import (
     JobListResponse,
     JobQueuedResponse,
     JobStatus,
+    SummaryJobRequest,
     TopicDigestJobRequest,
 )
 from ..workers.tasks import enrich_document as enqueue_enrich_task
+from ..workers.tasks import generate_document_summary as summary_task
 from ..workers.tasks import process_file
 from ..workers.tasks import celery, topic_digest as topic_digest_task
 
@@ -159,6 +161,40 @@ def enqueue_enrichment_job(
     session.commit()
 
     async_result = enqueue_enrich_task.delay(document.id, job.id)
+    task_id = getattr(async_result, "id", None)
+    if task_id:
+        job.task_id = task_id
+        session.add(job)
+        session.commit()
+
+    session.refresh(job)
+    return _serialize_job(job)
+
+
+@router.post(
+    "/summaries",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobStatus,
+)
+def enqueue_summary_job(
+    payload: SummaryJobRequest, session: Session = Depends(get_session)
+) -> JobStatus:
+    """Queue a summary-generation job for an existing document."""
+
+    document = session.get(Document, payload.document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    job = IngestionJob(
+        document_id=document.id,
+        job_type="summary",
+        status="queued",
+        payload={"source_document_id": document.id},
+    )
+    session.add(job)
+    session.commit()
+
+    async_result = summary_task.delay(document.id, job.id)
     task_id = getattr(async_result, "id", None)
     if task_id:
         job.task_id = task_id

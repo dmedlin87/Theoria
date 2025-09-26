@@ -5,12 +5,35 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from contextlib import asynccontextmanager
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
-from theo.services.api.app.main import app
-from theo.services.api.app.routes import jobs as jobs_module
+from theo.services.api.app.core.database import Base, get_engine
+from theo.services.api.app.db.seeds import seed_reference_data
+from theo.services.api.app.routes import ingest, jobs as jobs_module
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI):
+    engine = get_engine()
+    Base.metadata.create_all(bind=engine)
+    with Session(engine) as session:
+        seed_reference_data(session)
+    yield
+
+
+def _create_app() -> FastAPI:
+    app = FastAPI(lifespan=_lifespan)
+    app.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
+    app.include_router(jobs_module.router, prefix="/jobs", tags=["jobs"])
+    return app
+
+
+app = _create_app()
 
 
 @pytest.fixture()
@@ -123,3 +146,29 @@ def test_topic_digest_job_enqueues(monkeypatch: pytest.MonkeyPatch, client: Test
     assert captured["job_id"] == payload["id"]
     assert captured["since"] == since.isoformat()
     assert captured["notify"] == ["alerts@theo.app"]
+
+
+def test_summary_job_enqueues(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    document_id = _ingest_sample_document(client)
+    captured: dict[str, Any] = {}
+
+    def fake_delay(doc_id: str, job_id: str) -> Any:
+        captured["document_id"] = doc_id
+        captured["job_id"] = job_id
+
+        class Result:
+            id = "summary-job"
+
+        return Result()
+
+    monkeypatch.setattr(jobs_module.summary_task, "delay", fake_delay)
+
+    response = client.post("/jobs/summaries", json={"document_id": document_id})
+    assert response.status_code == 202, response.text
+    payload = response.json()
+
+    assert payload["job_type"] == "summary"
+    assert payload["document_id"] == document_id
+
+    assert captured["document_id"] == document_id
+    assert captured["job_id"] == payload["id"]

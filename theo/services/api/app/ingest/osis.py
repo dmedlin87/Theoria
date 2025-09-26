@@ -84,6 +84,15 @@ OSIS_BOOK_NAMES: dict[Book, str] = {
     Book.MACCABEES_2: "2Macc",
 }
 
+KNOWN_BOOK_CODES: set[str] = {
+    *(OSIS_BOOK_NAMES.values()),
+    *(
+        book.name.title().replace("_", "")
+        for book in pb.Book
+        if book not in OSIS_BOOK_NAMES
+    ),
+}
+
 
 @dataclass
 class DetectedOsis:
@@ -163,33 +172,85 @@ def _osis_to_readable(reference: str) -> str:
     """Convert an OSIS string into a pythonbible-friendly textual form."""
 
     start, *rest = reference.split("-")
-    book, chapter, verse = start.split(".")
-    text = f"{book} {chapter}:{verse}"
+    start_parts = [part for part in start.split(".") if part]
+    if not start_parts:
+        raise ValueError("Invalid OSIS reference")
+
+    book = start_parts[0]
+    chapter = start_parts[1] if len(start_parts) > 1 else None
+    verse = start_parts[2] if len(start_parts) > 2 else None
+
+    if chapter is None:
+        text_value = book
+    elif verse is None:
+        text_value = f"{book} {chapter}"
+    else:
+        text_value = f"{book} {chapter}:{verse}"
+
     if not rest:
-        return text
+        return text_value
 
     end = rest[0]
-    end_parts = end.split(".")
+    end_parts = [part for part in end.split(".") if part]
+    if not end_parts:
+        return text_value
+
+    def _format_range_end(end_book: str | None, end_chapter: str | None, end_verse: str | None) -> str:
+        target_book = end_book or book
+        if end_chapter is None:
+            return f"{text_value}-{target_book}"
+        if end_verse is None:
+            if target_book == book and verse is None:
+                return f"{text_value}-{end_chapter}"
+            return f"{text_value}-{target_book} {end_chapter}"
+        if target_book == book:
+            return f"{text_value}-{end_chapter}:{end_verse}"
+        return f"{text_value}-{target_book} {end_chapter}:{end_verse}"
+
+    if verse is not None:
+        if len(end_parts) == 1:
+            return f"{text_value}-{end_parts[0]}"
+        if len(end_parts) == 2:
+            if end_parts[0] in KNOWN_BOOK_CODES:
+                return _format_range_end(end_parts[0], end_parts[1], None)
+            if chapter is not None and end_parts[0] == chapter:
+                return f"{text_value}-{end_parts[1]}"
+            return f"{text_value}-{end_parts[0]}:{end_parts[1]}"
+        end_book = end_parts[0] if end_parts[0] in KNOWN_BOOK_CODES else book
+        offset = 1 if end_book == book else 0
+        end_chapter = end_parts[offset] if len(end_parts) > offset else None
+        end_verse = end_parts[offset + 1] if len(end_parts) > offset + 1 else None
+        return _format_range_end(end_book, end_chapter, end_verse)
+
     if len(end_parts) == 1:
-        return f"{text}-{end_parts[0]}"
+        return f"{text_value}-{end_parts[0]}"
     if len(end_parts) == 2:
-        return f"{text}-{end_parts[0]}:{end_parts[1]}"
-    # Book is repeated in fully-qualified end references.
-    return f"{text}-{end_parts[1]}:{end_parts[2]}"
+        if end_parts[0] in KNOWN_BOOK_CODES:
+            return _format_range_end(end_parts[0], end_parts[1], None)
+        return _format_range_end(None, end_parts[0], end_parts[1])
+
+    end_book = end_parts[0] if end_parts[0] in KNOWN_BOOK_CODES else book
+    offset = 1 if end_book == book else 0
+    end_chapter = end_parts[offset] if len(end_parts) > offset else None
+    end_verse = end_parts[offset + 1] if len(end_parts) > offset + 1 else None
+    return _format_range_end(end_book, end_chapter, end_verse)
+
+
+def expand_osis_reference(reference: str) -> set[int]:
+    """Return the set of verse identifiers covered by the supplied OSIS reference."""
+
+    normalized = pb.get_references(_osis_to_readable(reference))
+    verse_ids: list[int] = []
+    for entry in normalized:
+        verse_ids.extend(pb.convert_reference_to_verse_ids(entry))
+    return set(verse_ids)
 
 
 def osis_intersects(a: str, b: str) -> bool:
     """Determine if two OSIS ranges intersect (basic overlap check)."""
 
-    def _expand(ref: str) -> list[int]:
-        normalized = pb.get_references(_osis_to_readable(ref))
-        verse_ids: list[int] = []
-        for entry in normalized:
-            verse_ids.extend(pb.convert_reference_to_verse_ids(entry))
-        return verse_ids
-
-    ids_a = set(_expand(a))
-    ids_b = set(_expand(b))
+    ids_a = expand_osis_reference(a)
+    ids_b = expand_osis_reference(b)
     if not ids_a or not ids_b:
         return False
     return not ids_a.isdisjoint(ids_b)

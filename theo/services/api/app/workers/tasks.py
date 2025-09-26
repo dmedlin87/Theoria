@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_engine
 from ..core.settings import get_settings
-from ..db.models import Document, IngestionJob
+from ..db.models import Document, IngestionJob, Passage
 from ..analytics.topics import generate_topic_digest, store_topic_digest, upsert_digest_document
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
@@ -141,6 +141,87 @@ def enrich_document(document_id: str, job_id: str | None = None) -> None:
             if job_id:
                 with Session(engine) as retry_session:
                     _update_job_status(retry_session, job_id, status="failed", error="enrichment failed")
+                    retry_session.commit()
+            raise
+
+
+def _summarise_document(session: Session, document: Document) -> tuple[str, list[str]]:
+    passages = (
+        session.query(Passage)
+        .filter(Passage.document_id == document.id)
+        .order_by(Passage.page_no.asc(), Passage.t_start.asc(), Passage.start_char.asc())
+        .limit(3)
+        .all()
+    )
+    combined = " ".join(passage.text for passage in passages if passage.text)
+    if not combined:
+        combined = (document.abstract or "").strip()
+    text_content = combined.strip()
+    summary = text_content[:380]
+    if text_content and len(text_content) > 380:
+        summary = f"{summary}..."
+    if not summary:
+        summary = f"Summary for {document.title or document.id}"
+    tags: list[str] = []
+    if isinstance(document.bib_json, dict):
+        primary = document.bib_json.get("primary_topic")
+        if isinstance(primary, str) and primary:
+            tags.append(primary)
+        extra = document.bib_json.get("topics")
+        if isinstance(extra, list):
+            tags.extend(str(item) for item in extra if item)
+    return summary, tags
+
+
+
+def _persist_summary_document(session: Session, source: Document, summary: str, tags: list[str]) -> Document:
+    summary_doc = Document(
+        title=f"AI Summary - {source.title or source.id}",
+        authors=source.authors,
+        collection=source.collection,
+        source_type="ai_summary",
+        abstract=summary,
+        topics=tags or None,
+        bib_json={"generated_from": source.id, "tags": tags, "primary_topic": tags[0] if tags else None},
+    )
+    session.add(summary_doc)
+    session.flush()
+    return summary_doc
+
+
+
+@celery.task(name="tasks.generate_document_summary")
+def generate_document_summary(document_id: str, job_id: str | None = None) -> None:
+    """Create a lightweight AI summary document for the given artefact."""
+
+    engine = get_engine()
+    with Session(engine) as session:
+        if job_id:
+            _update_job_status(session, job_id, status="processing")
+            session.commit()
+        document = session.get(Document, document_id)
+        if document is None:
+            logger.warning("Document not found for summarisation", extra={"document_id": document_id})
+            if job_id:
+                _update_job_status(session, job_id, status="failed", error="document not found")
+                session.commit()
+            return
+
+        try:
+            summary, tags = _summarise_document(session, document)
+            summary_doc = _persist_summary_document(session, document, summary, tags)
+            session.commit()
+            if job_id:
+                _update_job_status(session, job_id, status="completed", document_id=summary_doc.id)
+                session.commit()
+        except Exception:  # pragma: no cover - defensive logging
+            session.rollback()
+            logger.exception("Failed to generate document summary", extra={"document_id": document_id})
+            if job_id:
+                with Session(engine) as retry_session:
+                    _update_job_status(
+                        retry_session, job_id, status="failed", error="summary generation failed"
+                    )
                     retry_session.commit()
             raise
 
