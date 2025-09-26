@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 
 import { buildPassageLink, formatAnchor } from "../lib/api";
+import { sortDocumentGroups, SortableDocumentGroup } from "./groupSorting";
 
 const SOURCE_OPTIONS = [
   { label: "Any source", value: "" },
@@ -33,11 +34,8 @@ type SearchResponse = {
   results: SearchResult[];
 };
 
-type DocumentGroup = {
+type DocumentGroup = SortableDocumentGroup & {
   documentId: string;
-  title: string;
-  rank?: number | null;
-  score?: number | null;
   passages: SearchResult[];
 };
 
@@ -131,15 +129,7 @@ export default function SearchPage(): JSX.Element {
         group.passages.push(result);
         grouped.set(result.document_id, group);
       }
-      const sortedGroups = Array.from(grouped.values()).sort((a, b) => {
-        if (a.rank && b.rank) return a.rank - b.rank;
-        if (a.rank) return -1;
-        if (b.rank) return 1;
-        if (typeof b.score === "number" && typeof a.score === "number") {
-          return b.score - a.score;
-        }
-        return a.title.localeCompare(b.title);
-      });
+      const sortedGroups = sortDocumentGroups(Array.from(grouped.values()));
       setGroups(sortedGroups);
     } catch (fetchError) {
       setError((fetchError as Error).message);
