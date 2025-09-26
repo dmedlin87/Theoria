@@ -61,7 +61,9 @@ def search_contradictions(
         score = float(seed.weight or 0.0)
         scored.append(_ScoredSeed(seed=seed, score=score))
 
-    scored.sort(key=lambda entry: (-entry.score, entry.seed.summary or "", entry.seed.id))
+    scored.sort(
+        key=lambda entry: (-entry.score, entry.seed.summary or "", entry.seed.id)
+    )
 
     items: list[ContradictionItem] = []
     for entry in scored[:limit]:

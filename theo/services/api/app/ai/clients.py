@@ -65,7 +65,9 @@ class OpenAIClient:
         response = self._client.post("/responses", json=payload)
         try:
             response.raise_for_status()
-        except httpx.HTTPStatusError as exc:  # pragma: no cover - network errors are rare in tests
+        except (
+            httpx.HTTPStatusError
+        ) as exc:  # pragma: no cover - network errors are rare in tests
             raise GenerationError(str(exc)) from exc
         data = response.json()
         if "output" in data and isinstance(data["output"], list):
@@ -111,7 +113,9 @@ def build_client(provider: str, config: dict[str, str]) -> LanguageModelClient:
             raise GenerationError("OpenAI provider requires an api_key")
         base_url = config.get("base_url") or "https://api.openai.com/v1"
         organization = config.get("organization")
-        return OpenAIClient(OpenAIConfig(api_key=api_key, base_url=base_url, organization=organization))
+        return OpenAIClient(
+            OpenAIConfig(api_key=api_key, base_url=base_url, organization=organization)
+        )
     if normalized in {"echo", "builtin", "mock"}:
         return EchoClient(config.get("suffix", ""))
     raise GenerationError(f"Unsupported provider: {provider}")

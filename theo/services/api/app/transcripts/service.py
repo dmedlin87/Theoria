@@ -60,7 +60,9 @@ def search_transcript_segments(
 ) -> list[TranscriptSegment]:
     """Return transcript segments filtered by OSIS and/or video identifier."""
 
-    query = session.query(TranscriptSegment).outerjoin(Video, TranscriptSegment.video_id == Video.id)
+    query = session.query(TranscriptSegment).outerjoin(
+        Video, TranscriptSegment.video_id == Video.id
+    )
     if video_identifier:
         query = query.filter(
             or_(
@@ -70,7 +72,9 @@ def search_transcript_segments(
             )
         )
 
-    ordered = query.order_by(TranscriptSegment.t_start.asc(), TranscriptSegment.created_at.asc()).all()
+    ordered = query.order_by(
+        TranscriptSegment.t_start.asc(), TranscriptSegment.created_at.asc()
+    ).all()
     results: list[TranscriptSegment] = []
     for segment in ordered:
         if osis and not _matches_osis(segment, osis):

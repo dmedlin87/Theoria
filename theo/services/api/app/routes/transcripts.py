@@ -15,11 +15,15 @@ router = APIRouter()
 @router.get("/search", response_model=TranscriptSearchResponse)
 def search_transcripts(
     osis: str | None = Query(default=None, description="Filter by OSIS reference."),
-    video: str | None = Query(default=None, description="Filter by video identifier or internal id."),
+    video: str | None = Query(
+        default=None, description="Filter by video identifier or internal id."
+    ),
     limit: int = Query(default=20, ge=1, le=100),
     session: Session = Depends(get_session),
 ) -> TranscriptSearchResponse:
-    segments = search_transcript_segments(session, osis=osis, video_identifier=video, limit=limit)
+    segments = search_transcript_segments(
+        session, osis=osis, video_identifier=video, limit=limit
+    )
     models: list[TranscriptSegmentModel] = []
     for segment in segments:
         video_model = segment.video
@@ -39,4 +43,6 @@ def search_transcripts(
                 video_url=video_model.url if video_model else None,
             )
         )
-    return TranscriptSearchResponse(osis=osis, video=video, total=len(models), segments=models)
+    return TranscriptSearchResponse(
+        osis=osis, video=video, total=len(models), segments=models
+    )

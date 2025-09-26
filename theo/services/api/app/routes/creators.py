@@ -6,32 +6,42 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
+from ..creators.service import (
+    CreatorTopicProfileData,
+    fetch_creator_topic_profile,
+    search_creators,
+)
 from ..models.creators import (
     CreatorSearchResponse,
     CreatorSummary,
     CreatorTopicProfile,
     CreatorTopicQuote,
 )
-from ..creators.service import CreatorTopicProfileData, fetch_creator_topic_profile, search_creators
 
 router = APIRouter()
 
 
 @router.get("/search", response_model=CreatorSearchResponse)
 def search_creators_route(
-    q: str | None = Query(default=None, alias="query", description="Filter creators by name."),
+    q: str | None = Query(
+        default=None, alias="query", description="Filter creators by name."
+    ),
     limit: int = Query(default=10, ge=1, le=50),
     session: Session = Depends(get_session),
 ) -> CreatorSearchResponse:
     creators = search_creators(session, query=q, limit=limit)
     results = [
-        CreatorSummary(id=creator.id, name=creator.name, channel=creator.channel, tags=creator.tags)
+        CreatorSummary(
+            id=creator.id, name=creator.name, channel=creator.channel, tags=creator.tags
+        )
         for creator in creators
     ]
     return CreatorSearchResponse(query=q, results=results)
 
 
-def _quote_from_data(data: CreatorTopicProfileData, *, limit: int) -> list[CreatorTopicQuote]:
+def _quote_from_data(
+    data: CreatorTopicProfileData, *, limit: int
+) -> list[CreatorTopicQuote]:
     quotes: list[CreatorTopicQuote] = []
     for quote in data.quotes[:limit]:
         segment = quote.segment
@@ -56,11 +66,15 @@ def _quote_from_data(data: CreatorTopicProfileData, *, limit: int) -> list[Creat
 def get_creator_topic_profile(
     creator_id: str,
     topic: str = Query(..., description="Topic to summarize for the creator."),
-    limit: int = Query(default=5, ge=1, le=20, description="Maximum number of quotes to return."),
+    limit: int = Query(
+        default=5, ge=1, le=20, description="Maximum number of quotes to return."
+    ),
     session: Session = Depends(get_session),
 ) -> CreatorTopicProfile:
     try:
-        profile = fetch_creator_topic_profile(session, creator_id=creator_id, topic=topic, limit=limit)
+        profile = fetch_creator_topic_profile(
+            session, creator_id=creator_id, topic=topic, limit=limit
+        )
     except LookupError as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=404, detail="Creator not found") from exc
 

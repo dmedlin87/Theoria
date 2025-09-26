@@ -48,7 +48,9 @@ class TopicDigest(APIModel):
 
 def _historical_counts(session: Session) -> Counter:
     counts: Counter[str] = Counter()
-    rows = session.execute(select(Document.id, Document.bib_json, Document.topics)).all()
+    rows = session.execute(
+        select(Document.id, Document.bib_json, Document.topics)
+    ).all()
     for _id, bib_json, topics in rows:
         doc = Document(id=_id)
         doc.bib_json = bib_json
@@ -58,11 +60,15 @@ def _historical_counts(session: Session) -> Counter:
     return counts
 
 
-def generate_topic_digest(session: Session, since: datetime | None = None) -> TopicDigest:
+def generate_topic_digest(
+    session: Session, since: datetime | None = None
+) -> TopicDigest:
     if since is None:
         since = datetime.now(UTC) - timedelta(days=7)
     rows = (
-        session.execute(select(Document).where(Document.created_at >= since)).scalars().all()
+        session.execute(select(Document).where(Document.created_at >= since))
+        .scalars()
+        .all()
     )
     topic_documents: dict[str, list[str]] = defaultdict(list)
     for document in rows:
@@ -70,17 +76,28 @@ def generate_topic_digest(session: Session, since: datetime | None = None) -> To
             topic_documents[topic].append(document.id)
 
     if not topic_documents:
-        return TopicDigest(generated_at=datetime.now(UTC), window_start=since, topics=[])
+        return TopicDigest(
+            generated_at=datetime.now(UTC), window_start=since, topics=[]
+        )
 
     historical = _historical_counts(session)
     clusters = []
-    for topic, ids in sorted(topic_documents.items(), key=lambda item: (-len(item[1]), item[0])):
+    for topic, ids in sorted(
+        topic_documents.items(), key=lambda item: (-len(item[1]), item[0])
+    ):
         total = historical.get(topic, 0)
         clusters.append(
-            TopicCluster(topic=topic, new_documents=len(ids), total_documents=total, document_ids=ids)
+            TopicCluster(
+                topic=topic,
+                new_documents=len(ids),
+                total_documents=total,
+                document_ids=ids,
+            )
         )
 
-    return TopicDigest(generated_at=datetime.now(UTC), window_start=since, topics=clusters)
+    return TopicDigest(
+        generated_at=datetime.now(UTC), window_start=since, topics=clusters
+    )
 
 
 def store_topic_digest(session: Session, digest: TopicDigest) -> None:
@@ -117,7 +134,9 @@ def upsert_digest_document(session: Session, digest: TopicDigest) -> Document:
             summary_lines.append(f"  Documents: {', '.join(cluster.document_ids)}")
 
     if not digest.topics:
-        summary_lines.append("No new topical activity detected for the selected window.")
+        summary_lines.append(
+            "No new topical activity detected for the selected window."
+        )
 
     metadata = {
         "type": "topic_digest",
@@ -133,7 +152,9 @@ def upsert_digest_document(session: Session, digest: TopicDigest) -> Document:
         .first()
     )
 
-    title = f"Topic Digest ({digest.window_start.date()} – {digest.generated_at.date()})"
+    title = (
+        f"Topic Digest ({digest.window_start.date()} – {digest.generated_at.date()})"
+    )
     topics = [cluster.topic for cluster in digest.topics]
     abstract = "\n".join(summary_lines)
 

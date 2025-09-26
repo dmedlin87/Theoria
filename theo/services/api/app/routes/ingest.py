@@ -11,13 +11,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
-from ..models.documents import DocumentIngestResponse, UrlIngestRequest
 from ..ingest.pipeline import (
     UnsupportedSourceError,
     run_pipeline_for_file,
     run_pipeline_for_transcript,
     run_pipeline_for_url,
 )
+from ..models.documents import DocumentIngestResponse, UrlIngestRequest
 
 router = APIRouter()
 
@@ -28,7 +28,9 @@ def _parse_frontmatter(raw: str | None) -> dict[str, Any] | None:
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid frontmatter JSON") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid frontmatter JSON"
+        ) from exc
 
 
 @router.post("/file", response_model=DocumentIngestResponse)
@@ -50,7 +52,9 @@ async def ingest_file(
     try:
         document = run_pipeline_for_file(session, tmp_path, parsed_frontmatter)
     except UnsupportedSourceError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     finally:
         try:
             tmp_path.unlink(missing_ok=True)
@@ -74,7 +78,9 @@ async def ingest_url(
             frontmatter=payload.frontmatter,
         )
     except UnsupportedSourceError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
     return DocumentIngestResponse(document_id=document.id, status="processed")
 
@@ -114,7 +120,9 @@ async def ingest_transcript(
             audio_path=audio_path,
         )
     except UnsupportedSourceError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     finally:
         try:
             if audio_path:

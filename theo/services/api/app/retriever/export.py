@@ -62,7 +62,9 @@ def _primary_topic(document: Document) -> str | None:
     return None
 
 
-def export_search_results(session: Session, request: HybridSearchRequest) -> SearchExportResponse:
+def export_search_results(
+    session: Session, request: HybridSearchRequest
+) -> SearchExportResponse:
     """Run hybrid search and return an export-friendly payload."""
 
     if request.mode == "mentions" and request.osis:
@@ -82,7 +84,9 @@ def export_search_results(session: Session, request: HybridSearchRequest) -> Sea
 
     documents: dict[str, Document] = {}
     if document_ids:
-        rows = session.execute(select(Document).where(Document.id.in_(document_ids))).scalars()
+        rows = session.execute(
+            select(Document).where(Document.id.in_(document_ids))
+        ).scalars()
         documents = {row.id: row for row in rows}
 
     all_rows: list[SearchExportRow] = []
@@ -167,7 +171,10 @@ def export_documents(
             query = query.filter(
                 or_(
                     Document.created_at > anchor.created_at,
-                    and_(Document.created_at == anchor.created_at, Document.id > anchor.id),
+                    and_(
+                        Document.created_at == anchor.created_at,
+                        Document.id > anchor.id,
+                    ),
                 )
             )
 
@@ -244,7 +251,9 @@ def export_documents(
     )
 
 
-def _mentions_to_export_response(mentions, request: HybridSearchRequest) -> SearchExportResponse:
+def _mentions_to_export_response(
+    mentions, request: HybridSearchRequest
+) -> SearchExportResponse:
     """Convert verse mentions into a search export payload."""
 
     limit = request.limit or request.k
@@ -265,8 +274,12 @@ def _mentions_to_export_response(mentions, request: HybridSearchRequest) -> Sear
             source_url=passage.meta.get("source_url") if passage.meta else None,
             topics=passage.meta.get("topics") if passage.meta else None,
             primary_topic=passage.meta.get("primary_topic") if passage.meta else None,
-            enrichment_version=passage.meta.get("enrichment_version") if passage.meta else None,
-            provenance_score=passage.meta.get("provenance_score") if passage.meta else None,
+            enrichment_version=(
+                passage.meta.get("enrichment_version") if passage.meta else None
+            ),
+            provenance_score=(
+                passage.meta.get("provenance_score") if passage.meta else None
+            ),
         )
         row = SearchExportRow(
             rank=idx,
@@ -297,4 +310,3 @@ def _mentions_to_export_response(mentions, request: HybridSearchRequest) -> Sear
         total_results=len(after_cursor),
         results=returned_rows,
     )
-

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import threading
-from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
-from io import BytesIO
-from pathlib import Path
+import threading
 import wave
 import zipfile
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
+from pathlib import Path
 from xml.sax.saxutils import escape
 
 from fastapi.testclient import TestClient
@@ -17,7 +17,9 @@ from fastapi.testclient import TestClient
 from theo.services.api.app.main import app
 
 
-def _start_static_server(directory: Path) -> tuple[ThreadingHTTPServer, threading.Thread]:
+def _start_static_server(
+    directory: Path,
+) -> tuple[ThreadingHTTPServer, threading.Thread]:
     handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -68,7 +70,8 @@ def _build_docx(paragraphs: list[str]) -> bytes:
 """,
         )
         body = "".join(
-            f"<w:p><w:r><w:t>{escape(paragraph)}</w:t></w:r></w:p>" for paragraph in paragraphs
+            f"<w:p><w:r><w:t>{escape(paragraph)}</w:t></w:r></w:p>"
+            for paragraph in paragraphs
         )
         archive.writestr(
             "word/document.xml",
@@ -105,7 +108,9 @@ def _build_wav(duration_seconds: float = 1.0, sample_rate: int = 8000) -> bytes:
 
 def test_ingest_and_search_roundtrip() -> None:
     with TestClient(app) as client:
-        document_id = _ingest_markdown(client, suffix="Additional reflection on John 3:16.")
+        document_id = _ingest_markdown(
+            client, suffix="Additional reflection on John 3:16."
+        )
 
         search_response = client.get("/search", params={"q": "Word"})
         assert search_response.status_code == 200
@@ -117,7 +122,11 @@ def test_ingest_and_search_roundtrip() -> None:
         assert osis_response.status_code == 200
         osis_results = osis_response.json()["results"]
         assert osis_results, "Expected OSIS search results"
-        assert all("John.1.1" in result["osis_ref"] or result["osis_ref"] == "John.1.1-5" for result in osis_results if result["osis_ref"])
+        assert all(
+            "John.1.1" in result["osis_ref"] or result["osis_ref"] == "John.1.1-5"
+            for result in osis_results
+            if result["osis_ref"]
+        )
 
         verse_response = client.get("/verses/John.1.1/mentions")
         assert verse_response.status_code == 200
@@ -161,7 +170,9 @@ def test_hybrid_search_combines_keyword_and_osis_filters() -> None:
 
 def test_export_endpoints_return_bulk_payloads() -> None:
     with TestClient(app) as client:
-        document_id = _ingest_markdown(client, suffix="Additional passage content for export testing.")
+        document_id = _ingest_markdown(
+            client, suffix="Additional passage content for export testing."
+        )
 
         search_export = client.get(
             "/export/search",
@@ -190,17 +201,24 @@ def test_export_endpoints_return_bulk_payloads() -> None:
         assert exported_records, "Expected exported documents"
         exported_ids = {doc["document_id"] for doc in exported_records}
         assert document_id in exported_ids
-        exported_doc = next(doc for doc in exported_records if doc["document_id"] == document_id)
+        exported_doc = next(
+            doc for doc in exported_records if doc["document_id"] == document_id
+        )
         assert exported_doc["passages"], "Passages should be included by default"
 
         docs_without_passages = client.get(
             "/export/documents",
-            params={"collection": "Gospels", "include_passages": "false", "format": "json"},
+            params={
+                "collection": "Gospels",
+                "include_passages": "false",
+                "format": "json",
+            },
         )
         assert docs_without_passages.status_code == 200
         payload_without = docs_without_passages.json()
         assert payload_without["manifest"]["totals"]["passages"] == 0
         assert all(not doc.get("passages") for doc in payload_without["records"])
+
 
 def test_document_listing_and_paginated_passages() -> None:
     with TestClient(app) as client:
@@ -212,7 +230,9 @@ def test_document_listing_and_paginated_passages() -> None:
         assert any(item["id"] == doc_id for item in listing["items"])
         assert listing["total"] >= 1
 
-        passages_response = client.get(f"/documents/{doc_id}/passages", params={"limit": 1})
+        passages_response = client.get(
+            f"/documents/{doc_id}/passages", params={"limit": 1}
+        )
         assert passages_response.status_code == 200
         passages_payload = passages_response.json()
         assert passages_payload["document_id"] == doc_id
@@ -244,6 +264,7 @@ This paragraph cites Romans 8:1 as well.
             params={"collection": "Gospels"},
         ).json()
         assert mentions_collection["total"] == mentions_all["total"]
+
 
 def test_pdf_ingestion_includes_page_numbers() -> None:
     with TestClient(app) as client:
@@ -284,6 +305,7 @@ def test_youtube_url_ingestion_uses_fixture_transcript() -> None:
         search = client.get("/search", params={"osis": "John.1.1-5"}).json()
         assert any(result["document_id"] == document_id for result in search["results"])
 
+
 def test_html_url_ingestion_and_searchable() -> None:
     html_dir = Path("fixtures/html").resolve()
     server, thread = _start_static_server(html_dir)
@@ -298,18 +320,29 @@ def test_html_url_ingestion_and_searchable() -> None:
             assert document["source_type"] == "web_page"
             assert document["source_url"] == "https://example.com/sample-sermon"
             assert document["title"] == "Sample HTML Sermon"
-            assert any("John 1:1-5" in passage["text"] for passage in document["passages"])
-            assert all("ignore this script" not in passage["text"] for passage in document["passages"])
+            assert any(
+                "John 1:1-5" in passage["text"] for passage in document["passages"]
+            )
+            assert all(
+                "ignore this script" not in passage["text"]
+                for passage in document["passages"]
+            )
 
             search = client.get("/search", params={"q": "reflection"}).json()
-            assert any(result["document_id"] == document_id for result in search["results"])
+            assert any(
+                result["document_id"] == document_id for result in search["results"]
+            )
 
             osis = client.get("/search", params={"osis": "John.1.1-5"}).json()
-            assert any(result["document_id"] == document_id for result in osis["results"])
+            assert any(
+                result["document_id"] == document_id for result in osis["results"]
+            )
     finally:
         server.shutdown()
         server.server_close()
         thread.join()
+
+
 def test_docx_ingestion_uses_doc_parser() -> None:
     with TestClient(app) as client:
         payload = _build_docx(
@@ -385,8 +418,13 @@ def test_audio_ingestion_with_inline_transcript() -> None:
         assert document["source_type"] == "audio"
         assert any(passage["t_start"] is not None for passage in document["passages"])
         assert any(
-            passage["meta"].get("speakers") == ["Host"] for passage in document["passages"] if passage["meta"]
+            passage["meta"].get("speakers") == ["Host"]
+            for passage in document["passages"]
+            if passage["meta"]
         )
 
         mentions = client.get("/verses/John.1.1/mentions").json()
-        assert any(item["passage"]["document_id"] == document_id for item in mentions["mentions"])
+        assert any(
+            item["passage"]["document_id"] == document_id
+            for item in mentions["mentions"]
+        )

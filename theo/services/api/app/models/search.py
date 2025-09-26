@@ -22,7 +22,9 @@ class HybridSearchRequest(APIModel):
     k: int = 10
     cursor: str | None = None
     limit: int | None = None
-    mode: str = Field(default="results", description="Search export mode (results or mentions)")
+    mode: str = Field(
+        default="results", description="Search export mode (results or mentions)"
+    )
 
 
 class HybridSearchResult(Passage):

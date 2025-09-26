@@ -44,15 +44,31 @@ def _build_filename(export_type: str, extension: str) -> str:
 def export_search(
     request: Request,
     q: str | None = Query(default=None, description="Keyword query to run."),
-    osis: str | None = Query(default=None, description="Optional OSIS reference to filter by."),
-    collection: str | None = Query(default=None, description="Filter results to a collection."),
+    osis: str | None = Query(
+        default=None, description="Optional OSIS reference to filter by."
+    ),
+    collection: str | None = Query(
+        default=None, description="Filter results to a collection."
+    ),
     author: str | None = Query(default=None, description="Filter by author."),
-    source_type: str | None = Query(default=None, description="Restrict to a specific source type."),
-    k: int = Query(default=100, ge=1, le=1000, description="Maximum number of results to export."),
-    cursor: str | None = Query(default=None, description="Resume from a specific passage identifier."),
-    limit: int | None = Query(default=None, ge=1, le=1000, description="Maximum number of rows to return."),
-    fields: str | None = Query(default=None, description="Comma separated list of fields to include."),
-    include_text: bool = Query(default=False, description="Include full passage text in the export."),
+    source_type: str | None = Query(
+        default=None, description="Restrict to a specific source type."
+    ),
+    k: int = Query(
+        default=100, ge=1, le=1000, description="Maximum number of results to export."
+    ),
+    cursor: str | None = Query(
+        default=None, description="Resume from a specific passage identifier."
+    ),
+    limit: int | None = Query(
+        default=None, ge=1, le=1000, description="Maximum number of rows to return."
+    ),
+    fields: str | None = Query(
+        default=None, description="Comma separated list of fields to include."
+    ),
+    include_text: bool = Query(
+        default=False, description="Include full passage text in the export."
+    ),
     mode: str = Query(default="results", description="results or mentions."),
     output_format: str = Query(
         default="ndjson",
@@ -67,7 +83,9 @@ def export_search(
     if normalized_format not in {"json", "ndjson", "csv"}:
         raise HTTPException(status_code=400, detail="Unsupported format")
     if mode == "mentions" and not osis:
-        raise HTTPException(status_code=400, detail="mode=mentions requires an osis parameter")
+        raise HTTPException(
+            status_code=400, detail="mode=mentions requires an osis parameter"
+        )
     field_set = _parse_fields(fields)
     limit_value = limit or k
     fetch_k = limit_value + 1 if limit_value is not None else k
@@ -78,7 +96,9 @@ def export_search(
         limit=limit_value,
         cursor=cursor,
         mode=mode,
-        filters=HybridSearchFilters(collection=collection, author=author, source_type=source_type),
+        filters=HybridSearchFilters(
+            collection=collection, author=author, source_type=source_type
+        ),
     )
     response_payload = export_search_results(session, search_request)
     manifest, records = build_search_export(
@@ -110,7 +130,9 @@ def export_search(
         headers["Content-Encoding"] = "gzip"
         filename_extension += ".gz"
 
-    headers["Content-Disposition"] = f"attachment; filename={_build_filename('search', filename_extension)}"
+    headers["Content-Disposition"] = (
+        f"attachment; filename={_build_filename('search', filename_extension)}"
+    )
     return Response(content=body_bytes, media_type=media_type, headers=headers)
 
 
@@ -119,12 +141,27 @@ def export_documents_endpoint(
     request: Request,
     collection: str | None = Query(default=None, description="Collection to export."),
     author: str | None = Query(default=None, description="Filter documents by author."),
-    source_type: str | None = Query(default=None, description="Restrict to a source type."),
-    include_passages: bool = Query(default=True, description="Whether to include passages in the export."),
-    include_text: bool = Query(default=False, description="Include passage text when exporting passages."),
-    cursor: str | None = Query(default=None, description="Resume from a specific document identifier."),
-    limit: int | None = Query(default=None, ge=1, le=1000, description="Maximum number of documents to export."),
-    fields: str | None = Query(default=None, description="Comma separated list of document fields to include."),
+    source_type: str | None = Query(
+        default=None, description="Restrict to a source type."
+    ),
+    include_passages: bool = Query(
+        default=True, description="Whether to include passages in the export."
+    ),
+    include_text: bool = Query(
+        default=False, description="Include passage text when exporting passages."
+    ),
+    cursor: str | None = Query(
+        default=None, description="Resume from a specific document identifier."
+    ),
+    limit: int | None = Query(
+        default=None,
+        ge=1,
+        le=1000,
+        description="Maximum number of documents to export.",
+    ),
+    fields: str | None = Query(
+        default=None, description="Comma separated list of document fields to include."
+    ),
     output_format: str = Query(
         default="ndjson",
         alias="format",
@@ -136,9 +173,13 @@ def export_documents_endpoint(
 
     normalized_format = output_format.lower()
     if normalized_format not in {"json", "ndjson"}:
-        raise HTTPException(status_code=400, detail="Unsupported format for document export")
+        raise HTTPException(
+            status_code=400, detail="Unsupported format for document export"
+        )
 
-    filters = DocumentExportFilters(collection=collection, author=author, source_type=source_type)
+    filters = DocumentExportFilters(
+        collection=collection, author=author, source_type=source_type
+    )
     response_payload = export_documents(
         session,
         filters,
@@ -170,6 +211,7 @@ def export_documents_endpoint(
         headers["Content-Encoding"] = "gzip"
         filename_extension += ".gz"
 
-    headers["Content-Disposition"] = f"attachment; filename={_build_filename('documents', filename_extension)}"
+    headers["Content-Disposition"] = (
+        f"attachment; filename={_build_filename('documents', filename_extension)}"
+    )
     return Response(content=body_bytes, media_type=media_type, headers=headers)
-

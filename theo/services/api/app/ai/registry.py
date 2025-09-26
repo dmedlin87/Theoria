@@ -34,7 +34,9 @@ class LLMModel:
             "name": self.name,
             "provider": self.provider,
             "model": self.model,
-            "config": {k: v for k, v in self.config.items() if include_secret or k != "api_key"},
+            "config": {
+                k: v for k, v in self.config.items() if include_secret or k != "api_key"
+            },
         }
         if not include_secret and self.config.get("api_key"):
             payload["masked_api_key"] = self.masked_api_key()
@@ -73,7 +75,9 @@ class LLMRegistry:
     def serialize(self) -> dict[str, Any]:
         return {
             "default_model": self.default_model,
-            "models": [model.to_payload(include_secret=True) for model in self.models.values()],
+            "models": [
+                model.to_payload(include_secret=True) for model in self.models.values()
+            ],
         }
 
     def to_response(self) -> dict[str, Any]:
@@ -112,7 +116,9 @@ def _registry_from_payload(payload: dict[str, Any] | None) -> LLMRegistry:
             config = item.get("config", {}) or {}
             if not name:
                 continue
-            registry.add_model(LLMModel(name=name, provider=provider, model=model_name, config=config))
+            registry.add_model(
+                LLMModel(name=name, provider=provider, model=model_name, config=config)
+            )
         default_model = payload.get("default_model")
         if isinstance(default_model, str):
             registry.default_model = default_model

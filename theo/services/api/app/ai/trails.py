@@ -109,7 +109,9 @@ class TrailRecorder:
         for citation in citations:
             if citation is None:
                 continue
-            reference = getattr(citation, "passage_id", None) or getattr(citation, "document_id", None)
+            reference = getattr(citation, "passage_id", None) or getattr(
+                citation, "document_id", None
+            )
             if not reference:
                 continue
             meta = {
@@ -214,12 +216,18 @@ class TrailService:
         osis = payload.get("osis")
         if not isinstance(osis, str):
             raise ValueError("Stored payload missing 'osis'")
-        question = payload.get("question") if isinstance(payload.get("question"), str) else None
+        question = (
+            payload.get("question")
+            if isinstance(payload.get("question"), str)
+            else None
+        )
         filters_payload = payload.get("filters")
         filters = None
         if isinstance(filters_payload, Mapping):
             filters = HybridSearchFilters(**dict(filters_payload))
-        model_name = payload.get("model") if isinstance(payload.get("model"), str) else None
+        model_name = (
+            payload.get("model") if isinstance(payload.get("model"), str) else None
+        )
         return generate_verse_brief(
             self._session,
             osis=osis,
@@ -239,7 +247,9 @@ class TrailService:
         filters = None
         if isinstance(filters_payload, Mapping):
             filters = HybridSearchFilters(**dict(filters_payload))
-        model_name = payload.get("model") if isinstance(payload.get("model"), str) else None
+        model_name = (
+            payload.get("model") if isinstance(payload.get("model"), str) else None
+        )
         return generate_sermon_prep_outline(
             self._session,
             topic=topic,
@@ -292,4 +302,3 @@ class TrailService:
 
 
 __all__ = ["TrailService", "TrailRecorder", "TrailReplayResult"]
-

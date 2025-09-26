@@ -81,7 +81,9 @@ def get_mentions_for_osis(
             meta=base_meta or None,
             score=None,
         )
-        mention = VerseMention(passage=passage_schema, context_snippet=_snippet(passage.text))
+        mention = VerseMention(
+            passage=passage_schema, context_snippet=_snippet(passage.text)
+        )
         mentions.append(mention)
 
     mentions.sort(

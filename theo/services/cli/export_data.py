@@ -62,7 +62,9 @@ def _persist_state(manifest: ExportManifest) -> None:
         fh.write("\n")
 
 
-def _flatten_passages(records: Sequence[OrderedDict[str, object]]) -> list[OrderedDict[str, object]]:
+def _flatten_passages(
+    records: Sequence[OrderedDict[str, object]],
+) -> list[OrderedDict[str, object]]:
     flattened: list[OrderedDict[str, object]] = []
     for record in records:
         passages = record.get("passages") if isinstance(record, dict) else None
@@ -95,12 +97,29 @@ def export() -> None:
 @export.command("search")
 @click.option("--query", "q", type=str, default=None, help="Keyword query to run.")
 @click.option("--osis", type=str, default=None, help="Optional OSIS reference filter.")
-@click.option("--collection", type=str, default=None, help="Filter results to a collection.")
+@click.option(
+    "--collection", type=str, default=None, help="Filter results to a collection."
+)
 @click.option("--author", type=str, default=None, help="Filter results by author.")
-@click.option("--source-type", type=str, default=None, help="Restrict to a source type.")
-@click.option("--limit", type=click.IntRange(1, 1000), default=100, show_default=True, help="Number of results to export.")
-@click.option("--cursor", type=str, default=None, help="Resume from this passage identifier.")
-@click.option("--fields", type=str, default=None, help="Comma separated list of fields to include.")
+@click.option(
+    "--source-type", type=str, default=None, help="Restrict to a source type."
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(1, 1000),
+    default=100,
+    show_default=True,
+    help="Number of results to export.",
+)
+@click.option(
+    "--cursor", type=str, default=None, help="Resume from this passage identifier."
+)
+@click.option(
+    "--fields",
+    type=str,
+    default=None,
+    help="Comma separated list of fields to include.",
+)
 @click.option(
     "--include-text/--no-include-text",
     default=False,
@@ -122,7 +141,9 @@ def export() -> None:
     show_default=True,
     help="Output format.",
 )
-@click.option("--export-id", type=str, default=None, help="Identifier for resumable exports.")
+@click.option(
+    "--export-id", type=str, default=None, help="Identifier for resumable exports."
+)
 @click.option(
     "--metadata-only/--no-metadata-only",
     default=False,
@@ -171,7 +192,9 @@ def export_search_command(
         limit=limit,
         cursor=cursor,
         mode=mode.lower(),
-        filters=HybridSearchFilters(collection=collection, author=author, source_type=source_type),
+        filters=HybridSearchFilters(
+            collection=collection, author=author, source_type=source_type
+        ),
     )
     with _session_scope() as session:
         response = export_search_results(session, request)
@@ -197,8 +220,15 @@ def export_search_command(
 @export.command("documents")
 @click.option("--collection", type=str, default=None, help="Collection to export.")
 @click.option("--author", type=str, default=None, help="Filter documents by author.")
-@click.option("--source-type", type=str, default=None, help="Restrict to a source type.")
-@click.option("--limit", type=click.IntRange(1, 1000), default=None, help="Maximum number of documents to export.")
+@click.option(
+    "--source-type", type=str, default=None, help="Restrict to a source type."
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(1, 1000),
+    default=None,
+    help="Maximum number of documents to export.",
+)
 @click.option(
     "--include-passages/--no-include-passages",
     default=True,
@@ -211,8 +241,15 @@ def export_search_command(
     show_default=True,
     help="Include passage text when passages are exported.",
 )
-@click.option("--cursor", type=str, default=None, help="Resume from this document identifier.")
-@click.option("--fields", type=str, default=None, help="Comma separated list of fields to include.")
+@click.option(
+    "--cursor", type=str, default=None, help="Resume from this document identifier."
+)
+@click.option(
+    "--fields",
+    type=str,
+    default=None,
+    help="Comma separated list of fields to include.",
+)
 @click.option(
     "--format",
     "output_format",
@@ -221,7 +258,9 @@ def export_search_command(
     show_default=True,
     help="Output format.",
 )
-@click.option("--export-id", type=str, default=None, help="Identifier for resumable exports.")
+@click.option(
+    "--export-id", type=str, default=None, help="Identifier for resumable exports."
+)
 @click.option(
     "--metadata-only/--no-metadata-only",
     default=False,
@@ -268,7 +307,9 @@ def export_documents_command(
         if saved_cursor:
             cursor = saved_cursor
 
-    filters = DocumentExportFilters(collection=collection, author=author, source_type=source_type)
+    filters = DocumentExportFilters(
+        collection=collection, author=author, source_type=source_type
+    )
     with _session_scope() as session:
         response = export_documents(
             session,

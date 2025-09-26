@@ -20,7 +20,6 @@ from ..api.app.enrich import MetadataEnricher
 from ..api.app.ingest.pipeline import run_pipeline_for_file
 from ..api.app.workers import tasks as worker_tasks
 
-
 SUPPORTED_TRANSCRIPT_EXTENSIONS = {".vtt", ".webvtt", ".srt"}
 SUPPORTED_TEXT_EXTENSIONS = {".md", ".markdown", ".txt", ".html", ".htm"}
 
@@ -215,11 +214,15 @@ def _ingest_batch_via_api(
     return document_ids
 
 
-def _queue_batch_via_worker(batch: list[FolderItem], overrides: dict[str, object]) -> list[str]:
+def _queue_batch_via_worker(
+    batch: list[FolderItem], overrides: dict[str, object]
+) -> list[str]:
     task_ids: list[str] = []
     for item in batch:
         frontmatter = dict(overrides)
-        async_result = worker_tasks.process_file.delay(str(uuid4()), str(item.path), frontmatter)
+        async_result = worker_tasks.process_file.delay(
+            str(uuid4()), str(item.path), frontmatter
+        )
         task_ids.append(async_result.id if hasattr(async_result, "id") else "queued")
     return task_ids
 
@@ -285,7 +288,9 @@ def ingest_folder(
             continue
 
         if mode.lower() == "api":
-            document_ids = _ingest_batch_via_api(batch, overrides, normalized_post_batch)
+            document_ids = _ingest_batch_via_api(
+                batch, overrides, normalized_post_batch
+            )
             for item, doc_id in zip(batch, document_ids):
                 click.echo(f"   Processed {item.path} → document {doc_id}")
         else:

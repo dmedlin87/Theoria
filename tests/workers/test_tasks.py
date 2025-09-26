@@ -18,7 +18,11 @@ from theo.services.api.app.core.database import (  # noqa: E402  (import after p
     get_engine,
     get_settings,
 )
-from theo.services.api.app.db.models import Document, IngestionJob, Passage  # noqa: E402
+from theo.services.api.app.db.models import (  # noqa: E402
+    Document,
+    IngestionJob,
+    Passage,
+)
 from theo.services.api.app.workers import tasks  # noqa: E402
 
 
@@ -95,7 +99,10 @@ def test_enrich_document_populates_metadata(tmp_path) -> None:
     }
     assert enriched.enrichment_version == 1
     assert isinstance(enriched.bib_json, dict)
-    assert enriched.bib_json.get("enrichment", {}).get("openalex", {}).get("id") == "https://openalex.org/W123456789"
+    assert (
+        enriched.bib_json.get("enrichment", {}).get("openalex", {}).get("id")
+        == "https://openalex.org/W123456789"
+    )
     assert enriched.bib_json.get("primary_topic") == "Theology"
 
 
@@ -120,7 +127,9 @@ def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
 
     captured: dict[str, Any] = {}
 
-    def fake_delay(document_id: str, recipients: list[str], context: dict[str, Any] | None = None):
+    def fake_delay(
+        document_id: str, recipients: list[str], context: dict[str, Any] | None = None
+    ):
         captured["document_id"] = document_id
         captured["recipients"] = recipients
         captured["context"] = context or {}

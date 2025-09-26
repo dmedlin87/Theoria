@@ -20,6 +20,7 @@ class UrlIngestRequest(APIModel):
     source_type: str | None = None
     frontmatter: dict[str, Any] | None = None
 
+
 class DocumentSummary(APIModel):
     id: str
     title: str | None = None
@@ -85,5 +86,6 @@ class DocumentUpdateRequest(APIModel):
     source_type: str | None = None
     abstract: str | None = None
     metadata: dict[str, Any] | None = Field(default=None, alias="meta")
+
 
 DocumentDetailResponse.model_rebuild()

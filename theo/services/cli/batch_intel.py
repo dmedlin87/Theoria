@@ -8,9 +8,9 @@ from typing import Iterable
 import click
 from sqlalchemy.orm import Session
 
+from ..api.app.ai import run_corpus_curation
 from ..api.app.core.database import get_engine
 from ..api.app.db.models import Document, Passage
-from ..api.app.ai import run_corpus_curation
 
 
 def _recent_documents(session: Session, since: datetime) -> Iterable[Document]:
@@ -26,7 +26,9 @@ def _summarise_document(session: Session, document: Document) -> tuple[str, list
     passages = (
         session.query(Passage)
         .filter(Passage.document_id == document.id)
-        .order_by(Passage.page_no.asc(), Passage.t_start.asc(), Passage.start_char.asc())
+        .order_by(
+            Passage.page_no.asc(), Passage.t_start.asc(), Passage.start_char.asc()
+        )
         .limit(3)
         .all()
     )
@@ -43,14 +45,20 @@ def _summarise_document(session: Session, document: Document) -> tuple[str, list
     return summary, tags
 
 
-def _persist_summary(session: Session, document: Document, summary: str, tags: list[str]) -> Document:
+def _persist_summary(
+    session: Session, document: Document, summary: str, tags: list[str]
+) -> Document:
     ai_doc = Document(
         title=f"AI Summary · {document.title or document.id}",
         authors=document.authors,
         collection=document.collection,
         source_type="ai_summary",
         abstract=summary,
-        bib_json={"generated_from": document.id, "tags": tags, "primary_topic": tags[0] if tags else None},
+        bib_json={
+            "generated_from": document.id,
+            "tags": tags,
+            "primary_topic": tags[0] if tags else None,
+        },
     )
     session.add(ai_doc)
     session.commit()
@@ -58,7 +66,9 @@ def _persist_summary(session: Session, document: Document, summary: str, tags: l
 
 
 @click.command()
-@click.option("--hours", type=int, default=24, show_default=True, help="Look back window in hours")
+@click.option(
+    "--hours", type=int, default=24, show_default=True, help="Look back window in hours"
+)
 @click.option("--dry-run", is_flag=True, help="Print work without persisting summaries")
 def main(hours: int, dry_run: bool) -> None:
     """Generate summaries/tags for freshly ingested documents."""
@@ -79,7 +89,9 @@ def main(hours: int, dry_run: bool) -> None:
 
         for document in documents:
             summary, tags = _summarise_document(session, document)
-            click.echo(f"Summarising {document.title or document.id} → tags: {', '.join(tags) or 'n/a'}")
+            click.echo(
+                f"Summarising {document.title or document.id} → tags: {', '.join(tags) or 'n/a'}"
+            )
             if dry_run:
                 continue
             ai_doc = _persist_summary(session, document, summary, tags)

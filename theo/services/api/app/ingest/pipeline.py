@@ -13,7 +13,6 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
-
 from uuid import uuid4
 
 import yaml
@@ -30,9 +29,7 @@ from ..db.models import (
     TranscriptSegment,
     Video,
 )
-
 from .chunking import Chunk, chunk_text, chunk_transcript
-
 from .embeddings import get_embedding_service, lexical_representation
 from .osis import DetectedOsis, detect_osis_references
 from .parsers import (
@@ -45,6 +42,7 @@ from .parsers import (
     parse_pdf_document,
     read_text_file,
 )
+
 
 class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
@@ -110,7 +108,6 @@ def _detect_source_type(path: Path, frontmatter: dict[str, Any]) -> str:
     return "file"
 
 
-
 def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
     combined = {**base}
     combined.update({k: v for k, v in overrides.items() if v is not None})
@@ -146,7 +143,6 @@ def _normalise_passage_meta(
     chunker_version: str,
     chunk_index: int,
     speakers: list[str] | None = None,
-
 ) -> dict[str, Any]:
     osis_all: list[str] = []
     if hints:
@@ -274,9 +270,7 @@ def _get_or_create_video(
         )
     if video is None:
         video = (
-            session.query(Video)
-            .filter(Video.document_id == document.id)
-            .one_or_none()
+            session.query(Video).filter(Video.document_id == document.id).one_or_none()
         )
 
     published_dt = _coerce_datetime(published_at)
@@ -333,7 +327,9 @@ def _get_or_create_video(
     return video
 
 
-def _build_source_ref(video_identifier: str | None, source_url: str | None, t_start: float | None) -> str | None:
+def _build_source_ref(
+    video_identifier: str | None, source_url: str | None, t_start: float | None
+) -> str | None:
     if video_identifier is None or t_start is None:
         return None
     prefix = "video"
@@ -401,6 +397,7 @@ def _derive_duration_from_chunks(chunks: list[Chunk]) -> int | None:
             return _coerce_int(chunk.t_end)
     return None
 
+
 def _resolve_fixtures_dir(settings) -> Path | None:
     root = getattr(settings, "fixtures_root", None)
     if not root:
@@ -411,7 +408,9 @@ def _resolve_fixtures_dir(settings) -> Path | None:
     return path
 
 
-def _load_youtube_transcript(settings, video_id: str) -> tuple[list[ParsedTranscriptSegment], Path | None]:
+def _load_youtube_transcript(
+    settings, video_id: str
+) -> tuple[list[ParsedTranscriptSegment], Path | None]:
     fixtures_dir = _resolve_fixtures_dir(settings)
     transcript_path: Path | None = None
     if fixtures_dir:
@@ -436,7 +435,9 @@ def _load_youtube_transcript(settings, video_id: str) -> tuple[list[ParsedTransc
         try:
             transcript = YouTubeTranscriptApi.get_transcript(video_id)
         except Exception as exc:  # pragma: no cover - network failure fallback
-            raise UnsupportedSourceError(f"Unable to fetch transcript for video {video_id}") from exc
+            raise UnsupportedSourceError(
+                f"Unable to fetch transcript for video {video_id}"
+            ) from exc
 
         for item in transcript:
             text = str(item.get("text") or "").strip()
@@ -496,7 +497,9 @@ def _is_youtube_url(url: str) -> bool:
 def _prepare_text_chunks(text: str, *, settings) -> ParserResult:
 
     chunks = chunk_text(text, max_tokens=settings.max_chunk_tokens)
-    return ParserResult(text=text, chunks=chunks, parser="plain_text", parser_version="0.1.0")
+    return ParserResult(
+        text=text, chunks=chunks, parser="plain_text", parser_version="0.1.0"
+    )
 
 
 def _prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
@@ -523,8 +526,9 @@ def _prepare_transcript_chunks(
         max_window_seconds=getattr(settings, "transcript_max_window", 40.0),
     )
     text = " ".join(segment.text for segment in segments)
-    return ParserResult(text=text, chunks=chunks, parser="transcript", parser_version="0.3.0")
-
+    return ParserResult(
+        text=text, chunks=chunks, parser="transcript", parser_version="0.3.0"
+    )
 
 
 class _HTMLMetadataParser(HTMLParser):
@@ -695,7 +699,10 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
     metadata["final_url"] = final_url
     return html, metadata
 
-def run_pipeline_for_file(session: Session, path: Path, frontmatter: dict[str, Any] | None = None) -> Document:
+
+def run_pipeline_for_file(
+    session: Session, path: Path, frontmatter: dict[str, Any] | None = None
+) -> Document:
     """Execute the file ingestion pipeline synchronously."""
 
     settings = get_settings()
@@ -937,7 +944,9 @@ def _persist_text_document(
                 segment_id=segment.id,
                 quote_md=_truncate(segment.text),
                 osis_refs=segment.osis_refs,
-                source_ref=_build_source_ref(quote_identifier, quote_source_url, segment.t_start),
+                source_ref=_build_source_ref(
+                    quote_identifier, quote_source_url, segment.t_start
+                ),
                 salience=1.0,
             )
             session.add(quote)
@@ -955,7 +964,9 @@ def _persist_text_document(
                     topic=topic,
                     stance=stance,
                     claim_md=_truncate(segment.text, limit=600),
-                    confidence=confidence_default if confidence_default is not None else 0.5,
+                    confidence=(
+                        confidence_default if confidence_default is not None else 0.5
+                    ),
                 )
                 session.add(claim)
 
@@ -966,7 +977,9 @@ def _persist_text_document(
 
     if frontmatter:
         frontmatter_path = storage_dir / "frontmatter.json"
-        frontmatter_path.write_text(_serialise_frontmatter(frontmatter) + "\n", encoding="utf-8")
+        frontmatter_path.write_text(
+            _serialise_frontmatter(frontmatter) + "\n", encoding="utf-8"
+        )
 
     if original_path and original_path.exists():
         dest_path = storage_dir / original_path.name
@@ -1012,7 +1025,9 @@ def _persist_text_document(
     }
 
     normalized_path = storage_dir / "normalized.json"
-    normalized_path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
+    normalized_path.write_text(
+        json.dumps(normalized_payload, indent=2), encoding="utf-8"
+    )
 
     document.storage_path = str(storage_dir)
     session.add(document)
@@ -1186,7 +1201,9 @@ def _persist_transcript_document(
                 segment_id=segment.id,
                 quote_md=_truncate(segment.text),
                 osis_refs=segment.osis_refs,
-                source_ref=_build_source_ref(quote_identifier, quote_source_url, segment.t_start),
+                source_ref=_build_source_ref(
+                    quote_identifier, quote_source_url, segment.t_start
+                ),
                 salience=1.0,
             )
             session.add(quote)
@@ -1204,7 +1221,9 @@ def _persist_transcript_document(
                     topic=topic,
                     stance=stance,
                     claim_md=_truncate(segment.text, limit=600),
-                    confidence=confidence_default if confidence_default is not None else 0.5,
+                    confidence=(
+                        confidence_default if confidence_default is not None else 0.5
+                    ),
                 )
                 session.add(claim)
 
@@ -1215,7 +1234,9 @@ def _persist_transcript_document(
 
     if frontmatter:
         frontmatter_path = storage_dir / "frontmatter.json"
-        frontmatter_path.write_text(_serialise_frontmatter(frontmatter) + "\n", encoding="utf-8")
+        frontmatter_path.write_text(
+            _serialise_frontmatter(frontmatter) + "\n", encoding="utf-8"
+        )
 
     artifacts: dict[str, str] = {}
     if transcript_path and transcript_path.exists():
@@ -1233,7 +1254,9 @@ def _persist_transcript_document(
             for passage in passages
         ]
         transcript_file = storage_dir / "transcript.json"
-        transcript_file.write_text(json.dumps(transcript_json, indent=2), encoding="utf-8")
+        transcript_file.write_text(
+            json.dumps(transcript_json, indent=2), encoding="utf-8"
+        )
         artifacts["transcript"] = transcript_file.name
 
     if audio_path and audio_path.exists():
@@ -1281,13 +1304,16 @@ def _persist_transcript_document(
         normalized_payload["artifacts"] = artifacts
 
     normalized_path = storage_dir / "normalized.json"
-    normalized_path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
+    normalized_path.write_text(
+        json.dumps(normalized_payload, indent=2), encoding="utf-8"
+    )
 
     document.storage_path = str(storage_dir)
     session.add(document)
     session.commit()
 
     return document
+
 
 def run_pipeline_for_url(
     session: Session,
@@ -1298,7 +1324,9 @@ def run_pipeline_for_url(
     """Ingest supported URLs into the document store."""
 
     settings = get_settings()
-    resolved_source_type = source_type or ("youtube" if _is_youtube_url(url) else "web_page")
+    resolved_source_type = source_type or (
+        "youtube" if _is_youtube_url(url) else "web_page"
+    )
 
     if resolved_source_type == "youtube":
         video_id = _extract_youtube_video_id(url)
@@ -1307,7 +1335,9 @@ def run_pipeline_for_url(
 
         segments, transcript_path = _load_youtube_transcript(settings, video_id)
         parser_result = _prepare_transcript_chunks(segments, settings=settings)
-        sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
+        sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
+            "utf-8"
+        )
         sha256 = hashlib.sha256(sha_payload).hexdigest()
 
         return _persist_transcript_document(
@@ -1319,16 +1349,14 @@ def run_pipeline_for_url(
             settings=settings,
             sha256=sha256,
             source_type="youtube",
-            title=
-                merged_frontmatter.get("title")
-                or metadata.get("title")
-                or f"YouTube Video {video_id}",
+            title=merged_frontmatter.get("title")
+            or metadata.get("title")
+            or f"YouTube Video {video_id}",
             source_url=merged_frontmatter.get("source_url") or url,
             channel=merged_frontmatter.get("channel") or metadata.get("channel"),
             video_id=video_id,
-            duration_seconds=
-                merged_frontmatter.get("duration_seconds")
-                or metadata.get("duration_seconds"),
+            duration_seconds=merged_frontmatter.get("duration_seconds")
+            or metadata.get("duration_seconds"),
             transcript_path=transcript_path,
         )
 
@@ -1344,7 +1372,9 @@ def run_pipeline_for_url(
 
     merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
     parser_result = _prepare_text_chunks(text_content, settings=settings)
-    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
+    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
+        "utf-8"
+    )
     sha256 = hashlib.sha256(sha_payload).hexdigest()
 
     return _persist_text_document(
@@ -1381,7 +1411,9 @@ def run_pipeline_for_transcript(
     segments = load_transcript(transcript_path)
     parser_result = _prepare_transcript_chunks(segments, settings=settings)
 
-    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
+    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
+        "utf-8"
+    )
     sha256 = hashlib.sha256(sha_payload).hexdigest()
 
     source_type = str(frontmatter.get("source_type") or "transcript")
@@ -1404,5 +1436,3 @@ def run_pipeline_for_transcript(
         transcript_path=transcript_path,
         audio_path=audio_path,
     )
-
-

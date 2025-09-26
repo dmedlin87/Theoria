@@ -1,0 +1,29 @@
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = ["theo"]
+combine_as_imports = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["theo", "tests", "scripts"]
+exclude = ["docs"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["theo"]
+combine-as-imports = true
+
+[tool.mypy]
+python_version = "3.11"
+files = ["theo/services/api/app/export", "tests/export"]
+ignore_missing_imports = true
+warn_unused_configs = true
+follow_imports = "skip"

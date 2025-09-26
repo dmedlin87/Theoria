@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from contextlib import asynccontextmanager
 
 import pytest
 from fastapi import FastAPI
@@ -51,7 +51,9 @@ def _ingest_sample_document(client: TestClient) -> str:
     return response.json()["document_id"]
 
 
-def test_reparse_queues_job(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+def test_reparse_queues_job(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     document_id = _ingest_sample_document(client)
 
     captured: dict[str, Any] = {}
@@ -60,8 +62,10 @@ def test_reparse_queues_job(monkeypatch: pytest.MonkeyPatch, client: TestClient)
         captured["doc_id"] = doc_id
         captured["path"] = path
         captured["frontmatter"] = frontmatter
+
         class Result:
             id = "dummy"
+
         return Result()
 
     monkeypatch.setattr(jobs_module.process_file, "delay", fake_delay)
@@ -83,10 +87,16 @@ def test_reparse_missing_document_returns_404(client: TestClient) -> None:
     assert response.json()["detail"] == "Document not found"
 
 
-def test_enqueue_endpoint_returns_idempotent_response(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+def test_enqueue_endpoint_returns_idempotent_response(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     captured: list[dict[str, Any]] = []
 
-    def fake_send_task(task_name: str, kwargs: dict[str, Any] | None = None, eta: datetime | None = None) -> Any:
+    def fake_send_task(
+        task_name: str,
+        kwargs: dict[str, Any] | None = None,
+        eta: datetime | None = None,
+    ) -> Any:
         captured.append({"task": task_name, "kwargs": kwargs, "eta": eta})
 
         class Result:
@@ -116,7 +126,9 @@ def test_enqueue_endpoint_returns_idempotent_response(monkeypatch: pytest.Monkey
     assert len(captured) == 1, "Duplicate enqueue should not dispatch twice"
 
 
-def test_topic_digest_job_enqueues(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+def test_topic_digest_job_enqueues(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     captured: dict[str, Any] = {}
 
     def fake_delay(**kwargs: Any) -> Any:
@@ -148,7 +160,9 @@ def test_topic_digest_job_enqueues(monkeypatch: pytest.MonkeyPatch, client: Test
     assert captured["notify"] == ["alerts@theo.app"]
 
 
-def test_summary_job_enqueues(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+def test_summary_job_enqueues(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     document_id = _ingest_sample_document(client)
     captured: dict[str, Any] = {}
 

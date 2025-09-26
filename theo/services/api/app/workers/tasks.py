@@ -10,10 +10,14 @@ from celery import Celery
 from celery.utils.log import get_task_logger
 from sqlalchemy.orm import Session
 
+from ..analytics.topics import (
+    generate_topic_digest,
+    store_topic_digest,
+    upsert_digest_document,
+)
 from ..core.database import get_engine
 from ..core.settings import get_settings
 from ..db.models import Document, IngestionJob, Passage
-from ..analytics.topics import generate_topic_digest, store_topic_digest, upsert_digest_document
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
 
@@ -28,7 +32,14 @@ celery = Celery(
 )
 
 
-def _update_job_status(session: Session, job_id: str, *, status: str, error: str | None = None, document_id: str | None = None) -> None:
+def _update_job_status(
+    session: Session,
+    job_id: str,
+    *,
+    status: str,
+    error: str | None = None,
+    document_id: str | None = None,
+) -> None:
     job = session.get(IngestionJob, job_id)
     if job is None:
         return
@@ -58,7 +69,9 @@ def process_file(
             document = run_pipeline_for_file(session, Path(path), frontmatter)
             session.commit()
             if job_id:
-                _update_job_status(session, job_id, status="completed", document_id=document.id)
+                _update_job_status(
+                    session, job_id, status="completed", document_id=document.id
+                )
                 session.commit()
         except Exception as exc:  # pragma: no cover - surfaced via job failure
             if job_id:
@@ -93,7 +106,9 @@ def process_url(
             )
             session.commit()
             if job_id:
-                _update_job_status(session, job_id, status="completed", document_id=document.id)
+                _update_job_status(
+                    session, job_id, status="completed", document_id=document.id
+                )
                 session.commit()
     except Exception as exc:  # pragma: no cover - exercised indirectly via retry logic
         logger.exception(
@@ -104,7 +119,7 @@ def process_url(
             with Session(engine) as session:
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
-        retry_delay = min(2 ** self.request.retries, 60) if self.request.retries else 1
+        retry_delay = min(2**self.request.retries, 60) if self.request.retries else 1
         raise self.retry(exc=exc, countdown=retry_delay)
 
 
@@ -121,26 +136,41 @@ def enrich_document(document_id: str, job_id: str | None = None) -> None:
             session.commit()
         document = session.get(Document, document_id)
         if document is None:
-            logger.warning("Document not found for enrichment", extra={"document_id": document_id})
+            logger.warning(
+                "Document not found for enrichment", extra={"document_id": document_id}
+            )
             if job_id:
-                _update_job_status(session, job_id, status="failed", error="document not found")
+                _update_job_status(
+                    session, job_id, status="failed", error="document not found"
+                )
                 session.commit()
             return
 
         try:
             enriched = enricher.enrich_document(session, document)
             if not enriched:
-                logger.info("No enrichment data available", extra={"document_id": document_id})
+                logger.info(
+                    "No enrichment data available", extra={"document_id": document_id}
+                )
             session.commit()
             if job_id:
-                _update_job_status(session, job_id, status="completed", document_id=document.id)
+                _update_job_status(
+                    session, job_id, status="completed", document_id=document.id
+                )
                 session.commit()
         except Exception:  # pragma: no cover - defensive logging
             session.rollback()
-            logger.exception("Failed to enrich document", extra={"document_id": document_id})
+            logger.exception(
+                "Failed to enrich document", extra={"document_id": document_id}
+            )
             if job_id:
                 with Session(engine) as retry_session:
-                    _update_job_status(retry_session, job_id, status="failed", error="enrichment failed")
+                    _update_job_status(
+                        retry_session,
+                        job_id,
+                        status="failed",
+                        error="enrichment failed",
+                    )
                     retry_session.commit()
             raise
 
@@ -149,7 +179,9 @@ def _summarise_document(session: Session, document: Document) -> tuple[str, list
     passages = (
         session.query(Passage)
         .filter(Passage.document_id == document.id)
-        .order_by(Passage.page_no.asc(), Passage.t_start.asc(), Passage.start_char.asc())
+        .order_by(
+            Passage.page_no.asc(), Passage.t_start.asc(), Passage.start_char.asc()
+        )
         .limit(3)
         .all()
     )
@@ -173,8 +205,9 @@ def _summarise_document(session: Session, document: Document) -> tuple[str, list
     return summary, tags
 
 
-
-def _persist_summary_document(session: Session, source: Document, summary: str, tags: list[str]) -> Document:
+def _persist_summary_document(
+    session: Session, source: Document, summary: str, tags: list[str]
+) -> Document:
     summary_doc = Document(
         title=f"AI Summary - {source.title or source.id}",
         authors=source.authors,
@@ -182,12 +215,15 @@ def _persist_summary_document(session: Session, source: Document, summary: str, 
         source_type="ai_summary",
         abstract=summary,
         topics=tags or None,
-        bib_json={"generated_from": source.id, "tags": tags, "primary_topic": tags[0] if tags else None},
+        bib_json={
+            "generated_from": source.id,
+            "tags": tags,
+            "primary_topic": tags[0] if tags else None,
+        },
     )
     session.add(summary_doc)
     session.flush()
     return summary_doc
-
 
 
 @celery.task(name="tasks.generate_document_summary")
@@ -201,9 +237,14 @@ def generate_document_summary(document_id: str, job_id: str | None = None) -> No
             session.commit()
         document = session.get(Document, document_id)
         if document is None:
-            logger.warning("Document not found for summarisation", extra={"document_id": document_id})
+            logger.warning(
+                "Document not found for summarisation",
+                extra={"document_id": document_id},
+            )
             if job_id:
-                _update_job_status(session, job_id, status="failed", error="document not found")
+                _update_job_status(
+                    session, job_id, status="failed", error="document not found"
+                )
                 session.commit()
             return
 
@@ -212,15 +253,23 @@ def generate_document_summary(document_id: str, job_id: str | None = None) -> No
             summary_doc = _persist_summary_document(session, document, summary, tags)
             session.commit()
             if job_id:
-                _update_job_status(session, job_id, status="completed", document_id=summary_doc.id)
+                _update_job_status(
+                    session, job_id, status="completed", document_id=summary_doc.id
+                )
                 session.commit()
         except Exception:  # pragma: no cover - defensive logging
             session.rollback()
-            logger.exception("Failed to generate document summary", extra={"document_id": document_id})
+            logger.exception(
+                "Failed to generate document summary",
+                extra={"document_id": document_id},
+            )
             if job_id:
                 with Session(engine) as retry_session:
                     _update_job_status(
-                        retry_session, job_id, status="failed", error="summary generation failed"
+                        retry_session,
+                        job_id,
+                        status="failed",
+                        error="summary generation failed",
                     )
                     retry_session.commit()
             raise
@@ -228,7 +277,9 @@ def generate_document_summary(document_id: str, job_id: str | None = None) -> No
 
 @celery.task(name="tasks.send_topic_digest_notification")
 def send_topic_digest_notification(
-    digest_document_id: str, recipients: list[str], context: dict[str, Any] | None = None
+    digest_document_id: str,
+    recipients: list[str],
+    context: dict[str, Any] | None = None,
 ) -> None:
     """Dispatch notifications that a topic digest is ready."""
 
@@ -262,7 +313,10 @@ def topic_digest(
                     parsed = parsed.replace(tzinfo=UTC)
                 window_start = parsed
             except ValueError:
-                logger.warning("Invalid since value supplied to topic digest", extra={"since": since})
+                logger.warning(
+                    "Invalid since value supplied to topic digest",
+                    extra={"since": since},
+                )
 
         if window_start is None:
             window_start = datetime.now(UTC) - timedelta(hours=hours)
@@ -286,7 +340,9 @@ def topic_digest(
                     "window_start": window_start.isoformat(),
                     "topics": [cluster.topic for cluster in digest.topics],
                 }
-                send_topic_digest_notification.delay(digest_document.id, notify, context)
+                send_topic_digest_notification.delay(
+                    digest_document.id, notify, context
+                )
                 logger.info(
                     "Topic digest ready for notification",
                     extra={

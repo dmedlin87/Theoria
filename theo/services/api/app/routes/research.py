@@ -33,7 +33,9 @@ router = APIRouter()
 @router.get("/scripture", response_model=ScriptureResponse)
 def get_scripture(
     osis: str = Query(..., description="OSIS reference or range"),
-    translation: str | None = Query(default="SBLGNT", description="Preferred translation code"),
+    translation: str | None = Query(
+        default="SBLGNT", description="Preferred translation code"
+    ),
 ) -> ScriptureResponse:
     verses = fetch_passage(osis, translation)
     translation_code = verses[0].translation if verses else (translation or "SBLGNT")

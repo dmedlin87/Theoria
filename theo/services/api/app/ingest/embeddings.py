@@ -74,7 +74,11 @@ class EmbeddingService:
             embeddings = model.encode(texts)
         else:  # pragma: no cover - extremely defensive
             embeddings = []
-        if isinstance(embeddings, list) and embeddings and isinstance(embeddings[0], list):
+        if (
+            isinstance(embeddings, list)
+            and embeddings
+            and isinstance(embeddings[0], list)
+        ):
             raw_vectors = embeddings
         else:
             raw_vectors = [list(vector) for vector in embeddings]  # type: ignore[arg-type]
@@ -113,7 +117,9 @@ def lexical_representation(session, text: str) -> str | object:
     """
 
     bind = getattr(session, "bind", None)
-    dialect_name = getattr(bind.dialect, "name", "sqlite") if bind is not None else "sqlite"
+    dialect_name = (
+        getattr(bind.dialect, "name", "sqlite") if bind is not None else "sqlite"
+    )
     if dialect_name == "postgresql":
         from sqlalchemy import func
 
