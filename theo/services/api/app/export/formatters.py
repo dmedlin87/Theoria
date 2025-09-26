@@ -264,10 +264,9 @@ def build_search_export(
 ) -> tuple[ExportManifest, list[OrderedDict[str, object]]]:
     records = _search_row_to_record(response, include_text=include_text, fields=fields)
     enrichment_values = [
-        value
-        for row in records
-        if (value := row.get("enrichment_version")) is not None
-        if isinstance(value, int)
+        row.document.enrichment_version
+        for row in response.results
+        if isinstance(row.document.enrichment_version, int)
     ]
     enrichment_version = max(enrichment_values) if enrichment_values else None
     manifest = build_manifest(
@@ -305,10 +304,9 @@ def build_document_export(
         for document in response.documents
     ]
     enrichment_values = [
-        value
-        for record in records
-        if (value := record.get("enrichment_version")) is not None
-        if isinstance(value, int)
+        document.enrichment_version
+        for document in response.documents
+        if isinstance(document.enrichment_version, int)
     ]
     enrichment_version = max(enrichment_values) if enrichment_values else None
     manifest = build_manifest(

@@ -203,6 +203,33 @@ def test_search_export_cli_requests_extra_row(monkeypatch: pytest.MonkeyPatch) -
     assert captured["k"] == 26
 
 
+def test_search_export_manifest_includes_enrichment_version_without_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        cli, "export_search_results", lambda session, request: _build_search_export()
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.export,
+        [
+            "search",
+            "--query",
+            "grace",
+            "--fields",
+            "rank,score,document_id",
+            "--export-id",
+            "search-no-field",
+        ],
+    )
+
+    assert result.exit_code == 0
+    state_file = cli.STATE_DIR / "search-no-field.json"
+    saved_manifest = json.loads(state_file.read_text("utf-8"))
+    assert saved_manifest["enrichment_version"] == 3
+
+
 def test_document_export_cli_ndjson_contains_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -238,6 +265,38 @@ def test_document_export_cli_ndjson_contains_metadata(
     assert record["doi"] == "10.1234/example"
     state_file = cli.STATE_DIR / "doc-demo.json"
     assert state_file.exists()
+
+
+def test_document_export_manifest_includes_enrichment_version_without_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "export_documents",
+        lambda session, filters, include_passages, limit, cursor=None: _build_document_export(),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.export,
+        [
+            "documents",
+            "--collection",
+            "sermons",
+            "--format",
+            "ndjson",
+            "--no-include-passages",
+            "--fields",
+            "kind,title",
+            "--export-id",
+            "doc-no-field",
+        ],
+    )
+
+    assert result.exit_code == 0
+    state_file = cli.STATE_DIR / "doc-no-field.json"
+    saved_manifest = json.loads(state_file.read_text("utf-8"))
+    assert saved_manifest["enrichment_version"] == 2
 
 
 def test_search_manifest_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
