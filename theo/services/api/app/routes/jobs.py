@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 
+from typing import Any, NotRequired, TypedDict, cast
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +21,7 @@ from ..models.jobs import (
     JobListResponse,
     JobQueuedResponse,
     JobStatus,
+    JSONDict,
     SummaryJobRequest,
     TopicDigestJobRequest,
 )
@@ -33,6 +36,28 @@ from ..workers.tasks import (
 router = APIRouter()
 
 IDEMPOTENCY_TTL = timedelta(minutes=10)
+
+
+class TopicDigestTaskArgs(TypedDict):
+    """Keyword arguments passed to the topic digest Celery task."""
+
+    job_id: str
+    since: NotRequired[str]
+    notify: NotRequired[list[str]]
+
+
+class TopicDigestJobPayload(TypedDict, total=False):
+    """Stored payload associated with a topic digest job."""
+
+    since: str
+    notify: list[str]
+
+
+class EnqueueJobPayload(TypedDict, total=False):
+    """JSON payload stored for scheduled deterministic tasks."""
+
+    args: JSONDict
+    schedule_at: str
 
 
 def _resolve_source_file(storage_path: str | None) -> Path:
@@ -111,7 +136,7 @@ def get_job(job_id: str, session: Session = Depends(get_session)) -> JobStatus:
 def enqueue_reparse_job(
     document_id: str,
     session: Session = Depends(get_session),
-) -> JobStatus:
+) -> JobQueuedResponse:
     """Queue a background reparse job for an existing document."""
 
     document = session.get(Document, document_id)
@@ -231,21 +256,24 @@ def enqueue_topic_digest_job(
 ) -> JobStatus:
     """Queue a background job that generates the topical activity digest."""
 
-    notify = [entry.strip() for entry in (payload.notify or []) if entry.strip()]
+    notify = payload.notify or []
     since = payload.since
+
+    job_payload: TopicDigestJobPayload = {}
+    if since:
+        job_payload["since"] = since.isoformat()
+    if notify:
+        job_payload["notify"] = notify
 
     job = IngestionJob(
         job_type="topic_digest",
         status="queued",
-        payload={
-            "since": since.isoformat() if since else None,
-            "notify": notify or None,
-        },
+        payload=job_payload or None,
     )
     session.add(job)
     session.commit()
 
-    kwargs: dict[str, object] = {"job_id": job.id}
+    kwargs: TopicDigestTaskArgs = {"job_id": job.id}
     if since:
         kwargs["since"] = since.isoformat()
     if notify:
@@ -262,11 +290,11 @@ def enqueue_topic_digest_job(
     return _serialize_job(job)
 
 
-def _normalize_args(args: dict[str, object] | None) -> dict[str, object]:
-    return dict(args or {})
+def _normalize_args(args: JSONDict | None) -> JSONDict:
+    return args.copy() if args else {}
 
 
-def _hash_args(args: dict[str, object]) -> str:
+def _hash_args(args: JSONDict) -> str:
     encoded = json.dumps(
         args, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
@@ -311,22 +339,25 @@ def enqueue_job(
     if schedule_at is not None and schedule_at.tzinfo is None:
         schedule_at = schedule_at.replace(tzinfo=UTC)
 
+    stored_payload: EnqueueJobPayload = {"args": args} if args else {}
+    if schedule_at:
+        stored_payload["schedule_at"] = schedule_at.isoformat()
+
     job = IngestionJob(
         job_type=payload.task,
         status="queued",
-        payload={
-            "args": args,
-            "schedule_at": schedule_at.isoformat() if schedule_at else None,
-        },
+        payload=stored_payload or None,
         args_hash=args_hash,
         scheduled_at=schedule_at,
     )
     session.add(job)
     session.flush()
 
-    send_kwargs = args.copy()
+    send_kwargs: dict[str, Any] = {
+        key: cast(Any, value) for key, value in args.items()
+    }
     eta = schedule_at
-    result = celery.send_task(payload.task, kwargs=send_kwargs, eta=eta)  # type: ignore[arg-type]
+    result = celery.send_task(payload.task, kwargs=send_kwargs, eta=eta)
     task_id = getattr(result, "id", None)
     if task_id:
         job.task_id = task_id
