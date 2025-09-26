@@ -1,6 +1,9 @@
 # Bulk ingestion CLI
 
-The `theo.services.cli.ingest_folder` command walks a folder (or a single file) and submits every supported asset to the Theo ingestion pipeline. It is intended for local bulk imports and supports synchronous API execution or background worker queuing.
+The `theo.services.cli.ingest_folder` command walks a folder (or a single file) and
+submits every supported asset to the Theo ingestion pipeline. It is intended for
+local bulk imports and supports synchronous API execution or background worker
+queuing.
 
 ## Supported sources
 
@@ -19,6 +22,9 @@ Any other file types are ignored.
 ```bash
 python -m theo.services.cli.ingest_folder PATH [OPTIONS]
 ```
+
+Run `python -m theo.services.cli.ingest_folder --help` to review the available
+flags and descriptions directly from the command line.
 
 Key options:
 
@@ -80,6 +86,7 @@ python -m theo.services.cli.export_data documents \
 
 Pass `--no-include-passages` to export metadata only, or `--limit N` to cap the
 number of returned documents.
+
 Run metadata enrichment immediately after ingest:
 
 ```bash
