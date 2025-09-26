@@ -1,12 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { buildPassageLink, formatAnchor } from "../lib/api";
 import { usePersistentSort } from "../lib/usePersistentSort";
 import { sortDocumentGroups, SortableDocumentGroup } from "./groupSorting";
 import { SortControls } from "./SortControls";
+import {
+  parseSearchParams,
+  serializeSearchParams,
+  type SearchFilters,
+} from "./searchParams";
 
 const SOURCE_OPTIONS = [
   { label: "Any source", value: "" },
@@ -65,6 +78,9 @@ function highlightTokens(text: string, tokens: string[]): JSX.Element {
 }
 
 export default function SearchPage(): JSX.Element {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const skipNextHydratedSearchRef = useRef(false);
   const [query, setQuery] = useState("");
   const [osis, setOsis] = useState("");
   const [collection, setCollection] = useState("");
@@ -91,56 +107,106 @@ export default function SearchPage(): JSX.Element {
       .filter(Boolean);
   }, [query]);
 
+  const runSearch = useCallback(
+    async (filters: SearchFilters) => {
+      setIsSearching(true);
+      setError(null);
+      setHasSearched(true);
+
+      try {
+        const searchQuery = serializeSearchParams(filters);
+        const response = await fetch(`/api/search${searchQuery ? `?${searchQuery}` : ""}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error(`Search failed with status ${response.status}`);
+        }
+        const payload = (await response.json()) as SearchResponse;
+        const grouped = new Map<string, DocumentGroup>();
+        for (const result of payload.results ?? []) {
+          const group = grouped.get(result.document_id) ?? {
+            documentId: result.document_id,
+            title: result.document_title ?? "Untitled document",
+            rank: result.document_rank,
+            score: result.document_score ?? result.score ?? null,
+            passages: [],
+          };
+          group.rank = group.rank ?? result.document_rank;
+          const candidateScore = result.document_score ?? result.score ?? null;
+          if (typeof candidateScore === "number") {
+            if (typeof group.score !== "number" || candidateScore > group.score) {
+              group.score = candidateScore;
+            }
+          }
+          group.passages.push(result);
+          grouped.set(result.document_id, group);
+        }
+        const sortedGroups = sortDocumentGroups(Array.from(grouped.values()), sortKey);
+        setGroups(sortedGroups);
+      } catch (fetchError) {
+        setError((fetchError as Error).message);
+        setGroups([]);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [sortKey],
+  );
+
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsSearching(true);
-    setError(null);
-    setHasSearched(true);
+    const filters: SearchFilters = {
+      query: query.trim(),
+      osis: osis.trim(),
+      collection: collection.trim(),
+      author: author.trim(),
+      sourceType,
+    };
 
-    const params = new URLSearchParams();
-    if (query.trim()) params.set("q", query.trim());
-    if (osis.trim()) params.set("osis", osis.trim());
-    if (collection.trim()) params.set("collection", collection.trim());
-    if (author.trim()) params.set("author", author.trim());
-    if (sourceType) params.set("source_type", sourceType);
+    setQuery(filters.query);
+    setOsis(filters.osis);
+    setCollection(filters.collection);
+    setAuthor(filters.author);
+    setSourceType(filters.sourceType);
 
-    try {
-      const searchQuery = params.toString();
-      const response = await fetch(`/api/search${searchQuery ? `?${searchQuery}` : ""}`, {
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        throw new Error(`Search failed with status ${response.status}`);
-      }
-      const payload = (await response.json()) as SearchResponse;
-      const grouped = new Map<string, DocumentGroup>();
-      for (const result of payload.results ?? []) {
-        const group = grouped.get(result.document_id) ?? {
-          documentId: result.document_id,
-          title: result.document_title ?? "Untitled document",
-          rank: result.document_rank,
-          score: result.document_score ?? result.score ?? null,
-          passages: [],
-        };
-        group.rank = group.rank ?? result.document_rank;
-        const candidateScore = result.document_score ?? result.score ?? null;
-        if (typeof candidateScore === "number") {
-          if (typeof group.score !== "number" || candidateScore > group.score) {
-            group.score = candidateScore;
-          }
-        }
-        group.passages.push(result);
-        grouped.set(result.document_id, group);
-      }
-      const sortedGroups = sortDocumentGroups(Array.from(grouped.values()), sortKey);
-      setGroups(sortedGroups);
-    } catch (fetchError) {
-      setError((fetchError as Error).message);
-      setGroups([]);
-    } finally {
-      setIsSearching(false);
+    const currentQuery = searchParams.toString();
+    const nextQuery = serializeSearchParams(filters);
+    if (currentQuery !== nextQuery) {
+      skipNextHydratedSearchRef.current = true;
+      router.replace(`/search${nextQuery ? `?${nextQuery}` : ""}`, { scroll: false });
     }
+
+    await runSearch(filters);
   };
+
+  useEffect(() => {
+    const filters = parseSearchParams(searchParams);
+    setQuery((current) => (current === filters.query ? current : filters.query));
+    setOsis((current) => (current === filters.osis ? current : filters.osis));
+    setCollection((current) =>
+      current === filters.collection ? current : filters.collection,
+    );
+    setAuthor((current) => (current === filters.author ? current : filters.author));
+    setSourceType((current) =>
+      current === filters.sourceType ? current : filters.sourceType,
+    );
+
+    if (skipNextHydratedSearchRef.current) {
+      skipNextHydratedSearchRef.current = false;
+      return;
+    }
+
+    const hasFilters = Object.values(filters).some((value) => value);
+    if (!hasFilters) {
+      setHasSearched(false);
+      setGroups([]);
+      setError(null);
+      setIsSearching(false);
+      return;
+    }
+
+    void runSearch(filters);
+  }, [searchParams, runSearch]);
 
   useEffect(() => {
     setGroups((currentGroups) => sortDocumentGroups(currentGroups, sortKey));
