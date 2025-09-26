@@ -31,7 +31,11 @@ from ..db.models import (
 )
 from .chunking import Chunk, chunk_text, chunk_transcript
 from .embeddings import get_embedding_service, lexical_representation
-from .osis import DetectedOsis, detect_osis_references
+from .osis import (
+    DetectedOsis,
+    classify_osis_matches,
+    detect_osis_references,
+)
 from .parsers import (
     ParserResult,
     TranscriptSegment as ParsedTranscriptSegment,
@@ -144,19 +148,29 @@ def _normalise_passage_meta(
     chunk_index: int,
     speakers: list[str] | None = None,
 ) -> dict[str, Any]:
-    osis_all: list[str] = []
-    if hints:
-        osis_all.extend(hints)
-    osis_all.extend(detected.all)
-    deduped = sorted({ref for ref in osis_all if ref})
+    hint_list = [hint for hint in hints or [] if hint]
+    detected_refs = [ref for ref in detected.all if ref]
+    matched_hints, unmatched_hints = classify_osis_matches(
+        ([detected.primary] if detected.primary else []) + detected_refs,
+        hint_list,
+    )
+
+    combined_refs = sorted({*detected_refs, *matched_hints, *unmatched_hints})
+
     meta: dict[str, Any] = {
         "parser": parser,
         "parser_version": parser_version,
         "chunker_version": chunker_version,
         "chunk_index": chunk_index,
     }
-    if deduped:
-        meta["osis_refs_all"] = deduped
+    if combined_refs:
+        meta["osis_refs_all"] = combined_refs
+    if detected_refs:
+        meta["osis_refs_detected"] = sorted(detected_refs)
+    if matched_hints:
+        meta["osis_refs_hints"] = matched_hints
+    if unmatched_hints:
+        meta["osis_refs_unmatched"] = unmatched_hints
     if detected.primary:
         meta["primary_osis"] = detected.primary
     if speakers:
@@ -975,21 +989,29 @@ def _persist_text_document(
     storage_dir = settings.storage_root / document.id
     storage_dir.mkdir(parents=True, exist_ok=True)
 
+    artifacts: dict[str, str] = {}
+
     if frontmatter:
         frontmatter_path = storage_dir / "frontmatter.json"
         frontmatter_path.write_text(
             _serialise_frontmatter(frontmatter) + "\n", encoding="utf-8"
         )
+        artifacts.setdefault("frontmatter", frontmatter_path.name)
 
     if original_path and original_path.exists():
         dest_path = storage_dir / original_path.name
         shutil.copy(original_path, dest_path)
+        artifacts["source"] = dest_path.name
 
-    (storage_dir / "content.txt").write_text(text_content, encoding="utf-8")
+    content_path = storage_dir / "content.txt"
+    content_path.write_text(text_content, encoding="utf-8")
+    artifacts["content"] = content_path.name
 
     if raw_content is not None:
         raw_name = raw_filename or "source.html"
-        (storage_dir / raw_name).write_text(raw_content, encoding="utf-8")
+        raw_path = storage_dir / raw_name
+        raw_path.write_text(raw_content, encoding="utf-8")
+        artifacts["raw"] = raw_path.name
 
     normalized_payload = {
         "document": {
@@ -1023,6 +1045,9 @@ def _persist_text_document(
             for segment in segments
         ],
     }
+
+    if artifacts:
+        normalized_payload["artifacts"] = artifacts
 
     normalized_path = storage_dir / "normalized.json"
     normalized_path.write_text(
@@ -1232,13 +1257,15 @@ def _persist_transcript_document(
     storage_dir = settings.storage_root / document.id
     storage_dir.mkdir(parents=True, exist_ok=True)
 
+    artifacts: dict[str, str] = {}
+
     if frontmatter:
         frontmatter_path = storage_dir / "frontmatter.json"
         frontmatter_path.write_text(
             _serialise_frontmatter(frontmatter) + "\n", encoding="utf-8"
         )
+        artifacts.setdefault("frontmatter", frontmatter_path.name)
 
-    artifacts: dict[str, str] = {}
     if transcript_path and transcript_path.exists():
         dest = storage_dir / transcript_path.name
         shutil.copy(transcript_path, dest)
@@ -1263,6 +1290,12 @@ def _persist_transcript_document(
         audio_dest = storage_dir / audio_path.name
         shutil.copy(audio_path, audio_dest)
         artifacts["audio"] = audio_dest.name
+
+    content_text = "\n\n".join(passage.text for passage in passages)
+    if content_text:
+        content_path = storage_dir / "content.txt"
+        content_path.write_text(content_text, encoding="utf-8")
+        artifacts.setdefault("content", content_path.name)
 
     normalized_payload = {
         "document": {

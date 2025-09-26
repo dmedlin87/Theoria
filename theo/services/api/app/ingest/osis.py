@@ -246,10 +246,17 @@ def _osis_to_readable(reference: str) -> str:
 def expand_osis_reference(reference: str) -> frozenset[int]:
     """Return the set of verse identifiers covered by the supplied OSIS reference."""
 
-    normalized = pb.get_references(_osis_to_readable(reference))
+    try:
+        normalized = pb.get_references(_osis_to_readable(reference))
+    except Exception:  # pragma: no cover - defensive parsing guard
+        return frozenset()
+
     verse_ids: list[int] = []
     for entry in normalized:
-        verse_ids.extend(pb.convert_reference_to_verse_ids(entry))
+        try:
+            verse_ids.extend(pb.convert_reference_to_verse_ids(entry))
+        except Exception:  # pragma: no cover - pythonbible safety net
+            return frozenset()
     return frozenset(verse_ids)
 
 
@@ -261,3 +268,31 @@ def osis_intersects(a: str, b: str) -> bool:
     if not ids_a or not ids_b:
         return False
     return not ids_a.isdisjoint(ids_b)
+
+
+def classify_osis_matches(
+    detected: Sequence[str], hints: Sequence[str]
+) -> tuple[list[str], list[str]]:
+    """Separate hint references into those intersecting detected ranges and the rest."""
+
+    detected_clean = [ref for ref in detected if ref]
+    matched: list[str] = []
+    unmatched: list[str] = []
+
+    for hint in hints:
+        if not hint:
+            continue
+        if not detected_clean:
+            unmatched.append(hint)
+            continue
+        try:
+            intersects = any(osis_intersects(candidate, hint) for candidate in detected_clean)
+        except Exception:  # pragma: no cover - intersection should never fail but be safe
+            intersects = False
+        if intersects:
+            if hint not in matched:
+                matched.append(hint)
+        elif hint not in unmatched:
+            unmatched.append(hint)
+
+    return matched, unmatched
