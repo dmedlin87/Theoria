@@ -67,7 +67,7 @@ function renderCitations(citations: RAGCitation[]): JSX.Element | null {
       <ol style={{ paddingLeft: "1.25rem" }}>
         {citations.map((citation) => (
           <li key={citation.index} style={{ marginBottom: "0.5rem" }}>
-            <strong>{citation.osis}</strong> ({citation.anchor}) — {citation.snippet}
+            <strong>{citation.osis}</strong> ({citation.anchor}) â€” {citation.snippet}
           </li>
         ))}
       </ol>
@@ -214,7 +214,7 @@ export default function CopilotPage(): JSX.Element {
     return (
       <section>
         <h2>Copilot</h2>
-        <p>Loading…</p>
+        <p>LoadingÂ…</p>
       </section>
     );
   }
