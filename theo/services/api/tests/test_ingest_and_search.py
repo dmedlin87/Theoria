@@ -165,6 +165,12 @@ def test_hybrid_search_combines_keyword_and_osis_filters() -> None:
             result["osis_ref"] and result["osis_ref"].startswith("John.1.1")
             for result in results
         )
+        assert all(result["snippet"].strip() for result in results)
+        assert all(
+            result.get("meta", {}).get("document_title")
+            for result in results
+            if result.get("meta")
+        )
         assert any(result["document_id"] == document_id for result in results)
 
 
@@ -252,6 +258,16 @@ This paragraph cites Romans 8:1 as well.
 
         mentions_all = client.get("/verses/John.1.1/mentions").json()
         assert mentions_all["total"] >= 1
+        assert all(
+            mention["passage"]["osis_ref"]
+            and mention["passage"]["osis_ref"].startswith("John.1.1")
+            for mention in mentions_all["mentions"]
+        )
+        assert all(
+            mention["passage"].get("meta", {}).get("document_title")
+            for mention in mentions_all["mentions"]
+            if mention["passage"].get("meta")
+        )
 
         mentions_filtered = client.get(
             "/verses/John.1.1/mentions",

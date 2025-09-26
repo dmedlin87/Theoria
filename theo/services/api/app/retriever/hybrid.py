@@ -15,6 +15,7 @@ from ..db.types import VectorType
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import osis_intersects
 from ..models.search import HybridSearchRequest, HybridSearchResult
+from .utils import compose_passage_meta
 
 
 def _tokenise(text: str) -> list[str]:
@@ -153,7 +154,7 @@ def _fallback_search(
             t_start=passage.t_start,
             t_end=passage.t_end,
             score=score,
-            meta=passage.meta,
+            meta=compose_passage_meta(passage, document),
             document_title=document.title,
             snippet=_snippet(passage.text),
             rank=0,
@@ -306,7 +307,7 @@ def _postgres_hybrid_search(
             t_start=passage.t_start,
             t_end=passage.t_end,
             score=score,
-            meta=passage.meta,
+            meta=compose_passage_meta(passage, document),
             document_title=document.title,
             snippet=_snippet(passage.text),
             rank=0,
