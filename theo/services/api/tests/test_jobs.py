@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -43,9 +44,10 @@ def client() -> TestClient:
 
 
 def _ingest_sample_document(client: TestClient) -> str:
+    unique_content = f"Content about John 1:1 -- {uuid4()}"
     response = client.post(
         "/ingest/file",
-        files={"file": ("sample.md", "Content about John 1:1", "text/markdown")},
+        files={"file": ("sample.md", unique_content, "text/markdown")},
     )
     assert response.status_code == 200, response.text
     return response.json()["document_id"]

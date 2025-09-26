@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from click.testing import CliRunner
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -23,12 +25,16 @@ def _seed_corpus() -> None:
             title="Sample Sermon",
             source_type="markdown",
             collection="Gospels",
+            topics=["Pauline eschatology", "Christology"],
             bib_json={"primary_topic": "Pauline eschatology"},
         )
         passage = Passage(
             id="passage-1",
             document_id="doc-1",
-            text="In John 1:1 the Word is proclaimed.",
+            text=(
+                "In John 1:1 the Word is proclaimed as light that brings abiding hope; "
+                "these highlights anchor faith in the Logos."
+            ),
             osis_ref="John.1.1",
             page_no=1,
         )
@@ -38,11 +44,14 @@ def _seed_corpus() -> None:
             title="Q&A Transcript",
             source_type="audio",
             collection="Gospels",
+            topics=["Hope", "Logos"],
         )
         transcript_passage = Passage(
             id="passage-2",
             document_id="doc-2",
-            text="Question: How is the Logos understood?",
+            text=(
+                "Audio highlights exploring how the Logos is understood with abiding hope."
+            ),
             osis_ref="John.1.1",
             t_start=10.0,
             t_end=25.0,
@@ -227,6 +236,104 @@ def test_transcript_export_csv() -> None:
         assert "Student" in text
 
 
+def test_comparative_analysis_returns_citations_and_comparisons() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
+        response = client.post(
+            "/ai/comparative",
+            json={
+                "osis": "John.1.1",
+                "participants": ["Origen", "Augustine"],
+                "model": "echo",
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        citations = payload["answer"]["citations"]
+        assert citations, payload
+        for citation in citations:
+            assert citation["osis"] == "John.1.1"
+            assert citation["snippet"]
+            assert citation["passage_id"]
+        assert payload["comparisons"], payload
+        assert any("Sample Sermon" in comparison for comparison in payload["comparisons"])
+
+
+def test_multimedia_digest_highlights_audio_sources() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
+        response = client.post(
+            "/ai/multimedia",
+            json={"collection": "Gospels", "model": "echo"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        citations = payload["answer"]["citations"]
+        assert citations, payload
+        for citation in citations:
+            assert citation["document_id"] == "doc-2"
+            assert citation["snippet"]
+            assert citation["anchor"].startswith("t=")
+        assert payload["highlights"], payload
+        assert any("highlights" in highlight.lower() for highlight in payload["highlights"])
+
+
+def test_devotional_flow_returns_reflection_and_prayer() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
+        response = client.post(
+            "/ai/devotional",
+            json={"osis": "John.1.1", "focus": "Word", "model": "echo"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        citations = payload["answer"]["citations"]
+        assert citations, payload
+        for citation in citations:
+            assert citation["osis"] == "John.1.1"
+            assert citation["snippet"]
+        assert "Reflect on" in payload["reflection"]
+        assert payload["prayer"].startswith("Spirit")
+
+
+def test_collaboration_reconciliation_includes_synthesized_view() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
+        response = client.post(
+            "/ai/collaboration",
+            json={
+                "thread": "forum-thread-1",
+                "osis": "John.1.1",
+                "viewpoints": ["Logos", "Creation"],
+                "model": "echo",
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        citations = payload["answer"]["citations"]
+        assert citations, payload
+        for citation in citations:
+            assert citation["osis"] == "John.1.1"
+            assert citation["snippet"]
+        assert "John.1.1" in payload["synthesized_view"]
+
+
+def test_corpus_curation_report_persists_summaries() -> None:
+    _seed_corpus()
+    since = (datetime.now(UTC) - timedelta(days=1)).isoformat()
+    with TestClient(app) as client:
+        response = client.post("/ai/curation", json={"since": since})
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["documents_processed"] >= 1
+        assert any(summary.startswith("Sample Sermon") for summary in payload["summaries"])
+        assert payload["since"].startswith(since[:10])
+
+
 def test_topic_digest_generation() -> None:
     _seed_corpus()
     with TestClient(app) as client:
@@ -235,13 +342,14 @@ def test_topic_digest_generation() -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["topics"]
-        assert payload["topics"][0]["topic"] == "Pauline eschatology"
+        topic_labels = {topic["topic"] for topic in payload["topics"]}
+        assert "Pauline eschatology" in topic_labels
 
         digest_document_response = client.get("/documents/digest")
         assert digest_document_response.status_code == 200
         digest_document = digest_document_response.json()
         assert digest_document["source_type"] == "digest"
-        assert digest_document["topics"] == ["Pauline eschatology"]
+        assert "Pauline eschatology" in digest_document["topics"]
         clusters = digest_document["meta"]["clusters"]
         assert clusters
         assert "doc-1" in clusters[0]["document_ids"]
