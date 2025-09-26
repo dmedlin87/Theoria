@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
+
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.core import settings as settings_module
 from theo.services.api.app.core.database import Base, configure_engine
@@ -152,3 +158,71 @@ def test_worker_mode_enqueues_tasks(tmp_path, monkeypatch):
     assert path.endswith("lecture.json")
     assert frontmatter["collection"] == "bulk"
     assert "Queued" in result.output
+
+
+def test_post_batch_tags_runs_enricher(tmp_path, monkeypatch):
+    doc_path = tmp_path / "note.md"
+    doc_path.write_text("---\ntitle: Example\n---\nBody")
+
+    calls: list[str] = []
+
+    class _FakeEnricher:
+        def enrich_document(self, session, document):
+            calls.append(document.id)
+            return True
+
+    monkeypatch.setattr(
+        "theo.services.cli.ingest_folder.MetadataEnricher",
+        lambda: _FakeEnricher(),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        ingest_folder,
+        [str(doc_path), "--batch-size", "1", "--post-batch", "tags"],
+    )
+
+    assert result.exit_code == 0
+    assert calls, "Expected metadata enrichment to run"
+    assert "[post-batch:tags] enriched" in result.output
+
+
+def test_post_batch_skipped_for_worker_mode(tmp_path, monkeypatch):
+    source = tmp_path / "lecture.json"
+    source.write_text("{}")
+
+    class _FakeAsyncResult:
+        def __init__(self, task_id: str) -> None:
+            self.id = task_id
+
+    class _FakeProcessFile:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def delay(self, doc_id: str, path: str, frontmatter: dict[str, object]):
+            self.calls.append((doc_id, path))
+            return _FakeAsyncResult(f"task-{len(self.calls)}")
+
+    fake_worker = _FakeProcessFile()
+    monkeypatch.setattr(
+        "theo.services.cli.ingest_folder.worker_tasks.process_file",
+        fake_worker,
+    )
+    monkeypatch.setattr(
+        "theo.services.cli.ingest_folder.run_pipeline_for_file",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("API mode should not run")),
+    )
+    monkeypatch.setattr(
+        "theo.services.cli.ingest_folder.MetadataEnricher",
+        lambda: (_ for _ in ()).throw(AssertionError("Post-batch should be skipped")),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        ingest_folder,
+        [str(source), "--mode", "worker", "--post-batch", "tags"],
+    )
+
+    assert result.exit_code == 0
+    assert "Post-batch steps require API mode" in result.output
+    assert fake_worker.calls
