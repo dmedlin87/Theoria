@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import List
+from datetime import datetime
+from typing import Dict, List
 
 from .base import APIModel
 
@@ -40,3 +41,40 @@ class CreatorTopicProfile(APIModel):
     quotes: List[CreatorTopicQuote]
     claim_summaries: List[str]
     total_claims: int
+
+
+class VersePerspectiveVideo(APIModel):
+    video_id: str | None = None
+    title: str | None = None
+    url: str | None = None
+    t_start: float | None = None
+
+
+class VersePerspectiveQuote(APIModel):
+    segment_id: str | None = None
+    quote_md: str
+    source_ref: str | None = None
+    osis_refs: List[str] | None = None
+    video: VersePerspectiveVideo | None = None
+
+
+class CreatorVersePerspectiveCreator(APIModel):
+    creator_id: str
+    creator_name: str
+    stance: str | None = None
+    confidence: float | None = None
+    claim_count: int
+    stance_distribution: Dict[str, int] | None = None
+    quotes: List[VersePerspectiveQuote]
+
+
+class CreatorVersePerspectiveMeta(APIModel):
+    range: str
+    generated_at: datetime
+
+
+class CreatorVersePerspectiveResponse(APIModel):
+    osis: str
+    total_creators: int
+    creators: List[CreatorVersePerspectiveCreator]
+    meta: CreatorVersePerspectiveMeta | None = None

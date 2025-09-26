@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     geo_enabled: bool = Field(
         default=True, description="Toggle geography lookup endpoints"
     )
+    creator_verse_perspectives_enabled: bool = Field(
+        default=True,
+        description="Toggle aggregated creator perspectives by verse",
+    )
 
 
 @lru_cache

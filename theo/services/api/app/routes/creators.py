@@ -6,16 +6,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
+from ..core.settings import get_settings
 from ..creators.service import (
     CreatorTopicProfileData,
     fetch_creator_topic_profile,
     search_creators,
 )
+from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..models.creators import (
     CreatorSearchResponse,
     CreatorSummary,
     CreatorTopicProfile,
     CreatorTopicQuote,
+    CreatorVersePerspectiveResponse,
 )
 
 router = APIRouter()
@@ -89,4 +92,57 @@ def get_creator_topic_profile(
         quotes=quotes,
         claim_summaries=claim_summaries,
         total_claims=len(profile.claims),
+    )
+
+
+def _build_verse_perspective_response(
+    *,
+    session: Session,
+    osis: str,
+    limit_creators: int,
+    limit_quotes: int,
+) -> CreatorVersePerspectiveResponse:
+    settings = get_settings()
+    if not getattr(settings, "creator_verse_perspectives_enabled", True):
+        return CreatorVersePerspectiveResponse(
+            osis=osis,
+            total_creators=0,
+            creators=[],
+        )
+
+    service = CreatorVersePerspectiveService(session)
+    return service.get_perspectives(
+        osis,
+        limit_creators=limit_creators,
+        limit_quotes=limit_quotes,
+    )
+
+
+@router.get("/verses", response_model=CreatorVersePerspectiveResponse)
+def list_creator_verse_perspectives(
+    osis: str = Query(..., description="OSIS reference or short range"),
+    limit_creators: int = Query(default=10, ge=1, le=50),
+    limit_quotes: int = Query(default=3, ge=1, le=10),
+    session: Session = Depends(get_session),
+) -> CreatorVersePerspectiveResponse:
+    return _build_verse_perspective_response(
+        session=session,
+        osis=osis,
+        limit_creators=limit_creators,
+        limit_quotes=limit_quotes,
+    )
+
+
+@router.get("/verses/{osis}", response_model=CreatorVersePerspectiveResponse)
+def get_creator_verse_perspectives(
+    osis: str,
+    limit_creators: int = Query(default=10, ge=1, le=50),
+    limit_quotes: int = Query(default=3, ge=1, le=10),
+    session: Session = Depends(get_session),
+) -> CreatorVersePerspectiveResponse:
+    return _build_verse_perspective_response(
+        session=session,
+        osis=osis,
+        limit_creators=limit_creators,
+        limit_quotes=limit_quotes,
     )
