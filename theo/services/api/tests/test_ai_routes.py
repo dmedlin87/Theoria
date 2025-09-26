@@ -53,12 +53,31 @@ def _seed_corpus() -> None:
         session.commit()
 
 
+def _register_echo_model(client: TestClient, *, make_default: bool = True) -> dict:
+    response = client.post(
+        "/ai/llm",
+        json={
+            "name": "echo",
+            "provider": "echo",
+            "model": "echo",
+            "make_default": make_default,
+        },
+    )
+    assert response.status_code == 200, response.text
+    registry_state = response.json()
+    assert any(model["name"] == "echo" for model in registry_state["models"])
+    if make_default:
+        assert registry_state["default_model"] == "echo"
+    get_response = client.get("/ai/llm")
+    assert get_response.status_code == 200
+    return get_response.json()
+
+
 def test_verse_copilot_returns_citations_and_followups() -> None:
     _seed_corpus()
     with TestClient(app) as client:
-        client.post(
-            "/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"}
-        )
+        state = _register_echo_model(client)
+        assert state["default_model"] == "echo"
         response = client.post(
             "/ai/verse",
             json={
@@ -92,9 +111,43 @@ def test_verse_copilot_returns_citations_and_followups() -> None:
             assert trail.user_id == "user-123"
 
 
+def test_llm_registry_crud_operations() -> None:
+    with TestClient(app) as client:
+        state = _register_echo_model(client)
+        assert state["default_model"] == "echo"
+
+        second = client.post(
+            "/ai/llm",
+            json={
+                "name": "echo-secondary",
+                "provider": "echo",
+                "model": "echo",
+                "config": {"suffix": "secondary"},
+            },
+        )
+        assert second.status_code == 200, second.text
+        payload = second.json()
+        assert any(model["name"] == "echo-secondary" for model in payload["models"])
+        assert payload["default_model"] == "echo"
+
+        make_default = client.patch(
+            "/ai/llm/default", json={"name": "echo-secondary"}
+        )
+        assert make_default.status_code == 200, make_default.text
+        patched = make_default.json()
+        assert patched["default_model"] == "echo-secondary"
+
+        delete_response = client.delete("/ai/llm/echo-secondary")
+        assert delete_response.status_code == 200, delete_response.text
+        final_state = delete_response.json()
+        assert all(model["name"] != "echo-secondary" for model in final_state["models"])
+        assert final_state["default_model"] == "echo"
+
+
 def test_verse_copilot_guardrails_when_no_citations() -> None:
     _seed_corpus()
     with TestClient(app) as client:
+        _register_echo_model(client)
         response = client.post(
             "/ai/verse",
             json={"osis": "Gen.99.1", "question": "Missing?"},
@@ -105,6 +158,7 @@ def test_verse_copilot_guardrails_when_no_citations() -> None:
 def test_sermon_prep_export_markdown() -> None:
     _seed_corpus()
     with TestClient(app) as client:
+        _register_echo_model(client)
         response = client.post(
             "/ai/sermon-prep/export",
             params={"format": "markdown"},
@@ -119,6 +173,7 @@ def test_sermon_prep_export_markdown() -> None:
 def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
     _seed_corpus()
     with TestClient(app) as client:
+        _register_echo_model(client)
         response = client.post(
             "/ai/sermon-prep",
             json={
@@ -151,6 +206,7 @@ def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
 def test_sermon_prep_guardrails_when_no_results() -> None:
     _seed_corpus()
     with TestClient(app) as client:
+        _register_echo_model(client)
         response = client.post(
             "/ai/sermon-prep",
             json={"topic": "Unknown", "osis": "Rev.99.1"},
@@ -174,6 +230,7 @@ def test_transcript_export_csv() -> None:
 def test_topic_digest_generation() -> None:
     _seed_corpus()
     with TestClient(app) as client:
+        _register_echo_model(client)
         response = client.post("/ai/digest", params={"hours": 24})
         assert response.status_code == 200
         payload = response.json()

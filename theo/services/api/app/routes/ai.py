@@ -20,7 +20,7 @@ from ..ai import (
     run_research_reconciliation,
 )
 from ..ai.rag import GuardrailError
-from ..ai.registry import LLMModel, get_llm_registry, save_llm_registry
+from ..ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
 from ..ai.trails import TrailService
 from ..analytics.topics import (
     TopicDigest,
@@ -35,6 +35,7 @@ from ..models.ai import (
     ComparativeAnalysisRequest,
     CorpusCurationRequest,
     DevotionalRequest,
+    LLMDefaultRequest,
     LLMModelRequest,
     LLMSettingsResponse,
     MultimediaDigestRequest,
@@ -44,6 +45,58 @@ from ..models.ai import (
 )
 
 router = APIRouter()
+
+
+def _persist_and_respond(
+    session: Session, registry: LLMRegistry
+) -> LLMSettingsResponse:
+    save_llm_registry(session, registry)
+    return LLMSettingsResponse(**registry.to_response())
+
+
+@router.get("/llm", response_model=LLMSettingsResponse)
+def list_llm_models(session: Session = Depends(get_session)) -> LLMSettingsResponse:
+    registry = get_llm_registry(session)
+    return LLMSettingsResponse(**registry.to_response())
+
+
+@router.post("/llm", response_model=LLMSettingsResponse, response_model_exclude_none=True)
+def register_llm_model(
+    payload: LLMModelRequest, session: Session = Depends(get_session)
+) -> LLMSettingsResponse:
+    registry = get_llm_registry(session)
+    model = LLMModel(
+        name=payload.name,
+        provider=payload.provider,
+        model=payload.model,
+        config=dict(payload.config),
+    )
+    registry.add_model(model, make_default=payload.make_default)
+    return _persist_and_respond(session, registry)
+
+
+@router.patch(
+    "/llm/default", response_model=LLMSettingsResponse, response_model_exclude_none=True
+)
+def set_default_llm_model(
+    payload: LLMDefaultRequest, session: Session = Depends(get_session)
+) -> LLMSettingsResponse:
+    registry = get_llm_registry(session)
+    if payload.name not in registry.models:
+        raise HTTPException(status_code=404, detail="Unknown model")
+    registry.default_model = payload.name
+    return _persist_and_respond(session, registry)
+
+
+@router.delete(
+    "/llm/{name}", response_model=LLMSettingsResponse, response_model_exclude_none=True
+)
+def remove_llm_model(name: str, session: Session = Depends(get_session)) -> LLMSettingsResponse:
+    registry = get_llm_registry(session)
+    if name not in registry.models:
+        raise HTTPException(status_code=404, detail="Unknown model")
+    registry.remove_model(name)
+    return _persist_and_respond(session, registry)
 
 VERSE_COPILOT_PLAN = "\n".join(
     [

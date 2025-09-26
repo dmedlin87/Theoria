@@ -38,6 +38,10 @@ class LLMSettingsResponse(APIModel):
     models: list[dict[str, object]]
 
 
+class LLMDefaultRequest(APIModel):
+    name: str
+
+
 class VerseCopilotRequest(APIModel):
     osis: str
     question: str | None = None
@@ -104,6 +108,7 @@ __all__ = [
     "RecorderMetadata",
     "LLMModelRequest",
     "LLMSettingsResponse",
+    "LLMDefaultRequest",
     "MultimediaDigestRequest",
     "SermonPrepRequest",
     "VerseCopilotRequest",
