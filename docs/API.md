@@ -212,6 +212,53 @@ Response:
 Research endpoints power the study/reader dock. They respect feature flags
 surfaced via `/features/discovery` so clients can hide unavailable panels.
 
+### `GET /research/notes`
+
+Lists saved research notes for a specific OSIS reference. Clients can layer
+optional filters to narrow the response to matching stances, claim types, tags,
+or a minimum confidence threshold.
+
+Query parameters:
+
+| Parameter         | Type   | Description                                                      |
+| ----------------- | ------ | ---------------------------------------------------------------- |
+| `osis`            | str    | Required OSIS anchor (e.g., `John.1.1`).                          |
+| `stance`          | str    | Optional stance label filter (case-insensitive).                 |
+| `claim_type`      | str    | Optional claim type filter (case-insensitive).                   |
+| `tag`             | str    | Restrict to notes where `tags` contains the provided label.      |
+| `min_confidence`  | float  | Minimum inclusive confidence score (`0.0` – `1.0`).              |
+
+Example filtered response:
+
+```http
+GET /research/notes?osis=Luke.1.1&stance=investigative&tag=orderly&min_confidence=0.75
+```
+
+```json
+{
+  "osis": "Luke.1.1",
+  "notes": [
+    {
+      "id": "018fa7c0-...",
+      "osis": "Luke.1.1",
+      "title": null,
+      "stance": "investigative",
+      "claim_type": "historical",
+      "confidence": 0.85,
+      "tags": ["preface", "orderly"],
+      "body": "Detailed investigation",
+      "evidences": [],
+      "created_at": "2024-08-12T18:21:00Z",
+      "updated_at": "2024-08-12T18:21:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+Invalid confidence values outside `0.0` – `1.0` return **422 Unprocessable
+Entity** with FastAPI's default validation payload.
+
 ### `GET /research/contradictions`
 
 Returns seeded contradiction or harmony claims anchored to OSIS references.
