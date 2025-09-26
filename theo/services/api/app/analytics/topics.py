@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -93,4 +94,75 @@ def load_topic_digest(session: Session) -> TopicDigest | None:
     return TopicDigest.model_validate(payload)
 
 
-__all__ = ["TopicCluster", "TopicDigest", "generate_topic_digest", "store_topic_digest", "load_topic_digest"]
+def upsert_digest_document(session: Session, digest: TopicDigest) -> Document:
+    """Create or update a document representation for the supplied digest."""
+
+    summary_lines = [
+        f"Topic digest generated at {digest.generated_at.isoformat()} for window starting {digest.window_start.isoformat()}."
+    ]
+    clusters: list[dict[str, Any]] = []
+    for cluster in digest.topics:
+        clusters.append(
+            {
+                "topic": cluster.topic,
+                "new_documents": cluster.new_documents,
+                "total_documents": cluster.total_documents,
+                "document_ids": cluster.document_ids,
+            }
+        )
+        summary_lines.append(
+            f"- {cluster.topic}: {cluster.new_documents} new / {cluster.total_documents} total"
+        )
+        if cluster.document_ids:
+            summary_lines.append(f"  Documents: {', '.join(cluster.document_ids)}")
+
+    if not digest.topics:
+        summary_lines.append("No new topical activity detected for the selected window.")
+
+    metadata = {
+        "type": "topic_digest",
+        "generated_at": digest.generated_at.isoformat(),
+        "window_start": digest.window_start.isoformat(),
+        "clusters": clusters,
+    }
+
+    document = (
+        session.query(Document)
+        .filter(Document.source_type == "digest")
+        .order_by(Document.created_at.desc())
+        .first()
+    )
+
+    title = f"Topic Digest ({digest.window_start.date()} – {digest.generated_at.date()})"
+    topics = [cluster.topic for cluster in digest.topics]
+    abstract = "\n".join(summary_lines)
+
+    if document is None:
+        document = Document(
+            title=title,
+            source_type="digest",
+            collection="Digests",
+            abstract=abstract,
+            topics=topics,
+            bib_json=metadata,
+        )
+    else:
+        document.title = title
+        document.collection = document.collection or "Digests"
+        document.abstract = abstract
+        document.topics = topics or None
+        document.bib_json = metadata
+
+    session.add(document)
+    session.flush()
+    return document
+
+
+__all__ = [
+    "TopicCluster",
+    "TopicDigest",
+    "generate_topic_digest",
+    "store_topic_digest",
+    "load_topic_digest",
+    "upsert_digest_document",
+]

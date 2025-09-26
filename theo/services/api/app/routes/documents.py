@@ -19,6 +19,7 @@ from ..retriever.documents import (
     delete_annotation,
     get_document,
     get_document_passages,
+    get_latest_digest_document,
     list_annotations,
     list_documents,
     update_document,
@@ -36,6 +37,16 @@ def document_list(
     """Return paginated documents."""
 
     return list_documents(session, limit=limit, offset=offset)
+
+
+@router.get("/digest", response_model=DocumentDetailResponse)
+def latest_digest_document(session: Session = Depends(get_session)) -> DocumentDetailResponse:
+    """Return the most recently generated topic digest document."""
+
+    try:
+        return get_latest_digest_document(session)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/{document_id}", response_model=DocumentDetailResponse)
