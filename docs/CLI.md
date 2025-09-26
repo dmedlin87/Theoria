@@ -26,6 +26,7 @@ Key options:
 - `--batch-size N` &mdash; process `N` files per batch. The CLI lists the files in each batch before handing them to the backend.
 - `--dry-run` &mdash; print the detected files and their inferred source types without ingesting anything.
 - `--meta key=value` &mdash; apply metadata overrides to every file. Values are parsed as JSON when possible (e.g. `--meta 'authors=["Jane"]'`).
+- `--post-batch [tags]` &mdash; run metadata enrichment after each API batch (ignored in `worker` mode).
 
 ## Examples
 
@@ -79,3 +80,11 @@ python -m theo.services.cli.export_data documents \
 
 Pass `--no-include-passages` to export metadata only, or `--limit N` to cap the
 number of returned documents.
+Run metadata enrichment immediately after ingest:
+
+```bash
+python -m theo.services.cli.ingest_folder ./sermons \
+  --post-batch tags
+```
+
+The CLI reuses the synchronous metadata enricher for every ingested document; this is only available in API mode.
