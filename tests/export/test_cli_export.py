@@ -1,5 +1,6 @@
 import csv
 import json
+import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,6 +8,11 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from theo.services.api.app.export import formatters
 from theo.services.api.app.models.base import Passage
 from theo.services.api.app.models.documents import DocumentDetailResponse
 from theo.services.api.app.models.export import (
@@ -141,6 +147,7 @@ def test_search_export_cli_csv_includes_manifest(
     assert result.exit_code == 0
     lines = [line for line in result.output.strip().splitlines() if line]
     manifest = json.loads(lines[0])
+    assert manifest["schema_version"] == formatters.SCHEMA_VERSION
     assert manifest["type"] == "search"
     assert manifest["filters"]["osis"] == "John.1.1"
     assert manifest["totals"]["results"] == 1
@@ -257,6 +264,7 @@ def test_document_export_cli_ndjson_contains_metadata(
     assert result.exit_code == 0
     lines = [line for line in result.output.strip().splitlines() if line]
     manifest = json.loads(lines[0])
+    assert manifest["schema_version"] == formatters.SCHEMA_VERSION
     assert manifest["type"] == "documents"
     assert manifest["totals"]["documents"] == 1
     record = json.loads(lines[1])

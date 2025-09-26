@@ -157,3 +157,12 @@ def test_ingest_folder_uses_selected_backend(monkeypatch, tmp_path: Path) -> Non
     assert len(queued_batches) == 1
     assert api_overrides == [{"flag": True}]
     assert worker_overrides == [{}]
+
+
+def test_ingest_folder_help_lists_core_options() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli.ingest_folder, ["--help"])
+
+    assert result.exit_code == 0
+    for token in ["--mode", "--batch-size", "--dry-run", "--meta", "--post-batch"]:
+        assert token in result.output
