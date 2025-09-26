@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import crypto from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -42,6 +42,60 @@ test.describe("Theo Engine UI", () => {
     await page.click("button[type='submit']");
     const firstResultLink = page.getByRole("link", { name: /Open passage/i }).first();
     await expect(firstResultLink).toBeVisible();
+  });
+
+  test("primary navigation links load", async ({ page }) => {
+    const navLinks: Array<{
+      href: string;
+      label: string;
+      assertion: (page: Page) => Promise<void>;
+    }> = [
+      {
+        href: "/search",
+        label: "Search",
+        assertion: async (pageInstance) => {
+          await expect(pageInstance.getByRole("heading", { name: "Search" })).toBeVisible();
+        },
+      },
+      {
+        href: "/upload",
+        label: "Upload",
+        assertion: async (pageInstance) => {
+          await expect(pageInstance.getByRole("heading", { name: "Upload" })).toBeVisible();
+        },
+      },
+      {
+        href: "/copilot",
+        label: "Copilot",
+        assertion: async (pageInstance) => {
+          await expect(pageInstance.getByRole("heading", { name: "Copilot" })).toBeVisible();
+        },
+      },
+      {
+        href: "/verse/John.1.1",
+        label: "Verse explorer",
+        assertion: async (pageInstance) => {
+          await expect(
+            pageInstance.getByRole("heading", { name: /Verse Mentions/i })
+          ).toBeVisible();
+        },
+      },
+    ];
+
+    for (const { href, label, assertion } of navLinks) {
+      await page.goto("/");
+      const navLink = page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: label, exact: true });
+      await expect(navLink).toBeVisible();
+
+      await Promise.all([
+        page.waitForURL(`**${href}`, { waitUntil: "networkidle" }),
+        navLink.click(),
+      ]);
+
+      await assertion(page);
+    }
   });
 
   test("filters verse mentions", async ({ page }) => {

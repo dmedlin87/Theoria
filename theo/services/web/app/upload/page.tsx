@@ -290,7 +290,7 @@ export default function UploadPage(): JSX.Element {
                     <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9" }}>{job.job_type}</td>
                     <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9" }}>{job.status}</td>
                     <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9" }}>
-                      {job.document_id ?? "—"}
+                      {job.document_id ?? "â€”"}
                     </td>
                     <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9" }}>{formatTimestamp(job.updated_at)}</td>
                     <td style={{ padding: "0.5rem", borderBottom: "1px solid #f1f5f9", color: job.error ? "crimson" : "#475569" }}>
