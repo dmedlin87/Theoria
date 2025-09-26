@@ -6,15 +6,25 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..db.models import TranscriptSegment, Video
+from ..ingest.osis import osis_intersects
 
 
 def _matches_osis(segment: TranscriptSegment, osis: str) -> bool:
-    refs: set[str] = set()
+    """Return True when *segment* overlaps the requested OSIS reference."""
+
+    references: list[str] = []
     if segment.primary_osis:
-        refs.add(segment.primary_osis)
+        references.append(segment.primary_osis)
     if segment.osis_refs:
-        refs.update(segment.osis_refs)
-    return osis in refs
+        references.extend(ref for ref in segment.osis_refs if ref)
+
+    for reference in references:
+        try:
+            if osis_intersects(reference, osis):
+                return True
+        except Exception:  # pragma: no cover - defensive against malformed data
+            continue
+    return False
 
 
 def build_source_ref(video: Video | None, t_start: float | None) -> str | None:
