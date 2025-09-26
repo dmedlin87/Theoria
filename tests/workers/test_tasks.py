@@ -17,7 +17,7 @@ from theo.services.api.app.core.database import (  # noqa: E402  (import after p
     get_engine,
     get_settings,
 )
-from theo.services.api.app.db.models import Document  # noqa: E402
+from theo.services.api.app.db.models import Document, IngestionJob  # noqa: E402
 from theo.services.api.app.workers import tasks  # noqa: E402
 
 
@@ -96,3 +96,24 @@ def test_enrich_document_populates_metadata(tmp_path) -> None:
     assert isinstance(enriched.bib_json, dict)
     assert enriched.bib_json.get("enrichment", {}).get("openalex", {}).get("id") == "https://openalex.org/W123456789"
     assert enriched.bib_json.get("primary_topic") == "Theology"
+
+
+def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
+    db_path = tmp_path / "topic.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        job = IngestionJob(job_type="topic_digest", status="queued")
+        session.add(job)
+        session.commit()
+        job_id = job.id
+
+    tasks.topic_digest.run(hours=1, job_id=job_id)
+
+    with Session(engine) as session:
+        updated = session.get(IngestionJob, job_id)
+
+    assert updated is not None
+    assert updated.status == "completed"

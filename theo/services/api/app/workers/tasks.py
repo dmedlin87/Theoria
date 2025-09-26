@@ -146,15 +146,57 @@ def enrich_document(document_id: str, job_id: str | None = None) -> None:
 
 
 @celery.task(name="tasks.generate_topic_digest")
-def topic_digest(hours: int = 168) -> None:
+def topic_digest(
+    hours: int = 168,
+    *,
+    since: str | None = None,
+    notify: list[str] | None = None,
+    job_id: str | None = None,
+) -> None:
     """Generate and persist a topical digest for recently ingested works."""
 
     engine = get_engine()
     with Session(engine) as session:
-        since = datetime.now(UTC) - timedelta(hours=hours)
-        digest = generate_topic_digest(session, since)
-        store_topic_digest(session, digest)
-        logger.info(
-            "Generated topic digest",
-            extra={"topics": [cluster.topic for cluster in digest.topics], "since": since.isoformat()},
-        )
+        window_start: datetime | None = None
+        if since:
+            try:
+                parsed = datetime.fromisoformat(since)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=UTC)
+                window_start = parsed
+            except ValueError:
+                logger.warning("Invalid since value supplied to topic digest", extra={"since": since})
+
+        if window_start is None:
+            window_start = datetime.now(UTC) - timedelta(hours=hours)
+
+        if job_id:
+            _update_job_status(session, job_id, status="processing")
+            session.commit()
+
+        try:
+            digest = generate_topic_digest(session, window_start)
+            store_topic_digest(session, digest)
+
+            if job_id:
+                _update_job_status(session, job_id, status="completed")
+                session.commit()
+
+            if notify:
+                logger.info(
+                    "Topic digest ready for notification",
+                    extra={"recipients": notify, "since": window_start.isoformat()},
+                )
+            logger.info(
+                "Generated topic digest",
+                extra={
+                    "topics": [cluster.topic for cluster in digest.topics],
+                    "since": window_start.isoformat(),
+                },
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            session.rollback()
+            if job_id:
+                _update_job_status(session, job_id, status="failed", error=str(exc))
+                session.commit()
+            raise
