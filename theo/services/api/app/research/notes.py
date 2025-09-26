@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..db.models import NoteEvidence, ResearchNote
@@ -53,15 +54,44 @@ def create_research_note(
     return note
 
 
-def get_notes_for_osis(session: Session, osis: str) -> list[ResearchNote]:
-    """Return all notes linked to a given OSIS reference."""
+def get_notes_for_osis(
+    session: Session,
+    osis: str,
+    *,
+    stance: str | None = None,
+    claim_type: str | None = None,
+    tag: str | None = None,
+    min_confidence: float | None = None,
+) -> list[ResearchNote]:
+    """Return all notes linked to a given OSIS reference with optional filters."""
 
-    return (
-        session.query(ResearchNote)
-        .filter(ResearchNote.osis == osis)
-        .order_by(ResearchNote.created_at.desc())
-        .all()
-    )
+    query = session.query(ResearchNote).filter(ResearchNote.osis == osis)
+
+    if stance:
+        stance_normalized = stance.lower()
+        query = query.filter(
+            ResearchNote.stance.is_not(None),
+            func.lower(ResearchNote.stance) == stance_normalized,
+        )
+
+    if claim_type:
+        claim_normalized = claim_type.lower()
+        query = query.filter(
+            ResearchNote.claim_type.is_not(None),
+            func.lower(ResearchNote.claim_type) == claim_normalized,
+        )
+
+    if tag:
+        tag_pattern = f'%"{tag.lower()}"%'
+        query = query.filter(
+            ResearchNote.tags.is_not(None),
+            func.lower(ResearchNote.tags).like(tag_pattern),
+        )
+
+    if min_confidence is not None:
+        query = query.filter(ResearchNote.confidence >= min_confidence)
+
+    return query.order_by(ResearchNote.created_at.desc()).all()
 
 
 def update_research_note(

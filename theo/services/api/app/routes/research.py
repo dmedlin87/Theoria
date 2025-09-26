@@ -107,9 +107,34 @@ def get_morphology(
 @router.get("/notes", response_model=ResearchNotesResponse)
 def list_notes(
     osis: str = Query(..., description="Anchor OSIS reference"),
+    stance: str | None = Query(
+        default=None,
+        description="Optional stance label to filter by",
+    ),
+    claim_type: str | None = Query(
+        default=None,
+        description="Optional claim type to filter by",
+    ),
+    tag: str | None = Query(
+        default=None,
+        description="Filter notes containing a specific tag",
+    ),
+    min_confidence: float | None = Query(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence score inclusive",
+    ),
     session: Session = Depends(get_session),
 ) -> ResearchNotesResponse:
-    notes = get_notes_for_osis(session, osis)
+    notes = get_notes_for_osis(
+        session,
+        osis,
+        stance=stance,
+        claim_type=claim_type,
+        tag=tag,
+        min_confidence=min_confidence,
+    )
     return ResearchNotesResponse(
         osis=osis,
         notes=notes,
