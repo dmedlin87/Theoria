@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
+import os
+
 from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from .core.database import Base, get_engine
@@ -23,6 +26,13 @@ from .routes import (
     transcripts,
     verses,
 )
+from .telemetry import configure_console_tracer
+
+try:  # pragma: no cover - optional dependency
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+except ImportError:  # pragma: no cover - graceful degradation
+    CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
+    generate_latest = None
 
 
 @asynccontextmanager
@@ -38,6 +48,8 @@ def create_app() -> FastAPI:
     """Create FastAPI application instance."""
 
     app = FastAPI(title="Theo Engine API", version="0.2.0", lifespan=lifespan)
+    if os.getenv("THEO_ENABLE_CONSOLE_TRACES", "0").lower() in {"1", "true", "yes"}:
+        configure_console_tracer()
     app.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
     app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
     app.include_router(search.router, prefix="/search", tags=["search"])
@@ -51,6 +63,13 @@ def create_app() -> FastAPI:
     app.include_router(trails.router, prefix="/trails", tags=["trails"])
 
     app.include_router(ai.router, prefix="/ai", tags=["ai"])
+
+    if generate_latest is not None:
+
+        @app.get("/metrics", tags=["telemetry"])
+        def metrics_endpoint() -> PlainTextResponse:
+            payload = generate_latest()
+            return PlainTextResponse(payload, media_type=CONTENT_TYPE_LATEST)
 
     return app
 

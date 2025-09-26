@@ -13,6 +13,7 @@ from ..db.models import Document, Passage
 from ..models.base import APIModel
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from ..retriever.hybrid import hybrid_search
+from ..telemetry import instrument_workflow, log_workflow_event, set_span_attribute
 from .clients import GenerationError
 from .registry import LLMRegistry, get_llm_registry
 
@@ -260,47 +261,71 @@ def generate_verse_brief(
     recorder: "TrailRecorder | None" = None,
 ) -> VerseCopilotResponse:
     filters = filters or HybridSearchFilters()
-    results = _search(session, query=question or osis, osis=osis, filters=filters)
-    registry = get_llm_registry(session)
-    if recorder:
-        recorder.log_step(
-            tool="hybrid_search",
-            action="retrieve_passages",
-            input_payload={
-                "query": question or osis,
-                "osis": osis,
-                "filters": filters,
-            },
-            output_payload=[
-                {
-                    "id": result.id,
-                    "osis": result.osis_ref,
-                    "document_id": result.document_id,
-                    "score": getattr(result, "score", None),
-                    "snippet": result.snippet,
-                }
-                for result in results
-            ],
-            output_digest=f"{len(results)} passages",
-        )
-    answer = _guarded_answer(
-        session,
-        question=question,
-        results=results,
-        registry=registry,
+    with instrument_workflow(
+        "verse_copilot",
+        osis=osis,
+        question_present=bool(question),
         model_hint=model_name,
-        recorder=recorder,
-    )
-    if recorder:
-        recorder.record_citations(answer.citations)
-    follow_ups = [
-        "Compare historical and contemporary commentary",
-        "Trace how this verse links to adjacent passages",
-        "Surface sermons that emphasise this verse",
-    ]
-    return VerseCopilotResponse(
-        osis=osis, question=question, answer=answer, follow_ups=follow_ups
-    )
+    ) as span:
+        set_span_attribute(
+            span,
+            "workflow.filters",
+            filters.model_dump(exclude_none=True),
+        )
+        results = _search(session, query=question or osis, osis=osis, filters=filters)
+        set_span_attribute(span, "workflow.result_count", len(results))
+        log_workflow_event(
+            "workflow.passages_retrieved",
+            workflow="verse_copilot",
+            osis=osis,
+            result_count=len(results),
+        )
+        registry = get_llm_registry(session)
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": question or osis,
+                    "osis": osis,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
+        answer = _guarded_answer(
+            session,
+            question=question,
+            results=results,
+            registry=registry,
+            model_hint=model_name,
+            recorder=recorder,
+        )
+        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        log_workflow_event(
+            "workflow.answer_composed",
+            workflow="verse_copilot",
+            citations=len(answer.citations),
+        )
+        if recorder:
+            recorder.record_citations(answer.citations)
+        follow_ups = [
+            "Compare historical and contemporary commentary",
+            "Trace how this verse links to adjacent passages",
+            "Surface sermons that emphasise this verse",
+        ]
+        return VerseCopilotResponse(
+            osis=osis, question=question, answer=answer, follow_ups=follow_ups
+        )
 
 
 def generate_sermon_prep_outline(
@@ -314,51 +339,75 @@ def generate_sermon_prep_outline(
 ) -> SermonPrepResponse:
     filters = filters or HybridSearchFilters()
     query = topic if not osis else f"{topic} {osis}"
-    results = _search(session, query=query, osis=osis, filters=filters, k=10)
-    registry = get_llm_registry(session)
-    if recorder:
-        recorder.log_step(
-            tool="hybrid_search",
-            action="retrieve_passages",
-            input_payload={
-                "query": query,
-                "osis": osis,
-                "filters": filters,
-            },
-            output_payload=[
-                {
-                    "id": result.id,
-                    "osis": result.osis_ref,
-                    "document_id": result.document_id,
-                    "score": getattr(result, "score", None),
-                    "snippet": result.snippet,
-                }
-                for result in results
-            ],
-            output_digest=f"{len(results)} passages",
-        )
-    answer = _guarded_answer(
-        session,
-        question=query,
-        results=results,
-        registry=registry,
+    with instrument_workflow(
+        "sermon_prep",
+        topic=topic,
+        has_osis=bool(osis),
         model_hint=model_name,
-        recorder=recorder,
-    )
-    if recorder:
-        recorder.record_citations(answer.citations)
-    outline = [
-        "Opening: situate the passage within the wider canon",
-        "Exposition: unpack key theological moves in the passages",
-        "Application: connect the insights to contemporary discipleship",
-        "Closing: invite response grounded in the cited witnesses",
-    ]
-    key_points = [
-        f"{citation.osis}: {citation.snippet}" for citation in answer.citations[:4]
-    ]
-    return SermonPrepResponse(
-        topic=topic, osis=osis, outline=outline, key_points=key_points, answer=answer
-    )
+    ) as span:
+        set_span_attribute(
+            span,
+            "workflow.filters",
+            filters.model_dump(exclude_none=True),
+        )
+        results = _search(session, query=query, osis=osis, filters=filters, k=10)
+        set_span_attribute(span, "workflow.result_count", len(results))
+        log_workflow_event(
+            "workflow.passages_retrieved",
+            workflow="sermon_prep",
+            topic=topic,
+            result_count=len(results),
+        )
+        registry = get_llm_registry(session)
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": query,
+                    "osis": osis,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
+        answer = _guarded_answer(
+            session,
+            question=query,
+            results=results,
+            registry=registry,
+            model_hint=model_name,
+            recorder=recorder,
+        )
+        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        log_workflow_event(
+            "workflow.answer_composed",
+            workflow="sermon_prep",
+            citations=len(answer.citations),
+        )
+        if recorder:
+            recorder.record_citations(answer.citations)
+        outline = [
+            "Opening: situate the passage within the wider canon",
+            "Exposition: unpack key theological moves in the passages",
+            "Application: connect the insights to contemporary discipleship",
+            "Closing: invite response grounded in the cited witnesses",
+        ]
+        key_points = [
+            f"{citation.osis}: {citation.snippet}" for citation in answer.citations[:4]
+        ]
+        return SermonPrepResponse(
+            topic=topic, osis=osis, outline=outline, key_points=key_points, answer=answer
+        )
 
 
 def generate_comparative_analysis(
@@ -369,28 +418,52 @@ def generate_comparative_analysis(
     model_name: str | None = None,
 ) -> ComparativeAnalysisResponse:
     filters = HybridSearchFilters()
-    results = _search(
-        session, query="; ".join(participants), osis=osis, filters=filters, k=12
-    )
-    registry = get_llm_registry(session)
-    answer = _guarded_answer(
-        session,
-        question=f"How do {', '.join(participants)} interpret {osis}?",
-        results=results,
-        registry=registry,
-        model_hint=model_name,
-    )
-    comparisons = []
-    for citation in answer.citations:
-        comparisons.append(
-            f"{citation.document_title or citation.document_id}: {citation.snippet}"
-        )
-    return ComparativeAnalysisResponse(
+    with instrument_workflow(
+        "comparative_analysis",
         osis=osis,
-        participants=list(participants),
-        comparisons=comparisons,
-        answer=answer,
-    )
+        participant_count=len(participants),
+        model_hint=model_name,
+    ) as span:
+        set_span_attribute(
+            span,
+            "workflow.participants",
+            list(participants),
+        )
+        results = _search(
+            session, query="; ".join(participants), osis=osis, filters=filters, k=12
+        )
+        set_span_attribute(span, "workflow.result_count", len(results))
+        log_workflow_event(
+            "workflow.passages_retrieved",
+            workflow="comparative_analysis",
+            osis=osis,
+            result_count=len(results),
+        )
+        registry = get_llm_registry(session)
+        answer = _guarded_answer(
+            session,
+            question=f"How do {', '.join(participants)} interpret {osis}?",
+            results=results,
+            registry=registry,
+            model_hint=model_name,
+        )
+        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        log_workflow_event(
+            "workflow.answer_composed",
+            workflow="comparative_analysis",
+            citations=len(answer.citations),
+        )
+        comparisons = []
+        for citation in answer.citations:
+            comparisons.append(
+                f"{citation.document_title or citation.document_id}: {citation.snippet}"
+            )
+        return ComparativeAnalysisResponse(
+            osis=osis,
+            participants=list(participants),
+            comparisons=comparisons,
+            answer=answer,
+        )
 
 
 def generate_multimedia_digest(
@@ -402,22 +475,39 @@ def generate_multimedia_digest(
     filters = HybridSearchFilters(
         collection=collection, source_type="audio" if collection else None
     )
-    results = _search(session, query="highlights", osis=None, filters=filters, k=8)
-    registry = get_llm_registry(session)
-    answer = _guarded_answer(
-        session,
-        question="What are the key audio/video insights?",
-        results=results,
-        registry=registry,
+    with instrument_workflow(
+        "multimedia_digest",
+        collection=collection or "all",
         model_hint=model_name,
-    )
-    highlights = [
-        f"{citation.document_title or citation.document_id}: {citation.snippet}"
-        for citation in answer.citations
-    ]
-    return MultimediaDigestResponse(
-        collection=collection, highlights=highlights, answer=answer
-    )
+    ) as span:
+        set_span_attribute(
+            span,
+            "workflow.filters",
+            filters.model_dump(exclude_none=True),
+        )
+        results = _search(session, query="highlights", osis=None, filters=filters, k=8)
+        set_span_attribute(span, "workflow.result_count", len(results))
+        log_workflow_event(
+            "workflow.passages_retrieved",
+            workflow="multimedia_digest",
+            result_count=len(results),
+        )
+        registry = get_llm_registry(session)
+        answer = _guarded_answer(
+            session,
+            question="What are the key audio/video insights?",
+            results=results,
+            registry=registry,
+            model_hint=model_name,
+        )
+        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        highlights = [
+            f"{citation.document_title or citation.document_id}: {citation.snippet}"
+            for citation in answer.citations
+        ]
+        return MultimediaDigestResponse(
+            collection=collection, highlights=highlights, answer=answer
+        )
 
 
 def generate_devotional_flow(
@@ -428,27 +518,51 @@ def generate_devotional_flow(
     model_name: str | None = None,
 ) -> DevotionalResponse:
     filters = HybridSearchFilters()
-    results = _search(session, query=focus, osis=osis, filters=filters, k=6)
-    registry = get_llm_registry(session)
-    answer = _guarded_answer(
-        session,
-        question=f"Devotional focus: {focus}",
-        results=results,
-        registry=registry,
+    with instrument_workflow(
+        "devotional",
+        osis=osis,
+        focus=focus,
         model_hint=model_name,
-    )
-    reflection = "\n".join(
-        f"Reflect on {citation.osis} ({citation.anchor}): {citation.snippet}"
-        for citation in answer.citations[:3]
-    )
-    prayer_lines = [
-        f"Spirit, help me embody {citation.snippet}"
-        for citation in answer.citations[:2]
-    ]
-    prayer = "\n".join(prayer_lines)
-    return DevotionalResponse(
-        osis=osis, focus=focus, reflection=reflection, prayer=prayer, answer=answer
-    )
+    ) as span:
+        set_span_attribute(
+            span,
+            "workflow.filters",
+            filters.model_dump(exclude_none=True),
+        )
+        results = _search(session, query=focus, osis=osis, filters=filters, k=6)
+        set_span_attribute(span, "workflow.result_count", len(results))
+        log_workflow_event(
+            "workflow.passages_retrieved",
+            workflow="devotional",
+            osis=osis,
+            result_count=len(results),
+        )
+        registry = get_llm_registry(session)
+        answer = _guarded_answer(
+            session,
+            question=f"Devotional focus: {focus}",
+            results=results,
+            registry=registry,
+            model_hint=model_name,
+        )
+        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        log_workflow_event(
+            "workflow.answer_composed",
+            workflow="devotional",
+            citations=len(answer.citations),
+        )
+        reflection = "\n".join(
+            f"Reflect on {citation.osis} ({citation.anchor}): {citation.snippet}"
+            for citation in answer.citations[:3]
+        )
+        prayer_lines = [
+            f"Spirit, help me embody {citation.snippet}"
+            for citation in answer.citations[:2]
+        ]
+        prayer = "\n".join(prayer_lines)
+        return DevotionalResponse(
+            osis=osis, focus=focus, reflection=reflection, prayer=prayer, answer=answer
+        )
 
 
 def run_corpus_curation(
@@ -456,31 +570,43 @@ def run_corpus_curation(
     *,
     since: datetime | None = None,
 ) -> CorpusCurationReport:
-    if since is None:
-        since = datetime.now(UTC) - timedelta(days=7)
-    rows = (
-        session.execute(
-            select(Document)
-            .where(Document.created_at >= since)
-            .order_by(Document.created_at.asc())
+    with instrument_workflow(
+        "corpus_curation",
+        since=since.isoformat() if since else "auto-7d",
+    ) as span:
+        if since is None:
+            since = datetime.now(UTC) - timedelta(days=7)
+        set_span_attribute(span, "workflow.effective_since", since.isoformat())
+        rows = (
+            session.execute(
+                select(Document)
+                .where(Document.created_at >= since)
+                .order_by(Document.created_at.asc())
+            )
+            .scalars()
+            .all()
         )
-        .scalars()
-        .all()
-    )
-    summaries: list[str] = []
-    for document in rows:
-        primary_topic = None
-        if document.bib_json and isinstance(document.bib_json, dict):
-            primary_topic = document.bib_json.get("primary_topic")
-        if isinstance(document.topics, list) and not primary_topic:
-            primary_topic = document.topics[0] if document.topics else None
-        topic_label = primary_topic or "Uncategorised"
-        summaries.append(
-            f"{document.title or document.id} — {topic_label} ({document.collection or 'general'})"
+        set_span_attribute(span, "workflow.documents_processed", len(rows))
+        log_workflow_event(
+            "workflow.documents_loaded",
+            workflow="corpus_curation",
+            count=len(rows),
         )
-    return CorpusCurationReport(
-        since=since, documents_processed=len(rows), summaries=summaries
-    )
+        summaries: list[str] = []
+        for document in rows:
+            primary_topic = None
+            if document.bib_json and isinstance(document.bib_json, dict):
+                primary_topic = document.bib_json.get("primary_topic")
+            if isinstance(document.topics, list) and not primary_topic:
+                primary_topic = document.topics[0] if document.topics else None
+            topic_label = primary_topic or "Uncategorised"
+            summaries.append(
+                f"{document.title or document.id} — {topic_label} ({document.collection or 'general'})"
+            )
+        set_span_attribute(span, "workflow.summary_count", len(summaries))
+        return CorpusCurationReport(
+            since=since, documents_processed=len(rows), summaries=summaries
+        )
 
 
 def run_research_reconciliation(
@@ -492,24 +618,49 @@ def run_research_reconciliation(
     model_name: str | None = None,
 ) -> CollaborationResponse:
     filters = HybridSearchFilters()
-    results = _search(
-        session, query="; ".join(viewpoints), osis=osis, filters=filters, k=10
-    )
-    registry = get_llm_registry(session)
-    answer = _guarded_answer(
-        session,
-        question=f"Reconcile viewpoints for {osis} in {thread}",
-        results=results,
-        registry=registry,
+    with instrument_workflow(
+        "research_reconciliation",
+        thread=thread,
+        osis=osis,
+        viewpoint_count=len(viewpoints),
         model_hint=model_name,
-    )
-    synthesis_lines = [
-        f"{citation.osis}: {citation.snippet}" for citation in answer.citations
-    ]
-    synthesized_view = "\n".join(synthesis_lines)
-    return CollaborationResponse(
-        thread=thread, synthesized_view=synthesized_view, answer=answer
-    )
+    ) as span:
+        set_span_attribute(
+            span,
+            "workflow.viewpoints",
+            list(viewpoints),
+        )
+        results = _search(
+            session, query="; ".join(viewpoints), osis=osis, filters=filters, k=10
+        )
+        set_span_attribute(span, "workflow.result_count", len(results))
+        log_workflow_event(
+            "workflow.passages_retrieved",
+            workflow="research_reconciliation",
+            thread=thread,
+            result_count=len(results),
+        )
+        registry = get_llm_registry(session)
+        answer = _guarded_answer(
+            session,
+            question=f"Reconcile viewpoints for {osis} in {thread}",
+            results=results,
+            registry=registry,
+            model_hint=model_name,
+        )
+        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        log_workflow_event(
+            "workflow.answer_composed",
+            workflow="research_reconciliation",
+            citations=len(answer.citations),
+        )
+        synthesis_lines = [
+            f"{citation.osis}: {citation.snippet}" for citation in answer.citations
+        ]
+        synthesized_view = "\n".join(synthesis_lines)
+        return CollaborationResponse(
+            thread=thread, synthesized_view=synthesized_view, answer=answer
+        )
 
 
 def build_sermon_prep_package(

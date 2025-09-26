@@ -20,8 +20,16 @@ else:  # pragma: no cover - used only at runtime
     from .base import APIModel
 
 
+try:  # pragma: no cover - Python 3.12+
+    from typing import TypeAliasType
+except ImportError:  # pragma: no cover - fallback for older typing
+    from typing_extensions import TypeAliasType
+
 JSONScalar = str | int | float | bool | None
-JSONValue = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
+JSONValue = TypeAliasType(
+    "JSONValue",
+    JSONScalar | list["JSONValue"] | dict[str, "JSONValue"],
+)
 JSONDict: TypeAlias = dict[str, JSONValue]
 
 
