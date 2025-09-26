@@ -30,7 +30,13 @@ def _extract_topics(document: Document) -> list[str]:
             topics.extend(str(item) for item in document.topics)
         elif isinstance(document.topics, dict):
             topics.extend(str(value) for value in document.topics.values())
-    return [topic for topic in topics if topic]
+    unique_topics: list[str] = []
+    seen: set[str] = set()
+    for topic in topics:
+        if topic and topic not in seen:
+            seen.add(topic)
+            unique_topics.append(topic)
+    return unique_topics
 
 
 class TopicCluster(APIModel):
@@ -70,10 +76,10 @@ def generate_topic_digest(
         .scalars()
         .all()
     )
-    topic_documents: dict[str, list[str]] = defaultdict(list)
+    topic_documents: dict[str, set[str]] = defaultdict(set)
     for document in rows:
         for topic in _extract_topics(document):
-            topic_documents[topic].append(document.id)
+            topic_documents[topic].add(document.id)
 
     if not topic_documents:
         return TopicDigest(
@@ -85,13 +91,14 @@ def generate_topic_digest(
     for topic, ids in sorted(
         topic_documents.items(), key=lambda item: (-len(item[1]), item[0])
     ):
+        doc_ids = sorted(ids)
         total = historical.get(topic, 0)
         clusters.append(
             TopicCluster(
                 topic=topic,
-                new_documents=len(ids),
+                new_documents=len(doc_ids),
                 total_documents=total,
-                document_ids=ids,
+                document_ids=doc_ids,
             )
         )
 
