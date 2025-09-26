@@ -13,6 +13,8 @@ import click
 from sqlalchemy.orm import Session
 
 from ..api.app.core.database import get_engine
+from ..api.app.db.models import Document
+from ..api.app.enrich import MetadataEnricher
 from ..api.app.ingest.pipeline import run_pipeline_for_file
 from ..api.app.workers import tasks as worker_tasks
 
@@ -97,7 +99,36 @@ def _batched(iterable: Iterable[FolderItem], size: int) -> Iterator[list[FolderI
         yield batch
 
 
-def _ingest_batch_via_api(batch: list[FolderItem], overrides: dict[str, object]) -> list[str]:
+def _run_post_batch_operations(
+    session: Session,
+    document_ids: list[str],
+    steps: set[str],
+) -> None:
+    if not steps:
+        return
+
+    if "tags" in steps:
+        enricher = MetadataEnricher()
+        click.echo("   Running post-batch step: tags")
+        for doc_id in document_ids:
+            document = session.get(Document, doc_id)
+            if document is None:
+                click.echo(f"     [post-batch:tags] skipped missing document {doc_id}")
+                continue
+            try:
+                enriched = enricher.enrich_document(session, document)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                click.echo(f"     [post-batch:tags] failed for {doc_id}: {exc}", err=True)
+                continue
+            status = "enriched" if enriched else "no updates"
+            click.echo(f"     [post-batch:tags] {status} for {doc_id}")
+
+
+def _ingest_batch_via_api(
+    batch: list[FolderItem],
+    overrides: dict[str, object],
+    post_batch_steps: set[str] | None = None,
+) -> list[str]:
     engine = get_engine()
     document_ids: list[str] = []
     with Session(engine) as session:
@@ -105,6 +136,8 @@ def _ingest_batch_via_api(batch: list[FolderItem], overrides: dict[str, object])
             frontmatter = dict(overrides)
             document = run_pipeline_for_file(session, item.path, frontmatter)
             document_ids.append(document.id)
+        if post_batch_steps:
+            _run_post_batch_operations(session, document_ids, post_batch_steps)
     return document_ids
 
 
@@ -140,6 +173,13 @@ def _queue_batch_via_worker(batch: list[FolderItem], overrides: dict[str, object
     multiple=True,
     help="Metadata overrides applied to every file (key=value, JSON values allowed).",
 )
+@click.option(
+    "--post-batch",
+    "post_batch_steps",
+    type=click.Choice(["tags"], case_sensitive=False),
+    multiple=True,
+    help="Run post-ingest operations after each API batch (e.g. tags).",
+)
 def ingest_folder(
     path: Path,
     *,
@@ -147,11 +187,13 @@ def ingest_folder(
     batch_size: int,
     dry_run: bool,
     metadata_overrides: tuple[str, ...],
+    post_batch_steps: tuple[str, ...],
 ) -> None:
     """Queue every supported file in PATH for ingestion."""
 
     overrides = _parse_metadata_overrides(metadata_overrides)
     items = list(_walk_folder(path))
+    normalized_post_batch = {step.lower() for step in post_batch_steps}
     if not items:
         click.echo("No supported files found.")
         return
@@ -167,10 +209,12 @@ def ingest_folder(
             continue
 
         if mode.lower() == "api":
-            document_ids = _ingest_batch_via_api(batch, overrides)
+            document_ids = _ingest_batch_via_api(batch, overrides, normalized_post_batch)
             for item, doc_id in zip(batch, document_ids):
                 click.echo(f"   Processed {item.path} → document {doc_id}")
         else:
+            if normalized_post_batch:
+                click.echo("   Post-batch steps require API mode; skipping.")
             task_ids = _queue_batch_via_worker(batch, overrides)
             for item, task_id in zip(batch, task_ids):
                 click.echo(f"   Queued {item.path} → task {task_id}")
