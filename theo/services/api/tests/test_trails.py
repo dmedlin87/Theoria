@@ -56,6 +56,7 @@ def test_trail_persistence_and_replay() -> None:
         trail_response = client.get(f"/trails/{trail_id}")
         assert trail_response.status_code == 200
         trail_payload = trail_response.json()
+        assert trail_payload["status"] == "completed"
         assert trail_payload["steps"], trail_payload
         assert any(step["tool"] == "llm.generate" for step in trail_payload["steps"])
         assert trail_payload["sources"], trail_payload
