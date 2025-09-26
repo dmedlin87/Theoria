@@ -58,7 +58,8 @@
 - **Morph & Interlinear** - lemma, parsing, glosses.
 - **Historical Context** - timeline card (who/when/where), brief summaries, links to external sources; show DSS links when relevant.
 - **Contradictions & Harmonies** - known entries with citations, plus user/vetted notes.
-- **Commentaries & Perspectives** - tabs for "Apologetic" vs "Critical" (e.g., Bart D. Ehrman) with side-by-side arguments.
+- **Commentaries & Perspectives** - tabs for "Apologetic" vs "Critical" (e.g., Bart D. Ehrman) with side-by-side arguments, now
+  backed by cached creator verse rollups so quotes and stance summaries load instantly when a verse chip is opened.
 - **Study Notes (Living)** - your structured notes: claims, fallacies flagged, verdicts, sources; all OSIS-anchored.
 
 **Ergonomics**

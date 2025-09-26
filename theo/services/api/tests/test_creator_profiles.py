@@ -5,6 +5,7 @@ import json
 from fastapi.testclient import TestClient
 
 from theo.services.api.app.main import app
+from theo.services.api.app.core import settings as settings_module
 
 SAMPLE_VTT = """WEBVTT
 
@@ -16,16 +17,22 @@ We also draw from Matthew 28:19 to discuss discipleship.
 """
 
 
-def _ingest_sample_transcript(client: TestClient) -> str:
+def _ingest_sample_transcript(client: TestClient, *, salt: str | None = None) -> str:
+    transcript_body = SAMPLE_VTT
+    if salt:
+        transcript_body = SAMPLE_VTT.replace("Baptism", f"Baptism {salt}")
+
     frontmatter = {
-        "title": "Baptism Teaching",
+        "title": "Baptism Teaching" if not salt else f"Baptism Teaching {salt}",
         "collection": "teachings",
         "creator": "Wes Huff",
         "channel": "Apologia",
         "creator_tags": ["apologetics", "youtube"],
         "creator_bio": "Apologist and teacher.",
-        "video_id": "abc123",
-        "source_url": "https://youtu.be/abc123",
+        "video_id": "abc123" if not salt else f"abc123-{salt}",
+        "source_url": "https://youtu.be/abc123"
+        if not salt
+        else f"https://youtu.be/abc123?{salt}",
         "published_at": "2024-05-12T00:00:00Z",
         "duration_seconds": 120,
         "topics": ["Baptism", "Grace"],
@@ -34,7 +41,7 @@ def _ingest_sample_transcript(client: TestClient) -> str:
     }
     response = client.post(
         "/ingest/transcript",
-        files={"transcript": ("teaching.vtt", SAMPLE_VTT, "text/vtt")},
+        files={"transcript": ("teaching.vtt", transcript_body, "text/vtt")},
         data={"frontmatter": json.dumps(frontmatter)},
     )
     assert response.status_code == 200, response.text
@@ -74,3 +81,44 @@ def test_creator_profile_endpoints_surface_quotes() -> None:
         first_segment = t_payload["segments"][0]
         assert first_segment["primary_osis"] == "John.3.5"
         assert "abc123" in (first_segment["source_ref"] or "")
+
+
+def test_creator_verse_perspectives_endpoint() -> None:
+    with TestClient(app) as client:
+        _ingest_sample_transcript(client, salt="perspectives")
+
+        response = client.get(
+            "/creators/verses",
+            params={"osis": "John.3.5", "limit_creators": 5, "limit_quotes": 2},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["osis"] == "John.3.5"
+        assert payload["total_creators"] >= 1
+        assert payload["creators"], "Expected at least one creator perspective"
+        first_creator = payload["creators"][0]
+        assert first_creator["quotes"], "Expected at least one quote for the creator"
+        meta = payload.get("meta")
+        assert meta and meta["range"] == "John.3.5"
+        assert meta.get("generated_at")
+
+
+def test_creator_verse_perspectives_respects_feature_flag() -> None:
+    with TestClient(app) as client:
+        _ingest_sample_transcript(client, salt="flag")
+
+        settings = settings_module.get_settings()
+        original = settings.creator_verse_perspectives_enabled
+        settings.creator_verse_perspectives_enabled = False
+        try:
+            response = client.get(
+                "/creators/verses",
+                params={"osis": "John.3.5"},
+            )
+            assert response.status_code == 200, response.text
+            payload = response.json()
+            assert payload["creators"] == []
+            assert payload["total_creators"] == 0
+            assert payload.get("meta") is None
+        finally:
+            settings.creator_verse_perspectives_enabled = original

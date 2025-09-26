@@ -28,5 +28,8 @@ def discovery() -> dict[str, dict[str, bool]]:
             "research": True,
             "contradictions": getattr(settings, "contradictions_enabled", False),
             "geo": getattr(settings, "geo_enabled", False),
+            "creator_verse_perspectives": getattr(
+                settings, "creator_verse_perspectives_enabled", False
+            ),
         }
     }

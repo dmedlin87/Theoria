@@ -207,6 +207,65 @@ Response:
 }
 ```
 
+## Creator perspectives
+
+Creator endpoints surface stance summaries and timestamped quotes for creators
+who mention a given verse or short range. The feature is guarded by the
+`creator_verse_perspectives` flag returned from `/features/discovery`.
+
+### `GET /creators/verses`
+
+Aggregate creators and their quotes for an OSIS reference. Query parameters:
+
+| Parameter        | Type | Description                                                    |
+| ---------------- | ---- | -------------------------------------------------------------- |
+| `osis`           | str  | Required OSIS reference or short range (e.g., `John.1.1-John.1.3`). |
+| `limit_creators` | int  | Optional maximum creators to return (default 10, max 50).      |
+| `limit_quotes`   | int  | Optional maximum quotes per creator (default 3, max 10).       |
+
+Response:
+
+```json
+{
+  "osis": "John.1.1",
+  "total_creators": 2,
+  "creators": [
+    {
+      "creator_id": "cr_123",
+      "creator_name": "A. Scholar",
+      "stance": "apologetic",
+      "confidence": 0.62,
+      "claim_count": 5,
+      "stance_distribution": {"apologetic": 4, "neutral": 1},
+      "quotes": [
+        {
+          "segment_id": "seg_456",
+          "quote_md": "_In the beginning_ reflects...",
+          "source_ref": "youtube:abc123#t=252",
+          "osis_refs": ["John.1.1"],
+          "video": {
+            "video_id": "abc123",
+            "title": "Logos and Creation",
+            "url": "https://youtu.be/abc123",
+            "t_start": 252.0
+          }
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "range": "John.1.1",
+    "generated_at": "2025-02-14T12:00:00Z"
+  }
+}
+```
+
+### `GET /creators/verses/{osis}`
+
+Path-based variant that accepts the OSIS reference as part of the URL. Query
+parameters `limit_creators` and `limit_quotes` behave the same as the collection
+endpoint.
+
 ## Research dock
 
 Research endpoints power the study/reader dock. They respect feature flags

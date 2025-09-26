@@ -441,6 +441,38 @@ class TranscriptQuote(Base):
     )
 
 
+class CreatorVerseRollup(Base):
+    """Cached aggregation of creator perspectives for a verse or short range."""
+
+    __tablename__ = "creator_verse_rollups"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    osis: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    creator_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("creators.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    stance_counts: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    avg_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    claim_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    top_quote_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    creator: Mapped[Creator] = relationship("Creator")
+
+
 class CrossReference(Base):
     """Graph edge linking two OSIS references together."""
 
