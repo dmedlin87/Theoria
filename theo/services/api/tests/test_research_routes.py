@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import Query, Session
 
 from theo.services.api.app.core import settings as settings_module
 from theo.services.api.app.main import app
+from theo.services.api.app.research.notes import get_notes_for_osis
 
 
 def test_scripture_endpoint_returns_range() -> None:
@@ -185,3 +191,28 @@ def test_flags_off_returns_empty_items_but_200() -> None:
     finally:
         settings.contradictions_enabled = original_contra
         settings.geo_enabled = original_geo
+
+
+def test_get_notes_tag_filter_executes_with_postgres_dialect() -> None:
+    compiled_sql: list[str] = []
+    dialect = postgresql.dialect()
+
+    original_all = Query.all
+
+    def compile_with_postgres(self: Query) -> list[Any]:
+        compiled = self.statement.compile(dialect=dialect)
+        compiled_sql.append(str(compiled))
+        return []
+
+    Query.all = compile_with_postgres
+    engine = create_engine("sqlite://")
+    try:
+        with Session(engine) as session:
+            results = get_notes_for_osis(session, osis="John.1.1", tag="Prologue")
+            assert results == []
+    finally:
+        Query.all = original_all
+        engine.dispose()
+
+    assert compiled_sql, "Expected SQL to be compiled against Postgres dialect"
+    assert "lower(cast(" in compiled_sql[0].lower()
