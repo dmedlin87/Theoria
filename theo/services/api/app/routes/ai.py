@@ -34,7 +34,13 @@ from ..models.ai import (
 )
 from ..models.ai import LLMModelRequest, TranscriptExportRequest
 from ..ai.registry import LLMModel, get_llm_registry, save_llm_registry
-from ..analytics.topics import TopicDigest, generate_topic_digest, load_topic_digest, store_topic_digest
+from ..analytics.topics import (
+    TopicDigest,
+    generate_topic_digest,
+    load_topic_digest,
+    store_topic_digest,
+    upsert_digest_document,
+)
 
 router = APIRouter()
 
@@ -231,6 +237,7 @@ def get_topic_digest(session: Session = Depends(get_session)):
     digest = load_topic_digest(session)
     if digest is None:
         digest = generate_topic_digest(session)
+        upsert_digest_document(session, digest)
         store_topic_digest(session, digest)
     return digest
 
@@ -242,6 +249,7 @@ def refresh_topic_digest(
 ):
     since = datetime.now(UTC) - timedelta(hours=hours)
     digest = generate_topic_digest(session, since)
+    upsert_digest_document(session, digest)
     store_topic_digest(session, digest)
     return digest
 

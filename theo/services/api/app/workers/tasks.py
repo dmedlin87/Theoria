@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ..core.database import get_engine
 from ..core.settings import get_settings
 from ..db.models import Document, IngestionJob
-from ..analytics.topics import generate_topic_digest, store_topic_digest
+from ..analytics.topics import generate_topic_digest, store_topic_digest, upsert_digest_document
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
 
@@ -145,6 +145,22 @@ def enrich_document(document_id: str, job_id: str | None = None) -> None:
             raise
 
 
+@celery.task(name="tasks.send_topic_digest_notification")
+def send_topic_digest_notification(
+    digest_document_id: str, recipients: list[str], context: dict[str, Any] | None = None
+) -> None:
+    """Dispatch notifications that a topic digest is ready."""
+
+    logger.info(
+        "Dispatching topic digest notification",
+        extra={
+            "document_id": digest_document_id,
+            "recipients": recipients,
+            "context": context or {},
+        },
+    )
+
+
 @celery.task(name="tasks.generate_topic_digest")
 def topic_digest(
     hours: int = 168,
@@ -176,6 +192,7 @@ def topic_digest(
 
         try:
             digest = generate_topic_digest(session, window_start)
+            digest_document = upsert_digest_document(session, digest)
             store_topic_digest(session, digest)
 
             if job_id:
@@ -183,9 +200,19 @@ def topic_digest(
                 session.commit()
 
             if notify:
+                context = {
+                    "generated_at": digest.generated_at.isoformat(),
+                    "window_start": window_start.isoformat(),
+                    "topics": [cluster.topic for cluster in digest.topics],
+                }
+                send_topic_digest_notification.delay(digest_document.id, notify, context)
                 logger.info(
                     "Topic digest ready for notification",
-                    extra={"recipients": notify, "since": window_start.isoformat()},
+                    extra={
+                        "recipients": notify,
+                        "since": window_start.isoformat(),
+                        "document_id": digest_document.id,
+                    },
                 )
             logger.info(
                 "Generated topic digest",

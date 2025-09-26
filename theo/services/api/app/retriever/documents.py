@@ -147,6 +147,20 @@ def get_document_passages(
     )
 
 
+def get_latest_digest_document(session: Session) -> DocumentDetailResponse:
+    """Return the most recently generated topic digest document."""
+
+    digest = (
+        session.query(Document)
+        .filter(Document.source_type == "digest")
+        .order_by(Document.created_at.desc())
+        .first()
+    )
+    if digest is None:
+        raise KeyError("No topic digest document available")
+    return get_document(session, digest.id)
+
+
 def update_document(
     session: Session,
     document_id: str,

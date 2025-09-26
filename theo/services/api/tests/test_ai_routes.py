@@ -98,6 +98,15 @@ def test_topic_digest_generation() -> None:
         assert payload["topics"]
         assert payload["topics"][0]["topic"] == "Pauline eschatology"
 
+        digest_document_response = client.get("/documents/digest")
+        assert digest_document_response.status_code == 200
+        digest_document = digest_document_response.json()
+        assert digest_document["source_type"] == "digest"
+        assert digest_document["topics"] == ["Pauline eschatology"]
+        clusters = digest_document["meta"]["clusters"]
+        assert clusters
+        assert "doc-1" in clusters[0]["document_ids"]
+
 
 def test_batch_intel_cli(tmp_path) -> None:
     _seed_corpus()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -105,15 +106,46 @@ def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
     Base.metadata.create_all(engine)
 
     with Session(engine) as session:
+        source = Document(
+            id="source-doc",
+            title="Digest Source",
+            source_type="markdown",
+            bib_json={"primary_topic": "Digest Topic"},
+        )
+        session.add(source)
         job = IngestionJob(job_type="topic_digest", status="queued")
         session.add(job)
         session.commit()
         job_id = job.id
 
-    tasks.topic_digest.run(hours=1, job_id=job_id)
+    captured: dict[str, Any] = {}
+
+    def fake_delay(document_id: str, recipients: list[str], context: dict[str, Any] | None = None):
+        captured["document_id"] = document_id
+        captured["recipients"] = recipients
+        captured["context"] = context or {}
+
+    original_delay = tasks.send_topic_digest_notification.delay
+    tasks.send_topic_digest_notification.delay = fake_delay
+    try:
+        tasks.topic_digest.run(hours=1, job_id=job_id, notify=["alerts@example.com"])
+    finally:
+        tasks.send_topic_digest_notification.delay = original_delay
 
     with Session(engine) as session:
         updated = session.get(IngestionJob, job_id)
+        digest_doc = (
+            session.query(Document)
+            .filter(Document.source_type == "digest")
+            .order_by(Document.created_at.desc())
+            .first()
+        )
 
     assert updated is not None
     assert updated.status == "completed"
+    assert digest_doc is not None
+    assert digest_doc.topics == ["Digest Topic"]
+    assert digest_doc.bib_json["clusters"][0]["document_ids"] == ["source-doc"]
+    assert captured["recipients"] == ["alerts@example.com"]
+    assert captured["document_id"] == digest_doc.id
+    assert "Digest Topic" in captured["context"].get("topics", [])
