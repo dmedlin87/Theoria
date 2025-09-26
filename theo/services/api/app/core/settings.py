@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     openai_base_url: str | None = Field(
         default=None, description="Override base URL for OpenAI-compatible APIs"
     )
+    notification_webhook_url: str | None = Field(
+        default=None,
+        description="Endpoint for dispatching notification webhooks",
+    )
+    notification_webhook_headers: dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional HTTP headers applied to webhook notifications",
+    )
+    notification_timeout_seconds: float = Field(
+        default=10.0, description="HTTP timeout when delivering notifications"
+    )
     contradictions_enabled: bool = Field(
         default=True, description="Toggle contradiction search endpoints"
     )

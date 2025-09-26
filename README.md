@@ -23,6 +23,16 @@ pip install -r requirements.txt
 
 After the dependencies are installed you can run `pytest` from the repository root to execute the automated test suite.
 
+## Configuring topic digest notifications
+
+Background workers can send a webhook each time a topic digest is generated. Configure the delivery endpoint via environment variables (they map directly to fields in `Settings`).
+
+- `NOTIFICATION_WEBHOOK_URL` – required to enable delivery. When unset the worker logs the attempt and skips dispatching.
+- `NOTIFICATION_WEBHOOK_HEADERS` – optional JSON object of extra HTTP headers (for example `{ "Authorization": "Bearer …" }`).
+- `NOTIFICATION_TIMEOUT_SECONDS` – optional float override for the HTTP timeout (defaults to 10 seconds).
+
+Each notification POST includes the digest document identifier, the recipient list supplied to the task, and any extra context so downstream systems can format the alert.
+
 ## Running the Web UI (Next.js frontend)
 
 The Next.js application lives under `theo/services/web` (there is **no** `package.json` at the repository root). If you run `npm run dev` from the root you will see an error similar to:
