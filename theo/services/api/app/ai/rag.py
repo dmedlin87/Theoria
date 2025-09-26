@@ -311,6 +311,7 @@ def generate_verse_brief(
             recorder=recorder,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        set_span_attribute(span, "workflow.summary_length", len(answer.summary))
         log_workflow_event(
             "workflow.answer_composed",
             workflow="verse_copilot",
@@ -323,6 +324,12 @@ def generate_verse_brief(
             "Trace how this verse links to adjacent passages",
             "Surface sermons that emphasise this verse",
         ]
+        set_span_attribute(span, "workflow.follow_up_count", len(follow_ups))
+        log_workflow_event(
+            "workflow.follow_ups_suggested",
+            workflow="verse_copilot",
+            follow_up_count=len(follow_ups),
+        )
         return VerseCopilotResponse(
             osis=osis, question=question, answer=answer, follow_ups=follow_ups
         )
@@ -389,6 +396,7 @@ def generate_sermon_prep_outline(
             recorder=recorder,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        set_span_attribute(span, "workflow.summary_length", len(answer.summary))
         log_workflow_event(
             "workflow.answer_composed",
             workflow="sermon_prep",
@@ -405,6 +413,18 @@ def generate_sermon_prep_outline(
         key_points = [
             f"{citation.osis}: {citation.snippet}" for citation in answer.citations[:4]
         ]
+        set_span_attribute(span, "workflow.outline_steps", len(outline))
+        set_span_attribute(span, "workflow.key_point_count", len(key_points))
+        log_workflow_event(
+            "workflow.outline_ready",
+            workflow="sermon_prep",
+            outline_steps=len(outline),
+        )
+        log_workflow_event(
+            "workflow.key_points_selected",
+            workflow="sermon_prep",
+            key_point_count=len(key_points),
+        )
         return SermonPrepResponse(
             topic=topic, osis=osis, outline=outline, key_points=key_points, answer=answer
         )
