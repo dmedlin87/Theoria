@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import Text, cast, func
 from sqlalchemy.orm import Session
 
 from ..db.models import NoteEvidence, ResearchNote
@@ -85,7 +85,7 @@ def get_notes_for_osis(
         tag_pattern = f'%"{tag.lower()}"%'
         query = query.filter(
             ResearchNote.tags.is_not(None),
-            func.lower(ResearchNote.tags).like(tag_pattern),
+            func.lower(cast(ResearchNote.tags, Text)).like(tag_pattern),
         )
 
     if min_confidence is not None:
