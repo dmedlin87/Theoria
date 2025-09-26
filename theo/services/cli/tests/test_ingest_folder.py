@@ -181,6 +181,66 @@ def test_post_batch_tags_runs_enricher(tmp_path, monkeypatch):
     assert "[post-batch:tags] enriched" in result.output
 
 
+def test_post_batch_multiple_steps_dispatches_followups(tmp_path, monkeypatch):
+    doc_path = tmp_path / "note.md"
+    doc_path.write_text("---\ntitle: Example\n---\nBody")
+
+    tag_calls: list[str] = []
+    biblio_calls: list[str] = []
+    summary_calls: list[tuple[str, dict[str, object] | None]] = []
+
+    class _FakeEnricher:
+        def enrich_document(self, session, document):
+            tag_calls.append(document.id)
+            return True
+
+    class _FakeAsyncResult(SimpleNamespace):
+        id: str | None
+
+    class _FakeEnrichTask:
+        def delay(self, document_id: str):
+            biblio_calls.append(document_id)
+            return _FakeAsyncResult(id=f"task-{document_id}")
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, url: str, json: dict[str, object] | None = None):
+            summary_calls.append((url, json))
+            return SimpleNamespace(status_code=202, text="accepted")
+
+    monkeypatch.setattr("theo.services.cli.ingest_folder.MetadataEnricher", _FakeEnricher)
+    monkeypatch.setattr(
+        "theo.services.cli.ingest_folder.worker_tasks.enrich_document",
+        _FakeEnrichTask(),
+    )
+    monkeypatch.setattr("theo.services.cli.ingest_folder.httpx.Client", _FakeClient)
+    monkeypatch.setenv("API_BASE_URL", "http://api.test")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        ingest_folder,
+        [str(doc_path), "--batch-size", "1", "--post-batch", "summaries,tags,biblio"],
+    )
+
+    assert result.exit_code == 0
+    assert tag_calls, "Expected tag enrichment to run"
+    assert biblio_calls == tag_calls
+    assert summary_calls
+    url, payload = summary_calls[0]
+    assert url == "http://api.test/jobs/summaries"
+    assert payload == {"document_id": tag_calls[0]}
+    assert "[post-batch:summaries] queued" in result.output
+    assert "[post-batch:biblio] queued task" in result.output
+
+
 def test_post_batch_skipped_for_worker_mode(tmp_path, monkeypatch):
     source = tmp_path / "lecture.json"
     source.write_text("{}")
@@ -220,3 +280,17 @@ def test_post_batch_skipped_for_worker_mode(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert "Post-batch steps require API mode" in result.output
     assert fake_worker.calls
+
+
+def test_post_batch_rejects_unknown_step(tmp_path):
+    doc_path = tmp_path / "note.md"
+    doc_path.write_text("Body")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        ingest_folder,
+        [str(doc_path), "--batch-size", "1", "--post-batch", "invalid"],
+    )
+
+    assert result.exit_code != 0
+    assert "Invalid post-batch step" in result.output

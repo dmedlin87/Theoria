@@ -26,7 +26,7 @@ Key options:
 - `--batch-size N` &mdash; process `N` files per batch. The CLI lists the files in each batch before handing them to the backend.
 - `--dry-run` &mdash; print the detected files and their inferred source types without ingesting anything.
 - `--meta key=value` &mdash; apply metadata overrides to every file. Values are parsed as JSON when possible (e.g. `--meta 'authors=["Jane"]'`).
-- `--post-batch [tags]` &mdash; run metadata enrichment after each API batch (ignored in `worker` mode).
+- `--post-batch steps` &mdash; request comma-separated post-ingest operations (`summaries`, `tags`, `biblio`) after each API batch. Ignored when running in `worker` mode.
 
 ## Examples
 
@@ -87,4 +87,11 @@ python -m theo.services.cli.ingest_folder ./sermons \
   --post-batch tags
 ```
 
-The CLI reuses the synchronous metadata enricher for every ingested document; this is only available in API mode.
+Request additional post-processing steps (summaries plus metadata enrichment and bibliography refresh):
+
+```bash
+python -m theo.services.cli.ingest_folder ./sermons \
+  --post-batch summaries,tags,biblio
+```
+
+Metadata enrichment runs inline with the API ingestion, while bibliography and summary jobs are queued through the API/worker stack. These post-batch operations are only available in API mode because worker jobs do not expose document identifiers immediately.

@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Callable, Iterable, Iterator
 from uuid import uuid4
 
 import click
+import httpx
 from sqlalchemy.orm import Session
 
 from ..api.app.core.database import get_engine
@@ -21,6 +23,8 @@ from ..api.app.workers import tasks as worker_tasks
 
 SUPPORTED_TRANSCRIPT_EXTENSIONS = {".vtt", ".webvtt", ".srt"}
 SUPPORTED_TEXT_EXTENSIONS = {".md", ".markdown", ".txt", ".html", ".htm"}
+
+POST_BATCH_CHOICES = {"tags", "summaries", "biblio"}
 
 
 @dataclass(frozen=True)
@@ -99,27 +103,99 @@ def _batched(iterable: Iterable[FolderItem], size: int) -> Iterator[list[FolderI
         yield batch
 
 
+def _parse_post_batch_steps(values: tuple[str, ...]) -> set[str]:
+    steps: set[str] = set()
+    for raw_value in values:
+        for part in raw_value.split(","):
+            step = part.strip().lower()
+            if not step:
+                continue
+            if step not in POST_BATCH_CHOICES:
+                allowed = ", ".join(sorted(POST_BATCH_CHOICES))
+                raise click.BadParameter(
+                    f"Invalid post-batch step '{step}'. Allowed values: {allowed}."
+                )
+            steps.add(step)
+    return steps
+
+
+def _post_batch_tags(session: Session, document_ids: Iterable[str]) -> None:
+    enricher = MetadataEnricher()
+    click.echo("   Running post-batch step: tags")
+    for doc_id in document_ids:
+        document = session.get(Document, doc_id)
+        if document is None:
+            click.echo(f"     [post-batch:tags] skipped missing document {doc_id}")
+            continue
+        try:
+            enriched = enricher.enrich_document(session, document)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            click.echo(f"     [post-batch:tags] failed for {doc_id}: {exc}", err=True)
+            continue
+        status = "enriched" if enriched else "no updates"
+        click.echo(f"     [post-batch:tags] {status} for {doc_id}")
+
+
+def _post_batch_biblio(_: Session, document_ids: Iterable[str]) -> None:
+    click.echo("   Running post-batch step: biblio")
+    for doc_id in document_ids:
+        try:
+            async_result = worker_tasks.enrich_document.delay(doc_id)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            click.echo(f"     [post-batch:biblio] failed for {doc_id}: {exc}", err=True)
+            continue
+        task_id = getattr(async_result, "id", None)
+        suffix = f" task {task_id}" if task_id else ""
+        click.echo(f"     [post-batch:biblio] queued{suffix} for {doc_id}")
+
+
+def _post_batch_summaries(_: Session, document_ids: Iterable[str]) -> None:
+    click.echo("   Running post-batch step: summaries")
+    base_url = (
+        os.environ.get("API_BASE_URL")
+        or os.environ.get("NEXT_PUBLIC_API_BASE_URL")
+        or "http://127.0.0.1:8000"
+    )
+    base_url = base_url.rstrip("/")
+
+    with httpx.Client(timeout=10.0) as client:
+        for doc_id in document_ids:
+            try:
+                response = client.post(
+                    f"{base_url}/jobs/summaries",
+                    json={"document_id": doc_id},
+                )
+            except httpx.HTTPError as exc:  # pragma: no cover - defensive logging
+                click.echo(
+                    f"     [post-batch:summaries] failed for {doc_id}: {exc}",
+                    err=True,
+                )
+                continue
+            if response.status_code >= 400:
+                click.echo(
+                    "     [post-batch:summaries] failed for"
+                    f" {doc_id}: {response.status_code} {response.text}",
+                    err=True,
+                )
+                continue
+            click.echo(f"     [post-batch:summaries] queued for {doc_id}")
+
+
+POST_BATCH_HANDLERS: dict[str, Callable[[Session, Iterable[str]], None]] = {
+    "tags": _post_batch_tags,
+    "biblio": _post_batch_biblio,
+    "summaries": _post_batch_summaries,
+}
+
+
 def _run_post_batch_operations(
     session: Session, document_ids: list[str], steps: set[str]
 ) -> None:
-    if not steps:
-        return
-
-    if "tags" in steps:
-        enricher = MetadataEnricher()
-        click.echo("   Running post-batch step: tags")
-        for doc_id in document_ids:
-            document = session.get(Document, doc_id)
-            if document is None:
-                click.echo(f"     [post-batch:tags] skipped missing document {doc_id}")
-                continue
-            try:
-                enriched = enricher.enrich_document(session, document)
-            except Exception as exc:  # pragma: no cover - defensive logging
-                click.echo(f"     [post-batch:tags] failed for {doc_id}: {exc}", err=True)
-                continue
-            status = "enriched" if enriched else "no updates"
-            click.echo(f"     [post-batch:tags] {status} for {doc_id}")
+    for step in sorted(steps):
+        handler = POST_BATCH_HANDLERS.get(step)
+        if handler is None:  # pragma: no cover - guarded by parser
+            continue
+        handler(session, document_ids)
 
 
 def _ingest_batch_via_api(
@@ -174,9 +250,11 @@ def _queue_batch_via_worker(batch: list[FolderItem], overrides: dict[str, object
 @click.option(
     "--post-batch",
     "post_batch_steps",
-    type=click.Choice(["tags"], case_sensitive=False),
     multiple=True,
-    help="Run post-ingest operations after each API batch (e.g. tags).",
+    help=(
+        "Comma-separated post-ingest operations to run after each API batch "
+        "(options: summaries, tags, biblio)."
+    ),
 )
 def ingest_folder(
     path: Path,
@@ -191,7 +269,7 @@ def ingest_folder(
 
     overrides = _parse_metadata_overrides(metadata_overrides)
     items = list(_walk_folder(path))
-    normalized_post_batch = {step.lower() for step in post_batch_steps}
+    normalized_post_batch = _parse_post_batch_steps(post_batch_steps)
     if not items:
         click.echo("No supported files found.")
         return
