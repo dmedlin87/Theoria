@@ -68,3 +68,55 @@ def test_trail_persistence_and_replay() -> None:
         assert replay_payload["replay_output"]["answer"]["summary"]
         assert replay_payload["diff"]["summary_changed"] in {True, False}
         assert "added_citations" in replay_payload["diff"]
+
+
+def test_sermon_prep_trail_replay_diff_metadata() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        client.post(
+            "/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"}
+        )
+        response = client.post(
+            "/ai/sermon-prep",
+            json={
+                "topic": "Abiding Hope",
+                "osis": "John.1.1",
+                "model": "echo",
+                "recorder_metadata": {"user_id": "minister-42"},
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["outline"], payload
+
+        engine = get_engine()
+        with Session(engine) as session:
+            trail = (
+                session.query(AgentTrail)
+                .filter(AgentTrail.workflow == "sermon_prep")
+                .order_by(AgentTrail.created_at.desc())
+                .first()
+            )
+            assert trail is not None
+            trail_id = trail.id
+            assert trail.user_id == "minister-42"
+
+        trail_response = client.get(f"/trails/{trail_id}")
+        assert trail_response.status_code == 200
+        trail_payload = trail_response.json()
+        assert trail_payload["workflow"] == "sermon_prep"
+        assert trail_payload["status"] == "completed"
+        assert any(step["tool"] == "hybrid_search" for step in trail_payload["steps"])
+
+        replay_response = client.post(f"/trails/{trail_id}/replay")
+        assert replay_response.status_code == 200
+        replay_payload = replay_response.json()
+        assert replay_payload["trail_id"] == trail_id
+        assert replay_payload["replay_output"]["outline"], replay_payload
+        assert replay_payload["replay_output"]["answer"]["citations"], replay_payload
+        diff = replay_payload["diff"]
+        assert diff["summary_changed"] in {True, False}
+        assert "added_citations" in diff
+        assert "removed_citations" in diff
+        assert isinstance(diff["added_citations"], list)
+        assert isinstance(diff["removed_citations"], list)
