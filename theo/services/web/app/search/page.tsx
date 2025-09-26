@@ -42,7 +42,7 @@ type DocumentGroup = {
 };
 
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\]/g, "\$&");
+  return value.replace(/[\^$.*+?()\[\]{}|]/g, "\\$&");
 }
 
 function highlightTokens(text: string, tokens: string[]): JSX.Element {
