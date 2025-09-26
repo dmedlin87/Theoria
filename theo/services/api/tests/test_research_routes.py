@@ -76,6 +76,48 @@ def test_notes_crud_roundtrip() -> None:
         assert note["stance"] == "apologetic"
         assert note["evidences"][0]["source_ref"] == "Genesis.1.1"
 
+        update = client.patch(
+            f"/research/notes/{note_id}",
+            json={
+                "body": "The Logos is both divine and distinct.",
+                "tags": ["prologue"],
+                "evidences": [
+                    {
+                        "source_type": "crossref",
+                        "source_ref": "Exodus.3.14",
+                        "snippet": "I AM resonances.",
+                        "osis_refs": ["Exodus.3.14"],
+                    }
+                ],
+            },
+        )
+        assert update.status_code == 200, update.text
+        updated_note = update.json()["note"]
+        assert updated_note["body"] == "The Logos is both divine and distinct."
+        assert updated_note["tags"] == ["prologue"]
+        assert len(updated_note["evidences"]) == 1
+        assert updated_note["evidences"][0]["source_ref"] == "Exodus.3.14"
+
+        delete = client.delete(f"/research/notes/{note_id}")
+        assert delete.status_code == 204, delete.text
+
+        after = client.get("/research/notes", params={"osis": "John.1.1"})
+        assert after.status_code == 200
+        assert after.json()["total"] == 0
+        assert after.json()["notes"] == []
+
+
+def test_note_update_and_delete_missing_note_returns_404() -> None:
+    with TestClient(app) as client:
+        update = client.patch(
+            "/research/notes/missing",
+            json={"body": "No-op"},
+        )
+        assert update.status_code == 404
+
+        delete = client.delete("/research/notes/missing")
+        assert delete.status_code == 404
+
 
 def test_contradictions_by_osis_returns_items_and_is_stable_shape() -> None:
     with TestClient(app) as client:

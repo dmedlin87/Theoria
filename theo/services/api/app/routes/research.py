@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
@@ -15,14 +15,17 @@ from ..models.research import (
     ResearchNoteCreate,
     ResearchNoteResponse,
     ResearchNotesResponse,
+    ResearchNoteUpdate,
     ScriptureResponse,
 )
 from ..research import (
     create_research_note,
+    delete_research_note,
     fetch_cross_references,
     fetch_morphology,
     fetch_passage,
     get_notes_for_osis,
+    update_research_note,
     lookup_geo_places,
     search_contradictions,
 )
@@ -134,6 +137,46 @@ def create_note(
         evidences=[e.model_dump() for e in payload.evidences or []],
     )
     return ResearchNoteResponse(note=note)
+
+
+@router.patch("/notes/{note_id}", response_model=ResearchNoteResponse)
+def patch_note(
+    note_id: str,
+    payload: ResearchNoteUpdate,
+    session: Session = Depends(get_session),
+) -> ResearchNoteResponse:
+    update_data = payload.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=422, detail="No fields provided for update")
+
+    if "body" in update_data and update_data["body"] is not None:
+        if not update_data["body"].strip():
+            raise HTTPException(status_code=422, detail="Note body cannot be empty")
+
+    evidence_payload = None
+    if "evidences" in update_data:
+        raw_evidences = payload.evidences
+        evidence_payload = [] if raw_evidences is None else [
+            evidence.model_dump() for evidence in raw_evidences
+        ]
+        update_data.pop("evidences", None)
+
+    note = update_research_note(
+        session,
+        note_id,
+        changes=update_data,
+        evidences=evidence_payload,
+    )
+    return ResearchNoteResponse(note=note)
+
+
+@router.delete("/notes/{note_id}", status_code=204)
+def delete_note(
+    note_id: str,
+    session: Session = Depends(get_session),
+) -> Response:
+    delete_research_note(session, note_id)
+    return Response(status_code=204)
 
 
 @router.get("/contradictions", response_model=ContradictionSearchResponse)

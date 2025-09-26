@@ -6,7 +6,9 @@ from .geo import lookup_geo_places
 from .morphology import fetch_morphology
 from .notes import (
     create_research_note,
+    delete_research_note,
     get_notes_for_osis,
+    update_research_note,
 )
 from .scripture import fetch_passage
 
@@ -16,6 +18,8 @@ __all__ = [
     "fetch_morphology",
     "create_research_note",
     "get_notes_for_osis",
+    "update_research_note",
+    "delete_research_note",
     "search_contradictions",
     "lookup_geo_places",
 ]
