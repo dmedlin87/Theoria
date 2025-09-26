@@ -8,6 +8,7 @@ from ..db.models import Document, Passage
 from ..ingest.osis import osis_intersects
 from ..models.base import Passage as PassageSchema
 from ..models.verses import VerseMention, VerseMentionsFilters
+from .utils import compose_passage_meta
 
 
 def _snippet(text: str, max_length: int = 280) -> str:
@@ -23,7 +24,11 @@ def get_mentions_for_osis(
 ) -> list[VerseMention]:
     """Return passages whose OSIS reference intersects the requested range."""
 
-    query = session.query(Passage, Document).join(Document)
+    query = (
+        session.query(Passage, Document)
+        .join(Document)
+        .filter(Passage.osis_ref.isnot(None))
+    )
     if filters:
         if filters.source_type:
             query = query.filter(Document.source_type == filters.source_type)
@@ -42,34 +47,6 @@ def get_mentions_for_osis(
             if filters.author not in authors:
                 continue
 
-        base_meta = passage.meta.copy() if passage.meta else {}
-        if document.title:
-            base_meta.setdefault("document_title", document.title)
-        if document.source_type:
-            base_meta.setdefault("source_type", document.source_type)
-        if document.collection:
-            base_meta.setdefault("collection", document.collection)
-        if document.authors:
-            base_meta.setdefault("authors", document.authors)
-        if document.doi:
-            base_meta.setdefault("doi", document.doi)
-        if document.venue:
-            base_meta.setdefault("venue", document.venue)
-        if document.year:
-            base_meta.setdefault("year", document.year)
-        if document.source_url:
-            base_meta.setdefault("source_url", document.source_url)
-        if document.topics is not None:
-            base_meta.setdefault("topics", document.topics)
-        if document.enrichment_version is not None:
-            base_meta.setdefault("enrichment_version", document.enrichment_version)
-        if document.provenance_score is not None:
-            base_meta.setdefault("provenance_score", document.provenance_score)
-        if document.bib_json and isinstance(document.bib_json, dict):
-            primary_topic = document.bib_json.get("primary_topic")
-            if primary_topic is not None:
-                base_meta.setdefault("primary_topic", primary_topic)
-
         passage_schema = PassageSchema(
             id=passage.id,
             document_id=passage.document_id,
@@ -78,7 +55,7 @@ def get_mentions_for_osis(
             page_no=passage.page_no,
             t_start=passage.t_start,
             t_end=passage.t_end,
-            meta=base_meta or None,
+            meta=compose_passage_meta(passage, document),
             score=None,
         )
         mention = VerseMention(
