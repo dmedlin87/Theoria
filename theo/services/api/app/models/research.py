@@ -75,6 +75,17 @@ class ResearchNoteCreate(APIModel):
     evidences: list[NoteEvidenceCreate] | None = None
 
 
+class ResearchNoteUpdate(APIModel):
+    osis: str | None = None
+    body: str | None = None
+    title: str | None = None
+    stance: str | None = None
+    claim_type: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    tags: list[str] | None = None
+    evidences: list[NoteEvidenceCreate] | None = None
+
+
 class NoteEvidence(APIModel):
     id: str
     source_type: str | None = None

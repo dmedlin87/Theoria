@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Any, Iterable
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from ..db.models import NoteEvidence, ResearchNote
@@ -61,3 +62,53 @@ def get_notes_for_osis(session: Session, osis: str) -> list[ResearchNote]:
         .order_by(ResearchNote.created_at.desc())
         .all()
     )
+
+
+def update_research_note(
+    session: Session,
+    note_id: str,
+    *,
+    changes: dict[str, Any],
+    evidences: Iterable[dict] | None = None,
+) -> ResearchNote:
+    """Update persisted note fields and optionally replace evidence rows."""
+
+    note = session.get(ResearchNote, note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Research note not found")
+
+    for field, value in changes.items():
+        if field == "tags":
+            note.tags = list(value) if value is not None else None
+        elif field in {"osis", "body", "title", "stance", "claim_type", "confidence"}:
+            setattr(note, field, value)
+
+    if evidences is not None:
+        note.evidences.clear()
+        session.flush()
+        for evidence in evidences:
+            note.evidences.append(
+                NoteEvidence(
+                    source_type=evidence.get("source_type"),
+                    source_ref=evidence.get("source_ref"),
+                    osis_refs=evidence.get("osis_refs"),
+                    citation=evidence.get("citation"),
+                    snippet=evidence.get("snippet"),
+                    meta=evidence.get("meta"),
+                )
+            )
+
+    session.commit()
+    session.refresh(note)
+    return note
+
+
+def delete_research_note(session: Session, note_id: str) -> None:
+    """Remove a research note and cascade-delete evidence rows."""
+
+    note = session.get(ResearchNote, note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Research note not found")
+
+    session.delete(note)
+    session.commit()
