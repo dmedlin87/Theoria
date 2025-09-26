@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -92,3 +91,35 @@ def test_enqueue_endpoint_returns_idempotent_response(monkeypatch: pytest.Monkey
     assert second.status_code == 202
     assert second.json() == first_payload
     assert len(captured) == 1, "Duplicate enqueue should not dispatch twice"
+
+
+def test_topic_digest_job_enqueues(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_delay(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+
+        class Result:
+            id = "topic-digest-job"
+
+        return Result()
+
+    monkeypatch.setattr(jobs_module.topic_digest_task, "delay", fake_delay)
+
+    since = datetime(2024, 8, 5, tzinfo=UTC)
+    response = client.post(
+        "/jobs/topic_digest",
+        json={"since": since.isoformat(), "notify": ["alerts@theo.app", ""]},
+    )
+
+    assert response.status_code == 202, response.text
+    payload = response.json()
+
+    assert payload["job_type"] == "topic_digest"
+    assert payload["status"] == "queued"
+    assert payload["payload"]["since"] == since.isoformat()
+    assert payload["payload"]["notify"] == ["alerts@theo.app"]
+
+    assert captured["job_id"] == payload["id"]
+    assert captured["since"] == since.isoformat()
+    assert captured["notify"] == ["alerts@theo.app"]

@@ -52,3 +52,8 @@ class JobEnqueueResponse(APIModel):
     queued_at: datetime
     schedule_at: datetime | None = None
     status_url: str
+
+
+class TopicDigestJobRequest(APIModel):
+    since: datetime | None = None
+    notify: list[str] | None = None

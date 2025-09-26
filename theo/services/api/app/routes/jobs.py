@@ -19,10 +19,11 @@ from ..models.jobs import (
     JobListResponse,
     JobQueuedResponse,
     JobStatus,
+    TopicDigestJobRequest,
 )
 from ..workers.tasks import enrich_document as enqueue_enrich_task
 from ..workers.tasks import process_file
-from ..workers.tasks import celery
+from ..workers.tasks import celery, topic_digest as topic_digest_task
 
 router = APIRouter()
 
@@ -158,6 +159,48 @@ def enqueue_enrichment_job(
     session.commit()
 
     async_result = enqueue_enrich_task.delay(document.id, job.id)
+    task_id = getattr(async_result, "id", None)
+    if task_id:
+        job.task_id = task_id
+        session.add(job)
+        session.commit()
+
+    session.refresh(job)
+    return _serialize_job(job)
+
+
+@router.post(
+    "/topic_digest",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobStatus,
+)
+def enqueue_topic_digest_job(
+    payload: TopicDigestJobRequest,
+    session: Session = Depends(get_session),
+) -> JobStatus:
+    """Queue a background job that generates the topical activity digest."""
+
+    notify = [entry.strip() for entry in (payload.notify or []) if entry.strip()]
+    since = payload.since
+
+    job = IngestionJob(
+        job_type="topic_digest",
+        status="queued",
+        payload={
+            "since": since.isoformat() if since else None,
+            "notify": notify or None,
+        },
+    )
+    session.add(job)
+    session.commit()
+
+    kwargs: dict[str, object] = {"job_id": job.id}
+    if since:
+        kwargs["since"] = since.isoformat()
+    if notify:
+        kwargs["notify"] = notify
+
+    async_result = topic_digest_task.delay(**kwargs)
     task_id = getattr(async_result, "id", None)
     if task_id:
         job.task_id = task_id
