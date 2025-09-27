@@ -10,6 +10,8 @@ from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy.orm import Session
 
+from theo.services.geo import seed_openbible_geo
+
 from .models import ContradictionSeed, GeoPlace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -161,3 +163,4 @@ def seed_reference_data(session: Session) -> None:
 
     seed_contradiction_claims(session)
     seed_geo_places(session)
+    seed_openbible_geo(session)

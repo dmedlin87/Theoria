@@ -13,20 +13,22 @@ from ..models.research import (
     DssLinksResponse,
     FallacyDetectRequest,
     FallacyDetectResponse,
-    ReliabilityOverviewResponse,
     GeoPlaceSearchResponse,
+    GeoVerseResponse,
     HistoricitySearchResponse,
     MorphologyResponse,
+    ReliabilityOverviewResponse,
     ReportBuildRequest,
-    ResearchReportResponse,
     ResearchNoteCreate,
     ResearchNoteResponse,
     ResearchNotesResponse,
     ResearchNoteUpdate,
+    ResearchReportResponse,
     ScriptureResponse,
     VariantApparatusResponse,
 )
 from ..research import (
+    build_reliability_overview,
     create_research_note,
     delete_research_note,
     fallacy_detect,
@@ -34,13 +36,13 @@ from ..research import (
     fetch_dss_links,
     fetch_morphology,
     fetch_passage,
-    historicity_search,
-    build_reliability_overview,
     get_notes_for_osis,
-    report_build,
-    update_research_note,
+    historicity_search,
     lookup_geo_places,
+    places_for_osis,
+    report_build,
     search_contradictions,
+    update_research_note,
     variants_apparatus,
 )
 
@@ -430,3 +432,15 @@ def lookup_geo(
 
     items = lookup_geo_places(session, query=query, limit=limit)
     return GeoPlaceSearchResponse(items=items)
+
+
+@router.get("/geo/verse", response_model=GeoVerseResponse)
+def lookup_geo_for_verse(
+    osis: str = Query(..., description="OSIS reference to inspect"),
+    session: Session = Depends(get_session),
+) -> GeoVerseResponse:
+    settings = get_settings()
+    if not getattr(settings, "geo_enabled", True):
+        return GeoVerseResponse(osis=osis)
+
+    return places_for_osis(session, osis)

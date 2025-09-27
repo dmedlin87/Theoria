@@ -3,7 +3,7 @@
 from .contradictions import search_contradictions
 from .crossrefs import fetch_cross_references
 from .fallacies import fallacy_detect
-from .geo import lookup_geo_places
+from .geo import lookup_geo_places, places_for_osis
 from .morphology import fetch_morphology
 from .notes import (
     create_research_note,
@@ -28,6 +28,7 @@ __all__ = [
     "delete_research_note",
     "search_contradictions",
     "lookup_geo_places",
+    "places_for_osis",
     "variants_apparatus",
     "historicity_search",
     "fallacy_detect",

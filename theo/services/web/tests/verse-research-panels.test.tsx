@@ -15,6 +15,17 @@ import ResearchPanels, {
   type ResearchFeatureFlags,
 } from "../app/verse/[osis]/research-panels";
 
+jest.mock("../app/mode-context", () => {
+  const { RESEARCH_MODES, DEFAULT_MODE_ID } = require("../app/mode-config");
+  return {
+    useMode: () => ({
+      mode: RESEARCH_MODES[DEFAULT_MODE_ID],
+      modes: Object.values(RESEARCH_MODES),
+      setMode: jest.fn(),
+    }),
+  };
+});
+
 describe("ContradictionsPanel", () => {
   const baseUrl = "http://127.0.0.1:8000";
 
@@ -149,22 +160,43 @@ describe("GeoPanel", () => {
   });
 
   it("renders search results", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        results: [
-          {
-            name: "Jerusalem",
-            osis: "Josh.10.1",
-            coordinates: { lat: 31.78, lng: 35.21 },
-            aliases: ["Jebus"],
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          osis: "Gen.1.1",
+          places: [],
+          attribution: {
+            source: "OpenBible.info",
+            url: "https://www.openbible.info/geo",
+            license: "CC-BY-4.0",
+            commit_sha: "abcdef1",
+            osm_required: false,
           },
-        ],
-      }),
-      text: async () => "",
-    });
+        }),
+        text: async () => "",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              modern_id: "m123",
+              name: "Jerusalem",
+              lat: 31.78,
+              lng: 35.21,
+              aliases: ["Jebus"],
+            },
+          ],
+        }),
+        text: async () => "",
+      });
 
-    render(<GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />);
+    render(
+      <ModeProvider value="neutral">
+        <GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />
+      </ModeProvider>,
+    );
 
     fireEvent.change(screen.getByLabelText(/Search locations/i), { target: { value: "Jerusalem" } });
     fireEvent.click(screen.getByRole("button", { name: /search/i }));
@@ -175,23 +207,36 @@ describe("GeoPanel", () => {
       expect(screen.getByText(/Also known as/)).toHaveTextContent("Jebus");
     });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/research/geo/search"),
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ query: "Jerusalem", osis: "Gen.1.1" }),
-      }),
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("/research/geo/verse"),
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("/research/geo/search?query=Jerusalem"),
+      expect.objectContaining({ method: "GET" }),
     );
   });
 
   it("renders empty state when no results", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({ results: [] }),
-      text: async () => "",
-    });
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ osis: "Gen.1.1", places: [], attribution: null }),
+        text: async () => "",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [] }),
+        text: async () => "",
+      });
 
-    render(<GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />);
+    render(
+      <ModeProvider value="neutral">
+        <GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />
+      </ModeProvider>,
+    );
 
     fireEvent.change(screen.getByLabelText(/Search locations/i), { target: { value: "Nineveh" } });
     fireEvent.click(screen.getByRole("button", { name: /search/i }));
@@ -202,13 +247,23 @@ describe("GeoPanel", () => {
   });
 
   it("renders error state when search fails", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      statusText: "Server error",
-      text: async () => "Geo failure",
-    });
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ osis: "Gen.1.1", places: [], attribution: null }),
+        text: async () => "",
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        statusText: "Server error",
+        text: async () => "Geo failure",
+      });
 
-    render(<GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />);
+    render(
+      <ModeProvider value="neutral">
+        <GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />
+      </ModeProvider>,
+    );
 
     fireEvent.change(screen.getByLabelText(/Search locations/i), { target: { value: "Bethel" } });
     fireEvent.click(screen.getByRole("button", { name: /search/i }));
@@ -219,8 +274,66 @@ describe("GeoPanel", () => {
   });
 
   it("does not render when geo feature disabled", () => {
-    const { container } = render(<GeoPanel osis="Gen.1.1" features={{ research: true, geo: false }} />);
+    const { container } = render(
+      <ModeProvider value="neutral">
+        <GeoPanel osis="Gen.1.1" features={{ research: true, geo: false }} />
+      </ModeProvider>,
+    );
     expect(container.firstChild).toBeNull();
+  });
+
+  it("displays verse-linked places", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          osis: "Gen.1.1",
+          places: [
+            {
+              ancient_id: "a123",
+              friendly_id: "Eden",
+              classification: "region",
+              osis_refs: ["Gen.1.1"],
+              modern_locations: [
+                {
+                  modern_id: "m1",
+                  friendly_id: "Mesopotamia",
+                  latitude: 33.5,
+                  longitude: 44.4,
+                  names: ["Fertile Crescent"],
+                },
+              ],
+            },
+          ],
+          attribution: {
+            source: "OpenBible.info",
+            url: "https://www.openbible.info/geo",
+            license: "CC-BY-4.0",
+            commit_sha: "abcdef1",
+            osm_required: true,
+          },
+        }),
+        text: async () => "",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [] }),
+        text: async () => "",
+      });
+
+    render(
+      <ModeProvider value="neutral">
+        <GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />
+      </ModeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Eden")).toBeInTheDocument();
+      expect(screen.getByText(/Mesopotamia/)).toBeInTheDocument();
+      expect(screen.getByText(/Fertile Crescent/)).toBeInTheDocument();
+      expect(screen.getByText(/Geodata ©/)).toHaveTextContent("commit abcdef1");
+      expect(screen.getByText(/Licensed ODbL/)).toBeInTheDocument();
+    });
   });
 });
 

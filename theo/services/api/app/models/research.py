@@ -260,10 +260,12 @@ class ContradictionSearchResponse(APIModel):
 
 
 class GeoPlaceItem(APIModel):
-    slug: str
+    modern_id: str
     name: str
+    slug: str | None = None
     lat: float | None = None
     lng: float | None = None
+    geom_kind: str | None = None
     confidence: float | None = None
     aliases: list[str] | None = None
     sources: dict[str, Any] | list[dict[str, Any]] | None = None
@@ -271,3 +273,38 @@ class GeoPlaceItem(APIModel):
 
 class GeoPlaceSearchResponse(APIModel):
     items: list[GeoPlaceItem] = Field(default_factory=list)
+
+
+class GeoLocationItem(APIModel):
+    modern_id: str
+    friendly_id: str
+    latitude: float | None = None
+    longitude: float | None = None
+    geom_kind: str | None = None
+    confidence: float | None = None
+    names: list[str] | None = None
+    geometry: dict[str, Any] | None = None
+    raw: dict[str, Any] | None = None
+
+
+class GeoPlaceOccurrence(APIModel):
+    ancient_id: str
+    friendly_id: str
+    classification: str | None = None
+    osis_refs: list[str] = Field(default_factory=list)
+    modern_locations: list[GeoLocationItem] = Field(default_factory=list)
+    raw: dict[str, Any] | None = None
+
+
+class GeoAttribution(APIModel):
+    source: str
+    url: str
+    license: str
+    commit_sha: str | None = None
+    osm_required: bool = False
+
+
+class GeoVerseResponse(APIModel):
+    osis: str
+    places: list[GeoPlaceOccurrence] = Field(default_factory=list)
+    attribution: GeoAttribution | None = None

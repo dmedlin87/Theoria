@@ -703,6 +703,76 @@ class WatchlistEvent(Base):
     )
 
 
+class GeoAncientPlace(Base):
+    """Canonical OpenBible place keyed by ancient identifier."""
+
+    __tablename__ = "geo_place"
+
+    ancient_id: Mapped[str] = mapped_column(String, primary_key=True)
+    friendly_id: Mapped[str] = mapped_column(String, nullable=False)
+    classification: Mapped[str | None] = mapped_column(String, nullable=True)
+    raw: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    verses: Mapped[list["GeoPlaceVerse"]] = relationship(
+        "GeoPlaceVerse", back_populates="place", cascade="all, delete-orphan"
+    )
+
+
+class GeoModernLocation(Base):
+    """Modern geographic expression linked to ancient places."""
+
+    __tablename__ = "geo_location"
+
+    modern_id: Mapped[str] = mapped_column(String, primary_key=True)
+    friendly_id: Mapped[str] = mapped_column(String, nullable=False)
+    geom_kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    names: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    raw: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
+class GeoPlaceVerse(Base):
+    """Join table linking ancient places to OSIS references."""
+
+    __tablename__ = "geo_place_verse"
+    __table_args__ = (Index("idx_geo_place_verse_osis", "osis_ref"),)
+
+    ancient_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("geo_place.ancient_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    osis_ref: Mapped[str] = mapped_column(String, primary_key=True)
+
+    place: Mapped[GeoAncientPlace] = relationship("GeoAncientPlace", back_populates="verses")
+
+
+class GeoGeometry(Base):
+    """Complex geometry payloads for large features."""
+
+    __tablename__ = "geo_geometry"
+
+    geometry_id: Mapped[str] = mapped_column(String, primary_key=True)
+    geom_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    geojson: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
+class GeoImage(Base):
+    """Image metadata keyed by owner and thumbnail asset."""
+
+    __tablename__ = "geo_image"
+
+    image_id: Mapped[str] = mapped_column(String, primary_key=True)
+    owner_kind: Mapped[str] = mapped_column(String, primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String, primary_key=True)
+    thumb_file: Mapped[str] = mapped_column(String, primary_key=True)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
+    license: Mapped[str | None] = mapped_column(String, nullable=True)
+    attribution: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class GeoPlace(Base):
     """Normalized lookup table for biblical geography."""
 
@@ -738,5 +808,10 @@ __all__ = [
     "TrailSource",
     "UserWatchlist",
     "WatchlistEvent",
+    "GeoAncientPlace",
+    "GeoModernLocation",
+    "GeoPlaceVerse",
+    "GeoGeometry",
+    "GeoImage",
     "GeoPlace",
 ]

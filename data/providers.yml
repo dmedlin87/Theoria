@@ -1,0 +1,6 @@
+- id: openbible_geo
+  type: geo
+  name: OpenBible Bible-Geocoding Data
+  license: CC-BY-4.0
+  source_url: https://github.com/openbibleinfo/Bible-Geocoding-Data
+  commit_sha: 7eb18a5ee62f27b9b93bd6689ea272d76dd23b8f

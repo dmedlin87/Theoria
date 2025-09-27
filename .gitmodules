@@ -1,0 +1,3 @@
+[submodule "theo/data/providers/openbible-geo"]
+	path = theo/data/providers/openbible-geo
+	url = https://github.com/openbibleinfo/Bible-Geocoding-Data
