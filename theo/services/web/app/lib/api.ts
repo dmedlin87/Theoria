@@ -9,6 +9,13 @@ export function getApiBaseUrl(): string {
   return "http://127.0.0.1:8000";
 }
 
+export function getCitationManagerEndpoint(): string | null {
+  if (typeof process !== "undefined") {
+    return process.env.NEXT_PUBLIC_CITATION_MANAGER_URL || null;
+  }
+  return null;
+}
+
 export function buildPassageLink(
   documentId: string,
   passageId: string,
