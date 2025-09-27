@@ -148,7 +148,7 @@ def _run_redis_command(operation: Callable[[Any], Awaitable[T]]) -> T | None:
     try:
         return asyncio.run(_runner())
     except RuntimeError as exc:  # pragma: no cover - nested loop guard
-        if "event loop is running" in str(exc).lower():
+        if "running event loop" in str(exc).lower():
             loop = asyncio.new_event_loop()
             try:
                 return loop.run_until_complete(_runner())
