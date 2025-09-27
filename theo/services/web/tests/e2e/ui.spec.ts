@@ -30,8 +30,34 @@ Test run: ${crypto.randomUUID()}
   expect(response.ok()).toBeTruthy();
 }
 
+async function seedResearchNote(request: APIRequestContext): Promise<void> {
+  const payload = {
+    osis: "John.1.1",
+    body: "Playwright integration commentary on John 1:1",
+    title: "Playwright commentary",
+    stance: "apologetic",
+    claim_type: "textual",
+    confidence: 0.7,
+    tags: ["playwright", "integration"],
+    evidences: [
+      {
+        source_type: "crossref",
+        source_ref: "Genesis.1.1",
+        snippet: "Creation language links the passages.",
+        osis_refs: ["Genesis.1.1"],
+      },
+    ],
+  };
+  const response = await request.post(`${API_BASE}/research/notes`, {
+    data: JSON.stringify(payload),
+    headers: { "content-type": "application/json" },
+  });
+  expect(response.ok()).toBeTruthy();
+}
+
 test.beforeAll(async ({ request }) => {
   await seedCorpus(request);
+  await seedResearchNote(request);
 });
 
 test.describe("Theo Engine UI", () => {
@@ -107,6 +133,24 @@ test.describe("Theo Engine UI", () => {
     await page.fill("input[name='collection']", "Nonexistent");
     await page.click("button[type='submit']");
     await expect(page.getByText(/No mentions/, { exact: false })).toBeVisible();
+  });
+
+  test("renders research panels with data", async ({ page }) => {
+    await page.goto("/verse/John.1.1");
+
+    await expect(page.getByRole("heading", { name: "Research" })).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: "Cross-references" })).toBeVisible();
+    await expect(page.getByText(/Genesis\.1\.1/)).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: "Textual variants" })).toBeVisible();
+    await expect(page.getByText("English Standard Version")).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: "Morphology" })).toBeVisible();
+    await expect(page.getByText(/Ἐν/, { exact: false })).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: "Commentaries & notes" })).toBeVisible();
+    await expect(page.getByText(/Playwright commentary/)).toBeVisible();
   });
 
   test("navigates from search to document view", async ({ page }) => {
