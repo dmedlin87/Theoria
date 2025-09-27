@@ -42,24 +42,30 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
     initialMode && isResearchModeId(initialMode) ? initialMode : DEFAULT_MODE_ID,
   );
   const hasUserInteracted = useRef(false);
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem(MODE_STORAGE_KEY) : null;
+    if (typeof window === "undefined" || hasHydrated) {
+      return;
+    }
+    const stored = localStorage.getItem(MODE_STORAGE_KEY);
     if (stored && isResearchModeId(stored) && stored !== modeId) {
       setModeId(stored);
     }
-  }, [modeId]);
+    setHasHydrated(true);
+  }, [hasHydrated, modeId]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !hasHydrated) {
       return;
     }
     localStorage.setItem(MODE_STORAGE_KEY, modeId);
-    document.cookie = `${MODE_COOKIE_KEY}=${modeId};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;
+    const maxAge = 60 * 60 * 24 * 365;
+    document.cookie = `${MODE_COOKIE_KEY}=${modeId}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
     if (hasUserInteracted.current) {
       router.refresh();
     }
-  }, [modeId, router]);
+  }, [hasHydrated, modeId, router]);
 
   const setMode = useCallback(
     (next: ResearchModeId) => {
