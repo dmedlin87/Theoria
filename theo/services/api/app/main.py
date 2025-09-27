@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from .core.database import Base, get_engine
 from .db.seeds import seed_reference_data
+from .debug import ErrorReportingMiddleware
 from .routes import (
     ai,
     creators,
@@ -50,6 +51,10 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Theo Engine API", version="0.2.0", lifespan=lifespan)
     if os.getenv("THEO_ENABLE_CONSOLE_TRACES", "0").lower() in {"1", "true", "yes"}:
         configure_console_tracer()
+    app.add_middleware(
+        ErrorReportingMiddleware,
+        extra_context={"service": "api"},
+    )
     app.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
     app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
     app.include_router(search.router, prefix="/search", tags=["search"])
