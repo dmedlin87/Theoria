@@ -98,62 +98,38 @@ export function ModeSwitcher(): JSX.Element {
   const { mode, modes, setMode } = useMode();
 
   return (
-    <div
-      aria-live="polite"
-      style={{
-        display: "grid",
-        gap: "0.5rem",
-        padding: "0.75rem 1rem",
-        borderRadius: "0.75rem",
-        background: "rgba(15, 23, 42, 0.05)",
-        border: "1px solid rgba(148, 163, 184, 0.4)",
-        maxWidth: "28rem",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
-        <label htmlFor="mode-selector" style={{ fontWeight: 600 }}>
+    <div className="mode-panel" aria-live="polite">
+      <div className="mode-panel__header">
+        <label htmlFor="mode-selector" className="mode-panel__title">
           Research mode
         </label>
-        <select
-          id="mode-selector"
-          value={mode.id}
-          onChange={(event) => setMode(event.target.value as ResearchModeId)}
-          style={{
-            padding: "0.35rem 0.5rem",
-            borderRadius: "0.5rem",
-            border: "1px solid var(--border, #e5e7eb)",
-            fontSize: "0.95rem",
-          }}
-        >
-          {modes.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--muted-foreground, #4b5563)" }}>{mode.description}</p>
-      <dl
-        style={{
-          display: "grid",
-          gap: "0.25rem",
-          margin: 0,
-          fontSize: "0.85rem",
-          color: "var(--muted-foreground, #4b5563)",
-        }}
-      >
-        <div style={{ display: "grid", gap: "0.25rem" }}>
-          <dt style={{ fontWeight: 600 }}>Emphasises</dt>
-          <dd style={{ margin: 0 }}>{mode.emphasis.join(", ")}</dd>
+        <div className="mode-panel__control">
+          <select
+            id="mode-selector"
+            value={mode.id}
+            onChange={(event) => setMode(event.target.value as ResearchModeId)}
+            className="mode-panel__select"
+          >
+            {modes.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
-        <div style={{ display: "grid", gap: "0.25rem" }}>
-          <dt style={{ fontWeight: 600 }}>Softens</dt>
-          <dd style={{ margin: 0 }}>{mode.suppressions.join(", ")}</dd>
+      </div>
+      <p className="mode-panel__description">{mode.description}</p>
+      <dl className="mode-panel__meta">
+        <div className="mode-panel__row">
+          <dt className="mode-panel__label">Emphasises</dt>
+          <dd className="mode-panel__value">{mode.emphasis.join(", ")}</dd>
+        </div>
+        <div className="mode-panel__row">
+          <dt className="mode-panel__label">Softens</dt>
+          <dd className="mode-panel__value">{mode.suppressions.join(", ")}</dd>
         </div>
       </dl>
-      <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted-foreground, #64748b)" }}>
-        {formatEmphasisSummary(mode)}
-      </p>
+      <p className="mode-panel__summary">{formatEmphasisSummary(mode)}</p>
     </div>
   );
 }

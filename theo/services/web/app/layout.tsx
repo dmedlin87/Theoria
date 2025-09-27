@@ -52,10 +52,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 ))}
               </nav>
             </div>
-            <div className="container" style={{ marginTop: "0.75rem" }}>
+          </header>
+          <section className="mode-banner" aria-label="Research mode selection">
+            <div className="container">
               <ModeSwitcher />
             </div>
-          </header>
+          </section>
           <main className="site-main">
             <div className="container">{children}</div>
           </main>
