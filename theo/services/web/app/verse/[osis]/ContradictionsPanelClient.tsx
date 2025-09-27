@@ -218,6 +218,7 @@ export default function ContradictionsPanelClient({
                       rel="noopener noreferrer"
                       style={{ color: "#2563eb" }}
                     >
+
                       {item.source}
                     </Link>
                   ) : (
