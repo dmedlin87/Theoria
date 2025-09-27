@@ -17,6 +17,11 @@ def list_features() -> dict[str, bool]:
         "job_tracking": True,
         "document_annotations": True,
         "ai_copilot": True,
+        "cross_references": True,
+        "textual_variants": True,
+        "morphology": True,
+        "commentaries": True,
+        "verse_timeline": getattr(settings, "verse_timeline_enabled", False),
     }
 
 
@@ -28,8 +33,13 @@ def discovery() -> dict[str, dict[str, bool]]:
             "research": True,
             "contradictions": getattr(settings, "contradictions_enabled", False),
             "geo": getattr(settings, "geo_enabled", False),
+            "cross_references": True,
+            "textual_variants": True,
+            "morphology": True,
+            "commentaries": True,
             "creator_verse_perspectives": getattr(
                 settings, "creator_verse_perspectives_enabled", False
             ),
+            "verse_timeline": getattr(settings, "verse_timeline_enabled", False),
         }
     }

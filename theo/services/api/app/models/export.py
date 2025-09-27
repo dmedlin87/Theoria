@@ -89,3 +89,62 @@ class ExportManifest(APIModel):
     cursor: str | None = None
     next_cursor: str | None = None
     mode: str | None = None
+
+
+class DeliverableManifest(APIModel):
+    """Metadata describing an export-ready deliverable payload."""
+
+    export_id: str
+    schema_version: str
+    generated_at: datetime
+    type: Literal["sermon", "transcript"]
+    filters: dict[str, Any] = Field(default_factory=dict)
+    git_sha: str | None = None
+    model_preset: str | None = None
+    sources: list[str] = Field(default_factory=list)
+
+
+class DeliverableAsset(APIModel):
+    """Single file artifact returned by a deliverable export."""
+
+    format: Literal["markdown", "ndjson", "csv"]
+    filename: str
+    media_type: str
+    content: str
+
+
+class DeliverablePackage(APIModel):
+    """Complete payload for an export deliverable."""
+
+    manifest: DeliverableManifest
+    assets: list[DeliverableAsset]
+
+    def get_asset(self, fmt: str) -> DeliverableAsset:
+        for asset in self.assets:
+            if asset.format == fmt:
+                return asset
+        raise ValueError(f"format {fmt!r} not present in deliverable")
+
+
+class DeliverableResponse(APIModel):
+    """API response describing an export deliverable job result."""
+
+    export_id: str
+    status: Literal["queued", "processing", "completed", "failed"]
+    manifest: DeliverableManifest
+    assets: list[DeliverableAsset]
+    message: str | None = None
+
+
+class DeliverableRequest(APIModel):
+    """Parameters accepted by the deliverable export endpoint."""
+
+    type: Literal["sermon", "transcript"]
+    formats: list[Literal["markdown", "ndjson", "csv"]] = Field(
+        default_factory=lambda: ["markdown"]
+    )
+    topic: str | None = None
+    osis: str | None = None
+    filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
+    model: str | None = None
+    document_id: str | None = None

@@ -24,6 +24,8 @@ class Passage(APIModel):
     document_id: str
     text: str
     osis_ref: str | None = None
+    start_char: int | None = None
+    end_char: int | None = None
     page_no: int | None = None
     t_start: float | None = None
     t_end: float | None = None

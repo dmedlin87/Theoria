@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+
+import pytest
+from sqlalchemy.orm import Session
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from theo.services.api.app.ai.clients import (  # noqa: E402
+    AnthropicClient,
+    AzureOpenAIClient,
+    LocalVLLMClient,
+    OpenAIClient,
+    VertexAIClient,
+    build_client,
+)
+from theo.services.api.app.ai.registry import (  # noqa: E402
+    LLMModel,
+    get_llm_registry,
+    save_llm_registry,
+)
+from theo.services.api.app.core.database import (  # noqa: E402
+    Base,
+    configure_engine,
+    get_engine,
+)
+from theo.services.api.app.core.settings import (  # noqa: E402
+    get_settings,
+    get_settings_cipher,
+)
+from theo.services.api.app.core.settings_store import (  # noqa: E402
+    load_setting,
+    save_setting,
+)
+from theo.services.api.app.db.models import AppSetting  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _reset_settings(monkeypatch):
+    monkeypatch.setenv("SETTINGS_SECRET_KEY", "test-secret-key")
+    get_settings.cache_clear()
+    get_settings_cipher.cache_clear()
+    yield
+    get_settings.cache_clear()
+    get_settings_cipher.cache_clear()
+
+
+def _prepare_engine(tmp_path: Path):
+    configure_engine(f"sqlite:///{tmp_path / 'llm.db'}")
+    engine = get_engine()
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    return engine
+
+
+def test_settings_store_encrypts_and_decrypts(tmp_path: Path) -> None:
+    engine = _prepare_engine(tmp_path)
+    with Session(engine) as session:
+        save_setting(session, "secrets", {"token": "value"})
+        record = session.get(AppSetting, "app:secrets")
+        assert record is not None
+        assert isinstance(record.value, dict)
+        assert "__encrypted__" in record.value
+        assert load_setting(session, "secrets") == {"token": "value"}
+
+
+def test_registry_encrypts_api_keys_and_migrates_plaintext(tmp_path: Path) -> None:
+    engine = _prepare_engine(tmp_path)
+    payload = {
+        "default_model": "anthropic",
+        "models": [
+            {
+                "name": "anthropic",
+                "provider": "anthropic",
+                "model": "claude-3",
+                "config": {"api_key": "plain-key"},
+            }
+        ],
+    }
+    with Session(engine) as session:
+        session.add(AppSetting(key="app:llm", value=payload))
+        session.commit()
+
+        registry = get_llm_registry(session)
+        model = registry.get("anthropic")
+        assert model.config["api_key"] == "plain-key"
+
+        record = session.get(AppSetting, "app:llm")
+        assert record is not None
+        assert isinstance(record.value, dict)
+        assert "__encrypted__" in record.value
+
+        serialized = registry.serialize()
+        stored_config = serialized["models"][0]["config"]["api_key"]
+        assert isinstance(stored_config, dict)
+        assert "__encrypted__" in stored_config
+
+
+@pytest.mark.parametrize(
+    "provider, config, expected",
+    [
+        ("openai", {"api_key": "key"}, OpenAIClient),
+        (
+            "azure",
+            {
+                "api_key": "key",
+                "endpoint": "https://example.openai.azure.com",
+                "deployment": "gpt",
+            },
+            AzureOpenAIClient,
+        ),
+        ("anthropic", {"api_key": "key"}, AnthropicClient),
+        (
+            "vertex",
+            {
+                "project_id": "proj",
+                "location": "us-central1",
+                "model": "text-model",
+                "access_token": "token",
+            },
+            VertexAIClient,
+        ),
+        (
+            "vllm",
+            {
+                "base_url": "http://localhost:8000",
+            },
+            LocalVLLMClient,
+        ),
+    ],
+)
+def test_build_client_dispatch(provider, config, expected) -> None:
+    client = build_client(provider, config)
+    assert isinstance(client, expected)
+
+
+def test_registry_persists_model_metadata(tmp_path: Path) -> None:
+    engine = _prepare_engine(tmp_path)
+    with Session(engine) as session:
+        registry = get_llm_registry(session)
+        model = LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[ok]"},
+            pricing={"per_call": 0.5},
+            latency={"p95": 1200},
+            routing={"spend_ceiling": 5.0, "weight": 2.5},
+        )
+        registry.add_model(model, make_default=True)
+        save_llm_registry(session, registry)
+        session.expire_all()
+
+        reloaded = get_llm_registry(session)
+        loaded = reloaded.get("primary")
+        assert loaded.pricing["per_call"] == 0.5
+        assert loaded.latency["p95"] == 1200
+        assert loaded.routing["spend_ceiling"] == 5.0

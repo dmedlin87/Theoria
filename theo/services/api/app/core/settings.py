@@ -1,9 +1,14 @@
 """Application configuration for the Theo Engine API."""
 
+from __future__ import annotations
+
+import base64
+import hashlib
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from cryptography.fernet import Fernet
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,6 +61,11 @@ class Settings(BaseSettings):
     notification_timeout_seconds: float = Field(
         default=10.0, description="HTTP timeout when delivering notifications"
     )
+    settings_secret_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SETTINGS_SECRET_KEY", "settings_secret_key"),
+        description="Secret used to derive the Fernet key for persisted settings",
+    )
     contradictions_enabled: bool = Field(
         default=True, description="Toggle contradiction search endpoints"
     )
@@ -65,6 +75,14 @@ class Settings(BaseSettings):
     creator_verse_perspectives_enabled: bool = Field(
         default=True,
         description="Toggle aggregated creator perspectives by verse",
+    )
+    creator_verse_rollups_async_refresh: bool = Field(
+        default=False,
+        description="Queue creator verse rollup refreshes via Celery instead of inline",
+    )
+    verse_timeline_enabled: bool = Field(
+        default=True,
+        description="Toggle verse mention timeline aggregation endpoints",
     )
 
 
@@ -79,3 +97,18 @@ def get_settings() -> Settings:
             settings.fixtures_root = candidate
 
     return settings
+
+
+def _derive_fernet_key(secret: str) -> bytes:
+    digest = hashlib.sha256(secret.encode("utf-8")).digest()
+    return base64.urlsafe_b64encode(digest)
+
+
+@lru_cache
+def get_settings_cipher() -> Fernet | None:
+    """Return a cached Fernet instance for encrypting persisted settings."""
+
+    secret = get_settings().settings_secret_key
+    if not secret:
+        return None
+    return Fernet(_derive_fernet_key(secret))

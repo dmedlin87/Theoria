@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..db.models import Document, IngestionJob
 from ..models.jobs import (
+    HNSWRefreshJobRequest,
     JobEnqueueRequest,
     JobEnqueueResponse,
     JobListResponse,
@@ -30,6 +31,7 @@ from ..workers.tasks import (
     enrich_document as enqueue_enrich_task,
     generate_document_summary as summary_task,
     process_file,
+    refresh_hnsw as refresh_hnsw_task,
     topic_digest as topic_digest_task,
 )
 
@@ -199,6 +201,46 @@ def enqueue_enrichment_job(
     session.commit()
 
     async_result = enqueue_enrich_task.delay(document.id, job.id)
+    task_id = getattr(async_result, "id", None)
+    if task_id:
+        job.task_id = task_id
+        session.add(job)
+        session.commit()
+
+    session.refresh(job)
+    return _serialize_job(job)
+
+
+@router.post(
+    "/refresh-hnsw",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobStatus,
+)
+def enqueue_refresh_hnsw_job(
+    request: HNSWRefreshJobRequest, session: Session = Depends(get_session)
+) -> JobStatus:
+    """Queue a pgvector HNSW refresh and recall evaluation."""
+
+    job = IngestionJob(
+        job_type="refresh_hnsw",
+        status="queued",
+        payload={
+            "sample_queries": request.sample_queries,
+            "top_k": request.top_k,
+        },
+    )
+    session.add(job)
+    session.commit()
+
+    delay_callable = refresh_hnsw_task.delay
+    try:
+        async_result = delay_callable(
+            job.id,
+            sample_queries=request.sample_queries,
+            top_k=request.top_k,
+        )
+    except TypeError:  # pragma: no cover - celery stubs in tests
+        async_result = delay_callable(job.id)
     task_id = getattr(async_result, "id", None)
     if task_id:
         job.task_id = task_id

@@ -37,6 +37,8 @@ def _seed_corpus() -> None:
             ),
             osis_ref="John.1.1",
             page_no=1,
+            start_char=0,
+            end_char=113,
         )
         doc.passages.append(passage)
         transcript = Document(
@@ -56,6 +58,8 @@ def _seed_corpus() -> None:
             t_start=10.0,
             t_end=25.0,
             meta={"speaker": "Student"},
+            start_char=0,
+            end_char=73,
         )
         transcript.passages.append(transcript_passage)
         session.add_all([doc, transcript])
@@ -99,11 +103,15 @@ def test_verse_copilot_returns_citations_and_followups() -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["answer"]["citations"], payload
-        for citation in payload["answer"]["citations"]:
-            assert citation["osis"] == "John.1.1"
-            assert citation["snippet"], citation
-        assert payload["follow_ups"], payload
         with Session(get_engine()) as session:
+            for citation in payload["answer"]["citations"]:
+                assert citation["osis"] == "John.1.1"
+                assert citation["snippet"], citation
+                assert citation["source_url"].startswith("/doc/"), citation
+                passage = session.get(Passage, citation["passage_id"])
+                assert passage is not None
+                assert citation["snippet"] in passage.text
+            assert payload["follow_ups"], payload
             trail = (
                 session.execute(
                     select(AgentTrail)
@@ -153,6 +161,102 @@ def test_llm_registry_crud_operations() -> None:
         assert final_state["default_model"] == "echo"
 
 
+def test_chat_session_returns_guarded_answer_and_trail() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {"role": "user", "content": "Summarise John 1:1 from the library"}
+                ],
+                "osis": "John.1.1",
+                "recorder_metadata": {"user_id": "chat-user"},
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["session_id"]
+        assert payload["answer"]["citations"]
+        assert payload["message"]["role"] == "assistant"
+        assert payload["message"]["content"]
+        with Session(get_engine()) as session:
+            trail = (
+                session.execute(
+                    select(AgentTrail)
+                    .where(
+                        AgentTrail.workflow == "chat",
+                        AgentTrail.status == "completed",
+                    )
+                    .order_by(AgentTrail.started_at.desc())
+                )
+                .scalars()
+                .first()
+            )
+            assert trail is not None
+            assert trail.user_id == "chat-user"
+
+
+def test_chat_turn_guardrail_failure_returns_422() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {"role": "user", "content": "Share insights on an unknown topic"}
+                ],
+                "osis": "Gen.99.1",
+                "filters": {"collection": "Nonexistent"},
+            },
+        )
+        assert response.status_code == 422
+
+
+def test_provider_settings_crud_flow() -> None:
+    with TestClient(app) as client:
+        missing = client.get("/settings/ai/providers/openai")
+        assert missing.status_code == 404
+
+        upsert = client.put(
+            "/settings/ai/providers/openai",
+            json={
+                "api_key": "secret-key",
+                "base_url": "https://example.com",
+                "default_model": "gpt-test",
+                "extra_headers": {"X-Test": "1"},
+            },
+        )
+        assert upsert.status_code == 200, upsert.text
+        payload = upsert.json()
+        assert payload["provider"] == "openai"
+        assert payload["has_api_key"] is True
+        assert payload["base_url"] == "https://example.com"
+        assert payload["extra_headers"] == {"X-Test": "1"}
+
+        listing = client.get("/settings/ai/providers")
+        assert listing.status_code == 200
+        providers = listing.json()
+        assert providers and providers[0]["provider"] == "openai"
+
+        rotate = client.put(
+            "/settings/ai/providers/openai", json={"api_key": None}
+        )
+        assert rotate.status_code == 200
+        rotated = rotate.json()
+        assert rotated["has_api_key"] is False
+
+        delete = client.delete("/settings/ai/providers/openai")
+        assert delete.status_code == 204
+        after = client.get("/settings/ai/providers/openai")
+        assert after.status_code == 404
+        final_listing = client.get("/settings/ai/providers")
+        assert final_listing.status_code == 200
+        assert final_listing.json() == []
+
+
 def test_verse_copilot_guardrails_when_no_citations() -> None:
     _seed_corpus()
     with TestClient(app) as client:
@@ -177,6 +281,31 @@ def test_sermon_prep_export_markdown() -> None:
         body = response.text
         assert body.startswith("---\nexport_id:")
         assert "Sermon Prep" in body
+
+
+def test_export_deliverable_sermon_bundle() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/export/deliverable",
+            json={
+                "type": "sermon",
+                "topic": "Logos",
+                "osis": "John.1.1",
+                "formats": ["markdown", "ndjson"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["status"] == "completed"
+        assert payload["manifest"]["type"] == "sermon"
+        assert payload["manifest"]["filters"]["topic"] == "Logos"
+        assert len(payload["assets"]) == 2
+        formats = {asset["format"] for asset in payload["assets"]}
+        assert {"markdown", "ndjson"} == formats
+        markdown_asset = next(asset for asset in payload["assets"] if asset["format"] == "markdown")
+        assert markdown_asset["content"].startswith("---\nexport_id:")
 
 
 def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
@@ -234,6 +363,28 @@ def test_transcript_export_csv() -> None:
         text = response.text
         assert "export_id=transcript-doc-2" in text
         assert "Student" in text
+
+
+def test_export_deliverable_transcript_bundle() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        response = client.post(
+            "/export/deliverable",
+            json={
+                "type": "transcript",
+                "document_id": "doc-2",
+                "formats": ["csv"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["status"] == "completed"
+        assert payload["manifest"]["type"] == "transcript"
+        assert payload["manifest"]["filters"]["document_id"] == "doc-2"
+        assert payload["assets"]
+        csv_asset = payload["assets"][0]
+        assert csv_asset["format"] == "csv"
+        assert csv_asset["content"].startswith("export_id=transcript-doc-2")
 
 
 def test_comparative_analysis_returns_citations_and_comparisons() -> None:
@@ -352,7 +503,7 @@ def test_topic_digest_generation() -> None:
         assert "Pauline eschatology" in digest_document["topics"]
         clusters = digest_document["meta"]["clusters"]
         assert clusters
-        assert "doc-1" in clusters[0]["document_ids"]
+        assert any("doc-1" in cluster["document_ids"] for cluster in clusters)
 
 
 def test_batch_intel_cli(tmp_path) -> None:

@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+from datetime import UTC, date, datetime
+from pathlib import Path
+import sys
+
+import pytest
+from sqlalchemy.orm import Session
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from theo.services.api.app.core.database import (  # noqa: E402  # import after path tweak
+    Base,
+    configure_engine,
+    get_engine,
+)
+from theo.services.api.app.db.models import Document, Passage  # noqa: E402
+from theo.services.api.app.models.verses import VerseMentionsFilters  # noqa: E402
+from theo.services.api.app.retriever.verses import (  # noqa: E402
+    get_verse_timeline,
+)
+
+
+def _prepare_engine(tmp_path: Path):
+    configure_engine(f"sqlite:///{tmp_path / 'timeline.db'}")
+    engine = get_engine()
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    return engine
+
+
+def _seed_documents(session: Session) -> None:
+    doc1 = Document(
+        id="doc-1",
+        title="First",
+        source_type="pdf",
+        authors=["Alice"],
+        pub_date=date(2023, 1, 15),
+    )
+    doc2 = Document(
+        id="doc-2",
+        title="Second",
+        source_type="pdf",
+        authors=["Bob"],
+        pub_date=date(2023, 1, 28),
+    )
+    doc3 = Document(
+        id="doc-3",
+        title="Third",
+        source_type="markdown",
+        authors=["Alice"],
+        pub_date=None,
+        created_at=datetime(2023, 3, 5, tzinfo=UTC),
+    )
+    doc4 = Document(
+        id="doc-4",
+        title="Fourth",
+        source_type="pdf",
+        authors=["Carol"],
+        pub_date=date(2022, 12, 3),
+    )
+
+    session.add_all([doc1, doc2, doc3, doc4])
+    session.flush()
+
+    passages = [
+        Passage(id="p-1", document_id=doc1.id, text="Ref", osis_ref="John.3.16"),
+        Passage(id="p-2", document_id=doc2.id, text="Ref", osis_ref="John.3.16"),
+        Passage(id="p-3", document_id=doc3.id, text="Ref", osis_ref="John.3.16"),
+        Passage(id="p-4", document_id=doc4.id, text="Ref", osis_ref="John.3.16"),
+    ]
+    session.add_all(passages)
+    session.commit()
+
+
+def test_get_verse_timeline_groups_mentions_by_month(tmp_path) -> None:
+    engine = _prepare_engine(tmp_path)
+    with Session(engine) as session:
+        _seed_documents(session)
+
+        response = get_verse_timeline(
+            session=session,
+            osis="John.3.16",
+            window="month",
+            filters=VerseMentionsFilters(),
+        )
+
+    assert response.window == "month"
+    assert response.total_mentions == 4
+    assert len(response.buckets) == 3
+
+    labels = {bucket.label: bucket for bucket in response.buckets}
+    assert labels["2023-01"].count == 2
+    assert sorted(labels["2023-01"].document_ids) == ["doc-1", "doc-2"]
+    assert labels["2023-03"].count == 1
+    assert labels["2023-03"].document_ids == ["doc-3"]
+    assert labels["2022-12"].count == 1
+
+
+def test_get_verse_timeline_honors_filters_and_limit(tmp_path) -> None:
+    engine = _prepare_engine(tmp_path)
+    with Session(engine) as session:
+        _seed_documents(session)
+
+        filtered = get_verse_timeline(
+            session=session,
+            osis="John.3.16",
+            window="month",
+            filters=VerseMentionsFilters(source_type="pdf"),
+        )
+
+        limited = get_verse_timeline(
+            session=session,
+            osis="John.3.16",
+            window="month",
+            limit=2,
+            filters=VerseMentionsFilters(),
+        )
+
+    assert filtered.total_mentions == 3
+    assert all(doc_id != "doc-3" for bucket in filtered.buckets for doc_id in bucket.document_ids)
+
+    assert len(limited.buckets) == 2
+    assert all(bucket.label != "2022-12" for bucket in limited.buckets)
+    assert limited.total_mentions == sum(bucket.count for bucket in limited.buckets)
+
+
+def test_get_verse_timeline_rejects_invalid_window(tmp_path) -> None:
+    engine = _prepare_engine(tmp_path)
+    with Session(engine) as session:
+        _seed_documents(session)
+
+        with pytest.raises(ValueError):
+            get_verse_timeline(session=session, osis="John.3.16", window="invalid")  # type: ignore[arg-type]

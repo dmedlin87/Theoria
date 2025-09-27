@@ -2,6 +2,8 @@
 
 import { FormEvent, useMemo, useState } from "react";
 
+import { formatEmphasisSummary } from "../../mode-config";
+import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
 import type { ResearchFeatureFlags } from "./research-panels";
 
@@ -28,7 +30,9 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
   const [results, setResults] = useState<GeoSearchResult[]>([]);
   const [submitted, setSubmitted] = useState(false);
 
+  const { mode } = useMode();
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+  const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
 
   if (!features?.geo) {
     return null;
@@ -51,7 +55,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
       const response = await fetch(`${baseUrl}/research/geo/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim(), osis }),
+        body: JSON.stringify({ query: query.trim(), osis, mode: mode.id }),
       });
       if (!response.ok) {
         throw new Error((await response.text()) || response.statusText);
@@ -85,6 +89,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
       <p style={{ marginTop: 0 }}>
         Discover locations linked to <strong>{osis}</strong>.
       </p>
+      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.85rem" }}>{modeSummary}</p>
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem", marginBottom: "1rem" }}>
         <label style={{ display: "grid", gap: "0.5rem" }}>
           Search locations

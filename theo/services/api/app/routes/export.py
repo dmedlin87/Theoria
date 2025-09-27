@@ -9,6 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
+from ..ai.rag import (
+    GuardrailError,
+    build_sermon_deliverable,
+    build_transcript_deliverable,
+    generate_sermon_prep_outline,
+)
 from ..core.database import get_session
 from ..export.formatters import (
     DEFAULT_FILENAME_PREFIX,
@@ -16,7 +22,11 @@ from ..export.formatters import (
     build_search_export,
     render_bundle,
 )
-from ..models.export import DocumentExportFilters
+from ..models.export import (
+    DeliverableRequest,
+    DeliverableResponse,
+    DocumentExportFilters,
+)
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.export import export_documents, export_search_results
 
@@ -38,6 +48,67 @@ def _should_gzip(request: Request) -> bool:
 def _build_filename(export_type: str, extension: str) -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return f"{DEFAULT_FILENAME_PREFIX}_{export_type}_{timestamp}.{extension}"
+
+
+def _normalise_formats(formats: list[str]) -> list[str]:
+    if not formats:
+        return ["markdown"]
+    return [fmt.lower() for fmt in formats]
+
+
+@router.post("/deliverable", response_model=DeliverableResponse)
+def export_deliverable(
+    payload: DeliverableRequest,
+    session: Session = Depends(get_session),
+) -> DeliverableResponse:
+    """Generate sermon or transcript deliverables under a unified schema."""
+
+    formats = _normalise_formats(payload.formats)
+    try:
+        if payload.type == "sermon":
+            if not payload.topic:
+                raise HTTPException(
+                    status_code=400,
+                    detail="topic is required for sermon deliverables",
+                )
+            response = generate_sermon_prep_outline(
+                session,
+                topic=payload.topic,
+                osis=payload.osis,
+                filters=payload.filters,
+                model_name=payload.model,
+            )
+            package = build_sermon_deliverable(
+                response,
+                formats=formats,
+                filters=payload.filters.model_dump(exclude_none=True),
+            )
+        elif payload.type == "transcript":
+            if not payload.document_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="document_id is required for transcript deliverables",
+                )
+            package = build_transcript_deliverable(
+                session,
+                payload.document_id,
+                formats=formats,
+            )
+        else:  # pragma: no cover - payload validation guards this
+            raise HTTPException(status_code=400, detail="Unsupported deliverable type")
+    except GuardrailError as exc:
+        status_code = 422 if payload.type == "sermon" else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return DeliverableResponse(
+        export_id=package.manifest.export_id,
+        status="completed",
+        manifest=package.manifest,
+        assets=package.assets,
+        message=f"Generated {payload.type} deliverable",
+    )
 
 
 @router.get("/search")

@@ -2,23 +2,142 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
+import logging
+import math
+import re
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Sequence, TypeVar
+from urllib.parse import urlencode
+
+try:  # pragma: no cover - optional dependency guard
+    from redis import asyncio as redis_asyncio
+except ImportError:  # pragma: no cover - redis is optional at runtime
+    redis_asyncio = None  # type: ignore[assignment]
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..core.settings import get_settings
 from ..core.version import get_git_sha
 from ..db.models import Document, Passage
+from ..export.formatters import SCHEMA_VERSION, generate_export_id
 from ..models.base import APIModel
+from ..models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from ..retriever.hybrid import hybrid_search
 from ..telemetry import instrument_workflow, log_workflow_event, set_span_attribute
 from .clients import GenerationError
 from .registry import LLMRegistry, get_llm_registry
+from .router import get_router
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from .trails import TrailRecorder
+
+
+LOGGER = logging.getLogger(__name__)
+
+_CACHE_TTL_SECONDS = 30 * 60
+_CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*\((?P<anchor>[^()]+)\)$")
+_SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
+
+_redis_client: Any = None
+
+
+def _normalise_profile_value(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = value.strip().lower()
+    return text or None
+
+
+def _extract_topic_domains(meta: Mapping[str, Any] | None) -> set[str]:
+    domains: set[str] = set()
+    if not meta:
+        return domains
+    raw = meta.get("topic_domains") or meta.get("topic_domain")
+    if raw is None:
+        return domains
+    if isinstance(raw, str):
+        candidates = re.split(r"[,;]", raw)
+    elif isinstance(raw, Iterable):
+        candidates = raw
+    else:
+        return domains
+    for item in candidates:
+        text = str(item).strip().lower()
+        if text:
+            domains.add(text)
+    return domains
+
+
+def _apply_guardrail_profile(
+    results: Sequence[HybridSearchResult],
+    filters: HybridSearchFilters | None,
+) -> tuple[list[HybridSearchResult], dict[str, str] | None]:
+    ordered = list(results)
+    if not filters:
+        return ordered, None
+
+    tradition_filter = _normalise_profile_value(filters.theological_tradition)
+    domain_filter = _normalise_profile_value(filters.topic_domain)
+    if not tradition_filter and not domain_filter:
+        payload = {
+            key: value
+            for key, value in {
+                "theological_tradition": filters.theological_tradition,
+                "topic_domain": filters.topic_domain,
+            }.items()
+            if value
+        }
+        return ordered, payload or None
+
+    matched: list[HybridSearchResult] = []
+    remainder: list[HybridSearchResult] = []
+    for result in ordered:
+        meta = getattr(result, "meta", None)
+        meta_mapping: Mapping[str, Any] | None = meta if isinstance(meta, Mapping) else None
+        meta_tradition = (
+            _normalise_profile_value(str(meta_mapping.get("theological_tradition")))
+            if meta_mapping and meta_mapping.get("theological_tradition") is not None
+            else None
+        )
+        domains = _extract_topic_domains(meta_mapping)
+
+        matches_tradition = True
+        if tradition_filter:
+            matches_tradition = meta_tradition == tradition_filter
+
+        matches_domain = True
+        if domain_filter:
+            matches_domain = domain_filter in domains
+
+        if matches_tradition and matches_domain:
+            matched.append(result)
+        else:
+            remainder.append(result)
+
+    if not matched:
+        LOGGER.warning(
+            "guardrail profile rejected retrieved passages",
+            extra={
+                "theological_tradition": filters.theological_tradition,
+                "topic_domain": filters.topic_domain,
+            },
+        )
+        raise GuardrailError("No passages matched the requested guardrail profile")
+
+    payload = {
+        key: value
+        for key, value in {
+            "theological_tradition": filters.theological_tradition,
+            "topic_domain": filters.topic_domain,
+        }.items()
+        if value
+    }
+    return matched + remainder, payload or None
 
 
 class GuardrailError(GenerationError):
@@ -33,6 +152,7 @@ class RAGCitation(APIModel):
     document_id: str
     document_title: str | None = None
     snippet: str
+    source_url: str
 
 
 class RAGAnswer(APIModel):
@@ -40,6 +160,7 @@ class RAGAnswer(APIModel):
     citations: list[RAGCitation]
     model_name: str | None = None
     model_output: str | None = None
+    guardrail_profile: dict[str, str] | None = None
 
 
 class VerseCopilotResponse(APIModel):
@@ -90,6 +211,110 @@ class CollaborationResponse(APIModel):
     answer: RAGAnswer
 
 
+T = TypeVar("T")
+
+
+def _get_cache_client() -> Any:
+    """Return a memoized Redis client or ``None`` if unavailable."""
+
+    global _redis_client
+
+    if redis_asyncio is None:
+        return None
+    if _redis_client is not None:
+        return _redis_client
+
+    try:
+        settings = get_settings()
+        _redis_client = redis_asyncio.from_url(  # type: ignore[assignment]
+            settings.redis_url,
+            encoding="utf-8",
+            decode_responses=True,
+        )
+    except Exception:  # pragma: no cover - network/config errors
+        LOGGER.debug("failed to initialise redis client", exc_info=True)
+        _redis_client = None
+    return _redis_client
+
+
+def _run_redis_command(operation: Callable[[Any], Awaitable[T]]) -> T | None:
+    """Execute an async redis command from synchronous code."""
+
+    client = _get_cache_client()
+    if client is None:
+        return None
+
+    async def _runner() -> T:
+        return await operation(client)
+
+    try:
+        return asyncio.run(_runner())
+    except RuntimeError as exc:  # pragma: no cover - nested loop guard
+        if "running event loop" in str(exc).lower():
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(_runner())
+            finally:
+                loop.close()
+        raise
+    except Exception:  # pragma: no cover - redis failures logged at debug
+        LOGGER.debug("redis command failed", exc_info=True)
+        return None
+
+
+def _normalise_cache_segment(value: str | None, default: str) -> str:
+    segment = value or default
+    return re.sub(r"[^a-zA-Z0-9._-]", "_", segment)
+
+
+def _build_cache_key(
+    *,
+    user_id: str | None,
+    model_label: str | None,
+    prompt: str,
+    retrieval_digest: str,
+) -> str:
+    prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    version = _normalise_cache_segment(get_git_sha() or "dev", "dev")
+    user_segment = _normalise_cache_segment(user_id, "anon")
+    model_segment = _normalise_cache_segment(model_label, "default")
+    return f"rag:{version}:{user_segment}:{model_segment}:{retrieval_digest}:{prompt_hash}"
+
+
+def _load_cached_answer(key: str) -> dict[str, Any] | None:
+    raw = _run_redis_command(lambda client: client.get(key))
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        LOGGER.debug("invalid JSON payload in cache for key %s", key, exc_info=True)
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _store_cached_answer(
+    key: str,
+    *,
+    answer: RAGAnswer,
+    validation: dict[str, Any] | None,
+) -> None:
+    payload = {
+        "answer": answer.model_dump(mode="json"),
+        "validation": validation,
+        "model_name": answer.model_name,
+        "cached_at": datetime.now(UTC).isoformat(),
+    }
+    try:
+        serialised = json.dumps(payload)
+    except TypeError:
+        LOGGER.debug("failed to serialise cache payload", exc_info=True)
+        return
+    _run_redis_command(lambda client: client.set(key, serialised, ex=_CACHE_TTL_SECONDS))
+
+
 def _format_anchor(passage: HybridSearchResult | Passage) -> str:
     if getattr(passage, "page_no", None) is not None:
         return f"page {passage.page_no}"
@@ -101,13 +326,66 @@ def _format_anchor(passage: HybridSearchResult | Passage) -> str:
     return "context"
 
 
+def _build_source_url(result: HybridSearchResult) -> str:
+    params: dict[str, str] = {}
+    if getattr(result, "page_no", None) is not None:
+        params["page"] = str(result.page_no)
+    if getattr(result, "t_start", None) is not None:
+        params["t"] = str(math.floor(result.t_start))
+    query = urlencode(params)
+    base = f"/doc/{result.document_id}"
+    anchor = f"#passage-{result.id}"
+    return f"{base}?{query}{anchor}" if query else f"{base}{anchor}"
+
+
+def _iter_sentence_spans(text: str) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    for match in _SENTENCE_PATTERN.finditer(text):
+        start, end = match.span()
+        sentence = text[start:end].strip()
+        if sentence:
+            spans.append((start, end, sentence))
+    return spans
+
+
+def _derive_snippet(result: HybridSearchResult) -> str:
+    base_text = result.text or ""
+    fallback = (result.snippet or base_text).strip()
+    if not base_text.strip():
+        return fallback
+
+    start_char = getattr(result, "start_char", None)
+    end_char = getattr(result, "end_char", None)
+    if start_char is None or end_char is None:
+        return fallback
+
+    start = max(0, min(len(base_text), start_char))
+    end = max(start, min(len(base_text), end_char))
+    spans = _iter_sentence_spans(base_text)
+    if not spans:
+        snippet = base_text[start:end].strip()
+        return snippet or fallback
+
+    selected_sentences = [
+        sentence
+        for span_start, span_end, sentence in spans
+        if span_end > start and span_start < end
+    ]
+    if not selected_sentences:
+        snippet = base_text[start:end].strip()
+        return snippet or fallback
+
+    snippet = " ".join(selected_sentences).strip()
+    return snippet or fallback
+
+
 def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
     citations: list[RAGCitation] = []
     for index, result in enumerate(results, start=1):
         if not result.osis_ref:
             continue
         anchor = _format_anchor(result)
-        snippet = (result.snippet or result.text).strip()
+        snippet = _derive_snippet(result)
         citations.append(
             RAGCitation(
                 index=index,
@@ -117,9 +395,89 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
                 document_id=result.document_id,
                 document_title=result.document_title,
                 snippet=snippet,
+                source_url=_build_source_url(result),
             )
         )
     return citations
+
+
+def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
+    digest = hashlib.sha256()
+    for result in results:
+        digest.update(str(result.id).encode("utf-8"))
+        digest.update(str(result.document_id).encode("utf-8"))
+        digest.update(str(result.osis_ref or "").encode("utf-8"))
+        digest.update(str(result.rank).encode("utf-8"))
+        digest.update(str(result.snippet or result.text or "").encode("utf-8"))
+        digest.update(_format_anchor(result).encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _validate_model_completion(
+    completion: str,
+    citations: Sequence[RAGCitation],
+) -> dict[str, Any]:
+    if not completion or not completion.strip():
+        raise GuardrailError("Model completion was empty")
+
+    marker_index = completion.lower().rfind("sources:")
+    if marker_index == -1:
+        raise GuardrailError("Model completion missing 'Sources:' line")
+
+    sources_text = completion[marker_index + len("Sources:") :].strip()
+    if not sources_text:
+        raise GuardrailError("Model completion missing citations after 'Sources:'")
+
+    entries = [entry.strip() for entry in re.split(r";|\n", sources_text) if entry.strip()]
+    if not entries:
+        raise GuardrailError("Model completion missing citations after 'Sources:'")
+
+    expected = {citation.index: citation for citation in citations}
+    mismatches: list[str] = []
+    parsed_entries: list[dict[str, Any]] = []
+    cited_indices: list[int] = []
+
+    for entry in entries:
+        entry_match = _CITATION_ENTRY_PATTERN.match(entry)
+        if not entry_match:
+            mismatches.append(f"unparseable citation '{entry}'")
+            continue
+
+        index = int(entry_match.group("index"))
+        osis = entry_match.group("osis").strip()
+        anchor = entry_match.group("anchor").strip()
+        parsed_entries.append({"index": index, "osis": osis, "anchor": anchor})
+        cited_indices.append(index)
+
+        citation = expected.get(index)
+        if citation is None:
+            mismatches.append(
+                f"citation index {index} not present in retrieved passages"
+            )
+            continue
+        if osis != citation.osis:
+            mismatches.append(
+                f"citation [{index}] OSIS mismatch (expected {citation.osis}, got {osis})"
+            )
+        if anchor != citation.anchor:
+            mismatches.append(
+                f"citation [{index}] anchor mismatch (expected {citation.anchor}, got {anchor})"
+            )
+
+    if not cited_indices:
+        raise GuardrailError("Model completion did not include any recognised citations")
+
+    if mismatches:
+        raise GuardrailError(
+            "Model citations failed guardrails: " + "; ".join(mismatches)
+        )
+
+    return {
+        "status": "passed",
+        "cited_indices": sorted(set(cited_indices)),
+        "citation_count": len(parsed_entries),
+        "sources": parsed_entries,
+    }
 
 
 def _guarded_answer(
@@ -130,15 +488,17 @@ def _guarded_answer(
     registry: LLMRegistry,
     model_hint: str | None = None,
     recorder: "TrailRecorder | None" = None,
+    filters: HybridSearchFilters | None = None,
 ) -> RAGAnswer:
-    citations = _build_citations(results)
+    ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
+    citations = _build_citations(ordered_results)
     if not citations:
         raise GuardrailError(
             "Retrieved passages lacked OSIS references; aborting generation"
         )
 
     summary_lines = []
-    for citation, result in zip(citations, results):
+    for citation, result in zip(citations, ordered_results):
         summary_lines.append(
             f"[{citation.index}] {citation.snippet} — {citation.document_title or citation.document_id}"
             f" ({citation.osis}, {citation.anchor})"
@@ -147,37 +507,153 @@ def _guarded_answer(
 
     model_output = None
     model_name = None
-    try:
-        model = registry.get(model_hint)
-    except GenerationError:
-        model = None
+    validation_result: dict[str, Any] | None = None
+    cache_status = "skipped"
+    cache_key: str | None = None
+    cache_key_suffix: str | None = None
 
-    if model:
-        context_lines = [
-            f"[{citation.index}] {citation.snippet} (OSIS {citation.osis}, {citation.anchor})"
-            for citation in citations
-        ]
-        prompt_parts = [
-            "You are Theo Engine's grounded assistant.",
-            "Answer the question strictly from the provided passages.",
-            "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
-            "If the passages do not answer the question, state that explicitly.",
-        ]
-        if question:
-            prompt_parts.append(f"Question: {question}")
-        prompt_parts.append("Passages:")
-        prompt_parts.extend(context_lines)
-        prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
-        prompt = "\n".join(prompt_parts)
-        client = model.build_client()
+
+    user_id = None
+    if recorder and getattr(recorder, "trail", None) is not None:
+        user_id = getattr(recorder.trail, "user_id", None)
+
+    router = get_router(session, registry=registry)
+    candidates = list(router.iter_candidates("rag", model_hint))
+    if not candidates:
+        raise GenerationError("No language models are available for workflow 'rag'")
+
+    context_lines = [
+        f"[{citation.index}] {citation.snippet} (OSIS {citation.osis}, {citation.anchor})"
+        for citation in citations
+    ]
+    prompt_parts = [
+        "You are Theo Engine's grounded assistant.",
+        "Answer the question strictly from the provided passages.",
+        "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
+        "If the passages do not answer the question, state that explicitly.",
+    ]
+    if question:
+        prompt_parts.append(f"Question: {question}")
+    prompt_parts.append("Passages:")
+    prompt_parts.extend(context_lines)
+    prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
+    prompt = "\\n".join(prompt_parts)
+
+    retrieval_digest = _build_retrieval_digest(ordered_results)
+    last_error: GenerationError | None = None
+    selected_model: LLMModel | None = None
+
+    cache_key = None
+    cache_key_suffix = None
+    cache_status = "skipped"
+
+    for candidate in candidates:
+        selected_model = candidate
+        cache_event_logged = False
+        cache_key = _build_cache_key(
+            user_id=user_id,
+            model_label=candidate.name,
+            prompt=prompt,
+            retrieval_digest=retrieval_digest,
+        )
+        cache_key_suffix = cache_key[-12:]
+        cache_status = "miss"
+        cache_hit_payload: RAGAnswer | None = None
+        validation_result = None
+        model_output = None
+
+        cached_payload = _load_cached_answer(cache_key)
+        if cached_payload:
+            cache_status = "hit"
+            try:
+                cache_hit_payload = RAGAnswer.model_validate(cached_payload.get("answer"))
+            except Exception:
+                LOGGER.debug(
+                    "invalid cached answer payload for key %s", cache_key, exc_info=True
+                )
+                cache_hit_payload = None
+
+            if cache_hit_payload and cache_hit_payload.model_output:
+                try:
+                    validation_result = _validate_model_completion(
+                        cache_hit_payload.model_output, citations
+                    )
+                except GuardrailError as exc:
+                    cache_status = "stale"
+                    _run_redis_command(lambda client: client.delete(cache_key))
+                    log_workflow_event(
+                        "workflow.guardrails_cache",
+                        workflow="rag",
+                        status="stale",
+                        cache_key_suffix=cache_key_suffix,
+                    )
+                    cache_event_logged = True
+                    if recorder:
+                        recorder.log_step(
+                            tool="rag.cache",
+                            action="invalidate",
+                            input_payload={"cache_key_suffix": cache_key_suffix},
+                            status="failed",
+                            error_message=str(exc),
+                        )
+                    cache_hit_payload = None
+                    validation_result = None
+                else:
+                    model_output = cache_hit_payload.model_output
+                    model_name = cached_payload.get("model_name", candidate.name)
+            else:
+                cache_status = "stale"
+
+        if cache_status == "hit" and model_output:
+            log_workflow_event(
+                "workflow.guardrails_cache",
+                workflow="rag",
+                status="hit",
+                cache_key_suffix=cache_key_suffix,
+            )
+        elif not cache_event_logged:
+            if cache_status == "hit":
+                cache_status = "stale"
+            if cache_status == "stale":
+                log_workflow_event(
+                    "workflow.guardrails_cache",
+                    workflow="rag",
+                    status="stale",
+                    cache_key_suffix=cache_key_suffix,
+                )
+            else:
+                log_workflow_event(
+                    "workflow.guardrails_cache",
+                    workflow="rag",
+                    status="miss",
+                    cache_key_suffix=cache_key_suffix,
+                )
+
+        if recorder and cache_key:
+            recorder.log_step(
+                tool="rag.cache",
+                action="lookup",
+                input_payload={"cache_key_suffix": cache_key_suffix},
+                output_payload={"status": cache_status},
+                output_digest=cache_status,
+            )
+
+        if model_output:
+            break
+
         llm_payload = {
             "prompt": prompt,
-            "model": model.model,
-            "registry_name": model.name,
+            "model": candidate.model,
+            "registry_name": candidate.name,
         }
         try:
-            completion = client.generate(prompt=prompt, model=model.model)
+            routed_generation = router.execute_generation(
+                workflow="rag",
+                model=candidate,
+                prompt=prompt,
+            )
         except GenerationError as exc:
+            last_error = exc
             if recorder:
                 recorder.log_step(
                     tool="llm.generate",
@@ -187,24 +663,102 @@ def _guarded_answer(
                     output_digest=str(exc),
                     error_message=str(exc),
                 )
-            completion = None
-        else:
+            continue
+
+        completion = routed_generation.output
+        if recorder:
+            recorder.log_step(
+                tool="llm.generate",
+                action="generate_grounded_answer",
+                input_payload=llm_payload,
+                output_payload={
+                    "completion": completion,
+                    "latency_ms": routed_generation.latency_ms,
+                    "cost": routed_generation.cost,
+                },
+                output_digest=f"{len(completion)} characters",
+            )
+        sources_line = "; ".join(
+            f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
+        )
+        has_citations_line = bool(re.search(r"Sources:\s*\[\d+]", completion))
+        if not has_citations_line:
+            completion = completion.strip() + f"\\n\\nSources: {sources_line}"
+        try:
+            validation_result = _validate_model_completion(completion, citations)
+        except GuardrailError as exc:
+            log_workflow_event(
+                "workflow.guardrails_validation",
+                workflow="rag",
+                status="failed",
+                cache_status=cache_status,
+                cache_key_suffix=cache_key_suffix,
+            )
             if recorder:
                 recorder.log_step(
-                    tool="llm.generate",
-                    action="generate_grounded_answer",
-                    input_payload=llm_payload,
+                    tool="guardrails.validate",
+                    action="check_citations",
+                    status="failed",
+                    input_payload={
+                        "cache_status": cache_status,
+                        "cache_key_suffix": cache_key_suffix,
+                    },
                     output_payload={"completion": completion},
-                    output_digest=f"{len(completion)} characters",
+                    error_message=str(exc),
                 )
-            sources_line = "; ".join(
-                f"[{citation.index}] {citation.osis} ({citation.anchor})"
-                for citation in citations
+            raise
+        model_output = completion
+        model_name = candidate.name
+        if cache_status == "stale":
+            cache_status = "refresh"
+        break
+
+    if not model_output:
+        if last_error is not None:
+            raise last_error
+        raise GenerationError("Language model routing failed to produce a completion")
+    if validation_result:
+        log_workflow_event(
+            "workflow.guardrails_validation",
+            workflow="rag",
+            status=validation_result.get("status", "passed"),
+            cache_status=cache_status,
+            cache_key_suffix=cache_key_suffix,
+            citation_count=validation_result.get("citation_count"),
+            cited_indices=validation_result.get("cited_indices"),
+        )
+        if recorder:
+            recorder.log_step(
+                tool="guardrails.validate",
+                action="check_citations",
+                input_payload={
+                    "cache_status": cache_status,
+                    "cache_key_suffix": cache_key_suffix,
+                },
+                output_payload=validation_result,
+                output_digest=f"status={validation_result.get('status', 'passed')}",
             )
-            if "Sources:" not in completion:
-                completion = completion.strip() + f"\n\nSources: {sources_line}"
-            model_output = completion
-            model_name = model.name
+
+    answer = RAGAnswer(
+        summary=summary_text,
+        citations=citations,
+        model_name=model_name,
+        model_output=model_output,
+        guardrail_profile=guardrail_profile,
+    )
+
+    if cache_key and model_output and validation_result and cache_status in {
+        "miss",
+        "refresh",
+    }:
+        _store_cached_answer(cache_key, answer=answer, validation=validation_result)
+        if cache_status == "refresh":
+            log_workflow_event(
+                "workflow.guardrails_cache",
+                workflow="rag",
+                status="refresh",
+                cache_key_suffix=cache_key_suffix,
+            )
 
     if recorder:
         recorder.log_step(
@@ -227,16 +781,13 @@ def _guarded_answer(
                 "summary": summary_text,
                 "model_name": model_name,
                 "model_output": model_output,
+                "cache_status": cache_status,
+                "validation": validation_result,
             },
             output_digest=f"{len(summary_lines)} summary lines",
         )
 
-    return RAGAnswer(
-        summary=summary_text,
-        citations=citations,
-        model_name=model_name,
-        model_output=model_output,
-    )
+    return answer
 
 
 def _search(
@@ -249,6 +800,76 @@ def _search(
 ) -> list[HybridSearchResult]:
     request = HybridSearchRequest(query=query, osis=osis, filters=filters, k=k)
     return hybrid_search(session, request)
+
+
+def run_guarded_chat(
+    session: Session,
+    *,
+    question: str,
+    osis: str | None = None,
+    filters: HybridSearchFilters | None = None,
+    model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
+) -> RAGAnswer:
+    filters = filters or HybridSearchFilters()
+    with instrument_workflow(
+        "chat",
+        question_present=bool(question),
+        model_hint=model_name,
+    ) as span:
+        set_span_attribute(
+            span,
+            "workflow.filters",
+            filters.model_dump(exclude_none=True),
+        )
+        results = _search(session, query=question, osis=osis, filters=filters)
+        set_span_attribute(span, "workflow.result_count", len(results))
+        log_workflow_event(
+            "workflow.passages_retrieved",
+            workflow="chat",
+            result_count=len(results),
+        )
+        registry = get_llm_registry(session)
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": question,
+                    "osis": osis,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
+        answer = _guarded_answer(
+            session,
+            question=question,
+            results=results,
+            registry=registry,
+            model_hint=model_name,
+            recorder=recorder,
+            filters=filters,
+        )
+        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        set_span_attribute(span, "workflow.summary_length", len(answer.summary))
+        log_workflow_event(
+            "workflow.answer_composed",
+            workflow="chat",
+            citations=len(answer.citations),
+        )
+        if recorder:
+            recorder.record_citations(answer.citations)
+        return answer
 
 
 def generate_verse_brief(
@@ -309,6 +930,7 @@ def generate_verse_brief(
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -394,6 +1016,7 @@ def generate_sermon_prep_outline(
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -466,6 +1089,7 @@ def generate_comparative_analysis(
             results=results,
             registry=registry,
             model_hint=model_name,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -491,6 +1115,7 @@ def generate_multimedia_digest(
     *,
     collection: str | None = None,
     model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> MultimediaDigestResponse:
     filters = HybridSearchFilters(
         collection=collection, source_type="audio" if collection else None
@@ -512,6 +1137,27 @@ def generate_multimedia_digest(
             workflow="multimedia_digest",
             result_count=len(results),
         )
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": "highlights",
+                    "osis": None,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
         registry = get_llm_registry(session)
         answer = _guarded_answer(
             session,
@@ -519,12 +1165,16 @@ def generate_multimedia_digest(
             results=results,
             registry=registry,
             model_hint=model_name,
+            recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         highlights = [
             f"{citation.document_title or citation.document_id}: {citation.snippet}"
             for citation in answer.citations
         ]
+        if recorder:
+            recorder.record_citations(answer.citations)
         return MultimediaDigestResponse(
             collection=collection, highlights=highlights, answer=answer
         )
@@ -536,6 +1186,7 @@ def generate_devotional_flow(
     osis: str,
     focus: str,
     model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> DevotionalResponse:
     filters = HybridSearchFilters()
     with instrument_workflow(
@@ -557,6 +1208,27 @@ def generate_devotional_flow(
             osis=osis,
             result_count=len(results),
         )
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": focus,
+                    "osis": osis,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
         registry = get_llm_registry(session)
         answer = _guarded_answer(
             session,
@@ -564,6 +1236,8 @@ def generate_devotional_flow(
             results=results,
             registry=registry,
             model_hint=model_name,
+            recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -571,6 +1245,8 @@ def generate_devotional_flow(
             workflow="devotional",
             citations=len(answer.citations),
         )
+        if recorder:
+            recorder.record_citations(answer.citations)
         reflection = "\n".join(
             f"Reflect on {citation.osis} ({citation.anchor}): {citation.snippet}"
             for citation in answer.citations[:3]
@@ -589,6 +1265,7 @@ def run_corpus_curation(
     session: Session,
     *,
     since: datetime | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> CorpusCurationReport:
     with instrument_workflow(
         "corpus_curation",
@@ -624,6 +1301,14 @@ def run_corpus_curation(
                 f"{document.title or document.id} — {topic_label} ({document.collection or 'general'})"
             )
         set_span_attribute(span, "workflow.summary_count", len(summaries))
+        if recorder:
+            recorder.log_step(
+                tool="corpus_curation",
+                action="summarise_documents",
+                input_payload={"since": since.isoformat()},
+                output_payload=summaries,
+                output_digest=f"{len(summaries)} summaries",
+            )
         return CorpusCurationReport(
             since=since, documents_processed=len(rows), summaries=summaries
         )
@@ -636,6 +1321,7 @@ def run_research_reconciliation(
     osis: str,
     viewpoints: Sequence[str],
     model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> CollaborationResponse:
     filters = HybridSearchFilters()
     with instrument_workflow(
@@ -660,6 +1346,27 @@ def run_research_reconciliation(
             thread=thread,
             result_count=len(results),
         )
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": "; ".join(viewpoints),
+                    "osis": osis,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
         registry = get_llm_registry(session)
         answer = _guarded_answer(
             session,
@@ -667,6 +1374,8 @@ def run_research_reconciliation(
             results=results,
             registry=registry,
             model_hint=model_name,
+            recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -674,6 +1383,8 @@ def run_research_reconciliation(
             workflow="research_reconciliation",
             citations=len(answer.citations),
         )
+        if recorder:
+            recorder.record_citations(answer.citations)
         synthesis_lines = [
             f"{citation.osis}: {citation.snippet}" for citation in answer.citations
         ]
@@ -683,100 +1394,223 @@ def run_research_reconciliation(
         )
 
 
-def build_sermon_prep_package(
-    response: SermonPrepResponse, *, format: str
-) -> tuple[str, str]:
-    manifest = {
-        "export_id": f"sermon-{response.answer.citations[0].document_id if response.answer.citations else 'unknown'}",
-        "schema_version": "2024-07-01",
-        "filters": {"topic": response.topic, "osis": response.osis},
-        "git_sha": get_git_sha(),
-    }
-    if format == "markdown":
-        lines = [
-            "---",
-            f"export_id: {manifest['export_id']}",
-            f"schema_version: {manifest['schema_version']}",
-        ]
-        lines.append(f"filters: {manifest['filters']}")
-        lines.append("---\n")
-        lines.append(f"# Sermon Prep — {response.topic}")
-        if response.osis:
-            lines.append(f"Focus Passage: {response.osis}\n")
+_SUPPORTED_DELIVERABLE_FORMATS = {"markdown", "ndjson", "csv"}
+
+
+def _normalise_formats(formats: Sequence[str]) -> list[str]:
+    """Return a deduplicated list of valid deliverable formats."""
+
+    normalised: list[str] = []
+    for fmt in formats:
+        candidate = fmt.lower()
+        if candidate not in _SUPPORTED_DELIVERABLE_FORMATS:
+            raise ValueError(f"Unsupported format: {fmt}")
+        if candidate not in normalised:
+            normalised.append(candidate)
+    return normalised
+
+
+def _build_deliverable_manifest(
+    deliverable_type: Literal["sermon", "transcript"],
+    *,
+    export_id: str | None = None,
+    filters: Mapping[str, Any] | None = None,
+    model_preset: str | None = None,
+    sources: Sequence[str] | None = None,
+) -> DeliverableManifest:
+    """Create a manifest describing the generated deliverable."""
+
+    manifest_sources = list(dict.fromkeys(list(sources or [])))
+    return DeliverableManifest(
+        export_id=export_id or generate_export_id(),
+        schema_version=SCHEMA_VERSION,
+        generated_at=datetime.now(UTC),
+        type=deliverable_type,  # type: ignore[arg-type]
+        filters=dict(filters or {}),
+        git_sha=get_git_sha(),
+        model_preset=model_preset,
+        sources=manifest_sources,
+    )
+
+
+def _manifest_front_matter(manifest: DeliverableManifest) -> list[str]:
+    lines = [
+        "---",
+        f"export_id: {manifest.export_id}",
+        f"schema_version: {manifest.schema_version}",
+        f"generated_at: {manifest.generated_at.isoformat()}",
+        f"type: {manifest.type}",
+    ]
+    if manifest.model_preset:
+        lines.append(f"model_preset: {manifest.model_preset}")
+    if manifest.git_sha:
+        lines.append(f"git_sha: {manifest.git_sha}")
+    if manifest.sources:
+        lines.append(f"sources: {json.dumps(manifest.sources)}")
+    if manifest.filters:
+        lines.append(f"filters: {json.dumps(manifest.filters, sort_keys=True)}")
+    lines.append("---\n")
+    return lines
+
+
+def _csv_manifest_prefix(manifest: DeliverableManifest) -> str:
+    parts = [
+        f"export_id={manifest.export_id}",
+        f"schema_version={manifest.schema_version}",
+        f"type={manifest.type}",
+        f"generated_at={manifest.generated_at.isoformat()}",
+    ]
+    if manifest.git_sha:
+        parts.append(f"git_sha={manifest.git_sha}")
+    if manifest.model_preset:
+        parts.append(f"model_preset={manifest.model_preset}")
+    if manifest.sources:
+        parts.append(f"sources={json.dumps(manifest.sources)}")
+    if manifest.filters:
+        parts.append(f"filters={json.dumps(manifest.filters, sort_keys=True)}")
+    return ",".join(parts) + "\n"
+
+
+def _render_sermon_markdown(
+    manifest: DeliverableManifest, response: SermonPrepResponse
+) -> str:
+    lines = _manifest_front_matter(manifest)
+    lines.append(f"# Sermon Prep — {response.topic}")
+    if response.osis:
+        lines.append(f"Focus Passage: {response.osis}\n")
+    if response.outline:
         lines.append("## Outline")
         for item in response.outline:
             lines.append(f"- {item}")
-        lines.append("\n## Key Points")
-        for citation in response.answer.citations:
-            lines.append(f"- {citation.osis} ({citation.anchor}): {citation.snippet}")
-        body = "\n".join(lines)
-        return body, "text/markdown"
-    if format == "ndjson":
-        import json
-
-        lines = [json.dumps(manifest)]
+        lines.append("")
+    if response.key_points:
+        lines.append("## Key Points")
+        for point in response.key_points:
+            lines.append(f"- {point}")
+        lines.append("")
+    if response.answer.citations:
+        lines.append("## Citations")
         for citation in response.answer.citations:
             lines.append(
-                json.dumps(
-                    {
-                        "osis": citation.osis,
-                        "anchor": citation.anchor,
-                        "snippet": citation.snippet,
-                        "document_id": citation.document_id,
-                    }
-                )
+                f"- {citation.osis} ({citation.anchor}) — {citation.snippet}"
             )
-        return "\n".join(lines) + "\n", "application/x-ndjson"
-    if format == "csv":
-        import csv
-        import io
+    return "\n".join(lines).strip() + "\n"
 
-        buffer = io.StringIO()
-        writer = csv.DictWriter(
-            buffer, fieldnames=["osis", "anchor", "snippet", "document_id"]
+
+def _render_sermon_ndjson(
+    manifest: DeliverableManifest, response: SermonPrepResponse
+) -> str:
+    payload = manifest.model_dump(mode="json")
+    lines = [json.dumps(payload, ensure_ascii=False)]
+    for idx, item in enumerate(response.outline, start=1):
+        lines.append(
+            json.dumps(
+                {"kind": "outline", "order": idx, "value": item},
+                ensure_ascii=False,
+            )
         )
-        writer.writeheader()
-        for citation in response.answer.citations:
-            writer.writerow(
+    for idx, point in enumerate(response.key_points, start=1):
+        lines.append(
+            json.dumps(
+                {"kind": "key_point", "order": idx, "value": point},
+                ensure_ascii=False,
+            )
+        )
+    for citation in response.answer.citations:
+        lines.append(
+            json.dumps(
                 {
+                    "kind": "citation",
                     "osis": citation.osis,
                     "anchor": citation.anchor,
                     "snippet": citation.snippet,
                     "document_id": citation.document_id,
-                }
+                },
+                ensure_ascii=False,
             )
-        body = buffer.getvalue()
-        prefix = f"export_id={manifest['export_id']},schema_version={manifest['schema_version']},filters={manifest['filters']},git_sha={manifest['git_sha']}\n"
-        return prefix + body, "text/csv"
-    raise ValueError(f"Unsupported format: {format}")
-
-
-def build_transcript_package(
-    session: Session,
-    document_id: str,
-    *,
-    format: str,
-) -> tuple[str, str]:
-    document = session.get(Document, document_id)
-    if document is None:
-        raise GuardrailError(f"Document {document_id} not found")
-    passages = (
-        session.query(Passage)
-        .filter(Passage.document_id == document_id)
-        .order_by(
-            Passage.page_no.asc(),
-            Passage.t_start.asc(),
-            Passage.start_char.asc(),
         )
-        .all()
+    return "\n".join(lines) + "\n"
+
+
+def _render_sermon_csv(
+    manifest: DeliverableManifest, response: SermonPrepResponse
+) -> str:
+    import csv
+    import io
+
+    buffer = io.StringIO()
+    writer = csv.DictWriter(
+        buffer, fieldnames=["osis", "anchor", "snippet", "document_id"]
     )
-    manifest = {
-        "export_id": f"transcript-{document_id}",
-        "schema_version": "2024-07-01",
-        "filters": {"document_id": document_id},
-        "git_sha": get_git_sha(),
-    }
-    rows = []
+    writer.writeheader()
+    for citation in response.answer.citations:
+        writer.writerow(
+            {
+                "osis": citation.osis,
+                "anchor": citation.anchor,
+                "snippet": citation.snippet,
+                "document_id": citation.document_id,
+            }
+        )
+    return _csv_manifest_prefix(manifest) + buffer.getvalue()
+
+
+def build_sermon_deliverable(
+    response: SermonPrepResponse,
+    *,
+    formats: Sequence[str],
+    filters: Mapping[str, Any] | None = None,
+) -> DeliverablePackage:
+    """Render sermon prep content as a multi-format deliverable."""
+
+    normalised = _normalise_formats(formats)
+    citations = response.answer.citations
+    export_id = (
+        f"sermon-{citations[0].document_id}"
+        if citations
+        else generate_export_id()
+    )
+    manifest_filters: dict[str, Any] = {"topic": response.topic}
+    if response.osis:
+        manifest_filters["osis"] = response.osis
+    if filters:
+        manifest_filters["search_filters"] = dict(filters)
+    manifest = _build_deliverable_manifest(
+        "sermon",
+        export_id=export_id,
+        filters=manifest_filters,
+        model_preset=response.answer.model_name,
+        sources=[citation.document_id for citation in citations],
+    )
+    assets: list[DeliverableAsset] = []
+    for fmt in normalised:
+        if fmt == "markdown":
+            body = _render_sermon_markdown(manifest, response)
+            media_type = "text/markdown"
+            filename = "sermon.md"
+        elif fmt == "ndjson":
+            body = _render_sermon_ndjson(manifest, response)
+            media_type = "application/x-ndjson"
+            filename = "sermon.ndjson"
+        elif fmt == "csv":
+            body = _render_sermon_csv(manifest, response)
+            media_type = "text/csv"
+            filename = "sermon.csv"
+        else:  # pragma: no cover - guarded earlier
+            raise ValueError(f"Unsupported format: {fmt}")
+        assets.append(
+            DeliverableAsset(
+                format=fmt,
+                filename=filename,
+                media_type=media_type,
+                content=body,
+            )
+        )
+    return DeliverablePackage(manifest=manifest, assets=assets)
+
+
+def _build_transcript_rows(passages: Sequence[Passage]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     for passage in passages:
         speaker = None
         if passage.meta and isinstance(passage.meta, dict):
@@ -792,40 +1626,124 @@ def build_transcript_package(
                 "passage_id": passage.id,
             }
         )
-    if format == "markdown":
-        lines = [
-            "---",
-            f"export_id: {manifest['export_id']}",
-            f"schema_version: {manifest['schema_version']}",
-        ]
-        lines.append(f"filters: {manifest['filters']}")
-        lines.append("---\n")
-        lines.append(f"# Q&A Transcript — {document.title or document_id}")
-        for row in rows:
-            anchor = row["osis"] or row["page_no"] or row["t_start"]
-            lines.append(f"- **{row['speaker']}** ({anchor}): {row['text']}")
-        return "\n".join(lines), "text/markdown"
-    if format == "ndjson":
-        import json
+    return rows
 
-        lines = [json.dumps(manifest)]
-        for row in rows:
-            lines.append(json.dumps(row, ensure_ascii=False))
-        return "\n".join(lines) + "\n", "application/x-ndjson"
-    if format == "csv":
-        import csv
-        import io
 
-        buffer = io.StringIO()
-        writer = csv.DictWriter(
-            buffer, fieldnames=list(rows[0].keys()) if rows else ["speaker", "text"]
+def _render_transcript_markdown(
+    manifest: DeliverableManifest,
+    title: str | None,
+    rows: Sequence[dict[str, Any]],
+) -> str:
+    lines = _manifest_front_matter(manifest)
+    lines.append(f"# Q&A Transcript — {title or manifest.filters.get('document_id')}")
+    for row in rows:
+        anchor = row.get("osis") or row.get("page_no") or row.get("t_start")
+        lines.append(
+            f"- **{row['speaker']}** ({anchor}): {row['text']}"
         )
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
-        header = f"export_id={manifest['export_id']},schema_version={manifest['schema_version']},filters={manifest['filters']},git_sha={manifest['git_sha']}\n"
-        return header + buffer.getvalue(), "text/csv"
-    raise ValueError(f"Unsupported format: {format}")
+    return "\n".join(lines).strip() + "\n"
+
+
+def _render_transcript_ndjson(
+    manifest: DeliverableManifest, rows: Sequence[dict[str, Any]]
+) -> str:
+    payload = manifest.model_dump(mode="json")
+    lines = [json.dumps(payload, ensure_ascii=False)]
+    for row in rows:
+        lines.append(json.dumps(row, ensure_ascii=False))
+    return "\n".join(lines) + "\n"
+
+
+def _render_transcript_csv(
+    manifest: DeliverableManifest, rows: Sequence[dict[str, Any]]
+) -> str:
+    import csv
+    import io
+
+    buffer = io.StringIO()
+    fieldnames = list(rows[0].keys()) if rows else ["speaker", "text"]
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    return _csv_manifest_prefix(manifest) + buffer.getvalue()
+
+
+def build_transcript_deliverable(
+    session: Session,
+    document_id: str,
+    *,
+    formats: Sequence[str],
+) -> DeliverablePackage:
+    """Generate transcript exports for the requested document."""
+
+    document = session.get(Document, document_id)
+    if document is None:
+        raise GuardrailError(f"Document {document_id} not found")
+    passages = (
+        session.query(Passage)
+        .filter(Passage.document_id == document_id)
+        .order_by(
+            Passage.page_no.asc(),
+            Passage.t_start.asc(),
+            Passage.start_char.asc(),
+        )
+        .all()
+    )
+    rows = _build_transcript_rows(passages)
+    manifest = _build_deliverable_manifest(
+        "transcript",
+        export_id=f"transcript-{document_id}",
+        filters={"document_id": document_id},
+        sources=[document_id],
+    )
+    normalised = _normalise_formats(formats)
+    assets: list[DeliverableAsset] = []
+    for fmt in normalised:
+        if fmt == "markdown":
+            body = _render_transcript_markdown(manifest, document.title, rows)
+            media_type = "text/markdown"
+            filename = "transcript.md"
+        elif fmt == "ndjson":
+            body = _render_transcript_ndjson(manifest, rows)
+            media_type = "application/x-ndjson"
+            filename = "transcript.ndjson"
+        elif fmt == "csv":
+            body = _render_transcript_csv(manifest, rows)
+            media_type = "text/csv"
+            filename = "transcript.csv"
+        else:  # pragma: no cover - guarded earlier
+            raise ValueError(f"Unsupported format: {fmt}")
+        assets.append(
+            DeliverableAsset(
+                format=fmt,
+                filename=filename,
+                media_type=media_type,
+                content=body,
+            )
+        )
+    return DeliverablePackage(manifest=manifest, assets=assets)
+
+
+def build_sermon_prep_package(
+    response: SermonPrepResponse, *, format: str
+) -> tuple[str, str]:
+    normalised = format.lower()
+    package = build_sermon_deliverable(response, formats=[normalised])
+    asset = package.get_asset(normalised)
+    return asset.content, asset.media_type
+
+
+def build_transcript_package(
+    session: Session,
+    document_id: str,
+    *,
+    format: str,
+) -> tuple[str, str]:
+    normalised = format.lower()
+    package = build_transcript_deliverable(session, document_id, formats=[normalised])
+    asset = package.get_asset(normalised)
+    return asset.content, asset.media_type
 
 
 __all__ = [
@@ -839,13 +1757,16 @@ __all__ = [
     "RAGCitation",
     "SermonPrepResponse",
     "VerseCopilotResponse",
+    "build_sermon_deliverable",
     "build_sermon_prep_package",
+    "build_transcript_deliverable",
     "build_transcript_package",
     "generate_comparative_analysis",
     "generate_devotional_flow",
     "generate_multimedia_digest",
     "generate_sermon_prep_outline",
     "generate_verse_brief",
+    "run_guarded_chat",
     "run_corpus_curation",
     "run_research_reconciliation",
 ]

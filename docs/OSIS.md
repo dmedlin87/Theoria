@@ -10,6 +10,13 @@ normalize Bible references across the corpus.
 2. Normalize via `pythonbible` to standard OSIS strings.
 3. Store canonical references on each passage for Verse Aggregator queries.
 
+## TEI Integration
+
+- TEI ingestion annotates each chunk with OSIS references discovered during OCR
+  normalisation.
+- `tei_pipeline` stores the TEI XML alongside the chunk and mirrors scripture
+  references into passage metadata for downstream search facets.
+
 ## Range Handling
 
 - Represent inclusive ranges (`John.1.1-John.1.5`).

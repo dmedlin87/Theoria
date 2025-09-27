@@ -41,6 +41,99 @@ class CrossReferenceResponse(APIModel):
     total: int
 
 
+class VariantReading(APIModel):
+    id: str
+    osis: str
+    category: str
+    reading: str
+    note: str | None = None
+    source: str | None = None
+    witness: str | None = None
+    translation: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class VariantApparatusResponse(APIModel):
+    osis: str
+    readings: list[VariantReading] = Field(default_factory=list)
+    total: int
+
+
+class HistoricityEntry(APIModel):
+    id: str
+    title: str
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    summary: str | None = None
+    source: str | None = None
+    url: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    score: float
+
+
+class HistoricitySearchResponse(APIModel):
+    query: str
+    results: list[HistoricityEntry] = Field(default_factory=list)
+    total: int
+
+
+class FallacyDetection(APIModel):
+    id: str
+    name: str
+    category: str
+    description: str
+    severity: str | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    matches: list[str] = Field(default_factory=list)
+
+
+class FallacyDetectRequest(APIModel):
+    text: str
+    min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class FallacyDetectResponse(APIModel):
+    text: str
+    detections: list[FallacyDetection] = Field(default_factory=list)
+    total: int
+
+
+class ReportClaim(APIModel):
+    statement: str
+    stance: str | None = None
+    support: list[str] | None = None
+
+
+class ReportBuildRequest(APIModel):
+    osis: str
+    stance: str
+    claims: list[ReportClaim] | None = None
+    historicity_query: str | None = None
+    narrative_text: str | None = None
+    include_fallacies: bool = False
+    variants_limit: int | None = Field(default=None, ge=1, le=50)
+    citations_limit: int = Field(default=5, ge=1, le=20)
+    min_fallacy_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class ResearchReportSection(APIModel):
+    title: str
+    summary: str | None = None
+    items: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ResearchReport(APIModel):
+    osis: str
+    stance: str
+    summary: str
+    sections: list[ResearchReportSection] = Field(default_factory=list)
+    meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class ResearchReportResponse(APIModel):
+    report: ResearchReport
+
+
 class MorphToken(APIModel):
     osis: str
     surface: str

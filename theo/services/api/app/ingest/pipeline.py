@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from datetime import date, datetime, timezone
 from html import unescape
@@ -20,6 +21,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
+from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import (
     Creator,
     CreatorClaim,
@@ -118,6 +120,35 @@ def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str
     return combined
 
 
+def _refresh_creator_verse_rollups(
+    session: Session, segments: list[TranscriptSegment]
+) -> None:
+    """Refresh cached creator verse rollups impacted by *segments*."""
+
+    osis_refs: set[str] = set()
+    for segment in segments:
+        if segment.osis_refs:
+            osis_refs.update(segment.osis_refs)
+
+    if not osis_refs:
+        return
+
+    settings = get_settings()
+    sorted_refs = sorted(osis_refs)
+    if getattr(settings, "creator_verse_rollups_async_refresh", False):
+        try:
+            from ..workers import tasks as worker_tasks
+
+            worker_tasks.refresh_creator_verse_rollups.delay(sorted_refs)
+            return
+        except Exception:
+            # Fall back to in-process refresh if the broker is unavailable.
+            pass
+
+    service = CreatorVersePerspectiveService(session)
+    service.refresh_many(sorted_refs)
+
+
 def _serialise_frontmatter(frontmatter: dict[str, Any]) -> str:
     """Render a frontmatter dictionary to JSON, normalising complex types."""
 
@@ -213,6 +244,70 @@ def _ensure_list(value: Any) -> list[str] | None:
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
+
+
+def _normalise_guardrail_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _normalise_guardrail_collection(value: Any) -> list[str] | None:
+    if value is None:
+        return None
+    items: list[str] = []
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            text = _normalise_guardrail_value(item)
+            if text:
+                items.append(text)
+    else:
+        for part in re.split(r"[,;]", str(value)):
+            text = _normalise_guardrail_value(part)
+            if text:
+                items.append(text)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for item in items:
+        key = item.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique or None
+
+
+def _extract_guardrail_profile(
+    frontmatter: dict[str, Any]
+) -> tuple[str | None, list[str] | None]:
+    tradition = _normalise_guardrail_value(frontmatter.get("theological_tradition"))
+    topic_domains = _normalise_guardrail_collection(
+        frontmatter.get("topic_domains") or frontmatter.get("topic_domain")
+    )
+
+    tag_sources: list[str] = []
+    for key in ("admin_tags", "tags"):
+        entries = _ensure_list(frontmatter.get(key)) or []
+        tag_sources.extend(entries)
+
+    for raw_tag in tag_sources:
+        tag = str(raw_tag)
+        if ":" not in tag:
+            continue
+        prefix, value = tag.split(":", 1)
+        prefix_key = prefix.strip().lower()
+        value_text = _normalise_guardrail_value(value)
+        if not value_text:
+            continue
+        if prefix_key in {"tradition", "confession"} and not tradition:
+            tradition = value_text
+        if prefix_key in {"domain", "topic_domain"}:
+            topic_domains = topic_domains or []
+            if value_text not in topic_domains:
+                topic_domains.append(value_text)
+
+    return tradition, topic_domains or None
 
 
 def _get_or_create_creator(
@@ -813,6 +908,8 @@ def _persist_text_document(
     raw_content: str | None = None,
     raw_filename: str | None = None,
 ) -> Document:
+    tradition, topic_domains = _extract_guardrail_profile(frontmatter)
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Document",
@@ -833,6 +930,8 @@ def _persist_text_document(
         video_id=frontmatter.get("video_id"),
         duration_seconds=_coerce_int(frontmatter.get("duration_seconds")),
         bib_json=frontmatter.get("bib_json"),
+        theological_tradition=tradition,
+        topic_domains=topic_domains,
         sha256=sha256,
     )
 
@@ -878,6 +977,10 @@ def _persist_text_document(
             chunk_index=chunk.index or 0,
             speakers=chunk.speakers,
         )
+        if tradition:
+            meta.setdefault("theological_tradition", tradition)
+        if topic_domains:
+            meta.setdefault("topic_domains", topic_domains)
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         embedding = embeddings[idx] if idx < len(embeddings) else None
         passage = Passage(
@@ -986,6 +1089,8 @@ def _persist_text_document(
 
     session.commit()
 
+    _refresh_creator_verse_rollups(session, segments)
+
     storage_dir = settings.storage_root / document.id
     storage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1079,6 +1184,8 @@ def _persist_transcript_document(
     transcript_path: Path | None = None,
     audio_path: Path | None = None,
 ) -> Document:
+    tradition, topic_domains = _extract_guardrail_profile(frontmatter)
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Transcript",
@@ -1101,6 +1208,8 @@ def _persist_transcript_document(
         or _coerce_int(frontmatter.get("duration_seconds"))
         or _derive_duration_from_chunks(chunks),
         bib_json=frontmatter.get("bib_json"),
+        theological_tradition=tradition,
+        topic_domains=topic_domains,
         sha256=sha256,
     )
 
@@ -1146,6 +1255,10 @@ def _persist_transcript_document(
             chunk_index=chunk.index or 0,
             speakers=chunk.speakers,
         )
+        if tradition:
+            meta.setdefault("theological_tradition", tradition)
+        if topic_domains:
+            meta.setdefault("topic_domains", topic_domains)
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         embedding = embeddings[idx] if idx < len(embeddings) else None
         passage = Passage(

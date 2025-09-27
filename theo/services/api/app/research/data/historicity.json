@@ -1,0 +1,32 @@
+[
+  {
+    "id": "quirinius-census-bond2011",
+    "title": "Reassessing Quirinius and the Census of Luke 2",
+    "authors": ["Sean E. Bond"],
+    "year": 2011,
+    "summary": "Analyzes inscriptional evidence suggesting an earlier administrative role for Quirinius in Syria.",
+    "tags": ["luke", "census", "quirinius", "bethlehem"],
+    "source": "Journal of Ancient Near Eastern Studies",
+    "url": "https://example.com/quirinius-census"
+  },
+  {
+    "id": "bethlehem-archaeology-pritchard2018",
+    "title": "Bethlehem in the Second Temple Period",
+    "authors": ["Elaine Pritchard"],
+    "year": 2018,
+    "summary": "Synthesizes archaeological surveys around Bethlehem with emphasis on Herodian expansions.",
+    "tags": ["bethlehem", "archaeology", "herodian"],
+    "source": "Palestine Exploration Quarterly",
+    "url": "https://example.com/bethlehem-herodian"
+  },
+  {
+    "id": "logos-christology-sanchez2020",
+    "title": "The Logos Hymn and Second Temple Wisdom Traditions",
+    "authors": ["Marina Sanchez"],
+    "year": 2020,
+    "summary": "Connects John 1 to Jewish sapiential texts with attention to textual transmission.",
+    "tags": ["john", "logos", "wisdom", "christology"],
+    "source": "Journal for the Study of the New Testament",
+    "url": "https://example.com/logos-wisdom"
+  }
+]

@@ -207,6 +207,42 @@ Response:
 }
 ```
 
+### `GET /verses/{osis}/timeline`
+
+Aggregates mention counts into fixed windows so clients can visualize trends.
+The endpoint respects the same filters as the mentions route and is guarded by
+the `verse_timeline` feature flag returned from `/features/discovery`.
+
+Query parameters:
+
+| Parameter     | Type   | Description                                      |
+| ------------- | ------ | ------------------------------------------------ |
+| `window`      | str    | Bucket size: `week`, `month`, `quarter`, `year`. |
+| `limit`       | int    | Max number of windows to return (default 36).    |
+| `source_type` | str    | Optional filter mirroring `/mentions`.           |
+| `collection`  | str    | Optional filter mirroring `/mentions`.           |
+| `author`      | str    | Optional filter mirroring `/mentions`.           |
+
+Example response:
+
+```json
+{
+  "osis": "John.3.16",
+  "window": "month",
+  "total_mentions": 12,
+  "buckets": [
+    {
+      "label": "2024-01",
+      "start": "2024-01-01T00:00:00+00:00",
+      "end": "2024-02-01T00:00:00+00:00",
+      "count": 3,
+      "document_ids": ["doc-123", "doc-456"],
+      "sample_passage_ids": ["passage-9"]
+    }
+  ]
+}
+```
+
 ## Creator perspectives
 
 Creator endpoints surface stance summaries and timestamped quotes for creators
@@ -392,12 +428,14 @@ Response:
   "features": {
     "research": true,
     "contradictions": true,
-    "geo": true
+    "geo": true,
+    "verse_timeline": true
   }
 }
 ```
 
-Clients should check `features.contradictions` and `features.geo` before
+Clients should check `features.contradictions`, `features.geo`, and
+`features.verse_timeline` before
 rendering the corresponding panels.
 
 ## Documents
@@ -702,3 +740,27 @@ re-running the loader is safe in every environment. Because contradictions are
 anchored to OSIS ranges, queries accept single verses or ranges and the service
 uses the same normalization logic as ingestion (`pythonbible`) to compute
 intersections.
+
+## AI routing and guardrails
+
+Theo Engine's `/ai/*` workflows call a routing service layered on top of the LLM
+registry. Each registered model can optionally include three metadata
+containers:
+
+- `pricing` – per-request or per-token cost hints (for example `{"per_call": 0.6}`)
+- `latency` – observed latency percentiles used for analytics (`{"p95": 1200}`)
+- `routing` – weights and thresholds (such as `{"weight": 5, "spend_ceiling": 12}`)
+
+The router maintains cumulative spend in-process. Models whose `spend_ceiling`
+has been reached are skipped automatically, and entries that advertise a
+`latency_threshold_ms` are temporarily sidelined when the most recent call
+exceeds that ceiling. Workflows prefer the highest weighted candidate and fall
+back to the next available model when budgets, latency thresholds, or provider
+failures occur. When every candidate violates routing constraints the service
+raises a `GenerationError`, surfaced to clients as a 503 with a clear message.
+
+Guardrails continue to run on the chosen completion. Cached responses are
+revalidated before reuse, stale entries are invalidated, and fresh completions
+are persisted only when validation passes. If a completion fails guardrail
+checks the API responds with **422 Unprocessable Entity** containing the
+guardrail error message.

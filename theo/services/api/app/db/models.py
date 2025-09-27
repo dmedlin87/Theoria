@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Date,
     DateTime,
     Float,
@@ -46,6 +47,8 @@ class Document(Base):
     video_id: Mapped[str | None] = mapped_column(String, nullable=True)
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     bib_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    theological_tradition: Mapped[str | None] = mapped_column(String, nullable=True)
+    topic_domains: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     sha256: Mapped[str | None] = mapped_column(String, unique=True)
     storage_path: Mapped[str | None] = mapped_column(String, nullable=True)
     enrichment_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -99,6 +102,7 @@ class Passage(Base):
     )
     lexeme: Mapped[str | None] = mapped_column(TSVectorType(), nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    tei_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="passages")
 
@@ -624,6 +628,81 @@ class TrailSource(Base):
     trail: Mapped[AgentTrail] = relationship("AgentTrail", back_populates="sources")
 
 
+class UserWatchlist(Base):
+    """Persisted definition of a personalised alert watchlist."""
+
+    __tablename__ = "user_watchlists"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    filters: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    cadence: Mapped[str] = mapped_column(String, nullable=False, default="daily")
+    delivery_channels: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_run: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    events: Mapped[list["WatchlistEvent"]] = relationship(
+        "WatchlistEvent", back_populates="watchlist", cascade="all, delete-orphan"
+    )
+
+
+class WatchlistEvent(Base):
+    """Execution record of a watchlist evaluation run."""
+
+    __tablename__ = "watchlist_events"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    watchlist_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("user_watchlists.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    run_started: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    run_completed: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    window_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    matches: Mapped[list[dict] | dict | None] = mapped_column(JSON, nullable=True)
+    document_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    passage_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    delivery_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    watchlist: Mapped[UserWatchlist] = relationship(
+        "UserWatchlist", back_populates="events"
+    )
+
+
 class GeoPlace(Base):
     """Normalized lookup table for biblical geography."""
 
@@ -657,5 +736,7 @@ __all__ = [
     "AgentTrail",
     "AgentStep",
     "TrailSource",
+    "UserWatchlist",
+    "WatchlistEvent",
     "GeoPlace",
 ]

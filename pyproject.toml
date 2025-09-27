@@ -27,3 +27,8 @@ files = ["theo/services/api/app/export", "tests/export"]
 ignore_missing_imports = true
 warn_unused_configs = true
 follow_imports = "skip"
+
+[tool.pytest.ini_options]
+markers = [
+    "redteam: OWASP LLM red-team regression suite",
+]

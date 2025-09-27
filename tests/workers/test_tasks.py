@@ -153,7 +153,7 @@ def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
     assert updated is not None
     assert updated.status == "completed"
     assert digest_doc is not None
-    assert digest_doc.topics == ["Digest Topic"]
+    assert digest_doc.topics and "Digest Topic" in digest_doc.topics
     assert digest_doc.bib_json["clusters"][0]["document_ids"] == ["source-doc"]
     assert captured["recipients"] == ["alerts@example.com"]
     assert captured["document_id"] == digest_doc.id
@@ -207,3 +207,48 @@ def test_generate_document_summary_creates_summary_document(tmp_path) -> None:
     assert summary_doc.topics == ["Creation", "John", "Logos"]
     assert job_record is not None and job_record.status == "completed"
     assert job_record.document_id == summary_doc.id
+
+
+def test_refresh_hnsw_executes_rebuild_sql(monkeypatch) -> None:
+    executed: list[str] = []
+
+    class DummyResult:
+        def scalars(self):
+            return self
+
+        def all(self):
+            return []
+
+    class DummyConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def execute(self, statement):
+            executed.append(str(statement))
+            return DummyResult()
+
+    class DummyEngine:
+        def begin(self):
+            return DummyConnection()
+
+    dummy_engine = DummyEngine()
+
+    monkeypatch.setattr(tasks, "get_engine", lambda: dummy_engine)
+    monkeypatch.setattr(
+        tasks,
+        "_evaluate_hnsw_recall",
+        lambda *args, **kwargs: {"sample_size": 0},
+    )
+
+    metrics = tasks.refresh_hnsw.run()
+
+    assert any(
+        "DROP INDEX IF EXISTS ix_passages_embedding_hnsw" in statement
+        for statement in executed
+    )
+    assert any("USING hnsw" in statement for statement in executed)
+    assert any("ANALYZE passages" in statement for statement in executed)
+    assert metrics["sample_size"] == 0

@@ -63,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(trails.router, prefix="/trails", tags=["trails"])
 
     app.include_router(ai.router, prefix="/ai", tags=["ai"])
+    app.include_router(ai.settings_router, tags=["ai-settings"])
 
     if generate_latest is not None:
 
