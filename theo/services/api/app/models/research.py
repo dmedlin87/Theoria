@@ -41,6 +41,19 @@ class CrossReferenceResponse(APIModel):
     total: int
 
 
+class OverviewBullet(APIModel):
+    summary: str
+    citations: list[str] = Field(default_factory=list)
+
+
+class ReliabilityOverviewResponse(APIModel):
+    osis: str
+    mode: str
+    consensus: list[OverviewBullet] = Field(default_factory=list)
+    disputed: list[OverviewBullet] = Field(default_factory=list)
+    manuscripts: list[OverviewBullet] = Field(default_factory=list)
+
+
 class VariantReading(APIModel):
     id: str
     osis: str

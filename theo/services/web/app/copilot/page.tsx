@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import ModeChangeBanner from "../components/ModeChangeBanner";
+import { formatEmphasisSummary } from "../mode-config";
+import { useMode } from "../mode-context";
 import { getApiBaseUrl, getCitationManagerEndpoint } from "../lib/api";
 
 type FeatureFlags = {
@@ -371,6 +374,11 @@ export default function CopilotPage(): JSX.Element {
   const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
   const [isSendingCitations, setIsSendingCitations] = useState(false);
 
+  const activeWorkflow = useMemo(
+    () => WORKFLOWS.find((item) => item.id === workflow),
+    [workflow]
+  );
+
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const citationManagerEndpoint = useMemo(
     () => getCitationManagerEndpoint(),
@@ -443,7 +451,13 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/verse`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+
+               body: JSON.stringify({
+            osis: verseForm.osis.trim(),
+            question: verseForm.question.trim() || null,
+            mode: mode.id,
+          }),
+
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -460,6 +474,7 @@ export default function CopilotPage(): JSX.Element {
           body: JSON.stringify({
             topic: sermonForm.topic.trim(),
             osis: sermonForm.osis.trim() || null,
+            mode: mode.id,
           }),
         });
         if (!response.ok) {
@@ -481,7 +496,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/comparative`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ osis: comparativeForm.osis.trim(), participants }),
+          body: JSON.stringify({ osis: comparativeForm.osis.trim(), participants, mode: mode.id }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -493,7 +508,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/multimedia`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ collection: collection || null }),
+          body: JSON.stringify({ collection: collection || null, mode: mode.id }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -513,6 +528,7 @@ export default function CopilotPage(): JSX.Element {
           body: JSON.stringify({
             osis: devotionalForm.osis.trim(),
             focus: devotionalForm.focus.trim(),
+            mode: mode.id,
           }),
         });
         if (!response.ok) {
@@ -541,6 +557,7 @@ export default function CopilotPage(): JSX.Element {
             thread: collaborationForm.thread.trim(),
             osis: collaborationForm.osis.trim(),
             viewpoints,
+            mode: mode.id,
           }),
         });
         if (!response.ok) {
@@ -556,7 +573,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/curation`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ since: since || null }),
+          body: JSON.stringify({ since: since || null, mode: mode.id }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -577,6 +594,7 @@ export default function CopilotPage(): JSX.Element {
           body = {
             topic: exportForm.topic.trim(),
             osis: exportForm.osis.trim() || null,
+            mode: mode.id,
           };
         } else {
           url = `${baseUrl}/ai/transcript/export`;
@@ -586,6 +604,7 @@ export default function CopilotPage(): JSX.Element {
           body = {
             document_id: exportForm.documentId.trim(),
             format: preset.format,
+            mode: mode.id,
           };
         }
         response = await fetch(url, {
@@ -617,15 +636,54 @@ export default function CopilotPage(): JSX.Element {
     if (isRunning) {
       return;
     }
-    setWorkflow(preset.workflow);
-    if (preset.workflow === "verse" && preset.verse) {
-      setVerseAdvanced(Boolean(preset.verse.useAdvanced));
-      setVerseForm((prev) => ({
-        ...prev,
-        osis: preset.verse?.osis ?? "",
-        passage: preset.verse?.passage ?? "",
-        question: preset.verse?.question ?? "",
-      }));
+
+    setCitationExportStatus(null);
+    setError(null);
+    setIsSendingCitations(true);
+    try {
+      const response = await fetch(`${baseUrl}/ai/citations/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ citations, mode: mode.id }),
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const payload = (await response.json()) as CitationExportResponse;
+      const cslBody = JSON.stringify(payload.csl, null, 2);
+      const filename = `${payload.manifest.export_id || "theo-citations"}.csl.json`;
+      if (citationManagerEndpoint) {
+        const managerResponse = await fetch(citationManagerEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload.manager_payload),
+        });
+        if (!managerResponse.ok) {
+          throw new Error(await managerResponse.text());
+        }
+        setCitationExportStatus(
+          "Sent citations to the configured manager endpoint."
+        );
+      } else {
+        const blob = new Blob([cslBody], {
+          type: "application/vnd.citationstyles.csl+json",
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        setCitationExportStatus(
+          "Downloaded CSL bibliography for the selected citations."
+        );
+      }
+    } catch (exportError) {
+      setCitationExportStatus(null);
+      setError((exportError as Error).message || "Unable to export citations");
+    } finally {
+      setIsSendingCitations(false);
     }
     await runWorkflow({
       workflow: preset.workflow,
@@ -655,6 +713,8 @@ export default function CopilotPage(): JSX.Element {
     <section>
       <h2>Copilot</h2>
       <p>Run grounded workflows that stay anchored to your corpus.</p>
+      <p style={{ marginTop: "0.5rem", color: "#4b5563" }}>{formatEmphasisSummary(mode)}</p>
+      <ModeChangeBanner area="Copilot workspace" />
 
       <div style={{ display: "flex", gap: "0.75rem", margin: "1.5rem 0", flexWrap: "wrap" }}>
         {WORKFLOWS.map((item) => (
@@ -662,16 +722,23 @@ export default function CopilotPage(): JSX.Element {
             key={item.id}
             type="button"
             onClick={() => setWorkflow(item.id)}
-            style={{
-              borderRadius: "0.75rem",
-              padding: "0.75rem 1rem",
-              border: workflow === item.id ? "2px solid #2563eb" : "1px solid #cbd5f5",
-              background: workflow === item.id ? "#eff4ff" : "#fff",
-              cursor: "pointer",
-            }}
+            className={`workflow-button${workflow === item.id ? " is-active" : ""}`}
+            aria-pressed={workflow === item.id}
           >
-            <strong style={{ display: "block" }}>{item.label}</strong>
-            <span style={{ fontSize: "0.85rem", color: "#555" }}>{item.description}</span>
+            <span className="workflow-header">
+              <strong>{item.label}</strong>
+              {workflow === item.id && (
+                <span aria-hidden="true" className="workflow-indicator">
+                  Selected
+                </span>
+              )}
+            </span>
+            <span className="workflow-description">{item.description}</span>
+            <span className="sr-only">
+              {workflow === item.id
+                ? `${item.label} workflow currently selected.`
+                : `Activate the ${item.label} workflow.`}
+            </span>
           </button>
         ))}
       </div>
@@ -713,6 +780,7 @@ export default function CopilotPage(): JSX.Element {
           ))}
         </div>
       </section>
+
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem", maxWidth: 600 }}>
         {workflow === "verse" && (
@@ -1050,6 +1118,72 @@ export default function CopilotPage(): JSX.Element {
         </button>
       </form>
 
+      <style jsx>{`
+        .workflow-button {
+          border-radius: 0.75rem;
+          padding: 0.75rem 1rem;
+          border: 1px solid #cbd5f5;
+          background: #fff;
+          cursor: pointer;
+          display: grid;
+          gap: 0.35rem;
+          text-align: left;
+          position: relative;
+          outline: 3px solid transparent;
+          outline-offset: 2px;
+        }
+
+        .workflow-button:focus-visible {
+          outline: 3px solid #1d4ed8;
+        }
+
+        .workflow-button.is-active {
+          border: 2px solid #1d4ed8;
+          background: #eff4ff;
+        }
+
+        .workflow-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+        }
+
+        .workflow-description {
+          font-size: 0.85rem;
+          color: #555;
+        }
+
+        .workflow-indicator {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #1d4ed8;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+
+        .workflow-indicator::before {
+          content: "✓";
+          font-size: 0.85rem;
+        }
+
+        .workflow-status {
+          margin-bottom: 1rem;
+        }
+
+        .sr-only {
+          border: 0;
+          clip: rect(0 0 0 0);
+          height: 1px;
+          margin: -1px;
+          overflow: hidden;
+          padding: 0;
+          position: absolute;
+          width: 1px;
+        }
+      `}</style>
+
       {error && (
         <p role="alert" style={{ color: "crimson", marginTop: "1rem" }}>
           {error}
@@ -1058,6 +1192,9 @@ export default function CopilotPage(): JSX.Element {
 
       {result && (
         <section style={{ marginTop: "2rem", background: "#fff", padding: "1.5rem", borderRadius: "0.75rem" }}>
+          <p style={{ marginTop: 0, marginBottom: "1rem", color: "#4b5563" }}>
+            {formatEmphasisSummary(mode)}
+          </p>
           {result.kind === "verse" && (
             <>
               <h3>Verse brief for {result.payload.osis}</h3>
