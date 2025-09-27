@@ -55,7 +55,8 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
       return;
     }
     localStorage.setItem(MODE_STORAGE_KEY, modeId);
-    document.cookie = `${MODE_COOKIE_KEY}=${modeId};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;
+    const maxAge = 60 * 60 * 24 * 365;
+    document.cookie = `${MODE_COOKIE_KEY}=${modeId}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
     if (hasUserInteracted.current) {
       router.refresh();
     }
