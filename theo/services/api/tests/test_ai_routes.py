@@ -275,6 +275,31 @@ def test_sermon_prep_export_markdown() -> None:
         assert "Sermon Prep" in body
 
 
+def test_export_deliverable_sermon_bundle() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/export/deliverable",
+            json={
+                "type": "sermon",
+                "topic": "Logos",
+                "osis": "John.1.1",
+                "formats": ["markdown", "ndjson"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["status"] == "completed"
+        assert payload["manifest"]["type"] == "sermon"
+        assert payload["manifest"]["filters"]["topic"] == "Logos"
+        assert len(payload["assets"]) == 2
+        formats = {asset["format"] for asset in payload["assets"]}
+        assert {"markdown", "ndjson"} == formats
+        markdown_asset = next(asset for asset in payload["assets"] if asset["format"] == "markdown")
+        assert markdown_asset["content"].startswith("---\nexport_id:")
+
+
 def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
     _seed_corpus()
     with TestClient(app) as client:
@@ -330,6 +355,28 @@ def test_transcript_export_csv() -> None:
         text = response.text
         assert "export_id=transcript-doc-2" in text
         assert "Student" in text
+
+
+def test_export_deliverable_transcript_bundle() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        response = client.post(
+            "/export/deliverable",
+            json={
+                "type": "transcript",
+                "document_id": "doc-2",
+                "formats": ["csv"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["status"] == "completed"
+        assert payload["manifest"]["type"] == "transcript"
+        assert payload["manifest"]["filters"]["document_id"] == "doc-2"
+        assert payload["assets"]
+        csv_asset = payload["assets"][0]
+        assert csv_asset["format"] == "csv"
+        assert csv_asset["content"].startswith("export_id=transcript-doc-2")
 
 
 def test_comparative_analysis_returns_citations_and_comparisons() -> None:

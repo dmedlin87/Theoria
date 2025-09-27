@@ -10,8 +10,8 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..ai import (
-    build_sermon_prep_package,
-    build_transcript_package,
+    build_sermon_deliverable,
+    build_transcript_deliverable,
     generate_comparative_analysis,
     generate_devotional_flow,
     generate_multimedia_digest,
@@ -457,8 +457,14 @@ def sermon_prep_export(
         )
     except GuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    body, media_type = build_sermon_prep_package(response, format=format.lower())
-    return Response(content=body, media_type=media_type)
+    normalized = format.lower()
+    package = build_sermon_deliverable(
+        response,
+        formats=[normalized],
+        filters=payload.filters.model_dump(exclude_none=True),
+    )
+    asset = package.get_asset(normalized)
+    return Response(content=asset.content, media_type=asset.media_type)
 
 
 @router.post("/transcript/export")
@@ -468,14 +474,15 @@ def transcript_export(
 ) -> Response:
     normalized = payload.format.lower()
     try:
-        body, media_type = build_transcript_package(
-            session, payload.document_id, format=normalized
+        package = build_transcript_deliverable(
+            session, payload.document_id, formats=[normalized]
         )
     except GuardrailError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return Response(content=body, media_type=media_type)
+    asset = package.get_asset(normalized)
+    return Response(content=asset.content, media_type=asset.media_type)
 
 
 @router.post("/comparative", response_model_exclude_none=True)
