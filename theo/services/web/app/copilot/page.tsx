@@ -185,6 +185,52 @@ const WORKFLOWS: { id: WorkflowId; label: string; description: string }[] = [
   { id: "export", label: "Export presets", description: "Produce ready-to-share sermon and transcript bundles." },
 ];
 
+type QuickStartPreset = {
+  id: string;
+  title: string;
+  description: string;
+  workflow: WorkflowId;
+  verse?: {
+    passage?: string;
+    question?: string;
+    osis?: string;
+    useAdvanced?: boolean;
+  };
+};
+
+const QUICK_START_PRESETS: QuickStartPreset[] = [
+  {
+    id: "mark-reliability",
+    title: "Reliability of the Gospel of Mark",
+    description: "Investigate the longer ending from Mark 16:9–20 without memorising OSIS codes.",
+    workflow: "verse",
+    verse: {
+      passage: "Mark 16:9–20",
+      question: "What evidence supports the reliability of this passage?",
+    },
+  },
+  {
+    id: "beatitudes-themes",
+    title: "Themes in the Beatitudes",
+    description: "Surface the key themes from Matthew 5:1-12 in a grounded summary.",
+    workflow: "verse",
+    verse: {
+      passage: "Matthew 5:1-12",
+      question: "What themes emerge in the Beatitudes?",
+    },
+  },
+  {
+    id: "logos-overview",
+    title: "Prologue of John",
+    description: "Review how John 1:1-5 presents the Logos and its implications.",
+    workflow: "verse",
+    verse: {
+      passage: "John 1:1-5",
+      question: "How does this passage describe the Logos?",
+    },
+  },
+];
+
 function extractFilename(disposition: string | null): string | null {
   if (!disposition) {
     return null;
@@ -305,7 +351,8 @@ function renderRAGAnswer(
 export default function CopilotPage(): JSX.Element {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowId>("verse");
-  const [verseForm, setVerseForm] = useState({ osis: "", question: "" });
+  const [verseForm, setVerseForm] = useState({ osis: "", passage: "", question: "" });
+  const [verseAdvanced, setVerseAdvanced] = useState(false);
   const [sermonForm, setSermonForm] = useState({ topic: "", osis: "" });
   const [comparativeForm, setComparativeForm] = useState({ osis: "", participants: "" });
   const [multimediaForm, setMultimediaForm] = useState({ collection: "" });
@@ -355,8 +402,17 @@ export default function CopilotPage(): JSX.Element {
     };
   }, [baseUrl]);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const runWorkflow = async (
+    options?: {
+      workflow?: WorkflowId;
+      verse?: {
+        passage?: string;
+        question?: string;
+        osis?: string;
+        useAdvanced?: boolean;
+      };
+    }
+  ) => {
     setIsRunning(true);
     setError(null);
     setResult(null);
@@ -364,21 +420,37 @@ export default function CopilotPage(): JSX.Element {
 
     try {
       let response: Response;
-      if (workflow === "verse") {
-        if (!verseForm.osis.trim()) {
-          throw new Error("Provide an OSIS reference.");
+      const selectedWorkflow = options?.workflow ?? workflow;
+      if (selectedWorkflow === "verse") {
+        const useAdvanced = options?.verse?.useAdvanced ?? verseAdvanced;
+        const osis = (options?.verse?.osis ?? verseForm.osis).trim();
+        const passage = (options?.verse?.passage ?? verseForm.passage).trim();
+        const question = (options?.verse?.question ?? verseForm.question).trim();
+        if (useAdvanced) {
+          if (!osis) {
+            throw new Error("Provide an OSIS reference.");
+          }
+        } else if (!passage) {
+          throw new Error("Provide a passage to analyse.");
+        }
+        const body: Record<string, unknown> = { question: question || null };
+        if (osis) {
+          body.osis = osis;
+        }
+        if (passage) {
+          body.passage = passage;
         }
         response = await fetch(`${baseUrl}/ai/verse`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ osis: verseForm.osis.trim(), question: verseForm.question.trim() || null }),
+          body: JSON.stringify(body),
         });
         if (!response.ok) {
           throw new Error(await response.text());
         }
         const payload = (await response.json()) as VerseResponse;
         setResult({ kind: "verse", payload });
-      } else if (workflow === "sermon") {
+      } else if (selectedWorkflow === "sermon") {
         if (!sermonForm.topic.trim()) {
           throw new Error("Provide a sermon topic.");
         }
@@ -395,7 +467,7 @@ export default function CopilotPage(): JSX.Element {
         }
         const payload = (await response.json()) as SermonResponse;
         setResult({ kind: "sermon", payload });
-      } else if (workflow === "comparative") {
+      } else if (selectedWorkflow === "comparative") {
         if (!comparativeForm.osis.trim()) {
           throw new Error("Provide an OSIS reference.");
         }
@@ -416,7 +488,7 @@ export default function CopilotPage(): JSX.Element {
         }
         const payload = (await response.json()) as ComparativeResponse;
         setResult({ kind: "comparative", payload });
-      } else if (workflow === "multimedia") {
+      } else if (selectedWorkflow === "multimedia") {
         const collection = multimediaForm.collection.trim();
         response = await fetch(`${baseUrl}/ai/multimedia`, {
           method: "POST",
@@ -428,7 +500,7 @@ export default function CopilotPage(): JSX.Element {
         }
         const payload = (await response.json()) as MultimediaDigestResponse;
         setResult({ kind: "multimedia", payload });
-      } else if (workflow === "devotional") {
+      } else if (selectedWorkflow === "devotional") {
         if (!devotionalForm.osis.trim()) {
           throw new Error("Provide an OSIS reference.");
         }
@@ -448,7 +520,7 @@ export default function CopilotPage(): JSX.Element {
         }
         const payload = (await response.json()) as DevotionalResponse;
         setResult({ kind: "devotional", payload });
-      } else if (workflow === "collaboration") {
+      } else if (selectedWorkflow === "collaboration") {
         if (!collaborationForm.thread.trim()) {
           throw new Error("Provide a thread identifier.");
         }
@@ -476,7 +548,7 @@ export default function CopilotPage(): JSX.Element {
         }
         const payload = (await response.json()) as CollaborationResponse;
         setResult({ kind: "collaboration", payload });
-      } else if (workflow === "curation") {
+      } else if (selectedWorkflow === "curation") {
         const since = curationForm.since.trim();
         if (since && Number.isNaN(Date.parse(since))) {
           throw new Error("Provide an ISO 8601 timestamp (YYYY-MM-DD or similar).");
@@ -491,7 +563,7 @@ export default function CopilotPage(): JSX.Element {
         }
         const payload = (await response.json()) as CorpusCurationReport;
         setResult({ kind: "curation", payload });
-      } else if (workflow === "export") {
+      } else if (selectedWorkflow === "export") {
         const preset = EXPORT_PRESETS.find((item) => item.id === exportForm.preset);
         if (!preset) {
           throw new Error("Select an export preset.");
@@ -524,83 +596,42 @@ export default function CopilotPage(): JSX.Element {
         if (!response.ok) {
           throw new Error(await response.text());
         }
-        const content = await response.text();
-        const filename = extractFilename(response.headers.get("content-disposition"));
-        setResult({
-          kind: "export",
-          payload: {
-            preset: preset.id,
-            label: preset.label,
-            format: preset.format,
-            filename,
-            mediaType: response.headers.get("content-type"),
-            content,
-          },
-        });
+        const payload = (await response.json()) as ExportPresetResult;
+        setResult({ kind: "export", payload });
       } else {
-        throw new Error("Unsupported workflow selected.");
+        throw new Error("Unsupported workflow selection.");
       }
-    } catch (requestError) {
-      setError((requestError as Error).message || "Unable to run workflow");
+    } catch (submitError) {
+      setError((submitError as Error).message || "Unable to run the workflow");
     } finally {
       setIsRunning(false);
     }
   };
 
-  const handleCitationExport = async (citations: RAGCitation[]) => {
-    if (!citations.length) {
-      return;
-    }
-    setCitationExportStatus(null);
-    setError(null);
-    setIsSendingCitations(true);
-    try {
-      const response = await fetch(`${baseUrl}/ai/citations/export`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citations }),
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const payload = (await response.json()) as CitationExportResponse;
-      const cslBody = JSON.stringify(payload.csl, null, 2);
-      const filename = `${payload.manifest.export_id || "theo-citations"}.csl.json`;
-      if (citationManagerEndpoint) {
-        const managerResponse = await fetch(citationManagerEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload.manager_payload),
-        });
-        if (!managerResponse.ok) {
-          throw new Error(await managerResponse.text());
-        }
-        setCitationExportStatus(
-          "Sent citations to the configured manager endpoint."
-        );
-      } else {
-        const blob = new Blob([cslBody], {
-          type: "application/vnd.citationstyles.csl+json",
-        });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-        setCitationExportStatus(
-          "Downloaded CSL bibliography for the selected citations."
-        );
-      }
-    } catch (exportError) {
-      setCitationExportStatus(null);
-      setError((exportError as Error).message || "Unable to export citations");
-    } finally {
-      setIsSendingCitations(false);
-    }
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await runWorkflow();
   };
 
+  const handleQuickStart = async (preset: QuickStartPreset) => {
+    if (isRunning) {
+      return;
+    }
+    setWorkflow(preset.workflow);
+    if (preset.workflow === "verse" && preset.verse) {
+      setVerseAdvanced(Boolean(preset.verse.useAdvanced));
+      setVerseForm((prev) => ({
+        ...prev,
+        osis: preset.verse?.osis ?? "",
+        passage: preset.verse?.passage ?? "",
+        question: preset.verse?.question ?? "",
+      }));
+    }
+    await runWorkflow({
+      workflow: preset.workflow,
+      verse: preset.verse,
+    });
+  };
   if (enabled === false) {
     return (
       <section>
@@ -645,20 +676,95 @@ export default function CopilotPage(): JSX.Element {
         ))}
       </div>
 
+      <section
+        style={{
+          marginBottom: "1.5rem",
+          padding: "1rem",
+          background: "#f8fafc",
+          borderRadius: "0.75rem",
+          border: "1px solid #e2e8f0",
+        }}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Quick start</h3>
+        <p style={{ marginTop: 0, color: "#475569" }}>
+          Use a preset prompt to auto-fill the form and run the workflow instantly.
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+          {QUICK_START_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => void handleQuickStart(preset)}
+              disabled={isRunning}
+              style={{
+                flex: "1 1 240px",
+                minWidth: 220,
+                textAlign: "left",
+                borderRadius: "0.75rem",
+                padding: "0.75rem 1rem",
+                border: "1px solid #cbd5f5",
+                background: "#fff",
+                cursor: isRunning ? "not-allowed" : "pointer",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: "0.25rem" }}>{preset.title}</strong>
+              <span style={{ fontSize: "0.85rem", color: "#475569" }}>{preset.description}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem", maxWidth: 600 }}>
         {workflow === "verse" && (
           <>
             <label>
-              OSIS reference
+              Passage
               <input
                 type="text"
-                value={verseForm.osis}
-                onChange={(event) => setVerseForm((prev) => ({ ...prev, osis: event.target.value }))}
-                placeholder="John.1.1-5"
-                required
+                value={verseForm.passage}
+                onChange={(event) =>
+                  setVerseForm((prev) => ({ ...prev, passage: event.target.value }))
+                }
+                placeholder="Mark 16:9–20"
+                required={!verseAdvanced}
                 style={{ width: "100%" }}
               />
             </label>
+            {!verseAdvanced && (
+              <p style={{ margin: "-0.5rem 0 0", fontSize: "0.85rem", color: "#475569" }}>
+                Describe a passage naturally, such as “Mark 16:9–20” or “John 1:1-5”. We will resolve the
+                exact reference for you.
+              </p>
+            )}
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <input
+                type="checkbox"
+                checked={verseAdvanced}
+                onChange={(event) => setVerseAdvanced(event.target.checked)}
+              />
+              Advanced mode (use OSIS)
+            </label>
+            {verseAdvanced && (
+              <>
+                <label>
+                  OSIS reference
+                  <input
+                    type="text"
+                    value={verseForm.osis}
+                    onChange={(event) =>
+                      setVerseForm((prev) => ({ ...prev, osis: event.target.value }))
+                    }
+                    placeholder="Mark.16.9-Mark.16.20"
+                    required={verseAdvanced}
+                    style={{ width: "100%" }}
+                  />
+                </label>
+                <p style={{ margin: "-0.5rem 0 0", fontSize: "0.85rem", color: "#475569" }}>
+                  OSIS uses Book.Chapter.Verse notation. Provide precise ranges like “Mark.16.9-Mark.16.20” when
+                  you need exact control.
+                </p>
+              </>
+            )}
             <label>
               Question
               <textarea

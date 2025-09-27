@@ -128,6 +128,19 @@ def test_verse_copilot_returns_citations_and_followups() -> None:
             assert trail.user_id == "user-123"
 
 
+def test_verse_copilot_accepts_plain_language_passage() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/ai/verse",
+            json={"passage": "John 1:1", "question": "What is said?"},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["osis"] == "John.1.1"
+
+
 def test_llm_registry_crud_operations() -> None:
     with TestClient(app) as client:
         state = _register_echo_model(client)
