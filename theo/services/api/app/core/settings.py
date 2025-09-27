@@ -66,6 +66,10 @@ class Settings(BaseSettings):
         default=True,
         description="Toggle aggregated creator perspectives by verse",
     )
+    verse_timeline_enabled: bool = Field(
+        default=True,
+        description="Toggle verse mention timeline aggregation endpoints",
+    )
 
 
 @lru_cache
