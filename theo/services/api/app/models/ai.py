@@ -31,6 +31,9 @@ class LLMModelRequest(APIModel):
     provider: str = Field(default="openai")
     model: str
     config: dict[str, object] = Field(default_factory=dict)
+    pricing: dict[str, float] = Field(default_factory=dict)
+    latency: dict[str, float] = Field(default_factory=dict)
+    routing: dict[str, object] = Field(default_factory=dict)
     make_default: bool = False
 
 
@@ -47,6 +50,9 @@ class LLMModelUpdateRequest(APIModel):
     provider: str | None = None
     model: str | None = None
     config: dict[str, object] | None = None
+    pricing: dict[str, float] | None = None
+    latency: dict[str, float] | None = None
+    routing: dict[str, object] | None = None
     make_default: bool | None = None
 
 

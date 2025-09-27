@@ -24,12 +24,21 @@ SECRET_CONFIG_KEYS = {
 _ENCRYPTED_FIELD = "__encrypted__"
 
 
+def _normalize_metadata(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    return {str(key): value for key, value in payload.items()}
+
+
 @dataclass
 class LLMModel:
     name: str
     provider: str
     model: str
     config: dict[str, Any] = field(default_factory=dict)
+    pricing: dict[str, Any] = field(default_factory=dict)
+    latency: dict[str, Any] = field(default_factory=dict)
+    routing: dict[str, Any] = field(default_factory=dict)
 
     def masked_api_key(self) -> str | None:
         for key_name in SECRET_CONFIG_KEYS:
@@ -52,6 +61,12 @@ class LLMModel:
                 if include_secret or k not in SECRET_CONFIG_KEYS
             },
         }
+        if self.pricing:
+            payload["pricing"] = dict(self.pricing)
+        if self.latency:
+            payload["latency"] = dict(self.latency)
+        if self.routing:
+            payload["routing"] = dict(self.routing)
         if not include_secret and self.masked_api_key():
             payload["masked_api_key"] = self.masked_api_key()
         return payload
@@ -95,6 +110,9 @@ class LLMRegistry:
                     "provider": model.provider,
                     "model": model.model,
                     "config": _encrypt_config(model.config),
+                    "pricing": dict(model.pricing),
+                    "latency": dict(model.latency),
+                    "routing": dict(model.routing),
                 }
                 for model in self.models.values()
             ],
@@ -139,9 +157,18 @@ def _registry_from_payload(payload: dict[str, Any] | None) -> tuple[LLMRegistry,
                 continue
             decrypted_config, was_plaintext = _decrypt_config(config)
             migrated = migrated or was_plaintext
+            pricing = item.get("pricing") if isinstance(item, dict) else None
+            latency = item.get("latency") if isinstance(item, dict) else None
+            routing = item.get("routing") if isinstance(item, dict) else None
             registry.add_model(
                 LLMModel(
-                    name=name, provider=provider, model=model_name, config=decrypted_config
+                    name=name,
+                    provider=provider,
+                    model=model_name,
+                    config=decrypted_config,
+                    pricing=_normalize_metadata(pricing),
+                    latency=_normalize_metadata(latency),
+                    routing=_normalize_metadata(routing),
                 )
             )
         default_model = payload.get("default_model")

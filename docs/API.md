@@ -740,3 +740,27 @@ re-running the loader is safe in every environment. Because contradictions are
 anchored to OSIS ranges, queries accept single verses or ranges and the service
 uses the same normalization logic as ingestion (`pythonbible`) to compute
 intersections.
+
+## AI routing and guardrails
+
+Theo Engine's `/ai/*` workflows call a routing service layered on top of the LLM
+registry. Each registered model can optionally include three metadata
+containers:
+
+- `pricing` – per-request or per-token cost hints (for example `{"per_call": 0.6}`)
+- `latency` – observed latency percentiles used for analytics (`{"p95": 1200}`)
+- `routing` – weights and thresholds (such as `{"weight": 5, "spend_ceiling": 12}`)
+
+The router maintains cumulative spend in-process. Models whose `spend_ceiling`
+has been reached are skipped automatically, and entries that advertise a
+`latency_threshold_ms` are temporarily sidelined when the most recent call
+exceeds that ceiling. Workflows prefer the highest weighted candidate and fall
+back to the next available model when budgets, latency thresholds, or provider
+failures occur. When every candidate violates routing constraints the service
+raises a `GenerationError`, surfaced to clients as a 503 with a clear message.
+
+Guardrails continue to run on the chosen completion. Cached responses are
+revalidated before reuse, stale entries are invalidated, and fresh completions
+are persisted only when validation passes. If a completion fails guardrail
+checks the API responds with **422 Unprocessable Entity** containing the
+guardrail error message.

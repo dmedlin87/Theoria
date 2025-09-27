@@ -27,6 +27,7 @@ from ..retriever.hybrid import hybrid_search
 from ..telemetry import instrument_workflow, log_workflow_event, set_span_attribute
 from .clients import GenerationError
 from .registry import LLMRegistry, get_llm_registry
+from .router import get_router
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from .trails import TrailRecorder
@@ -354,46 +355,57 @@ def _guarded_answer(
     cache_key: str | None = None
     cache_key_suffix: str | None = None
 
-    try:
-        model = registry.get(model_hint)
-    except GenerationError:
-        model = None
 
     user_id = None
     if recorder and getattr(recorder, "trail", None) is not None:
         user_id = getattr(recorder.trail, "user_id", None)
 
-    if model:
-        context_lines = [
-            f"[{citation.index}] {citation.snippet} (OSIS {citation.osis}, {citation.anchor})"
-            for citation in citations
-        ]
-        prompt_parts = [
-            "You are Theo Engine's grounded assistant.",
-            "Answer the question strictly from the provided passages.",
-            "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
-            "If the passages do not answer the question, state that explicitly.",
-        ]
-        if question:
-            prompt_parts.append(f"Question: {question}")
-        prompt_parts.append("Passages:")
-        prompt_parts.extend(context_lines)
-        prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
-        prompt = "\n".join(prompt_parts)
+    router = get_router(session, registry=registry)
+    candidates = list(router.iter_candidates("rag", model_hint))
+    if not candidates:
+        raise GenerationError("No language models are available for workflow 'rag'")
 
-        retrieval_digest = _build_retrieval_digest(results)
+    context_lines = [
+        f"[{citation.index}] {citation.snippet} (OSIS {citation.osis}, {citation.anchor})"
+        for citation in citations
+    ]
+    prompt_parts = [
+        "You are Theo Engine's grounded assistant.",
+        "Answer the question strictly from the provided passages.",
+        "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
+        "If the passages do not answer the question, state that explicitly.",
+    ]
+    if question:
+        prompt_parts.append(f"Question: {question}")
+    prompt_parts.append("Passages:")
+    prompt_parts.extend(context_lines)
+    prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
+    prompt = "\\n".join(prompt_parts)
+
+    retrieval_digest = _build_retrieval_digest(results)
+    last_error: GenerationError | None = None
+    selected_model: LLMModel | None = None
+
+    cache_key = None
+    cache_key_suffix = None
+    cache_status = "skipped"
+
+    for candidate in candidates:
+        selected_model = candidate
+        cache_event_logged = False
         cache_key = _build_cache_key(
             user_id=user_id,
-            model_label=model.name,
+            model_label=candidate.name,
             prompt=prompt,
             retrieval_digest=retrieval_digest,
         )
         cache_key_suffix = cache_key[-12:]
         cache_status = "miss"
-        cached_payload = _load_cached_answer(cache_key)
         cache_hit_payload: RAGAnswer | None = None
-        cache_event_logged = False
+        validation_result = None
+        model_output = None
 
+        cached_payload = _load_cached_answer(cache_key)
         if cached_payload:
             cache_status = "hit"
             try:
@@ -431,7 +443,7 @@ def _guarded_answer(
                     validation_result = None
                 else:
                     model_output = cache_hit_payload.model_output
-                    model_name = cached_payload.get("model_name", model.name)
+                    model_name = cached_payload.get("model_name", candidate.name)
             else:
                 cache_status = "stale"
 
@@ -469,72 +481,85 @@ def _guarded_answer(
                 output_digest=cache_status,
             )
 
-        if not model_output:
-            client = model.build_client()
-            llm_payload = {
-                "prompt": prompt,
-                "model": model.model,
-                "registry_name": model.name,
-            }
-            try:
-                completion = client.generate(prompt=prompt, model=model.model)
-            except GenerationError as exc:
-                if recorder:
-                    recorder.log_step(
-                        tool="llm.generate",
-                        action="generate_grounded_answer",
-                        status="failed",
-                        input_payload=llm_payload,
-                        output_digest=str(exc),
-                        error_message=str(exc),
-                    )
-                completion = None
-            else:
-                if recorder:
-                    recorder.log_step(
-                        tool="llm.generate",
-                        action="generate_grounded_answer",
-                        input_payload=llm_payload,
-                        output_payload={"completion": completion},
-                        output_digest=f"{len(completion)} characters",
-                    )
-                sources_line = "; ".join(
-                    f"[{citation.index}] {citation.osis} ({citation.anchor})"
-                    for citation in citations
-                )
-                has_citations_line = bool(
-                    re.search(r"Sources:\s*\[\d+]", completion)
-                )
-                if not has_citations_line:
-                    completion = completion.strip() + f"\n\nSources: {sources_line}"
-                try:
-                    validation_result = _validate_model_completion(completion, citations)
-                except GuardrailError as exc:
-                    log_workflow_event(
-                        "workflow.guardrails_validation",
-                        workflow="rag",
-                        status="failed",
-                        cache_status=cache_status,
-                        cache_key_suffix=cache_key_suffix,
-                    )
-                    if recorder:
-                        recorder.log_step(
-                            tool="guardrails.validate",
-                            action="check_citations",
-                            status="failed",
-                            input_payload={
-                                "cache_status": cache_status,
-                                "cache_key_suffix": cache_key_suffix,
-                            },
-                            output_payload={"completion": completion},
-                            error_message=str(exc),
-                        )
-                    raise
-                model_output = completion
-                model_name = model.name
-                if cache_status == "stale":
-                    cache_status = "refresh"
+        if model_output:
+            break
 
+        llm_payload = {
+            "prompt": prompt,
+            "model": candidate.model,
+            "registry_name": candidate.name,
+        }
+        try:
+            routed_generation = router.execute_generation(
+                workflow="rag",
+                model=candidate,
+                prompt=prompt,
+            )
+        except GenerationError as exc:
+            last_error = exc
+            if recorder:
+                recorder.log_step(
+                    tool="llm.generate",
+                    action="generate_grounded_answer",
+                    status="failed",
+                    input_payload=llm_payload,
+                    output_digest=str(exc),
+                    error_message=str(exc),
+                )
+            continue
+
+        completion = routed_generation.output
+        if recorder:
+            recorder.log_step(
+                tool="llm.generate",
+                action="generate_grounded_answer",
+                input_payload=llm_payload,
+                output_payload={
+                    "completion": completion,
+                    "latency_ms": routed_generation.latency_ms,
+                    "cost": routed_generation.cost,
+                },
+                output_digest=f"{len(completion)} characters",
+            )
+        sources_line = "; ".join(
+            f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
+        )
+        has_citations_line = bool(re.search(r"Sources:\s*\[\d+]", completion))
+        if not has_citations_line:
+            completion = completion.strip() + f"\\n\\nSources: {sources_line}"
+        try:
+            validation_result = _validate_model_completion(completion, citations)
+        except GuardrailError as exc:
+            log_workflow_event(
+                "workflow.guardrails_validation",
+                workflow="rag",
+                status="failed",
+                cache_status=cache_status,
+                cache_key_suffix=cache_key_suffix,
+            )
+            if recorder:
+                recorder.log_step(
+                    tool="guardrails.validate",
+                    action="check_citations",
+                    status="failed",
+                    input_payload={
+                        "cache_status": cache_status,
+                        "cache_key_suffix": cache_key_suffix,
+                    },
+                    output_payload={"completion": completion},
+                    error_message=str(exc),
+                )
+            raise
+        model_output = completion
+        model_name = candidate.name
+        if cache_status == "stale":
+            cache_status = "refresh"
+        break
+
+    if not model_output:
+        if last_error is not None:
+            raise last_error
+        raise GenerationError("Language model routing failed to produce a completion")
     if validation_result:
         log_workflow_event(
             "workflow.guardrails_validation",
