@@ -27,7 +27,20 @@ describe("ContradictionsPanel", () => {
       ok: true,
       json: async () => ({
         contradictions: [
-          { summary: "Summary", osis: ["Gen.1.1", "Gen.1.2"] },
+          {
+            summary: "Summary",
+            osis: ["Gen.1.1", "Gen.1.2"],
+            severity: "high",
+            sources: [
+              { label: "Skeptical commentary", url: "https://example.com/contradiction" },
+            ],
+            snippet_pairs: [
+              {
+                left: { osis: "Gen.1.1", text: "In the beginning God created" },
+                right: { osis: "Gen.1.2", text: "The earth was without form" },
+              },
+            ],
+          },
           { summary: "Another summary", osis: ["Gen.2.1", "Gen.2.2"] },
         ],
       }),
@@ -44,6 +57,12 @@ describe("ContradictionsPanel", () => {
     expect(screen.getByText("Potential contradictions")).toBeInTheDocument();
     expect(screen.getByText("Summary")).toBeInTheDocument();
     expect(screen.getByText("Gen.1.1 ⇄ Gen.1.2")).toBeInTheDocument();
+    expect(screen.getByText("Severity: High")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Skeptical commentary" }),
+    ).toHaveAttribute("href", "https://example.com/contradiction");
+    expect(screen.getAllByText("Open verse").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/In the beginning God created/)).toBeInTheDocument();
   });
 
   it("renders empty state when no contradictions", async () => {
@@ -72,6 +91,43 @@ describe("ContradictionsPanel", () => {
     render(element ?? <></>);
 
     expect(screen.getByRole("alert")).toHaveTextContent("Unable to load contradictions. Boom");
+  });
+
+  it("allows toggling visibility for Apologetic mode", async () => {
+    const mockFlags: ResearchFeatureFlags = { research: true, contradictions: true };
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        contradictions: [
+          {
+            summary: "Summary",
+            osis: ["Gen.1.1", "Gen.1.2"],
+            severity: "medium",
+          },
+        ],
+      }),
+      text: async () => "",
+    });
+
+    const element = await ContradictionsPanel({ osis: "Gen.1.1", features: mockFlags });
+    render(element ?? <></>);
+
+    fireEvent.change(screen.getByLabelText("Select viewing mode"), {
+      target: { value: "apologetic" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contradictions-apologetic-hidden")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByLabelText(/Show contradictions in Apologetic mode/i),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("contradictions-apologetic-hidden")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Severity: Medium")).toBeInTheDocument();
   });
 
   it("returns null when contradictions feature disabled", async () => {
