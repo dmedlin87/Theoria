@@ -1,3 +1,5 @@
+import { formatEmphasisSummary } from "../../mode-config";
+import { getActiveMode } from "../../mode-server";
 import { getApiBaseUrl } from "../../lib/api";
 import type { ResearchFeatureFlags } from "./research-panels";
 
@@ -27,9 +29,10 @@ async function fetchTranslation(
   osis: string,
   translation: string,
   baseUrl: string,
+  modeId: string,
 ): Promise<{ translation: string; verses: ScriptureVerse[]; label: string } | null> {
   const response = await fetch(
-    `${baseUrl}/research/scripture?osis=${encodeURIComponent(osis)}&translation=${encodeURIComponent(translation)}`,
+    `${baseUrl}/research/scripture?osis=${encodeURIComponent(osis)}&translation=${encodeURIComponent(translation)}&mode=${encodeURIComponent(modeId)}`,
     { cache: "no-store" },
   );
   if (!response.ok) {
@@ -52,6 +55,7 @@ export default async function TextualVariantsPanel({
     return null;
   }
 
+  const mode = getActiveMode();
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
 
   let readings: Array<{ translation: string; verses: ScriptureVerse[]; label: string }> = [];
@@ -61,7 +65,7 @@ export default async function TextualVariantsPanel({
     const results = await Promise.all(
       TRANSLATIONS.map(async ({ code }) => {
         try {
-          return await fetchTranslation(osis, code, baseUrl);
+          return await fetchTranslation(osis, code, baseUrl, mode.id);
         } catch (translationError) {
           throw translationError;
         }
@@ -88,6 +92,9 @@ export default async function TextualVariantsPanel({
       </h3>
       <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
         Compare witness readings for <strong>{osis}</strong>.
+      </p>
+      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.875rem" }}>
+        {formatEmphasisSummary(mode)}
       </p>
       {error ? (
         <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>

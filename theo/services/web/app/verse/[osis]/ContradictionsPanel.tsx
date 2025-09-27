@@ -1,3 +1,5 @@
+import { formatEmphasisSummary } from "../../mode-config";
+import { getActiveMode } from "../../mode-server";
 import { getApiBaseUrl } from "../../lib/api";
 import type { ResearchFeatureFlags } from "./research-panels";
 import ContradictionsPanelClient from "./ContradictionsPanelClient";
@@ -43,6 +45,7 @@ export default async function ContradictionsPanel({
     return null;
   }
 
+  const mode = getActiveMode();
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
 
   let error: string | null = null;
@@ -50,7 +53,7 @@ export default async function ContradictionsPanel({
 
   try {
     const response = await fetch(
-      `${baseUrl}/research/contradictions?osis=${encodeURIComponent(osis)}`,
+      `${baseUrl}/research/contradictions?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
       { cache: "no-store" },
     );
     if (!response.ok) {
@@ -77,6 +80,9 @@ export default async function ContradictionsPanel({
       <h3 id="contradictions-heading" style={{ marginTop: 0 }}>
         Potential contradictions
       </h3>
+      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
+        {formatEmphasisSummary(mode)}
+      </p>
       {error ? (
         <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
           Unable to load contradictions. {error}
