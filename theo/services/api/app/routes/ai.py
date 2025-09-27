@@ -46,6 +46,7 @@ from ..models.ai import (
     DevotionalRequest,
     LLMDefaultRequest,
     LLMModelRequest,
+    LLMModelUpdateRequest,
     LLMSettingsResponse,
     MultimediaDigestRequest,
     SermonPrepRequest,
@@ -87,6 +88,31 @@ def register_llm_model(
         config=dict(payload.config),
     )
     registry.add_model(model, make_default=payload.make_default)
+    return _persist_and_respond(session, registry)
+
+
+@router.patch(
+    "/llm/{name}", response_model=LLMSettingsResponse, response_model_exclude_none=True
+)
+def update_llm_model(
+    name: str, payload: LLMModelUpdateRequest, session: Session = Depends(get_session)
+) -> LLMSettingsResponse:
+    registry = get_llm_registry(session)
+    if name not in registry.models:
+        raise HTTPException(status_code=404, detail="Unknown model")
+    model = registry.models[name]
+    if payload.provider:
+        model.provider = payload.provider
+    if payload.model:
+        model.model = payload.model
+    if payload.config is not None:
+        for key, value in dict(payload.config).items():
+            if value is None:
+                model.config.pop(key, None)
+            else:
+                model.config[key] = value
+    if payload.make_default:
+        registry.default_model = name
     return _persist_and_respond(session, registry)
 
 

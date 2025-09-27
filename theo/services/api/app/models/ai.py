@@ -42,6 +42,13 @@ class LLMDefaultRequest(APIModel):
     name: str
 
 
+class LLMModelUpdateRequest(APIModel):
+    provider: str | None = None
+    model: str | None = None
+    config: dict[str, object] | None = None
+    make_default: bool | None = None
+
+
 class VerseCopilotRequest(APIModel):
     osis: str
     question: str | None = None
@@ -107,6 +114,7 @@ __all__ = [
     "DevotionalRequest",
     "RecorderMetadata",
     "LLMModelRequest",
+    "LLMModelUpdateRequest",
     "LLMSettingsResponse",
     "LLMDefaultRequest",
     "MultimediaDigestRequest",
