@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { getApiBaseUrl } from "../lib/api";
@@ -16,6 +17,7 @@ type RAGCitation = {
   document_id: string;
   document_title?: string | null;
   passage_id?: string;
+  source_url: string;
 };
 
 type RAGAnswer = {
@@ -182,7 +184,40 @@ function renderCitations(citations: RAGCitation[]): JSX.Element | null {
       <ol style={{ paddingLeft: "1.25rem" }}>
         {citations.map((citation) => (
           <li key={citation.index} style={{ marginBottom: "0.5rem" }}>
-            <strong>{citation.osis}</strong> ({citation.anchor}) — {citation.snippet}
+            <Link
+              href={citation.source_url}
+              prefetch={false}
+              style={{
+                display: "block",
+                padding: "0.75rem",
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.5rem",
+                background: "#f8fafc",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+              title={`${citation.document_title ?? "Document"} — ${citation.snippet}`}
+            >
+              <span style={{ fontWeight: 600 }}>
+                {citation.osis} ({citation.anchor})
+              </span>
+              {citation.document_title && (
+                <span style={{ display: "block", marginTop: "0.25rem", fontSize: "0.9rem", color: "#475569" }}>
+                  {citation.document_title}
+                </span>
+              )}
+              <span
+                style={{
+                  display: "block",
+                  marginTop: "0.35rem",
+                  fontStyle: "italic",
+                  color: "#0f172a",
+                  lineHeight: 1.4,
+                }}
+              >
+                “{citation.snippet}”
+              </span>
+            </Link>
           </li>
         ))}
       </ol>
@@ -236,7 +271,7 @@ export default function CopilotPage(): JSX.Element {
     let isMounted = true;
     const fetchFeatures = async () => {
       try {
-        const response = await fetch(`${baseUrl}/features`, { cache: "no-store" });
+        const response = await fetch(`${baseUrl}/features/`, { cache: "no-store" });
         if (!response.ok) {
           throw new Error(await response.text());
         }
@@ -462,12 +497,7 @@ export default function CopilotPage(): JSX.Element {
     return (
       <section>
         <h2>Copilot</h2>
-            onClick={() => {
-              setWorkflow(item.id);
-              setError(null);
-              setResult(null);
-            }}
-</p>
+        <p>Loading feature flags…</p>
       </section>
     );
   }
@@ -551,6 +581,36 @@ export default function CopilotPage(): JSX.Element {
         )}
 
         {workflow === "comparative" && (
+          <>
+            <label>
+              OSIS reference
+              <input
+                type="text"
+                value={comparativeForm.osis}
+                onChange={(event) =>
+                  setComparativeForm((prev) => ({ ...prev, osis: event.target.value }))
+                }
+                placeholder="John.1.1"
+                required
+                style={{ width: "100%" }}
+              />
+            </label>
+            <label>
+              Participants (comma separated)
+              <input
+                type="text"
+                value={comparativeForm.participants}
+                onChange={(event) =>
+                  setComparativeForm((prev) => ({ ...prev, participants: event.target.value }))
+                }
+                placeholder="Augustine, Luther, Calvin"
+                required
+                style={{ width: "100%" }}
+              />
+            </label>
+          </>
+        )}
+
         {workflow === "multimedia" && (
           <label>
             Collection (optional)
@@ -734,6 +794,7 @@ export default function CopilotPage(): JSX.Element {
           </>
         )}
 
+        {workflow === "comparative" && (
           <>
             <label>
               OSIS reference

@@ -6,9 +6,11 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 import re
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Sequence, TypeVar
+from urllib.parse import urlencode
 
 try:  # pragma: no cover - optional dependency guard
     from redis import asyncio as redis_asyncio
@@ -39,6 +41,7 @@ LOGGER = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 30 * 60
 _CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*\((?P<anchor>[^()]+)\)$")
+_SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
 
 _redis_client: Any = None
 
@@ -55,6 +58,7 @@ class RAGCitation(APIModel):
     document_id: str
     document_title: str | None = None
     snippet: str
+    source_url: str
 
 
 class RAGAnswer(APIModel):
@@ -227,13 +231,66 @@ def _format_anchor(passage: HybridSearchResult | Passage) -> str:
     return "context"
 
 
+def _build_source_url(result: HybridSearchResult) -> str:
+    params: dict[str, str] = {}
+    if getattr(result, "page_no", None) is not None:
+        params["page"] = str(result.page_no)
+    if getattr(result, "t_start", None) is not None:
+        params["t"] = str(math.floor(result.t_start))
+    query = urlencode(params)
+    base = f"/doc/{result.document_id}"
+    anchor = f"#passage-{result.id}"
+    return f"{base}?{query}{anchor}" if query else f"{base}{anchor}"
+
+
+def _iter_sentence_spans(text: str) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    for match in _SENTENCE_PATTERN.finditer(text):
+        start, end = match.span()
+        sentence = text[start:end].strip()
+        if sentence:
+            spans.append((start, end, sentence))
+    return spans
+
+
+def _derive_snippet(result: HybridSearchResult) -> str:
+    base_text = result.text or ""
+    fallback = (result.snippet or base_text).strip()
+    if not base_text.strip():
+        return fallback
+
+    start_char = getattr(result, "start_char", None)
+    end_char = getattr(result, "end_char", None)
+    if start_char is None or end_char is None:
+        return fallback
+
+    start = max(0, min(len(base_text), start_char))
+    end = max(start, min(len(base_text), end_char))
+    spans = _iter_sentence_spans(base_text)
+    if not spans:
+        snippet = base_text[start:end].strip()
+        return snippet or fallback
+
+    selected_sentences = [
+        sentence
+        for span_start, span_end, sentence in spans
+        if span_end > start and span_start < end
+    ]
+    if not selected_sentences:
+        snippet = base_text[start:end].strip()
+        return snippet or fallback
+
+    snippet = " ".join(selected_sentences).strip()
+    return snippet or fallback
+
+
 def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
     citations: list[RAGCitation] = []
     for index, result in enumerate(results, start=1):
         if not result.osis_ref:
             continue
         anchor = _format_anchor(result)
-        snippet = (result.snippet or result.text).strip()
+        snippet = _derive_snippet(result)
         citations.append(
             RAGCitation(
                 index=index,
@@ -243,6 +300,7 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
                 document_id=result.document_id,
                 document_title=result.document_title,
                 snippet=snippet,
+                source_url=_build_source_url(result),
             )
         )
     return citations
