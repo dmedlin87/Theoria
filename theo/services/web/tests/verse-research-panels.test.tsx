@@ -371,7 +371,10 @@ describe("TextualVariantsPanel", () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       `${baseUrl}/research/variants?osis=Gen.1.1`,
-      { cache: "no-store" },
+      expect.objectContaining({
+        cache: "no-store",
+        signal: expect.any(AbortSignal),
+      }),
     );
     expect(screen.getByText("Mainstream vs. competing readings")).toBeInTheDocument();
     expect(screen.getByText(/Papyrus 66/)).toBeInTheDocument();
