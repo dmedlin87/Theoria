@@ -271,6 +271,38 @@ class Creator(Base):
     claims: Mapped[list["CreatorClaim"]] = relationship(
         "CreatorClaim", back_populates="creator", cascade="all, delete-orphan"
     )
+    verse_rollups: Mapped[list["CreatorVerseRollup"]] = relationship(
+        "CreatorVerseRollup",
+        back_populates="creator",
+        cascade="all, delete-orphan",
+    )
+
+
+class CreatorVerseRollup(Base):
+    """Cached aggregation of creator claims for a specific OSIS reference."""
+
+    __tablename__ = "creator_verse_rollups"
+    __table_args__ = (Index("ix_creator_verse_rollups_osis_creator", "osis", "creator_id", unique=True),)
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    osis: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    creator_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("creators.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    claim_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    stance_counts: Mapped[dict[str, int]] = mapped_column(JSON, nullable=False, default=dict)
+    avg_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    top_quote_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    creator: Mapped[Creator] = relationship("Creator", back_populates="verse_rollups")
 
 
 class Video(Base):
