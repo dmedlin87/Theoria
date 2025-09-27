@@ -102,15 +102,21 @@ if (-not $env:VIRTUAL_ENV) {
 }
 
 Write-Section 'Starting API'
-$ApiCmd = "uvicorn $ApiModule --reload --host $BindHost --port $ApiPort"
-Write-Host $ApiCmd -ForegroundColor Green
+$ApiExe = 'uvicorn'
+$ApiArgs = @(
+  $ApiModule,
+  '--reload',
+  '--host', $BindHost,
+  '--port', $ApiPort
+)
+Write-Host ("{0} {1}" -f $ApiExe, ($ApiArgs -join ' ')) -ForegroundColor Green
 
 # Start API in background job
 $ApiJob = Start-Job -ScriptBlock {
-  param($cmd, $wd)
+  param($exe, $exeArgs, $wd)
   Set-Location $wd
-  & $cmd
-} -ArgumentList $ApiCmd, $RepoRoot
+  & $exe @exeArgs
+} -ArgumentList $ApiExe, $ApiArgs, $RepoRoot
 
 $ApiReady = $false
 $TimeoutSeconds = 45
