@@ -8,7 +8,17 @@ import json
 import logging
 import re
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Sequence, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Iterable,
+    Literal,
+    Mapping,
+    Sequence,
+    TypeVar,
+)
 
 try:  # pragma: no cover - optional dependency guard
     from redis import asyncio as redis_asyncio
@@ -43,6 +53,100 @@ _CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*
 _redis_client: Any = None
 
 
+def _normalise_profile_value(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = value.strip().lower()
+    return text or None
+
+
+def _extract_topic_domains(meta: Mapping[str, Any] | None) -> set[str]:
+    domains: set[str] = set()
+    if not meta:
+        return domains
+    raw = meta.get("topic_domains") or meta.get("topic_domain")
+    if raw is None:
+        return domains
+    if isinstance(raw, str):
+        candidates = re.split(r"[,;]", raw)
+    elif isinstance(raw, Iterable):
+        candidates = raw
+    else:
+        return domains
+    for item in candidates:
+        text = str(item).strip().lower()
+        if text:
+            domains.add(text)
+    return domains
+
+
+def _apply_guardrail_profile(
+    results: Sequence[HybridSearchResult],
+    filters: HybridSearchFilters | None,
+) -> tuple[list[HybridSearchResult], dict[str, str] | None]:
+    ordered = list(results)
+    if not filters:
+        return ordered, None
+
+    tradition_filter = _normalise_profile_value(filters.theological_tradition)
+    domain_filter = _normalise_profile_value(filters.topic_domain)
+    if not tradition_filter and not domain_filter:
+        payload = {
+            key: value
+            for key, value in {
+                "theological_tradition": filters.theological_tradition,
+                "topic_domain": filters.topic_domain,
+            }.items()
+            if value
+        }
+        return ordered, payload or None
+
+    matched: list[HybridSearchResult] = []
+    remainder: list[HybridSearchResult] = []
+    for result in ordered:
+        meta = getattr(result, "meta", None)
+        meta_mapping: Mapping[str, Any] | None = meta if isinstance(meta, Mapping) else None
+        meta_tradition = (
+            _normalise_profile_value(str(meta_mapping.get("theological_tradition")))
+            if meta_mapping and meta_mapping.get("theological_tradition") is not None
+            else None
+        )
+        domains = _extract_topic_domains(meta_mapping)
+
+        matches_tradition = True
+        if tradition_filter:
+            matches_tradition = meta_tradition == tradition_filter
+
+        matches_domain = True
+        if domain_filter:
+            matches_domain = domain_filter in domains
+
+        if matches_tradition and matches_domain:
+            matched.append(result)
+        else:
+            remainder.append(result)
+
+    if not matched:
+        LOGGER.warning(
+            "guardrail profile rejected retrieved passages",
+            extra={
+                "theological_tradition": filters.theological_tradition,
+                "topic_domain": filters.topic_domain,
+            },
+        )
+        raise GuardrailError("No passages matched the requested guardrail profile")
+
+    payload = {
+        key: value
+        for key, value in {
+            "theological_tradition": filters.theological_tradition,
+            "topic_domain": filters.topic_domain,
+        }.items()
+        if value
+    }
+    return matched + remainder, payload or None
+
+
 class GuardrailError(GenerationError):
     """Raised when an answer violates grounding requirements."""
 
@@ -62,6 +166,7 @@ class RAGAnswer(APIModel):
     citations: list[RAGCitation]
     model_name: str | None = None
     model_output: str | None = None
+    guardrail_profile: dict[str, str] | None = None
 
 
 class VerseCopilotResponse(APIModel):
@@ -335,15 +440,17 @@ def _guarded_answer(
     registry: LLMRegistry,
     model_hint: str | None = None,
     recorder: "TrailRecorder | None" = None,
+    filters: HybridSearchFilters | None = None,
 ) -> RAGAnswer:
-    citations = _build_citations(results)
+    ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
+    citations = _build_citations(ordered_results)
     if not citations:
         raise GuardrailError(
             "Retrieved passages lacked OSIS references; aborting generation"
         )
 
     summary_lines = []
-    for citation, result in zip(citations, results):
+    for citation, result in zip(citations, ordered_results):
         summary_lines.append(
             f"[{citation.index}] {citation.snippet} — {citation.document_title or citation.document_id}"
             f" ({citation.osis}, {citation.anchor})"
@@ -384,7 +491,7 @@ def _guarded_answer(
     prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
     prompt = "\\n".join(prompt_parts)
 
-    retrieval_digest = _build_retrieval_digest(results)
+    retrieval_digest = _build_retrieval_digest(ordered_results)
     last_error: GenerationError | None = None
     selected_model: LLMModel | None = None
 
@@ -589,6 +696,7 @@ def _guarded_answer(
         citations=citations,
         model_name=model_name,
         model_output=model_output,
+        guardrail_profile=guardrail_profile,
     )
 
     if cache_key and model_output and validation_result and cache_status in {
@@ -702,6 +810,7 @@ def run_guarded_chat(
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -773,6 +882,7 @@ def generate_verse_brief(
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -858,6 +968,7 @@ def generate_sermon_prep_outline(
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -930,6 +1041,7 @@ def generate_comparative_analysis(
             results=results,
             registry=registry,
             model_hint=model_name,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1006,6 +1118,7 @@ def generate_multimedia_digest(
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         highlights = [
@@ -1076,6 +1189,7 @@ def generate_devotional_flow(
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1213,6 +1327,7 @@ def run_research_reconciliation(
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
+            filters=filters,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(

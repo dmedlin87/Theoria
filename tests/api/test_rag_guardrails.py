@@ -17,7 +17,10 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.ai import rag  # noqa: E402  # import after sys.path mutation
 from theo.services.api.app.ai.rag import GuardrailError  # noqa: E402
 from theo.services.api.app.ai.registry import LLMRegistry  # noqa: E402
-from theo.services.api.app.models.search import HybridSearchResult  # noqa: E402
+from theo.services.api.app.models.search import (  # noqa: E402
+    HybridSearchFilters,
+    HybridSearchResult,
+)
 
 
 class _DummyClient:
@@ -42,12 +45,13 @@ class _DummyModel:
         self.name = "dummy"
         self.model = "dummy-model"
         self.client = _DummyClient(completion)
+        self.routing: dict[str, object] = {}
 
     def build_client(self) -> _DummyClient:
         return self.client
 
 
-def _make_result() -> HybridSearchResult:
+def _make_result(meta: dict[str, object] | None = None) -> HybridSearchResult:
     return HybridSearchResult(
         id="passage-1",
         document_id="doc-1",
@@ -56,6 +60,7 @@ def _make_result() -> HybridSearchResult:
         osis_ref="John.3.16",
         rank=1,
         page_no=2,
+        meta=meta,
     )
 
 
@@ -88,10 +93,12 @@ def test_guarded_answer_accepts_valid_completion(fake_cache: fakeredis_aioredis.
         results=[_make_result()],
         registry=registry,
         model_hint=model.name,
+        filters=HybridSearchFilters(),
     )
 
     assert answer.model_output == completion
     assert answer.model_name == model.name
+    assert answer.guardrail_profile is None
 
     keys = asyncio.run(fake_cache.keys("rag:*"))
     assert keys
@@ -115,9 +122,71 @@ def test_guarded_answer_rejects_mismatched_citations(fake_cache: fakeredis_aiore
             results=[_make_result()],
             registry=registry,
             model_hint=model.name,
+            filters=HybridSearchFilters(),
         )
 
     assert asyncio.run(fake_cache.dbsize()) == 0
+
+
+def test_guarded_answer_profile_mismatch_raises_guardrail_error(
+    fake_cache: fakeredis_aioredis.FakeRedis,
+) -> None:
+    completion = "Balanced summary.\n\nSources: [1] John.3.16 (page 2)"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    filters = HybridSearchFilters(theological_tradition="reformed")
+
+    with pytest.raises(GuardrailError):
+        rag._guarded_answer(  # type: ignore[arg-type]
+            session,
+            question="Summarise with a Reformed lens",
+            results=[
+                _make_result(meta={"theological_tradition": "catholic"})
+            ],
+            registry=registry,
+            model_hint=model.name,
+            filters=filters,
+        )
+
+    assert asyncio.run(fake_cache.dbsize()) == 0
+
+
+def test_guarded_answer_profile_match_includes_profile(
+    fake_cache: fakeredis_aioredis.FakeRedis,
+) -> None:
+    completion = "Grace summary.\n\nSources: [1] John.3.16 (page 2)"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    filters = HybridSearchFilters(
+        theological_tradition="reformed", topic_domain="soteriology"
+    )
+    results = [
+        _make_result(
+            meta={
+                "theological_tradition": "Reformed",
+                "topic_domains": ["Soteriology", "Christology"],
+            }
+        )
+    ]
+
+    answer = rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="Summarise the passage with a Reformed soteriology focus",
+        results=results,
+        registry=registry,
+        model_hint=model.name,
+        filters=filters,
+    )
+
+    assert answer.model_output == completion
+    assert answer.guardrail_profile == {
+        "theological_tradition": "reformed",
+        "topic_domain": "soteriology",
+    }
 
 
 def test_guarded_answer_reuses_cache(fake_cache: fakeredis_aioredis.FakeRedis) -> None:
@@ -132,6 +201,7 @@ def test_guarded_answer_reuses_cache(fake_cache: fakeredis_aioredis.FakeRedis) -
         results=[_make_result()],
         registry=registry,
         model_hint=model.name,
+        filters=HybridSearchFilters(),
     )
 
     assert model.client.call_count == 1
@@ -143,6 +213,7 @@ def test_guarded_answer_reuses_cache(fake_cache: fakeredis_aioredis.FakeRedis) -
         results=[_make_result()],
         registry=registry,
         model_hint=model.name,
+        filters=HybridSearchFilters(),
     )
 
     assert model.client.call_count == 1, "cached response should skip regeneration"

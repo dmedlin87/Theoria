@@ -47,6 +47,8 @@ class Document(Base):
     video_id: Mapped[str | None] = mapped_column(String, nullable=True)
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     bib_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    theological_tradition: Mapped[str | None] = mapped_column(String, nullable=True)
+    topic_domains: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     sha256: Mapped[str | None] = mapped_column(String, unique=True)
     storage_path: Mapped[str | None] = mapped_column(String, nullable=True)
     enrichment_version: Mapped[int | None] = mapped_column(Integer, nullable=True)

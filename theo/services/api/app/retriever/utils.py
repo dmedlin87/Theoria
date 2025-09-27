@@ -30,6 +30,10 @@ def compose_passage_meta(passage: Passage, document: Document) -> dict[str, Any]
         meta["source_url"] = document.source_url
     if document.topics is not None:
         meta["topics"] = document.topics
+    if document.theological_tradition:
+        meta["theological_tradition"] = document.theological_tradition
+    if document.topic_domains:
+        meta["topic_domains"] = document.topic_domains
     if document.enrichment_version is not None:
         meta["enrichment_version"] = document.enrichment_version
     if document.provenance_score is not None:
