@@ -10,24 +10,34 @@ from ..core.settings import get_settings
 from ..models.research import (
     ContradictionSearchResponse,
     CrossReferenceResponse,
+    FallacyDetectRequest,
+    FallacyDetectResponse,
     GeoPlaceSearchResponse,
+    HistoricitySearchResponse,
     MorphologyResponse,
+    ReportBuildRequest,
+    ResearchReportResponse,
     ResearchNoteCreate,
     ResearchNoteResponse,
     ResearchNotesResponse,
     ResearchNoteUpdate,
     ScriptureResponse,
+    VariantApparatusResponse,
 )
 from ..research import (
     create_research_note,
     delete_research_note,
+    fallacy_detect,
     fetch_cross_references,
     fetch_morphology,
     fetch_passage,
+    historicity_search,
     get_notes_for_osis,
+    report_build,
     update_research_note,
     lookup_geo_places,
     search_contradictions,
+    variants_apparatus,
 )
 
 router = APIRouter()
@@ -80,6 +90,42 @@ def get_crossrefs(
             for item in results
         ],
         total=len(results),
+    )
+
+
+@router.get("/variants", response_model=VariantApparatusResponse)
+def get_variants(
+    osis: str = Query(..., description="Verse or range to retrieve apparatus notes for"),
+    category: list[str] | None = Query(
+        default=None,
+        description="Optional category filters such as manuscript, translation, version",
+    ),
+    limit: int | None = Query(
+        default=None,
+        ge=1,
+        le=50,
+        description="Maximum number of apparatus entries to return",
+    ),
+) -> VariantApparatusResponse:
+    categories = category or None
+    entries = variants_apparatus(osis, categories=categories, limit=limit)
+    return VariantApparatusResponse(
+        osis=osis,
+        readings=[
+            {
+                "id": entry.id,
+                "osis": entry.osis,
+                "category": entry.category,
+                "reading": entry.reading,
+                "note": entry.note,
+                "source": entry.source,
+                "witness": entry.witness,
+                "translation": entry.translation,
+                "confidence": entry.confidence,
+            }
+            for entry in entries
+        ],
+        total=len(entries),
     )
 
 
@@ -139,6 +185,46 @@ def list_notes(
         osis=osis,
         notes=notes,
         total=len(notes),
+    )
+
+
+@router.get("/historicity", response_model=HistoricitySearchResponse)
+def get_historicity(
+    query: str = Query(..., min_length=2, description="Keywords to locate related citations"),
+    year_from: int | None = Query(
+        default=None, description="Minimum publication year inclusive"
+    ),
+    year_to: int | None = Query(
+        default=None, description="Maximum publication year inclusive"
+    ),
+    limit: int = Query(default=20, ge=1, le=50),
+) -> HistoricitySearchResponse:
+    if year_from is not None and year_to is not None and year_from > year_to:
+        raise HTTPException(status_code=422, detail="year_from cannot exceed year_to")
+
+    results = historicity_search(
+        query,
+        year_from=year_from,
+        year_to=year_to,
+        limit=limit,
+    )
+    return HistoricitySearchResponse(
+        query=query,
+        results=[
+            {
+                "id": entry.id,
+                "title": entry.title,
+                "authors": entry.authors,
+                "year": entry.year,
+                "summary": entry.summary,
+                "source": entry.source,
+                "url": entry.url,
+                "tags": entry.tags,
+                "score": entry.score,
+            }
+            for entry in results
+        ],
+        total=len(results),
     )
 
 
@@ -202,6 +288,70 @@ def delete_note(
 ) -> Response:
     delete_research_note(session, note_id)
     return Response(status_code=204)
+
+
+@router.post("/fallacies", response_model=FallacyDetectResponse)
+def detect_fallacies(payload: FallacyDetectRequest) -> FallacyDetectResponse:
+    if not payload.text.strip():
+        raise HTTPException(status_code=422, detail="Text must not be empty")
+
+    detections = fallacy_detect(
+        payload.text,
+        min_confidence=payload.min_confidence,
+    )
+    return FallacyDetectResponse(
+        text=payload.text,
+        detections=[
+            {
+                "id": hit.id,
+                "name": hit.name,
+                "category": hit.category,
+                "description": hit.description,
+                "severity": hit.severity,
+                "confidence": hit.confidence,
+                "matches": hit.matches,
+            }
+            for hit in detections
+        ],
+        total=len(detections),
+    )
+
+
+@router.post("/report", response_model=ResearchReportResponse)
+def build_report(payload: ReportBuildRequest) -> ResearchReportResponse:
+    if payload.include_fallacies and not payload.narrative_text:
+        raise HTTPException(
+            status_code=422,
+            detail="narrative_text is required when include_fallacies is true",
+        )
+
+    report = report_build(
+        payload.osis,
+        stance=payload.stance,
+        claims=[claim.model_dump() for claim in payload.claims or []],
+        historicity_query=payload.historicity_query,
+        narrative_text=payload.narrative_text,
+        include_fallacies=payload.include_fallacies,
+        variants_limit=payload.variants_limit,
+        citations_limit=payload.citations_limit,
+        min_fallacy_confidence=payload.min_fallacy_confidence,
+    )
+    return ResearchReportResponse(
+        report={
+            "osis": report.osis,
+            "stance": report.stance,
+            "summary": report.summary,
+            "sections": [
+                {
+                    "title": section.title,
+                    "summary": section.summary,
+                    "items": section.items,
+                }
+                for section in report.sections
+            ],
+            "meta": report.meta,
+        }
+    )
 
 
 @router.get("/contradictions", response_model=ContradictionSearchResponse)

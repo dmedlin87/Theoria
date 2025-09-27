@@ -1,0 +1,29 @@
+{
+  "default": {
+    "summary": "Research briefing for {osis} adopting a {stance} stance.",
+    "sections": {
+      "variants": "Textual Variants",
+      "historicity": "Historicity Sources",
+      "fallacies": "Fallacy Audit",
+      "claims": "Key Claims"
+    }
+  },
+  "apologetic": {
+    "summary": "Apologetic briefing for {osis}: highlight harmonization and supportive evidence.",
+    "sections": {
+      "variants": "Stability of the Text",
+      "historicity": "Historical Corroboration",
+      "fallacies": "Rhetorical Vulnerabilities",
+      "claims": "Affirmed Claims"
+    }
+  },
+  "critical": {
+    "summary": "Critical briefing for {osis}: surface tensions, disputed readings, and historiographical cautions.",
+    "sections": {
+      "variants": "Disputed Readings",
+      "historicity": "Critical References",
+      "fallacies": "Argumentative Risks",
+      "claims": "Contested Claims"
+    }
+  }
+}

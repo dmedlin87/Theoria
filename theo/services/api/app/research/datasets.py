@@ -38,3 +38,31 @@ def morphology_dataset() -> dict[str, list[dict[str, Any]]]:
     """Return the morphology dataset keyed by OSIS."""
 
     return _load_json("morphology.json")
+
+
+@lru_cache(maxsize=None)
+def variants_dataset() -> dict[str, list[dict[str, Any]]]:
+    """Return the textual variants dataset keyed by OSIS."""
+
+    return _load_json("variants.json")
+
+
+@lru_cache(maxsize=None)
+def historicity_dataset() -> list[dict[str, Any]]:
+    """Return the historicity dataset containing citation entries."""
+
+    return _load_json("historicity.json")
+
+
+@lru_cache(maxsize=None)
+def fallacy_dataset() -> list[dict[str, Any]]:
+    """Return heuristic definitions for fallacy detection."""
+
+    return _load_json("fallacies.json")
+
+
+@lru_cache(maxsize=None)
+def report_templates_dataset() -> dict[str, dict[str, Any]]:
+    """Return stance-specific report templates."""
+
+    return _load_json("report_templates.json")

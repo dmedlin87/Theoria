@@ -39,6 +39,30 @@ def test_crossrefs_endpoint_returns_ranked_results() -> None:
         assert payload["results"][0]["target"] == "Genesis.1.1"
 
 
+def test_variants_endpoint_returns_apparatus() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/variants",
+            params={"osis": "John.1.1"},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["total"] >= 2
+        assert any(entry["category"] == "manuscript" for entry in payload["readings"])
+
+
+def test_variants_endpoint_empty_for_unknown_reference() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/variants",
+            params={"osis": "Obadiah.1.1"},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["total"] == 0
+        assert payload["readings"] == []
+
+
 def test_morphology_endpoint_returns_tokens() -> None:
     with TestClient(app) as client:
         response = client.get("/research/morphology", params={"osis": "John.1.1"})
@@ -123,6 +147,100 @@ def test_note_update_and_delete_missing_note_returns_404() -> None:
 
         delete = client.delete("/research/notes/missing")
         assert delete.status_code == 404
+
+
+def test_historicity_endpoint_filters_and_limits() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/historicity",
+            params={"query": "bethlehem", "year_from": 2015, "limit": 5},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["query"] == "bethlehem"
+        assert payload["total"] >= 1
+        assert all(
+            item.get("year") is None or item["year"] >= 2015
+            for item in payload["results"]
+        )
+
+
+def test_historicity_endpoint_empty_results() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/historicity",
+            params={"query": "unknown subject"},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["total"] == 0
+        assert payload["results"] == []
+
+
+def test_historicity_endpoint_rejects_invalid_year_range() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/historicity",
+            params={"query": "bethlehem", "year_from": 2020, "year_to": 2000},
+        )
+        assert response.status_code == 422
+
+
+def test_fallacies_endpoint_returns_detections() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/research/fallacies",
+            json={
+                "text": "Leading experts agree this is so and critics claim that believers worship idols.",
+                "min_confidence": 0.3,
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["total"] >= 1
+        assert any(hit["id"] == "straw-man" for hit in payload["detections"])
+
+
+def test_fallacies_endpoint_requires_non_empty_text() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/research/fallacies",
+            json={"text": "   "},
+        )
+        assert response.status_code == 422
+
+
+def test_report_endpoint_combines_sections() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/research/report",
+            json={
+                "osis": "John.1.1",
+                "stance": "apologetic",
+                "historicity_query": "logos",
+                "claims": [{"statement": "The Logos pre-exists creation."}],
+                "include_fallacies": True,
+                "narrative_text": "Leading experts agree this hymn preserves apostolic tradition.",
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()["report"]
+        assert payload["osis"] == "John.1.1"
+        assert payload["meta"]["variant_count"] >= 1
+        assert any(section["title"].startswith("Stability") for section in payload["sections"])
+
+
+def test_report_endpoint_requires_text_when_auditing_fallacies() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/research/report",
+            json={
+                "osis": "John.1.1",
+                "stance": "apologetic",
+                "include_fallacies": True,
+            },
+        )
+        assert response.status_code == 422
 
 
 def test_contradictions_by_osis_returns_items_and_is_stable_shape() -> None:
