@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import DeliverableExportAction from "../../components/DeliverableExportAction";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
 import ResearchPanels, { type ResearchFeatureFlags } from "./research-panels";
 
@@ -273,6 +274,16 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   const osis = data?.osis ?? params.osis;
   const mentions = data?.mentions ?? [];
   const total = data?.total ?? 0;
+  const deliverableFilters: Record<string, string> = {};
+  if (sourceType) {
+    deliverableFilters.source_type = sourceType;
+  }
+  if (collection) {
+    deliverableFilters.collection = collection;
+  }
+  if (author) {
+    deliverableFilters.author = author;
+  }
 
   return (
     <section>
@@ -289,6 +300,23 @@ export default async function VersePage({ params, searchParams }: VersePageProps
           <p>
             Aggregated references for <strong>{osis}</strong>
           </p>
+
+          <DeliverableExportAction
+            label="Export sermon packet"
+            preparingText="Generating sermon packet…"
+            successText="Sermon packet ready."
+            idleText="Create a sermon outline with citations."
+            requestPayload={{
+              type: "sermon",
+              topic: `Sermon prep for ${osis}`,
+              osis,
+              formats: ["markdown", "ndjson"],
+              filters:
+                Object.keys(deliverableFilters).length > 0
+                  ? deliverableFilters
+                  : undefined,
+            }}
+          />
 
           {error ? (
             <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>

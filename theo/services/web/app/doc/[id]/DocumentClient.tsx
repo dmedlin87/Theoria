@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 
+import DeliverableExportAction from "../../components/DeliverableExportAction";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
 import type { DocumentAnnotation, DocumentDetail } from "./types";
 
@@ -131,6 +132,21 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
     <section>
       <h2>{document.title ?? "Document"}</h2>
       <p>Document ID: {document.id}</p>
+
+      <section style={{ margin: "1.5rem 0" }}>
+        <h3>Exports</h3>
+        <DeliverableExportAction
+          label="Export Q&A digest"
+          preparingText="Generating transcript digest…"
+          successText="Transcript export ready."
+          idleText="Download a digest for this transcript."
+          requestPayload={{
+            type: "transcript",
+            document_id: document.id,
+            formats: ["markdown", "csv"],
+          }}
+        />
+      </section>
 
       <form onSubmit={handleMetadataSubmit} style={{ margin: "1.5rem 0", display: "grid", gap: "0.75rem", maxWidth: 560 }}>
         <fieldset disabled={isSavingMetadata} style={{ display: "grid", gap: "0.75rem" }}>
