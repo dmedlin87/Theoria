@@ -96,14 +96,78 @@ def _match_keywords(document: Document, filters: WatchlistFilters) -> bool:
     return any(keyword.lower() in haystack for keyword in filters.keywords)
 
 
+def _normalise_metadata_values(value: object) -> list[str]:
+    """Flatten metadata values to lower-cased strings for comparison."""
+
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value.lower()]
+    if isinstance(value, dict):
+        result: list[str] = []
+        for item in value.values():
+            result.extend(_normalise_metadata_values(item))
+        return result
+    if isinstance(value, (int, float, bool)):
+        return [str(value).lower()]
+    if isinstance(value, Iterable):
+        result: list[str] = []
+        for item in value:
+            result.extend(_normalise_metadata_values(item))
+        return result
+    return [str(value).lower()]
+
+
+def _match_metadata(document: Document, filters: WatchlistFilters) -> bool:
+    """Return ``True`` when document metadata satisfies requested filters.
+
+    Metadata filters perform case-insensitive equality checks against the
+    document fields and any bibliographic metadata stored in ``bib_json``.
+    Iterable filter values (lists/sets/tuples) must all be present in the
+    document metadata, while scalar values require a single exact match.
+    Nested structures (lists/dicts) in the document metadata are flattened
+    before comparison, so partial string containment is **not** supported.
+    """
+
+    if not filters.metadata:
+        return True
+
+    doc_metadata: dict[str, list[str]] = {}
+
+    def _append_values(key: str, value: object) -> None:
+        if value is None:
+            return
+        doc_metadata.setdefault(key, []).extend(_normalise_metadata_values(value))
+
+    for key in filters.metadata:
+        attr_value = getattr(document, key, None)
+        _append_values(key, attr_value)
+        if isinstance(document.bib_json, dict) and key in document.bib_json:
+            _append_values(key, document.bib_json.get(key))
+
+    for key, raw_expected in filters.metadata.items():
+        expected = _normalise_metadata_values(raw_expected)
+        if not expected:
+            continue
+        observed = doc_metadata.get(key, [])
+        if not observed:
+            return False
+        observed_set = set(observed)
+        if not set(expected).issubset(observed_set):
+            return False
+    return True
+
+
 def _document_reason(document: Document, filters: WatchlistFilters) -> list[str] | None:
-    if not any([filters.keywords, filters.authors, filters.topics]):
+    if not any([filters.keywords, filters.authors, filters.topics, filters.metadata]):
         return None
     if not _match_topics(document, filters):
         return None
     if not _match_authors(document, filters):
         return None
     if not _match_keywords(document, filters):
+        return None
+    if not _match_metadata(document, filters):
         return None
     reasons: list[str] = []
     if filters.topics:
@@ -112,6 +176,8 @@ def _document_reason(document: Document, filters: WatchlistFilters) -> list[str]
         reasons.append("author")
     if filters.keywords:
         reasons.append("keyword")
+    if filters.metadata:
+        reasons.append("metadata")
     return reasons or ["recent"]
 
 
