@@ -18,3 +18,10 @@ minimize verse boundary splits.
 
 - Respect YAML frontmatter for metadata.
 - Split on top-level headings (`# Heading`).
+
+## TEI Pipeline
+
+- The `tei_pipeline` module orchestrates OCR/HTR ingestion for scanned corpora.
+- OCR confidences are averaged per chunk and persisted on each passage's `meta`.
+- TEI markup (speakers, people, places, scripture refs) is generated alongside
+  chunked text so downstream retrieval can reason over structured metadata.

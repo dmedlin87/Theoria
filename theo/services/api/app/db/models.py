@@ -102,6 +102,7 @@ class Passage(Base):
     )
     lexeme: Mapped[str | None] = mapped_column(TSVectorType(), nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    tei_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="passages")
 
