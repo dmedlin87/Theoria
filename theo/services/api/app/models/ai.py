@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Literal, Sequence
 
 from pydantic import Field
 
@@ -13,6 +13,7 @@ from ..ai.rag import (
     MultimediaDigestResponse,
     SermonPrepResponse,
     VerseCopilotResponse,
+    RAGAnswer,
 )
 from ..models.search import HybridSearchFilters
 from .base import APIModel
@@ -47,6 +48,41 @@ class LLMModelUpdateRequest(APIModel):
     model: str | None = None
     config: dict[str, object] | None = None
     make_default: bool | None = None
+
+
+class ChatSessionMessage(APIModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
+class ChatSessionRequest(APIModel):
+    messages: Sequence[ChatSessionMessage]
+    session_id: str | None = None
+    model: str | None = None
+    osis: str | None = None
+    filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
+    recorder_metadata: RecorderMetadata | None = None
+
+
+class ChatSessionResponse(APIModel):
+    session_id: str
+    message: ChatSessionMessage
+    answer: RAGAnswer
+
+
+class ProviderSettingsRequest(APIModel):
+    api_key: str | None = None
+    base_url: str | None = None
+    default_model: str | None = None
+    extra_headers: dict[str, str] | None = None
+
+
+class ProviderSettingsResponse(APIModel):
+    provider: str
+    base_url: str | None = None
+    default_model: str | None = None
+    extra_headers: dict[str, str] | None = None
+    has_api_key: bool = False
 
 
 class VerseCopilotRequest(APIModel):
@@ -112,11 +148,16 @@ __all__ = [
     "CollaborationRequest",
     "ComparativeAnalysisRequest",
     "DevotionalRequest",
+    "ChatSessionMessage",
+    "ChatSessionRequest",
+    "ChatSessionResponse",
     "RecorderMetadata",
     "LLMModelRequest",
     "LLMModelUpdateRequest",
     "LLMSettingsResponse",
     "LLMDefaultRequest",
+    "ProviderSettingsRequest",
+    "ProviderSettingsResponse",
     "MultimediaDigestRequest",
     "SermonPrepRequest",
     "VerseCopilotRequest",
