@@ -397,6 +397,38 @@ SERMON_PREP_PLAN = "\n".join(
     ]
 )
 
+MULTIMEDIA_PLAN = "\n".join(
+    [
+        "- Retrieve recent multimedia passages with hybrid search",
+        "- Summarise cross-media highlights with the configured LLM",
+        "- Return grounded insights with supporting citations",
+    ]
+)
+
+DEVOTIONAL_PLAN = "\n".join(
+    [
+        "- Retrieve reflective passages tied to the devotional focus",
+        "- Compose a prayerful reflection grounded in citations",
+        "- Suggest prayer prompts rooted in retrieved passages",
+    ]
+)
+
+COLLABORATION_PLAN = "\n".join(
+    [
+        "- Gather sources representing each supplied viewpoint",
+        "- Reconcile perspectives using a grounded synthesis",
+        "- Surface shared insights with cited support",
+    ]
+)
+
+CORPUS_CURATION_PLAN = "\n".join(
+    [
+        "- Load documents added within the requested window",
+        "- Summarise each document by topic and collection",
+        "- Produce a curator-ready digest of repository changes",
+    ]
+)
+
 
 @router.post("/verse", response_model_exclude_none=True)
 def verse_copilot(
@@ -529,12 +561,24 @@ def multimedia_digest(
     payload: MultimediaDigestRequest,
     session: Session = Depends(get_session),
 ):
+    trail_service = TrailService(session)
     try:
-        return generate_multimedia_digest(
-            session,
-            collection=payload.collection,
-            model_name=payload.model,
-        )
+        with trail_service.start_trail(
+            workflow="multimedia_digest",
+            plan_md=MULTIMEDIA_PLAN,
+            mode="multimedia_digest",
+            input_payload=payload.model_dump(mode="json"),
+            user_id=None,
+        ) as recorder:
+            response = generate_multimedia_digest(
+                session,
+                collection=payload.collection,
+                model_name=payload.model,
+                recorder=recorder,
+            )
+            final_md = response.answer.summary or "\n".join(response.highlights)
+            recorder.finalize(final_md=final_md, output_payload=response)
+            return response
     except GuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -544,13 +588,27 @@ def devotional_flow(
     payload: DevotionalRequest,
     session: Session = Depends(get_session),
 ):
+    trail_service = TrailService(session)
     try:
-        return generate_devotional_flow(
-            session,
-            osis=payload.osis,
-            focus=payload.focus,
-            model_name=payload.model,
-        )
+        with trail_service.start_trail(
+            workflow="devotional",
+            plan_md=DEVOTIONAL_PLAN,
+            mode="devotional",
+            input_payload=payload.model_dump(mode="json"),
+            user_id=None,
+        ) as recorder:
+            response = generate_devotional_flow(
+                session,
+                osis=payload.osis,
+                focus=payload.focus,
+                model_name=payload.model,
+                recorder=recorder,
+            )
+            recorder.finalize(
+                final_md=response.reflection,
+                output_payload=response,
+            )
+            return response
     except GuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -562,14 +620,28 @@ def collaboration(
 ):
     if not payload.viewpoints:
         raise HTTPException(status_code=400, detail="viewpoints cannot be empty")
+    trail_service = TrailService(session)
     try:
-        return run_research_reconciliation(
-            session,
-            thread=payload.thread,
-            osis=payload.osis,
-            viewpoints=payload.viewpoints,
-            model_name=payload.model,
-        )
+        with trail_service.start_trail(
+            workflow="research_reconciliation",
+            plan_md=COLLABORATION_PLAN,
+            mode="collaboration",
+            input_payload=payload.model_dump(mode="json"),
+            user_id=None,
+        ) as recorder:
+            response = run_research_reconciliation(
+                session,
+                thread=payload.thread,
+                osis=payload.osis,
+                viewpoints=payload.viewpoints,
+                model_name=payload.model,
+                recorder=recorder,
+            )
+            recorder.finalize(
+                final_md=response.synthesized_view,
+                output_payload=response,
+            )
+            return response
     except GuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -587,7 +659,18 @@ def corpus_curation(
             raise HTTPException(
                 status_code=400, detail="since must be ISO formatted"
             ) from exc
-    return run_corpus_curation(session, since=since_dt)
+    trail_service = TrailService(session)
+    with trail_service.start_trail(
+        workflow="corpus_curation",
+        plan_md=CORPUS_CURATION_PLAN,
+        mode="corpus_curation",
+        input_payload=payload.model_dump(mode="json"),
+        user_id=None,
+    ) as recorder:
+        response = run_corpus_curation(session, since=since_dt, recorder=recorder)
+        digest = "\n".join(response.summaries)
+        recorder.finalize(final_md=digest or None, output_payload=response)
+        return response
 
 
 @router.get(
