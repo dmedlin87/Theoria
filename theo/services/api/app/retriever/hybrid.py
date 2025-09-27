@@ -6,7 +6,7 @@ import heapq
 from dataclasses import dataclass
 from typing import Iterable
 
-from sqlalchemy import and_, func, literal, select
+from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
@@ -95,6 +95,34 @@ def _passes_author_filter(document: Document, author: str | None) -> bool:
     return author in document.authors
 
 
+def _tei_terms(passage: Passage) -> list[str]:
+    meta = passage.meta or {}
+    if not isinstance(meta, dict):
+        return []
+    terms: list[str] = []
+    tei_section = meta.get("tei")
+    if isinstance(tei_section, dict):
+        for values in tei_section.values():
+            if isinstance(values, list):
+                terms.extend(str(value) for value in values)
+            elif isinstance(values, dict):
+                terms.extend(str(value) for value in values.values())
+    search_blob = meta.get("tei_search_blob")
+    if isinstance(search_blob, str):
+        terms.extend(search_blob.split())
+    return [term for term in terms if term]
+
+
+def _tei_match_score(passage: Passage, query_tokens: Iterable[str]) -> float:
+    lowered_terms = " ".join(term.lower() for term in _tei_terms(passage))
+    if not lowered_terms:
+        return 0.0
+    score = 0.0
+    for token in query_tokens:
+        score += lowered_terms.count(token)
+    return score
+
+
 def _apply_common_filters(stmt, request: HybridSearchRequest):
     if request.filters.collection:
         stmt = stmt.where(Document.collection == request.filters.collection)
@@ -111,7 +139,16 @@ def _fallback_search(
     stmt = select(Passage, Document).join(Document)
     stmt = _apply_common_filters(stmt, request)
     if request.query and not request.osis:
-        token_clauses = [Passage.text.ilike(f"%{token}%") for token in query_tokens]
+        token_clauses = []
+        tei_blob = func.json_extract(Passage.meta, "$.tei_search_blob")
+        for token in query_tokens:
+            like_value = f"%{token}%"
+            token_clauses.append(
+                or_(
+                    Passage.text.ilike(like_value),
+                    tei_blob.isnot(None) & tei_blob.ilike(like_value),
+                )
+            )
         if token_clauses:
             stmt = stmt.where(and_(*token_clauses))
     if request.osis:
@@ -129,6 +166,7 @@ def _fallback_search(
             continue
 
         lexical = _lexical_score(passage.text, query_tokens)
+        tei_score = _tei_match_score(passage, query_tokens)
         osis_match = False
         if request.osis:
             if passage.osis_ref and osis_intersects(passage.osis_ref, request.osis):
@@ -136,10 +174,13 @@ def _fallback_search(
             elif not lexical:
                 continue
 
-        if not lexical and not osis_match and not request.query:
+        if not lexical and not osis_match and not request.query and tei_score == 0.0:
             continue
 
-        score = lexical
+        if request.query and lexical == 0.0 and tei_score == 0.0 and not osis_match:
+            continue
+
+        score = lexical + 0.5 * tei_score
         if osis_match:
             score += 5.0
         if request.query and passage.lexeme:
@@ -191,6 +232,7 @@ def _postgres_hybrid_search(
 
     candidates: dict[str, _Candidate] = {}
     limit = max(request.k * 4, 20)
+    query_tokens = _tokenise(request.query or "")
 
     base_stmt = select(Passage, Document).join(Document)
     base_stmt = _apply_common_filters(base_stmt, request)
@@ -285,17 +327,29 @@ def _postgres_hybrid_search(
     for candidate in candidates.values():
         passage = candidate.passage
         document = candidate.document
+        tei_score = _tei_match_score(passage, query_tokens)
         score = 0.0
         if candidate.vector_score:
             score += VECTOR_WEIGHT * candidate.vector_score
         if candidate.lexical_score:
             score += LEXICAL_WEIGHT * candidate.lexical_score
         if (
+            request.query
+            and candidate.lexical_score == 0.0
+            and candidate.vector_score == 0.0
+            and tei_score == 0.0
+            and not candidate.osis_match
+        ):
+            continue
+        if (
             request.query is None
             and candidate.lexical_score == 0.0
             and candidate.vector_score == 0.0
+            and tei_score == 0.0
         ):
             score = max(score, 0.1)
+        if tei_score:
+            score += 0.35 * tei_score
         if candidate.osis_match:
             score += OSIS_BONUS
         result = HybridSearchResult(
@@ -327,7 +381,6 @@ def _postgres_hybrid_search(
         doc_scores[result.document_id] = max(
             doc_scores.get(result.document_id, float("-inf")), result.score or 0.0
         )
-    query_tokens = _tokenise(request.query or "")
     return _apply_document_ranks(results, doc_scores, query_tokens)
 
 
