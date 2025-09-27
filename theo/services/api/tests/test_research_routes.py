@@ -63,6 +63,77 @@ def test_variants_endpoint_empty_for_unknown_reference() -> None:
         assert payload["readings"] == []
 
 
+def test_reliability_overview_adjusts_by_mode() -> None:
+    with TestClient(app) as client:
+        supportive = client.post(
+            "/research/notes",
+            json={
+                "osis": "John.1.1",
+                "title": "Most early teachers say the verse supports Jesus.",
+                "body": "Supportive note",
+                "stance": "apologetic",
+                "claim_type": "theological",
+                "confidence": 0.9,
+                "evidences": [
+                    {
+                        "citation": "Irenaeus, Against Heresies 3.1",
+                        "source_ref": "Genesis.1.1",
+                    }
+                ],
+            },
+        )
+        assert supportive.status_code == 201, supportive.text
+        supportive_id = supportive.json()["note"]["id"]
+
+        critical = client.post(
+            "/research/notes",
+            json={
+                "osis": "John.1.1",
+                "title": "Some scholars raise a tension in the wording.",
+                "body": "Critical note",
+                "stance": "critical",
+                "claim_type": "textual",
+                "confidence": 0.6,
+                "evidences": [
+                    {
+                        "citation": "Bart D. Ehrman, Misquoting Jesus",
+                        "source_ref": "Luke.1.1",
+                    }
+                ],
+            },
+        )
+        assert critical.status_code == 201, critical.text
+        critical_id = critical.json()["note"]["id"]
+
+        apologetic_view = client.get(
+            "/research/overview", params={"osis": "John.1.1", "mode": "apologetic"}
+        )
+        assert apologetic_view.status_code == 200, apologetic_view.text
+        payload = apologetic_view.json()
+        assert payload["mode"] == "apologetic"
+        assert any(
+            "supports Jesus" in item["summary"] for item in payload["consensus"]
+        ), payload
+        assert any(
+            "raise a tension" in item["summary"] for item in payload["disputed"]
+        ), payload
+        assert payload["manuscripts"], payload
+        assert payload["manuscripts"][0]["citations"], payload
+
+        skeptical_view = client.get(
+            "/research/overview", params={"osis": "John.1.1", "mode": "skeptical"}
+        )
+        assert skeptical_view.status_code == 200, skeptical_view.text
+        skeptical_payload = skeptical_view.json()
+        assert skeptical_payload["mode"] == "skeptical"
+        assert any(
+            "raise a tension" in item["summary"] for item in skeptical_payload["consensus"]
+        ), skeptical_payload
+
+        client.delete(f"/research/notes/{supportive_id}")
+        client.delete(f"/research/notes/{critical_id}")
+
+
 def test_morphology_endpoint_returns_tokens() -> None:
     with TestClient(app) as client:
         response = client.get("/research/morphology", params={"osis": "John.1.1"})

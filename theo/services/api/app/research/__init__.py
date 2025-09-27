@@ -11,6 +11,7 @@ from .notes import (
     get_notes_for_osis,
     update_research_note,
 )
+from .overview import build_reliability_overview
 from .reports import report_build
 from .scripture import fetch_passage
 from .variants import variants_apparatus
@@ -30,4 +31,5 @@ __all__ = [
     "historicity_search",
     "fallacy_detect",
     "report_build",
+    "build_reliability_overview",
 ]
