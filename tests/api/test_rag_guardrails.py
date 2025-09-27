@@ -51,15 +51,28 @@ class _DummyModel:
         return self.client
 
 
-def _make_result(meta: dict[str, object] | None = None) -> HybridSearchResult:
+def _make_result(
+    *,
+    meta: dict[str, object] | None = None,
+    result_id: str = "passage-1",
+    document_id: str = "doc-1",
+    document_title: str | None = None,
+    text: str = "For God so loved the world",
+    snippet: str | None = None,
+    osis_ref: str | None = "John.3.16",
+    rank: int = 1,
+    page_no: int | None = 2,
+) -> HybridSearchResult:
+    content = text
     return HybridSearchResult(
-        id="passage-1",
-        document_id="doc-1",
-        text="For God so loved the world",
-        snippet="For God so loved the world",
-        osis_ref="John.3.16",
-        rank=1,
-        page_no=2,
+        id=result_id,
+        document_id=document_id,
+        document_title=document_title,
+        text=content,
+        snippet=snippet or content,
+        osis_ref=osis_ref,
+        rank=rank,
+        page_no=page_no,
         meta=meta,
     )
 
@@ -126,6 +139,71 @@ def test_guarded_answer_rejects_mismatched_citations(fake_cache: fakeredis_aiore
         )
 
     assert asyncio.run(fake_cache.dbsize()) == 0
+
+
+def test_guarded_answer_summary_uses_citation_documents(
+    fake_cache: fakeredis_aioredis.FakeRedis,
+) -> None:
+    completion = (
+        "Layered explanation.\n\n"
+        "Sources: [2] John.3.16 (page 2); [3] Rom.5.8 (page 4)"
+    )
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    results = [
+        _make_result(
+            result_id="passage-0",
+            document_id="doc-generic",
+            document_title="General Resource",
+            text="General background information",
+            snippet="General background information",
+            osis_ref=None,
+            rank=1,
+            page_no=1,
+        ),
+        _make_result(
+            result_id="passage-1",
+            document_id="doc-john",
+            document_title="Gospel According to John",
+            text="For God so loved the world",
+            snippet="For God so loved the world",
+            osis_ref="John.3.16",
+            rank=2,
+            page_no=2,
+        ),
+        _make_result(
+            result_id="passage-2",
+            document_id="doc-romans",
+            document_title="Epistle to the Romans",
+            text="While we were still sinners Christ died for us.",
+            snippet="While we were still sinners Christ died for us.",
+            osis_ref="Rom.5.8",
+            rank=3,
+            page_no=4,
+        ),
+    ]
+
+    answer = rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="Explain these passages",
+        results=results,
+        registry=registry,
+        model_hint=model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    summary_lines = answer.summary.splitlines()
+    assert summary_lines == [
+        "[2] For God so loved the world — Gospel According to John (John.3.16, page 2)",
+        "[3] While we were still sinners Christ died for us. — Epistle to the Romans (Rom.5.8, page 4)",
+    ]
+    assert [citation.index for citation in answer.citations] == [2, 3]
+    assert [citation.document_title for citation in answer.citations] == [
+        "Gospel According to John",
+        "Epistle to the Romans",
+    ]
 
 
 def test_guarded_answer_profile_mismatch_raises_guardrail_error(
