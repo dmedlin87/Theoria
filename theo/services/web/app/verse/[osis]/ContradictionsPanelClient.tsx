@@ -212,7 +212,7 @@ export default function ContradictionsPanelClient({
                 <p style={{ margin: 0, fontSize: "0.875rem" }}>
                   Source:{" "}
                   {isLikelyUrl(item.source) ? (
-                    <Link href={item.source} target="_blank" rel="noreferrer" style={{ color: "#2563eb" }}>
+                    <Link href={item.source} target="_blank" rel="noreferrer noopener" style={{ color: "#2563eb" }}>
                       {item.source}
                     </Link>
                   ) : (
