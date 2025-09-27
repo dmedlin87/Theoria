@@ -20,6 +20,33 @@ type JobStatus = {
   updated_at: string;
 };
 
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  const text = await response.text();
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  try {
+    const data = JSON.parse(trimmed) as {
+      detail?: unknown;
+      message?: unknown;
+      error?: unknown;
+    };
+    const detailCandidates = [data.detail, data.message, data.error];
+    for (const candidate of detailCandidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate;
+      }
+    }
+  } catch {
+    // Fall back to the raw response text if parsing fails.
+    return trimmed;
+  }
+
+  return trimmed;
+}
+
 async function uploadFile({
   file,
   frontmatter,
@@ -39,8 +66,8 @@ async function uploadFile({
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    return { kind: "error", message: detail || "Upload failed" };
+    const message = await readErrorMessage(response, "Upload failed");
+    return { kind: "error", message };
   }
 
   const payload = (await response.json()) as { document_id: string; status: string };
@@ -83,8 +110,8 @@ async function uploadUrl({
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    return { kind: "error", message: detail || "URL ingestion failed" };
+    const message = await readErrorMessage(response, "URL ingestion failed");
+    return { kind: "error", message };
   }
 
   const data = (await response.json()) as { document_id: string; status: string };
@@ -161,7 +188,17 @@ export default function UploadPage(): JSX.Element {
       setStatus(result);
       form.reset();
     } catch (error) {
-      setStatus({ kind: "error", message: (error as Error).message });
+      const fallbackMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Upload failed";
+      const message =
+        error instanceof TypeError && /fetch/i.test(error.message)
+          ? "Unable to reach the ingestion service. Please verify the API is running."
+          : fallbackMessage;
+      setStatus({ kind: "error", message });
     } finally {
       setIsUploadingFile(false);
     }
@@ -192,7 +229,17 @@ export default function UploadPage(): JSX.Element {
       setStatus(result);
       form.reset();
     } catch (error) {
-      setStatus({ kind: "error", message: (error as Error).message });
+      const fallbackMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "URL ingestion failed";
+      const message =
+        error instanceof TypeError && /fetch/i.test(error.message)
+          ? "Unable to reach the ingestion service. Please verify the API is running."
+          : fallbackMessage;
+      setStatus({ kind: "error", message });
     } finally {
       setIsSubmittingUrl(false);
     }
