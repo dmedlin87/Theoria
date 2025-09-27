@@ -27,6 +27,39 @@ function Write-Section($msg) {
   Write-Host "`n=== $msg ===" -ForegroundColor Cyan
 }
 
+function Test-PortOpen {
+  param(
+    [string]$Host,
+    [int]$Port,
+    [int]$TimeoutMilliseconds = 2000
+  )
+
+  $client = [System.Net.Sockets.TcpClient]::new()
+  try {
+    $asyncResult = $client.BeginConnect($Host, $Port, $null, $null)
+    if (-not $asyncResult.AsyncWaitHandle.WaitOne($TimeoutMilliseconds)) {
+      return $false
+    }
+    $client.EndConnect($asyncResult)
+    return $true
+  } catch {
+    return $false
+  } finally {
+    $client.Dispose()
+  }
+}
+
+function Stop-ApiJob {
+  param($Job)
+
+  if (-not $Job) { return }
+
+  Stop-Job $Job -ErrorAction SilentlyContinue | Out-Null
+  $output = Receive-Job $Job -ErrorAction SilentlyContinue
+  if ($output) { Write-Host $output }
+  Remove-Job $Job -Force -ErrorAction SilentlyContinue | Out-Null
+}
+
 # Resolve repo root (directory containing this script's parent)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
@@ -49,12 +82,43 @@ $ApiCmd = "uvicorn $ApiModule --reload --host $BindHost --port $ApiPort"
 Write-Host $ApiCmd -ForegroundColor Green
 
 # Start API in background job
-$ApiJob = Start-Job -ScriptBlock { param($cmd, $wd) Set-Location $wd; & $cmd } -ArgumentList $ApiCmd, $RepoRoot
-Start-Sleep -Seconds 2
+$ApiJob = Start-Job -ScriptBlock {
+  param($cmd, $wd)
+  Set-Location $wd
+  & $cmd
+} -ArgumentList $ApiCmd, $RepoRoot
+
+$ApiReady = $false
+$TimeoutSeconds = 45
+$Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+while ($Stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+  if ($ApiJob.State -eq 'Failed' -or $ApiJob.State -eq 'Stopped') {
+    Write-Host 'API process failed to start.' -ForegroundColor Red
+    $jobOutput = Receive-Job $ApiJob -ErrorAction SilentlyContinue
+    if ($jobOutput) { Write-Host $jobOutput }
+    Stop-ApiJob $ApiJob
+    exit 1
+  }
+
+  if (Test-PortOpen -Host $BindHost -Port $ApiPort) {
+    $ApiReady = $true
+    break
+  }
+
+  Start-Sleep -Milliseconds 500
+}
+
+if (-not $ApiReady) {
+  Write-Host "API did not become ready within $TimeoutSeconds seconds." -ForegroundColor Red
+  Stop-ApiJob $ApiJob
+  exit 1
+}
+
+Write-Host "API is listening on $BindHost:$ApiPort" -ForegroundColor Green
 
 if (-not (Test-Path $WebDir)) {
   Write-Host "Web directory not found: $WebDir" -ForegroundColor Red
-  Stop-Job $ApiJob | Out-Null
+  Stop-ApiJob $ApiJob
   exit 1
 }
 
@@ -63,14 +127,14 @@ Set-Location $WebDir
 
 if (-not (Test-Path (Join-Path $WebDir 'package.json'))) {
   Write-Host 'package.json missing in web directory.' -ForegroundColor Red
-  Stop-Job $ApiJob | Out-Null
+  Stop-ApiJob $ApiJob
   exit 1
 }
 
 # Ensure Node is installed
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
   Write-Host 'Node.js (node) not found on PATH. Please install Node 18+.' -ForegroundColor Red
-  Stop-Job $ApiJob | Out-Null
+  Stop-ApiJob $ApiJob
   exit 1
 }
 
@@ -81,6 +145,7 @@ if (-not (Test-Path (Join-Path $WebDir 'node_modules'))) {
 }
 
 $env:NEXT_PUBLIC_API_BASE_URL = ('http://{0}:{1}' -f $BindHost, $ApiPort)
+$env:API_BASE_URL = $env:NEXT_PUBLIC_API_BASE_URL
 Write-Section "Starting Web (NEXT_PUBLIC_API_BASE_URL=$env:NEXT_PUBLIC_API_BASE_URL)"
 <#
  Use explicit executable + argument array so PowerShell does not treat the entire
@@ -104,6 +169,4 @@ Write-Host ("{0} {1}" -f $NextExe, ($NextArgs -join ' ')) -ForegroundColor Green
 & $NextExe @NextArgs
 
 Write-Host 'Shutting down API job...' -ForegroundColor Yellow
-Stop-Job $ApiJob | Out-Null
-Receive-Job $ApiJob | Out-Null
-Remove-Job $ApiJob | Out-Null
+Stop-ApiJob $ApiJob
