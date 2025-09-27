@@ -103,6 +103,28 @@ def test_export_citations_returns_csl_payload(client: TestClient) -> None:
     assert payload["manager_payload"]["zotero"]["items"][0]["id"] == "doc-1"
 
 
+def test_export_citations_allows_missing_source_url(client: TestClient) -> None:
+    response = client.post(
+        "/ai/citations/export",
+        json={
+            "citations": [
+                {
+                    "index": 1,
+                    "osis": "John.1.1",
+                    "anchor": "John 1:1",
+                    "passage_id": "passage-1",
+                    "document_id": "doc-1",
+                    "document_title": "Sample Document",
+                    "snippet": "In the beginning was the Word.",
+                    "source_url": None,
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+
+
 def test_export_citations_rejects_empty_payload(client: TestClient) -> None:
     response = client.post("/ai/citations/export", json={"citations": []})
     assert response.status_code == 400
