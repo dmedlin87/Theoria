@@ -301,6 +301,33 @@ def _postgres_hybrid_search(
             if request.osis:
                 candidate.osis_match = True
 
+        tei_blob = Passage.meta["tei_search_blob"].astext
+        tei_facet_blob = Passage.meta["tei"].astext
+        tei_like_clauses = []
+        for token in query_tokens:
+            like_value = f"%{token}%"
+            tei_like_clauses.append(tei_blob.ilike(like_value))
+            tei_like_clauses.append(tei_facet_blob.ilike(like_value))
+        tei_present = or_(tei_blob.isnot(None), tei_facet_blob.isnot(None))
+        if tei_like_clauses:
+            tei_stmt = base_stmt.where(tei_present).where(or_(*tei_like_clauses)).limit(limit)
+        else:
+            tei_stmt = base_stmt.where(tei_present).limit(limit)
+        for passage, document in session.execute(tei_stmt):
+            if not _passes_author_filter(document, request.filters.author):
+                continue
+            if request.osis and not (
+                passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)
+            ):
+                continue
+            key = passage.id
+            candidate = candidates.get(key)
+            if not candidate:
+                candidate = _Candidate(passage=passage, document=document)
+                candidates[key] = candidate
+            if request.osis:
+                candidate.osis_match = True
+
     if request.osis and (not request.query or not candidates):
         osis_stmt = base_stmt.where(Passage.osis_ref.isnot(None)).limit(limit)
         for passage, document in session.execute(osis_stmt):
