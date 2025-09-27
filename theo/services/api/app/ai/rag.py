@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
+import logging
+import re
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Sequence, TypeVar
+
+try:  # pragma: no cover - optional dependency guard
+    from redis import asyncio as redis_asyncio
+except ImportError:  # pragma: no cover - redis is optional at runtime
+    redis_asyncio = None  # type: ignore[assignment]
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..core.settings import get_settings
 from ..core.version import get_git_sha
 from ..db.models import Document, Passage
 from ..models.base import APIModel
@@ -19,6 +30,15 @@ from .registry import LLMRegistry, get_llm_registry
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from .trails import TrailRecorder
+
+
+LOGGER = logging.getLogger(__name__)
+
+_CACHE_TTL_SECONDS = 30 * 60
+_SOURCES_PATTERN = re.compile(r"Sources:\s*(.*)", re.IGNORECASE | re.DOTALL)
+_CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*\((?P<anchor>[^()]+)\)$")
+
+_redis_client: Any = None
 
 
 class GuardrailError(GenerationError):
@@ -90,6 +110,110 @@ class CollaborationResponse(APIModel):
     answer: RAGAnswer
 
 
+T = TypeVar("T")
+
+
+def _get_cache_client() -> Any:
+    """Return a memoized Redis client or ``None`` if unavailable."""
+
+    global _redis_client
+
+    if redis_asyncio is None:
+        return None
+    if _redis_client is not None:
+        return _redis_client
+
+    try:
+        settings = get_settings()
+        _redis_client = redis_asyncio.from_url(  # type: ignore[assignment]
+            settings.redis_url,
+            encoding="utf-8",
+            decode_responses=True,
+        )
+    except Exception:  # pragma: no cover - network/config errors
+        LOGGER.debug("failed to initialise redis client", exc_info=True)
+        _redis_client = None
+    return _redis_client
+
+
+def _run_redis_command(operation: Callable[[Any], Awaitable[T]]) -> T | None:
+    """Execute an async redis command from synchronous code."""
+
+    client = _get_cache_client()
+    if client is None:
+        return None
+
+    async def _runner() -> T:
+        return await operation(client)
+
+    try:
+        return asyncio.run(_runner())
+    except RuntimeError as exc:  # pragma: no cover - nested loop guard
+        if "event loop is running" in str(exc).lower():
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(_runner())
+            finally:
+                loop.close()
+        raise
+    except Exception:  # pragma: no cover - redis failures logged at debug
+        LOGGER.debug("redis command failed", exc_info=True)
+        return None
+
+
+def _normalise_cache_segment(value: str | None, default: str) -> str:
+    segment = value or default
+    return re.sub(r"[^a-zA-Z0-9._-]", "_", segment)
+
+
+def _build_cache_key(
+    *,
+    user_id: str | None,
+    model_label: str | None,
+    prompt: str,
+    retrieval_digest: str,
+) -> str:
+    prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    version = _normalise_cache_segment(get_git_sha() or "dev", "dev")
+    user_segment = _normalise_cache_segment(user_id, "anon")
+    model_segment = _normalise_cache_segment(model_label, "default")
+    return f"rag:{version}:{user_segment}:{model_segment}:{retrieval_digest}:{prompt_hash}"
+
+
+def _load_cached_answer(key: str) -> dict[str, Any] | None:
+    raw = _run_redis_command(lambda client: client.get(key))
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        LOGGER.debug("invalid JSON payload in cache for key %s", key, exc_info=True)
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _store_cached_answer(
+    key: str,
+    *,
+    answer: RAGAnswer,
+    validation: dict[str, Any] | None,
+) -> None:
+    payload = {
+        "answer": answer.model_dump(mode="json"),
+        "validation": validation,
+        "model_name": answer.model_name,
+        "cached_at": datetime.now(UTC).isoformat(),
+    }
+    try:
+        serialised = json.dumps(payload)
+    except TypeError:
+        LOGGER.debug("failed to serialise cache payload", exc_info=True)
+        return
+    _run_redis_command(lambda client: client.set(key, serialised, ex=_CACHE_TTL_SECONDS))
+
+
 def _format_anchor(passage: HybridSearchResult | Passage) -> str:
     if getattr(passage, "page_no", None) is not None:
         return f"page {passage.page_no}"
@@ -122,6 +246,85 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
     return citations
 
 
+def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
+    digest = hashlib.sha256()
+    for result in results:
+        digest.update(str(result.id).encode("utf-8"))
+        digest.update(str(result.document_id).encode("utf-8"))
+        digest.update(str(result.osis_ref or "").encode("utf-8"))
+        digest.update(str(result.rank).encode("utf-8"))
+        digest.update(str(result.snippet or result.text or "").encode("utf-8"))
+        digest.update(_format_anchor(result).encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _validate_model_completion(
+    completion: str,
+    citations: Sequence[RAGCitation],
+) -> dict[str, Any]:
+    if not completion or not completion.strip():
+        raise GuardrailError("Model completion was empty")
+
+    match = _SOURCES_PATTERN.search(completion)
+    if not match:
+        raise GuardrailError("Model completion missing 'Sources:' line")
+
+    sources_text = match.group(1).strip()
+    if not sources_text:
+        raise GuardrailError("Model completion missing citations after 'Sources:'")
+
+    entries = [entry.strip() for entry in re.split(r";|\n", sources_text) if entry.strip()]
+    if not entries:
+        raise GuardrailError("Model completion missing citations after 'Sources:'")
+
+    expected = {citation.index: citation for citation in citations}
+    mismatches: list[str] = []
+    parsed_entries: list[dict[str, Any]] = []
+    cited_indices: list[int] = []
+
+    for entry in entries:
+        entry_match = _CITATION_ENTRY_PATTERN.match(entry)
+        if not entry_match:
+            mismatches.append(f"unparseable citation '{entry}'")
+            continue
+
+        index = int(entry_match.group("index"))
+        osis = entry_match.group("osis").strip()
+        anchor = entry_match.group("anchor").strip()
+        parsed_entries.append({"index": index, "osis": osis, "anchor": anchor})
+        cited_indices.append(index)
+
+        citation = expected.get(index)
+        if citation is None:
+            mismatches.append(
+                f"citation index {index} not present in retrieved passages"
+            )
+            continue
+        if osis != citation.osis:
+            mismatches.append(
+                f"citation [{index}] OSIS mismatch (expected {citation.osis}, got {osis})"
+            )
+        if anchor != citation.anchor:
+            mismatches.append(
+                f"citation [{index}] anchor mismatch (expected {citation.anchor}, got {anchor})"
+            )
+
+    if not cited_indices:
+        raise GuardrailError("Model completion did not include any recognised citations")
+
+    if mismatches:
+        raise GuardrailError(
+            "Model citations failed guardrails: " + "; ".join(mismatches)
+        )
+
+    return {
+        "status": "passed",
+        "cited_indices": sorted(set(cited_indices)),
+        "citation_count": len(parsed_entries),
+        "sources": parsed_entries,
+    }
+
+
 def _guarded_answer(
     session: Session,
     *,
@@ -147,10 +350,19 @@ def _guarded_answer(
 
     model_output = None
     model_name = None
+    validation_result: dict[str, Any] | None = None
+    cache_status = "skipped"
+    cache_key: str | None = None
+    cache_key_suffix: str | None = None
+
     try:
         model = registry.get(model_hint)
     except GenerationError:
         model = None
+
+    user_id = None
+    if recorder and getattr(recorder, "trail", None) is not None:
+        user_id = getattr(recorder.trail, "user_id", None)
 
     if model:
         context_lines = [
@@ -169,42 +381,199 @@ def _guarded_answer(
         prompt_parts.extend(context_lines)
         prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
         prompt = "\n".join(prompt_parts)
-        client = model.build_client()
-        llm_payload = {
-            "prompt": prompt,
-            "model": model.model,
-            "registry_name": model.name,
-        }
-        try:
-            completion = client.generate(prompt=prompt, model=model.model)
-        except GenerationError as exc:
-            if recorder:
-                recorder.log_step(
-                    tool="llm.generate",
-                    action="generate_grounded_answer",
-                    status="failed",
-                    input_payload=llm_payload,
-                    output_digest=str(exc),
-                    error_message=str(exc),
+
+        retrieval_digest = _build_retrieval_digest(results)
+        cache_key = _build_cache_key(
+            user_id=user_id,
+            model_label=model.name,
+            prompt=prompt,
+            retrieval_digest=retrieval_digest,
+        )
+        cache_key_suffix = cache_key[-12:]
+        cache_status = "miss"
+        cached_payload = _load_cached_answer(cache_key)
+        cache_hit_payload: RAGAnswer | None = None
+        cache_event_logged = False
+
+        if cached_payload:
+            cache_status = "hit"
+            try:
+                cache_hit_payload = RAGAnswer.model_validate(cached_payload.get("answer"))
+            except Exception:
+                LOGGER.debug(
+                    "invalid cached answer payload for key %s", cache_key, exc_info=True
                 )
-            completion = None
-        else:
-            if recorder:
-                recorder.log_step(
-                    tool="llm.generate",
-                    action="generate_grounded_answer",
-                    input_payload=llm_payload,
-                    output_payload={"completion": completion},
-                    output_digest=f"{len(completion)} characters",
-                )
-            sources_line = "; ".join(
-                f"[{citation.index}] {citation.osis} ({citation.anchor})"
-                for citation in citations
+                cache_hit_payload = None
+
+            if cache_hit_payload and cache_hit_payload.model_output:
+                try:
+                    validation_result = _validate_model_completion(
+                        cache_hit_payload.model_output, citations
+                    )
+                except GuardrailError as exc:
+                    cache_status = "stale"
+                    _run_redis_command(lambda client: client.delete(cache_key))
+                    log_workflow_event(
+                        "workflow.guardrails_cache",
+                        workflow="rag",
+                        status="stale",
+                        cache_key_suffix=cache_key_suffix,
+                    )
+                    cache_event_logged = True
+                    if recorder:
+                        recorder.log_step(
+                            tool="rag.cache",
+                            action="invalidate",
+                            input_payload={"cache_key_suffix": cache_key_suffix},
+                            status="failed",
+                            error_message=str(exc),
+                        )
+                    cache_hit_payload = None
+                    validation_result = None
+                else:
+                    model_output = cache_hit_payload.model_output
+                    model_name = cached_payload.get("model_name", model.name)
+            else:
+                cache_status = "stale"
+
+        if cache_status == "hit" and model_output:
+            log_workflow_event(
+                "workflow.guardrails_cache",
+                workflow="rag",
+                status="hit",
+                cache_key_suffix=cache_key_suffix,
             )
-            if "Sources:" not in completion:
-                completion = completion.strip() + f"\n\nSources: {sources_line}"
-            model_output = completion
-            model_name = model.name
+        elif not cache_event_logged:
+            if cache_status == "hit":
+                cache_status = "stale"
+            if cache_status == "stale":
+                log_workflow_event(
+                    "workflow.guardrails_cache",
+                    workflow="rag",
+                    status="stale",
+                    cache_key_suffix=cache_key_suffix,
+                )
+            else:
+                log_workflow_event(
+                    "workflow.guardrails_cache",
+                    workflow="rag",
+                    status="miss",
+                    cache_key_suffix=cache_key_suffix,
+                )
+
+        if recorder and cache_key:
+            recorder.log_step(
+                tool="rag.cache",
+                action="lookup",
+                input_payload={"cache_key_suffix": cache_key_suffix},
+                output_payload={"status": cache_status},
+                output_digest=cache_status,
+            )
+
+        if not model_output:
+            client = model.build_client()
+            llm_payload = {
+                "prompt": prompt,
+                "model": model.model,
+                "registry_name": model.name,
+            }
+            try:
+                completion = client.generate(prompt=prompt, model=model.model)
+            except GenerationError as exc:
+                if recorder:
+                    recorder.log_step(
+                        tool="llm.generate",
+                        action="generate_grounded_answer",
+                        status="failed",
+                        input_payload=llm_payload,
+                        output_digest=str(exc),
+                        error_message=str(exc),
+                    )
+                completion = None
+            else:
+                if recorder:
+                    recorder.log_step(
+                        tool="llm.generate",
+                        action="generate_grounded_answer",
+                        input_payload=llm_payload,
+                        output_payload={"completion": completion},
+                        output_digest=f"{len(completion)} characters",
+                    )
+                sources_line = "; ".join(
+                    f"[{citation.index}] {citation.osis} ({citation.anchor})"
+                    for citation in citations
+                )
+                if "Sources:" not in completion:
+                    completion = completion.strip() + f"\n\nSources: {sources_line}"
+                try:
+                    validation_result = _validate_model_completion(completion, citations)
+                except GuardrailError as exc:
+                    log_workflow_event(
+                        "workflow.guardrails_validation",
+                        workflow="rag",
+                        status="failed",
+                        cache_status=cache_status,
+                        cache_key_suffix=cache_key_suffix,
+                    )
+                    if recorder:
+                        recorder.log_step(
+                            tool="guardrails.validate",
+                            action="check_citations",
+                            status="failed",
+                            input_payload={
+                                "cache_status": cache_status,
+                                "cache_key_suffix": cache_key_suffix,
+                            },
+                            output_payload={"completion": completion},
+                            error_message=str(exc),
+                        )
+                    raise
+                model_output = completion
+                model_name = model.name
+                if cache_status == "stale":
+                    cache_status = "refresh"
+
+    if validation_result:
+        log_workflow_event(
+            "workflow.guardrails_validation",
+            workflow="rag",
+            status=validation_result.get("status", "passed"),
+            cache_status=cache_status,
+            cache_key_suffix=cache_key_suffix,
+            citation_count=validation_result.get("citation_count"),
+            cited_indices=validation_result.get("cited_indices"),
+        )
+        if recorder:
+            recorder.log_step(
+                tool="guardrails.validate",
+                action="check_citations",
+                input_payload={
+                    "cache_status": cache_status,
+                    "cache_key_suffix": cache_key_suffix,
+                },
+                output_payload=validation_result,
+                output_digest=f"status={validation_result.get('status', 'passed')}",
+            )
+
+    answer = RAGAnswer(
+        summary=summary_text,
+        citations=citations,
+        model_name=model_name,
+        model_output=model_output,
+    )
+
+    if cache_key and model_output and validation_result and cache_status in {
+        "miss",
+        "refresh",
+    }:
+        _store_cached_answer(cache_key, answer=answer, validation=validation_result)
+        if cache_status == "refresh":
+            log_workflow_event(
+                "workflow.guardrails_cache",
+                workflow="rag",
+                status="refresh",
+                cache_key_suffix=cache_key_suffix,
+            )
 
     if recorder:
         recorder.log_step(
@@ -227,16 +596,13 @@ def _guarded_answer(
                 "summary": summary_text,
                 "model_name": model_name,
                 "model_output": model_output,
+                "cache_status": cache_status,
+                "validation": validation_result,
             },
             output_digest=f"{len(summary_lines)} summary lines",
         )
 
-    return RAGAnswer(
-        summary=summary_text,
-        citations=citations,
-        model_name=model_name,
-        model_output=model_output,
-    )
+    return answer
 
 
 def _search(
