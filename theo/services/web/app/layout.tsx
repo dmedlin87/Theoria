@@ -14,6 +14,11 @@ const NAV_LINKS = [
   { href: "/verse/John.1.1", label: "Verse explorer" },
 ];
 
+const adminLinks =
+  process.env.NEXT_PUBLIC_ENABLE_ADMIN === "true"
+    ? [{ href: "/admin/digests", label: "Admin" }]
+    : [];
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
@@ -24,7 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               Theo Engine
             </Link>
             <nav className="site-nav" aria-label="Primary">
-              {NAV_LINKS.map((item) => (
+              {[...NAV_LINKS, ...adminLinks].map((item) => (
                 <Link key={item.href} href={item.href} className="nav-link">
                   {item.label}
                 </Link>
