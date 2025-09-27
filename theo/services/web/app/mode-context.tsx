@@ -45,15 +45,15 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined" || hasHydrated) {
+    if (typeof window === "undefined") {
       return;
     }
     const stored = localStorage.getItem(MODE_STORAGE_KEY);
-    if (stored && isResearchModeId(stored) && stored !== modeId) {
-      setModeId(stored);
+    if (stored && isResearchModeId(stored)) {
+      setModeId((current) => (current === stored ? current : stored));
     }
     setHasHydrated(true);
-  }, [hasHydrated, modeId]);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !hasHydrated) {
