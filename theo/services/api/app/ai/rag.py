@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import re
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Sequence, TypeVar
 from urllib.parse import urlencode
@@ -152,7 +153,7 @@ class RAGCitation(APIModel):
     document_id: str
     document_title: str | None = None
     snippet: str
-    source_url: str
+    source_url: str | None = None
 
 
 class RAGAnswer(APIModel):

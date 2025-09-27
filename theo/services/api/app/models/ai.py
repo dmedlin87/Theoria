@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Sequence
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 
 from ..ai.rag import (
     CollaborationResponse,
@@ -66,7 +66,7 @@ class ChatSessionMessage(APIModel):
 class ChatSessionRequest(APIModel):
     messages: Sequence[ChatSessionMessage]
     session_id: str | None = None
-    model: str | None = None
+    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     recorder_metadata: RecorderMetadata | None = None
@@ -181,7 +181,7 @@ class VerseCopilotRequest(APIModel):
     passage: str | None = None
     question: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
-    model: str | None = None
+    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
     recorder_metadata: RecorderMetadata | None = None
 
     @model_validator(mode="after")
@@ -195,32 +195,32 @@ class SermonPrepRequest(APIModel):
     topic: str
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
-    model: str | None = None
+    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
     recorder_metadata: RecorderMetadata | None = None
 
 
 class ComparativeAnalysisRequest(APIModel):
     osis: str
     participants: Sequence[str]
-    model: str | None = None
+    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
 
 
 class MultimediaDigestRequest(APIModel):
     collection: str | None = None
-    model: str | None = None
+    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
 
 
 class DevotionalRequest(APIModel):
     osis: str
     focus: str = Field(default="reflection")
-    model: str | None = None
+    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
 
 
 class CollaborationRequest(APIModel):
     thread: str
     osis: str
     viewpoints: Sequence[str]
-    model: str | None = None
+    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
 
 
 class CorpusCurationRequest(APIModel):

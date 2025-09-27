@@ -20,7 +20,7 @@ type RAGCitation = {
   document_id: string;
   document_title?: string | null;
   passage_id?: string;
-  source_url: string;
+  source_url?: string | null;
 };
 
 type RAGAnswer = {
@@ -258,27 +258,16 @@ function renderCitations(
     <div style={{ marginTop: "1rem" }}>
       <h4>Citations</h4>
       <ol style={{ paddingLeft: "1.25rem" }}>
-        {citations.map((citation) => (
-          <li key={citation.index} style={{ marginBottom: "0.5rem" }}>
-            <Link
-              href={citation.source_url}
-              prefetch={false}
-              style={{
-                display: "block",
-                padding: "0.75rem",
-                border: "1px solid #e2e8f0",
-                borderRadius: "0.5rem",
-                background: "#f8fafc",
-                textDecoration: "none",
-                color: "inherit",
-              }}
-              title={`${citation.document_title ?? "Document"} — ${citation.snippet}`}
-            >
+        {citations.map((citation) => {
+          const content = (
+            <>
               <span style={{ fontWeight: 600 }}>
                 {citation.osis} ({citation.anchor})
               </span>
               {citation.document_title && (
-                <span style={{ display: "block", marginTop: "0.25rem", fontSize: "0.9rem", color: "#475569" }}>
+                <span
+                  style={{ display: "block", marginTop: "0.25rem", fontSize: "0.9rem", color: "#475569" }}
+                >
                   {citation.document_title}
                 </span>
               )}
@@ -293,9 +282,36 @@ function renderCitations(
               >
                 “{citation.snippet}”
               </span>
-            </Link>
-          </li>
-        ))}
+            </>
+          );
+          const commonStyle = {
+            display: "block",
+            padding: "0.75rem",
+            border: "1px solid #e2e8f0",
+            borderRadius: "0.5rem",
+            background: "#f8fafc",
+            textDecoration: "none",
+            color: "inherit",
+          } as const;
+          return (
+            <li key={citation.index} style={{ marginBottom: "0.5rem" }}>
+              {citation.source_url ? (
+                <Link
+                  href={citation.source_url}
+                  prefetch={false}
+                  style={commonStyle}
+                  title={`${citation.document_title ?? "Document"} — ${citation.snippet}`}
+                >
+                  {content}
+                </Link>
+              ) : (
+                <div style={commonStyle}>
+                  {content}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ol>
       {onExport && (
         <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -351,7 +367,25 @@ function renderRAGAnswer(
   );
 }
 
+function extractCitationsFromResult(result: CopilotResult | null): RAGCitation[] {
+  if (!result) {
+    return [];
+  }
+  switch (result.kind) {
+    case "verse":
+    case "sermon":
+    case "comparative":
+    case "multimedia":
+    case "devotional":
+    case "collaboration":
+      return result.payload.answer?.citations ?? [];
+    default:
+      return [];
+  }
+}
+
 export default function CopilotPage(): JSX.Element {
+  const { mode } = useMode();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowId>("verse");
   const [verseForm, setVerseForm] = useState({ osis: "", passage: "", question: "" });
@@ -373,11 +407,6 @@ export default function CopilotPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
   const [isSendingCitations, setIsSendingCitations] = useState(false);
-
-  const activeWorkflow = useMemo(
-    () => WORKFLOWS.find((item) => item.id === workflow),
-    [workflow]
-  );
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const citationManagerEndpoint = useMemo(
@@ -429,6 +458,7 @@ export default function CopilotPage(): JSX.Element {
     try {
       let response: Response;
       const selectedWorkflow = options?.workflow ?? workflow;
+      const model = mode.id;
       if (selectedWorkflow === "verse") {
         const useAdvanced = options?.verse?.useAdvanced ?? verseAdvanced;
         const osis = (options?.verse?.osis ?? verseForm.osis).trim();
@@ -441,23 +471,20 @@ export default function CopilotPage(): JSX.Element {
         } else if (!passage) {
           throw new Error("Provide a passage to analyse.");
         }
-        const body: Record<string, unknown> = { question: question || null };
+        const body: Record<string, unknown> = {
+          model,
+          question: question || null,
+        };
         if (osis) {
           body.osis = osis;
         }
-        if (passage) {
-          body.passage = passage;
+        if (!useAdvanced) {
+          body.passage = passage || null;
         }
         response = await fetch(`${baseUrl}/ai/verse`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-
-               body: JSON.stringify({
-            osis: verseForm.osis.trim(),
-            question: verseForm.question.trim() || null,
-            mode: mode.id,
-          }),
-
+          body: JSON.stringify(body),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -465,16 +492,18 @@ export default function CopilotPage(): JSX.Element {
         const payload = (await response.json()) as VerseResponse;
         setResult({ kind: "verse", payload });
       } else if (selectedWorkflow === "sermon") {
-        if (!sermonForm.topic.trim()) {
+        const topic = sermonForm.topic.trim();
+        if (!topic) {
           throw new Error("Provide a sermon topic.");
         }
+        const osis = sermonForm.osis.trim();
         response = await fetch(`${baseUrl}/ai/sermon-prep`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            topic: sermonForm.topic.trim(),
-            osis: sermonForm.osis.trim() || null,
-            mode: mode.id,
+            topic,
+            osis: osis || null,
+            model,
           }),
         });
         if (!response.ok) {
@@ -483,7 +512,8 @@ export default function CopilotPage(): JSX.Element {
         const payload = (await response.json()) as SermonResponse;
         setResult({ kind: "sermon", payload });
       } else if (selectedWorkflow === "comparative") {
-        if (!comparativeForm.osis.trim()) {
+        const osis = comparativeForm.osis.trim();
+        if (!osis) {
           throw new Error("Provide an OSIS reference.");
         }
         const participants = comparativeForm.participants
@@ -496,7 +526,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/comparative`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ osis: comparativeForm.osis.trim(), participants, mode: mode.id }),
+          body: JSON.stringify({ osis, participants, model }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -508,7 +538,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/multimedia`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ collection: collection || null, mode: mode.id }),
+          body: JSON.stringify({ collection: collection || null, model }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -516,19 +546,21 @@ export default function CopilotPage(): JSX.Element {
         const payload = (await response.json()) as MultimediaDigestResponse;
         setResult({ kind: "multimedia", payload });
       } else if (selectedWorkflow === "devotional") {
-        if (!devotionalForm.osis.trim()) {
+        const osis = devotionalForm.osis.trim();
+        if (!osis) {
           throw new Error("Provide an OSIS reference.");
         }
-        if (!devotionalForm.focus.trim()) {
+        const focus = devotionalForm.focus.trim();
+        if (!focus) {
           throw new Error("Provide a devotional focus.");
         }
         response = await fetch(`${baseUrl}/ai/devotional`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            osis: devotionalForm.osis.trim(),
-            focus: devotionalForm.focus.trim(),
-            mode: mode.id,
+            osis,
+            focus,
+            model,
           }),
         });
         if (!response.ok) {
@@ -537,10 +569,12 @@ export default function CopilotPage(): JSX.Element {
         const payload = (await response.json()) as DevotionalResponse;
         setResult({ kind: "devotional", payload });
       } else if (selectedWorkflow === "collaboration") {
-        if (!collaborationForm.thread.trim()) {
+        const thread = collaborationForm.thread.trim();
+        if (!thread) {
           throw new Error("Provide a thread identifier.");
         }
-        if (!collaborationForm.osis.trim()) {
+        const osis = collaborationForm.osis.trim();
+        if (!osis) {
           throw new Error("Provide an OSIS reference.");
         }
         const viewpoints = collaborationForm.viewpoints
@@ -554,10 +588,10 @@ export default function CopilotPage(): JSX.Element {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            thread: collaborationForm.thread.trim(),
-            osis: collaborationForm.osis.trim(),
+            thread,
+            osis,
             viewpoints,
-            mode: mode.id,
+            model,
           }),
         });
         if (!response.ok) {
@@ -573,7 +607,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/curation`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ since: since || null, mode: mode.id }),
+          body: JSON.stringify({ since: since || null, model }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -588,23 +622,24 @@ export default function CopilotPage(): JSX.Element {
         let url = `${baseUrl}/ai/sermon-prep/export?format=${preset.format}`;
         let body: Record<string, unknown> = {};
         if (preset.type === "sermon") {
-          if (!exportForm.topic.trim()) {
+          const topic = exportForm.topic.trim();
+          if (!topic) {
             throw new Error("Provide a sermon topic to export.");
           }
           body = {
-            topic: exportForm.topic.trim(),
+            topic,
             osis: exportForm.osis.trim() || null,
-            mode: mode.id,
+            model,
           };
         } else {
           url = `${baseUrl}/ai/transcript/export`;
-          if (!exportForm.documentId.trim()) {
+          const documentId = exportForm.documentId.trim();
+          if (!documentId) {
             throw new Error("Provide a document identifier to export.");
           }
           body = {
-            document_id: exportForm.documentId.trim(),
+            document_id: documentId,
             format: preset.format,
-            mode: mode.id,
           };
         }
         response = await fetch(url, {
@@ -632,11 +667,10 @@ export default function CopilotPage(): JSX.Element {
     await runWorkflow();
   };
 
-  const handleQuickStart = async (preset: QuickStartPreset) => {
-    if (isRunning) {
+  const exportCitations = async (citations: RAGCitation[]) => {
+    if (!citations.length) {
       return;
     }
-
     setCitationExportStatus(null);
     setError(null);
     setIsSendingCitations(true);
@@ -644,7 +678,7 @@ export default function CopilotPage(): JSX.Element {
       const response = await fetch(`${baseUrl}/ai/citations/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citations, mode: mode.id }),
+        body: JSON.stringify({ citations, model: mode.id }),
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -661,9 +695,7 @@ export default function CopilotPage(): JSX.Element {
         if (!managerResponse.ok) {
           throw new Error(await managerResponse.text());
         }
-        setCitationExportStatus(
-          "Sent citations to the configured manager endpoint."
-        );
+        setCitationExportStatus("Sent citations to the configured manager endpoint.");
       } else {
         const blob = new Blob([cslBody], {
           type: "application/vnd.citationstyles.csl+json",
@@ -675,9 +707,7 @@ export default function CopilotPage(): JSX.Element {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
-        setCitationExportStatus(
-          "Downloaded CSL bibliography for the selected citations."
-        );
+        setCitationExportStatus("Downloaded CSL bibliography for the selected citations.");
       }
     } catch (exportError) {
       setCitationExportStatus(null);
@@ -685,6 +715,38 @@ export default function CopilotPage(): JSX.Element {
     } finally {
       setIsSendingCitations(false);
     }
+  };
+
+  const handleCitationExport = async (citations: RAGCitation[]) => {
+    if (!citations.length) {
+      setCitationExportStatus("No citations available to export.");
+      return;
+    }
+    await exportCitations(citations);
+  };
+
+  const handleQuickStart = async (preset: QuickStartPreset) => {
+    if (isRunning) {
+      return;
+    }
+
+    const citations = extractCitationsFromResult(result);
+    if (citations.length) {
+      await exportCitations(citations);
+    } else {
+      setCitationExportStatus(null);
+    }
+
+    if (preset.workflow === "verse" && preset.verse) {
+      setVerseAdvanced(Boolean(preset.verse.useAdvanced));
+      setVerseForm({
+        passage: preset.verse.passage ?? "",
+        question: preset.verse.question ?? "",
+        osis: preset.verse.osis ?? "",
+      });
+    }
+    setWorkflow(preset.workflow);
+
     await runWorkflow({
       workflow: preset.workflow,
       verse: preset.verse,
@@ -1210,20 +1272,47 @@ export default function CopilotPage(): JSX.Element {
             <>
               <h3>Sermon prep: {result.payload.topic}</h3>
               {result.payload.osis && <p>Anchored to {result.payload.osis}</p>}
-              <h4>Outline</h4>
-              <ul>
+              {result.payload.outline?.length ? (
+                <>
+                  <h4>Outline</h4>
+                  <ul>
+                    {result.payload.outline.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {result.payload.key_points?.length ? (
+                <>
+                  <h4>Key points</h4>
+                  <ul>
+                    {result.payload.key_points.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {renderRAGAnswer(result.payload.answer, {
+                onExport: handleCitationExport,
+                exporting: isSendingCitations,
+                status: citationExportStatus,
+              })}
+            </>
+          )}
           {result.kind === "multimedia" && (
             <>
               <h3>Multimedia digest</h3>
-              {result.payload.collection && (
-                <p>Collection: {result.payload.collection}</p>
+              {result.payload.collection && <p>Collection: {result.payload.collection}</p>}
+              {result.payload.highlights.length > 0 && (
+                <>
+                  <h4>Highlights</h4>
+                  <ul>
+                    {result.payload.highlights.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </>
               )}
-              <h4>Highlights</h4>
-              <ul>
-                {result.payload.highlights.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
               {renderRAGAnswer(result.payload.answer, {
                 onExport: handleCitationExport,
                 exporting: isSendingCitations,
@@ -1290,23 +1379,6 @@ export default function CopilotPage(): JSX.Element {
                   {result.payload.content}
                 </pre>
               </details>
-            </>
-          )}
-                {result.payload.outline.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-              <h4>Key points</h4>
-              <ul>
-                {result.payload.key_points.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-              {renderRAGAnswer(result.payload.answer, {
-                onExport: handleCitationExport,
-                exporting: isSendingCitations,
-                status: citationExportStatus,
-              })}
             </>
           )}
           {result.kind === "comparative" && (
