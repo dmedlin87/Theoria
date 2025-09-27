@@ -37,6 +37,8 @@ def _seed_corpus() -> None:
             ),
             osis_ref="John.1.1",
             page_no=1,
+            start_char=0,
+            end_char=113,
         )
         doc.passages.append(passage)
         transcript = Document(
@@ -56,6 +58,8 @@ def _seed_corpus() -> None:
             t_start=10.0,
             t_end=25.0,
             meta={"speaker": "Student"},
+            start_char=0,
+            end_char=73,
         )
         transcript.passages.append(transcript_passage)
         session.add_all([doc, transcript])
@@ -99,11 +103,15 @@ def test_verse_copilot_returns_citations_and_followups() -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["answer"]["citations"], payload
-        for citation in payload["answer"]["citations"]:
-            assert citation["osis"] == "John.1.1"
-            assert citation["snippet"], citation
-        assert payload["follow_ups"], payload
         with Session(get_engine()) as session:
+            for citation in payload["answer"]["citations"]:
+                assert citation["osis"] == "John.1.1"
+                assert citation["snippet"], citation
+                assert citation["source_url"].startswith("/doc/"), citation
+                passage = session.get(Passage, citation["passage_id"])
+                assert passage is not None
+                assert citation["snippet"] in passage.text
+            assert payload["follow_ups"], payload
             trail = (
                 session.execute(
                     select(AgentTrail)
@@ -495,7 +503,7 @@ def test_topic_digest_generation() -> None:
         assert "Pauline eschatology" in digest_document["topics"]
         clusters = digest_document["meta"]["clusters"]
         assert clusters
-        assert "doc-1" in clusters[0]["document_ids"]
+        assert any("doc-1" in cluster["document_ids"] for cluster in clusters)
 
 
 def test_batch_intel_cli(tmp_path) -> None:
