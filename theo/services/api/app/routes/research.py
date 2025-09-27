@@ -12,6 +12,7 @@ from ..models.research import (
     CrossReferenceResponse,
     FallacyDetectRequest,
     FallacyDetectResponse,
+    ReliabilityOverviewResponse,
     GeoPlaceSearchResponse,
     HistoricitySearchResponse,
     MorphologyResponse,
@@ -32,6 +33,7 @@ from ..research import (
     fetch_morphology,
     fetch_passage,
     historicity_search,
+    build_reliability_overview,
     get_notes_for_osis,
     report_build,
     update_research_note,
@@ -126,6 +128,25 @@ def get_variants(
             for entry in entries
         ],
         total=len(entries),
+    )
+
+
+@router.get("/overview", response_model=ReliabilityOverviewResponse)
+def get_reliability_overview(
+    osis: str = Query(..., description="Verse to summarise"),
+    mode: str | None = Query(
+        default=None,
+        description="Active study mode such as apologetic or skeptical",
+    ),
+    session: Session = Depends(get_session),
+) -> ReliabilityOverviewResponse:
+    overview = build_reliability_overview(session, osis, mode=mode)
+    return ReliabilityOverviewResponse(
+        osis=overview.osis,
+        mode=overview.mode,
+        consensus=[{"summary": bullet.summary, "citations": bullet.citations} for bullet in overview.consensus],
+        disputed=[{"summary": bullet.summary, "citations": bullet.citations} for bullet in overview.disputed],
+        manuscripts=[{"summary": bullet.summary, "citations": bullet.citations} for bullet in overview.manuscripts],
     )
 
 

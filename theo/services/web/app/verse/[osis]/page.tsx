@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import DeliverableExportAction from "../../components/DeliverableExportAction";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
 import ResearchPanels, { type ResearchFeatureFlags } from "./research-panels";
+import ReliabilityOverviewCard from "./ReliabilityOverviewCard";
 
 const TIMELINE_WINDOWS = ["week", "month", "quarter", "year"] as const;
 type TimelineWindow = (typeof TIMELINE_WINDOWS)[number];
@@ -159,6 +160,14 @@ async function fetchTimeline(
   return (await response.json()) as VerseTimelineResponse;
 }
 
+const STUDY_MODES = ["apologetic", "skeptical"] as const;
+type StudyMode = (typeof STUDY_MODES)[number];
+
+function getActiveMode(searchParams: VersePageProps["searchParams"]): StudyMode {
+  const candidate = getParamValue(searchParams, "mode")?.toLowerCase();
+  return (STUDY_MODES.find((mode) => mode === candidate) ?? "apologetic") as StudyMode;
+}
+
 function TimelineSection({
   timeline,
   window: activeWindow,
@@ -242,6 +251,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   const sourceType = getParamValue(searchParams, "source_type") ?? "";
   const collection = getParamValue(searchParams, "collection") ?? "";
   const author = getParamValue(searchParams, "author") ?? "";
+  const activeMode = getActiveMode(searchParams);
 
   let data: VerseMentionsResponse | null = null;
   let error: string | null = null;
@@ -300,6 +310,10 @@ export default async function VersePage({ params, searchParams }: VersePageProps
           <p>
             Aggregated references for <strong>{osis}</strong>
           </p>
+
+          <Suspense fallback={<p>Loading reliability snapshot…</p>}>
+            <ReliabilityOverviewCard osis={osis} mode={activeMode} />
+          </Suspense>
 
           <DeliverableExportAction
             label="Export sermon packet"
