@@ -327,7 +327,10 @@ export default function CopilotPage(): JSX.Element {
   const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
   const [isSendingCitations, setIsSendingCitations] = useState(false);
 
-  const { mode } = useMode();
+  const activeWorkflow = useMemo(
+    () => WORKFLOWS.find((item) => item.id === workflow),
+    [workflow]
+  );
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const citationManagerEndpoint = useMemo(
@@ -647,19 +650,32 @@ export default function CopilotPage(): JSX.Element {
             key={item.id}
             type="button"
             onClick={() => setWorkflow(item.id)}
-            style={{
-              borderRadius: "0.75rem",
-              padding: "0.75rem 1rem",
-              border: workflow === item.id ? "2px solid #2563eb" : "1px solid #cbd5f5",
-              background: workflow === item.id ? "#eff4ff" : "#fff",
-              cursor: "pointer",
-            }}
+            className={`workflow-button${workflow === item.id ? " is-active" : ""}`}
+            aria-pressed={workflow === item.id}
           >
-            <strong style={{ display: "block" }}>{item.label}</strong>
-            <span style={{ fontSize: "0.85rem", color: "#555" }}>{item.description}</span>
+            <span className="workflow-header">
+              <strong>{item.label}</strong>
+              {workflow === item.id && (
+                <span aria-hidden="true" className="workflow-indicator">
+                  Selected
+                </span>
+              )}
+            </span>
+            <span className="workflow-description">{item.description}</span>
+            <span className="sr-only">
+              {workflow === item.id
+                ? `${item.label} workflow currently selected.`
+                : `Activate the ${item.label} workflow.`}
+            </span>
           </button>
         ))}
       </div>
+
+      <p aria-live="polite" className="workflow-status">
+        {activeWorkflow
+          ? `Selected workflow: ${activeWorkflow.label}. ${activeWorkflow.description}`
+          : "Select a workflow to get started."}
+      </p>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem", maxWidth: 600 }}>
         {workflow === "verse" && (
@@ -959,6 +975,72 @@ export default function CopilotPage(): JSX.Element {
           {isRunning ? "Running." : "Run workflow"}
         </button>
       </form>
+
+      <style jsx>{`
+        .workflow-button {
+          border-radius: 0.75rem;
+          padding: 0.75rem 1rem;
+          border: 1px solid #cbd5f5;
+          background: #fff;
+          cursor: pointer;
+          display: grid;
+          gap: 0.35rem;
+          text-align: left;
+          position: relative;
+          outline: 3px solid transparent;
+          outline-offset: 2px;
+        }
+
+        .workflow-button:focus-visible {
+          outline: 3px solid #1d4ed8;
+        }
+
+        .workflow-button.is-active {
+          border: 2px solid #1d4ed8;
+          background: #eff4ff;
+        }
+
+        .workflow-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+        }
+
+        .workflow-description {
+          font-size: 0.85rem;
+          color: #555;
+        }
+
+        .workflow-indicator {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #1d4ed8;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+
+        .workflow-indicator::before {
+          content: "✓";
+          font-size: 0.85rem;
+        }
+
+        .workflow-status {
+          margin-bottom: 1rem;
+        }
+
+        .sr-only {
+          border: 0;
+          clip: rect(0 0 0 0);
+          height: 1px;
+          margin: -1px;
+          overflow: hidden;
+          padding: 0;
+          position: absolute;
+          width: 1px;
+        }
+      `}</style>
 
       {error && (
         <p role="alert" style={{ color: "crimson", marginTop: "1rem" }}>
