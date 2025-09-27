@@ -6,6 +6,12 @@ export type SearchFilters = {
   collection: string;
   author: string;
   sourceType: string;
+  collectionFacets: string[];
+  dateStart: string;
+  dateEnd: string;
+  includeVariants: boolean;
+  includeDisputed: boolean;
+  preset: string;
 };
 
 const KEY_MAP: Record<keyof SearchFilters, string> = {
@@ -14,10 +20,33 @@ const KEY_MAP: Record<keyof SearchFilters, string> = {
   collection: "collection",
   author: "author",
   sourceType: "source_type",
+  collectionFacets: "collection_facets",
+  dateStart: "date_start",
+  dateEnd: "date_end",
+  includeVariants: "variants",
+  includeDisputed: "disputed",
+  preset: "preset",
 };
 
 function normalizeInput(value: string | undefined | null): string {
   return value?.trim() ?? "";
+}
+
+function normalizeList(value: string | undefined | null): string[] {
+  const normalized = normalizeInput(value);
+  if (!normalized) {
+    return [];
+  }
+  return normalized
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseBoolean(value: string | undefined | null): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 function createSearchParams(input: string | URLSearchParams | ReadonlyURLSearchParams): URLSearchParams {
@@ -38,6 +67,12 @@ export function parseSearchParams(
     collection: normalizeInput(params.get(KEY_MAP.collection)),
     author: normalizeInput(params.get(KEY_MAP.author)),
     sourceType: normalizeInput(params.get(KEY_MAP.sourceType)),
+    collectionFacets: normalizeList(params.get(KEY_MAP.collectionFacets)),
+    dateStart: normalizeInput(params.get(KEY_MAP.dateStart)),
+    dateEnd: normalizeInput(params.get(KEY_MAP.dateEnd)),
+    includeVariants: parseBoolean(params.get(KEY_MAP.includeVariants)),
+    includeDisputed: parseBoolean(params.get(KEY_MAP.includeDisputed)),
+    preset: normalizeInput(params.get(KEY_MAP.preset)),
   };
 }
 
@@ -49,6 +84,20 @@ export function serializeSearchParams(filters: Partial<SearchFilters>): string {
       const trimmed = value.trim();
       if (trimmed) {
         params.set(KEY_MAP[key], trimmed);
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length > 0) {
+        params.set(KEY_MAP[key], value.map((item) => item.trim()).filter(Boolean).join(","));
+      }
+      return;
+    }
+
+    if (typeof value === "boolean") {
+      if (value) {
+        params.set(KEY_MAP[key], "1");
       }
     }
   });
