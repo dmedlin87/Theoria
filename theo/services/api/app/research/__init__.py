@@ -16,6 +16,7 @@ from .reports import report_build
 from .scripture import fetch_passage
 from .variants import variants_apparatus
 from .historicity import historicity_search
+from .dss_links import fetch_dss_links
 
 __all__ = [
     "fetch_passage",
@@ -32,4 +33,5 @@ __all__ = [
     "fallacy_detect",
     "report_build",
     "build_reliability_overview",
+    "fetch_dss_links",
 ]
