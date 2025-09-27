@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from theo.services.api.app.main import app
@@ -122,3 +124,78 @@ def test_creator_verse_perspectives_respects_feature_flag() -> None:
             assert payload.get("meta") is None
         finally:
             settings.creator_verse_perspectives_enabled = original
+
+
+def test_creator_rollups_async_refresh_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    with TestClient(app) as client:
+        settings = settings_module.get_settings()
+        original_async = settings.creator_verse_rollups_async_refresh
+        settings.creator_verse_rollups_async_refresh = True
+        try:
+            from theo.services.api.app.workers import tasks as worker_tasks
+
+            def fake_delay(*args, **kwargs):  # pragma: no cover - invoked for side effects
+                raise RuntimeError("broker unavailable")
+
+            monkeypatch.setattr(
+                worker_tasks.refresh_creator_verse_rollups,
+                "delay",
+                fake_delay,
+                raising=True,
+            )
+
+            _ingest_sample_transcript(client, salt="async")
+
+            response = client.get(
+                "/creators/verses",
+                params={"osis": "John.3.5", "limit_creators": 1, "limit_quotes": 1},
+            )
+            assert response.status_code == 200, response.text
+            payload = response.json()
+            assert payload["total_creators"] >= 1
+        finally:
+            settings.creator_verse_rollups_async_refresh = original_async
+
+
+def test_refresh_creator_rollups_helper_handles_async_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_module.get_settings()
+    original_async = settings.creator_verse_rollups_async_refresh
+    settings.creator_verse_rollups_async_refresh = True
+    try:
+        from theo.services.api.app.workers import tasks as worker_tasks
+        from theo.services.api.app.ingest.pipeline import _refresh_creator_verse_rollups
+
+        recorded: list[list[str]] = []
+
+        def fake_delay(refs, *_, **__):
+            recorded.append(list(refs))
+            raise RuntimeError("broker unavailable")
+
+        monkeypatch.setattr(
+            worker_tasks.refresh_creator_verse_rollups,
+            "delay",
+            fake_delay,
+            raising=True,
+        )
+
+        service_calls: list[list[str]] = []
+
+        def fake_refresh_many(self, refs):
+            service_calls.append(list(refs))
+
+        monkeypatch.setattr(
+            "theo.services.api.app.creators.verse_perspectives.CreatorVersePerspectiveService.refresh_many",
+            fake_refresh_many,
+        )
+
+        session_stub = SimpleNamespace()
+        segments = [SimpleNamespace(osis_refs=["John.3.6", "John.3.5"])]
+
+        _refresh_creator_verse_rollups(session_stub, segments)
+
+        assert recorded and sorted(recorded[0]) == ["John.3.5", "John.3.6"]
+        assert service_calls and service_calls[0] == ["John.3.5", "John.3.6"]
+    finally:
+        settings.creator_verse_rollups_async_refresh = original_async

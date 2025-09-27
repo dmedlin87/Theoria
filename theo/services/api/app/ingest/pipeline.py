@@ -20,6 +20,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
+from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import (
     Creator,
     CreatorClaim,
@@ -116,6 +117,35 @@ def _merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str
     combined = {**base}
     combined.update({k: v for k, v in overrides.items() if v is not None})
     return combined
+
+
+def _refresh_creator_verse_rollups(
+    session: Session, segments: list[TranscriptSegment]
+) -> None:
+    """Refresh cached creator verse rollups impacted by *segments*."""
+
+    osis_refs: set[str] = set()
+    for segment in segments:
+        if segment.osis_refs:
+            osis_refs.update(segment.osis_refs)
+
+    if not osis_refs:
+        return
+
+    settings = get_settings()
+    sorted_refs = sorted(osis_refs)
+    if getattr(settings, "creator_verse_rollups_async_refresh", False):
+        try:
+            from ..workers import tasks as worker_tasks
+
+            worker_tasks.refresh_creator_verse_rollups.delay(sorted_refs)
+            return
+        except Exception:
+            # Fall back to in-process refresh if the broker is unavailable.
+            pass
+
+    service = CreatorVersePerspectiveService(session)
+    service.refresh_many(sorted_refs)
 
 
 def _serialise_frontmatter(frontmatter: dict[str, Any]) -> str:
@@ -985,6 +1015,8 @@ def _persist_text_document(
                 session.add(claim)
 
     session.commit()
+
+    _refresh_creator_verse_rollups(session, segments)
 
     storage_dir = settings.storage_root / document.id
     storage_dir.mkdir(parents=True, exist_ok=True)

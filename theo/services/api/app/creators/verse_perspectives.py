@@ -45,6 +45,14 @@ class CreatorVersePerspectiveService:
     def __init__(self, session: Session):
         self._session = session
 
+    # Cache maintenance -------------------------------------------------------
+    def refresh_many(self, osis_refs: Iterable[str]) -> None:
+        """Rebuild cached rollups for the provided OSIS references."""
+
+        unique_refs = sorted({ref.strip() for ref in osis_refs if ref})
+        for reference in unique_refs:
+            self._rebuild_rollups(reference)
+
     # Public API -----------------------------------------------------------------
     def get_perspectives(
         self,

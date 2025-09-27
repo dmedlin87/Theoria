@@ -23,6 +23,7 @@ from ..analytics.watchlists import (
 )
 from ..core.database import get_engine
 from ..core.settings import get_settings
+from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import Document, IngestionJob, Passage
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
@@ -456,3 +457,16 @@ def schedule_watchlist_alerts() -> None:
         "Scheduled watchlist alerts",
         extra={"count": scheduled, "timestamp": now.isoformat()},
     )
+
+
+@celery.task(name="tasks.refresh_creator_verse_rollups")
+def refresh_creator_verse_rollups(osis_refs: list[str]) -> None:
+    """Rebuild cached creator verse rollups for the supplied references."""
+
+    if not osis_refs:
+        return
+
+    engine = get_engine()
+    with Session(engine) as session:
+        service = CreatorVersePerspectiveService(session)
+        service.refresh_many(osis_refs)
