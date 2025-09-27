@@ -2,6 +2,7 @@
 
 import "@testing-library/jest-dom";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 
 import CommentariesPanel from "../app/verse/[osis]/CommentariesPanel";
 import ContradictionsPanel from "../app/verse/[osis]/ContradictionsPanel";
@@ -9,6 +10,7 @@ import CrossReferencesPanel from "../app/verse/[osis]/CrossReferencesPanel";
 import GeoPanel from "../app/verse/[osis]/GeoPanel";
 import MorphologyPanel from "../app/verse/[osis]/MorphologyPanel";
 import TextualVariantsPanel from "../app/verse/[osis]/TextualVariantsPanel";
+import { ModeProvider } from "../app/context/ModeContext";
 import ResearchPanels, {
   type ResearchFeatureFlags,
 } from "../app/verse/[osis]/research-panels";
@@ -254,61 +256,87 @@ describe("TextualVariantsPanel", () => {
     global.fetch = jest.fn();
   });
 
-  it("renders multiple translation readings", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("translation=SBLGNT")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
+  function renderWithMode(
+    ui: ReactElement,
+    mode: "neutral" | "apologetic" | "skeptical" = "neutral",
+  ) {
+    return render(<ModeProvider value={mode}>{ui}</ModeProvider>);
+  }
+
+  it("renders variant readings with metadata and summary", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        osis: "Gen.1.1",
+        readings: [
+          {
+            id: "r1",
             osis: "Gen.1.1",
-            verses: [
-              { osis: "Gen.1.1", translation: "SBLGNT", text: "Ἐν ἀρχῇ" },
-            ],
-          }),
-          text: async () => "",
-        });
-      }
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({
-          osis: "Gen.1.1",
-          verses: [
-            { osis: "Gen.1.1", translation: "ESV", text: "In the beginning" },
-          ],
-        }),
-        text: async () => "",
-      });
+            category: "manuscript",
+            reading: "Ἐν ἀρχῇ",
+            note: "Mainstream reading",
+            witness: "P66",
+            disputed: false,
+            confidence: 0.85,
+            witness_metadata: { name: "Papyrus 66", date: "c. 200 CE" },
+          },
+          {
+            id: "r2",
+            osis: "Gen.1.1",
+            category: "manuscript",
+            reading: "Ἐν ἀρχῇ ὁ Θεός",
+            note: "Alternative reading",
+            witness: "Codex X",
+            disputed: true,
+            confidence: 0.35,
+            witness_metadata: { name: "Codex X", date: "4th c. CE" },
+          },
+        ],
+      }),
+      text: async () => "",
     });
 
-    const element = await TextualVariantsPanel({
-      osis: "Gen.1.1",
-      features: { research: true, textual_variants: true },
+    renderWithMode(
+      <TextualVariantsPanel
+        osis="Gen.1.1"
+        features={{ research: true, textual_variants: true }}
+      />,
+      "apologetic",
+    );
+
+    expect(screen.getByText("Loading textual variants…")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText("Papyrus 66")).toBeInTheDocument();
     });
-    render(element ?? <></>);
 
     expect(global.fetch).toHaveBeenCalledWith(
-      `${baseUrl}/research/scripture?osis=Gen.1.1&translation=SBLGNT`,
+      `${baseUrl}/research/variants?osis=Gen.1.1`,
       { cache: "no-store" },
     );
-    expect(screen.getByText("SBL Greek NT")).toBeInTheDocument();
-    expect(screen.getByText("Ἐν ἀρχῇ")).toBeInTheDocument();
-    expect(screen.getByText("English Standard Version")).toBeInTheDocument();
+    expect(screen.getByText("Mainstream vs. competing readings")).toBeInTheDocument();
+    expect(screen.getByText(/Papyrus 66/)).toBeInTheDocument();
+    expect(screen.getByText(/Alternative reading/)).toBeInTheDocument();
+    expect(screen.getByText("Disputed")).toBeInTheDocument();
   });
 
   it("renders empty state when no readings", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ osis: "Gen.1.1", verses: [] }),
+      json: async () => ({ osis: "Gen.1.1", readings: [] }),
       text: async () => "",
     });
 
-    const element = await TextualVariantsPanel({
-      osis: "Gen.1.1",
-      features: { research: true, textual_variants: true },
-    });
-    render(element ?? <></>);
+    renderWithMode(
+      <TextualVariantsPanel
+        osis="Gen.1.1"
+        features={{ research: true, textual_variants: true }}
+      />,
+    );
 
-    expect(screen.getByText("No textual variants available.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("No textual variants available.")).toBeInTheDocument();
+    });
   });
 
   it("renders error state when request fails", async () => {
@@ -318,21 +346,29 @@ describe("TextualVariantsPanel", () => {
       text: async () => "Boom",
     });
 
-    const element = await TextualVariantsPanel({
-      osis: "Gen.1.1",
-      features: { research: true, textual_variants: true },
-    });
-    render(element ?? <></>);
+    renderWithMode(
+      <TextualVariantsPanel
+        osis="Gen.1.1"
+        features={{ research: true, textual_variants: true }}
+      />,
+    );
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Unable to load textual variants. Boom");
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Unable to load textual variants. Boom",
+      );
+    });
   });
 
-  it("returns null when feature disabled", async () => {
-    const element = await TextualVariantsPanel({
-      osis: "Gen.1.1",
-      features: { research: true, textual_variants: false },
-    });
-    expect(element).toBeNull();
+  it("returns null when feature disabled", () => {
+    const { container } = renderWithMode(
+      <TextualVariantsPanel
+        osis="Gen.1.1"
+        features={{ research: true, textual_variants: false }}
+      />,
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
