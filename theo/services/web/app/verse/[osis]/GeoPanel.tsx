@@ -7,15 +7,16 @@ import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
 import type { ResearchFeatureFlags } from "./research-panels";
 
-type GeoSearchResult = {
-  name: string;
-  osis: string;
-  coordinates?: { lat: number; lng: number } | null;
+type GeoPlaceItem = {
+  slug?: string | null;
+  name?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   aliases?: string[] | null;
 };
 
 type GeoSearchResponse = {
-  results?: GeoSearchResult[] | null;
+  items: GeoPlaceItem[];
 };
 
 interface GeoPanelProps {
@@ -27,7 +28,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<GeoSearchResult[]>([]);
+  const [results, setResults] = useState<GeoPlaceItem[]>([]);
   const [submitted, setSubmitted] = useState(false);
 
   const { mode } = useMode();
@@ -52,18 +53,18 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
     setError(null);
 
     try {
-      const response = await fetch(`${baseUrl}/research/geo/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim(), osis, mode: mode.id }),
-      });
+      const params = new URLSearchParams({ query: query.trim() });
+      const response = await fetch(
+        `${baseUrl}/research/geo/search?${params.toString()}`,
+        {
+          method: "GET",
+        },
+      );
       if (!response.ok) {
         throw new Error((await response.text()) || response.statusText);
       }
       const payload = (await response.json()) as GeoSearchResponse;
-      setResults(
-        payload.results?.filter((item): item is GeoSearchResult => Boolean(item)) ?? [],
-      );
+      setResults(Array.isArray(payload.items) ? payload.items : []);
     } catch (requestError) {
       console.error("Failed to run geo search", requestError);
       setError(requestError instanceof Error ? requestError.message : "Unknown error");
@@ -118,25 +119,30 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
 
       {results.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.75rem" }}>
-          {results.map((item) => (
-            <li
-              key={`${item.name}-${item.osis}`}
-              style={{ border: "1px solid var(--border, #e5e7eb)", borderRadius: "0.5rem", padding: "0.75rem" }}
-            >
-              <h4 style={{ margin: "0 0 0.25rem" }}>{item.name}</h4>
-              <p style={{ margin: "0 0 0.25rem", fontSize: "0.875rem" }}>OSIS: {item.osis}</p>
-              {item.coordinates ? (
-                <p style={{ margin: "0 0 0.25rem", fontSize: "0.875rem" }}>
-                  Coordinates: {item.coordinates.lat.toFixed(2)}, {item.coordinates.lng.toFixed(2)}
-                </p>
-              ) : null}
-              {item.aliases && item.aliases.length > 0 ? (
-                <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted-foreground, #4b5563)" }}>
-                  Also known as: {item.aliases.join(", ")}
-                </p>
-              ) : null}
-            </li>
-          ))}
+          {results.map((item, index) => {
+            const identifier = item.slug || item.name || `geo-result-${index}`;
+            const lat = typeof item.lat === "number" ? item.lat : null;
+            const lng = typeof item.lng === "number" ? item.lng : null;
+
+            return (
+              <li
+                key={identifier}
+                style={{ border: "1px solid var(--border, #e5e7eb)", borderRadius: "0.5rem", padding: "0.75rem" }}
+              >
+                <h4 style={{ margin: "0 0 0.25rem" }}>{item.name ?? "Unknown location"}</h4>
+                {lat !== null && lng !== null ? (
+                  <p style={{ margin: "0 0 0.25rem", fontSize: "0.875rem" }}>
+                    Coordinates: {lat.toFixed(2)}, {lng.toFixed(2)}
+                  </p>
+                ) : null}
+                {item.aliases && item.aliases.length > 0 ? (
+                  <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted-foreground, #4b5563)" }}>
+                    Also known as: {item.aliases.join(", ")}
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
