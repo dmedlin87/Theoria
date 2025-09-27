@@ -1,3 +1,6 @@
+import ModeChangeBanner from "../../components/ModeChangeBanner";
+import { formatEmphasisSummary } from "../../mode-config";
+import { getActiveMode } from "../../mode-server";
 import { getApiBaseUrl } from "../../lib/api";
 import type { ResearchFeatureFlags } from "./research-panels";
 
@@ -42,6 +45,7 @@ export default async function CommentariesPanel({
     return null;
   }
 
+  const mode = getActiveMode();
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
 
   let notes: ResearchNote[] = [];
@@ -49,7 +53,7 @@ export default async function CommentariesPanel({
 
   try {
     const response = await fetch(
-      `${baseUrl}/research/notes?osis=${encodeURIComponent(osis)}`,
+      `${baseUrl}/research/notes?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
       { cache: "no-store" },
     );
     if (!response.ok) {
@@ -78,6 +82,10 @@ export default async function CommentariesPanel({
       <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
         Curated research notes anchored to <strong>{osis}</strong>.
       </p>
+      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.9rem" }}>
+        {formatEmphasisSummary(mode)}
+      </p>
+      <ModeChangeBanner area="Commentaries" />
       {error ? (
         <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
           Unable to load commentaries. {error}
@@ -105,12 +113,42 @@ export default async function CommentariesPanel({
             >
               <header style={{ marginBottom: "0.5rem" }}>
                 <h4 style={{ margin: "0 0 0.25rem" }}>{note.title ?? "Untitled note"}</h4>
-                <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted-foreground, #4b5563)" }}>
-                  {note.stance ? `${note.stance} perspective` : "Perspective not set"}
-                  {note.claim_type ? ` · ${note.claim_type}` : ""}
-                  {typeof note.confidence === "number"
-                    ? ` · Confidence ${(note.confidence * 100).toFixed(0)}%`
-                    : ""}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+                  {note.stance ? (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "0.25rem 0.5rem",
+                        borderRadius: "9999px",
+                        background: "rgba(37, 99, 235, 0.12)",
+                        color: "#1d4ed8",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Stance: {note.stance}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground, #6b7280)" }}>
+                      Perspective not set
+                    </span>
+                  )}
+                  {note.claim_type ? (
+                    <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground, #6b7280)" }}>
+                      Claim: {note.claim_type}
+                    </span>
+                  ) : null}
+                  {typeof note.confidence === "number" ? (
+                    <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground, #6b7280)" }}>
+                      Confidence {(note.confidence * 100).toFixed(0)}%
+                    </span>
+                  ) : null}
+                </div>
+                <p style={{ margin: "0.35rem 0 0", fontSize: "0.8rem", color: "var(--muted-foreground, #4b5563)" }}>
+                  Mode signal: {mode.label} mode foregrounds {mode.emphasis.join(", ")}
+                  {mode.suppressions.length > 0
+                    ? ` while muting ${mode.suppressions.join(", ")}.`
+                    : "."}
                 </p>
                 {note.tags && note.tags.length > 0 ? (
                   <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--muted-foreground, #4b5563)" }}>

@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import ModeChangeBanner from "../components/ModeChangeBanner";
+import { formatEmphasisSummary } from "../mode-config";
+import { useMode } from "../mode-context";
 import { getApiBaseUrl, getCitationManagerEndpoint } from "../lib/api";
 
 type FeatureFlags = {
@@ -324,6 +327,8 @@ export default function CopilotPage(): JSX.Element {
   const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
   const [isSendingCitations, setIsSendingCitations] = useState(false);
 
+  const { mode } = useMode();
+
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const citationManagerEndpoint = useMemo(
     () => getCitationManagerEndpoint(),
@@ -371,7 +376,11 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/verse`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ osis: verseForm.osis.trim(), question: verseForm.question.trim() || null }),
+          body: JSON.stringify({
+            osis: verseForm.osis.trim(),
+            question: verseForm.question.trim() || null,
+            mode: mode.id,
+          }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -388,6 +397,7 @@ export default function CopilotPage(): JSX.Element {
           body: JSON.stringify({
             topic: sermonForm.topic.trim(),
             osis: sermonForm.osis.trim() || null,
+            mode: mode.id,
           }),
         });
         if (!response.ok) {
@@ -409,7 +419,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/comparative`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ osis: comparativeForm.osis.trim(), participants }),
+          body: JSON.stringify({ osis: comparativeForm.osis.trim(), participants, mode: mode.id }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -421,7 +431,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/multimedia`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ collection: collection || null }),
+          body: JSON.stringify({ collection: collection || null, mode: mode.id }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -441,6 +451,7 @@ export default function CopilotPage(): JSX.Element {
           body: JSON.stringify({
             osis: devotionalForm.osis.trim(),
             focus: devotionalForm.focus.trim(),
+            mode: mode.id,
           }),
         });
         if (!response.ok) {
@@ -469,6 +480,7 @@ export default function CopilotPage(): JSX.Element {
             thread: collaborationForm.thread.trim(),
             osis: collaborationForm.osis.trim(),
             viewpoints,
+            mode: mode.id,
           }),
         });
         if (!response.ok) {
@@ -484,7 +496,7 @@ export default function CopilotPage(): JSX.Element {
         response = await fetch(`${baseUrl}/ai/curation`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ since: since || null }),
+          body: JSON.stringify({ since: since || null, mode: mode.id }),
         });
         if (!response.ok) {
           throw new Error(await response.text());
@@ -505,6 +517,7 @@ export default function CopilotPage(): JSX.Element {
           body = {
             topic: exportForm.topic.trim(),
             osis: exportForm.osis.trim() || null,
+            mode: mode.id,
           };
         } else {
           url = `${baseUrl}/ai/transcript/export`;
@@ -514,6 +527,7 @@ export default function CopilotPage(): JSX.Element {
           body = {
             document_id: exportForm.documentId.trim(),
             format: preset.format,
+            mode: mode.id,
           };
         }
         response = await fetch(url, {
@@ -558,7 +572,7 @@ export default function CopilotPage(): JSX.Element {
       const response = await fetch(`${baseUrl}/ai/citations/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citations }),
+        body: JSON.stringify({ citations, mode: mode.id }),
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -624,6 +638,8 @@ export default function CopilotPage(): JSX.Element {
     <section>
       <h2>Copilot</h2>
       <p>Run grounded workflows that stay anchored to your corpus.</p>
+      <p style={{ marginTop: "0.5rem", color: "#4b5563" }}>{formatEmphasisSummary(mode)}</p>
+      <ModeChangeBanner area="Copilot workspace" />
 
       <div style={{ display: "flex", gap: "0.75rem", margin: "1.5rem 0", flexWrap: "wrap" }}>
         {WORKFLOWS.map((item) => (
@@ -952,6 +968,9 @@ export default function CopilotPage(): JSX.Element {
 
       {result && (
         <section style={{ marginTop: "2rem", background: "#fff", padding: "1.5rem", borderRadius: "0.75rem" }}>
+          <p style={{ marginTop: 0, marginBottom: "1rem", color: "#4b5563" }}>
+            {formatEmphasisSummary(mode)}
+          </p>
           {result.kind === "verse" && (
             <>
               <h3>Verse brief for {result.payload.osis}</h3>
