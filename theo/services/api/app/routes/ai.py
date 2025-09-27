@@ -95,6 +95,9 @@ def register_llm_model(
         provider=payload.provider,
         model=payload.model,
         config=dict(payload.config),
+        pricing=dict(payload.pricing),
+        latency=dict(payload.latency),
+        routing=dict(payload.routing),
     )
     registry.add_model(model, make_default=payload.make_default)
     return _persist_and_respond(session, registry)
@@ -133,6 +136,24 @@ def update_llm_model(
                 model.config.pop(key, None)
             else:
                 model.config[key] = value
+    if payload.pricing is not None:
+        for key, value in dict(payload.pricing).items():
+            if value is None:
+                model.pricing.pop(key, None)
+            else:
+                model.pricing[key] = value
+    if payload.latency is not None:
+        for key, value in dict(payload.latency).items():
+            if value is None:
+                model.latency.pop(key, None)
+            else:
+                model.latency[key] = value
+    if payload.routing is not None:
+        for key, value in dict(payload.routing).items():
+            if value is None:
+                model.routing.pop(key, None)
+            else:
+                model.routing[key] = value
     if payload.make_default:
         registry.default_model = name
     return _persist_and_respond(session, registry)
