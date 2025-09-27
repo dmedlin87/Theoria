@@ -7,6 +7,7 @@ export type ResearchFeatureFlags = {
   research?: boolean;
   contradictions?: boolean;
   geo?: boolean;
+  verse_timeline?: boolean;
 };
 
 interface ResearchPanelsProps {

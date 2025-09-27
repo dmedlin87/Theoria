@@ -207,6 +207,42 @@ Response:
 }
 ```
 
+### `GET /verses/{osis}/timeline`
+
+Aggregates mention counts into fixed windows so clients can visualize trends.
+The endpoint respects the same filters as the mentions route and is guarded by
+the `verse_timeline` feature flag returned from `/features/discovery`.
+
+Query parameters:
+
+| Parameter     | Type   | Description                                      |
+| ------------- | ------ | ------------------------------------------------ |
+| `window`      | str    | Bucket size: `week`, `month`, `quarter`, `year`. |
+| `limit`       | int    | Max number of windows to return (default 36).    |
+| `source_type` | str    | Optional filter mirroring `/mentions`.           |
+| `collection`  | str    | Optional filter mirroring `/mentions`.           |
+| `author`      | str    | Optional filter mirroring `/mentions`.           |
+
+Example response:
+
+```json
+{
+  "osis": "John.3.16",
+  "window": "month",
+  "total_mentions": 12,
+  "buckets": [
+    {
+      "label": "2024-01",
+      "start": "2024-01-01T00:00:00+00:00",
+      "end": "2024-02-01T00:00:00+00:00",
+      "count": 3,
+      "document_ids": ["doc-123", "doc-456"],
+      "sample_passage_ids": ["passage-9"]
+    }
+  ]
+}
+```
+
 ## Creator perspectives
 
 Creator endpoints surface stance summaries and timestamped quotes for creators
@@ -392,12 +428,14 @@ Response:
   "features": {
     "research": true,
     "contradictions": true,
-    "geo": true
+    "geo": true,
+    "verse_timeline": true
   }
 }
 ```
 
-Clients should check `features.contradictions` and `features.geo` before
+Clients should check `features.contradictions`, `features.geo`, and
+`features.verse_timeline` before
 rendering the corresponding panels.
 
 ## Documents
