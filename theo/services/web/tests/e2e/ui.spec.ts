@@ -124,6 +124,280 @@ test.describe("Theo Engine UI", () => {
     }
   });
 
+  test("runs copilot workflows", async ({ page }) => {
+    const observedWorkflows = new Set<string>();
+    const observedExportPresets = new Set<string>();
+    const baseCitation = {
+      index: 0,
+      osis: "John.1.1",
+      anchor: "John 1:1",
+      snippet: "In the beginning was the Word.",
+      document_id: "doc-1",
+      document_title: "Sample Document",
+    };
+    const ragAnswer = {
+      summary: "Test summary",
+      citations: [baseCitation],
+    };
+
+    await page.route("**/ai/*", async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      if (path === "/ai/verse") {
+        const payload = route.request().postDataJSON();
+        expect(payload).toMatchObject({ osis: "John.1.1" });
+        observedWorkflows.add("verse");
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            osis: payload.osis,
+            question: payload.question,
+            answer: ragAnswer,
+            follow_ups: ["What parallels exist with Genesis 1?"],
+          }),
+        });
+        return;
+      }
+      if (path === "/ai/sermon-prep" && !url.search) {
+        const payload = route.request().postDataJSON();
+        expect(payload.topic).toBe("Embodied hope");
+        observedWorkflows.add("sermon");
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            topic: payload.topic,
+            osis: payload.osis,
+            outline: ["Point 1", "Point 2"],
+            key_points: ["Key insight"],
+            answer: ragAnswer,
+          }),
+        });
+        return;
+      }
+      if (path === "/ai/comparative") {
+        const payload = route.request().postDataJSON();
+        expect(payload.participants).toEqual(["Origen", "Augustine"]);
+        observedWorkflows.add("comparative");
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            osis: payload.osis,
+            participants: payload.participants,
+            comparisons: ["Origen emphasises pre-existence."],
+            answer: ragAnswer,
+          }),
+        });
+        return;
+      }
+      if (path === "/ai/multimedia") {
+        const payload = route.request().postDataJSON();
+        expect(payload.collection).toBe("Gospels");
+        observedWorkflows.add("multimedia");
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            collection: payload.collection,
+            highlights: ["Sample highlight from audio"],
+            answer: ragAnswer,
+          }),
+        });
+        return;
+      }
+      if (path === "/ai/devotional") {
+        const payload = route.request().postDataJSON();
+        expect(payload.focus).toBe("Logos");
+        observedWorkflows.add("devotional");
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            osis: payload.osis,
+            focus: payload.focus,
+            reflection: "Reflect on the Word becoming flesh.",
+            prayer: "Spirit, help me embody the Word.",
+            answer: ragAnswer,
+          }),
+        });
+        return;
+      }
+      if (path === "/ai/collaboration") {
+        const payload = route.request().postDataJSON();
+        expect(payload.viewpoints).toEqual(["Creation", "Logos"]);
+        observedWorkflows.add("collaboration");
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            thread: payload.thread,
+            synthesized_view: "Creation meets Logos in harmony.",
+            answer: ragAnswer,
+          }),
+        });
+        return;
+      }
+      if (path === "/ai/curation") {
+        const payload = route.request().postDataJSON();
+        expect(payload).toMatchObject({ since: "2024-01-01T00:00:00" });
+        observedWorkflows.add("curation");
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            since: payload.since,
+            documents_processed: 3,
+            summaries: ["Sample Sermon — Gospels"],
+          }),
+        });
+        return;
+      }
+      if (path === "/ai/sermon-prep/export") {
+        const payload = route.request().postDataJSON();
+        const format = new URL(route.request().url()).searchParams.get("format") ?? "markdown";
+        expect(payload.topic).toBe("Embodied hope");
+        observedExportPresets.add(`sermon-${format}`);
+        await route.fulfill({
+          status: 200,
+          headers: {
+            "content-type": format === "csv" ? "text/csv" : "text/plain",
+            "content-disposition": `attachment; filename=sermon.${format}`,
+          },
+          body: `SERMON EXPORT (${format.toUpperCase()})`,
+        });
+        return;
+      }
+      if (path === "/ai/transcript/export") {
+        const payload = route.request().postDataJSON();
+        expect(payload.document_id).toBe("doc-123");
+        observedExportPresets.add(`transcript-${payload.format}`);
+        await route.fulfill({
+          status: 200,
+          headers: {
+            "content-type": payload.format === "csv" ? "text/csv" : "text/plain",
+            "content-disposition": `attachment; filename=transcript.${payload.format}`,
+          },
+          body: `TRANSCRIPT EXPORT (${String(payload.format).toUpperCase()})`,
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto("/copilot");
+    await expect(page.getByRole("heading", { name: "Copilot" })).toBeVisible();
+
+    await page.getByRole("button", { name: /^Verse brief/ }).click();
+    await page.getByLabel("OSIS reference").fill("John.1.1");
+    await page.getByLabel("Question").fill("How does the Logos reveal God's nature?");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/ai/verse")),
+      page.click("button[type='submit']"),
+    ]);
+    await expect(page.getByRole("heading", { name: /Verse brief for John\.1\.1/ })).toBeVisible();
+
+    await page.getByRole("button", { name: /^Sermon prep/ }).click();
+    await page.getByLabel("Sermon topic").fill("Embodied hope");
+    await page.getByLabel("OSIS anchor (optional)").fill("John.1.1");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/ai/sermon-prep")),
+      page.click("button[type='submit']"),
+    ]);
+    await expect(page.getByRole("heading", { name: /Sermon prep: Embodied hope/ })).toBeVisible();
+
+    await page.getByRole("button", { name: /^Comparative analysis/ }).click();
+    await page.getByLabel("OSIS reference").fill("John.1.1");
+    await page.getByLabel("Participants \(comma separated\)").fill("Origen, Augustine");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/ai/comparative")),
+      page.click("button[type='submit']"),
+    ]);
+    await expect(page.getByRole("heading", { name: /Comparative analysis/ })).toBeVisible();
+
+    await page.getByRole("button", { name: /^Multimedia digest/ }).click();
+    await page.getByLabel("Collection \(optional\)").fill("Gospels");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/ai/multimedia")),
+      page.click("button[type='submit']"),
+    ]);
+    await expect(page.getByRole("heading", { name: "Multimedia digest" })).toBeVisible();
+
+    await page.getByRole("button", { name: /^Devotional guide/ }).click();
+    await page.getByLabel("OSIS reference").fill("John.1.1");
+    await page.getByLabel("Focus theme").fill("Logos");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/ai/devotional")),
+      page.click("button[type='submit']"),
+    ]);
+    await expect(page.getByRole("heading", { name: /Devotional guide for John\.1\.1/ })).toBeVisible();
+
+    await page.getByRole("button", { name: /^Collaboration reconciliation/ }).click();
+    await page.getByLabel("Thread identifier").fill("forum-thread-1");
+    await page.getByLabel("OSIS reference").fill("John.1.1");
+    await page.getByLabel("Viewpoints \(comma separated\)").fill("Creation, Logos");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/ai/collaboration")),
+      page.click("button[type='submit']"),
+    ]);
+    await expect(page.getByRole("heading", { name: /Collaboration synthesis/ })).toBeVisible();
+
+    await page.getByRole("button", { name: /^Corpus curation/ }).click();
+    await page.getByLabel("Since \(ISO timestamp, optional\)").fill("2024-01-01T00:00:00");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/ai/curation")),
+      page.click("button[type='submit']"),
+    ]);
+    await expect(page.getByRole("heading", { name: "Corpus curation report" })).toBeVisible();
+
+    await page.getByRole("button", { name: /^Export presets/ }).click();
+    const presetSelect = page.getByLabel("Export preset");
+    const exportPresets = [
+      { id: "sermon-markdown", type: "sermon", urlSuffix: "/ai/sermon-prep/export?format=markdown" },
+      { id: "sermon-ndjson", type: "sermon", urlSuffix: "/ai/sermon-prep/export?format=ndjson" },
+      { id: "sermon-csv", type: "sermon", urlSuffix: "/ai/sermon-prep/export?format=csv" },
+      { id: "transcript-markdown", type: "transcript", urlSuffix: "/ai/transcript/export" },
+      { id: "transcript-csv", type: "transcript", urlSuffix: "/ai/transcript/export" },
+    ];
+
+    for (const preset of exportPresets) {
+      await presetSelect.selectOption(preset.id);
+      if (preset.type === "sermon") {
+        await page.getByLabel("Sermon topic").fill("Embodied hope");
+        await page.getByLabel("OSIS anchor (optional)").fill("John.1.1");
+      } else {
+        await page.getByLabel("Document identifier").fill("doc-123");
+      }
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes(preset.urlSuffix)),
+        page.click("button[type='submit']"),
+      ]);
+      await expect(page.getByRole("heading", { name: /Export preset:/ })).toBeVisible();
+    }
+
+    expect(Array.from(observedWorkflows).sort()).toEqual(
+      [
+        "collaboration",
+        "comparative",
+        "curation",
+        "devotional",
+        "multimedia",
+        "sermon",
+        "verse",
+      ].sort()
+    );
+    expect(Array.from(observedExportPresets).sort()).toEqual(
+      [
+        "sermon-csv",
+        "sermon-markdown",
+        "sermon-ndjson",
+        "transcript-csv",
+        "transcript-markdown",
+      ].sort()
+    );
+  });
+
   test("filters verse mentions", async ({ page }) => {
     await page.goto("/verse/John.1.1");
 
