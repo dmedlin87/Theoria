@@ -35,7 +35,6 @@ if TYPE_CHECKING:  # pragma: no cover - hints only
 LOGGER = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 30 * 60
-_SOURCES_PATTERN = re.compile(r"Sources:\s*(.*)", re.IGNORECASE | re.DOTALL)
 _CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*\((?P<anchor>[^()]+)\)$")
 
 _redis_client: Any = None
@@ -265,11 +264,11 @@ def _validate_model_completion(
     if not completion or not completion.strip():
         raise GuardrailError("Model completion was empty")
 
-    match = _SOURCES_PATTERN.search(completion)
-    if not match:
+    marker_index = completion.lower().rfind("sources:")
+    if marker_index == -1:
         raise GuardrailError("Model completion missing 'Sources:' line")
 
-    sources_text = match.group(1).strip()
+    sources_text = completion[marker_index + len("Sources:") :].strip()
     if not sources_text:
         raise GuardrailError("Model completion missing citations after 'Sources:'")
 
@@ -503,7 +502,10 @@ def _guarded_answer(
                     f"[{citation.index}] {citation.osis} ({citation.anchor})"
                     for citation in citations
                 )
-                if "Sources:" not in completion:
+                has_citations_line = bool(
+                    re.search(r"Sources:\s*\[\d+]", completion)
+                )
+                if not has_citations_line:
                     completion = completion.strip() + f"\n\nSources: {sources_line}"
                 try:
                     validation_result = _validate_model_completion(completion, citations)
@@ -615,6 +617,75 @@ def _search(
 ) -> list[HybridSearchResult]:
     request = HybridSearchRequest(query=query, osis=osis, filters=filters, k=k)
     return hybrid_search(session, request)
+
+
+def run_guarded_chat(
+    session: Session,
+    *,
+    question: str,
+    osis: str | None = None,
+    filters: HybridSearchFilters | None = None,
+    model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
+) -> RAGAnswer:
+    filters = filters or HybridSearchFilters()
+    with instrument_workflow(
+        "chat",
+        question_present=bool(question),
+        model_hint=model_name,
+    ) as span:
+        set_span_attribute(
+            span,
+            "workflow.filters",
+            filters.model_dump(exclude_none=True),
+        )
+        results = _search(session, query=question, osis=osis, filters=filters)
+        set_span_attribute(span, "workflow.result_count", len(results))
+        log_workflow_event(
+            "workflow.passages_retrieved",
+            workflow="chat",
+            result_count=len(results),
+        )
+        registry = get_llm_registry(session)
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": question,
+                    "osis": osis,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
+        answer = _guarded_answer(
+            session,
+            question=question,
+            results=results,
+            registry=registry,
+            model_hint=model_name,
+            recorder=recorder,
+        )
+        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
+        set_span_attribute(span, "workflow.summary_length", len(answer.summary))
+        log_workflow_event(
+            "workflow.answer_composed",
+            workflow="chat",
+            citations=len(answer.citations),
+        )
+        if recorder:
+            recorder.record_citations(answer.citations)
+        return answer
 
 
 def generate_verse_brief(
@@ -1212,6 +1283,7 @@ __all__ = [
     "generate_multimedia_digest",
     "generate_sermon_prep_outline",
     "generate_verse_brief",
+    "run_guarded_chat",
     "run_corpus_curation",
     "run_research_reconciliation",
 ]

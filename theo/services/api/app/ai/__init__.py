@@ -15,6 +15,7 @@ from .rag import (
     generate_multimedia_digest,
     generate_sermon_prep_outline,
     generate_verse_brief,
+    run_guarded_chat,
     run_corpus_curation,
     run_research_reconciliation,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "generate_multimedia_digest",
     "generate_sermon_prep_outline",
     "generate_verse_brief",
+    "run_guarded_chat",
     "run_corpus_curation",
     "run_research_reconciliation",
 ]

@@ -153,6 +153,102 @@ def test_llm_registry_crud_operations() -> None:
         assert final_state["default_model"] == "echo"
 
 
+def test_chat_session_returns_guarded_answer_and_trail() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {"role": "user", "content": "Summarise John 1:1 from the library"}
+                ],
+                "osis": "John.1.1",
+                "recorder_metadata": {"user_id": "chat-user"},
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["session_id"]
+        assert payload["answer"]["citations"]
+        assert payload["message"]["role"] == "assistant"
+        assert payload["message"]["content"]
+        with Session(get_engine()) as session:
+            trail = (
+                session.execute(
+                    select(AgentTrail)
+                    .where(
+                        AgentTrail.workflow == "chat",
+                        AgentTrail.status == "completed",
+                    )
+                    .order_by(AgentTrail.started_at.desc())
+                )
+                .scalars()
+                .first()
+            )
+            assert trail is not None
+            assert trail.user_id == "chat-user"
+
+
+def test_chat_turn_guardrail_failure_returns_422() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {"role": "user", "content": "Share insights on an unknown topic"}
+                ],
+                "osis": "Gen.99.1",
+                "filters": {"collection": "Nonexistent"},
+            },
+        )
+        assert response.status_code == 422
+
+
+def test_provider_settings_crud_flow() -> None:
+    with TestClient(app) as client:
+        missing = client.get("/settings/ai/providers/openai")
+        assert missing.status_code == 404
+
+        upsert = client.put(
+            "/settings/ai/providers/openai",
+            json={
+                "api_key": "secret-key",
+                "base_url": "https://example.com",
+                "default_model": "gpt-test",
+                "extra_headers": {"X-Test": "1"},
+            },
+        )
+        assert upsert.status_code == 200, upsert.text
+        payload = upsert.json()
+        assert payload["provider"] == "openai"
+        assert payload["has_api_key"] is True
+        assert payload["base_url"] == "https://example.com"
+        assert payload["extra_headers"] == {"X-Test": "1"}
+
+        listing = client.get("/settings/ai/providers")
+        assert listing.status_code == 200
+        providers = listing.json()
+        assert providers and providers[0]["provider"] == "openai"
+
+        rotate = client.put(
+            "/settings/ai/providers/openai", json={"api_key": None}
+        )
+        assert rotate.status_code == 200
+        rotated = rotate.json()
+        assert rotated["has_api_key"] is False
+
+        delete = client.delete("/settings/ai/providers/openai")
+        assert delete.status_code == 204
+        after = client.get("/settings/ai/providers/openai")
+        assert after.status_code == 404
+        final_listing = client.get("/settings/ai/providers")
+        assert final_listing.status_code == 200
+        assert final_listing.json() == []
+
+
 def test_verse_copilot_guardrails_when_no_citations() -> None:
     _seed_corpus()
     with TestClient(app) as client:
