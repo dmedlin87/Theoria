@@ -1,4 +1,11 @@
+
 'use client';
+
+import { formatEmphasisSummary } from "../../mode-config";
+import { getActiveMode } from "../../mode-server";
+import { getApiBaseUrl } from "../../lib/api";
+import type { ResearchFeatureFlags } from "./research-panels";
+
 
 import { useEffect, useMemo, useState } from 'react';
 
@@ -106,6 +113,17 @@ function buildSummary(readings: VariantReading[], mode: StudyMode): string | nul
 
   const manuscripts = readings.filter(
     (reading) => reading.category.toLowerCase() === 'manuscript',
+=======
+async function fetchTranslation(
+  osis: string,
+  translation: string,
+  baseUrl: string,
+  modeId: string,
+): Promise<{ translation: string; verses: ScriptureVerse[]; label: string } | null> {
+  const response = await fetch(
+    `${baseUrl}/research/scripture?osis=${encodeURIComponent(osis)}&translation=${encodeURIComponent(translation)}&mode=${encodeURIComponent(modeId)}`,
+    { cache: "no-store" },
+
   );
   if (manuscripts.length === 0) {
     return null;
@@ -197,12 +215,18 @@ export default function TextualVariantsPanel({
   const [showDisputedOnly, setShowDisputedOnly] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
+
   useEffect(() => {
     if (!features?.textual_variants) {
       return;
     }
 
+  const mode = getActiveMode();
+  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+
+
     const controller = new AbortController();
+
 
     async function loadVariants() {
       setLoading(true);
@@ -214,6 +238,14 @@ export default function TextualVariantsPanel({
         );
         if (!response.ok) {
           throw new Error((await response.text()) || response.statusText);
+
+  try {
+    const results = await Promise.all(
+      TRANSLATIONS.map(async ({ code }) => {
+        try {
+          return await fetchTranslation(osis, code, baseUrl, mode.id);
+        } catch (translationError) {
+          throw translationError;
         }
         const payload = (await response.json()) as VariantApparatusResponse;
         const items = payload.readings?.filter(
@@ -300,10 +332,12 @@ export default function TextualVariantsPanel({
         Compare witness readings for <strong>{osis}</strong> with timeline and commentary cues.
       </p>
 
-      {loading ? (
-        <p>Loading textual variants…</p>
-      ) : error ? (
-        <p role="alert" style={{ color: 'var(--danger, #b91c1c)' }}>
+      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.875rem" }}>
+        {formatEmphasisSummary(mode)}
+      </p>
+      {error ? (
+        <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+
           Unable to load textual variants. {error}
         </p>
       ) : readings.length === 0 ? (

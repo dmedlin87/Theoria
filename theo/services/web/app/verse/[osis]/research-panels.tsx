@@ -1,5 +1,8 @@
 import { Suspense } from "react";
 
+import ModeChangeBanner from "../../components/ModeChangeBanner";
+import { formatEmphasisSummary } from "../../mode-config";
+import { getActiveMode } from "../../mode-server";
 import ContradictionsPanel from "./ContradictionsPanel";
 import CommentariesPanel from "./CommentariesPanel";
 import CrossReferencesPanel from "./CrossReferencesPanel";
@@ -28,6 +31,7 @@ export default function ResearchPanels({ osis, features }: ResearchPanelsProps) 
     return null;
   }
 
+  const mode = getActiveMode();
   const hasAnyPanel = Boolean(
     features.contradictions ||
       features.cross_references ||
@@ -42,8 +46,14 @@ export default function ResearchPanels({ osis, features }: ResearchPanelsProps) 
       <header>
         <h2 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Research</h2>
         <p style={{ margin: 0, color: "var(--muted-foreground, #4b5563)" }}>
-          Explore related findings for <strong>{osis}</strong>.
+          Explore related findings for <strong>{osis}</strong> in
+          {" "}
+          <strong>{mode.label}</strong> mode.
         </p>
+        <p style={{ margin: "0.5rem 0 0", color: "var(--muted-foreground, #64748b)" }}>
+          {formatEmphasisSummary(mode)}
+        </p>
+        <ModeChangeBanner area="Research panels" />
       </header>
 
       {features.contradictions ? (
