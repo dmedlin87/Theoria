@@ -66,6 +66,10 @@ class Settings(BaseSettings):
         default=True,
         description="Toggle aggregated creator perspectives by verse",
     )
+    creator_verse_rollups_async_refresh: bool = Field(
+        default=False,
+        description="Queue creator verse rollup refreshes via Celery instead of inline",
+    )
     verse_timeline_enabled: bool = Field(
         default=True,
         description="Toggle verse mention timeline aggregation endpoints",
