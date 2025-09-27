@@ -1075,37 +1075,3 @@ def run_user_watchlist(
         raise HTTPException(status_code=404, detail="Watchlist not found")
     return run_watchlist(session, watchlist, persist=True)
 
-
-@router.get("/llm", response_model=LLMSettingsResponse)
-def list_models(session: Session = Depends(get_session)) -> LLMSettingsResponse:
-    registry = get_llm_registry(session)
-    return LLMSettingsResponse(**registry.to_response())
-
-
-@router.post("/llm", response_model=LLMSettingsResponse)
-def add_model(
-    payload: LLMModelRequest,
-    session: Session = Depends(get_session),
-) -> LLMSettingsResponse:
-    registry = get_llm_registry(session)
-    registry.add_model(
-        LLMModel(
-            name=payload.name,
-            provider=payload.provider,
-            model=payload.model,
-            config=dict(payload.config),
-        ),
-        make_default=payload.make_default,
-    )
-    save_llm_registry(session, registry)
-    return LLMSettingsResponse(**registry.to_response())
-
-
-@router.delete("/llm/{name}", response_model=LLMSettingsResponse)
-def remove_model(
-    name: str, session: Session = Depends(get_session)
-) -> LLMSettingsResponse:
-    registry = get_llm_registry(session)
-    registry.remove_model(name)
-    save_llm_registry(session, registry)
-    return LLMSettingsResponse(**registry.to_response())

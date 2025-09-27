@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -27,6 +28,7 @@ from theo.services.api.app.core.database import (  # noqa: E402
     Base,
     configure_engine,
     get_engine,
+    get_session,
 )
 from theo.services.api.app.core.settings import (  # noqa: E402
     get_settings,
@@ -37,6 +39,7 @@ from theo.services.api.app.core.settings_store import (  # noqa: E402
     save_setting,
 )
 from theo.services.api.app.db.models import AppSetting  # noqa: E402
+from theo.services.api.app.main import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -55,6 +58,27 @@ def _prepare_engine(tmp_path: Path):
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     return engine
+
+
+@pytest.fixture()
+def api_client(tmp_path: Path) -> TestClient:
+    """Provide a TestClient wired to a temporary SQLite database."""
+
+    engine = _prepare_engine(tmp_path)
+
+    def _override_session():
+        db = Session(engine)
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = _override_session
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.pop(get_session, None)
 
 
 def test_settings_store_encrypts_and_decrypts(tmp_path: Path) -> None:
@@ -160,3 +184,51 @@ def test_registry_persists_model_metadata(tmp_path: Path) -> None:
         assert loaded.pricing["per_call"] == 0.5
         assert loaded.latency["p95"] == 1200
         assert loaded.routing["spend_ceiling"] == 5.0
+
+
+def test_llm_routes_persist_metadata(api_client: TestClient) -> None:
+    payload = {
+        "name": "primary",
+        "provider": "echo",
+        "model": "echo",
+        "config": {"suffix": "[ok]"},
+        "pricing": {"per_call": 0.25},
+        "latency": {"p95": 900},
+        "routing": {"weight": 1.5},
+        "make_default": True,
+    }
+
+    create_response = api_client.post("/ai/llm", json=payload)
+    assert create_response.status_code == 200
+    created = create_response.json()
+    assert created["default_model"] == "primary"
+    stored_model = created["models"][0]
+    assert stored_model["pricing"]["per_call"] == 0.25
+    assert stored_model["latency"]["p95"] == 900
+    assert stored_model["routing"]["weight"] == 1.5
+
+    list_response = api_client.get("/ai/llm")
+    assert list_response.status_code == 200
+    payload = list_response.json()
+    assert payload["default_model"] == "primary"
+    listed = payload["models"][0]
+    assert listed["pricing"]["per_call"] == 0.25
+    assert listed["latency"]["p95"] == 900
+    assert listed["routing"]["weight"] == 1.5
+
+
+def test_llm_routes_openapi_schema(api_client: TestClient) -> None:
+    schema_response = api_client.get("/openapi.json")
+    assert schema_response.status_code == 200
+    schema = schema_response.json()
+
+    llm_paths = schema["paths"]["/ai/llm"]
+    assert set(llm_paths.keys()) == {"get", "post"}
+
+    llm_default = schema["paths"].get("/ai/llm/default")
+    assert llm_default is not None
+    assert set(llm_default.keys()) == {"patch"}
+
+    llm_model = schema["paths"].get("/ai/llm/{name}")
+    assert llm_model is not None
+    assert set(llm_model.keys()) == {"patch", "delete"}
