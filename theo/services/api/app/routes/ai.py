@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,15 @@ from ..analytics.topics import (
     store_topic_digest,
     upsert_digest_document,
 )
+from ..analytics.watchlists import (
+    create_watchlist,
+    delete_watchlist,
+    get_watchlist,
+    list_watchlist_events,
+    list_watchlists,
+    run_watchlist,
+    update_watchlist,
+)
 from ..core.database import get_session
 from ..models.ai import (
     CollaborationRequest,
@@ -42,6 +51,12 @@ from ..models.ai import (
     SermonPrepRequest,
     TranscriptExportRequest,
     VerseCopilotRequest,
+)
+from ..models.watchlists import (
+    WatchlistCreateRequest,
+    WatchlistResponse,
+    WatchlistRunResponse,
+    WatchlistUpdateRequest,
 )
 
 router = APIRouter()
@@ -322,6 +337,92 @@ def refresh_topic_digest(
     upsert_digest_document(session, digest)
     store_topic_digest(session, digest)
     return digest
+
+
+@router.get("/digest/watchlists", response_model=list[WatchlistResponse])
+def list_user_watchlists(
+    user_id: str = Query(..., description="Owning user identifier"),
+    session: Session = Depends(get_session),
+) -> list[WatchlistResponse]:
+    return list_watchlists(session, user_id)
+
+
+@router.post(
+    "/digest/watchlists",
+    response_model=WatchlistResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_user_watchlist(
+    payload: WatchlistCreateRequest, session: Session = Depends(get_session)
+) -> WatchlistResponse:
+    return create_watchlist(session, payload)
+
+
+@router.patch(
+    "/digest/watchlists/{watchlist_id}", response_model=WatchlistResponse
+)
+def update_user_watchlist(
+    watchlist_id: str,
+    payload: WatchlistUpdateRequest,
+    session: Session = Depends(get_session),
+) -> WatchlistResponse:
+    watchlist = get_watchlist(session, watchlist_id)
+    if watchlist is None:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+    return update_watchlist(session, watchlist, payload)
+
+
+@router.delete("/digest/watchlists/{watchlist_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_watchlist(
+    watchlist_id: str, session: Session = Depends(get_session)
+) -> None:
+    watchlist = get_watchlist(session, watchlist_id)
+    if watchlist is None:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+    delete_watchlist(session, watchlist)
+
+
+@router.get(
+    "/digest/watchlists/{watchlist_id}/events",
+    response_model=list[WatchlistRunResponse],
+)
+def list_user_watchlist_events(
+    watchlist_id: str,
+    since: datetime | None = Query(
+        default=None, description="Return events generated after this timestamp"
+    ),
+    session: Session = Depends(get_session),
+) -> list[WatchlistRunResponse]:
+    watchlist = get_watchlist(session, watchlist_id)
+    if watchlist is None:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+    return list_watchlist_events(session, watchlist, since=since)
+
+
+@router.get(
+    "/digest/watchlists/{watchlist_id}/preview",
+    response_model=WatchlistRunResponse,
+)
+def preview_user_watchlist(
+    watchlist_id: str, session: Session = Depends(get_session)
+) -> WatchlistRunResponse:
+    watchlist = get_watchlist(session, watchlist_id)
+    if watchlist is None:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+    return run_watchlist(session, watchlist, persist=False)
+
+
+@router.post(
+    "/digest/watchlists/{watchlist_id}/run",
+    response_model=WatchlistRunResponse,
+)
+def run_user_watchlist(
+    watchlist_id: str, session: Session = Depends(get_session)
+) -> WatchlistRunResponse:
+    watchlist = get_watchlist(session, watchlist_id)
+    if watchlist is None:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+    return run_watchlist(session, watchlist, persist=True)
 
 
 @router.get("/llm", response_model=LLMSettingsResponse)
