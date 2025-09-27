@@ -3,9 +3,15 @@
 import "@testing-library/jest-dom";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
+import CommentariesPanel from "../app/verse/[osis]/CommentariesPanel";
 import ContradictionsPanel from "../app/verse/[osis]/ContradictionsPanel";
+import CrossReferencesPanel from "../app/verse/[osis]/CrossReferencesPanel";
 import GeoPanel from "../app/verse/[osis]/GeoPanel";
-import type { ResearchFeatureFlags } from "../app/verse/[osis]/research-panels";
+import MorphologyPanel from "../app/verse/[osis]/MorphologyPanel";
+import TextualVariantsPanel from "../app/verse/[osis]/TextualVariantsPanel";
+import ResearchPanels, {
+  type ResearchFeatureFlags,
+} from "../app/verse/[osis]/research-panels";
 
 describe("ContradictionsPanel", () => {
   const baseUrl = "http://127.0.0.1:8000";
@@ -154,5 +160,366 @@ describe("GeoPanel", () => {
   it("does not render when geo feature disabled", () => {
     const { container } = render(<GeoPanel osis="Gen.1.1" features={{ research: true, geo: false }} />);
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("CrossReferencesPanel", () => {
+  const baseUrl = "http://127.0.0.1:8000";
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    global.fetch = jest.fn();
+  });
+
+  it("renders cross references", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        osis: "Gen.1.1",
+        results: [
+          {
+            source: "Gen.1.1",
+            target: "John.1.1",
+            summary: "Creation echoes",
+            relation_type: "thematic",
+            weight: 0.9,
+            dataset: "starter",
+          },
+        ],
+      }),
+      text: async () => "",
+    });
+
+    const element = await CrossReferencesPanel({
+      osis: "Gen.1.1",
+      features: { research: true, cross_references: true },
+    });
+    render(element ?? <></>);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${baseUrl}/research/crossrefs?osis=Gen.1.1`,
+      { cache: "no-store" },
+    );
+    expect(screen.getByText("Cross-references")).toBeInTheDocument();
+    expect(screen.getByText(/John.1.1/)).toBeInTheDocument();
+    expect(screen.getByText(/Creation echoes/)).toBeInTheDocument();
+  });
+
+  it("renders empty state when no items", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ osis: "Gen.1.1", results: [] }),
+      text: async () => "",
+    });
+
+    const element = await CrossReferencesPanel({
+      osis: "Gen.1.1",
+      features: { research: true, cross_references: true },
+    });
+    render(element ?? <></>);
+
+    expect(screen.getByText("No cross-references available.")).toBeInTheDocument();
+  });
+
+  it("shows error when request fails", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      statusText: "Server error",
+      text: async () => "Boom",
+    });
+
+    const element = await CrossReferencesPanel({
+      osis: "Gen.1.1",
+      features: { research: true, cross_references: true },
+    });
+    render(element ?? <></>);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Unable to load cross-references. Boom");
+  });
+
+  it("returns null when feature disabled", async () => {
+    const element = await CrossReferencesPanel({
+      osis: "Gen.1.1",
+      features: { research: true, cross_references: false },
+    });
+    expect(element).toBeNull();
+  });
+});
+
+describe("TextualVariantsPanel", () => {
+  const baseUrl = "http://127.0.0.1:8000";
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    global.fetch = jest.fn();
+  });
+
+  it("renders multiple translation readings", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("translation=SBLGNT")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            osis: "Gen.1.1",
+            verses: [
+              { osis: "Gen.1.1", translation: "SBLGNT", text: "Ἐν ἀρχῇ" },
+            ],
+          }),
+          text: async () => "",
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          osis: "Gen.1.1",
+          verses: [
+            { osis: "Gen.1.1", translation: "ESV", text: "In the beginning" },
+          ],
+        }),
+        text: async () => "",
+      });
+    });
+
+    const element = await TextualVariantsPanel({
+      osis: "Gen.1.1",
+      features: { research: true, textual_variants: true },
+    });
+    render(element ?? <></>);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${baseUrl}/research/scripture?osis=Gen.1.1&translation=SBLGNT`,
+      { cache: "no-store" },
+    );
+    expect(screen.getByText("SBL Greek NT")).toBeInTheDocument();
+    expect(screen.getByText("Ἐν ἀρχῇ")).toBeInTheDocument();
+    expect(screen.getByText("English Standard Version")).toBeInTheDocument();
+  });
+
+  it("renders empty state when no readings", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ osis: "Gen.1.1", verses: [] }),
+      text: async () => "",
+    });
+
+    const element = await TextualVariantsPanel({
+      osis: "Gen.1.1",
+      features: { research: true, textual_variants: true },
+    });
+    render(element ?? <></>);
+
+    expect(screen.getByText("No textual variants available.")).toBeInTheDocument();
+  });
+
+  it("renders error state when request fails", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      statusText: "Server error",
+      text: async () => "Boom",
+    });
+
+    const element = await TextualVariantsPanel({
+      osis: "Gen.1.1",
+      features: { research: true, textual_variants: true },
+    });
+    render(element ?? <></>);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Unable to load textual variants. Boom");
+  });
+
+  it("returns null when feature disabled", async () => {
+    const element = await TextualVariantsPanel({
+      osis: "Gen.1.1",
+      features: { research: true, textual_variants: false },
+    });
+    expect(element).toBeNull();
+  });
+});
+
+describe("MorphologyPanel", () => {
+  const baseUrl = "http://127.0.0.1:8000";
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    global.fetch = jest.fn();
+  });
+
+  it("renders morphology tokens", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        osis: "Gen.1.1",
+        tokens: [
+          {
+            osis: "Gen.1.1",
+            surface: "בְּרֵאשִׁית",
+            lemma: "רֵאשִׁית",
+            morph: "noun",
+            gloss: "beginning",
+            position: 1,
+          },
+        ],
+      }),
+      text: async () => "",
+    });
+
+    const element = await MorphologyPanel({
+      osis: "Gen.1.1",
+      features: { research: true, morphology: true },
+    });
+    render(element ?? <></>);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${baseUrl}/research/morphology?osis=Gen.1.1`,
+      { cache: "no-store" },
+    );
+    expect(screen.getByText("בְּרֵאשִׁית")).toBeInTheDocument();
+    expect(screen.getByText("רֵאשִׁית")).toBeInTheDocument();
+  });
+
+  it("renders empty state when no tokens", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ osis: "Gen.1.1", tokens: [] }),
+      text: async () => "",
+    });
+
+    const element = await MorphologyPanel({
+      osis: "Gen.1.1",
+      features: { research: true, morphology: true },
+    });
+    render(element ?? <></>);
+
+    expect(screen.getByText("No morphology tokens available.")).toBeInTheDocument();
+  });
+
+  it("renders error state when request fails", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      statusText: "Server error",
+      text: async () => "Boom",
+    });
+
+    const element = await MorphologyPanel({
+      osis: "Gen.1.1",
+      features: { research: true, morphology: true },
+    });
+    render(element ?? <></>);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Unable to load morphology. Boom");
+  });
+
+  it("returns null when feature disabled", async () => {
+    const element = await MorphologyPanel({
+      osis: "Gen.1.1",
+      features: { research: true, morphology: false },
+    });
+    expect(element).toBeNull();
+  });
+});
+
+describe("CommentariesPanel", () => {
+  const baseUrl = "http://127.0.0.1:8000";
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    global.fetch = jest.fn();
+  });
+
+  it("renders notes", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        osis: "Gen.1.1",
+        notes: [
+          {
+            id: "note-1",
+            title: "Creation prologue",
+            body: "Commentary body",
+            stance: "apologetic",
+            claim_type: "theological",
+            confidence: 0.8,
+            tags: ["creation"],
+            evidences: [
+              {
+                id: "ev-1",
+                source_type: "crossref",
+                source_ref: "John.1.1",
+                snippet: "In the beginning was the Word",
+                osis_refs: ["John.1.1"],
+              },
+            ],
+          },
+        ],
+      }),
+      text: async () => "",
+    });
+
+    const element = await CommentariesPanel({
+      osis: "Gen.1.1",
+      features: { research: true, commentaries: true },
+    });
+    render(element ?? <></>);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${baseUrl}/research/notes?osis=Gen.1.1`,
+      { cache: "no-store" },
+    );
+    expect(screen.getByText("Creation prologue")).toBeInTheDocument();
+    expect(screen.getByText(/In the beginning was the Word/)).toBeInTheDocument();
+  });
+
+  it("renders empty state when no notes", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ osis: "Gen.1.1", notes: [] }),
+      text: async () => "",
+    });
+
+    const element = await CommentariesPanel({
+      osis: "Gen.1.1",
+      features: { research: true, commentaries: true },
+    });
+    render(element ?? <></>);
+
+    expect(screen.getByText("No commentaries recorded yet.")).toBeInTheDocument();
+  });
+
+  it("renders error state when request fails", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      statusText: "Server error",
+      text: async () => "Boom",
+    });
+
+    const element = await CommentariesPanel({
+      osis: "Gen.1.1",
+      features: { research: true, commentaries: true },
+    });
+    render(element ?? <></>);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Unable to load commentaries. Boom");
+  });
+
+  it("returns null when feature disabled", async () => {
+    const element = await CommentariesPanel({
+      osis: "Gen.1.1",
+      features: { research: true, commentaries: false },
+    });
+    expect(element).toBeNull();
+  });
+});
+
+describe("ResearchPanels", () => {
+  it("returns null when research feature disabled", () => {
+    const { container } = render(<ResearchPanels osis="Gen.1.1" features={{ research: false }} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("renders empty message when no panel features enabled", () => {
+    const { getByText } = render(<ResearchPanels osis="Gen.1.1" features={{ research: true }} />);
+    expect(
+      getByText("No research panels are available for this verse yet."),
+    ).toBeInTheDocument();
   });
 });
