@@ -105,6 +105,18 @@ def export() -> None:
     "--source-type", type=str, default=None, help="Restrict to a source type."
 )
 @click.option(
+    "--dataset",
+    type=str,
+    default=None,
+    help="Restrict results to a specific dataset facet.",
+)
+@click.option(
+    "--variant",
+    type=str,
+    default=None,
+    help="Restrict results to a variant facet label.",
+)
+@click.option(
     "--limit",
     type=click.IntRange(1, 1000),
     default=100,
@@ -163,6 +175,8 @@ def export_search_command(
     collection: str | None,
     author: str | None,
     source_type: str | None,
+    dataset: str | None,
+    variant: str | None,
     limit: int,
     cursor: str | None,
     fields: str | None,
@@ -193,7 +207,11 @@ def export_search_command(
         cursor=cursor,
         mode=mode.lower(),
         filters=HybridSearchFilters(
-            collection=collection, author=author, source_type=source_type
+            collection=collection,
+            author=author,
+            source_type=source_type,
+            dataset=dataset,
+            variant=variant,
         ),
     )
     with _session_scope() as session:

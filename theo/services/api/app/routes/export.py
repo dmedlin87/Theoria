@@ -125,6 +125,12 @@ def export_search(
     source_type: str | None = Query(
         default=None, description="Restrict to a specific source type."
     ),
+    dataset: str | None = Query(
+        default=None, description="Restrict to a dataset facet."
+    ),
+    variant: str | None = Query(
+        default=None, description="Restrict to a variant facet."
+    ),
     k: int = Query(
         default=100, ge=1, le=1000, description="Maximum number of results to export."
     ),
@@ -168,7 +174,11 @@ def export_search(
         cursor=cursor,
         mode=mode,
         filters=HybridSearchFilters(
-            collection=collection, author=author, source_type=source_type
+            collection=collection,
+            author=author,
+            source_type=source_type,
+            dataset=dataset,
+            variant=variant,
         ),
     )
     response_payload = export_search_results(session, search_request)

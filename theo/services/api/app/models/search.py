@@ -15,6 +15,8 @@ class HybridSearchFilters(APIModel):
     source_type: str | None = Field(default=None)
     theological_tradition: str | None = Field(default=None)
     topic_domain: str | None = Field(default=None)
+    dataset: str | None = Field(default=None)
+    variant: str | None = Field(default=None)
 
 
 class HybridSearchRequest(APIModel):

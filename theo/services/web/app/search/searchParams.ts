@@ -6,6 +6,8 @@ export type SearchFilters = {
   collection: string;
   author: string;
   sourceType: string;
+  dataset: string;
+  variant: string;
 };
 
 const KEY_MAP: Record<keyof SearchFilters, string> = {
@@ -14,6 +16,8 @@ const KEY_MAP: Record<keyof SearchFilters, string> = {
   collection: "collection",
   author: "author",
   sourceType: "source_type",
+  dataset: "dataset",
+  variant: "variant",
 };
 
 function normalizeInput(value: string | undefined | null): string {
@@ -38,6 +42,8 @@ export function parseSearchParams(
     collection: normalizeInput(params.get(KEY_MAP.collection)),
     author: normalizeInput(params.get(KEY_MAP.author)),
     sourceType: normalizeInput(params.get(KEY_MAP.sourceType)),
+    dataset: normalizeInput(params.get(KEY_MAP.dataset)),
+    variant: normalizeInput(params.get(KEY_MAP.variant)),
   };
 }
 

@@ -3,6 +3,7 @@
 from .contradictions import search_contradictions
 from .crossrefs import fetch_cross_references
 from .fallacies import fallacy_detect
+from .dss import fetch_dead_sea_scroll_links
 from .geo import lookup_geo_places
 from .morphology import fetch_morphology
 from .notes import (
@@ -30,4 +31,5 @@ __all__ = [
     "historicity_search",
     "fallacy_detect",
     "report_build",
+    "fetch_dead_sea_scroll_links",
 ]

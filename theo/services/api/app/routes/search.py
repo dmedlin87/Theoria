@@ -27,6 +27,12 @@ def search(
     source_type: str | None = Query(
         default=None, description="Restrict to a source type"
     ),
+    dataset: str | None = Query(
+        default=None, description="Restrict to a dataset facet"
+    ),
+    variant: str | None = Query(
+        default=None, description="Restrict to a variant facet"
+    ),
     k: int = Query(default=10, ge=1, le=50),
     session: Session = Depends(get_session),
 ) -> HybridSearchResponse:
@@ -36,7 +42,11 @@ def search(
         query=q,
         osis=osis,
         filters=HybridSearchFilters(
-            collection=collection, author=author, source_type=source_type
+            collection=collection,
+            author=author,
+            source_type=source_type,
+            dataset=dataset,
+            variant=variant,
         ),
         k=k,
     )

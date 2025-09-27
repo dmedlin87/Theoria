@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import heapq
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable
 
 from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session
@@ -14,7 +14,11 @@ from ..db.models import Document, Passage
 from ..db.types import VectorType
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import osis_intersects
-from ..models.search import HybridSearchRequest, HybridSearchResult
+from ..models.search import (
+    HybridSearchFilters,
+    HybridSearchRequest,
+    HybridSearchResult,
+)
 from .utils import compose_passage_meta
 
 
@@ -95,6 +99,60 @@ def _passes_author_filter(document: Document, author: str | None) -> bool:
     return author in document.authors
 
 
+def _value_matches(value: Any, needle: str) -> bool:
+    if isinstance(value, str):
+        return value.lower() == needle
+    if isinstance(value, (list, tuple, set)):
+        return any(_value_matches(item, needle) for item in value)
+    if isinstance(value, dict):
+        return any(_value_matches(item, needle) for item in value.values())
+    return False
+
+
+def _passes_meta_filters(
+    passage: Passage, document: Document, filters: HybridSearchFilters
+) -> bool:
+    if not filters.dataset and not filters.variant:
+        return True
+
+    meta_sources: list[dict[str, Any]] = []
+    if isinstance(passage.meta, dict):
+        meta_sources.append(passage.meta)
+
+    # Document-level metadata may be stored under passage meta when composed,
+    # but defensively inspect known document attributes as well.
+    doc_meta: dict[str, Any] = {}
+    if document.collection:
+        doc_meta.setdefault("collection", document.collection)
+    if document.source_type:
+        doc_meta.setdefault("source_type", document.source_type)
+    if document.topics is not None:
+        doc_meta.setdefault("topics", document.topics)
+    if doc_meta:
+        meta_sources.append(doc_meta)
+
+    dataset_ok = True
+    variant_ok = True
+    if filters.dataset:
+        needle = filters.dataset.lower()
+        dataset_ok = any(
+            _value_matches(source.get("dataset") or source.get("datasets"), needle)
+            for source in meta_sources
+        )
+    if filters.variant:
+        needle = filters.variant.lower()
+        variant_ok = any(
+            _value_matches(
+                source.get("variant")
+                or source.get("variant_label")
+                or source.get("variants"),
+                needle,
+            )
+            for source in meta_sources
+        )
+    return dataset_ok and variant_ok
+
+
 def _tei_terms(passage: Passage) -> list[str]:
     meta = passage.meta or {}
     if not isinstance(meta, dict):
@@ -163,6 +221,8 @@ def _fallback_search(
     counter = 0
     for passage, document in rows:
         if not _passes_author_filter(document, request.filters.author):
+            continue
+        if not _passes_meta_filters(passage, document, request.filters):
             continue
 
         lexical = _lexical_score(passage.text, query_tokens)
@@ -260,6 +320,8 @@ def _postgres_hybrid_search(
             document: Document = row[1]
             if not _passes_author_filter(document, request.filters.author):
                 continue
+            if not _passes_meta_filters(passage, document, request.filters):
+                continue
             if request.osis and not (
                 passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)
             ):
@@ -288,6 +350,8 @@ def _postgres_hybrid_search(
             document: Document = row[1]
             if not _passes_author_filter(document, request.filters.author):
                 continue
+            if not _passes_meta_filters(passage, document, request.filters):
+                continue
             if request.osis and not (
                 passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)
             ):
@@ -305,6 +369,8 @@ def _postgres_hybrid_search(
         osis_stmt = base_stmt.where(Passage.osis_ref.isnot(None)).limit(limit)
         for passage, document in session.execute(osis_stmt):
             if not _passes_author_filter(document, request.filters.author):
+                continue
+            if not _passes_meta_filters(passage, document, request.filters):
                 continue
             if not (
                 passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)

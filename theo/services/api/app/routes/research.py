@@ -10,6 +10,7 @@ from ..core.settings import get_settings
 from ..models.research import (
     ContradictionSearchResponse,
     CrossReferenceResponse,
+    DeadSeaScrollsResponse,
     FallacyDetectRequest,
     FallacyDetectResponse,
     GeoPlaceSearchResponse,
@@ -29,6 +30,7 @@ from ..research import (
     delete_research_note,
     fallacy_detect,
     fetch_cross_references,
+    fetch_dead_sea_scroll_links,
     fetch_morphology,
     fetch_passage,
     historicity_search,
@@ -90,6 +92,28 @@ def get_crossrefs(
             for item in results
         ],
         total=len(results),
+    )
+
+
+@router.get("/dss", response_model=DeadSeaScrollsResponse)
+def get_dead_sea_scroll_links(
+    osis: str = Query(..., description="Verse to fetch Dead Sea Scrolls links for"),
+) -> DeadSeaScrollsResponse:
+    links = fetch_dead_sea_scroll_links(osis)
+    return DeadSeaScrollsResponse(
+        osis=osis,
+        links=[
+            {
+                "id": link.id,
+                "fragment": link.fragment,
+                "scroll": link.scroll,
+                "summary": link.summary,
+                "source": link.source,
+                "url": link.url,
+            }
+            for link in links
+        ],
+        total=len(links),
     )
 
 

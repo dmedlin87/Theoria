@@ -86,6 +86,8 @@ export default function SearchPage(): JSX.Element {
   const [collection, setCollection] = useState("");
   const [author, setAuthor] = useState("");
   const [sourceType, setSourceType] = useState("");
+  const [dataset, setDataset] = useState("");
+  const [variant, setVariant] = useState("");
   const [groups, setGroups] = useState<DocumentGroup[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,8 +99,10 @@ export default function SearchPage(): JSX.Element {
     if (collection) chips.push({ label: "Collection", value: collection });
     if (author) chips.push({ label: "Author", value: author });
     if (sourceType) chips.push({ label: "Source", value: sourceType });
+    if (dataset) chips.push({ label: "Dataset", value: dataset });
+    if (variant) chips.push({ label: "Variant", value: variant });
     return chips;
-  }, [collection, author, sourceType]);
+  }, [collection, author, sourceType, dataset, variant]);
 
   const queryTokens = useMemo(() => {
     return query
@@ -161,6 +165,8 @@ export default function SearchPage(): JSX.Element {
       collection: collection.trim(),
       author: author.trim(),
       sourceType,
+      dataset: dataset.trim(),
+      variant: variant.trim(),
     };
 
     setQuery(filters.query);
@@ -168,6 +174,8 @@ export default function SearchPage(): JSX.Element {
     setCollection(filters.collection);
     setAuthor(filters.author);
     setSourceType(filters.sourceType);
+    setDataset(filters.dataset);
+    setVariant(filters.variant);
 
     const currentQuery = searchParams.toString();
     const nextQuery = serializeSearchParams(filters);
@@ -190,6 +198,8 @@ export default function SearchPage(): JSX.Element {
     setSourceType((current) =>
       current === filters.sourceType ? current : filters.sourceType,
     );
+    setDataset((current) => (current === filters.dataset ? current : filters.dataset));
+    setVariant((current) => (current === filters.variant ? current : filters.variant));
 
     if (skipNextHydratedSearchRef.current) {
       skipNextHydratedSearchRef.current = false;
@@ -276,6 +286,28 @@ export default function SearchPage(): JSX.Element {
                 </option>
               ))}
             </select>
+          </label>
+          <label style={{ display: "block" }}>
+            Dataset
+            <input
+              name="dataset"
+              type="text"
+              value={dataset}
+              onChange={(event) => setDataset(event.target.value)}
+              placeholder="dss"
+              style={{ width: "100%" }}
+            />
+          </label>
+          <label style={{ display: "block" }}>
+            Variant facet
+            <input
+              name="variant"
+              type="text"
+              value={variant}
+              onChange={(event) => setVariant(event.target.value)}
+              placeholder="disputed"
+              style={{ width: "100%" }}
+            />
           </label>
         </div>
         <button type="submit" style={{ marginTop: "1rem" }} disabled={isSearching}>

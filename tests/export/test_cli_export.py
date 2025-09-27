@@ -67,7 +67,11 @@ def _build_document_export() -> DocumentExportResponse:
     )
 
 
-def _build_search_export(next_cursor: str | None = "passage-1") -> SearchExportResponse:
+def _build_search_export(
+    next_cursor: str | None = "passage-1",
+    *,
+    filters: HybridSearchFilters | None = None,
+) -> SearchExportResponse:
     passage = Passage(
         id="passage-1",
         document_id="doc-1",
@@ -103,7 +107,7 @@ def _build_search_export(next_cursor: str | None = "passage-1") -> SearchExportR
     return SearchExportResponse(
         query="grace",
         osis="John.1.1",
-        filters=HybridSearchFilters(collection="sermons"),
+        filters=filters or HybridSearchFilters(collection="sermons"),
         total_results=1,
         next_cursor=next_cursor,
         results=[row],
@@ -124,9 +128,18 @@ def _patch_session(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_search_export_cli_csv_includes_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        cli, "export_search_results", lambda session, request: _build_search_export()
-    )
+    def _respond_with_filters(session, request: HybridSearchRequest) -> SearchExportResponse:
+        return _build_search_export(
+            filters=HybridSearchFilters(
+                collection=request.filters.collection,
+                author=request.filters.author,
+                source_type=request.filters.source_type,
+                dataset=request.filters.dataset,
+                variant=request.filters.variant,
+            ),
+        )
+
+    monkeypatch.setattr(cli, "export_search_results", _respond_with_filters)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -137,6 +150,10 @@ def test_search_export_cli_csv_includes_manifest(
             "grace",
             "--osis",
             "John.1.1",
+            "--dataset",
+            "dss",
+            "--variant",
+            "disputed",
             "--format",
             "csv",
             "--export-id",
@@ -150,6 +167,8 @@ def test_search_export_cli_csv_includes_manifest(
     assert manifest["schema_version"] == formatters.SCHEMA_VERSION
     assert manifest["type"] == "search"
     assert manifest["filters"]["osis"] == "John.1.1"
+    assert manifest["filters"]["dataset"] == "dss"
+    assert manifest["filters"]["variant"] == "disputed"
     assert manifest["totals"]["results"] == 1
     csv_reader = csv.DictReader(lines[1:])
     assert csv_reader.fieldnames == [

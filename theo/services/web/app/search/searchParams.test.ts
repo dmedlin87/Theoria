@@ -8,6 +8,8 @@ describe("searchParams helpers", () => {
       collection: "  Gospel Narratives  ",
       author: "   Jane Doe   ",
       sourceType: "  pdf  ",
+      dataset: "  dss  ",
+      variant: "  disputed  ",
     });
 
     expect(Object.fromEntries(new URLSearchParams(queryString))).toEqual({
@@ -16,6 +18,8 @@ describe("searchParams helpers", () => {
       osis: "John.3.16",
       q: "grace",
       source_type: "pdf",
+      dataset: "dss",
+      variant: "disputed",
     });
 
     const parsed = parseSearchParams(queryString);
@@ -25,6 +29,8 @@ describe("searchParams helpers", () => {
       collection: "Gospel Narratives",
       author: "Jane Doe",
       sourceType: "pdf",
+      dataset: "dss",
+      variant: "disputed",
     });
   });
 
@@ -35,6 +41,8 @@ describe("searchParams helpers", () => {
       collection: "Gospels",
       author: undefined,
       sourceType: "",
+      dataset: "",
+      variant: undefined,
     });
 
     expect(queryString).toBe("collection=Gospels");
@@ -47,6 +55,8 @@ describe("searchParams helpers", () => {
       collection: "",
       author: "",
       sourceType: "",
+      dataset: "",
+      variant: "",
     });
   });
 });

@@ -39,6 +39,29 @@ def test_crossrefs_endpoint_returns_ranked_results() -> None:
         assert payload["results"][0]["target"] == "Genesis.1.1"
 
 
+def test_dss_endpoint_returns_linkages() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/dss", params={"osis": "Psalm.22.16"}
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["total"] >= 1
+        assert payload["links"]
+        assert any(link["fragment"] for link in payload["links"])
+
+
+def test_dss_endpoint_empty_for_unknown_reference() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/dss", params={"osis": "Nahum.1.1"}
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["total"] == 0
+        assert payload["links"] == []
+
+
 def test_variants_endpoint_returns_apparatus() -> None:
     with TestClient(app) as client:
         response = client.get(

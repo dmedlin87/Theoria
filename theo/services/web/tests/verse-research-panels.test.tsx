@@ -255,29 +255,28 @@ describe("TextualVariantsPanel", () => {
   });
 
   it("renders multiple translation readings", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("translation=SBLGNT")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        osis: "Gen.1.1",
+        readings: [
+          {
+            id: "reading-sbl",
             osis: "Gen.1.1",
-            verses: [
-              { osis: "Gen.1.1", translation: "SBLGNT", text: "Ἐν ἀρχῇ" },
-            ],
-          }),
-          text: async () => "",
-        });
-      }
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({
-          osis: "Gen.1.1",
-          verses: [
-            { osis: "Gen.1.1", translation: "ESV", text: "In the beginning" },
-          ],
-        }),
-        text: async () => "",
-      });
+            category: "translation",
+            reading: "Ἐν ἀρχῇ ἦν ὁ λόγος",
+            translation: "SBLGNT",
+          },
+          {
+            id: "reading-esv",
+            osis: "Gen.1.1",
+            category: "translation",
+            reading: "In the beginning was the Word",
+            translation: "ESV",
+          },
+        ],
+      }),
+      text: async () => "",
     });
 
     const element = await TextualVariantsPanel({
@@ -287,18 +286,18 @@ describe("TextualVariantsPanel", () => {
     render(element ?? <></>);
 
     expect(global.fetch).toHaveBeenCalledWith(
-      `${baseUrl}/research/scripture?osis=Gen.1.1&translation=SBLGNT`,
+      `${baseUrl}/research/variants?osis=Gen.1.1`,
       { cache: "no-store" },
     );
-    expect(screen.getByText("SBL Greek NT")).toBeInTheDocument();
-    expect(screen.getByText("Ἐν ἀρχῇ")).toBeInTheDocument();
-    expect(screen.getByText("English Standard Version")).toBeInTheDocument();
+    expect(screen.getByText("Witness selection")).toBeInTheDocument();
+    expect(screen.getByText("Ἐν ἀρχῇ ἦν ὁ λόγος")).toBeInTheDocument();
+    expect(screen.getByText("In the beginning was the Word")).toBeInTheDocument();
   });
 
   it("renders empty state when no readings", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ osis: "Gen.1.1", verses: [] }),
+      json: async () => ({ osis: "Gen.1.1", readings: [] }),
       text: async () => "",
     });
 
@@ -324,7 +323,9 @@ describe("TextualVariantsPanel", () => {
     });
     render(element ?? <></>);
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Unable to load textual variants. Boom");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Unable to load textual variants. Boom",
+    );
   });
 
   it("returns null when feature disabled", async () => {
@@ -511,15 +512,54 @@ describe("CommentariesPanel", () => {
 });
 
 describe("ResearchPanels", () => {
-  it("returns null when research feature disabled", () => {
-    const { container } = render(<ResearchPanels osis="Gen.1.1" features={{ research: false }} />);
+  beforeEach(() => {
+    jest.resetAllMocks();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ osis: "Gen.1.1", links: [] }),
+      text: async () => "",
+    });
+  });
+
+  it("returns null when research feature disabled", async () => {
+    const element = await ResearchPanels({ osis: "Gen.1.1", features: { research: false } });
+    const { container } = render(element ?? <></>);
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders empty message when no panel features enabled", () => {
-    const { getByText } = render(<ResearchPanels osis="Gen.1.1" features={{ research: true }} />);
+  it("renders empty message when no panel features enabled", async () => {
+    const element = await ResearchPanels({ osis: "Gen.1.1", features: { research: true } });
+    const { getByText } = render(element ?? <></>);
     expect(
       getByText("No research panels are available for this verse yet."),
     ).toBeInTheDocument();
+  });
+
+  it("renders Dead Sea Scrolls chip when linkages exist", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        osis: "Gen.1.1",
+        links: [
+          {
+            id: "dss-1",
+            fragment: "4QIsa<sup>a</sup>",
+            summary: "Parallel reading",
+          },
+        ],
+      }),
+      text: async () => "",
+    });
+
+    const element = await ResearchPanels({
+      osis: "Gen.1.1",
+      features: { research: true, dss_linkages: true },
+    });
+    render(element ?? <></>);
+
+    const chip = screen.getByRole("button", { name: /Dead Sea Scrolls/i });
+    expect(chip).toBeEnabled();
+    fireEvent.click(chip);
+    expect(screen.getByText(/Parallel reading/)).toBeInTheDocument();
   });
 });

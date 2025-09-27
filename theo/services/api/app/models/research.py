@@ -41,6 +41,21 @@ class CrossReferenceResponse(APIModel):
     total: int
 
 
+class DeadSeaScrollLink(APIModel):
+    id: str
+    fragment: str
+    scroll: str | None = None
+    summary: str | None = None
+    source: str | None = None
+    url: str | None = None
+
+
+class DeadSeaScrollsResponse(APIModel):
+    osis: str
+    links: list[DeadSeaScrollLink] = Field(default_factory=list)
+    total: int
+
+
 class VariantReading(APIModel):
     id: str
     osis: str
