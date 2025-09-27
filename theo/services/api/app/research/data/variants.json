@@ -7,7 +7,15 @@
       "reading": "θεος",
       "note": "Early papyrus where the article before Θεός is absent, often cited for qualitative nuance.",
       "source": "NA28 apparatus",
-      "confidence": 0.82
+      "confidence": 0.82,
+      "dataset": "dss",
+      "disputed": true,
+      "witness_metadata": {
+        "name": "Papyrus 66",
+        "siglum": "P66",
+        "date": "c. 200 CE",
+        "provenance": "Egypt"
+      }
     },
     {
       "id": "john1-logos-sbl",
@@ -15,7 +23,8 @@
       "translation": "SBLGNT",
       "reading": "ἐν ἀρχῇ ἦν ὁ λόγος",
       "note": "Critical text retains the article before Λόγος to signal subject emphasis.",
-      "source": "SBLGNT"
+      "source": "SBLGNT",
+      "dataset": "critical"
     },
     {
       "id": "john1-logos-kjv",
@@ -23,7 +32,8 @@
       "translation": "KJV",
       "reading": "In the beginning was the Word",
       "note": "Traditional English rendering foregrounds the Word's pre-existence.",
-      "source": "King James Version"
+      "source": "King James Version",
+      "dataset": "traditional"
     }
   ],
   "Luke.2.2": [
@@ -34,7 +44,14 @@
       "reading": "Αὕτη ἀπογραφὴ πρώτη ἐγένετο",
       "note": "Majority reading identifying the census as the first when Quirinius was governing Syria.",
       "source": "NA28 apparatus",
-      "confidence": 0.76
+      "confidence": 0.76,
+      "dataset": "majority",
+      "witness_metadata": {
+        "name": "Codex Vaticanus",
+        "siglum": "B",
+        "date": "4th century CE",
+        "provenance": "Vatican Library"
+      }
     },
     {
       "id": "luke2-census-syriac",
@@ -42,7 +59,8 @@
       "witness": "Syriac Peshitta",
       "reading": "This enrollment was first made",
       "note": "Syriac tradition mirrors the majority Greek reading with emphasis on sequence.",
-      "source": "Peshitta"
+      "source": "Peshitta",
+      "dataset": "version"
     }
   ]
 }

@@ -36,6 +36,28 @@ const COLLECTION_FACETS = [
   "Second Temple",
 ];
 
+const DATASET_FILTERS = [
+  {
+    label: "Dead Sea Scrolls",
+    value: "dss",
+    description: "Qumran fragments and related parallels",
+  },
+  {
+    label: "Nag Hammadi Codices",
+    value: "nag-hammadi",
+    description: "Gnostic corpus for comparative study",
+  },
+];
+
+const VARIANT_FILTERS = [
+  { label: "Disputed readings", value: "disputed" },
+  { label: "Harmonized expansions", value: "harmonized" },
+  { label: "Orthographic shifts", value: "orthographic" },
+];
+
+const DATASET_LABELS = new Map(DATASET_FILTERS.map((option) => [option.value, option.label] as const));
+const VARIANT_LABELS = new Map(VARIANT_FILTERS.map((option) => [option.value, option.label] as const));
+
 const CUSTOM_PRESET_VALUE = "custom";
 const SAVED_SEARCH_STORAGE_KEY = "theo.search.saved";
 
@@ -60,6 +82,8 @@ const MODE_PRESETS: ModePreset[] = [
       includeVariants: true,
       includeDisputed: true,
       collectionFacets: ["Dead Sea Scrolls", "Church Fathers"],
+      datasetFacets: ["dss"],
+      variantFacets: ["disputed"],
       sourceType: "pdf",
     },
   },
@@ -71,6 +95,8 @@ const MODE_PRESETS: ModePreset[] = [
       includeVariants: false,
       includeDisputed: false,
       collectionFacets: ["Church Fathers"],
+      datasetFacets: [],
+      variantFacets: [],
       sourceType: "markdown",
     },
   },
@@ -82,6 +108,8 @@ const MODE_PRESETS: ModePreset[] = [
       includeVariants: true,
       includeDisputed: true,
       collectionFacets: ["Dead Sea Scrolls", "Second Temple"],
+      datasetFacets: ["dss"],
+      variantFacets: ["disputed", "harmonized"],
       sourceType: "pdf",
     },
   },
@@ -152,6 +180,8 @@ export default function SearchPage(): JSX.Element {
   const [author, setAuthor] = useState("");
   const [sourceType, setSourceType] = useState("");
   const [collectionFacets, setCollectionFacets] = useState<string[]>([]);
+  const [datasetFacets, setDatasetFacets] = useState<string[]>([]);
+  const [variantFacets, setVariantFacets] = useState<string[]>([]);
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
   const [includeVariants, setIncludeVariants] = useState(false);
@@ -182,6 +212,8 @@ export default function SearchPage(): JSX.Element {
       author: author.trim(),
       sourceType,
       collectionFacets,
+      datasetFacets,
+      variantFacets,
       dateStart: dateStart.trim(),
       dateEnd: dateEnd.trim(),
       includeVariants,
@@ -192,11 +224,13 @@ export default function SearchPage(): JSX.Element {
       author,
       collection,
       collectionFacets,
+      datasetFacets,
+      variantFacets,
       dateEnd,
       dateStart,
       includeDisputed,
       includeVariants,
-       osis,
+      osis,
       presetIsCustom,
       presetSelection,
       query,
@@ -228,6 +262,12 @@ export default function SearchPage(): JSX.Element {
     if (author) chips.push({ label: "Author", value: author });
     if (sourceType) chips.push({ label: "Source", value: sourceType });
     collectionFacets.forEach((facet) => chips.push({ label: "Facet", value: facet }));
+    datasetFacets.forEach((facet) =>
+      chips.push({ label: "Dataset", value: DATASET_LABELS.get(facet) ?? facet }),
+    );
+    variantFacets.forEach((facet) =>
+      chips.push({ label: "Variant", value: VARIANT_LABELS.get(facet) ?? facet }),
+    );
     if (dateStart || dateEnd) {
       chips.push({ label: "Date", value: `${dateStart || "…"} – ${dateEnd || "…"}` });
     }
@@ -244,6 +284,8 @@ export default function SearchPage(): JSX.Element {
     author,
     collection,
     collectionFacets,
+    datasetFacets,
+    variantFacets,
     dateEnd,
     dateStart,
     includeDisputed,
@@ -322,6 +364,8 @@ export default function SearchPage(): JSX.Element {
       setAuthor(filters.author);
       setSourceType(filters.sourceType);
       setCollectionFacets([...filters.collectionFacets]);
+      setDatasetFacets([...filters.datasetFacets]);
+      setVariantFacets([...filters.variantFacets]);
       setDateStart(filters.dateStart);
       setDateEnd(filters.dateEnd);
       setIncludeVariants(filters.includeVariants);
@@ -345,6 +389,12 @@ export default function SearchPage(): JSX.Element {
       collectionFacets: presetConfig?.filters?.collectionFacets
         ? [...presetConfig.filters.collectionFacets]
         : [...currentFilters.collectionFacets],
+      datasetFacets: presetConfig?.filters?.datasetFacets
+        ? [...presetConfig.filters.datasetFacets]
+        : [...currentFilters.datasetFacets],
+      variantFacets: presetConfig?.filters?.variantFacets
+        ? [...presetConfig.filters.variantFacets]
+        : [...currentFilters.variantFacets],
       preset: value,
     };
     applyFilters(nextFilters);
@@ -367,6 +417,32 @@ export default function SearchPage(): JSX.Element {
     [markPresetAsCustom],
   );
 
+  const toggleDatasetFacet = useCallback(
+    (facet: string) => {
+      setDatasetFacets((current) => {
+        const next = current.includes(facet)
+          ? current.filter((value) => value !== facet)
+          : [...current, facet];
+        markPresetAsCustom();
+        return next;
+      });
+    },
+    [markPresetAsCustom],
+  );
+
+  const toggleVariantFacet = useCallback(
+    (facet: string) => {
+      setVariantFacets((current) => {
+        const next = current.includes(facet)
+          ? current.filter((value) => value !== facet)
+          : [...current, facet];
+        markPresetAsCustom();
+        return next;
+      });
+    },
+    [markPresetAsCustom],
+  );
+
   const handleSavedSearchSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -376,6 +452,8 @@ export default function SearchPage(): JSX.Element {
       const filtersToPersist: SearchFilters = {
         ...currentFilters,
         collectionFacets: [...currentFilters.collectionFacets],
+        datasetFacets: [...currentFilters.datasetFacets],
+        variantFacets: [...currentFilters.variantFacets],
       };
       const nextSearch: SavedSearch = {
         id: crypto.randomUUID?.() ?? `${Date.now()}`,
@@ -410,19 +488,38 @@ export default function SearchPage(): JSX.Element {
     setSavedSearches((current) => current.filter((saved) => saved.id !== id));
   }, []);
 
-  const handleExportGroup = useCallback((group: DocumentGroup) => {
-    const blob = new Blob([JSON.stringify(group, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${group.title.replace(/[^a-z0-9]+/gi, "_") || "search"}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, []);
+  const handleExportGroup = useCallback(
+    (group: DocumentGroup) => {
+      const filtersSnapshot: SearchFilters = {
+        ...currentFilters,
+        collectionFacets: [...currentFilters.collectionFacets],
+        datasetFacets: [...currentFilters.datasetFacets],
+        variantFacets: [...currentFilters.variantFacets],
+      };
+      const exportPayload = {
+        exportedAt: new Date().toISOString(),
+        queryString: serializeSearchParams(filtersSnapshot),
+        filters: filtersSnapshot,
+        dataset: {
+          datasets: [...filtersSnapshot.datasetFacets],
+          variants: [...filtersSnapshot.variantFacets],
+        },
+        group,
+      };
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${group.title.replace(/[^a-z0-9]+/gi, "_") || "search"}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    },
+    [currentFilters],
+  );
 
   const handleToggleDiffGroup = useCallback((groupId: string) => {
     setDiffSelection((current) => {
@@ -496,6 +593,12 @@ export default function SearchPage(): JSX.Element {
     setCollectionFacets((current) =>
       arraysEqual(current, filters.collectionFacets) ? current : filters.collectionFacets,
     );
+    setDatasetFacets((current) =>
+      arraysEqual(current, filters.datasetFacets) ? current : filters.datasetFacets,
+    );
+    setVariantFacets((current) =>
+      arraysEqual(current, filters.variantFacets) ? current : filters.variantFacets,
+    );
     setDateStart((current) => (current === filters.dateStart ? current : filters.dateStart));
     setDateEnd((current) => (current === filters.dateEnd ? current : filters.dateEnd));
     setIncludeVariants((current) =>
@@ -526,6 +629,8 @@ export default function SearchPage(): JSX.Element {
           filters.preset,
       ) ||
       filters.collectionFacets.length > 0 ||
+      filters.datasetFacets.length > 0 ||
+      filters.variantFacets.length > 0 ||
       filters.includeVariants ||
       filters.includeDisputed;
     if (!hasFilters) {
@@ -667,6 +772,62 @@ export default function SearchPage(): JSX.Element {
                     onChange={() => toggleFacet(facet)}
                   />
                   {facet}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: "0.5rem",
+              padding: "0.75rem",
+            }}
+          >
+            <legend style={{ padding: "0 0.35rem" }}>Dataset facets</legend>
+            <div style={{ display: "grid", gap: "0.5rem" }}>
+              {DATASET_FILTERS.map((dataset) => {
+                const isActive = datasetFacets.includes(dataset.value);
+                return (
+                  <label
+                    key={dataset.value}
+                    style={{ display: "grid", gap: "0.1rem", alignItems: "flex-start" }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                      <input
+                        type="checkbox"
+                        checked={isActive}
+                        onChange={() => toggleDatasetFacet(dataset.value)}
+                      />
+                      <strong>{dataset.label}</strong>
+                    </span>
+                    <span style={{ fontSize: "0.8rem", color: "#4b5563", marginLeft: "1.75rem" }}>
+                      {dataset.description}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+          <fieldset
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: "0.5rem",
+              padding: "0.75rem",
+            }}
+          >
+            <legend style={{ padding: "0 0.35rem" }}>Variant focus</legend>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+              {VARIANT_FILTERS.map((variant) => (
+                <label
+                  key={variant.value}
+                  style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={variantFacets.includes(variant.value)}
+                    onChange={() => toggleVariantFacet(variant.value)}
+                  />
+                  {variant.label}
                 </label>
               ))}
             </div>

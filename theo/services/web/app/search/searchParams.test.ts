@@ -9,6 +9,8 @@ describe("searchParams helpers", () => {
       author: "   Jane Doe   ",
       sourceType: "  pdf  ",
       collectionFacets: ["  Dead Sea Scrolls  ", "  Nag Hammadi  "],
+      datasetFacets: ["  dss  "],
+      variantFacets: ["  disputed  ", "  harmonized  "],
       dateStart: " 0100-01-01 ",
       dateEnd: " 0200-12-31 ",
       includeVariants: true,
@@ -22,7 +24,9 @@ describe("searchParams helpers", () => {
       collection: "Gospel Narratives",
       date_end: "0200-12-31",
       date_start: "0100-01-01",
+      dataset: "dss",
       disputed: "1",
+      variant: "disputed,harmonized",
       osis: "John.3.16",
       preset: "scholar",
       q: "grace",
@@ -38,6 +42,8 @@ describe("searchParams helpers", () => {
       author: "Jane Doe",
       sourceType: "pdf",
       collectionFacets: ["Dead Sea Scrolls", "Nag Hammadi"],
+      datasetFacets: ["dss"],
+      variantFacets: ["disputed", "harmonized"],
       dateStart: "0100-01-01",
       dateEnd: "0200-12-31",
       includeVariants: true,
@@ -54,6 +60,8 @@ describe("searchParams helpers", () => {
       author: undefined,
       sourceType: "",
       collectionFacets: [],
+      datasetFacets: [],
+      variantFacets: [],
       includeVariants: false,
     });
 
@@ -68,6 +76,8 @@ describe("searchParams helpers", () => {
       author: "",
       sourceType: "",
       collectionFacets: [],
+      datasetFacets: [],
+      variantFacets: [],
       dateStart: "",
       dateEnd: "",
       includeVariants: false,
@@ -78,10 +88,12 @@ describe("searchParams helpers", () => {
 
   it("parses comma-delimited facets and boolean flags", () => {
     const parsed = parseSearchParams(
-      "collection_facets=Dead%20Sea%20Scrolls,Gospels&variants=1&disputed=true",
+      "collection_facets=Dead%20Sea%20Scrolls,Gospels&dataset=dss&variant=disputed,archaeology&variants=1&disputed=true",
     );
 
     expect(parsed.collectionFacets).toEqual(["Dead Sea Scrolls", "Gospels"]);
+    expect(parsed.datasetFacets).toEqual(["dss"]);
+    expect(parsed.variantFacets).toEqual(["disputed", "archaeology"]);
     expect(parsed.includeVariants).toBe(true);
     expect(parsed.includeDisputed).toBe(true);
   });

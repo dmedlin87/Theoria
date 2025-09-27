@@ -10,6 +10,7 @@ from ..core.settings import get_settings
 from ..models.research import (
     ContradictionSearchResponse,
     CrossReferenceResponse,
+    DssLinksResponse,
     FallacyDetectRequest,
     FallacyDetectResponse,
     ReliabilityOverviewResponse,
@@ -30,6 +31,7 @@ from ..research import (
     delete_research_note,
     fallacy_detect,
     fetch_cross_references,
+    fetch_dss_links,
     fetch_morphology,
     fetch_passage,
     historicity_search,
@@ -124,10 +126,36 @@ def get_variants(
                 "witness": entry.witness,
                 "translation": entry.translation,
                 "confidence": entry.confidence,
+                "dataset": entry.dataset,
+                "disputed": entry.disputed,
+                "witness_metadata": entry.witness_metadata,
             }
             for entry in entries
         ],
         total=len(entries),
+    )
+
+
+@router.get("/dss-links", response_model=DssLinksResponse)
+def get_dss_links(
+    osis: str = Query(..., description="Verse or range to retrieve Dead Sea Scrolls parallels for"),
+) -> DssLinksResponse:
+    links = fetch_dss_links(osis)
+    return DssLinksResponse(
+        osis=osis,
+        links=[
+            {
+                "id": entry.id,
+                "osis": entry.osis,
+                "title": entry.title,
+                "url": entry.url,
+                "fragment": entry.fragment,
+                "summary": entry.summary,
+                "dataset": entry.dataset,
+            }
+            for entry in links
+        ],
+        total=len(links),
     )
 
 

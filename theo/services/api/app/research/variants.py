@@ -19,6 +19,9 @@ class VariantEntry:
     witness: str | None = None
     translation: str | None = None
     confidence: float | None = None
+    dataset: str | None = None
+    disputed: bool | None = None
+    witness_metadata: dict[str, object] | None = None
 
 
 def _expand_osis(osis: str) -> list[str]:
@@ -71,6 +74,9 @@ def variants_apparatus(
                     witness=raw.get("witness"),
                     translation=raw.get("translation"),
                     confidence=raw.get("confidence"),
+                    dataset=raw.get("dataset"),
+                    disputed=raw.get("disputed"),
+                    witness_metadata=raw.get("witness_metadata"),
                 )
             )
 

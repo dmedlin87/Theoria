@@ -1,0 +1,22 @@
+{
+  "John.1.1": [
+    {
+      "id": "dss-john1-frag",
+      "title": "4Q246 Parallels",
+      "fragment": "4Q246 (Aramaic Apocalypse)",
+      "url": "https://www.deadseascrolls.org.il/explore-the-archive/fragment/4Q246-1",
+      "summary": "The Aramaic Apocalypse includes language paralleling John's Logos prologue.",
+      "dataset": "dss"
+    }
+  ],
+  "Luke.2.2": [
+    {
+      "id": "dss-luke2-qumran",
+      "title": "4Q159 Census Fragment",
+      "fragment": "4Q159 (Ordinances)",
+      "url": "https://www.deadseascrolls.org.il/explore-the-archive/fragment/4Q159-1",
+      "summary": "Legal ordinances referencing civic enrolments comparable to Luke's census notice.",
+      "dataset": "dss"
+    }
+  ]
+}

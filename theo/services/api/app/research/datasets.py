@@ -48,6 +48,13 @@ def variants_dataset() -> dict[str, list[dict[str, Any]]]:
 
 
 @lru_cache(maxsize=None)
+def dss_links_dataset() -> dict[str, list[dict[str, Any]]]:
+    """Return Dead Sea Scrolls linkage data keyed by OSIS."""
+
+    return _load_json("dss_links.json")
+
+
+@lru_cache(maxsize=None)
 def historicity_dataset() -> list[dict[str, Any]]:
     """Return the historicity dataset containing citation entries."""
 

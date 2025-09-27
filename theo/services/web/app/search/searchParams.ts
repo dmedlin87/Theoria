@@ -7,6 +7,8 @@ export type SearchFilters = {
   author: string;
   sourceType: string;
   collectionFacets: string[];
+  datasetFacets: string[];
+  variantFacets: string[];
   dateStart: string;
   dateEnd: string;
   includeVariants: boolean;
@@ -21,6 +23,8 @@ const KEY_MAP: Record<keyof SearchFilters, string> = {
   author: "author",
   sourceType: "source_type",
   collectionFacets: "collection_facets",
+  datasetFacets: "dataset",
+  variantFacets: "variant",
   dateStart: "date_start",
   dateEnd: "date_end",
   includeVariants: "variants",
@@ -68,6 +72,8 @@ export function parseSearchParams(
     author: normalizeInput(params.get(KEY_MAP.author)),
     sourceType: normalizeInput(params.get(KEY_MAP.sourceType)),
     collectionFacets: normalizeList(params.get(KEY_MAP.collectionFacets)),
+    datasetFacets: normalizeList(params.get(KEY_MAP.datasetFacets)),
+    variantFacets: normalizeList(params.get(KEY_MAP.variantFacets)),
     dateStart: normalizeInput(params.get(KEY_MAP.dateStart)),
     dateEnd: normalizeInput(params.get(KEY_MAP.dateEnd)),
     includeVariants: parseBoolean(params.get(KEY_MAP.includeVariants)),

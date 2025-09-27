@@ -64,11 +64,30 @@ class VariantReading(APIModel):
     witness: str | None = None
     translation: str | None = None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    dataset: str | None = None
+    disputed: bool | None = None
+    witness_metadata: dict[str, Any] | None = None
 
 
 class VariantApparatusResponse(APIModel):
     osis: str
     readings: list[VariantReading] = Field(default_factory=list)
+    total: int
+
+
+class DssLink(APIModel):
+    id: str
+    osis: str
+    title: str
+    url: str
+    fragment: str | None = None
+    summary: str | None = None
+    dataset: str | None = None
+
+
+class DssLinksResponse(APIModel):
+    osis: str
+    links: list[DssLink] = Field(default_factory=list)
     total: int
 
 
