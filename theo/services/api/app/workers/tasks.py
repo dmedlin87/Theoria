@@ -16,6 +16,11 @@ from ..analytics.topics import (
     store_topic_digest,
     upsert_digest_document,
 )
+from ..analytics.watchlists import (
+    get_watchlist,
+    iter_due_watchlists,
+    run_watchlist,
+)
 from ..core.database import get_engine
 from ..core.settings import get_settings
 from ..db.models import Document, IngestionJob, Passage
@@ -402,3 +407,52 @@ def topic_digest(
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
             raise
+
+
+@celery.task(name="tasks.run_watchlist_alert")
+def run_watchlist_alert(watchlist_id: str) -> None:
+    """Execute a single watchlist evaluation run."""
+
+    engine = get_engine()
+    with Session(engine) as session:
+        watchlist = get_watchlist(session, watchlist_id)
+        if watchlist is None:
+            logger.warning(
+                "Watchlist not found for alert run",
+                extra={"watchlist_id": watchlist_id},
+            )
+            return
+        try:
+            result = run_watchlist(session, watchlist, persist=True)
+            logger.info(
+                "Completed watchlist run",
+                extra={
+                    "watchlist_id": watchlist_id,
+                    "matches": len(result.matches),
+                    "document_ids": result.document_ids,
+                },
+            )
+        except Exception:
+            session.rollback()
+            logger.exception(
+                "Failed to execute watchlist run",
+                extra={"watchlist_id": watchlist_id},
+            )
+            raise
+
+
+@celery.task(name="tasks.schedule_watchlist_alerts")
+def schedule_watchlist_alerts() -> None:
+    """Enumerate due watchlists and queue alert runs."""
+
+    engine = get_engine()
+    scheduled = 0
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        for watchlist in iter_due_watchlists(session, now):
+            run_watchlist_alert.delay(watchlist.id)
+            scheduled += 1
+    logger.info(
+        "Scheduled watchlist alerts",
+        extra={"count": scheduled, "timestamp": now.isoformat()},
+    )
