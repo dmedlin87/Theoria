@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { getApiBaseUrl } from "../lib/api";
+import { getApiBaseUrl, getCitationManagerEndpoint } from "../lib/api";
 
 type FeatureFlags = {
   ai_copilot?: boolean;
@@ -95,6 +95,25 @@ type ExportPresetResult = {
   content: string;
 };
 
+type ExportManifest = {
+  export_id: string;
+  schema_version: string;
+  created_at: string;
+  type: string;
+  filters: Record<string, unknown>;
+  totals: Record<string, number>;
+  cursor?: string | null;
+  next_cursor?: string | null;
+  mode?: string | null;
+};
+
+type CitationExportResponse = {
+  manifest: ExportManifest;
+  records: Array<Record<string, unknown>>;
+  csl: Array<Record<string, unknown>>;
+  manager_payload: Record<string, unknown>;
+};
+
 type CopilotResult =
   | { kind: "verse"; payload: VerseResponse }
   | { kind: "sermon"; payload: SermonResponse }
@@ -172,10 +191,18 @@ function extractFilename(disposition: string | null): string | null {
   return match ? match[1] : null;
 }
 
-function renderCitations(citations: RAGCitation[]): JSX.Element | null {
+function renderCitations(
+  citations: RAGCitation[],
+  options?: {
+    onExport?: (citations: RAGCitation[]) => void;
+    exporting?: boolean;
+    status?: string | null;
+  }
+): JSX.Element | null {
   if (!citations.length) {
     return null;
   }
+  const { onExport, exporting, status } = options ?? {};
   return (
     <div style={{ marginTop: "1rem" }}>
       <h4>Citations</h4>
@@ -186,16 +213,46 @@ function renderCitations(citations: RAGCitation[]): JSX.Element | null {
           </li>
         ))}
       </ol>
+      {onExport && (
+        <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <button
+            type="button"
+            onClick={() => onExport(citations)}
+            disabled={Boolean(exporting)}
+            style={{ alignSelf: "flex-start" }}
+          >
+            {exporting ? "Sending citations…" : "Send to Zotero/Mendeley"}
+          </button>
+          {status && (
+            <p role="status" style={{ color: "#2563eb", margin: 0 }}>
+              {status}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function renderRAGAnswer(answer: RAGAnswer, followUps?: string[]): JSX.Element {
+function renderRAGAnswer(
+  answer: RAGAnswer,
+  options?: {
+    followUps?: string[];
+    onExport?: (citations: RAGCitation[]) => void;
+    exporting?: boolean;
+    status?: string | null;
+  }
+): JSX.Element {
+  const followUps = options?.followUps;
   return (
     <div style={{ marginTop: "1.5rem" }}>
       <h4>Answer</h4>
       <p>{answer.summary}</p>
-      {renderCitations(answer.citations)}
+      {renderCitations(answer.citations, {
+        onExport: options?.onExport,
+        exporting: options?.exporting,
+        status: options?.status,
+      })}
       {followUps && followUps.length > 0 && (
         <div style={{ marginTop: "1rem" }}>
           <h4>Follow-up questions</h4>
@@ -229,8 +286,14 @@ export default function CopilotPage(): JSX.Element {
   const [result, setResult] = useState<CopilotResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
+  const [isSendingCitations, setIsSendingCitations] = useState(false);
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+  const citationManagerEndpoint = useMemo(
+    () => getCitationManagerEndpoint(),
+    []
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -262,6 +325,7 @@ export default function CopilotPage(): JSX.Element {
     setIsRunning(true);
     setError(null);
     setResult(null);
+    setCitationExportStatus(null);
 
     try {
       let response: Response;
@@ -445,6 +509,60 @@ export default function CopilotPage(): JSX.Element {
       setError((requestError as Error).message || "Unable to run workflow");
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleCitationExport = async (citations: RAGCitation[]) => {
+    if (!citations.length) {
+      return;
+    }
+    setCitationExportStatus(null);
+    setError(null);
+    setIsSendingCitations(true);
+    try {
+      const response = await fetch(`${baseUrl}/ai/citations/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ citations }),
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const payload = (await response.json()) as CitationExportResponse;
+      const cslBody = JSON.stringify(payload.csl, null, 2);
+      const filename = `${payload.manifest.export_id || "theo-citations"}.csl.json`;
+      if (citationManagerEndpoint) {
+        const managerResponse = await fetch(citationManagerEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload.manager_payload),
+        });
+        if (!managerResponse.ok) {
+          throw new Error(await managerResponse.text());
+        }
+        setCitationExportStatus(
+          "Sent citations to the configured manager endpoint."
+        );
+      } else {
+        const blob = new Blob([cslBody], {
+          type: "application/vnd.citationstyles.csl+json",
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        setCitationExportStatus(
+          "Downloaded CSL bibliography for the selected citations."
+        );
+      }
+    } catch (exportError) {
+      setCitationExportStatus(null);
+      setError((exportError as Error).message || "Unable to export citations");
+    } finally {
+      setIsSendingCitations(false);
     }
   };
 
@@ -776,7 +894,12 @@ export default function CopilotPage(): JSX.Element {
           {result.kind === "verse" && (
             <>
               <h3>Verse brief for {result.payload.osis}</h3>
-              {renderRAGAnswer(result.payload.answer, result.payload.follow_ups)}
+              {renderRAGAnswer(result.payload.answer, {
+                followUps: result.payload.follow_ups,
+                onExport: handleCitationExport,
+                exporting: isSendingCitations,
+                status: citationExportStatus,
+              })}
             </>
           )}
           {result.kind === "sermon" && (
@@ -797,7 +920,11 @@ export default function CopilotPage(): JSX.Element {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-              {renderRAGAnswer(result.payload.answer)}
+              {renderRAGAnswer(result.payload.answer, {
+                onExport: handleCitationExport,
+                exporting: isSendingCitations,
+                status: citationExportStatus,
+              })}
             </>
           )}
           {result.kind === "devotional" && (
@@ -812,7 +939,11 @@ export default function CopilotPage(): JSX.Element {
               <pre style={{ background: "#f9fafb", padding: "0.75rem", whiteSpace: "pre-wrap" }}>
                 {result.payload.prayer}
               </pre>
-              {renderRAGAnswer(result.payload.answer)}
+              {renderRAGAnswer(result.payload.answer, {
+                onExport: handleCitationExport,
+                exporting: isSendingCitations,
+                status: citationExportStatus,
+              })}
             </>
           )}
           {result.kind === "collaboration" && (
@@ -821,7 +952,11 @@ export default function CopilotPage(): JSX.Element {
               <pre style={{ background: "#f9fafb", padding: "0.75rem", whiteSpace: "pre-wrap" }}>
                 {result.payload.synthesized_view}
               </pre>
-              {renderRAGAnswer(result.payload.answer)}
+              {renderRAGAnswer(result.payload.answer, {
+                onExport: handleCitationExport,
+                exporting: isSendingCitations,
+                status: citationExportStatus,
+              })}
             </>
           )}
           {result.kind === "curation" && (
@@ -863,7 +998,11 @@ export default function CopilotPage(): JSX.Element {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-              {renderRAGAnswer(result.payload.answer)}
+              {renderRAGAnswer(result.payload.answer, {
+                onExport: handleCitationExport,
+                exporting: isSendingCitations,
+                status: citationExportStatus,
+              })}
             </>
           )}
           {result.kind === "comparative" && (
@@ -876,7 +1015,11 @@ export default function CopilotPage(): JSX.Element {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-              {renderRAGAnswer(result.payload.answer)}
+              {renderRAGAnswer(result.payload.answer, {
+                onExport: handleCitationExport,
+                exporting: isSendingCitations,
+                status: citationExportStatus,
+              })}
             </>
           )}
         </section>

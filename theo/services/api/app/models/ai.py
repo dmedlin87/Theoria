@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Sequence
+from typing import Any, Literal, Sequence
 
 from pydantic import Field
 
@@ -11,10 +11,12 @@ from ..ai.rag import (
     ComparativeAnalysisResponse,
     DevotionalResponse,
     MultimediaDigestResponse,
+    RAGAnswer,
+    RAGCitation,
     SermonPrepResponse,
     VerseCopilotResponse,
-    RAGAnswer,
 )
+from ..models.export import ExportManifest
 from ..models.search import HybridSearchFilters
 from .base import APIModel
 
@@ -140,6 +142,21 @@ class TranscriptExportRequest(APIModel):
     format: str = Field(default="markdown")
 
 
+class CitationExportRequest(APIModel):
+    """Request payload for exporting citations used by the copilot."""
+
+    citations: Sequence[RAGCitation]
+
+
+class CitationExportResponse(APIModel):
+    """Response describing the rendered citation export bundle."""
+
+    manifest: ExportManifest
+    records: list[dict[str, Any]]
+    csl: list[dict[str, Any]]
+    manager_payload: dict[str, Any]
+
+
 AIResponse = (
     VerseCopilotResponse
     | SermonPrepResponse
@@ -169,5 +186,7 @@ __all__ = [
     "VerseCopilotRequest",
     "CorpusCurationRequest",
     "TranscriptExportRequest",
+    "CitationExportRequest",
+    "CitationExportResponse",
     "AIResponse",
 ]

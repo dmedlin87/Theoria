@@ -283,6 +283,76 @@ test.describe("Theo Engine UI", () => {
         });
         return;
       }
+      if (path === "/ai/citations/export") {
+        const payload = route.request().postDataJSON();
+        expect(Array.isArray(payload.citations)).toBeTruthy();
+        expect(payload.citations).toHaveLength(1);
+        const responseBody = {
+          manifest: {
+            export_id: "citations-1",
+            schema_version: "2024-07-01",
+            created_at: new Date().toISOString(),
+            type: "documents",
+            filters: {},
+            totals: { documents: 1, passages: 1, returned: 1 },
+            cursor: null,
+            next_cursor: null,
+            mode: null,
+          },
+          records: [
+            {
+              kind: "document",
+              document_id: "doc-1",
+              title: "Sample Document",
+              collection: "Test",
+              source_type: "article",
+              authors: ["Jane Doe"],
+              doi: "10.1234/example",
+              venue: "Theo Journal",
+              year: 2024,
+              topics: ["Theology"],
+              primary_topic: "Theology",
+              enrichment_version: 1,
+              provenance_score: 5,
+              abstract: "Example abstract",
+              source_url: "https://example.test",
+              metadata: {},
+              passages: [
+                {
+                  id: "passage-1",
+                  document_id: "doc-1",
+                  osis_ref: "John.1.1",
+                  page_no: 1,
+                  t_start: 0,
+                  t_end: 5,
+                  meta: { anchor: "John 1:1", snippet: "In the beginning" },
+                },
+              ],
+            },
+          ],
+          csl: [
+            {
+              id: "doc-1",
+              type: "article-journal",
+              title: "Sample Document",
+              author: [{ literal: "Jane Doe" }],
+              note: "Anchors: John.1.1 (John 1:1)",
+            },
+          ],
+          manager_payload: {
+            format: "csl-json",
+            export_id: "citations-1",
+            zotero: { items: [{ id: "doc-1" }] },
+            mendeley: { documents: [{ id: "doc-1" }] },
+          },
+        };
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(responseBody),
+        });
+        return;
+      }
       await route.continue();
     });
 
@@ -297,6 +367,17 @@ test.describe("Theo Engine UI", () => {
       page.click("button[type='submit']"),
     ]);
     await expect(page.getByRole("heading", { name: /Verse brief for John\.1\.1/ })).toBeVisible();
+    const exportButton = page.getByRole("button", { name: "Send to Zotero/Mendeley" });
+    await expect(exportButton).toBeVisible();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/ai/citations/export")),
+      exportButton.click(),
+    ]);
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: /Downloaded CSL bibliography for the selected citations\./i })
+    ).toBeVisible();
 
     await page.getByRole("button", { name: /^Sermon prep/ }).click();
     await page.getByLabel("Sermon topic").fill("Embodied hope");
