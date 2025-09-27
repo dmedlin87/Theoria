@@ -49,6 +49,30 @@ function Test-PortOpen {
   }
 }
 
+function Get-ApiReadinessHost {
+  param([string]$BindHost)
+
+  if (-not $BindHost) { return '127.0.0.1' }
+
+  $host = $BindHost.Trim()
+
+  $parsedAddress = $null
+  if ([System.Net.IPAddress]::TryParse($host, [ref]$parsedAddress)) {
+    if ($parsedAddress.Equals([System.Net.IPAddress]::Any)) { return '127.0.0.1' }
+    if ($parsedAddress.Equals([System.Net.IPAddress]::IPv6Any)) { return '::1' }
+    return $host
+  }
+
+  if ($host.StartsWith('[') -and $host.EndsWith(']')) {
+    $inner = $host.TrimStart('[').TrimEnd(']')
+    if ([System.Net.IPAddress]::TryParse($inner, [ref]$parsedAddress)) {
+      if ($parsedAddress.Equals([System.Net.IPAddress]::IPv6Any)) { return '::1' }
+    }
+  }
+
+  return $host
+}
+
 function Stop-ApiJob {
   param($Job)
 
@@ -91,6 +115,7 @@ $ApiJob = Start-Job -ScriptBlock {
 $ApiReady = $false
 $TimeoutSeconds = 45
 $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+$ReadinessHost = Get-ApiReadinessHost $BindHost
 while ($Stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
   if ($ApiJob.State -eq 'Failed' -or $ApiJob.State -eq 'Stopped') {
     Write-Host 'API process failed to start.' -ForegroundColor Red
@@ -100,7 +125,7 @@ while ($Stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
     exit 1
   }
 
-  if (Test-PortOpen -Host $BindHost -Port $ApiPort) {
+  if (Test-PortOpen -Host $ReadinessHost -Port $ApiPort) {
     $ApiReady = $true
     break
   }
