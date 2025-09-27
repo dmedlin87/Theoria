@@ -1,0 +1,26 @@
+[
+  {
+    "id": "appeal-to-authority",
+    "name": "Appeal to Authority",
+    "category": "appeal",
+    "severity": "medium",
+    "keywords": ["because the scholars say", "leading experts agree", "all historians confirm"],
+    "description": "Argument leans on unnamed or vague authorities instead of presenting evidence."
+  },
+  {
+    "id": "straw-man",
+    "name": "Straw Man",
+    "category": "misrepresentation",
+    "severity": "high",
+    "keywords": ["critics claim that believers worship", "skeptics insist that Christians", "opponents obviously think"],
+    "description": "Counter-argument is directed at an exaggerated version of the opposing position."
+  },
+  {
+    "id": "false-dilemma",
+    "name": "False Dilemma",
+    "category": "dilemma",
+    "severity": "medium",
+    "keywords": ["either we accept", "there is no third option", "you must choose between"],
+    "description": "Presents two options as the only possibilities when more exist."
+  }
+]

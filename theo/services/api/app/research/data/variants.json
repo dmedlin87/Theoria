@@ -1,0 +1,48 @@
+{
+  "John.1.1": [
+    {
+      "id": "john1-logos-p66",
+      "category": "manuscript",
+      "witness": "P66",
+      "reading": "θεος",
+      "note": "Early papyrus where the article before Θεός is absent, often cited for qualitative nuance.",
+      "source": "NA28 apparatus",
+      "confidence": 0.82
+    },
+    {
+      "id": "john1-logos-sbl",
+      "category": "translation",
+      "translation": "SBLGNT",
+      "reading": "ἐν ἀρχῇ ἦν ὁ λόγος",
+      "note": "Critical text retains the article before Λόγος to signal subject emphasis.",
+      "source": "SBLGNT"
+    },
+    {
+      "id": "john1-logos-kjv",
+      "category": "translation",
+      "translation": "KJV",
+      "reading": "In the beginning was the Word",
+      "note": "Traditional English rendering foregrounds the Word's pre-existence.",
+      "source": "King James Version"
+    }
+  ],
+  "Luke.2.2": [
+    {
+      "id": "luke2-census-b",
+      "category": "manuscript",
+      "witness": "Codex Vaticanus (B)",
+      "reading": "Αὕτη ἀπογραφὴ πρώτη ἐγένετο",
+      "note": "Majority reading identifying the census as the first when Quirinius was governing Syria.",
+      "source": "NA28 apparatus",
+      "confidence": 0.76
+    },
+    {
+      "id": "luke2-census-syriac",
+      "category": "version",
+      "witness": "Syriac Peshitta",
+      "reading": "This enrollment was first made",
+      "note": "Syriac tradition mirrors the majority Greek reading with emphasis on sequence.",
+      "source": "Peshitta"
+    }
+  ]
+}
