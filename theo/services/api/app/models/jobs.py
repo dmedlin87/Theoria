@@ -156,3 +156,8 @@ class TopicDigestJobRequest(APIModel):
             if stripped:
                 normalized.append(stripped)
         return normalized or None
+
+
+class HNSWRefreshJobRequest(APIModel):
+    sample_queries: int = Field(default=25, ge=1, le=500)
+    top_k: int = Field(default=10, ge=1, le=200)

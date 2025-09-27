@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import httpx
 from celery import Celery
+from celery.schedules import crontab
 from celery.utils.log import get_task_logger
+from sqlalchemy import func, literal, select, text
 from sqlalchemy.orm import Session
 
 from ..analytics.topics import (
@@ -25,6 +28,7 @@ from ..core.database import get_engine
 from ..core.settings import get_settings
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import Document, IngestionJob, Passage
+from ..db.types import VectorType
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
 
@@ -36,6 +40,15 @@ celery = Celery(
     "theo-workers",
     broker=settings.redis_url,
     backend=settings.redis_url,
+)
+
+celery.conf.beat_schedule = getattr(celery.conf, "beat_schedule", {}) or {}
+celery.conf.beat_schedule.setdefault(
+    "refresh-hnsw-nightly",
+    {
+        "task": "tasks.refresh_hnsw",
+        "schedule": crontab(hour=3, minute=0),
+    },
 )
 
 
@@ -408,6 +421,162 @@ def topic_digest(
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
             raise
+
+
+HNSW_INDEX_NAME = "ix_passages_embedding_hnsw"
+DEFAULT_SAMPLE_QUERIES = 25
+DEFAULT_TOP_K = 10
+
+
+def _format_vector(embedding: Iterable[float]) -> list[float]:
+    return [float(component) for component in embedding]
+
+
+def _rebuild_hnsw_index(engine) -> None:
+    statements = [
+        text(f"DROP INDEX IF EXISTS {HNSW_INDEX_NAME}"),
+        text(
+            "CREATE INDEX IF NOT EXISTS "
+            f"{HNSW_INDEX_NAME} ON passages USING hnsw (embedding vector_l2_ops)"
+        ),
+        text("ANALYZE passages (embedding)"),
+    ]
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(statement)
+
+
+def _evaluate_hnsw_recall(
+    engine, sample_queries: int = DEFAULT_SAMPLE_QUERIES, top_k: int = DEFAULT_TOP_K
+) -> dict[str, Any]:
+    settings = get_settings()
+    metrics: dict[str, Any] = {
+        "sample_size": 0,
+        "top_k": top_k,
+        "avg_recall": None,
+        "min_recall": None,
+        "max_recall": None,
+        "avg_index_latency_ms": None,
+        "avg_exact_latency_ms": None,
+    }
+
+    with Session(engine) as session:
+        bind = session.bind
+        if bind is None or bind.dialect.name != "postgresql":
+            return metrics
+
+        embeddings = (
+            session.execute(
+                select(Passage.embedding)
+                .where(Passage.embedding.isnot(None))
+                .order_by(func.random())
+                .limit(sample_queries)
+            )
+            .scalars()
+            .all()
+        )
+
+    valid_embeddings = [embedding for embedding in embeddings if embedding]
+    if not valid_embeddings:
+        return metrics
+
+    recalls: list[float] = []
+    index_latencies: list[float] = []
+    exact_latencies: list[float] = []
+
+    with Session(engine) as session:
+        for embedding in valid_embeddings:
+            vector_param = literal(
+                _format_vector(embedding),
+                type_=VectorType(settings.embedding_dim),
+            )
+            index_stmt = (
+                select(Passage.id)
+                .where(Passage.embedding.isnot(None))
+                .order_by(func.cosine_distance(Passage.embedding, vector_param))
+                .limit(top_k)
+            )
+            index_start = time.perf_counter()
+            approx_ids = session.execute(index_stmt).scalars().all()
+            index_latencies.append(time.perf_counter() - index_start)
+
+            with session.begin():
+                session.execute(text("SET LOCAL enable_indexscan = off"))
+                session.execute(text("SET LOCAL enable_indexonlyscan = off"))
+                session.execute(text("SET LOCAL enable_bitmapscan = off"))
+                exact_start = time.perf_counter()
+                exact_ids = session.execute(index_stmt).scalars().all()
+                exact_latencies.append(time.perf_counter() - exact_start)
+
+            if not exact_ids:
+                continue
+            overlap = len(set(approx_ids) & set(exact_ids))
+            recalls.append(overlap / len(exact_ids))
+
+    if not recalls:
+        return metrics
+
+    metrics["sample_size"] = len(recalls)
+    metrics["avg_recall"] = float(sum(recalls) / len(recalls))
+    metrics["min_recall"] = float(min(recalls))
+    metrics["max_recall"] = float(max(recalls))
+    if index_latencies:
+        metrics["avg_index_latency_ms"] = float(
+            sum(index_latencies) / len(index_latencies) * 1000.0
+        )
+    if exact_latencies:
+        metrics["avg_exact_latency_ms"] = float(
+            sum(exact_latencies) / len(exact_latencies) * 1000.0
+        )
+    return metrics
+
+
+@celery.task(name="tasks.refresh_hnsw")
+def refresh_hnsw(
+    job_id: str | None = None,
+    *,
+    sample_queries: int = DEFAULT_SAMPLE_QUERIES,
+    top_k: int = DEFAULT_TOP_K,
+) -> dict[str, Any]:
+    engine = get_engine()
+
+    if job_id:
+        with Session(engine) as session:
+            _update_job_status(session, job_id, status="processing")
+            session.commit()
+
+    try:
+        _rebuild_hnsw_index(engine)
+        metrics = _evaluate_hnsw_recall(
+            engine, sample_queries=sample_queries, top_k=top_k
+        )
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.exception("HNSW refresh failed")
+        if job_id:
+            with Session(engine) as session:
+                _update_job_status(session, job_id, status="failed", error=str(exc))
+                session.commit()
+        raise
+
+    if job_id:
+        with Session(engine) as session:
+            job = session.get(IngestionJob, job_id)
+            if job is not None:
+                payload = dict(job.payload or {})
+                payload.update({
+                    "sample_queries": sample_queries,
+                    "top_k": top_k,
+                    "metrics": metrics,
+                })
+                job.payload = payload
+            _update_job_status(session, job_id, status="completed")
+            session.commit()
+
+    logger.info(
+        "Rebuilt pgvector HNSW index",
+        extra={"metrics": metrics, "index": HNSW_INDEX_NAME},
+    )
+    return metrics
 
 
 @celery.task(name="tasks.run_watchlist_alert")
