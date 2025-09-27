@@ -34,3 +34,53 @@ def test_topic_digest_deduplicates_document_ids() -> None:
 
         session.delete(document)
         session.commit()
+
+
+class _FakeOpenAlexClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str | None, str | None]] = []
+
+    def fetch_topics(self, doi: str | None = None, title: str | None = None) -> list[str]:
+        self.calls.append((doi, title))
+        if doi == "10.1234/example":
+            return ["Systematic Theology", "Practical Ministry"]
+        return []
+
+
+def test_topic_digest_enriches_documents_with_openalex_topics() -> None:
+    engine = get_engine()
+    with Session(engine) as session:
+        document = Document(
+            id="openalex-topic-doc",
+            title="Understanding Systematic Theology",
+            doi="10.1234/example",
+            source_type="test",
+            bib_json={},
+        )
+        session.add(document)
+        session.commit()
+
+        client = _FakeOpenAlexClient()
+
+        digest = generate_topic_digest(
+            session,
+            since=datetime.now(UTC) - timedelta(days=1),
+            openalex_client=client,
+        )
+
+        session.refresh(document)
+
+        assert client.calls == [("10.1234/example", "Understanding Systematic Theology")]
+        assert document.topics == ["Systematic Theology", "Practical Ministry"]
+        assert document.bib_json == {"topics": ["Systematic Theology", "Practical Ministry"]}
+
+        cluster = next(
+            (item for item in digest.topics if item.topic == "Systematic Theology"),
+            None,
+        )
+        assert cluster is not None, digest
+        assert cluster.new_documents == 1
+        assert cluster.document_ids == ["openalex-topic-doc"]
+
+        session.delete(document)
+        session.commit()

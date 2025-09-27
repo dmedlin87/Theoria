@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..core.settings_store import load_setting, save_setting
 from ..db.models import Document
 from ..models.base import APIModel
+from .openalex import OpenAlexClient
 
 SETTINGS_KEY = "topic-digest"
 
@@ -66,8 +68,46 @@ def _historical_counts(session: Session) -> Counter:
     return counts
 
 
+def _attach_topics(document: Document, topics: list[str]) -> bool:
+    """Persist unique topics on the document and bib metadata."""
+
+    if not topics:
+        return False
+
+    existing = _extract_topics(document)
+    additions = [topic for topic in topics if topic and topic not in existing]
+    if not additions:
+        return False
+
+    merged = existing + additions
+    document.topics = merged
+
+    if isinstance(document.bib_json, dict):
+        updated_bib = dict(document.bib_json)
+    else:
+        updated_bib = {}
+
+    bib_topics = updated_bib.get("topics")
+    if isinstance(bib_topics, list):
+        deduped = []
+        seen: set[str] = set()
+        for value in list(bib_topics) + additions:
+            if value and value not in seen:
+                seen.add(value)
+                deduped.append(value)
+        updated_bib["topics"] = deduped
+    else:
+        updated_bib["topics"] = additions
+
+    document.bib_json = updated_bib or None
+    return True
+
+
 def generate_topic_digest(
-    session: Session, since: datetime | None = None
+    session: Session,
+    since: datetime | None = None,
+    *,
+    openalex_client: OpenAlexClient | None = None,
 ) -> TopicDigest:
     if since is None:
         since = datetime.now(UTC) - timedelta(days=7)
@@ -76,6 +116,22 @@ def generate_topic_digest(
         .scalars()
         .all()
     )
+
+    updated = False
+    with ExitStack() as stack:
+        client = openalex_client
+        if client is None:
+            client = OpenAlexClient()
+            stack.callback(client.close)
+
+        for document in rows:
+            topics = client.fetch_topics(document.doi, document.title)
+            if _attach_topics(document, topics):
+                session.add(document)
+                updated = True
+
+        if updated:
+            session.flush()
     topic_documents: dict[str, set[str]] = defaultdict(set)
     for document in rows:
         for topic in _extract_topics(document):
