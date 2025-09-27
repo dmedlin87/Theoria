@@ -54,6 +54,7 @@ from ..models.export import (
     DocumentExportResponse,
 )
 from ..models.ai import (
+    AIFeaturesResponse,
     ChatSessionMessage,
     ChatSessionRequest,
     ChatSessionResponse,
@@ -73,6 +74,7 @@ from ..models.ai import (
     SermonPrepRequest,
     TranscriptExportRequest,
     VerseCopilotRequest,
+    DEFAULT_GUARDRAIL_SETTINGS,
 )
 from ..models.watchlists import (
     WatchlistCreateRequest,
@@ -83,6 +85,13 @@ from ..models.watchlists import (
 
 router = APIRouter()
 settings_router = APIRouter(prefix="/settings/ai", tags=["ai-settings"])
+
+
+@router.get("/features", response_model=AIFeaturesResponse)
+def list_ai_features() -> AIFeaturesResponse:
+    """Expose guardrail catalogues for client selection."""
+
+    return AIFeaturesResponse(guardrails=DEFAULT_GUARDRAIL_SETTINGS)
 
 
 def _persist_and_respond(

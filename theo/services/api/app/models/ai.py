@@ -78,6 +78,89 @@ class ChatSessionResponse(APIModel):
     answer: RAGAnswer
 
 
+class GuardrailProfile(APIModel):
+    slug: str
+    label: str
+    description: str | None = None
+
+
+class GuardrailSettings(APIModel):
+    theological_traditions: list[GuardrailProfile]
+    topic_domains: list[GuardrailProfile]
+
+
+class AIFeaturesResponse(APIModel):
+    guardrails: GuardrailSettings
+
+
+DEFAULT_GUARDRAIL_SETTINGS = GuardrailSettings(
+    theological_traditions=[
+        GuardrailProfile(
+            slug="anglican",
+            label="Anglican Communion",
+            description="Voices shaped by the Book of Common Prayer and via media sensibilities.",
+        ),
+        GuardrailProfile(
+            slug="baptist",
+            label="Baptist",
+            description="Free church perspectives emphasising believer's baptism and congregational polity.",
+        ),
+        GuardrailProfile(
+            slug="catholic",
+            label="Roman Catholic",
+            description="Magisterial readings grounded in the Catechism and sacramental theology.",
+        ),
+        GuardrailProfile(
+            slug="orthodox",
+            label="Eastern Orthodox",
+            description="Patristic insights steeped in conciliar theology and theosis.",
+        ),
+        GuardrailProfile(
+            slug="reformed",
+            label="Reformed",
+            description="Confessional frameworks influenced by Calvin, the Westminster Standards, and covenant theology.",
+        ),
+        GuardrailProfile(
+            slug="wesleyan",
+            label="Wesleyan/Methodist",
+            description="Holiness traditions balancing scripture, reason, tradition, and experience.",
+        ),
+    ],
+    topic_domains=[
+        GuardrailProfile(
+            slug="christology",
+            label="Christology",
+            description="Passages and commentary exploring the person and work of Christ.",
+        ),
+        GuardrailProfile(
+            slug="soteriology",
+            label="Soteriology",
+            description="Studies on salvation, atonement, and grace.",
+        ),
+        GuardrailProfile(
+            slug="ecclesiology",
+            label="Ecclesiology",
+            description="Perspectives on the nature and mission of the church.",
+        ),
+        GuardrailProfile(
+            slug="sacramental",
+            label="Sacramental Theology",
+            description="Analyses of sacramental practice and theology across traditions.",
+        ),
+        GuardrailProfile(
+            slug="biblical-theology",
+            label="Biblical Theology",
+            description="Canonical themes tracing the storyline of scripture.",
+        ),
+        GuardrailProfile(
+            slug="ethics",
+            label="Christian Ethics",
+            description="Moral theology engaging discipleship, justice, and formation.",
+        ),
+    ],
+)
+
+
 class ProviderSettingsRequest(APIModel):
     api_key: str | None = None
     base_url: str | None = None
@@ -189,4 +272,8 @@ __all__ = [
     "CitationExportRequest",
     "CitationExportResponse",
     "AIResponse",
+    "GuardrailProfile",
+    "GuardrailSettings",
+    "AIFeaturesResponse",
+    "DEFAULT_GUARDRAIL_SETTINGS",
 ]
