@@ -29,14 +29,14 @@ function Write-Section($msg) {
 
 function Test-PortOpen {
   param(
-    [string]$Host,
+    [string]$TargetHost,
     [int]$Port,
     [int]$TimeoutMilliseconds = 2000
   )
 
   $client = [System.Net.Sockets.TcpClient]::new()
   try {
-    $asyncResult = $client.BeginConnect($Host, $Port, $null, $null)
+    $asyncResult = $client.BeginConnect($TargetHost, $Port, $null, $null)
     if (-not $asyncResult.AsyncWaitHandle.WaitOne($TimeoutMilliseconds)) {
       return $false
     }
@@ -54,23 +54,23 @@ function Get-ApiReadinessHost {
 
   if (-not $BindHost) { return '127.0.0.1' }
 
-  $host = $BindHost.Trim()
+  $normalizedHost = $BindHost.Trim()
 
   $parsedAddress = $null
-  if ([System.Net.IPAddress]::TryParse($host, [ref]$parsedAddress)) {
+  if ([System.Net.IPAddress]::TryParse($normalizedHost, [ref]$parsedAddress)) {
     if ($parsedAddress.Equals([System.Net.IPAddress]::Any)) { return '127.0.0.1' }
     if ($parsedAddress.Equals([System.Net.IPAddress]::IPv6Any)) { return '::1' }
-    return $host
+    return $normalizedHost
   }
 
-  if ($host.StartsWith('[') -and $host.EndsWith(']')) {
-    $inner = $host.TrimStart('[').TrimEnd(']')
+  if ($normalizedHost.StartsWith('[') -and $normalizedHost.EndsWith(']')) {
+    $inner = $normalizedHost.TrimStart('[').TrimEnd(']')
     if ([System.Net.IPAddress]::TryParse($inner, [ref]$parsedAddress)) {
       if ($parsedAddress.Equals([System.Net.IPAddress]::IPv6Any)) { return '::1' }
     }
   }
 
-  return $host
+  return $normalizedHost
 }
 
 function Stop-ApiJob {
@@ -125,7 +125,7 @@ while ($Stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
     exit 1
   }
 
-  if (Test-PortOpen -Host $ReadinessHost -Port $ApiPort) {
+  if (Test-PortOpen -TargetHost $ReadinessHost -Port $ApiPort) {
     $ApiReady = $true
     break
   }
@@ -139,7 +139,7 @@ if (-not $ApiReady) {
   exit 1
 }
 
-Write-Host "API is listening on $BindHost:$ApiPort" -ForegroundColor Green
+Write-Host "API is listening on ${BindHost}:${ApiPort}" -ForegroundColor Green
 
 if (-not (Test-Path $WebDir)) {
   Write-Host "Web directory not found: $WebDir" -ForegroundColor Red
@@ -195,3 +195,4 @@ Write-Host ("{0} {1}" -f $NextExe, ($NextArgs -join ' ')) -ForegroundColor Green
 
 Write-Host 'Shutting down API job...' -ForegroundColor Yellow
 Stop-ApiJob $ApiJob
+
