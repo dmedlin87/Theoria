@@ -498,10 +498,17 @@ def _guarded_answer(
             "Retrieved passages lacked OSIS references; aborting generation"
         )
 
+    cited_results = [result for result in ordered_results if result.osis_ref]
     summary_lines = []
-    for citation, result in zip(citations, ordered_results):
+    for idx, citation in enumerate(citations):
+        result = cited_results[idx] if idx < len(cited_results) else None
+        document_title = (
+            citation.document_title
+            or (result.document_title if result else None)
+            or citation.document_id
+        )
         summary_lines.append(
-            f"[{citation.index}] {citation.snippet} — {citation.document_title or citation.document_id}"
+            f"[{citation.index}] {citation.snippet} — {document_title}"
             f" ({citation.osis}, {citation.anchor})"
         )
     summary_text = "\n".join(summary_lines)
