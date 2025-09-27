@@ -15,48 +15,6 @@ const viewingModes: { id: ViewingMode; label: string }[] = [
   { id: "apologetic", label: "Apologetic" },
 ];
 
-const severityDescriptions: Record<string, string> = {
-  low: "Low severity: differences are usually reconciled with minor contextual notes.",
-  medium: "Medium severity: requires careful harmonization and may remain debated.",
-  high: "High severity: strongly conflicting claims with limited harmonization paths.",
-};
-
-function getSeverityLabel(severity?: string | null): string {
-  if (!severity) {
-    return "Unrated";
-  }
-  const normalized = severity.toLowerCase();
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function getSeverityDescription(severity?: string | null): string {
-  if (!severity) {
-    return "Severity indicates how difficult the passages are to reconcile.";
-  }
-  const normalized = severity.toLowerCase();
-  return (
-    severityDescriptions[normalized] ??
-    "Severity indicates how difficult the passages are to reconcile."
-  );
-}
-
-function getSeverityColor(severity?: string | null): string {
-  if (!severity) {
-    return "#94a3b8";
-  }
-  const normalized = severity.toLowerCase();
-  switch (normalized) {
-    case "low":
-      return "#16a34a";
-    case "medium":
-      return "#f59e0b";
-    case "high":
-      return "#dc2626";
-    default:
-      return "#6366f1";
-  }
-}
-
 function initializeModeState(): ModeState {
   return {
     neutral: true,
@@ -69,39 +27,34 @@ interface ContradictionsPanelClientProps {
   contradictions: ContradictionRecord[];
 }
 
+function isLikelyUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return Boolean(parsed.protocol && parsed.host);
+  } catch (error) {
+    return false;
+  }
+}
+
 export default function ContradictionsPanelClient({
   contradictions,
 }: ContradictionsPanelClientProps) {
   const [viewingMode, setViewingMode] = useState<ViewingMode>("neutral");
   const [modeState, setModeState] = useState<ModeState>(() => initializeModeState());
-  const [selectedSeverities, setSelectedSeverities] = useState<Set<string>>(
-    () => new Set(),
-  );
 
-  const severities = useMemo(() => {
-    const unique = new Set<string>();
-    contradictions.forEach((item) => {
-      if (item.severity) {
-        unique.add(item.severity.toLowerCase());
-      }
-    });
-    return Array.from(unique.values());
-  }, [contradictions]);
-
-  const shouldShowContradictions =
-    viewingMode !== "apologetic" || modeState.apologetic;
-
-  const filteredContradictions = useMemo(() => {
-    if (selectedSeverities.size === 0) {
-      return contradictions;
+  const shouldShowContradictions = useMemo(() => {
+    if (viewingMode !== "apologetic") {
+      return true;
     }
-    return contradictions.filter((item) => {
-      if (!item.severity) {
-        return selectedSeverities.has("unrated");
-      }
-      return selectedSeverities.has(item.severity.toLowerCase());
-    });
-  }, [contradictions, selectedSeverities]);
+    return modeState.apologetic;
+  }, [modeState.apologetic, viewingMode]);
+
+  const visibleContradictions = useMemo(() => {
+    if (!shouldShowContradictions) {
+      return [] as ContradictionRecord[];
+    }
+    return contradictions;
+  }, [contradictions, shouldShowContradictions]);
 
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
@@ -169,88 +122,6 @@ export default function ContradictionsPanelClient({
           </div>
         </fieldset>
 
-        {severities.length > 0 ? (
-          <fieldset
-            style={{
-              border: "1px solid var(--border, #dbeafe)",
-              borderRadius: "0.5rem",
-              padding: "0.75rem",
-              margin: 0,
-              display: "grid",
-              gap: "0.5rem",
-            }}
-          >
-            <legend style={{ fontWeight: 600 }}>Filter by severity</legend>
-            <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted-foreground, #475569)" }}>
-              Use severity filters to focus on the most critical tensions first.
-            </p>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "0.5rem",
-              }}
-            >
-              {severities.map((severity) => {
-                const normalized = severity.toLowerCase();
-                const isSelected = selectedSeverities.has(normalized);
-                return (
-                  <button
-                    key={severity}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSeverities((prev) => {
-                        const next = new Set(prev);
-                        if (isSelected) {
-                          next.delete(normalized);
-                        } else {
-                          next.add(normalized);
-                        }
-                        return next;
-                      });
-                    }}
-                    style={{
-                      border: `1px solid ${getSeverityColor(normalized)}`,
-                      background: isSelected ? `${getSeverityColor(normalized)}22` : "transparent",
-                      color: getSeverityColor(normalized),
-                      borderRadius: "999px",
-                      padding: "0.25rem 0.75rem",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {getSeverityLabel(normalized)}
-                  </button>
-                );
-              })}
-              {contradictions.some((item) => !item.severity) ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedSeverities((prev) => {
-                      const next = new Set(prev);
-                      if (next.has("unrated")) {
-                        next.delete("unrated");
-                      } else {
-                        next.add("unrated");
-                      }
-                      return next;
-                    });
-                  }}
-                  style={{
-                    border: "1px solid #94a3b8",
-                    background: selectedSeverities.has("unrated") ? "#94a3b822" : "transparent",
-                    color: "#475569",
-                    borderRadius: "999px",
-                    padding: "0.25rem 0.75rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  Unrated
-                </button>
-              ) : null}
-            </div>
-          </fieldset>
-        ) : null}
       </div>
 
       {!shouldShowContradictions ? (
@@ -261,7 +132,7 @@ export default function ContradictionsPanelClient({
           Contradictions are currently hidden in <strong>Apologetic</strong> mode. Enable the toggle above
           to include them while emphasizing harmonization evidence.
         </p>
-      ) : filteredContradictions.length === 0 ? (
+      ) : visibleContradictions.length === 0 ? (
         <p style={{ margin: 0 }}>No contradictions match the selected filters.</p>
       ) : (
         <ul
@@ -273,9 +144,9 @@ export default function ContradictionsPanelClient({
             gap: "0.75rem",
           }}
         >
-          {filteredContradictions.map((item, index) => (
+          {visibleContradictions.map((item) => (
             <li
-              key={`${item.summary}-${index}`}
+              key={item.id}
               style={{
                 border: "1px solid var(--border, #e5e7eb)",
                 borderRadius: "0.75rem",
@@ -284,133 +155,70 @@ export default function ContradictionsPanelClient({
                 gap: "0.75rem",
               }}
             >
-              <header style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-                <p style={{ margin: 0, fontWeight: 600, flex: "1 1 auto" }}>{item.summary}</p>
-                <span
-                  title={`${getSeverityLabel(item.severity)} severity. ${getSeverityDescription(item.severity)}`}
+              <header style={{ display: "grid", gap: "0.25rem" }}>
+                <p style={{ margin: 0, fontWeight: 600 }}>{item.summary}</p>
+                <p
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.25rem",
-                    background: `${getSeverityColor(item.severity)}22`,
-                    color: getSeverityColor(item.severity),
-                    borderRadius: "999px",
-                    padding: "0.25rem 0.75rem",
-                    fontSize: "0.75rem",
-                    fontWeight: 600,
+                    margin: 0,
+                    fontSize: "0.875rem",
+                    color: "var(--muted-foreground, #4b5563)",
                   }}
                 >
-                  Severity: {getSeverityLabel(item.severity)}
-                </span>
+                  {item.osis[0]} ⇄ {item.osis[1]}
+                </p>
               </header>
 
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "0.875rem",
-                  color: "var(--muted-foreground, #4b5563)",
-                }}
-              >
-                {item.osis[0]} ⇄ {item.osis[1]}
-              </p>
-
-              {item.snippet_pairs && item.snippet_pairs.length > 0 ? (
-                <div style={{ display: "grid", gap: "0.75rem" }}>
-                  {item.snippet_pairs.map((pair, pairIndex) => (
-                    <div
-                      key={pairIndex}
-                      style={{
-                        display: "grid",
-                        gap: "0.75rem",
-                        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                      }}
-                    >
-                      {pair.left ? (
-                        <article
-                          style={{
-                            background: "#f1f5f9",
-                            borderRadius: "0.5rem",
-                            padding: "0.75rem",
-                          }}
-                        >
-                          <header
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "baseline",
-                              gap: "0.5rem",
-                              marginBottom: "0.5rem",
-                            }}
-                          >
-                            <strong>{pair.left.osis}</strong>
-                            <Link
-                              href={`/verse/${encodeURIComponent(pair.left.osis)}`}
-                              style={{ fontSize: "0.75rem" }}
-                            >
-                              Open verse
-                            </Link>
-                          </header>
-                          <p style={{ margin: 0, fontSize: "0.875rem", lineHeight: 1.5 }}>
-                            {pair.left.text}
-                          </p>
-                        </article>
-                      ) : null}
-
-                      {pair.right ? (
-                        <article
-                          style={{
-                            background: "#f1f5f9",
-                            borderRadius: "0.5rem",
-                            padding: "0.75rem",
-                          }}
-                        >
-                          <header
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "baseline",
-                              gap: "0.5rem",
-                              marginBottom: "0.5rem",
-                            }}
-                          >
-                            <strong>{pair.right.osis}</strong>
-                            <Link
-                              href={`/verse/${encodeURIComponent(pair.right.osis)}`}
-                              style={{ fontSize: "0.75rem" }}
-                            >
-                              Open verse
-                            </Link>
-                          </header>
-                          <p style={{ margin: 0, fontSize: "0.875rem", lineHeight: 1.5 }}>
-                            {pair.right.text}
-                          </p>
-                        </article>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
+              {item.weight != null ? (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "0.8125rem",
+                    color: "var(--muted-foreground, #475569)",
+                  }}
+                >
+                  Weight: {item.weight.toFixed(2)}
+                </p>
               ) : null}
 
-              {item.sources && item.sources.length > 0 ? (
-                <div style={{ display: "grid", gap: "0.5rem" }}>
-                  <p style={{ margin: 0, fontSize: "0.875rem", fontWeight: 600 }}>
-                    Supporting evidence
-                  </p>
-                  <ul style={{ margin: 0, paddingLeft: "1rem", display: "grid", gap: "0.25rem" }}>
-                    {item.sources.map((source, sourceIndex) => (
-                      <li key={source.url ?? sourceIndex}>
-                        <Link
-                          href={source.url ?? "#"}
-                          target={source.url ? "_blank" : undefined}
-                          rel={source.url ? "noreferrer" : undefined}
-                          style={{ color: "#2563eb" }}
-                        >
-                          {source.label ?? source.url ?? "Evidence"}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {item.tags && item.tags.length > 0 ? (
+                <ul
+                  style={{
+                    listStyle: "none",
+                    margin: 0,
+                    padding: 0,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.5rem",
+                  }}
+                >
+                  {item.tags.map((tag) => (
+                    <li
+                      key={tag}
+                      style={{
+                        borderRadius: "999px",
+                        background: "#e0f2fe",
+                        color: "#0369a1",
+                        fontSize: "0.75rem",
+                        padding: "0.25rem 0.75rem",
+                      }}
+                    >
+                      {tag}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
+              {item.source ? (
+                <p style={{ margin: 0, fontSize: "0.875rem" }}>
+                  Source:{" "}
+                  {isLikelyUrl(item.source) ? (
+                    <Link href={item.source} target="_blank" rel="noreferrer" style={{ color: "#2563eb" }}>
+                      {item.source}
+                    </Link>
+                  ) : (
+                    <span>{item.source}</span>
+                  )}
+                </p>
               ) : null}
             </li>
           ))}
