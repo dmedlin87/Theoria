@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from uuid import uuid4
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -33,6 +34,16 @@ def _parse_frontmatter(raw: str | None) -> dict[str, Any] | None:
         ) from exc
 
 
+def _unique_safe_path(tmp_dir: Path, filename: str | None, default: str) -> Path:
+    """Return a unique, sanitized path anchored within ``tmp_dir``."""
+
+    safe_name = Path(filename or "").name
+    if not safe_name:
+        safe_name = Path(default).name or "upload.bin"
+    unique_name = f"{uuid4().hex}-{safe_name}"
+    return tmp_dir / unique_name
+
+
 @router.post("/file", response_model=DocumentIngestResponse)
 async def ingest_file(
     file: UploadFile = File(...),
@@ -42,7 +53,7 @@ async def ingest_file(
     """Accept a file upload and synchronously process it into passages."""
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="theo-ingest-"))
-    tmp_path = tmp_dir / file.filename
+    tmp_path = _unique_safe_path(tmp_dir, file.filename, "upload.bin")
     with tmp_path.open("wb") as destination:
         content = await file.read()
         destination.write(content)
@@ -95,8 +106,9 @@ async def ingest_transcript(
     """Accept a transcript (and optional audio) and process it into passages."""
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="theo-ingest-"))
-    transcript_name = transcript.filename or "transcript.vtt"
-    transcript_path = tmp_dir / transcript_name
+    transcript_path = _unique_safe_path(
+        tmp_dir, transcript.filename, "transcript.vtt"
+    )
     audio_path: Path | None = None
 
     try:
@@ -105,8 +117,7 @@ async def ingest_transcript(
             destination.write(transcript_bytes)
 
         if audio is not None:
-            audio_name = audio.filename or "audio.bin"
-            audio_path = tmp_dir / audio_name
+            audio_path = _unique_safe_path(tmp_dir, audio.filename, "audio.bin")
             audio_bytes = await audio.read()
             with audio_path.open("wb") as destination:
                 destination.write(audio_bytes)
