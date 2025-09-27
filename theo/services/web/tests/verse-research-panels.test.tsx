@@ -63,6 +63,9 @@ describe("ContradictionsPanel", () => {
     expect(
       screen.getByRole("link", { name: "Skeptical commentary" }),
     ).toHaveAttribute("href", "https://example.com/contradiction");
+    expect(
+      screen.getByRole("link", { name: "Skeptical commentary" }),
+    ).toHaveAttribute("rel", "noopener noreferrer");
     expect(screen.getAllByText("Open verse").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/In the beginning God created/)).toBeInTheDocument();
   });
