@@ -24,6 +24,7 @@ from ..ai import (
     run_guarded_chat,
     run_research_reconciliation,
 )
+from ..ai.passage import PassageResolutionError, resolve_passage_reference
 from ..ai.rag import GuardrailError, RAGCitation
 from ..ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
 from ..ai.trails import TrailService
@@ -718,6 +719,16 @@ def verse_copilot(
     session: Session = Depends(get_session),
 ):
     trail_service = TrailService(session)
+    osis_value = (payload.osis or "").strip() or None
+    passage_value = (payload.passage or "").strip() or None
+    try:
+        resolved_osis = osis_value or (
+            resolve_passage_reference(passage_value) if passage_value else None
+        )
+    except PassageResolutionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not resolved_osis:
+        raise HTTPException(status_code=422, detail="Provide an OSIS reference or passage.")
     try:
         with trail_service.start_trail(
             workflow="verse_copilot",
@@ -732,7 +743,7 @@ def verse_copilot(
         ) as recorder:
             response = generate_verse_brief(
                 session,
-                osis=payload.osis,
+                osis=resolved_osis,
                 question=payload.question,
                 filters=payload.filters,
                 model_name=payload.model,

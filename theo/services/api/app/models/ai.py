@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Sequence
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ..ai.rag import (
     CollaborationResponse,
@@ -177,11 +177,18 @@ class ProviderSettingsResponse(APIModel):
 
 
 class VerseCopilotRequest(APIModel):
-    osis: str
+    osis: str | None = None
+    passage: str | None = None
     question: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     model: str | None = None
     recorder_metadata: RecorderMetadata | None = None
+
+    @model_validator(mode="after")
+    def _validate_reference(self) -> "VerseCopilotRequest":
+        if not (self.osis or self.passage):
+            raise ValueError("Provide an OSIS reference or passage.")
+        return self
 
 
 class SermonPrepRequest(APIModel):
