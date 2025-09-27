@@ -928,6 +928,7 @@ def generate_multimedia_digest(
     *,
     collection: str | None = None,
     model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> MultimediaDigestResponse:
     filters = HybridSearchFilters(
         collection=collection, source_type="audio" if collection else None
@@ -949,6 +950,27 @@ def generate_multimedia_digest(
             workflow="multimedia_digest",
             result_count=len(results),
         )
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": "highlights",
+                    "osis": None,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
         registry = get_llm_registry(session)
         answer = _guarded_answer(
             session,
@@ -956,12 +978,15 @@ def generate_multimedia_digest(
             results=results,
             registry=registry,
             model_hint=model_name,
+            recorder=recorder,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         highlights = [
             f"{citation.document_title or citation.document_id}: {citation.snippet}"
             for citation in answer.citations
         ]
+        if recorder:
+            recorder.record_citations(answer.citations)
         return MultimediaDigestResponse(
             collection=collection, highlights=highlights, answer=answer
         )
@@ -973,6 +998,7 @@ def generate_devotional_flow(
     osis: str,
     focus: str,
     model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> DevotionalResponse:
     filters = HybridSearchFilters()
     with instrument_workflow(
@@ -994,6 +1020,27 @@ def generate_devotional_flow(
             osis=osis,
             result_count=len(results),
         )
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": focus,
+                    "osis": osis,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
         registry = get_llm_registry(session)
         answer = _guarded_answer(
             session,
@@ -1001,6 +1048,7 @@ def generate_devotional_flow(
             results=results,
             registry=registry,
             model_hint=model_name,
+            recorder=recorder,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1008,6 +1056,8 @@ def generate_devotional_flow(
             workflow="devotional",
             citations=len(answer.citations),
         )
+        if recorder:
+            recorder.record_citations(answer.citations)
         reflection = "\n".join(
             f"Reflect on {citation.osis} ({citation.anchor}): {citation.snippet}"
             for citation in answer.citations[:3]
@@ -1026,6 +1076,7 @@ def run_corpus_curation(
     session: Session,
     *,
     since: datetime | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> CorpusCurationReport:
     with instrument_workflow(
         "corpus_curation",
@@ -1061,6 +1112,14 @@ def run_corpus_curation(
                 f"{document.title or document.id} — {topic_label} ({document.collection or 'general'})"
             )
         set_span_attribute(span, "workflow.summary_count", len(summaries))
+        if recorder:
+            recorder.log_step(
+                tool="corpus_curation",
+                action="summarise_documents",
+                input_payload={"since": since.isoformat()},
+                output_payload=summaries,
+                output_digest=f"{len(summaries)} summaries",
+            )
         return CorpusCurationReport(
             since=since, documents_processed=len(rows), summaries=summaries
         )
@@ -1073,6 +1132,7 @@ def run_research_reconciliation(
     osis: str,
     viewpoints: Sequence[str],
     model_name: str | None = None,
+    recorder: "TrailRecorder | None" = None,
 ) -> CollaborationResponse:
     filters = HybridSearchFilters()
     with instrument_workflow(
@@ -1097,6 +1157,27 @@ def run_research_reconciliation(
             thread=thread,
             result_count=len(results),
         )
+        if recorder:
+            recorder.log_step(
+                tool="hybrid_search",
+                action="retrieve_passages",
+                input_payload={
+                    "query": "; ".join(viewpoints),
+                    "osis": osis,
+                    "filters": filters,
+                },
+                output_payload=[
+                    {
+                        "id": result.id,
+                        "osis": result.osis_ref,
+                        "document_id": result.document_id,
+                        "score": getattr(result, "score", None),
+                        "snippet": result.snippet,
+                    }
+                    for result in results
+                ],
+                output_digest=f"{len(results)} passages",
+            )
         registry = get_llm_registry(session)
         answer = _guarded_answer(
             session,
@@ -1104,6 +1185,7 @@ def run_research_reconciliation(
             results=results,
             registry=registry,
             model_hint=model_name,
+            recorder=recorder,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1111,6 +1193,8 @@ def run_research_reconciliation(
             workflow="research_reconciliation",
             citations=len(answer.citations),
         )
+        if recorder:
+            recorder.record_citations(answer.citations)
         synthesis_lines = [
             f"{citation.osis}: {citation.snippet}" for citation in answer.citations
         ]
