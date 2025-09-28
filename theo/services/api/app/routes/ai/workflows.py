@@ -12,7 +12,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..ai import (
+from ...ai import (
     build_sermon_deliverable,
     build_transcript_deliverable,
     generate_comparative_analysis,
@@ -24,37 +24,15 @@ from ..ai import (
     run_guarded_chat,
     run_research_reconciliation,
 )
-from ..ai.passage import PassageResolutionError, resolve_passage_reference
-from ..ai.rag import GuardrailError, RAGAnswer, RAGCitation
-from ..ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
-from ..ai.trails import TrailService
-from ..analytics.topics import (
-    TopicDigest,
-    generate_topic_digest,
-    load_topic_digest,
-    store_topic_digest,
-    upsert_digest_document,
-)
-from ..analytics.watchlists import (
-    create_watchlist,
-    delete_watchlist,
-    get_watchlist,
-    list_watchlist_events,
-    list_watchlists,
-    run_watchlist,
-    update_watchlist,
-)
-from ..core.database import get_session
-from ..db.models import Document, Passage
-from ..export.formatters import build_document_export
-from ..core.settings_store import load_setting, save_setting
-from ..models.base import Passage as PassageSchema
-from ..models.documents import DocumentDetailResponse
-from ..models.export import (
-    DocumentExportFilters,
-    DocumentExportResponse,
-)
-from ..models.ai import (
+from ...ai.passage import PassageResolutionError, resolve_passage_reference
+from ...ai.rag import GuardrailError, RAGAnswer, RAGCitation
+from ...ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
+from ...ai.trails import TrailService
+from ...core.database import get_session
+from ...core.settings_store import load_setting, save_setting
+from ...db.models import Document, Passage
+from ...export.formatters import build_document_export
+from ...models.ai import (
     AIFeaturesResponse,
     ChatSessionMessage,
     ChatSessionRequest,
@@ -77,11 +55,11 @@ from ..models.ai import (
     VerseCopilotRequest,
     DEFAULT_GUARDRAIL_SETTINGS,
 )
-from ..models.watchlists import (
-    WatchlistCreateRequest,
-    WatchlistResponse,
-    WatchlistRunResponse,
-    WatchlistUpdateRequest,
+from ...models.base import Passage as PassageSchema
+from ...models.documents import DocumentDetailResponse
+from ...models.export import (
+    DocumentExportFilters,
+    DocumentExportResponse,
 )
 
 router = APIRouter()
@@ -984,6 +962,7 @@ def corpus_curation(
         return response
 
 
+<<<<<<< HEAD:theo/services/api/app/routes/ai.py
 @router.get(
     "/digest", response_model=TopicDigest | None, response_model_exclude_none=True
 )
@@ -1098,3 +1077,5 @@ def run_user_watchlist(
         raise HTTPException(status_code=404, detail="Watchlist not found")
     return run_watchlist(session, watchlist, persist=True)
 
+=======
+>>>>>>> e8a1430a2928b514515e7debd602fa092c904fc1:theo/services/api/app/routes/ai/workflows.py
