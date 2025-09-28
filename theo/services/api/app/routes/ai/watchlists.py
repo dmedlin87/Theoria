@@ -17,6 +17,11 @@ from ...models.watchlists import (
 )
 
 
+_WATCHLIST_NOT_FOUND_RESPONSE = {
+    status.HTTP_404_NOT_FOUND: {"description": "Watchlist not found"}
+}
+
+
 router = APIRouter(prefix="/digest/watchlists")
 
 
@@ -39,7 +44,11 @@ def create_user_watchlist(
     return _service(session).create(payload)
 
 
-@router.patch("/{watchlist_id}", response_model=WatchlistResponse)
+@router.patch(
+    "/{watchlist_id}",
+    response_model=WatchlistResponse,
+    responses=_WATCHLIST_NOT_FOUND_RESPONSE,
+)
 def update_user_watchlist(
     watchlist_id: str,
     payload: WatchlistUpdateRequest,
@@ -51,7 +60,12 @@ def update_user_watchlist(
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
 
 
-@router.delete("/{watchlist_id}", response_class=Response, status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{watchlist_id}",
+    response_class=Response,
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=_WATCHLIST_NOT_FOUND_RESPONSE,
+)
 def delete_user_watchlist(
     watchlist_id: str, session: Session = Depends(get_session)
 ) -> Response:
@@ -62,7 +76,11 @@ def delete_user_watchlist(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/{watchlist_id}/events", response_model=list[WatchlistRunResponse])
+@router.get(
+    "/{watchlist_id}/events",
+    response_model=list[WatchlistRunResponse],
+    responses=_WATCHLIST_NOT_FOUND_RESPONSE,
+)
 def list_user_watchlist_events(
     watchlist_id: str,
     since: datetime | None = Query(
@@ -76,7 +94,11 @@ def list_user_watchlist_events(
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
 
 
-@router.get("/{watchlist_id}/preview", response_model=WatchlistRunResponse)
+@router.get(
+    "/{watchlist_id}/preview",
+    response_model=WatchlistRunResponse,
+    responses=_WATCHLIST_NOT_FOUND_RESPONSE,
+)
 def preview_user_watchlist(
     watchlist_id: str, session: Session = Depends(get_session)
 ) -> WatchlistRunResponse:
@@ -86,7 +108,11 @@ def preview_user_watchlist(
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
 
 
-@router.post("/{watchlist_id}/run", response_model=WatchlistRunResponse)
+@router.post(
+    "/{watchlist_id}/run",
+    response_model=WatchlistRunResponse,
+    responses=_WATCHLIST_NOT_FOUND_RESPONSE,
+)
 def run_user_watchlist(
     watchlist_id: str, session: Session = Depends(get_session)
 ) -> WatchlistRunResponse:

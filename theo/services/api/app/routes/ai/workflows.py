@@ -62,6 +62,18 @@ from ...models.export import (
     DocumentExportResponse,
 )
 
+_BAD_REQUEST_RESPONSE = {
+    status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
+}
+_NOT_FOUND_RESPONSE = {
+    status.HTTP_404_NOT_FOUND: {"description": "Resource not found"}
+}
+_BAD_REQUEST_NOT_FOUND_RESPONSES = {
+    **_BAD_REQUEST_RESPONSE,
+    **_NOT_FOUND_RESPONSE,
+}
+
+
 router = APIRouter()
 settings_router = APIRouter(prefix="/settings/ai", tags=["ai-settings"])
 
@@ -254,7 +266,11 @@ def _build_document_detail(
     )
 
 
-@router.post("/citations/export", response_model=CitationExportResponse)
+@router.post(
+    "/citations/export",
+    response_model=CitationExportResponse,
+    responses=_BAD_REQUEST_NOT_FOUND_RESPONSES,
+)
 def export_citations(
     payload: CitationExportRequest, session: Session = Depends(get_session)
 ) -> CitationExportResponse:
@@ -379,7 +395,10 @@ def register_llm_model(
 
 
 @router.patch(
-    "/llm/default", response_model=LLMSettingsResponse, response_model_exclude_none=True
+    "/llm/default",
+    response_model=LLMSettingsResponse,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
 )
 def set_default_llm_model(
     payload: LLMDefaultRequest, session: Session = Depends(get_session)
@@ -393,7 +412,10 @@ def set_default_llm_model(
 
 
 @router.patch(
-    "/llm/{name}", response_model=LLMSettingsResponse, response_model_exclude_none=True
+    "/llm/{name}",
+    response_model=LLMSettingsResponse,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
 )
 def update_llm_model(
     name: str, payload: LLMModelUpdateRequest, session: Session = Depends(get_session)
@@ -437,7 +459,10 @@ def update_llm_model(
 
 
 @router.delete(
-    "/llm/{name}", response_model=LLMSettingsResponse, response_model_exclude_none=True
+    "/llm/{name}",
+    response_model=LLMSettingsResponse,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
 )
 def remove_llm_model(name: str, session: Session = Depends(get_session)) -> LLMSettingsResponse:
     from . import get_llm_registry as _get_llm_registry
@@ -457,7 +482,12 @@ CHAT_PLAN = "\n".join(
 )
 
 
-@router.post("/chat", response_model=ChatSessionResponse, response_model_exclude_none=True)
+@router.post(
+    "/chat",
+    response_model=ChatSessionResponse,
+    response_model_exclude_none=True,
+    responses=_BAD_REQUEST_RESPONSE,
+)
 def chat_turn(
     payload: ChatSessionRequest, session: Session = Depends(get_session)
 ) -> ChatSessionResponse:
@@ -598,6 +628,7 @@ def list_providers(session: Session = Depends(get_session)) -> list[ProviderSett
     "/providers/{provider}",
     response_model=ProviderSettingsResponse,
     response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
 )
 def get_provider_settings(
     provider: str, session: Session = Depends(get_session)
@@ -814,7 +845,10 @@ def sermon_prep_export(
     return Response(content=asset.content, media_type=asset.media_type)
 
 
-@router.post("/transcript/export")
+@router.post(
+    "/transcript/export",
+    responses=_BAD_REQUEST_NOT_FOUND_RESPONSES,
+)
 def transcript_export(
     payload: TranscriptExportRequest,
     session: Session = Depends(get_session),
@@ -832,7 +866,11 @@ def transcript_export(
     return Response(content=asset.content, media_type=asset.media_type)
 
 
-@router.post("/comparative", response_model_exclude_none=True)
+@router.post(
+    "/comparative",
+    response_model_exclude_none=True,
+    responses=_BAD_REQUEST_RESPONSE,
+)
 def comparative_analysis(
     payload: ComparativeAnalysisRequest,
     session: Session = Depends(get_session),
@@ -907,7 +945,11 @@ def devotional_flow(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/collaboration", response_model_exclude_none=True)
+@router.post(
+    "/collaboration",
+    response_model_exclude_none=True,
+    responses=_BAD_REQUEST_RESPONSE,
+)
 def collaboration(
     payload: CollaborationRequest,
     session: Session = Depends(get_session),
@@ -940,7 +982,11 @@ def collaboration(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/curation", response_model_exclude_none=True)
+@router.post(
+    "/curation",
+    response_model_exclude_none=True,
+    responses=_BAD_REQUEST_RESPONSE,
+)
 def corpus_curation(
     payload: CorpusCurationRequest,
     session: Session = Depends(get_session),

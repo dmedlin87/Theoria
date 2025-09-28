@@ -26,6 +26,11 @@ from ..retriever.documents import (
     update_document,
 )
 
+_DOCUMENT_NOT_FOUND_RESPONSE = {
+    status.HTTP_404_NOT_FOUND: {"description": "Document not found"}
+}
+
+
 router = APIRouter()
 
 
@@ -40,7 +45,11 @@ def document_list(
     return list_documents(session, limit=limit, offset=offset)
 
 
-@router.get("/digest", response_model=DocumentDetailResponse)
+@router.get(
+    "/digest",
+    response_model=DocumentDetailResponse,
+    responses=_DOCUMENT_NOT_FOUND_RESPONSE,
+)
 def latest_digest_document(
     session: Session = Depends(get_session),
 ) -> DocumentDetailResponse:
@@ -54,7 +63,11 @@ def latest_digest_document(
         ) from exc
 
 
-@router.get("/{document_id}", response_model=DocumentDetailResponse)
+@router.get(
+    "/{document_id}",
+    response_model=DocumentDetailResponse,
+    responses=_DOCUMENT_NOT_FOUND_RESPONSE,
+)
 def document_detail(
     document_id: str, session: Session = Depends(get_session)
 ) -> DocumentDetailResponse:
@@ -68,7 +81,11 @@ def document_detail(
         ) from exc
 
 
-@router.get("/{document_id}/passages", response_model=DocumentPassagesResponse)
+@router.get(
+    "/{document_id}/passages",
+    response_model=DocumentPassagesResponse,
+    responses=_DOCUMENT_NOT_FOUND_RESPONSE,
+)
 def document_passages(
     document_id: str,
     limit: int = Query(default=20, ge=1, le=200),
@@ -85,7 +102,11 @@ def document_passages(
         ) from exc
 
 
-@router.patch("/{document_id}", response_model=DocumentDetailResponse)
+@router.patch(
+    "/{document_id}",
+    response_model=DocumentDetailResponse,
+    responses=_DOCUMENT_NOT_FOUND_RESPONSE,
+)
 def update_document_metadata(
     document_id: str,
     payload: DocumentUpdateRequest,
@@ -104,6 +125,7 @@ def update_document_metadata(
 @router.get(
     "/{document_id}/annotations",
     response_model=list[DocumentAnnotationResponse],
+    responses=_DOCUMENT_NOT_FOUND_RESPONSE,
 )
 def document_annotations(
     document_id: str,
@@ -123,6 +145,7 @@ def document_annotations(
     "/{document_id}/annotations",
     status_code=status.HTTP_201_CREATED,
     response_model=DocumentAnnotationResponse,
+    responses=_DOCUMENT_NOT_FOUND_RESPONSE,
 )
 def create_document_annotation(
     document_id: str,
@@ -142,6 +165,7 @@ def create_document_annotation(
 @router.delete(
     "/{document_id}/annotations/{annotation_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses=_DOCUMENT_NOT_FOUND_RESPONSE,
 )
 def delete_document_annotation(
     document_id: str,

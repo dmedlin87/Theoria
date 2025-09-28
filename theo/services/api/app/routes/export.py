@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from collections.abc import Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,15 @@ from ..models.export import (
 )
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.export import export_documents, export_search_results
+
+_BAD_REQUEST_RESPONSE = {
+    status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
+}
+_DELIVERABLE_ERROR_RESPONSES = {
+    **_BAD_REQUEST_RESPONSE,
+    status.HTTP_404_NOT_FOUND: {"description": "Deliverable not found"},
+}
+
 
 router = APIRouter()
 
@@ -58,7 +67,11 @@ def _normalise_formats(formats: Sequence[str] | None) -> list[str]:
     return [fmt.lower() for fmt in formats]
 
 
-@router.post("/deliverable", response_model=DeliverableResponse)
+@router.post(
+    "/deliverable",
+    response_model=DeliverableResponse,
+    responses=_DELIVERABLE_ERROR_RESPONSES,
+)
 def export_deliverable(
     payload: DeliverableRequest,
     session: Session = Depends(get_session),
@@ -113,7 +126,7 @@ def export_deliverable(
     )
 
 
-@router.get("/search")
+@router.get("/search", responses=_BAD_REQUEST_RESPONSE)
 def export_search(
     request: Request,
     q: str | None = Query(default=None, description="Keyword query to run."),
@@ -209,7 +222,7 @@ def export_search(
     return Response(content=body_bytes, media_type=media_type, headers=headers)
 
 
-@router.get("/documents")
+@router.get("/documents", responses=_BAD_REQUEST_RESPONSE)
 def export_documents_endpoint(
     request: Request,
     collection: str | None = Query(default=None, description="Collection to export."),
