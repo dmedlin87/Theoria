@@ -7,9 +7,10 @@ from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 
-from typing import Any, NotRequired, TypedDict, cast
+from typing import Any, Callable, NotRequired, TypedDict, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from celery.result import AsyncResult
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -159,7 +160,7 @@ def enqueue_reparse_job(
     session.add(job)
     session.commit()
 
-    delay_callable = process_file.delay
+    delay_callable: Callable[..., AsyncResult] = cast(Any, process_file).delay
     try:
         async_result = delay_callable(document.id, str(source_file), None, job.id)
     except TypeError:
@@ -200,7 +201,9 @@ def enqueue_enrichment_job(
     session.add(job)
     session.commit()
 
-    async_result = enqueue_enrich_task.delay(document.id, job.id)
+    async_result: AsyncResult = cast(Any, enqueue_enrich_task).delay(
+        document.id, job.id
+    )
     task_id = getattr(async_result, "id", None)
     if task_id:
         job.task_id = task_id
@@ -232,7 +235,7 @@ def enqueue_refresh_hnsw_job(
     session.add(job)
     session.commit()
 
-    delay_callable = refresh_hnsw_task.delay
+    delay_callable: Callable[..., AsyncResult] = cast(Any, refresh_hnsw_task).delay
     try:
         async_result = delay_callable(
             job.id,
@@ -276,7 +279,7 @@ def enqueue_summary_job(
     session.add(job)
     session.commit()
 
-    async_result = summary_task.delay(document.id, job.id)
+    async_result: AsyncResult = cast(Any, summary_task).delay(document.id, job.id)
     task_id = getattr(async_result, "id", None)
     if task_id:
         job.task_id = task_id
@@ -321,7 +324,7 @@ def enqueue_topic_digest_job(
     if notify:
         kwargs["notify"] = notify
 
-    async_result = topic_digest_task.delay(**kwargs)
+    async_result: AsyncResult = cast(Any, topic_digest_task).delay(**kwargs)
     task_id = getattr(async_result, "id", None)
     if task_id:
         job.task_id = task_id
