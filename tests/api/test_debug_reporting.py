@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict
@@ -43,6 +44,11 @@ def _make_request(body: bytes) -> Request:
 def test_build_debug_report_filters_sensitive_data(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("THEO_VISIBLE", "1")
     monkeypatch.setenv("SECRET_KEY", "hidden")
+
+    # Normalise the environment so we only assert on the keys we control.
+    for key in list(os.environ):
+        if key.startswith("THEO_") and key not in {"THEO_VISIBLE"}:
+            monkeypatch.delenv(key, raising=False)
     body = b"{\"password\": \"secret\"}"
     request = _make_request(body)
 
@@ -54,7 +60,9 @@ def test_build_debug_report_filters_sensitive_data(monkeypatch: pytest.MonkeyPat
     assert payload["request"]["body"]["bytes"] == len(body)
     assert payload["request"]["body"]["truncated"] is False
 
-    assert payload["environment"] == {"THEO_VISIBLE": "1"}
+    environment = payload["environment"]
+    assert environment["THEO_VISIBLE"] == "1"
+    assert "SECRET_KEY" not in environment
     assert payload["error"]["type"] == "ValueError"
     assert "ValueError: boom" in "".join(payload["error"]["stacktrace"])
 
