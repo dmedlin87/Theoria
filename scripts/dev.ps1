@@ -84,6 +84,21 @@ function Stop-ApiJob {
   Remove-Job $Job -Force -ErrorAction SilentlyContinue | Out-Null
 }
 
+function Resolve-PythonExe {
+  # Prefer venv python if active
+  if ($env:VIRTUAL_ENV) {
+    $venvPy = Join-Path $env:VIRTUAL_ENV 'Scripts/python.exe'
+    if (Test-Path $venvPy) { return $venvPy }
+  }
+  # Windows Python launcher
+  $py = Get-Command py -ErrorAction SilentlyContinue
+  if ($py) { return $py.Source }
+  # Fallback to python on PATH
+  $python = Get-Command python -ErrorAction SilentlyContinue
+  if ($python) { return $python.Source }
+  return $null
+}
+
 # Resolve repo root (directory containing this script's parent)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
@@ -102,8 +117,15 @@ if (-not $env:VIRTUAL_ENV) {
 }
 
 Write-Section 'Starting API'
-$ApiExe = 'uvicorn'
+$PythonExe = Resolve-PythonExe
+if (-not $PythonExe) {
+  Write-Host 'Python interpreter not found. Please install Python 3.11+ and ensure it is on PATH.' -ForegroundColor Red
+  exit 1
+}
+
+$ApiExe = $PythonExe
 $ApiArgs = @(
+  '-m','uvicorn',
   $ApiModule,
   '--reload',
   '--host', $BindHost,

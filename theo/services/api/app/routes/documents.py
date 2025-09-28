@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
@@ -146,7 +147,7 @@ def delete_document_annotation(
     document_id: str,
     annotation_id: str,
     session: Session = Depends(get_session),
-) -> None:
+) -> Response:
     """Delete a document annotation."""
 
     try:
@@ -155,3 +156,4 @@ def delete_document_annotation(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

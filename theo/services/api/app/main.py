@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
+import importlib
 import os
 from typing import Callable, Optional, cast
 
@@ -29,17 +30,17 @@ from .routes import (
     verses,
 )
 from .telemetry import configure_console_tracer
-
 GenerateLatestFn = Callable[[], bytes]
+CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
+generate_latest: Optional[GenerateLatestFn] = None
 
 try:  # pragma: no cover - optional dependency
-    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest as _generate_latest
+    prometheus_client = importlib.import_module("prometheus_client")
 except ImportError:  # pragma: no cover - graceful degradation
-    CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
-    _generate_latest = None
-
-generate_latest: Optional[GenerateLatestFn] = _generate_latest
-
+    pass
+else:
+    CONTENT_TYPE_LATEST = cast(str, prometheus_client.CONTENT_TYPE_LATEST)
+    generate_latest = cast(GenerateLatestFn, prometheus_client.generate_latest)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):

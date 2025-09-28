@@ -5,13 +5,39 @@ import json
 from pathlib import Path
 import sys
 from unittest.mock import MagicMock
+import importlib
+from collections.abc import Iterator
+from typing import Any, TYPE_CHECKING
 
 import pytest
 
 try:
-    from fakeredis import aioredis as fakeredis_aioredis
-except ImportError:  # pragma: no cover - fallback for type-checking environments
+    fakeredis_aioredis = importlib.import_module("fakeredis.aioredis")
+except ModuleNotFoundError:  # pragma: no cover - fallback for type-checking environments
     fakeredis_aioredis = pytest.importorskip("fakeredis.aioredis")
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class FakeRedisType(Protocol):  # pragma: no cover - typing helper only
+        async def keys(self, pattern: str, *args: object) -> list[str]: ...
+
+        async def get(self, key: str) -> str | None: ...
+
+        async def flushdb(self) -> None: ...
+
+        async def delete(self, *keys: str) -> int: ...
+
+        async def dbsize(self) -> int: ...
+
+        async def set(self, key: str, value: str) -> bool | None: ...
+
+        async def aclose(self) -> None: ...
+
+        def close(self) -> None: ...
+else:
+    FakeRedisType = Any
+
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -71,12 +97,13 @@ def _make_result(
     page_no: int | None = 2,
 ) -> HybridSearchResult:
     content = text
+    snippet_value = snippet if snippet is not None else text
     return HybridSearchResult(
         id=result_id,
         document_id=document_id,
         document_title=document_title,
         text=content,
-        snippet=snippet or content,
+        snippet=snippet_value,
         osis_ref=osis_ref,
         rank=rank,
         page_no=page_no,
@@ -85,7 +112,7 @@ def _make_result(
 
 
 @pytest.fixture()
-def fake_cache(monkeypatch: pytest.MonkeyPatch) -> fakeredis_aioredis.FakeRedis:
+def fake_cache(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeRedisType]:
     fake = fakeredis_aioredis.FakeRedis(decode_responses=True)
     monkeypatch.setattr(rag, "_redis_client", fake, raising=False)
     yield fake
@@ -101,7 +128,7 @@ def _make_registry(model: _DummyModel) -> LLMRegistry:
     return LLMRegistry(models={model.name: model}, default_model=model.name)
 
 
-def test_guarded_answer_accepts_valid_completion(fake_cache: fakeredis_aioredis.FakeRedis) -> None:
+def test_guarded_answer_accepts_valid_completion(fake_cache: FakeRedisType) -> None:
     completion = "Grace-focused summary.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
     registry = _make_registry(model)
@@ -129,7 +156,7 @@ def test_guarded_answer_accepts_valid_completion(fake_cache: fakeredis_aioredis.
     assert cached["answer"]["model_output"] == completion
 
 
-def test_guarded_answer_rejects_mismatched_citations(fake_cache: fakeredis_aioredis.FakeRedis) -> None:
+def test_guarded_answer_rejects_mismatched_citations(fake_cache: FakeRedisType) -> None:
     completion = "Incorrect.\n\nSources: [1] Luke.1.1 (page 2)"
     model = _DummyModel(completion)
     registry = _make_registry(model)
@@ -149,7 +176,7 @@ def test_guarded_answer_rejects_mismatched_citations(fake_cache: fakeredis_aiore
 
 
 def test_guarded_answer_requires_osis_reference(
-    fake_cache: fakeredis_aioredis.FakeRedis,
+    fake_cache: FakeRedisType,
 ) -> None:
     completion = "Answer with missing citations.\n\nSources: [1] Unknown"
     model = _DummyModel(completion)
@@ -175,7 +202,7 @@ def test_guarded_answer_requires_osis_reference(
 
 
 def test_guarded_answer_summary_uses_citation_documents(
-    fake_cache: fakeredis_aioredis.FakeRedis,
+    fake_cache: FakeRedisType,
 ) -> None:
     completion = (
         "Layered explanation.\n\n"
@@ -240,7 +267,7 @@ def test_guarded_answer_summary_uses_citation_documents(
 
 
 def test_guarded_answer_profile_mismatch_raises_guardrail_error(
-    fake_cache: fakeredis_aioredis.FakeRedis,
+    fake_cache: FakeRedisType,
 ) -> None:
     completion = "Balanced summary.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
@@ -265,7 +292,7 @@ def test_guarded_answer_profile_mismatch_raises_guardrail_error(
 
 
 def test_guarded_answer_profile_match_includes_profile(
-    fake_cache: fakeredis_aioredis.FakeRedis,
+    fake_cache: FakeRedisType,
 ) -> None:
     completion = "Grace summary.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
@@ -300,7 +327,7 @@ def test_guarded_answer_profile_match_includes_profile(
     }
 
 
-def test_guarded_answer_reuses_cache(fake_cache: fakeredis_aioredis.FakeRedis) -> None:
+def test_guarded_answer_reuses_cache(fake_cache: FakeRedisType) -> None:
     completion = "Stable answer.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
     registry = _make_registry(model)
@@ -333,7 +360,7 @@ def test_guarded_answer_reuses_cache(fake_cache: fakeredis_aioredis.FakeRedis) -
 
 
 def test_guarded_answer_invalidates_stale_cache(
-    fake_cache: fakeredis_aioredis.FakeRedis,
+    fake_cache: FakeRedisType,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     initial_completion = "Stable answer.\n\nSources: [1] John.3.16 (page 2)"

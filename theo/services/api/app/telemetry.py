@@ -84,7 +84,7 @@ def _get_tracer(name: str) -> TracerProtocol:
 
 LOGGER = logging.getLogger("theo.workflow")
 
-if Counter is None:  # pragma: no cover - metrics disabled
+if Counter is None or Histogram is None:  # pragma: no cover - metrics disabled
 
     class _NoopMetric:
         def labels(self, **_: Any) -> "_NoopMetric":
@@ -230,12 +230,20 @@ def configure_console_tracer() -> None:
         )
         return
 
-    TracerProvider = getattr(sdk_trace, "TracerProvider", None)
-    SimpleSpanProcessor = getattr(exporter_module, "SimpleSpanProcessor", None)
-    ConsoleSpanExporter = getattr(exporter_module, "ConsoleSpanExporter", None)
-    if None in {TracerProvider, SimpleSpanProcessor, ConsoleSpanExporter}:
+    TracerProvider: type[Any] | None = getattr(sdk_trace, "TracerProvider", None)
+    SimpleSpanProcessor: type[Any] | None = getattr(exporter_module, "SimpleSpanProcessor", None)
+    ConsoleSpanExporter: type[Any] | None = getattr(exporter_module, "ConsoleSpanExporter", None)
+    if (
+        TracerProvider is None
+        or SimpleSpanProcessor is None
+        or ConsoleSpanExporter is None
+    ):
         LOGGER.warning("opentelemetry-sdk is installed but missing tracing exports")
         return
+
+    assert TracerProvider is not None
+    assert SimpleSpanProcessor is not None
+    assert ConsoleSpanExporter is not None
 
     tracer_provider = TracerProvider()
     tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))

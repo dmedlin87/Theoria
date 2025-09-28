@@ -351,7 +351,9 @@ def send_topic_digest_notification(
         raise
 
 
-send_topic_digest_notification = cast(CeleryTask, send_topic_digest_notification)
+send_topic_digest_notification_task = cast(
+    CeleryTask, send_topic_digest_notification
+)
 
 
 @celery.task(name="tasks.generate_topic_digest")
@@ -401,7 +403,7 @@ def topic_digest(
                     "window_start": window_start.isoformat(),
                     "topics": [cluster.topic for cluster in digest.topics],
                 }
-                send_topic_digest_notification.delay(
+                send_topic_digest_notification_task.delay(
                     digest_document.id, notify, context
                 )
                 logger.info(
@@ -615,7 +617,7 @@ def run_watchlist_alert(watchlist_id: str) -> None:
             raise
 
 
-run_watchlist_alert = cast(CeleryTask, run_watchlist_alert)
+run_watchlist_alert_task = cast(CeleryTask, run_watchlist_alert)
 
 
 @celery.task(name="tasks.schedule_watchlist_alerts")
@@ -627,7 +629,7 @@ def schedule_watchlist_alerts() -> None:
     now = datetime.now(UTC)
     with Session(engine) as session:
         for watchlist in iter_due_watchlists(session, now):
-            run_watchlist_alert.delay(watchlist.id)
+            run_watchlist_alert_task.delay(watchlist.id)
             scheduled += 1
     logger.info(
         "Scheduled watchlist alerts",

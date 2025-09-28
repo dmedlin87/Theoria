@@ -139,8 +139,14 @@ def _refresh_creator_verse_rollups(
         try:
             from ..workers import tasks as worker_tasks
 
-            worker_tasks.refresh_creator_verse_rollups.delay(sorted_refs)
-            return
+            task = getattr(worker_tasks, "refresh_creator_verse_rollups", None)
+            if task:
+                maybe_delay = getattr(task, "delay", None)
+                if callable(maybe_delay):
+                    maybe_delay(sorted_refs)
+                else:
+                    task(sorted_refs)
+                return
         except Exception:
             # Fall back to in-process refresh if the broker is unavailable.
             pass
@@ -1068,12 +1074,9 @@ def _persist_text_document(
                 stance_overrides[key_clean] = value_clean
 
     confidence_default: float | None
+    raw_confidence = frontmatter.get("creator_confidence")
     try:
-        confidence_default = (
-            float(frontmatter.get("creator_confidence"))
-            if frontmatter.get("creator_confidence") is not None
-            else None
-        )
+        confidence_default = float(raw_confidence) if raw_confidence is not None else None
     except (TypeError, ValueError):
         confidence_default = None
 
@@ -1348,13 +1351,13 @@ def _persist_transcript_document(
                 stance_overrides[key_clean] = value_clean
 
     confidence_default: float | None
-    try:
-        confidence_default = (
-            float(frontmatter.get("creator_confidence"))
-            if frontmatter.get("creator_confidence") is not None
-            else None
-        )
-    except (TypeError, ValueError):
+    raw_confidence = frontmatter.get("creator_confidence")
+    if raw_confidence is not None:
+        try:
+            confidence_default = float(raw_confidence)
+        except (TypeError, ValueError):
+            confidence_default = None
+    else:
         confidence_default = None
 
     quote_identifier = (
@@ -1553,7 +1556,11 @@ def run_pipeline_for_url(
 
     if resolved_source_type not in {"web_page", "html", "website"}:
         raise UnsupportedSourceError(
-            f"Unsupported source type for URL ingestion: {resolved_source_type}"
+            (
+                "Unsupported source type for URL ingestion: "
+                f"{resolved_source_type}. Supported types are: "
+                "youtube, web_page, html, website"
+            )
         )
 
     html, metadata = _fetch_web_document(settings, url)

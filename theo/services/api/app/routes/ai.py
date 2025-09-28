@@ -670,7 +670,7 @@ def upsert_provider_settings(
 
 
 @settings_router.delete(
-    "/providers/{provider}", status_code=status.HTTP_204_NO_CONTENT
+    "/providers/{provider}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response
 )
 def delete_provider_settings(
     provider: str, session: Session = Depends(get_session)
@@ -1041,14 +1041,19 @@ def update_user_watchlist(
     return update_watchlist(session, watchlist, payload)
 
 
-@router.delete("/digest/watchlists/{watchlist_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/digest/watchlists/{watchlist_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
 def delete_user_watchlist(
     watchlist_id: str, session: Session = Depends(get_session)
-) -> None:
+) -> Response:
     watchlist = get_watchlist(session, watchlist_id)
     if watchlist is None:
         raise HTTPException(status_code=404, detail="Watchlist not found")
     delete_watchlist(session, watchlist)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
