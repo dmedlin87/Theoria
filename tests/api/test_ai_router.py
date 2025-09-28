@@ -93,3 +93,48 @@ def test_router_latency_threshold_triggers_fallback(monkeypatch):
     assert result.model.name == "fast"
     assert router.get_latency("slow") is not None
     assert router.get_latency("slow") > 1.0
+
+
+def test_router_generation_error_when_ledger_prepopulated():
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[primary]"},
+            pricing={"per_call": 0.2},
+            routing={
+                "spend_ceiling": 1.0,
+                "latency_threshold_ms": 10.0,
+                "weight": 2.0,
+            },
+        ),
+        make_default=True,
+    )
+    registry.add_model(
+        LLMModel(
+            name="secondary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[secondary]"},
+            pricing={"per_call": 0.2},
+            routing={
+                "spend_ceiling": 1.0,
+                "latency_threshold_ms": 10.0,
+                "weight": 1.0,
+            },
+        )
+    )
+    router = LLMRouterService(registry)
+
+    with router._ledger.lock:  # type: ignore[attr-defined]
+        for model in registry.models.values():
+            router._ledger.spend[model.name] = 1.5  # type: ignore[attr-defined]
+            router._ledger.latency[model.name] = 50.0  # type: ignore[attr-defined]
+
+    model = registry.models["primary"]
+    with pytest.raises(GenerationError):
+        router.execute_generation(workflow="chat", model=model, prompt="hello")
+
+    assert router.get_spend("primary") == pytest.approx(1.0)
