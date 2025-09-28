@@ -5,7 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import ConfigDict, Field
+from urllib.parse import urlparse
+
+from pydantic import ConfigDict, Field, field_validator
+
+from ..core.settings import get_settings
 
 from .base import APIModel, Passage
 
@@ -16,9 +20,28 @@ class DocumentIngestResponse(APIModel):
 
 
 class UrlIngestRequest(APIModel):
-    url: str
+    url: str = Field(max_length=2048)
     source_type: str | None = None
     frontmatter: dict[str, Any] | None = None
+
+    @field_validator("url")
+    @classmethod
+    def _validate_url(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError("URL must include a scheme and host")
+
+        settings = get_settings()
+        scheme = parsed.scheme.lower()
+        blocked = {item.lower() for item in settings.ingest_url_blocked_schemes}
+        if scheme in blocked:
+            raise ValueError("URL scheme is not allowed")
+
+        allowed = {item.lower() for item in settings.ingest_url_allowed_schemes}
+        if allowed and scheme not in allowed:
+            raise ValueError("URL scheme is not allowed")
+
+        return value
 
 
 class DocumentSummary(APIModel):

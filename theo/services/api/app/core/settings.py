@@ -166,6 +166,28 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return value
         raise ValueError("Invalid CORS origin configuration")
+
+    @staticmethod
+    def _parse_string_collection(value: object) -> list[str]:
+        if value in (None, ""):
+            return []
+        if isinstance(value, str):
+            return [segment.strip() for segment in value.split(",") if segment.strip()]
+        if isinstance(value, (list, tuple, set)):
+            return [str(item) for item in value]
+        raise ValueError("Invalid list configuration")
+
+    @field_validator(
+        "ingest_url_allowed_schemes",
+        "ingest_url_blocked_schemes",
+        "ingest_url_allowed_hosts",
+        "ingest_url_blocked_hosts",
+        "ingest_url_blocked_ip_networks",
+        mode="before",
+    )
+    @classmethod
+    def _parse_ingest_collections(cls, value: object) -> list[str]:
+        return cls._parse_string_collection(value)
     contradictions_enabled: bool = Field(
         default=True, description="Toggle contradiction search endpoints"
     )
@@ -187,6 +209,44 @@ class Settings(BaseSettings):
     ingest_upload_max_bytes: int = Field(
         default=16 * 1024 * 1024,
         description="Maximum allowed size for synchronous ingest uploads in bytes",
+    )
+    ingest_url_allowed_schemes: list[str] = Field(
+        default_factory=lambda: ["http", "https"],
+        description="Allowed URL schemes for ingestion requests.",
+    )
+    ingest_url_blocked_schemes: list[str] = Field(
+        default_factory=lambda: ["file", "gopher"],
+        description="URL schemes explicitly blocked for ingestion requests.",
+    )
+    ingest_url_allowed_hosts: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional hostname allowlist for URL ingestion. When non-empty only "
+            "listed hosts are permitted."
+        ),
+    )
+    ingest_url_blocked_hosts: list[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "::1"],
+        description="Hostnames blocked from URL ingestion.",
+    )
+    ingest_url_blocked_ip_networks: list[str] = Field(
+        default_factory=lambda: [
+            "127.0.0.0/8",
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "169.254.0.0/16",
+            "::1/128",
+            "fc00::/7",
+            "fe80::/10",
+        ],
+        description="CIDR ranges blocked from URL ingestion.",
+    )
+    ingest_url_block_private_networks: bool = Field(
+        default=True,
+        description=(
+            "Block URLs that resolve to private, loopback, or link-local addresses."
+        ),
     )
 
 

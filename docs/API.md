@@ -61,7 +61,19 @@ Accepts a JSON body matching `UrlIngestRequest`:
 ```
 
 `source_type` and `frontmatter` are optional. The backend fetches the resource
-and processes it with the same pipeline as uploaded files.
+and processes it with the same pipeline as uploaded files. To mitigate SSRF
+risks the service enforces a strict allowlist/denylist:
+
+- Only schemes listed in `ingest_url_allowed_schemes` (default `http`,
+  `https`) are accepted, with `ingest_url_blocked_schemes` taking precedence.
+- Hosts matching `ingest_url_blocked_hosts` or private/RFC1918 networks are
+  rejected unless explicitly included in `ingest_url_allowed_hosts`.
+- Additional CIDR ranges can be blocked via
+  `ingest_url_blocked_ip_networks`, and private networking checks can be
+  disabled with `ingest_url_block_private_networks`.
+
+Requests that violate these rules return **400 Bad Request** (or **422** when
+the scheme is rejected by request validation).
 
 ### `POST /ingest/transcript`
 

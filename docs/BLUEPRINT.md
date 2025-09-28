@@ -273,6 +273,11 @@ Optional frontmatter (JSON). Returns { document_id, status: "queued" }.
 
 POST /ingest/url — JSON { url, source_type? }
 
+URL ingest enforces scheme/host validation to avoid SSRF: only configured
+schemes (default `http`/`https`) are accepted, localhost/RFC1918 hosts are
+blocked, and additional CIDR or hostname rules can be tuned via the
+`ingest_url_*` settings.
+
 If YouTube: fetch metadata + transcript; create time-anchored passages.
 
 If web page: fetch + sanitize → HTML→text.

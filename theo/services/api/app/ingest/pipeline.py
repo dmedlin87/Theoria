@@ -11,7 +11,11 @@ from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+
+from ipaddress import ip_address, ip_network
+
 import socket
+
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -58,6 +62,72 @@ class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
 
 
+
+_URL_SCHEME_ERROR = "URL scheme is not allowed for ingestion"
+_URL_TARGET_ERROR = "URL target is not allowed for ingestion"
+
+
+def _normalise_host(host: str) -> str:
+    return host.strip().lower().rstrip(".")
+
+
+def _parse_blocked_networks(networks: list[str]) -> list[ip_network]:
+    parsed: list[ip_network] = []
+    for cidr in networks:
+        try:
+            parsed.append(ip_network(cidr, strict=False))
+        except ValueError:
+            continue
+    return parsed
+
+
+def _ensure_url_allowed(settings, url: str) -> None:
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        raise UnsupportedSourceError("URL must include a scheme and host")
+
+    scheme = parsed.scheme.lower()
+    blocked_schemes = {item.lower() for item in settings.ingest_url_blocked_schemes}
+    if scheme in blocked_schemes:
+        raise UnsupportedSourceError(_URL_SCHEME_ERROR)
+
+    allowed_schemes = {item.lower() for item in settings.ingest_url_allowed_schemes}
+    if allowed_schemes and scheme not in allowed_schemes:
+        raise UnsupportedSourceError(_URL_SCHEME_ERROR)
+
+    if parsed.username or parsed.password:
+        raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+    host = parsed.hostname
+    if host is None:
+        raise UnsupportedSourceError("URL must include a hostname")
+
+    normalised_host = _normalise_host(host)
+    allowed_hosts = {item.lower() for item in settings.ingest_url_allowed_hosts}
+    blocked_hosts = {item.lower() for item in settings.ingest_url_blocked_hosts}
+    host_is_allowed = normalised_host in allowed_hosts if allowed_hosts else False
+
+    if allowed_hosts and not host_is_allowed:
+        raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+    if normalised_host in blocked_hosts and not host_is_allowed:
+        raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+    try:
+        ip = ip_address(normalised_host)
+    except ValueError:
+        ip = None
+
+    if ip is not None and not host_is_allowed:
+        if settings.ingest_url_block_private_networks and (
+            ip.is_loopback or ip.is_private or ip.is_reserved or ip.is_link_local
+        ):
+            raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+        for network in _parse_blocked_networks(settings.ingest_url_blocked_ip_networks):
+            if ip in network:
+                raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
 def _ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
     """Raise if *sha256* already exists for another document."""
 
@@ -71,6 +141,7 @@ def _ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
     )
     if existing is not None:
         raise UnsupportedSourceError("Document already ingested")
+
 
 
 def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
@@ -891,6 +962,9 @@ class _LoopDetectingRedirectHandler(HTTPRedirectHandler):
 
 
 def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]:
+
+    _ensure_url_allowed(settings, url)
+
     timeout = getattr(settings, "ingest_web_timeout_seconds", 10.0)
     max_bytes = getattr(settings, "ingest_web_max_bytes", None)
     max_redirects = getattr(settings, "ingest_web_max_redirects", 5)
@@ -901,9 +975,21 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
     opener = build_opener(redirect_handler)
     opener.addheaders = [("User-Agent", settings.user_agent)]
 
+
     request = Request(url, headers={"User-Agent": settings.user_agent})
 
     try:
+
+        with urlopen(request) as response:
+            final_url = response.geturl()
+            _ensure_url_allowed(settings, final_url)
+            raw = response.read()
+            encoding = response.headers.get_content_charset() or "utf-8"
+            try:
+                html = raw.decode(encoding, errors="replace")
+            except LookupError:
+                html = raw.decode("utf-8", errors="replace")
+
         response = opener.open(request, timeout=timeout)
     except UnsupportedSourceError:
         raise
@@ -911,6 +997,7 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
         raise UnsupportedSourceError(
             f"Fetching URL timed out after {timeout} seconds"
         ) from exc
+
     except (HTTPError, URLError, TimeoutError, ValueError) as exc:
         raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
 
@@ -1651,10 +1738,20 @@ def run_pipeline_for_url(
         )
         set_span_attribute(span, "ingest.source_type", resolved_source_type)
 
+
+    if resolved_source_type != "youtube":
+        _ensure_url_allowed(settings, url)
+
+    if resolved_source_type == "youtube":
+        video_id = _extract_youtube_video_id(url)
+        metadata = _load_youtube_metadata(settings, video_id)
+        merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+
         if resolved_source_type == "youtube":
             video_id = _extract_youtube_video_id(url)
             metadata = _load_youtube_metadata(settings, video_id)
             merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+
 
             segments, transcript_path = _load_youtube_transcript(settings, video_id)
             parser_result = _prepare_transcript_chunks(segments, settings=settings)
