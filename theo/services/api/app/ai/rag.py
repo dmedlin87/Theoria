@@ -11,7 +11,17 @@ import re
 import textwrap
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Sequence, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Literal,
+    Mapping,
+    Pattern,
+    Sequence,
+    TypeVar,
+)
 from urllib.parse import urlencode
 
 try:  # pragma: no cover - optional dependency guard
@@ -56,6 +66,77 @@ _CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*
 _SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
 _MARKDOWN_ESCAPE_PATTERN = re.compile(r"([\\`*_{}\[\]()#+.!|\-])")
 
+_ADVERSARIAL_REPLACEMENTS: tuple[tuple[Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"\b(?:ignore|disregard|forget)\b[^\n]{0,40}?\b(?:previous|prior|all)\s+instructions?\b",
+            re.IGNORECASE,
+        ),
+        "[filtered-instruction]",
+    ),
+    (
+        re.compile(
+            r"\b(?:override|reset|disable)\b[^\n]{0,40}?\b(?:guardrails?|safety|system)\b",
+            re.IGNORECASE,
+        ),
+        "[filtered-override]",
+    ),
+    (
+        re.compile(r"drop\s+table\b", re.IGNORECASE),
+        "[filtered-sql]",
+    ),
+    (
+        re.compile(r"<\s*/?script\b[^>]*>", re.IGNORECASE),
+        "[filtered-html]",
+    ),
+    (
+        re.compile(r"<\s*/?style\b[^>]*>", re.IGNORECASE),
+        "[filtered-html]",
+    ),
+    (
+        re.compile(r"<!--.*?-->", re.DOTALL),
+        "[filtered-comment]",
+    ),
+    (
+        re.compile(r"```(?:html|javascript|sql)[\s\S]*?```", re.IGNORECASE),
+        "[filtered-code-block]",
+    ),
+)
+
+_DISALLOWED_COMPLETION_PATTERNS: tuple[tuple[Pattern[str], str], ...] = (
+    (
+        re.compile(r"\bselect\b[^\n]+\bfrom\b", re.IGNORECASE),
+        "SQL SELECT pattern",
+    ),
+    (
+        re.compile(
+            r"\b(insert|update|delete|drop|alter|create)\b[^\n]+\btable\b",
+            re.IGNORECASE,
+        ),
+        "SQL modification pattern",
+    ),
+    (
+        re.compile(r"<\s*/?script\b", re.IGNORECASE),
+        "script markup",
+    ),
+    (
+        re.compile(r"password\s*[:=]", re.IGNORECASE),
+        "credential disclosure",
+    ),
+    (
+        re.compile(r"api[-_\s]*key", re.IGNORECASE),
+        "credential disclosure",
+    ),
+    (
+        re.compile(r"access\s*token", re.IGNORECASE),
+        "credential disclosure",
+    ),
+    (
+        re.compile(r"secret\s*(?:key|token)", re.IGNORECASE),
+        "credential disclosure",
+    ),
+)
+
 _redis_client: Any = None
 
 
@@ -82,6 +163,15 @@ def _sanitize_markdown_field(value: Any) -> str:
         return ""
     text = str(value).replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
     return _escape_markdown_html(text)
+
+
+def _scrub_adversarial_language(value: str | None) -> str | None:
+    if not value:
+        return value
+    text = value
+    for pattern, replacement in _ADVERSARIAL_REPLACEMENTS:
+        text = pattern.sub(replacement, text)
+    return text
 
 
 def _sanitize_json_structure(payload: Any) -> Any:
@@ -535,6 +625,16 @@ def _validate_model_completion(
     }
 
 
+def ensure_completion_safe(completion: str | None) -> None:
+    if not completion:
+        return
+    for pattern, reason in _DISALLOWED_COMPLETION_PATTERNS:
+        if pattern.search(completion):
+            raise GuardrailError(
+                f"Model completion failed safety check: {reason}"
+            )
+
+
 def _guarded_answer(
     session: Session,
     *,
@@ -584,18 +684,21 @@ def _guarded_answer(
     if not candidates:
         raise GenerationError("No language models are available for workflow 'rag'")
 
-    context_lines = [
-        f"[{citation.index}] {citation.snippet} (OSIS {citation.osis}, {citation.anchor})"
-        for citation in citations
-    ]
+    context_lines = []
+    for citation in citations:
+        prompt_snippet = _scrub_adversarial_language(citation.snippet) or ""
+        context_lines.append(
+            f"[{citation.index}] {prompt_snippet.strip()} (OSIS {citation.osis}, {citation.anchor})"
+        )
     prompt_parts = [
         "You are Theo Engine's grounded assistant.",
         "Answer the question strictly from the provided passages.",
         "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
         "If the passages do not answer the question, state that explicitly.",
     ]
-    if question:
-        prompt_parts.append(f"Question: {question}")
+    sanitized_question = _scrub_adversarial_language(question)
+    if sanitized_question:
+        prompt_parts.append(f"Question: {sanitized_question}")
     prompt_parts.append("Passages:")
     prompt_parts.extend(context_lines)
     prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
@@ -640,6 +743,7 @@ def _guarded_answer(
                     validation_result = _validate_model_completion(
                         cache_hit_payload.model_output, citations
                     )
+                    ensure_completion_safe(cache_hit_payload.model_output)
                 except GuardrailError as exc:
                     cache_status = "stale"
                     _run_redis_command(lambda client: client.delete(cache_key))
@@ -754,6 +858,7 @@ def _guarded_answer(
                     completion = completion.strip() + f"\n\nSources: {sources_line}"
                 try:
                     validation_result = _validate_model_completion(completion, citations)
+                    ensure_completion_safe(completion)
                 except GuardrailError as exc:
                     span.record_exception(exc)
                     log_workflow_event(
