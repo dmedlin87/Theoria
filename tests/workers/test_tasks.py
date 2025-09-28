@@ -63,6 +63,88 @@ def test_process_url_ingests_fixture_url(tmp_path) -> None:
     assert document.channel == "Theo Channel"
 
 
+def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
+    """URL ingestion jobs transition status and persist the ingested document."""
+
+    db_path = tmp_path / "job.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir(parents=True, exist_ok=True)
+    settings.storage_root = storage_root
+
+    with Session(engine) as session:
+        job = IngestionJob(job_type="url_ingest", status="queued")
+        session.add(job)
+        session.commit()
+        job_id = job.id
+
+    status_transitions: list[str] = []
+    original_update = tasks._update_job_status
+    original_retry = tasks.process_url.retry
+
+    def tracking_update(
+        session: Session,
+        job_id_param: str,
+        *,
+        status: str,
+        error: str | None = None,
+        document_id: str | None = None,
+    ) -> None:
+        if job_id_param == job_id:
+            status_transitions.append(status)
+        original_update(
+            session,
+            job_id_param,
+            status=status,
+            error=error,
+            document_id=document_id,
+        )
+
+    retry_calls: list[tuple[tuple, dict]] = []
+
+    def fail_retry(*args: Any, **kwargs: Any) -> None:  # type: ignore[override]
+        retry_calls.append((args, kwargs))
+        raise AssertionError("process_url.retry should not be called during successful ingestion")
+
+    tasks._update_job_status = tracking_update
+    tasks.process_url.retry = fail_retry
+
+    try:
+        frontmatter = {
+            "title": "Job Status Theo Title",
+            "collection": "Job Collection",
+        }
+        tasks.process_url.run(
+            "doc-job-123",
+            "https://youtu.be/sample_video",
+            frontmatter=frontmatter,
+            job_id=job_id,
+        )
+    finally:
+        tasks._update_job_status = original_update
+        tasks.process_url.retry = original_retry
+        settings.storage_root = original_storage
+
+    with Session(engine) as session:
+        job_record = session.get(IngestionJob, job_id)
+        assert job_record is not None
+        document_id = job_record.document_id
+        document = session.get(Document, document_id) if document_id else None
+
+    assert status_transitions[:1] == ["processing"]
+    assert status_transitions[-1:] == ["completed"]
+    assert job_record.status == "completed"
+    assert job_record.document_id is not None
+    assert document is not None
+    assert document.title == "Job Status Theo Title"
+    assert retry_calls == []
+
+
 def test_enrich_document_populates_metadata(tmp_path) -> None:
     """Metadata enrichment hydrates bibliographic fields from fixtures."""
 
