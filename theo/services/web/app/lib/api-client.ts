@@ -1,6 +1,20 @@
 import { getApiBaseUrl } from "./api";
 import type { components } from "./generated/api";
 
+type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
+
+function normaliseExportResponse(
+  payload: ExportDeliverableResponse,
+): import("../copilot/components/types").ExportPresetResult {
+  return {
+    preset: payload.preset,
+    format: payload.format,
+    filename: payload.filename,
+    mediaType: payload.media_type,
+    content: payload.content,
+  };
+}
+
 function buildErrorMessage(status: number, body: string): string {
   if (body) {
     return body;
@@ -132,27 +146,30 @@ export class TheoApiClient {
     osis?: string | null;
     format: string;
   }): Promise<import("../copilot/components/types").ExportPresetResult> {
-    return this.request("/ai/sermon-prep/export?format=" + encodeURIComponent(payload.format), {
-      method: "POST",
-      body: JSON.stringify({
-        model: payload.model,
-        topic: payload.topic,
-        osis: payload.osis ?? null,
-      }),
-    });
+    return this.request<ExportDeliverableResponse>(
+      "/ai/sermon-prep/export?format=" + encodeURIComponent(payload.format),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          model: payload.model,
+          topic: payload.topic,
+          osis: payload.osis ?? null,
+        }),
+      },
+    ).then(normaliseExportResponse);
   }
 
   runTranscriptExport(payload: {
     documentId: string;
     format: string;
   }): Promise<import("../copilot/components/types").ExportPresetResult> {
-    return this.request("/ai/transcript/export", {
+    return this.request<ExportDeliverableResponse>("/ai/transcript/export", {
       method: "POST",
       body: JSON.stringify({
         document_id: payload.documentId,
         format: payload.format,
       }),
-    });
+    }).then(normaliseExportResponse);
   }
 
   exportCitations(

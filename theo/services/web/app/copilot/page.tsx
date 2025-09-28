@@ -14,7 +14,6 @@ import WorkflowResultPanel from "./components/WorkflowResultPanel";
 import WorkflowSelector from "./components/WorkflowSelector";
 import type {
   CopilotResult,
-  ExportPreset,
   FeatureFlags,
   QuickStartPreset,
   RAGCitation,
@@ -39,44 +38,7 @@ import {
   type SermonFormState,
   type VerseFormState,
 } from "./components/workflow-hooks";
-
-const EXPORT_PRESETS: ExportPreset[] = [
-  {
-    id: "sermon-markdown",
-    label: "Sermon prep (Markdown)",
-    description: "Download a Markdown outline for sermon planning.",
-    type: "sermon",
-    format: "markdown",
-  },
-  {
-    id: "sermon-ndjson",
-    label: "Sermon prep (NDJSON)",
-    description: "Structured NDJSON export of sermon citations.",
-    type: "sermon",
-    format: "ndjson",
-  },
-  {
-    id: "sermon-csv",
-    label: "Sermon prep (CSV)",
-    description: "Spreadsheet-ready CSV export of sermon citations.",
-    type: "sermon",
-    format: "csv",
-  },
-  {
-    id: "transcript-markdown",
-    label: "Transcript (Markdown)",
-    description: "Render a transcript with citations in Markdown.",
-    type: "transcript",
-    format: "markdown",
-  },
-  {
-    id: "transcript-csv",
-    label: "Transcript (CSV)",
-    description: "Generate a CSV bundle of transcript references.",
-    type: "transcript",
-    format: "csv",
-  },
-];
+import { EXPORT_PRESETS } from "./components/export-presets";
 
 const WORKFLOWS: { id: WorkflowId; label: string; description: string }[] = [
   { id: "verse", label: "Verse brief", description: "Ask a grounded question anchored to a verse." },
