@@ -151,6 +151,28 @@ def test_export_citations_reports_missing_document(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+
+def test_export_citations_requires_document_id(client: TestClient) -> None:
+    citation = {
+        "index": 1,
+        "osis": "John.1.1",
+        "anchor": "John 1:1",
+        "passage_id": "passage-1",
+        "document_title": "Sample Document",
+        "snippet": "In the beginning was the Word.",
+    }
+
+    response = client.post(
+        "/ai/citations/export",
+        json={"citations": [{**citation, "document_id": ""}]},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert "document_id" in payload.get("detail", "")
+    assert "manifest" not in payload
+    assert "records" not in payload
+
 @pytest.mark.parametrize(
     "source_type, expected",
     [
