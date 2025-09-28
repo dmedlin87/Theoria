@@ -3220,6 +3220,20 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentIngestResponse"];
                 };
             };
+            /** @description Invalid ingest request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -3256,6 +3270,20 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentIngestResponse"];
                 };
             };
+            /** @description Invalid ingest request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -3291,6 +3319,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DocumentIngestResponse"];
                 };
+            };
+            /** @description Invalid ingest request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -3656,6 +3698,20 @@ export interface operations {
                     "application/json": components["schemas"]["DeliverableResponse"];
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Deliverable not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -3713,6 +3769,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -3763,6 +3826,13 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -3917,6 +3987,13 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentDetailResponse"];
                 };
             };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -3950,6 +4027,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DocumentDetailResponse"];
                 };
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -3989,6 +4073,13 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentDetailResponse"];
                 };
             };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4026,6 +4117,13 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentPassagesResponse"];
                 };
             };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4059,6 +4157,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DocumentAnnotationResponse"][];
                 };
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -4098,6 +4203,13 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentAnnotationResponse"];
                 };
             };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4126,6 +4238,13 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Document not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5117,6 +5236,20 @@ export interface operations {
                     "application/json": components["schemas"]["CitationExportResponse"];
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5221,6 +5354,13 @@ export interface operations {
                     "application/json": components["schemas"]["LLMSettingsResponse"];
                 };
             };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5254,6 +5394,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LLMSettingsResponse"];
                 };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -5293,6 +5440,13 @@ export interface operations {
                     "application/json": components["schemas"]["LLMSettingsResponse"];
                 };
             };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5328,6 +5482,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ChatSessionResponse"];
                 };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -5476,6 +5637,20 @@ export interface operations {
                     "application/json": components["schemas"]["ExportDeliverableResponse"];
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5511,6 +5686,13 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -5620,6 +5802,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5655,6 +5844,13 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -5826,6 +6022,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Watchlist not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5864,6 +6067,13 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistResponse"];
                 };
             };
+            /** @description Watchlist not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5901,6 +6111,13 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistRunResponse"][];
                 };
             };
+            /** @description Watchlist not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5935,6 +6152,13 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistRunResponse"];
                 };
             };
+            /** @description Watchlist not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5968,6 +6192,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WatchlistRunResponse"];
                 };
+            };
+            /** @description Watchlist not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -6034,6 +6265,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ProviderSettingsResponse"];
                 };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

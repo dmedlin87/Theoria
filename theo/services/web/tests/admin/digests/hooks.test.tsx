@@ -98,6 +98,17 @@ describe("admin digest hooks", () => {
     expect(result.current.watchlists).toHaveLength(0);
   });
 
+  it("captures watchlist load errors", async () => {
+    const api = createMockApi();
+    api.listWatchlists.mockRejectedValueOnce(new Error("Watchlist not found"));
+    const { result } = renderHook(() => useWatchlistCrud(api as unknown as TheoApiClient));
+    await act(async () => {
+      await result.current.loadWatchlists("user");
+    });
+    expect(result.current.error).toBe("Watchlist not found");
+    expect(result.current.watchlists).toEqual([]);
+  });
+
   it("paginates watchlists", () => {
     const watchlists = Array.from({ length: 7 }, (_, index) => ({
       id: `${index}`,

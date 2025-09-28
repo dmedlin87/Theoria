@@ -178,6 +178,16 @@ describe("copilot workflow hooks", () => {
     expect(api.runTranscriptExport).toHaveBeenCalledWith({ documentId: "doc-1", format: "csv" });
   });
 
+  it("surfaces export errors for missing transcripts", async () => {
+    const api = createMockApi();
+    api.runTranscriptExport.mockRejectedValueOnce(new Error("Transcript not found"));
+    const { result } = renderHook(() => useExportWorkflow(api as unknown as TheoApiClient));
+    await act(async () => {
+      result.current.setForm({ preset: "transcript-csv", documentId: "missing" });
+    });
+    await expect(result.current.run("gpt")).rejects.toThrow("Transcript not found");
+  });
+
   it("exports citations", async () => {
     const api = createMockApi();
     api.exportCitations.mockResolvedValueOnce({
