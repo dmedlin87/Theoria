@@ -22,18 +22,35 @@ function buildErrorMessage(status: number, body: string): string {
   return `Request failed with status ${status}`;
 }
 
-async function handleResponse<T>(response: Response, parseJson: boolean): Promise<T> {
+async function handleResponse(
+  response: Response,
+  parseJson: false,
+): Promise<void>;
+async function handleResponse<T>(
+  response: Response,
+  parseJson: true,
+): Promise<T>;
+async function handleResponse<T>(
+  response: Response,
+  parseJson: boolean,
+): Promise<T | void>;
+async function handleResponse<T>(
+  response: Response,
+  parseJson: boolean,
+): Promise<T | void> {
   if (!response.ok) {
     const body = await response.text();
     throw new Error(buildErrorMessage(response.status, body));
   }
   if (!parseJson) {
-    return undefined as T;
+    return;
   }
   if (response.status === 204) {
-    return undefined as T;
+    return;
   }
-  return (await response.json()) as T;
+  const data = (await response.json()) as unknown;
+  // The generated OpenAPI types describe the JSON schema for this response.
+  return data as T;
 }
 
 export type RequestOptions = RequestInit & { parseJson?: boolean };
@@ -46,7 +63,12 @@ export class TheoApiClient {
     this.baseUrl = resolved;
   }
 
-  private async request<T>(path: string, init?: RequestOptions): Promise<T> {
+  private async request(path: string, init: RequestOptions & { parseJson: false }): Promise<void>;
+  private async request<T>(
+    path: string,
+    init?: RequestOptions & { parseJson?: true },
+  ): Promise<T>;
+  private async request<T>(path: string, init?: RequestOptions): Promise<T | void> {
     const { parseJson = true, headers, ...rest } = init ?? {};
     const response = await fetch(`${this.baseUrl}${path}`, {
       cache: "no-store",
@@ -56,7 +78,10 @@ export class TheoApiClient {
       },
       ...rest,
     });
-    return handleResponse<T>(response, parseJson);
+    if (parseJson) {
+      return handleResponse<T>(response, true);
+    }
+    return handleResponse(response, false);
   }
 
   fetchFeatures(): Promise<Record<string, boolean>> {
