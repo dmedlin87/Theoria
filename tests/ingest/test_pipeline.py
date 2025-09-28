@@ -138,6 +138,86 @@ def test_run_pipeline_for_url_rejects_disallowed_scheme(monkeypatch) -> None:
 
 
 def test_run_pipeline_for_url_blocks_private_ip_targets(monkeypatch) -> None:
+
+def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
+    """Unsafe source URLs are stripped during file ingestion."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    storage_root = tmp_path / "storage"
+    settings.storage_root = storage_root
+
+    try:
+        markdown = (
+            "---\n"
+            "title: Unsafe Doc\n"
+            "source_url: \"javascript:alert(1)\"\n"
+            "---\n\n"
+            "This document links to a javascript URI."
+        )
+        doc_path = tmp_path / "unsafe.md"
+        doc_path.write_text(markdown, encoding="utf-8")
+
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document_id = document.id
+
+        with Session(engine) as session:
+            stored = session.get(Document, document_id)
+
+        assert stored is not None
+        assert stored.source_url is None
+    finally:
+        settings.storage_root = original_storage
+
+
+def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> None:
+    """Unsafe source URLs are stripped during transcript ingestion."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    storage_root = tmp_path / "storage"
+    settings.storage_root = storage_root
+
+    try:
+        transcript_path = tmp_path / "segments.json"
+        transcript_payload = [{"text": "Hello world", "start": 0.0, "end": 2.5}]
+        transcript_path.write_text(json.dumps(transcript_payload), encoding="utf-8")
+
+        frontmatter = {"title": "Unsafe Transcript", "source_url": "javascript:alert(1)"}
+
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_transcript(
+                session,
+                transcript_path,
+                frontmatter=frontmatter,
+            )
+            document_id = document.id
+
+        with Session(engine) as session:
+            stored = session.get(Document, document_id)
+
+        assert stored is not None
+        assert stored.source_url is None
+    finally:
+        settings.storage_root = original_storage
+
+
+@pytest.mark.parametrize(
+    "blocked_url",
+    [
+        "http://localhost/resource",
+        "http://10.0.0.12/secret",
+    ],
+)
+def test_run_pipeline_for_url_blocks_private_targets(monkeypatch, blocked_url) -> None:
+
     def unexpected_fetch(*args, **kwargs):  # noqa: ANN001
         raise AssertionError("Blocked URLs should not be fetched")
 
