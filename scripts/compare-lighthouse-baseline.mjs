@@ -23,6 +23,7 @@ const toEntries = (manifest) => {
   if (!manifest) return [];
   if (Array.isArray(manifest)) return manifest;
   if (Array.isArray(manifest.results)) return manifest.results;
+  if (Array.isArray(manifest.runs)) return manifest.runs;
   if (Array.isArray(manifest.runWarnings)) {
     return manifest.runWarnings;
   }
