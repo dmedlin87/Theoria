@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures/error-guard";
+import type { APIRequestContext, Page } from "@playwright/test";
 import crypto from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
