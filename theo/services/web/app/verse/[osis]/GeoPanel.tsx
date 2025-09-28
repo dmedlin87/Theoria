@@ -13,10 +13,25 @@ type GeoPlaceItem = {
   lat?: number | null;
   lng?: number | null;
   aliases?: string[] | null;
+  confidence?: number | null;
+  sources?: {
+    dataset?: string | null;
+    license?: string | null;
+  } | null;
 };
 
 type GeoSearchResponse = {
-  items: GeoPlaceItem[];
+  items?: GeoPlaceItem[];
+  // Support legacy responses returned before the GET migration landed on the API.
+  results?: Array<
+    GeoPlaceItem & {
+      osis?: string | null;
+      coordinates?: {
+        lat?: number | null;
+        lng?: number | null;
+      } | null;
+    }
+  >;
 };
 
 interface GeoPanelProps {
@@ -64,7 +79,28 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
         throw new Error((await response.text()) || response.statusText);
       }
       const payload = (await response.json()) as GeoSearchResponse;
-      setResults(Array.isArray(payload.items) ? payload.items : []);
+      const items: GeoPlaceItem[] = Array.isArray(payload.items)
+        ? payload.items
+        : Array.isArray(payload.results)
+          ? payload.results.map((item) => {
+              const lat = item.lat ?? item.coordinates?.lat ?? null;
+              const lng = item.lng ?? item.coordinates?.lng ?? null;
+
+              const normalized: GeoPlaceItem = {
+                slug: item.slug ?? item.osis ?? null,
+                name: item.name ?? item.osis ?? null,
+                aliases: Array.isArray(item.aliases) ? item.aliases : null,
+                confidence: item.confidence ?? null,
+                sources: item.sources ?? null,
+                lat: typeof lat === "number" ? lat : null,
+                lng: typeof lng === "number" ? lng : null,
+              };
+
+              return normalized;
+            })
+          : [];
+
+      setResults(items);
     } catch (requestError) {
       console.error("Failed to run geo search", requestError);
       setError(requestError instanceof Error ? requestError.message : "Unknown error");

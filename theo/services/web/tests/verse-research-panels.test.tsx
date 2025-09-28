@@ -200,6 +200,32 @@ describe("GeoPanel", () => {
     });
   });
 
+  it("normalizes legacy payloads", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            name: "Hebron",
+            coordinates: { lat: 31.53, lng: 35.09 },
+            aliases: ["Kiriath-arba"],
+          },
+        ],
+      }),
+      text: async () => "",
+    });
+
+    render(<GeoPanel osis="Gen.23.2" features={{ research: true, geo: true }} />);
+
+    fireEvent.change(screen.getByLabelText(/Search locations/i), { target: { value: "Hebron" } });
+    fireEvent.click(screen.getByRole("button", { name: /search/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Hebron")).toBeInTheDocument();
+      expect(screen.getByText(/Coordinates:/i)).toHaveTextContent("31.53, 35.09");
+    });
+  });
+
   it("renders error state when search fails", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: false,
