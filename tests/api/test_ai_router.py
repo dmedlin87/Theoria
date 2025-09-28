@@ -91,8 +91,9 @@ def test_router_latency_threshold_triggers_fallback(monkeypatch):
 
     result = _run_generation(router)
     assert result.model.name == "fast"
-    assert router.get_latency("slow") is not None
-    assert router.get_latency("slow") > 1.0
+    slow_latency = router.get_latency("slow")
+    assert slow_latency is not None
+    assert slow_latency > 1.0
 
 
 def test_router_generation_error_when_ledger_prepopulated():
@@ -139,11 +140,27 @@ def test_router_generation_error_when_ledger_prepopulated():
         router.execute_generation(workflow="chat", model=model, prompt="hello")
 
     assert router.get_spend("primary") == pytest.approx(1.0)
+
+
+def test_router_prefers_model_hint_and_falls_back(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
             name="heavy",
             provider="echo",
             model="echo",
             config={"suffix": "[heavy]"},
             routing={"weight": 5.0},
+        ),
+        make_default=True,
+    )
+    registry.add_model(
+        LLMModel(
+            name="hinted",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[hinted]"},
+            routing={"weight": 1.0},
         )
     )
 
