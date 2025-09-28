@@ -20,7 +20,7 @@ describe("TheoApiClient error handling", () => {
         value: originalFetch,
       });
     } else {
-      delete (globalThis as { fetch?: unknown }).fetch;
+      Reflect.deleteProperty(globalThis, "fetch");
     }
     jest.restoreAllMocks();
   });
