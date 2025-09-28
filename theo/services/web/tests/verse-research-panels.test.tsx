@@ -163,16 +163,18 @@ describe("GeoPanel", () => {
 
   it("renders search results", async () => {
 
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        items: [
-          {
-            name: "Jerusalem",
-            lat: 31.78,
-            lng: 35.21,
-            aliases: ["Jebus"],
-          },
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              name: "Jerusalem",
+              lat: 31.78,
+              lng: 35.21,
+              aliases: ["Jebus"],
+            },
+          ],
         }),
         text: async () => "",
       })

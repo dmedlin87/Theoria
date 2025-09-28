@@ -71,7 +71,7 @@ async def _stream_upload_to_path(
             written += len(chunk)
             if max_bytes is not None and written > max_bytes:
                 raise HTTPException(
-                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                     detail="Upload exceeds maximum allowed size",
                 )
             handle.write(chunk)
@@ -181,3 +181,4 @@ async def ingest_transcript(
             pass
 
     return DocumentIngestResponse(document_id=document.id, status="processed")
+

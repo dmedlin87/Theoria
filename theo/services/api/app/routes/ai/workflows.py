@@ -26,7 +26,7 @@ from ...ai import (
 )
 from ...ai.passage import PassageResolutionError, resolve_passage_reference
 from ...ai.rag import GuardrailError, RAGAnswer, RAGCitation
-from ...ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
+from ...ai.registry import LLMModel, LLMRegistry, save_llm_registry
 from ...ai.trails import TrailService
 from ...core.database import get_session
 from ...core.settings_store import load_setting, save_setting
@@ -354,7 +354,8 @@ def export_citations(
 
 @router.get("/llm", response_model=LLMSettingsResponse)
 def list_llm_models(session: Session = Depends(get_session)) -> LLMSettingsResponse:
-    registry = get_llm_registry(session)
+    from . import get_llm_registry as _get_llm_registry
+    registry = _get_llm_registry(session)
     return LLMSettingsResponse(**registry.to_response())
 
 
@@ -362,7 +363,8 @@ def list_llm_models(session: Session = Depends(get_session)) -> LLMSettingsRespo
 def register_llm_model(
     payload: LLMModelRequest, session: Session = Depends(get_session)
 ) -> LLMSettingsResponse:
-    registry = get_llm_registry(session)
+    from . import get_llm_registry as _get_llm_registry
+    registry = _get_llm_registry(session)
     model = LLMModel(
         name=payload.name,
         provider=payload.provider,
@@ -382,7 +384,8 @@ def register_llm_model(
 def set_default_llm_model(
     payload: LLMDefaultRequest, session: Session = Depends(get_session)
 ) -> LLMSettingsResponse:
-    registry = get_llm_registry(session)
+    from . import get_llm_registry as _get_llm_registry
+    registry = _get_llm_registry(session)
     if payload.name not in registry.models:
         raise HTTPException(status_code=404, detail="Unknown model")
     registry.default_model = payload.name
@@ -395,7 +398,8 @@ def set_default_llm_model(
 def update_llm_model(
     name: str, payload: LLMModelUpdateRequest, session: Session = Depends(get_session)
 ) -> LLMSettingsResponse:
-    registry = get_llm_registry(session)
+    from . import get_llm_registry as _get_llm_registry
+    registry = _get_llm_registry(session)
     if name not in registry.models:
         raise HTTPException(status_code=404, detail="Unknown model")
     model = registry.models[name]
@@ -436,7 +440,8 @@ def update_llm_model(
     "/llm/{name}", response_model=LLMSettingsResponse, response_model_exclude_none=True
 )
 def remove_llm_model(name: str, session: Session = Depends(get_session)) -> LLMSettingsResponse:
-    registry = get_llm_registry(session)
+    from . import get_llm_registry as _get_llm_registry
+    registry = _get_llm_registry(session)
     if name not in registry.models:
         raise HTTPException(status_code=404, detail="Unknown model")
     registry.remove_model(name)

@@ -136,6 +136,7 @@ def test_ingest_file_rejects_upload_exceeding_limit(
         files={"file": ("huge.bin", payload, "application/octet-stream")},
     )
 
-    assert response.status_code == status.HTTP_413_CONTENT_TOO_LARGE
+    assert response.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
     assert called is False
+
 

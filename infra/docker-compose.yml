@@ -1,32 +1,66 @@
 version: "3.9"
+
 services:
   db:
     image: postgres:15
     environment:
       POSTGRES_DB: theo
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - db:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
-    build: ../services/api
+    build:
+      context: ..
+      dockerfile: theo/services/api/Dockerfile
     env_file: ../.env
+    environment:
+      storage_root: /data/storage
+      database_url: postgresql+psycopg://postgres:postgres@db:5432/theo
+      redis_url: redis://redis:6379/0
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
+    volumes:
+      - storage:/data/storage
+
   web:
-    build: ../services/web
+    build:
+      context: ..
+      dockerfile: theo/services/web/Dockerfile
     env_file: ../.env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api:8000
+      API_BASE_URL: http://api:8000
     depends_on:
-      - api
+      api:
+        condition: service_started
     ports:
       - "3000:3000"
+
 volumes:
   db: {}
+  storage: {}

@@ -6,13 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from ..analytics.topics import (
-    TopicDigest,
-    generate_topic_digest,
-    load_topic_digest,
-    store_topic_digest,
-    upsert_digest_document,
-)
+from ..analytics.topics import TopicDigest, load_topic_digest
 
 
 class DigestService:
@@ -26,17 +20,21 @@ class DigestService:
 
         digest = load_topic_digest(self._session)
         if digest is None:
-            digest = generate_topic_digest(self._session)
-            upsert_digest_document(self._session, digest)
-            store_topic_digest(self._session, digest)
+            from ..routes import ai as ai_module
+
+            digest = ai_module.generate_topic_digest(self._session)
+            ai_module.upsert_digest_document(self._session, digest)
+            ai_module.store_topic_digest(self._session, digest)
         return digest
 
     def refresh(self, hours: int) -> TopicDigest:
         """Force regeneration of the digest for the supplied lookback window."""
 
         since = datetime.now(UTC) - timedelta(hours=hours)
-        digest = generate_topic_digest(self._session, since)
-        upsert_digest_document(self._session, digest)
-        store_topic_digest(self._session, digest)
+        from ..routes import ai as ai_module
+
+        digest = ai_module.generate_topic_digest(self._session, since)
+        ai_module.upsert_digest_document(self._session, digest)
+        ai_module.store_topic_digest(self._session, digest)
         return digest
 

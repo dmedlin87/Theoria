@@ -7,8 +7,8 @@ import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
 import type { ResearchFeatureFlags } from "./research-panels";
 
-type GeoSearchItem = {
-  modern_id: string;
+type GeoPlaceItem = {
+  modern_id?: string | null;
   slug?: string | null;
   name: string;
   lat?: number | null;
@@ -16,7 +16,6 @@ type GeoSearchItem = {
   geom_kind?: string | null;
   confidence?: number | null;
   aliases?: string[] | null;
-  confidence?: number | null;
   sources?: {
     dataset?: string | null;
     license?: string | null;
@@ -24,7 +23,6 @@ type GeoSearchItem = {
 };
 
 type GeoSearchResponse = {
-
   items?: GeoPlaceItem[];
   // Support legacy responses returned before the GET migration landed on the API.
   results?: Array<
@@ -36,8 +34,6 @@ type GeoSearchResponse = {
       } | null;
     }
   >;
- 
-  items: GeoSearchItem[];
 };
 
 type GeoLocationDetail = {
@@ -82,7 +78,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<GeoSearchItem[]>([]);
+  const [results, setResults] = useState<GeoPlaceItem[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [verseData, setVerseData] = useState<GeoVerseResponse | null>(null);
   const [verseLoading, setVerseLoading] = useState(true);
@@ -357,3 +353,4 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
     </section>
   );
 }
+

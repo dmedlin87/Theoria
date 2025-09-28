@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ...ai.watchlists_service import WatchlistNotFoundError, WatchlistsService
@@ -51,14 +51,15 @@ def update_user_watchlist(
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
 
 
-@router.delete("/{watchlist_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{watchlist_id}", response_class=Response, status_code=status.HTTP_204_NO_CONTENT)
 def delete_user_watchlist(
     watchlist_id: str, session: Session = Depends(get_session)
-) -> None:
+) -> Response:
     try:
         _service(session).delete(watchlist_id)
     except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{watchlist_id}/events", response_model=list[WatchlistRunResponse])
