@@ -7,6 +7,8 @@ import math
 import threading
 from typing import Protocol, Sequence
 
+from opentelemetry import trace
+
 try:  # pragma: no cover - heavy dependency may be unavailable in tests
     from FlagEmbedding import FlagModel as _RuntimeFlagModel  # type: ignore
 except Exception:  # pragma: no cover - optional dependency
@@ -20,6 +22,9 @@ class _EmbeddingBackend(Protocol):
         ...
 
 from ..core.settings import get_settings
+
+
+_TRACER = trace.get_tracer("theo.embedding")
 
 
 def _normalise(vector: Sequence[float]) -> list[float]:
@@ -95,9 +100,16 @@ class EmbeddingService:
         batched: list[list[float]] = []
         if not texts:
             return batched
-        for start in range(0, len(texts), batch_size):
+        for batch_index, start in enumerate(range(0, len(texts), batch_size)):
             batch = texts[start : start + batch_size]
-            batched.extend(self._encode(batch))
+            with _TRACER.start_as_current_span("embedding.batch") as span:
+                span.set_attribute("embedding.model_name", self.model_name)
+                span.set_attribute("embedding.batch_index", batch_index)
+                span.set_attribute("embedding.batch_size", len(batch))
+                span.set_attribute("embedding.vector_dimensions", self.dimension)
+                vectors = self._encode(batch)
+                span.set_attribute("embedding.output_count", len(vectors))
+            batched.extend(vectors)
         return batched
 
 

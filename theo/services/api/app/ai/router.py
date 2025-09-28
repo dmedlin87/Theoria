@@ -8,6 +8,7 @@ import threading
 import time
 from typing import Any, Iterator
 
+from opentelemetry import trace
 from sqlalchemy.orm import Session
 
 from .clients import GenerationError
@@ -36,6 +37,9 @@ class _RoutingLedger:
 
 
 _LEDGER = _RoutingLedger.create()
+
+
+_TRACER = trace.get_tracer("theo.router")
 
 
 class LLMRouterService:
@@ -87,48 +91,85 @@ class LLMRouterService:
     ) -> RoutedGeneration:
         """Generate content using ``model`` if it meets routing constraints."""
 
-        config = self._workflow_config(model, workflow)
-        ceiling = self._as_float(config.get("spend_ceiling"))
-        estimated_cost = self._estimate_cost(model, prompt, None)
+        prompt_tokens = max(len(prompt) // 4, 0)
+        with _TRACER.start_as_current_span("router.execute_generation") as span:
+            span.set_attribute("llm.workflow", workflow)
+            span.set_attribute("llm.model_name", model.name)
+            span.set_attribute("llm.model_id", model.model)
+            span.set_attribute("llm.temperature", temperature)
+            span.set_attribute("llm.max_output_tokens", max_output_tokens)
+            span.set_attribute("llm.prompt_tokens", prompt_tokens)
 
-        with self._ledger.lock:
-            spent = self._ledger.spend[model.name]
-            if ceiling is not None and spent + estimated_cost > ceiling:
-                self._ledger.spend[model.name] = ceiling
-                raise GenerationError(
-                    f"Budget exhausted for model {model.name} (spent {spent:.2f} >= {ceiling:.2f})"
+            config = self._workflow_config(model, workflow)
+            ceiling = self._as_float(config.get("spend_ceiling"))
+            estimated_cost = self._estimate_cost(model, prompt, None)
+            span.set_attribute("llm.estimated_cost", estimated_cost)
+            if ceiling is not None:
+                span.set_attribute("llm.budget_ceiling", ceiling)
+
+            with self._ledger.lock:
+                spent = self._ledger.spend[model.name]
+                span.set_attribute("llm.spent_before_call", spent)
+                if ceiling is not None and spent + estimated_cost > ceiling:
+                    self._ledger.spend[model.name] = ceiling
+                    error = GenerationError(
+                        "Budget exhausted for model "
+                        f"{model.name} (spent {spent:.2f} >= {ceiling:.2f})"
+                    )
+                    span.set_attribute("llm.budget_status", "precheck_blocked")
+                    span.record_exception(error)
+                    raise error
+
+            client = model.build_client()
+            start = time.perf_counter()
+            try:
+                output = client.generate(
+                    prompt=prompt,
+                    model=model.model,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
                 )
+            except Exception as exc:  # pragma: no cover - propagate client errors
+                span.record_exception(exc)
+                raise
 
-        client = model.build_client()
-        start = time.perf_counter()
-        output = client.generate(
-            prompt=prompt,
-            model=model.model,
-            temperature=temperature,
-            max_output_tokens=max_output_tokens,
-        )
-        latency_ms = (time.perf_counter() - start) * 1000.0
+            latency_ms = (time.perf_counter() - start) * 1000.0
+            with self._ledger.lock:
+                self._ledger.latency[model.name] = latency_ms
+            latency_threshold = self._as_float(config.get("latency_threshold_ms"))
+            if latency_threshold is not None and latency_ms > latency_threshold:
+                error = GenerationError(
+                    "Latency threshold exceeded for model "
+                    f"{model.name}: {latency_ms:.1f}ms > {latency_threshold:.1f}ms"
+                )
+                span.set_attribute("llm.latency_threshold", latency_threshold)
+                span.set_attribute("llm.latency_ms", round(latency_ms, 2))
+                span.record_exception(error)
+                raise error
 
-        with self._ledger.lock:
-            self._ledger.latency[model.name] = latency_ms
-        latency_threshold = self._as_float(config.get("latency_threshold_ms"))
-        if latency_threshold is not None and latency_ms > latency_threshold:
-            raise GenerationError(
-                "Latency threshold exceeded for model "
-                f"{model.name}: {latency_ms:.1f}ms > {latency_threshold:.1f}ms"
+            completion_tokens = max(len(output) // 4, 0) if isinstance(output, str) else 0
+            cost = self._estimate_cost(model, prompt, output)
+            with self._ledger.lock:
+                spent = self._ledger.spend[model.name]
+                if ceiling is not None and spent + cost > ceiling:
+                    self._ledger.spend[model.name] = ceiling
+                    error = GenerationError(
+                        "Budget exhausted for model "
+                        f"{model.name} (spent {spent + cost:.2f} > {ceiling:.2f})"
+                    )
+                    span.set_attribute("llm.budget_status", "postcheck_blocked")
+                    span.record_exception(error)
+                    raise error
+                self._ledger.spend[model.name] = spent + cost
+
+            span.set_attribute("llm.latency_ms", round(latency_ms, 2))
+            span.set_attribute("llm.completion_tokens", completion_tokens)
+            span.set_attribute("llm.cost", cost)
+            span.set_attribute("llm.budget_status", "accepted")
+
+            return RoutedGeneration(
+                model=model, output=output, latency_ms=latency_ms, cost=cost
             )
-
-        cost = self._estimate_cost(model, prompt, output)
-        with self._ledger.lock:
-            spent = self._ledger.spend[model.name]
-            if ceiling is not None and spent + cost > ceiling:
-                self._ledger.spend[model.name] = ceiling
-                raise GenerationError(
-                    f"Budget exhausted for model {model.name} (spent {spent + cost:.2f} > {ceiling:.2f})"
-                )
-            self._ledger.spend[model.name] = spent + cost
-
-        return RoutedGeneration(model=model, output=output, latency_ms=latency_ms, cost=cost)
 
     # ------------------------------------------------------------------
     # Introspection utilities
