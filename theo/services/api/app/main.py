@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
+import logging
 import os
 from typing import Callable, Optional, cast
 
@@ -12,6 +13,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from .core.database import Base, get_engine
+from .core.settings import get_settings
 from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware
 from .routes import (
@@ -31,6 +33,8 @@ from .routes import (
 from .telemetry import configure_console_tracer
 
 GenerateLatestFn = Callable[[], bytes]
+
+logger = logging.getLogger(__name__)
 
 try:  # pragma: no cover - optional dependency
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest as _generate_latest
@@ -53,6 +57,7 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     """Create FastAPI application instance."""
 
+    _enforce_secret_requirements()
     app = FastAPI(title="Theo Engine API", version="0.2.0", lifespan=lifespan)
     if os.getenv("THEO_ENABLE_CONSOLE_TRACES", "0").lower() in {"1", "true", "yes"}:
         configure_console_tracer()
@@ -84,6 +89,25 @@ def create_app() -> FastAPI:
             return PlainTextResponse(payload, media_type=CONTENT_TYPE_LATEST)
 
     return app
+
+
+def _enforce_secret_requirements() -> None:
+    settings = get_settings()
+    if settings.settings_secret_key:
+        return
+    if not _secret_features_enabled():
+        return
+    message = (
+        "SETTINGS_SECRET_KEY must be configured to use the AI registry and provider "
+        "settings APIs. Set the environment variable and restart the service."
+    )
+    logger.error(message)
+    raise RuntimeError(message)
+
+
+def _secret_features_enabled() -> bool:
+    toggle = os.getenv("THEO_DISABLE_AI_SETTINGS", "0").lower()
+    return toggle not in {"1", "true", "yes"}
 
 
 app = create_app()
