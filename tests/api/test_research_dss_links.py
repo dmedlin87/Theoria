@@ -32,3 +32,13 @@ def test_dss_links_endpoint_handles_ranges() -> None:
         assert payload["total"] >= 1
         osis_values = {link["osis"] for link in payload["links"]}
         assert "Luke.2.2" in osis_values
+
+
+def test_dss_links_endpoint_handles_missing_osis() -> None:
+    with TestClient(app) as client:
+        response = client.get("/research/dss-links", params={"osis": "Nonexistent.1.1"})
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["osis"] == "Nonexistent.1.1"
+        assert payload["total"] == 0
+        assert payload["links"] == []
