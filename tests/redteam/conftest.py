@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 @pytest.fixture(scope="session", autouse=True)
 def configure_redteam_environment(
     tmp_path_factory: pytest.TempPathFactory,
-) -> None:
+) -> Generator[None, None, None]:
     """Provision a temporary database/storage layout for the suite."""
 
     db_path = tmp_path_factory.mktemp("redteam-db") / "test.db"
@@ -32,7 +33,7 @@ def configure_redteam_environment(
 
     settings_module.get_settings.cache_clear()
     settings = settings_module.get_settings()
-    settings_module.settings = settings
+    setattr(settings_module, "settings", settings)
 
     engine = configure_engine(settings.database_url)
     Base.metadata.drop_all(bind=engine)
