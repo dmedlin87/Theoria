@@ -188,6 +188,36 @@ def test_enrich_document_populates_metadata(tmp_path) -> None:
     assert enriched.bib_json.get("primary_topic") == "Theology"
 
 
+def test_enrich_document_missing_document_marks_job_failed(tmp_path, caplog) -> None:
+    """When a document is missing the enrichment job is marked failed."""
+
+    db_path = tmp_path / "missing_enrich.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        job = IngestionJob(job_type="enrich", status="queued")
+        session.add(job)
+        session.commit()
+        job_id = job.id
+
+    caplog.set_level("WARNING", logger="theo.services.api.app.workers.tasks")
+
+    tasks.enrich_document.run(document_id="missing", job_id=job_id)
+
+    with Session(engine) as session:
+        updated_job = session.get(IngestionJob, job_id)
+
+    assert updated_job is not None
+    assert updated_job.status == "failed"
+    assert updated_job.error == "document not found"
+    assert any(
+        "Document not found for enrichment" in record.getMessage()
+        for record in caplog.records
+    )
+
+
 def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
     db_path = tmp_path / "topic.db"
     configure_engine(f"sqlite:///{db_path}")
