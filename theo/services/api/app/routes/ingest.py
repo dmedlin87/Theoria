@@ -21,6 +21,12 @@ from ..ingest.pipeline import (
 )
 from ..models.documents import DocumentIngestResponse, UrlIngestRequest
 
+_INGEST_ERROR_RESPONSES = {
+    status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
+    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE: {"description": "Upload too large"},
+}
+
+
 router = APIRouter()
 
 
@@ -78,7 +84,11 @@ async def _stream_upload_to_path(
     return written
 
 
-@router.post("/file", response_model=DocumentIngestResponse)
+@router.post(
+    "/file",
+    response_model=DocumentIngestResponse,
+    responses=_INGEST_ERROR_RESPONSES,
+)
 async def ingest_file(
     file: UploadFile = File(...),
     frontmatter: str | None = Form(default=None),
@@ -112,7 +122,11 @@ async def ingest_file(
     return DocumentIngestResponse(document_id=document.id, status="processed")
 
 
-@router.post("/url", response_model=DocumentIngestResponse)
+@router.post(
+    "/url",
+    response_model=DocumentIngestResponse,
+    responses=_INGEST_ERROR_RESPONSES,
+)
 async def ingest_url(
     payload: UrlIngestRequest,
     session: Session = Depends(get_session),
@@ -132,7 +146,11 @@ async def ingest_url(
     return DocumentIngestResponse(document_id=document.id, status="processed")
 
 
-@router.post("/transcript", response_model=DocumentIngestResponse)
+@router.post(
+    "/transcript",
+    response_model=DocumentIngestResponse,
+    responses=_INGEST_ERROR_RESPONSES,
+)
 async def ingest_transcript(
     transcript: UploadFile = File(...),
     audio: UploadFile | None = File(default=None),
