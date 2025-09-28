@@ -1,22 +1,12 @@
+import type { components } from "../../lib/generated/api";
+
 export type FeatureFlags = {
   ai_copilot?: boolean;
 };
 
-export type RAGCitation = {
-  index: number;
-  osis: string;
-  anchor: string;
-  snippet: string;
-  document_id: string;
-  document_title?: string | null;
-  passage_id?: string;
-  source_url?: string | null;
-};
+export type RAGCitation = components["schemas"]["RAGCitation"];
 
-export type RAGAnswer = {
-  summary: string;
-  citations: RAGCitation[];
-};
+export type RAGAnswer = components["schemas"]["RAGAnswer"];
 
 export type VerseResponse = {
   osis: string;
@@ -90,24 +80,9 @@ export type ExportPresetResult = {
   content: string;
 };
 
-export type ExportManifest = {
-  export_id: string;
-  schema_version: string;
-  created_at: string;
-  type: string;
-  filters: Record<string, unknown>;
-  totals: Record<string, number>;
-  cursor?: string | null;
-  next_cursor?: string | null;
-  mode?: string | null;
-};
+export type ExportManifest = components["schemas"]["ExportManifest"];
 
-export type CitationExportResponse = {
-  manifest: ExportManifest;
-  records: Array<Record<string, unknown>>;
-  csl: Array<Record<string, unknown>>;
-  manager_payload: Record<string, unknown>;
-};
+export type CitationExportResponse = components["schemas"]["CitationExportResponse"];
 
 export type CopilotResult =
   | { kind: "verse"; payload: VerseResponse }
