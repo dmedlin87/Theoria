@@ -134,3 +134,65 @@ def test_get_verse_timeline_rejects_invalid_window(tmp_path) -> None:
 
         with pytest.raises(ValueError):
             get_verse_timeline(session=session, osis="John.3.16", window="invalid")  # type: ignore[arg-type]
+
+
+def test_get_verse_timeline_filters_by_author_for_week_window(tmp_path) -> None:
+    engine = _prepare_engine(tmp_path)
+    with Session(engine) as session:
+        documents = [
+            Document(
+                id="multi-1",
+                title="Week One",
+                source_type="pdf",
+                authors=["Alice", "Bob"],
+                pub_date=date(2023, 1, 2),
+            ),
+            Document(
+                id="multi-2",
+                title="Week Two",
+                source_type="pdf",
+                authors=["Bob"],
+                pub_date=date(2023, 1, 9),
+            ),
+            Document(
+                id="multi-3",
+                title="Week Three",
+                source_type="pdf",
+                authors=["Alice"],
+                pub_date=date(2023, 1, 16),
+            ),
+        ]
+
+        session.add_all(documents)
+        session.flush()
+
+        passages = [
+            Passage(id="multi-p1", document_id="multi-1", text="Ref", osis_ref="John.3.16"),
+            Passage(id="multi-p2", document_id="multi-2", text="Ref", osis_ref="John.3.16"),
+            Passage(id="multi-p3", document_id="multi-3", text="Ref", osis_ref="John.3.16"),
+        ]
+        session.add_all(passages)
+        session.commit()
+
+        timeline = get_verse_timeline(
+            session=session,
+            osis="John.3.16",
+            window="week",
+            filters=VerseMentionsFilters(author="Alice"),
+        )
+
+    assert timeline.window == "week"
+    assert timeline.total_mentions == 2
+
+    labels = {bucket.label: bucket for bucket in timeline.buckets}
+    assert sorted(labels.keys()) == ["2023-W01", "2023-W03"]
+
+    first_week = labels["2023-W01"]
+    assert first_week.count == 1
+    assert first_week.document_ids == ["multi-1"]
+
+    third_week = labels["2023-W03"]
+    assert third_week.count == 1
+    assert third_week.document_ids == ["multi-3"]
+
+    assert all("multi-2" not in bucket.document_ids for bucket in timeline.buckets)
