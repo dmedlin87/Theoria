@@ -25,9 +25,11 @@ from ..export.formatters import (
     render_bundle,
 )
 from ..models.export import (
+    DeliverableAsset,
     DeliverableRequest,
     DeliverableResponse,
     DocumentExportFilters,
+    serialise_asset_content,
 )
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.export import export_documents, export_search_results
@@ -117,11 +119,21 @@ def export_deliverable(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    encoded_assets = [
+        DeliverableAsset(
+            format=asset.format,
+            filename=asset.filename,
+            media_type=asset.media_type,
+            content=serialise_asset_content(asset.content),
+        )
+        for asset in package.assets
+    ]
+
     return DeliverableResponse(
         export_id=package.manifest.export_id,
         status="completed",
         manifest=package.manifest,
-        assets=package.assets,
+        assets=encoded_assets,
         message=f"Generated {payload.type} deliverable",
     )
 

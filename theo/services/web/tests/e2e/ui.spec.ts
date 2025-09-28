@@ -438,8 +438,10 @@ test.describe("Theo Engine UI", () => {
       { id: "sermon-markdown", type: "sermon", urlSuffix: "/ai/sermon-prep/export?format=markdown" },
       { id: "sermon-ndjson", type: "sermon", urlSuffix: "/ai/sermon-prep/export?format=ndjson" },
       { id: "sermon-csv", type: "sermon", urlSuffix: "/ai/sermon-prep/export?format=csv" },
+      { id: "sermon-pdf", type: "sermon", urlSuffix: "/ai/sermon-prep/export?format=pdf" },
       { id: "transcript-markdown", type: "transcript", urlSuffix: "/ai/transcript/export" },
       { id: "transcript-csv", type: "transcript", urlSuffix: "/ai/transcript/export" },
+      { id: "transcript-pdf", type: "transcript", urlSuffix: "/ai/transcript/export" },
     ];
 
     for (const preset of exportPresets) {
@@ -470,9 +472,11 @@ test.describe("Theo Engine UI", () => {
     );
     expect(Array.from(observedExportPresets).sort()).toEqual(
       [
+        "sermon-pdf",
         "sermon-csv",
         "sermon-markdown",
         "sermon-ndjson",
+        "transcript-pdf",
         "transcript-csv",
         "transcript-markdown",
       ].sort()

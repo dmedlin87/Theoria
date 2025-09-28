@@ -236,8 +236,10 @@ ExportPresetId = Literal[
     "sermon-markdown",
     "sermon-ndjson",
     "sermon-csv",
+    "sermon-pdf",
     "transcript-markdown",
     "transcript-csv",
+    "transcript-pdf",
 ]
 
 
@@ -245,10 +247,10 @@ class ExportDeliverableResponse(APIModel):
     """Serialized payload returned by the sermon and transcript export presets."""
 
     preset: ExportPresetId
-    format: Literal["markdown", "ndjson", "csv"]
+    format: Literal["markdown", "ndjson", "csv", "pdf"]
     filename: str
     media_type: str
-    content: str
+    content: str | bytes
 
 
 class CitationExportRequest(APIModel):
