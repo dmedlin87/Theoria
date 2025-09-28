@@ -271,7 +271,7 @@ def _build_document_detail(
         enrichment_version=document.enrichment_version,
         primary_topic=_extract_primary_topic(document),
         provenance_score=document.provenance_score,
-        metadata=document.bib_json,
+        meta=document.bib_json,
         passages=passages,
     )
 
