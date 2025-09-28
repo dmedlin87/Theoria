@@ -117,7 +117,14 @@ describe("copilot components", () => {
     render(
       <CitationList
         citations={[
-          { index: 1, osis: "John", anchor: "1", snippet: "Snippet", document_id: "doc" },
+          {
+            index: 1,
+            osis: "John",
+            anchor: "1",
+            snippet: "Snippet",
+            document_id: "doc",
+            passage_id: "passage-1",
+          },
         ]}
         onExport={onExport}
       />,

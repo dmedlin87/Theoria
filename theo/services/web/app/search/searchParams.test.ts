@@ -57,7 +57,6 @@ describe("searchParams helpers", () => {
       query: "",
       osis: "  ",
       collection: "Gospels",
-      author: undefined,
       sourceType: "",
       collectionFacets: [],
       datasetFacets: [],
