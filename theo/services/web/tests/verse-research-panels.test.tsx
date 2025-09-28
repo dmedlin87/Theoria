@@ -143,6 +143,8 @@ describe("ContradictionsPanel", () => {
 });
 
 describe("GeoPanel", () => {
+  const baseUrl = "http://127.0.0.1:8000";
+
   beforeEach(() => {
     jest.resetAllMocks();
     global.fetch = jest.fn();
@@ -152,11 +154,11 @@ describe("GeoPanel", () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
-        results: [
+        items: [
           {
             name: "Jerusalem",
-            osis: "Josh.10.1",
-            coordinates: { lat: 31.78, lng: 35.21 },
+            lat: 31.78,
+            lng: 35.21,
             aliases: ["Jebus"],
           },
         ],
@@ -176,18 +178,15 @@ describe("GeoPanel", () => {
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/research/geo/search"),
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ query: "Jerusalem", osis: "Gen.1.1" }),
-      }),
+      `${baseUrl}/research/geo/search?query=Jerusalem`,
+      { method: "GET" },
     );
   });
 
   it("renders empty state when no results", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ results: [] }),
+      json: async () => ({ items: [] }),
       text: async () => "",
     });
 
