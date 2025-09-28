@@ -141,6 +141,32 @@ def test_guarded_answer_rejects_mismatched_citations(fake_cache: fakeredis_aiore
     assert asyncio.run(fake_cache.dbsize()) == 0
 
 
+def test_guarded_answer_requires_osis_reference(
+    fake_cache: fakeredis_aioredis.FakeRedis,
+) -> None:
+    completion = "Answer with missing citations.\n\nSources: [1] Unknown"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    results = [
+        _make_result(result_id="passage-1", osis_ref=None, rank=1),
+        _make_result(result_id="passage-2", osis_ref=None, rank=2),
+    ]
+
+    with pytest.raises(GuardrailError):
+        rag._guarded_answer(  # type: ignore[arg-type]
+            session,
+            question="What does the passage say?",
+            results=results,
+            registry=registry,
+            model_hint=model.name,
+            filters=HybridSearchFilters(),
+        )
+
+    assert asyncio.run(fake_cache.dbsize()) == 0
+
+
 def test_guarded_answer_summary_uses_citation_documents(
     fake_cache: fakeredis_aioredis.FakeRedis,
 ) -> None:
