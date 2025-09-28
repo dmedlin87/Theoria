@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 
@@ -120,6 +121,17 @@ def _period_bounds(moment: date, window: Literal["week", "month", "quarter", "ye
     return label, start, end
 
 
+
+@dataclass
+class _BucketData:
+    label: str
+    start: datetime
+    end: datetime
+    count: int = 0
+    document_ids: set[str] = field(default_factory=set)
+    sample_passage_ids: set[str] = field(default_factory=set)
+
+
 def get_verse_timeline(
     session: Session,
     osis: str,
@@ -142,7 +154,7 @@ def get_verse_timeline(
         if filters.collection:
             query = query.filter(Document.collection == filters.collection)
 
-    bucket_map: dict[datetime, dict[str, object]] = {}
+    bucket_map: dict[datetime, _BucketData] = {}
 
     for passage, document in query.all():
         if not passage.osis_ref or not osis_intersects(passage.osis_ref, osis):
@@ -162,18 +174,15 @@ def get_verse_timeline(
         label, start, end = _period_bounds(reference_date, window)
         bucket = bucket_map.setdefault(
             start,
-            {
-                "label": label,
-                "start": start,
-                "end": end,
-                "count": 0,
-                "document_ids": set(),
-                "sample_passage_ids": set(),
-            },
+            _BucketData(
+                label=label,
+                start=start,
+                end=end,
+            ),
         )
-        bucket["count"] = int(bucket["count"]) + 1
-        bucket["document_ids"].add(document.id)
-        bucket["sample_passage_ids"].add(passage.id)
+        bucket.count = int(bucket.count) + 1
+        bucket.document_ids.add(document.id)
+        bucket.sample_passage_ids.add(passage.id)
 
     sorted_keys = sorted(bucket_map.keys())
     if limit is not None and limit > 0:
@@ -184,12 +193,12 @@ def get_verse_timeline(
         data = bucket_map[key]
         buckets.append(
             VerseTimelineBucket(
-                label=data["label"],
-                start=data["start"],
-                end=data["end"],
-                count=int(data["count"]),
-                document_ids=sorted(data["document_ids"]),
-                sample_passage_ids=sorted(data["sample_passage_ids"]),
+                label=data.label,
+                start=data.start,
+                end=data.end,
+                count=int(data.count),
+                document_ids=sorted(data.document_ids),
+                sample_passage_ids=sorted(data.sample_passage_ids),
             )
         )
 
