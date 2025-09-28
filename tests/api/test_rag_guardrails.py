@@ -266,6 +266,54 @@ def test_guarded_answer_summary_uses_citation_documents(
     ]
 
 
+def test_guarded_answer_uses_echo_model(fake_cache: FakeRedisType) -> None:
+    registry = LLMRegistry()
+    echo_model = LLMModel(name="echo", provider="echo", model="echo")
+    registry.add_model(echo_model, make_default=True)
+
+    session = MagicMock(spec=Session)
+    results = [
+        _make_result(
+            result_id="passage-1",
+            snippet="God loves the world",
+            osis_ref="John.3.16",
+            rank=1,
+            page_no=2,
+        ),
+        _make_result(
+            result_id="passage-2",
+            snippet="Believers receive eternal life",
+            osis_ref="John.3.17",
+            rank=2,
+            page_no=3,
+        ),
+    ]
+
+    answer = rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="Summarise the passages",
+        results=results,
+        registry=registry,
+        model_hint=echo_model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    expected_output = (
+        "[1] God loves the world. [2] Believers receive eternal life.\n\n"
+        "Sources: [1] John.3.16 (page 2)\n[2] John.3.17 (page 3)"
+    )
+    assert answer.model_output == expected_output
+    assert answer.model_name == echo_model.name
+    assert answer.guardrail_profile is None
+
+    keys = asyncio.run(fake_cache.keys("rag:*"))
+    assert keys
+    payload_raw = asyncio.run(fake_cache.get(keys[0]))
+    assert payload_raw is not None
+    payload = json.loads(payload_raw)
+    assert payload["validation"]["status"] == "passed"
+
+
 def test_guarded_answer_profile_mismatch_raises_guardrail_error(
     fake_cache: FakeRedisType,
 ) -> None:
