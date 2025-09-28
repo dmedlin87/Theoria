@@ -8,6 +8,10 @@ import sys
 from collections.abc import Generator
 from pathlib import Path
 
+
+import pytest
+from fastapi import Request as FastAPIRequest
+
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -33,6 +37,7 @@ def configure_test_environment(
     os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
     os.environ["STORAGE_ROOT"] = str(storage_root)
     os.environ["FIXTURES_ROOT"] = str(PROJECT_ROOT / "fixtures")
+    os.environ["THEO_AUTH_ALLOW_ANONYMOUS"] = "true"
 
     from theo.services.api.app.core import settings as settings_module
     from theo.services.api.app.core.database import Base, configure_engine
@@ -52,6 +57,7 @@ def configure_test_environment(
 
 
 @pytest.fixture(autouse=True)
+
 def bypass_authentication(request: pytest.FixtureRequest) -> Generator[None, None, None]:
     """Permit unauthenticated access for API tests unless explicitly disabled."""
 

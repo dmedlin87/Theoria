@@ -96,6 +96,13 @@ class Settings(BaseSettings):
         ),
         description="Allowed signing algorithms for validating JWTs",
     )
+    auth_allow_anonymous: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "THEO_AUTH_ALLOW_ANONYMOUS", "AUTH_ALLOW_ANONYMOUS"
+        ),
+        description="Allow unauthenticated requests (intended for testing only)",
+    )
 
     @field_validator("api_keys", mode="before")
     @classmethod
