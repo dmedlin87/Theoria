@@ -98,6 +98,7 @@ if Counter is None or Histogram is None:  # pragma: no cover - metrics disabled
 
     WORKFLOW_RUNS = _NoopMetric()
     WORKFLOW_LATENCY = _NoopMetric()
+    RAG_CACHE_EVENTS = _NoopMetric()
 else:
     WORKFLOW_RUNS = Counter(
         "theo_workflow_runs_total",
@@ -109,6 +110,11 @@ else:
         "Theo Engine workflow execution latency.",
         labelnames=("workflow",),
         buckets=(0.25, 0.5, 1, 2, 4, 8, 16, float("inf")),
+    )
+    RAG_CACHE_EVENTS = Counter(
+        "theo_rag_cache_events_total",
+        "Theo Engine RAG cache events by status.",
+        labelnames=("status",),
     )
 
 
@@ -206,6 +212,7 @@ __all__ = [
     "instrument_workflow",
     "log_workflow_event",
     "set_span_attribute",
+    "RAG_CACHE_EVENTS",
 ]
 
 

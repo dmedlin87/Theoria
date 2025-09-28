@@ -30,7 +30,12 @@ from ..models.base import APIModel
 from ..models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from ..retriever.hybrid import hybrid_search
-from ..telemetry import instrument_workflow, log_workflow_event, set_span_attribute
+from ..telemetry import (
+    RAG_CACHE_EVENTS,
+    instrument_workflow,
+    log_workflow_event,
+    set_span_attribute,
+)
 from .clients import GenerationError
 from .registry import LLMModel, LLMRegistry, get_llm_registry
 from .router import get_router
@@ -591,6 +596,7 @@ def _guarded_answer(
                 except GuardrailError as exc:
                     cache_status = "stale"
                     _run_redis_command(lambda client: client.delete(cache_key))
+                    RAG_CACHE_EVENTS.labels(status="stale").inc()
                     log_workflow_event(
                         "workflow.guardrails_cache",
                         workflow="rag",
@@ -615,6 +621,7 @@ def _guarded_answer(
                 cache_status = "stale"
 
         if cache_status == "hit" and model_output:
+            RAG_CACHE_EVENTS.labels(status="hit").inc()
             log_workflow_event(
                 "workflow.guardrails_cache",
                 workflow="rag",
@@ -625,6 +632,7 @@ def _guarded_answer(
             if cache_status == "hit":
                 cache_status = "stale"
             if cache_status == "stale":
+                RAG_CACHE_EVENTS.labels(status="stale").inc()
                 log_workflow_event(
                     "workflow.guardrails_cache",
                     workflow="rag",
@@ -632,6 +640,7 @@ def _guarded_answer(
                     cache_key_suffix=cache_key_suffix,
                 )
             else:
+                RAG_CACHE_EVENTS.labels(status="miss").inc()
                 log_workflow_event(
                     "workflow.guardrails_cache",
                     workflow="rag",
@@ -763,6 +772,7 @@ def _guarded_answer(
     }:
         _store_cached_answer(cache_key, answer=answer, validation=validation_result)
         if cache_status == "refresh":
+            RAG_CACHE_EVENTS.labels(status="refresh").inc()
             log_workflow_event(
                 "workflow.guardrails_cache",
                 workflow="rag",
