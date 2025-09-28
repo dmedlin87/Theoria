@@ -20,17 +20,7 @@ else:  # pragma: no cover - used only at runtime
     from .base import APIModel
 
 
-try:  # pragma: no cover - Python 3.12+
-    from typing import TypeAliasType
-except ImportError:  # pragma: no cover - fallback for older typing
-    from typing_extensions import TypeAliasType
-
-JSONScalar = str | int | float | bool | None
-JSONValue = TypeAliasType(
-    "JSONValue",
-    JSONScalar | list["JSONValue"] | dict[str, "JSONValue"],
-)
-JSONDict: TypeAlias = dict[str, JSONValue]
+JSONDict: TypeAlias = dict[str, Any]
 
 
 def _ensure_json_dict(value: Any) -> JSONDict:
@@ -46,7 +36,7 @@ def _ensure_json_dict(value: Any) -> JSONDict:
     return normalized
 
 
-def _ensure_json_value(value: Any) -> JSONValue:
+def _ensure_json_value(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, list):

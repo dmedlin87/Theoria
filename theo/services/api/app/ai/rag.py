@@ -31,7 +31,7 @@ from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSear
 from ..retriever.hybrid import hybrid_search
 from ..telemetry import instrument_workflow, log_workflow_event, set_span_attribute
 from .clients import GenerationError
-from .registry import LLMRegistry, get_llm_registry
+from .registry import LLMModel, LLMRegistry, get_llm_registry
 from .router import get_router
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
@@ -331,8 +331,9 @@ def _build_source_url(result: HybridSearchResult) -> str:
     params: dict[str, str] = {}
     if getattr(result, "page_no", None) is not None:
         params["page"] = str(result.page_no)
-    if getattr(result, "t_start", None) is not None:
-        params["t"] = str(math.floor(result.t_start))
+    t_start = getattr(result, "t_start", None)
+    if t_start is not None:
+        params["t"] = str(math.floor(t_start))
     query = urlencode(params)
     base = f"/doc/{result.document_id}"
     anchor = f"#passage-{result.id}"

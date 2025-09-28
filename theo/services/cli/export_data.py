@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import OrderedDict
+from collections.abc import Mapping, Sequence as SequenceABC
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Sequence
@@ -70,7 +71,11 @@ def _flatten_passages(
         passages = record.get("passages") if isinstance(record, dict) else None
         if not passages:
             continue
+        if not isinstance(passages, SequenceABC) or isinstance(passages, (str, bytes)):
+            continue
         for passage in passages:
+            if not isinstance(passage, Mapping):
+                continue
             entry = OrderedDict()
             entry["kind"] = "passage"
             entry["document_id"] = record.get("document_id")

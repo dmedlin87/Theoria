@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
+from typing import cast
+
+from sqlalchemy.orm import Session
 
 import pytest
 from fastapi.testclient import TestClient
 
+from theo.services.api.app.db.models import TranscriptSegment
 from theo.services.api.app.main import app
 from theo.services.api.app.core import settings as settings_module
 
@@ -190,8 +194,10 @@ def test_refresh_creator_rollups_helper_handles_async_failure(
             fake_refresh_many,
         )
 
-        session_stub = SimpleNamespace()
-        segments = [SimpleNamespace(osis_refs=["John.3.6", "John.3.5"])]
+        session_stub = cast(Session, SimpleNamespace())
+        segments = [
+            cast(TranscriptSegment, SimpleNamespace(osis_refs=["John.3.6", "John.3.5"]))
+        ]
 
         _refresh_creator_verse_rollups(session_stub, segments)
 

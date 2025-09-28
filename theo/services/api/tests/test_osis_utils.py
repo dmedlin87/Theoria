@@ -1,14 +1,16 @@
 from types import SimpleNamespace
+from typing import Iterator, cast
 
 import pytest
 
 from theo.services.api.app.core.database import get_engine
 from theo.services.api.app.ingest.osis import _osis_to_readable, osis_intersects
 from theo.services.api.app.transcripts.service import _matches_osis
+from theo.services.api.app.db.models import TranscriptSegment
 
 
 @pytest.fixture(autouse=True)
-def dispose_engine() -> None:
+def dispose_engine() -> Iterator[None]:
     try:
         yield
     finally:
@@ -28,7 +30,10 @@ def test_osis_to_readable_normalizes_inputs(reference: str, expected: str) -> No
 
 
 def test_matches_osis_accepts_chapter_only_query() -> None:
-    segment = SimpleNamespace(primary_osis="John.1.1", osis_refs=["John.1.2"], text="")
+    segment = cast(
+        TranscriptSegment,
+        SimpleNamespace(primary_osis="John.1.1", osis_refs=["John.1.2"], text=""),
+    )
     assert _matches_osis(segment, "John.1")
 
 

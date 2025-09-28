@@ -5,6 +5,8 @@ from __future__ import annotations
 import gzip
 from datetime import UTC, datetime
 
+from collections.abc import Sequence
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -50,7 +52,7 @@ def _build_filename(export_type: str, extension: str) -> str:
     return f"{DEFAULT_FILENAME_PREFIX}_{export_type}_{timestamp}.{extension}"
 
 
-def _normalise_formats(formats: list[str]) -> list[str]:
+def _normalise_formats(formats: Sequence[str] | None) -> list[str]:
     if not formats:
         return ["markdown"]
     return [fmt.lower() for fmt in formats]

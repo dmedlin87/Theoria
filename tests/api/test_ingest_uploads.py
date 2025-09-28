@@ -70,11 +70,22 @@ def test_ingest_file_sanitizes_uploaded_filename(tmp_path: Path, monkeypatch, ap
 def test_ingest_transcript_sanitizes_uploaded_files(
     tmp_path: Path, monkeypatch, api_client
 ) -> None:
-    captured: dict[str, Path | None] = {}
+    captured_paths: dict[str, Path | None] = {}
+    captured_filenames: dict[str, str | None] = {}
 
-    def fake_pipeline(_session, transcript_path: Path, frontmatter, audio_path: Path | None):
-        captured["transcript"] = transcript_path
-        captured["audio"] = audio_path
+    def fake_pipeline(
+        _session,
+        transcript_path: Path,
+        frontmatter,
+        audio_path: Path | None,
+        *,
+        transcript_filename: str | None = None,
+        audio_filename: str | None = None,
+    ):
+        captured_paths["transcript"] = transcript_path
+        captured_paths["audio"] = audio_path
+        captured_filenames["transcript"] = transcript_filename
+        captured_filenames["audio"] = audio_filename
         return _mkdoc()
 
     monkeypatch.setattr(
@@ -99,14 +110,15 @@ def test_ingest_transcript_sanitizes_uploaded_files(
     )
 
     assert response.status_code == 200
-    transcript_path = Path(captured["transcript"])
+    transcript_path = captured_paths.get("transcript")
+    assert isinstance(transcript_path, Path)
     assert transcript_path.parent == tmp_dir
     assert transcript_path.name.endswith("evil.vtt")
     assert transcript_path.resolve().is_relative_to(tmp_dir.resolve())
 
-    audio_path = captured.get("audio")
+    audio_path = captured_paths.get("audio")
     assert audio_path is not None
-    audio_path = Path(audio_path)
+    assert isinstance(audio_path, Path)
     assert audio_path.parent == tmp_dir
     assert audio_path.name.endswith("evil.mp3")
     assert audio_path.resolve().is_relative_to(tmp_dir.resolve())

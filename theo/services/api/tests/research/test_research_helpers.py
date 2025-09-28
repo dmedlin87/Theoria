@@ -53,6 +53,14 @@ def test_report_build_combines_sections() -> None:
     )
     section_titles = [section.title for section in report.sections]
     assert "Stability of the Text" in section_titles[0]
-    assert report.meta["variant_count"] > 0
-    assert report.meta["citation_count"] >= 1
-    assert report.meta["fallacy_count"] >= 0
+    variant_count = report.meta["variant_count"]
+    citation_count = report.meta["citation_count"]
+    fallacy_count = report.meta["fallacy_count"]
+
+    assert isinstance(variant_count, int)
+    assert isinstance(citation_count, int)
+    assert isinstance(fallacy_count, int)
+
+    assert variant_count > 0
+    assert citation_count >= 1
+    assert fallacy_count >= 0

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterator
 import sys
 
 import pytest
@@ -29,6 +30,9 @@ from theo.services.api.app.core.database import (  # noqa: E402
     configure_engine,
     get_engine,
     get_session,
+)
+from theo.services.api.app.core.secret_migration import (  # noqa: E402
+    migrate_secret_settings,
 )
 from theo.services.api.app.core.settings import (  # noqa: E402
     get_settings,
@@ -61,7 +65,7 @@ def _prepare_engine(tmp_path: Path):
 
 
 @pytest.fixture()
-def api_client(tmp_path: Path) -> TestClient:
+def api_client(tmp_path: Path) -> Iterator[TestClient]:
     """Provide a TestClient wired to a temporary SQLite database."""
 
     engine = _prepare_engine(tmp_path)
@@ -122,6 +126,92 @@ def test_registry_encrypts_api_keys_and_migrates_plaintext(tmp_path: Path) -> No
         stored_config = serialized["models"][0]["config"]["api_key"]
         assert isinstance(stored_config, dict)
         assert "__encrypted__" in stored_config
+
+
+def test_migrate_plaintext_settings_reencrypts(tmp_path: Path) -> None:
+    engine = _prepare_engine(tmp_path)
+    llm_payload = {
+        "default_model": "anthropic",
+        "models": [
+            {
+                "name": "anthropic",
+                "provider": "anthropic",
+                "model": "claude-3",
+                "config": {"api_key": "plain-key"},
+            }
+        ],
+    }
+    provider_payload = {
+        "openai": {
+            "api_key": "provider-secret",
+            "base_url": "https://api.openai.example",
+        }
+    }
+
+    with Session(engine) as session:
+        session.add(AppSetting(key="app:llm", value=llm_payload))
+        session.add(AppSetting(key="app:ai_providers", value=provider_payload))
+        session.commit()
+
+        migrated = migrate_secret_settings(session)
+        assert set(migrated) == {"llm", "ai_providers"}
+
+        llm_record = session.get(AppSetting, "app:llm")
+        assert llm_record is not None
+        assert isinstance(llm_record.value, dict)
+        assert "__encrypted__" in llm_record.value
+
+        provider_record = session.get(AppSetting, "app:ai_providers")
+        assert provider_record is not None
+        assert isinstance(provider_record.value, dict)
+        assert "__encrypted__" in provider_record.value
+
+        registry = get_llm_registry(session)
+        model = registry.get("anthropic")
+        assert model.config["api_key"] == "plain-key"
+
+        providers = load_setting(session, "ai_providers")
+        assert providers["openai"]["api_key"] == "provider-secret"
+
+        registry.add_model(
+            LLMModel(
+                name="azure",
+                provider="azure",
+                model="gpt-4o",
+                config={
+                    "api_key": "new-secret",
+                    "endpoint": "https://example.azure.com",
+                    "deployment": "prod",
+                },
+            )
+        )
+        save_llm_registry(session, registry)
+
+        save_setting(
+            session,
+            "ai_providers",
+            {
+                "openai": {
+                    "api_key": "rotated",
+                    "base_url": "https://api.openai.example",
+                }
+            },
+        )
+
+        session.expire_all()
+
+        llm_record = session.get(AppSetting, "app:llm")
+        assert llm_record is not None
+        assert isinstance(llm_record.value, dict)
+        assert "__encrypted__" in llm_record.value
+
+        provider_record = session.get(AppSetting, "app:ai_providers")
+        assert provider_record is not None
+        assert isinstance(provider_record.value, dict)
+        assert "__encrypted__" in provider_record.value
+
+        providers = load_setting(session, "ai_providers")
+        assert providers["openai"]["api_key"] == "rotated"
 
 
 @pytest.mark.parametrize(

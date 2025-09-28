@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from theo.services.api.app.analytics.openalex import OpenAlexClient
 from theo.services.api.app.analytics.topics import generate_topic_digest
 from theo.services.api.app.core.database import get_engine
 from theo.services.api.app.db.models import Document
@@ -36,7 +37,7 @@ def test_topic_digest_deduplicates_document_ids() -> None:
         session.commit()
 
 
-class _FakeOpenAlexClient:
+class _FakeOpenAlexClient(OpenAlexClient):
     def __init__(self) -> None:
         self.calls: list[tuple[str | None, str | None]] = []
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Iterable
@@ -213,11 +214,8 @@ class CreatorVersePerspectiveService:
         creators: list[CreatorVersePerspectiveCreator] = []
         for rollup in rollups[:limit_creators]:
             creator = rollup.creator
-            stance_distribution = (
-                {str(key): int(value) for key, value in (rollup.stance_counts or {}).items()}
-                if rollup.stance_counts
-                else None
-            )
+            stance_distribution_map = self._normalize_stance_counts(rollup.stance_counts)
+            stance_distribution = stance_distribution_map or None
             stance = None
             if stance_distribution:
                 stance = max(
@@ -241,6 +239,33 @@ class CreatorVersePerspectiveService:
             )
 
         return creators
+
+    def _normalize_stance_counts(
+        self, stance_counts: dict | list | None
+    ) -> dict[str, int]:
+        if not stance_counts:
+            return {}
+
+        if isinstance(stance_counts, Mapping):
+            items = stance_counts.items()
+        elif isinstance(stance_counts, Sequence) and not isinstance(
+            stance_counts, (str, bytes)
+        ):
+            items = stance_counts
+        else:
+            return {}
+
+        normalized: dict[str, int] = {}
+        for entry in items:
+            if isinstance(entry, Sequence) and not isinstance(entry, (str, bytes)) and len(entry) == 2:
+                key, value = entry
+            else:
+                continue
+            try:
+                normalized[str(key)] = int(value)
+            except (TypeError, ValueError):
+                continue
+        return normalized
 
     def _build_quote_payload(
         self,

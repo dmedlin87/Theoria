@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
-from typing import Callable, Iterable, Iterator
+from typing import Any, Callable, Iterable, Iterator, cast
 from uuid import uuid4
 
 import click
@@ -137,9 +137,10 @@ def _post_batch_tags(session: Session, document_ids: Iterable[str]) -> None:
 
 def _post_batch_biblio(_: Session, document_ids: Iterable[str]) -> None:
     click.echo("   Running post-batch step: biblio")
+    enrich_document_task = cast(Any, worker_tasks.enrich_document)
     for doc_id in document_ids:
         try:
-            async_result = worker_tasks.enrich_document.delay(doc_id)
+            async_result = enrich_document_task.delay(doc_id)
         except Exception as exc:  # pragma: no cover - defensive logging
             click.echo(f"     [post-batch:biblio] failed for {doc_id}: {exc}", err=True)
             continue
@@ -218,9 +219,10 @@ def _queue_batch_via_worker(
     batch: list[FolderItem], overrides: dict[str, object]
 ) -> list[str]:
     task_ids: list[str] = []
+    process_file_task = cast(Any, worker_tasks.process_file)
     for item in batch:
         frontmatter = dict(overrides)
-        async_result = worker_tasks.process_file.delay(
+        async_result = process_file_task.delay(
             str(uuid4()), str(item.path), frontmatter
         )
         task_ids.append(async_result.id if hasattr(async_result, "id") else "queued")

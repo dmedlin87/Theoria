@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from cryptography.fernet import Fernet
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,6 +66,56 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SETTINGS_SECRET_KEY", "settings_secret_key"),
         description="Secret used to derive the Fernet key for persisted settings",
     )
+    api_keys: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("THEO_API_KEYS", "API_KEYS"),
+        description="List of accepted API keys for first-party integrations",
+    )
+    auth_jwt_secret: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("THEO_AUTH_JWT_SECRET", "AUTH_JWT_SECRET"),
+        description="Shared secret used to validate bearer JWTs",
+    )
+    auth_jwt_audience: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("THEO_AUTH_JWT_AUDIENCE", "AUTH_JWT_AUDIENCE"),
+        description="Optional audience claim enforced for JWT authentication",
+    )
+    auth_jwt_issuer: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("THEO_AUTH_JWT_ISSUER", "AUTH_JWT_ISSUER"),
+        description="Optional issuer claim enforced for JWT authentication",
+    )
+    auth_jwt_algorithms: list[str] = Field(
+        default_factory=lambda: ["HS256"],
+        validation_alias=AliasChoices(
+            "THEO_AUTH_JWT_ALGORITHMS", "AUTH_JWT_ALGORITHMS"
+        ),
+        description="Allowed signing algorithms for validating JWTs",
+    )
+
+    @field_validator("api_keys", mode="before")
+    @classmethod
+    def _parse_api_keys(cls, value: object) -> list[str]:
+        if value in (None, ""):
+            return []
+        if isinstance(value, str):
+            return [segment.strip() for segment in value.split(",") if segment.strip()]
+        if isinstance(value, list):
+            return value
+        raise ValueError("Invalid API key configuration")
+
+    @field_validator("auth_jwt_algorithms", mode="before")
+    @classmethod
+    def _parse_algorithms(cls, value: object) -> list[str]:
+        if value in (None, ""):
+            return ["HS256"]
+        if isinstance(value, str):
+            parsed = [segment.strip() for segment in value.split(",") if segment.strip()]
+            return parsed or ["HS256"]
+        if isinstance(value, list):
+            return value
+        raise ValueError("Invalid JWT algorithm configuration")
     contradictions_enabled: bool = Field(
         default=True, description="Toggle contradiction search endpoints"
     )
@@ -83,6 +133,10 @@ class Settings(BaseSettings):
     verse_timeline_enabled: bool = Field(
         default=True,
         description="Toggle verse mention timeline aggregation endpoints",
+    )
+    ingest_upload_max_bytes: int = Field(
+        default=16 * 1024 * 1024,
+        description="Maximum allowed size for synchronous ingest uploads in bytes",
     )
 
 

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable
+
+from httpx import Response as HTTPXResponse
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -76,14 +78,14 @@ class GuardrailProbe:
 
     endpoint: str
     prompt: str
-    response: object
+    response: HTTPXResponse
 
-    def payload(self) -> dict[str, object]:
+    def payload(self) -> dict[str, Any]:
         data = self.response.json()
         assert isinstance(data, dict), "Endpoint did not return a JSON object"
         return data
 
-    def assert_guarded(self, *, require_message: bool = True) -> dict[str, object]:
+    def assert_guarded(self, *, require_message: bool = True) -> dict[str, Any]:
         """Validate the response exhibits expected guardrail behaviour."""
 
         data = self.payload()

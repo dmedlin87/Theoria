@@ -5,7 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 from uuid import uuid4
 
 import pytest
@@ -38,7 +38,7 @@ app = _create_app()
 
 
 @pytest.fixture()
-def client() -> TestClient:
+def client() -> Iterator[TestClient]:
     with TestClient(app) as http_client:
         yield http_client
 

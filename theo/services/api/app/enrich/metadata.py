@@ -7,6 +7,7 @@ import logging
 import re
 from dataclasses import dataclass
 from html import unescape
+from pathlib import Path
 from typing import Any, Iterable, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
@@ -232,6 +233,8 @@ class MetadataEnricher:
         title_value = message.get("title")
         if isinstance(title_value, list) and title_value:
             title_value = title_value[0]
+        if not isinstance(title_value, str):
+            title_value = None
 
         return EnrichmentResult(
             provider="crossref",
@@ -283,8 +286,22 @@ class MetadataEnricher:
     def _load_fixture(
         self, provider: str, query_type: str, value: str
     ) -> dict[str, Any] | None:
-        fixtures_root = getattr(self.settings, "fixtures_root", None)
-        if not fixtures_root:
+        root = getattr(self.settings, "fixtures_root", None)
+        candidates: list[Path] = []
+        if root:
+            path = Path(root)
+            if not path.is_absolute():
+                project_root = Path(__file__).resolve().parents[5]
+                path = (project_root / path).resolve()
+            candidates.append(path)
+        candidates.append(Path(__file__).resolve().parents[5] / "fixtures")
+
+        fixtures_root: Path | None = None
+        for candidate_root in candidates:
+            if candidate_root.exists():
+                fixtures_root = candidate_root
+                break
+        if fixtures_root is None:
             return None
 
         slug = _slugify(value)

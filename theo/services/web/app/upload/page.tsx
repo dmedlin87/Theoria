@@ -280,13 +280,11 @@ export default function UploadPage(): JSX.Element {
             <input type="url" name="url" placeholder="https://" required style={{ width: "100%" }} />
           </label>
           <label style={{ display: "block", marginTop: "1rem" }}>
-            Source type
+            Source type (URLs: YouTube or Web page)
             <select name="source_type" defaultValue="" style={{ width: "100%" }}>
               <option value="">Detect automatically</option>
               <option value="youtube">YouTube</option>
               <option value="html">Web page</option>
-              <option value="pdf">PDF</option>
-              <option value="audio">Audio</option>
             </select>
           </label>
           <label style={{ display: "block", marginTop: "1rem" }}>

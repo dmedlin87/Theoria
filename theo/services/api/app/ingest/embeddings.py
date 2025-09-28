@@ -5,12 +5,19 @@ from __future__ import annotations
 import hashlib
 import math
 import threading
-from typing import Sequence
+from typing import Protocol, Sequence
 
 try:  # pragma: no cover - heavy dependency may be unavailable in tests
-    from FlagEmbedding import FlagModel  # type: ignore
+    from FlagEmbedding import FlagModel as _RuntimeFlagModel  # type: ignore
 except Exception:  # pragma: no cover - optional dependency
-    FlagModel = None  # type: ignore
+    _RuntimeFlagModel = None  # type: ignore
+
+
+class _EmbeddingBackend(Protocol):
+    """Protocol representing the minimal surface of the embedding backend."""
+
+    def encode(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        ...
 
 from ..core.settings import get_settings
 
@@ -53,16 +60,16 @@ class EmbeddingService:
     def __init__(self, model_name: str, dimension: int) -> None:
         self.model_name = model_name
         self.dimension = dimension
-        self._model: FlagModel | _FallbackEmbedder | None = None
+        self._model: _EmbeddingBackend | None = None
         self._lock = threading.Lock()
 
-    def _ensure_model(self) -> FlagModel | _FallbackEmbedder:
+    def _ensure_model(self) -> _EmbeddingBackend:
         if self._model is not None:
             return self._model
         with self._lock:
             if self._model is None:
-                if FlagModel is not None:
-                    self._model = FlagModel(self.model_name, use_fp16=False)  # type: ignore[call-arg]
+                if _RuntimeFlagModel is not None:
+                    self._model = _RuntimeFlagModel(self.model_name, use_fp16=False)  # type: ignore[call-arg]
                 else:
                     self._model = _FallbackEmbedder(self.dimension)
         assert self._model is not None

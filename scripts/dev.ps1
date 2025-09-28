@@ -29,14 +29,14 @@ function Write-Section($msg) {
 
 function Test-PortOpen {
   param(
-    [string]$Host,
+    [string]$TargetHost,
     [int]$Port,
     [int]$TimeoutMilliseconds = 2000
   )
 
   $client = [System.Net.Sockets.TcpClient]::new()
   try {
-    $asyncResult = $client.BeginConnect($Host, $Port, $null, $null)
+    $asyncResult = $client.BeginConnect($TargetHost, $Port, $null, $null)
     if (-not $asyncResult.AsyncWaitHandle.WaitOne($TimeoutMilliseconds)) {
       return $false
     }
@@ -54,23 +54,23 @@ function Get-ApiReadinessHost {
 
   if (-not $BindHost) { return '127.0.0.1' }
 
-  $host = $BindHost.Trim()
+  $normalizedHost = $BindHost.Trim()
 
   $parsedAddress = $null
-  if ([System.Net.IPAddress]::TryParse($host, [ref]$parsedAddress)) {
+  if ([System.Net.IPAddress]::TryParse($normalizedHost, [ref]$parsedAddress)) {
     if ($parsedAddress.Equals([System.Net.IPAddress]::Any)) { return '127.0.0.1' }
     if ($parsedAddress.Equals([System.Net.IPAddress]::IPv6Any)) { return '::1' }
-    return $host
+    return $normalizedHost
   }
 
-  if ($host.StartsWith('[') -and $host.EndsWith(']')) {
-    $inner = $host.TrimStart('[').TrimEnd(']')
+  if ($normalizedHost.StartsWith('[') -and $normalizedHost.EndsWith(']')) {
+    $inner = $normalizedHost.TrimStart('[').TrimEnd(']')
     if ([System.Net.IPAddress]::TryParse($inner, [ref]$parsedAddress)) {
       if ($parsedAddress.Equals([System.Net.IPAddress]::IPv6Any)) { return '::1' }
     }
   }
 
-  return $host
+  return $normalizedHost
 }
 
 function Stop-ApiJob {
@@ -82,6 +82,21 @@ function Stop-ApiJob {
   $output = Receive-Job $Job -ErrorAction SilentlyContinue
   if ($output) { Write-Host $output }
   Remove-Job $Job -Force -ErrorAction SilentlyContinue | Out-Null
+}
+
+function Resolve-PythonExe {
+  # Prefer venv python if active
+  if ($env:VIRTUAL_ENV) {
+    $venvPy = Join-Path $env:VIRTUAL_ENV 'Scripts/python.exe'
+    if (Test-Path $venvPy) { return $venvPy }
+  }
+  # Windows Python launcher
+  $py = Get-Command py -ErrorAction SilentlyContinue
+  if ($py) { return $py.Source }
+  # Fallback to python on PATH
+  $python = Get-Command python -ErrorAction SilentlyContinue
+  if ($python) { return $python.Source }
+  return $null
 }
 
 # Resolve repo root (directory containing this script's parent)
@@ -102,15 +117,28 @@ if (-not $env:VIRTUAL_ENV) {
 }
 
 Write-Section 'Starting API'
-$ApiCmd = "uvicorn $ApiModule --reload --host $BindHost --port $ApiPort"
-Write-Host $ApiCmd -ForegroundColor Green
+$PythonExe = Resolve-PythonExe
+if (-not $PythonExe) {
+  Write-Host 'Python interpreter not found. Please install Python 3.11+ and ensure it is on PATH.' -ForegroundColor Red
+  exit 1
+}
+
+$ApiExe = $PythonExe
+$ApiArgs = @(
+  '-m','uvicorn',
+  $ApiModule,
+  '--reload',
+  '--host', $BindHost,
+  '--port', $ApiPort
+)
+Write-Host ("{0} {1}" -f $ApiExe, ($ApiArgs -join ' ')) -ForegroundColor Green
 
 # Start API in background job
 $ApiJob = Start-Job -ScriptBlock {
-  param($cmd, $wd)
+  param($exe, $exeArgs, $wd)
   Set-Location $wd
-  & $cmd
-} -ArgumentList $ApiCmd, $RepoRoot
+  & $exe @exeArgs
+} -ArgumentList $ApiExe, $ApiArgs, $RepoRoot
 
 $ApiReady = $false
 $TimeoutSeconds = 45
@@ -125,7 +153,7 @@ while ($Stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
     exit 1
   }
 
-  if (Test-PortOpen -Host $ReadinessHost -Port $ApiPort) {
+  if (Test-PortOpen -TargetHost $ReadinessHost -Port $ApiPort) {
     $ApiReady = $true
     break
   }
@@ -139,7 +167,7 @@ if (-not $ApiReady) {
   exit 1
 }
 
-Write-Host "API is listening on $BindHost:$ApiPort" -ForegroundColor Green
+Write-Host "API is listening on ${BindHost}:${ApiPort}" -ForegroundColor Green
 
 if (-not (Test-Path $WebDir)) {
   Write-Host "Web directory not found: $WebDir" -ForegroundColor Red
@@ -195,3 +223,4 @@ Write-Host ("{0} {1}" -f $NextExe, ($NextArgs -join ' ')) -ForegroundColor Green
 
 Write-Host 'Shutting down API job...' -ForegroundColor Yellow
 Stop-ApiJob $ApiJob
+

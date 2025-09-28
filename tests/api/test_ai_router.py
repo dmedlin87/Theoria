@@ -91,5 +91,94 @@ def test_router_latency_threshold_triggers_fallback(monkeypatch):
 
     result = _run_generation(router)
     assert result.model.name == "fast"
-    assert router.get_latency("slow") is not None
-    assert router.get_latency("slow") > 1.0
+    slow_latency = router.get_latency("slow")
+    assert slow_latency is not None
+    assert slow_latency > 1.0
+
+
+def test_router_generation_error_when_ledger_prepopulated():
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[primary]"},
+            pricing={"per_call": 0.2},
+            routing={
+                "spend_ceiling": 1.0,
+                "latency_threshold_ms": 10.0,
+                "weight": 2.0,
+            },
+
+        ),
+        make_default=True,
+    )
+    registry.add_model(
+        LLMModel(
+            name="secondary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[secondary]"},
+            pricing={"per_call": 0.2},
+            routing={
+                "spend_ceiling": 1.0,
+                "latency_threshold_ms": 10.0,
+                "weight": 1.0,
+            },
+        )
+    )
+    router = LLMRouterService(registry)
+
+    with router._ledger.lock:  # type: ignore[attr-defined]
+        for model in registry.models.values():
+            router._ledger.spend[model.name] = 1.5  # type: ignore[attr-defined]
+            router._ledger.latency[model.name] = 50.0  # type: ignore[attr-defined]
+
+    model = registry.models["primary"]
+    with pytest.raises(GenerationError):
+        router.execute_generation(workflow="chat", model=model, prompt="hello")
+
+    assert router.get_spend("primary") == pytest.approx(1.0)
+
+
+def test_router_prefers_model_hint_and_falls_back(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="heavy",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[heavy]"},
+            routing={"weight": 5.0},
+        ),
+        make_default=True,
+    )
+    registry.add_model(
+        LLMModel(
+            name="hinted",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[hinted]"},
+            routing={"weight": 1.0},
+        )
+    )
+
+    router = LLMRouterService(registry)
+
+    candidates = router.iter_candidates("chat", model_hint="hinted")
+    first = next(candidates)
+    assert first.name == "hinted"
+
+    class _FailingClient:
+        def generate(self, **_: object) -> str:
+            raise GenerationError("boom")
+
+    # Force the hinted model to fail generation to confirm fallback order.
+    monkeypatch.setattr(registry.models["hinted"], "build_client", lambda: _FailingClient())
+    with pytest.raises(GenerationError):
+        router.execute_generation(workflow="chat", model=first, prompt="hello")
+
+    fallback = next(candidates)
+    assert fallback.name == "heavy"
+

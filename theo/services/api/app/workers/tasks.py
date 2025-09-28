@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 import httpx
 from celery import Celery
+from celery.app.task import Task as CeleryTask
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
 from sqlalchemy import func, literal, select, text
@@ -47,7 +48,7 @@ celery.conf.beat_schedule.setdefault(
     "refresh-hnsw-nightly",
     {
         "task": "tasks.refresh_hnsw",
-        "schedule": crontab(hour=3, minute=0),
+        "schedule": crontab(hour="3", minute="0"),
     },
 )
 
@@ -350,6 +351,11 @@ def send_topic_digest_notification(
         raise
 
 
+send_topic_digest_notification_task = cast(
+    CeleryTask, send_topic_digest_notification
+)
+
+
 @celery.task(name="tasks.generate_topic_digest")
 def topic_digest(
     hours: int = 168,
@@ -397,7 +403,7 @@ def topic_digest(
                     "window_start": window_start.isoformat(),
                     "topics": [cluster.topic for cluster in digest.topics],
                 }
-                send_topic_digest_notification.delay(
+                send_topic_digest_notification_task.delay(
                     digest_document.id, notify, context
                 )
                 logger.info(
@@ -611,6 +617,9 @@ def run_watchlist_alert(watchlist_id: str) -> None:
             raise
 
 
+run_watchlist_alert_task = cast(CeleryTask, run_watchlist_alert)
+
+
 @celery.task(name="tasks.schedule_watchlist_alerts")
 def schedule_watchlist_alerts() -> None:
     """Enumerate due watchlists and queue alert runs."""
@@ -620,7 +629,7 @@ def schedule_watchlist_alerts() -> None:
     now = datetime.now(UTC)
     with Session(engine) as session:
         for watchlist in iter_due_watchlists(session, now):
-            run_watchlist_alert.delay(watchlist.id)
+            run_watchlist_alert_task.delay(watchlist.id)
             scheduled += 1
     logger.info(
         "Scheduled watchlist alerts",

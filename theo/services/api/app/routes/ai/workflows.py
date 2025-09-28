@@ -12,7 +12,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..ai import (
+from ...ai import (
     build_sermon_deliverable,
     build_transcript_deliverable,
     generate_comparative_analysis,
@@ -24,37 +24,15 @@ from ..ai import (
     run_guarded_chat,
     run_research_reconciliation,
 )
-from ..ai.passage import PassageResolutionError, resolve_passage_reference
-from ..ai.rag import GuardrailError, RAGCitation
-from ..ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
-from ..ai.trails import TrailService
-from ..analytics.topics import (
-    TopicDigest,
-    generate_topic_digest,
-    load_topic_digest,
-    store_topic_digest,
-    upsert_digest_document,
-)
-from ..analytics.watchlists import (
-    create_watchlist,
-    delete_watchlist,
-    get_watchlist,
-    list_watchlist_events,
-    list_watchlists,
-    run_watchlist,
-    update_watchlist,
-)
-from ..core.database import get_session
-from ..db.models import Document, Passage
-from ..export.formatters import build_document_export
-from ..core.settings_store import load_setting, save_setting
-from ..models.base import Passage as PassageSchema
-from ..models.documents import DocumentDetailResponse
-from ..models.export import (
-    DocumentExportFilters,
-    DocumentExportResponse,
-)
-from ..models.ai import (
+from ...ai.passage import PassageResolutionError, resolve_passage_reference
+from ...ai.rag import GuardrailError, RAGAnswer, RAGCitation
+from ...ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
+from ...ai.trails import TrailService
+from ...core.database import get_session
+from ...core.settings_store import load_setting, save_setting
+from ...db.models import Document, Passage
+from ...export.formatters import build_document_export
+from ...models.ai import (
     AIFeaturesResponse,
     ChatSessionMessage,
     ChatSessionRequest,
@@ -77,11 +55,11 @@ from ..models.ai import (
     VerseCopilotRequest,
     DEFAULT_GUARDRAIL_SETTINGS,
 )
-from ..models.watchlists import (
-    WatchlistCreateRequest,
-    WatchlistResponse,
-    WatchlistRunResponse,
-    WatchlistUpdateRequest,
+from ...models.base import Passage as PassageSchema
+from ...models.documents import DocumentDetailResponse
+from ...models.export import (
+    DocumentExportFilters,
+    DocumentExportResponse,
 )
 
 router = APIRouter()
@@ -243,6 +221,13 @@ def _build_document_detail(
 
     title = document.title or (citations[0].document_title if citations else None)
 
+    source_url = document.source_url
+    for citation in citations:
+        fields_set = getattr(citation, "model_fields_set", set())
+        if "source_url" in fields_set:
+            source_url = citation.source_url
+            break
+
     return DocumentDetailResponse(
         id=document.id,
         title=title,
@@ -254,7 +239,7 @@ def _build_document_detail(
         year=document.year,
         created_at=document.created_at,
         updated_at=document.updated_at,
-        source_url=document.source_url,
+        source_url=source_url,
         channel=document.channel,
         video_id=document.video_id,
         duration_seconds=document.duration_seconds,
@@ -264,7 +249,7 @@ def _build_document_detail(
         enrichment_version=document.enrichment_version,
         primary_topic=_extract_primary_topic(document),
         provenance_score=document.provenance_score,
-        metadata=document.bib_json,
+        meta=document.bib_json,
         passages=passages,
     )
 
@@ -343,10 +328,15 @@ def export_citations(
         export_id=None,
     )
     record_dicts = [dict(record) for record in records]
-    csl_entries = [
-        _build_csl_entry(record, citation_map.get(record.get("document_id"), []))
-        for record in record_dicts
-    ]
+    csl_entries: list[dict[str, Any]] = []
+    for record in record_dicts:
+        raw_document_id = record.get("document_id")
+        citations = (
+            citation_map.get(raw_document_id, [])
+            if isinstance(raw_document_id, str)
+            else []
+        )
+        csl_entries.append(_build_csl_entry(record, citations))
     manager_payload = {
         "format": "csl-json",
         "export_id": manifest.export_id,
@@ -481,6 +471,9 @@ def chat_turn(
     session_id = payload.session_id or str(uuid4())
     trail_service = TrailService(session)
 
+    message: ChatSessionMessage | None = None
+    answer: RAGAnswer | None = None
+
     try:
         with trail_service.start_trail(
             workflow="chat",
@@ -515,6 +508,9 @@ def chat_turn(
             )
     except GuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if message is None or answer is None:
+        raise HTTPException(status_code=500, detail="failed to compose chat response")
 
     return ChatSessionResponse(session_id=session_id, message=message, answer=answer)
 
@@ -652,7 +648,7 @@ def upsert_provider_settings(
 
 
 @settings_router.delete(
-    "/providers/{provider}", status_code=status.HTTP_204_NO_CONTENT
+    "/providers/{provider}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response
 )
 def delete_provider_settings(
     provider: str, session: Session = Depends(get_session)
@@ -965,113 +961,4 @@ def corpus_curation(
         recorder.finalize(final_md=digest or None, output_payload=response)
         return response
 
-
-@router.get(
-    "/digest", response_model=TopicDigest | None, response_model_exclude_none=True
-)
-def get_topic_digest(session: Session = Depends(get_session)):
-    digest = load_topic_digest(session)
-    if digest is None:
-        digest = generate_topic_digest(session)
-        upsert_digest_document(session, digest)
-        store_topic_digest(session, digest)
-    return digest
-
-
-@router.post("/digest", response_model=TopicDigest)
-def refresh_topic_digest(
-    hours: int = Query(default=168, ge=1, description="Lookback window in hours"),
-    session: Session = Depends(get_session),
-):
-    since = datetime.now(UTC) - timedelta(hours=hours)
-    digest = generate_topic_digest(session, since)
-    upsert_digest_document(session, digest)
-    store_topic_digest(session, digest)
-    return digest
-
-
-@router.get("/digest/watchlists", response_model=list[WatchlistResponse])
-def list_user_watchlists(
-    user_id: str = Query(..., description="Owning user identifier"),
-    session: Session = Depends(get_session),
-) -> list[WatchlistResponse]:
-    return list_watchlists(session, user_id)
-
-
-@router.post(
-    "/digest/watchlists",
-    response_model=WatchlistResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_user_watchlist(
-    payload: WatchlistCreateRequest, session: Session = Depends(get_session)
-) -> WatchlistResponse:
-    return create_watchlist(session, payload)
-
-
-@router.patch(
-    "/digest/watchlists/{watchlist_id}", response_model=WatchlistResponse
-)
-def update_user_watchlist(
-    watchlist_id: str,
-    payload: WatchlistUpdateRequest,
-    session: Session = Depends(get_session),
-) -> WatchlistResponse:
-    watchlist = get_watchlist(session, watchlist_id)
-    if watchlist is None:
-        raise HTTPException(status_code=404, detail="Watchlist not found")
-    return update_watchlist(session, watchlist, payload)
-
-
-@router.delete("/digest/watchlists/{watchlist_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user_watchlist(
-    watchlist_id: str, session: Session = Depends(get_session)
-) -> None:
-    watchlist = get_watchlist(session, watchlist_id)
-    if watchlist is None:
-        raise HTTPException(status_code=404, detail="Watchlist not found")
-    delete_watchlist(session, watchlist)
-
-
-@router.get(
-    "/digest/watchlists/{watchlist_id}/events",
-    response_model=list[WatchlistRunResponse],
-)
-def list_user_watchlist_events(
-    watchlist_id: str,
-    since: datetime | None = Query(
-        default=None, description="Return events generated after this timestamp"
-    ),
-    session: Session = Depends(get_session),
-) -> list[WatchlistRunResponse]:
-    watchlist = get_watchlist(session, watchlist_id)
-    if watchlist is None:
-        raise HTTPException(status_code=404, detail="Watchlist not found")
-    return list_watchlist_events(session, watchlist, since=since)
-
-
-@router.get(
-    "/digest/watchlists/{watchlist_id}/preview",
-    response_model=WatchlistRunResponse,
-)
-def preview_user_watchlist(
-    watchlist_id: str, session: Session = Depends(get_session)
-) -> WatchlistRunResponse:
-    watchlist = get_watchlist(session, watchlist_id)
-    if watchlist is None:
-        raise HTTPException(status_code=404, detail="Watchlist not found")
-    return run_watchlist(session, watchlist, persist=False)
-
-
-@router.post(
-    "/digest/watchlists/{watchlist_id}/run",
-    response_model=WatchlistRunResponse,
-)
-def run_user_watchlist(
-    watchlist_id: str, session: Session = Depends(get_session)
-) -> WatchlistRunResponse:
-    watchlist = get_watchlist(session, watchlist_id)
-    if watchlist is None:
-        raise HTTPException(status_code=404, detail="Watchlist not found")
-    return run_watchlist(session, watchlist, persist=True)
 

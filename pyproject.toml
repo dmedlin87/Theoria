@@ -31,4 +31,5 @@ follow_imports = "skip"
 [tool.pytest.ini_options]
 markers = [
     "redteam: OWASP LLM red-team regression suite",
+    "no_auth_override: disable authentication override fixture for security assertions",
 ]

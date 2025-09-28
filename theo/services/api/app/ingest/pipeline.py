@@ -139,8 +139,14 @@ def _refresh_creator_verse_rollups(
         try:
             from ..workers import tasks as worker_tasks
 
-            worker_tasks.refresh_creator_verse_rollups.delay(sorted_refs)
-            return
+            task = getattr(worker_tasks, "refresh_creator_verse_rollups", None)
+            if task:
+                maybe_delay = getattr(task, "delay", None)
+                if callable(maybe_delay):
+                    maybe_delay(sorted_refs)
+                else:
+                    task(sorted_refs)
+                return
         except Exception:
             # Fall back to in-process refresh if the broker is unavailable.
             pass
@@ -276,6 +282,26 @@ def _normalise_guardrail_collection(value: Any) -> list[str] | None:
         seen.add(key)
         unique.append(item)
     return unique or None
+
+
+def _safe_storage_name(name: str, *, fallback: str) -> str:
+    """Return a safe filename for persisted artifacts.
+
+    The candidate is normalised to its basename and values that would resolve
+    to the current or parent directory are rejected. When the provided name is
+    unsafe we fall back to ``fallback`` (which should originate from a trusted
+    source such as the upload path) before raising ``ValueError`` if no safe
+    option remains.
+    """
+
+    candidate = Path(name).name
+    if candidate in {"", ".", ".."}:
+        candidate = Path(fallback).name
+
+    if candidate in {"", ".", ".."}:
+        raise ValueError("artifact filename resolves outside storage directory")
+
+    return candidate
 
 
 def _extract_guardrail_profile(
@@ -508,13 +534,26 @@ def _derive_duration_from_chunks(chunks: list[Chunk]) -> int | None:
 
 
 def _resolve_fixtures_dir(settings) -> Path | None:
+    """Return the most suitable fixtures directory for the runtime settings."""
+
+    candidates: list[Path] = []
+
     root = getattr(settings, "fixtures_root", None)
-    if not root:
-        return None
-    path = Path(root)
-    if not path.exists():
-        return None
-    return path
+    if root:
+        path = Path(root)
+        if not path.is_absolute():
+            project_root = Path(__file__).resolve().parents[5]
+            path = (project_root / path).resolve()
+        candidates.append(path)
+
+    # Always fall back to the repository fixtures directory so tests that run
+    # without the optional datasets present still exercise the offline flows.
+    candidates.append(Path(__file__).resolve().parents[5] / "fixtures")
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _load_youtube_transcript(
@@ -873,6 +912,7 @@ def run_pipeline_for_file(
             title=frontmatter.get("title") or path.stem,
             source_url=frontmatter.get("source_url"),
             transcript_path=path,
+            transcript_filename=path.name,
         )
 
     return _persist_text_document(
@@ -1034,12 +1074,9 @@ def _persist_text_document(
                 stance_overrides[key_clean] = value_clean
 
     confidence_default: float | None
+    raw_confidence = frontmatter.get("creator_confidence")
     try:
-        confidence_default = (
-            float(frontmatter.get("creator_confidence"))
-            if frontmatter.get("creator_confidence") is not None
-            else None
-        )
+        confidence_default = float(raw_confidence) if raw_confidence is not None else None
     except (TypeError, ValueError):
         confidence_default = None
 
@@ -1183,6 +1220,8 @@ def _persist_transcript_document(
     duration_seconds: Any | None = None,
     transcript_path: Path | None = None,
     audio_path: Path | None = None,
+    transcript_filename: str | None = None,
+    audio_filename: str | None = None,
 ) -> Document:
     tradition, topic_domains = _extract_guardrail_profile(frontmatter)
 
@@ -1312,13 +1351,13 @@ def _persist_transcript_document(
                 stance_overrides[key_clean] = value_clean
 
     confidence_default: float | None
-    try:
-        confidence_default = (
-            float(frontmatter.get("creator_confidence"))
-            if frontmatter.get("creator_confidence") is not None
-            else None
-        )
-    except (TypeError, ValueError):
+    raw_confidence = frontmatter.get("creator_confidence")
+    if raw_confidence is not None:
+        try:
+            confidence_default = float(raw_confidence)
+        except (TypeError, ValueError):
+            confidence_default = None
+    else:
         confidence_default = None
 
     quote_identifier = (
@@ -1380,7 +1419,11 @@ def _persist_transcript_document(
         artifacts.setdefault("frontmatter", frontmatter_path.name)
 
     if transcript_path and transcript_path.exists():
-        dest = storage_dir / transcript_path.name
+        dest_name = _safe_storage_name(
+            transcript_filename or transcript_path.name,
+            fallback=transcript_path.name,
+        )
+        dest = storage_dir / dest_name
         shutil.copy(transcript_path, dest)
         artifacts["transcript"] = dest.name
     else:
@@ -1400,7 +1443,11 @@ def _persist_transcript_document(
         artifacts["transcript"] = transcript_file.name
 
     if audio_path and audio_path.exists():
-        audio_dest = storage_dir / audio_path.name
+        audio_name = _safe_storage_name(
+            audio_filename or audio_path.name,
+            fallback=audio_path.name,
+        )
+        audio_dest = storage_dir / audio_name
         shutil.copy(audio_path, audio_dest)
         artifacts["audio"] = audio_dest.name
 
@@ -1504,11 +1551,16 @@ def run_pipeline_for_url(
             duration_seconds=merged_frontmatter.get("duration_seconds")
             or metadata.get("duration_seconds"),
             transcript_path=transcript_path,
+            transcript_filename=(transcript_path.name if transcript_path else None),
         )
 
     if resolved_source_type not in {"web_page", "html", "website"}:
         raise UnsupportedSourceError(
-            f"Unsupported source type for URL ingestion: {resolved_source_type}"
+            (
+                "Unsupported source type for URL ingestion: "
+                f"{resolved_source_type}. Supported types are: "
+                "youtube, web_page, html, website"
+            )
         )
 
     html, metadata = _fetch_web_document(settings, url)
@@ -1548,6 +1600,8 @@ def run_pipeline_for_transcript(
     *,
     frontmatter: dict[str, Any] | None = None,
     audio_path: Path | None = None,
+    transcript_filename: str | None = None,
+    audio_filename: str | None = None,
 ) -> Document:
     """Ingest a transcript file and optional audio into the document store."""
 
@@ -1581,4 +1635,6 @@ def run_pipeline_for_transcript(
         duration_seconds=frontmatter.get("duration_seconds"),
         transcript_path=transcript_path,
         audio_path=audio_path,
+        transcript_filename=transcript_filename or transcript_path.name,
+        audio_filename=audio_filename,
     )

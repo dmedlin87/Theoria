@@ -125,6 +125,11 @@ def generate_topic_digest(
             stack.callback(client.close)
 
         for document in rows:
+            existing_topics = _extract_topics(document)
+            if existing_topics:
+                continue
+            if not document.doi:
+                continue
             topics = client.fetch_topics(document.doi, document.title)
             if _attach_topics(document, topics):
                 session.add(document)

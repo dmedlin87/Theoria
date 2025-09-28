@@ -6,6 +6,10 @@ import json
 
 import click
 
+from typing import cast
+
+from celery.app.task import Task
+
 from theo.services.api.app.workers.tasks import refresh_hnsw
 
 
@@ -34,8 +38,10 @@ from theo.services.api.app.workers.tasks import refresh_hnsw
 def main(sample_queries: int, top_k: int, enqueue: bool) -> None:
     """Trigger the background refresh job or run it inline."""
 
+    task = cast(Task, refresh_hnsw)
+
     if enqueue:
-        async_result = refresh_hnsw.delay(
+        async_result = task.delay(
             None, sample_queries=sample_queries, top_k=top_k
         )
         task_id = getattr(async_result, "id", None)
@@ -45,7 +51,7 @@ def main(sample_queries: int, top_k: int, enqueue: bool) -> None:
             click.echo("Queued refresh_hnsw task.")
         return
 
-    metrics = refresh_hnsw.run(
+    metrics = task.run(
         None, sample_queries=sample_queries, top_k=top_k
     )
     click.echo("HNSW index refreshed synchronously.")

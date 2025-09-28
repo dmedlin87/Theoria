@@ -5,9 +5,39 @@ import json
 from pathlib import Path
 import sys
 from unittest.mock import MagicMock
+import importlib
+from collections.abc import Iterator
+from typing import Any, TYPE_CHECKING
 
 import pytest
-from fakeredis import aioredis as fakeredis_aioredis
+
+try:
+    fakeredis_aioredis = importlib.import_module("fakeredis.aioredis")
+except ModuleNotFoundError:  # pragma: no cover - fallback for type-checking environments
+    fakeredis_aioredis = pytest.importorskip("fakeredis.aioredis")
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class FakeRedisType(Protocol):  # pragma: no cover - typing helper only
+        async def keys(self, pattern: str, *args: object) -> list[str]: ...
+
+        async def get(self, key: str) -> str | None: ...
+
+        async def flushdb(self) -> None: ...
+
+        async def delete(self, *keys: str) -> int: ...
+
+        async def dbsize(self) -> int: ...
+
+        async def set(self, key: str, value: str) -> bool | None: ...
+
+        async def aclose(self) -> None: ...
+
+        def close(self) -> None: ...
+else:
+    FakeRedisType = Any
+
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +46,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.ai import rag  # noqa: E402  # import after sys.path mutation
 from theo.services.api.app.ai.rag import GuardrailError  # noqa: E402
-from theo.services.api.app.ai.registry import LLMRegistry  # noqa: E402
+from theo.services.api.app.ai.registry import LLMModel, LLMRegistry  # noqa: E402
 from theo.services.api.app.models.search import (  # noqa: E402
     HybridSearchFilters,
     HybridSearchResult,
@@ -40,14 +70,17 @@ class _DummyClient:
         return self.completion
 
 
-class _DummyModel:
+class _DummyModel(LLMModel):
     def __init__(self, completion: str) -> None:
-        self.name = "dummy"
-        self.model = "dummy-model"
+        super().__init__(
+            name="dummy",
+            provider="dummy",
+            model="dummy-model",
+            routing={},
+        )
         self.client = _DummyClient(completion)
-        self.routing: dict[str, object] = {}
 
-    def build_client(self) -> _DummyClient:
+    def build_client(self) -> _DummyClient:  # type: ignore[override]
         return self.client
 
 
@@ -64,12 +97,13 @@ def _make_result(
     page_no: int | None = 2,
 ) -> HybridSearchResult:
     content = text
+    snippet_value = snippet if snippet is not None else text
     return HybridSearchResult(
         id=result_id,
         document_id=document_id,
         document_title=document_title,
         text=content,
-        snippet=snippet or content,
+        snippet=snippet_value,
         osis_ref=osis_ref,
         rank=rank,
         page_no=page_no,
@@ -78,7 +112,7 @@ def _make_result(
 
 
 @pytest.fixture()
-def fake_cache(monkeypatch: pytest.MonkeyPatch) -> fakeredis_aioredis.FakeRedis:
+def fake_cache(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeRedisType]:
     fake = fakeredis_aioredis.FakeRedis(decode_responses=True)
     monkeypatch.setattr(rag, "_redis_client", fake, raising=False)
     yield fake
@@ -94,7 +128,7 @@ def _make_registry(model: _DummyModel) -> LLMRegistry:
     return LLMRegistry(models={model.name: model}, default_model=model.name)
 
 
-def test_guarded_answer_accepts_valid_completion(fake_cache: fakeredis_aioredis.FakeRedis) -> None:
+def test_guarded_answer_accepts_valid_completion(fake_cache: FakeRedisType) -> None:
     completion = "Grace-focused summary.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
     registry = _make_registry(model)
@@ -122,7 +156,7 @@ def test_guarded_answer_accepts_valid_completion(fake_cache: fakeredis_aioredis.
     assert cached["answer"]["model_output"] == completion
 
 
-def test_guarded_answer_rejects_mismatched_citations(fake_cache: fakeredis_aioredis.FakeRedis) -> None:
+def test_guarded_answer_rejects_mismatched_citations(fake_cache: FakeRedisType) -> None:
     completion = "Incorrect.\n\nSources: [1] Luke.1.1 (page 2)"
     model = _DummyModel(completion)
     registry = _make_registry(model)
@@ -141,8 +175,34 @@ def test_guarded_answer_rejects_mismatched_citations(fake_cache: fakeredis_aiore
     assert asyncio.run(fake_cache.dbsize()) == 0
 
 
+def test_guarded_answer_requires_osis_reference(
+    fake_cache: FakeRedisType,
+) -> None:
+    completion = "Answer with missing citations.\n\nSources: [1] Unknown"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    results = [
+        _make_result(result_id="passage-1", osis_ref=None, rank=1),
+        _make_result(result_id="passage-2", osis_ref=None, rank=2),
+    ]
+
+    with pytest.raises(GuardrailError):
+        rag._guarded_answer(  # type: ignore[arg-type]
+            session,
+            question="What does the passage say?",
+            results=results,
+            registry=registry,
+            model_hint=model.name,
+            filters=HybridSearchFilters(),
+        )
+
+    assert asyncio.run(fake_cache.dbsize()) == 0
+
+
 def test_guarded_answer_summary_uses_citation_documents(
-    fake_cache: fakeredis_aioredis.FakeRedis,
+    fake_cache: FakeRedisType,
 ) -> None:
     completion = (
         "Layered explanation.\n\n"
@@ -207,7 +267,7 @@ def test_guarded_answer_summary_uses_citation_documents(
 
 
 def test_guarded_answer_profile_mismatch_raises_guardrail_error(
-    fake_cache: fakeredis_aioredis.FakeRedis,
+    fake_cache: FakeRedisType,
 ) -> None:
     completion = "Balanced summary.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
@@ -232,7 +292,7 @@ def test_guarded_answer_profile_mismatch_raises_guardrail_error(
 
 
 def test_guarded_answer_profile_match_includes_profile(
-    fake_cache: fakeredis_aioredis.FakeRedis,
+    fake_cache: FakeRedisType,
 ) -> None:
     completion = "Grace summary.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
@@ -267,7 +327,7 @@ def test_guarded_answer_profile_match_includes_profile(
     }
 
 
-def test_guarded_answer_reuses_cache(fake_cache: fakeredis_aioredis.FakeRedis) -> None:
+def test_guarded_answer_reuses_cache(fake_cache: FakeRedisType) -> None:
     completion = "Stable answer.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
     registry = _make_registry(model)
@@ -297,3 +357,79 @@ def test_guarded_answer_reuses_cache(fake_cache: fakeredis_aioredis.FakeRedis) -
     assert model.client.call_count == 1, "cached response should skip regeneration"
     assert second.model_output == completion
     assert second.model_name == model.name
+
+
+def test_guarded_answer_invalidates_stale_cache(
+    fake_cache: FakeRedisType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    initial_completion = "Stable answer.\n\nSources: [1] John.3.16 (page 2)"
+    refreshed_completion = "Refreshed answer.\n\nSources: [1] John.3.16 (page 2)"
+    model = _DummyModel(initial_completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def record_event(event: str, *, workflow: str, **context: object) -> None:
+        events.append((event, {"workflow": workflow, **context}))
+
+    monkeypatch.setattr(rag, "log_workflow_event", record_event)
+
+    deleted_keys: list[str] = []
+    original_delete = fake_cache.delete
+
+    async def record_delete(*keys: str) -> int:
+        deleted_keys.extend(keys)
+        return await original_delete(*keys)
+
+    monkeypatch.setattr(fake_cache, "delete", record_delete)
+
+    # Populate the cache with a valid answer for the current prompt.
+    rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="Explain John 3:16",
+        results=[_make_result()],
+        registry=registry,
+        model_hint=model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    assert model.client.call_count == 1
+
+    keys = asyncio.run(fake_cache.keys("rag:*"))
+    assert keys
+    cache_key = keys[0]
+    payload_raw = asyncio.run(fake_cache.get(cache_key))
+    assert payload_raw is not None
+    payload = json.loads(payload_raw)
+    payload["answer"]["model_output"] = (
+        "Stale answer.\n\nSources: [1] Luke.1.1 (page 9)"
+    )
+    asyncio.run(fake_cache.set(cache_key, json.dumps(payload)))
+
+    model.client.completion = refreshed_completion
+    deleted_keys.clear()
+    events.clear()
+
+    refreshed = rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="Explain John 3:16",
+        results=[_make_result()],
+        registry=registry,
+        model_hint=model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    assert refreshed.model_output == refreshed_completion
+    assert model.client.call_count == 2
+    assert cache_key in deleted_keys
+    assert any(
+        event == "workflow.guardrails_cache" and data.get("status") == "stale"
+        for event, data in events
+    )
+
+    refreshed_payload_raw = asyncio.run(fake_cache.get(cache_key))
+    assert refreshed_payload_raw is not None
+    refreshed_payload = json.loads(refreshed_payload_raw)
+    assert refreshed_payload["answer"]["model_output"] == refreshed_completion
