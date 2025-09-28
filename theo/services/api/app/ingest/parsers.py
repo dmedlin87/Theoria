@@ -305,38 +305,60 @@ def parse_docx_document(path: Path, *, max_tokens: int) -> ParserResult:
 
 
 class _HTMLExtractor(HTMLParser):
+    _BLOCK_TAGS = {
+        "article",
+        "div",
+        "section",
+        "p",
+        "li",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "br",
+    }
+
+    _SKIP_TAGS = {"script", "style", "noscript", "template"}
+
     def __init__(self) -> None:
         super().__init__()
         self._current_title = False
         self._title_chunks: list[str] = []
         self._body_chunks: list[str] = []
+        self._skip_depth = 0
 
     def handle_starttag(self, tag: str, attrs):  # type: ignore[override]
-        if tag.lower() == "title":
+        lower = tag.lower()
+        if lower == "title":
             self._current_title = True
-        if tag.lower() in {
-            "p",
-            "br",
-            "div",
-            "section",
-            "article",
-            "li",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-        }:
+        if lower in self._SKIP_TAGS:
+            self._skip_depth += 1
+            return
+        if self._skip_depth:
+            return
+        if lower == "br":
+            self._body_chunks.append("\n")
+        elif lower in self._BLOCK_TAGS:
             self._body_chunks.append("\n")
 
     def handle_endtag(self, tag: str):  # type: ignore[override]
-        if tag.lower() == "title":
+        lower = tag.lower()
+        if lower == "title":
             self._current_title = False
-        if tag.lower() in {"p", "div", "section", "article", "li"}:
+        if lower in self._SKIP_TAGS:
+            if self._skip_depth:
+                self._skip_depth -= 1
+            return
+        if self._skip_depth:
+            return
+        if lower in self._BLOCK_TAGS and lower != "br":
             self._body_chunks.append("\n")
 
     def handle_data(self, data: str):  # type: ignore[override]
+        if self._skip_depth:
+            return
         stripped = data.strip()
         if not stripped:
             return
@@ -387,11 +409,14 @@ def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
         parser = "unstructured"
         parser_version = _package_version("unstructured", "0.15.x")
     else:
+        html = read_text_file(path)
         extractor = _HTMLExtractor()
         try:
-            extractor.feed(read_text_file(path))
+            extractor.feed(html)
         except Exception:
             extractor = _HTMLExtractor()
+            extractor.feed(html)
+        extractor.close()
         text, metadata = extractor.result()
         parser = "html_fallback"
         parser_version = "0.1.0"
