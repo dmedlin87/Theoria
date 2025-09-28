@@ -402,7 +402,35 @@ def enqueue_job(
         key: cast(Any, value) for key, value in args.items()
     }
     eta = schedule_at
-    result = celery.send_task(payload.task, kwargs=send_kwargs, eta=eta)
+
+    try:
+        result = celery.send_task(payload.task, kwargs=send_kwargs, eta=eta)
+    except Exception as exc:
+        session.rollback()
+        fallback = (
+            session.query(IngestionJob)
+            .filter(
+                IngestionJob.job_type == payload.task,
+                IngestionJob.args_hash == args_hash,
+                IngestionJob.created_at >= cutoff,
+            )
+            .order_by(IngestionJob.created_at.desc())
+            .first()
+        )
+        if fallback is not None:
+            return JobEnqueueResponse(
+                job_id=fallback.id,
+                task=fallback.job_type,
+                args_hash=args_hash,
+                queued_at=fallback.created_at,
+                schedule_at=fallback.scheduled_at,
+                status_url=f"/jobs/{fallback.id}",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to enqueue job",
+        ) from exc
+
     task_id = getattr(result, "id", None)
     if task_id:
         job.task_id = task_id
