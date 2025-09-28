@@ -307,6 +307,65 @@ def test_document_export_manifest_includes_enrichment_version_without_field(
     assert saved_manifest["enrichment_version"] == 2
 
 
+def test_document_export_fields_include_parent_from_child_request() -> None:
+    now = datetime.now(timezone.utc)
+    passage = Passage(
+        id="passage-1",
+        document_id="doc-1",
+        text="Example passage text",
+        osis_ref="John.1.1",
+        page_no=1,
+        t_start=0.0,
+        t_end=5.0,
+        score=0.9,
+        meta={},
+    )
+    document = DocumentDetailResponse(
+        id="doc-1",
+        title="Example",
+        source_type="markdown",
+        collection="sermons",
+        authors=["Jane"],
+        doi="10.1234/example",
+        venue="Theo Journal",
+        year=2024,
+        created_at=now,
+        updated_at=now,
+        source_url="https://example.test",
+        channel=None,
+        video_id=None,
+        duration_seconds=None,
+        storage_path=None,
+        abstract="An illustrative sample.",
+        topics=["Theology", "Grace"],
+        enrichment_version=2,
+        primary_topic="Theology",
+        provenance_score=7,
+        meta={},
+        passages=[passage],
+    )
+    response = DocumentExportResponse(
+        filters=DocumentExportFilters(collection="sermons"),
+        include_passages=True,
+        limit=None,
+        total_documents=1,
+        total_passages=1,
+        documents=[document],
+    )
+
+    _, records = formatters.build_document_export(
+        response,
+        include_passages=True,
+        include_text=True,
+        fields={"document_id", "passages.text"},
+    )
+
+    assert len(records) == 1
+    record = records[0]
+    assert list(record.keys()) == ["document_id", "passages"]
+    assert record["passages"] == [{"text": "Example passage text"}]
+
+
 def test_search_manifest_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[HybridSearchRequest] = []
 

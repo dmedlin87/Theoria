@@ -115,14 +115,24 @@ def _filter_values(
 ) -> OrderedDict:
     """Filter *record* to include only keys listed in *allowed* preserving order."""
 
+    expanded_allowed: set[str] | None = None
+    if allowed is not None:
+        expanded_allowed = set(allowed)
+        for field in list(allowed):
+            if "." not in field:
+                continue
+            parts = field.split(".")
+            for index in range(1, len(parts)):
+                expanded_allowed.add(".".join(parts[:index]))
+
     output: OrderedDict[str, object] = OrderedDict()
     for key in order:
         if key not in record:
             continue
-        if allowed is not None and key not in allowed:
+        if expanded_allowed is not None and key not in expanded_allowed:
             continue
         value = record[key]
-        if value is None and allowed is not None and key not in allowed:
+        if value is None and expanded_allowed is not None and key not in expanded_allowed:
             continue
         output[key] = value
     return output
