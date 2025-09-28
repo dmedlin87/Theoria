@@ -32,6 +32,45 @@ _METADATA_SETTING_KEY = "openbible_geo.metadata"
 _LICENSE = "CC-BY-4.0"
 _SOURCE_URL = "https://github.com/openbibleinfo/Bible-Geocoding-Data"
 
+_SAMPLE_ANCIENT_PLACES = [
+    {
+        "ancient_id": "a-bethlehem",
+        "friendly_id": "Bethlehem",
+        "classification": "settlement",
+        "raw": {
+            "names": ["Bethlehem", "Bethlehem Ephrathah"],
+            "modern_associations": {"bethlehem": {"confidence": 0.95}},
+        },
+    }
+]
+
+_SAMPLE_VERSE_LINKS = [
+    {"ancient_id": "a-bethlehem", "osis_ref": "Mic.5.2"},
+    {"ancient_id": "a-bethlehem", "osis_ref": "Matt.2.1"},
+]
+
+_SAMPLE_MODERN_LOCATIONS = [
+    {
+        "modern_id": "bethlehem",
+        "friendly_id": "Bethlehem",
+        "geom_kind": "point",
+        "confidence": 0.95,
+        "names": [
+            {"name": "Bethlehem"},
+            {"name": "Bethlehem Ephrathah"},
+        ],
+        "longitude": 35.2003,
+        "latitude": 31.7054,
+        "raw": {
+            "names": [
+                {"name": "Bethlehem"},
+                {"name": "Bethlehem Ephrathah"},
+            ],
+            "coordinates_source": {"name": "Sample dataset"},
+        },
+    }
+]
+
 
 def _stream_json_lines(path: Path) -> Iterable[dict[str, Any]]:
     if not path.exists():
@@ -147,6 +186,40 @@ def _detect_commit_sha(data_root: Path) -> str | None:
     return result.stdout.strip() or None
 
 
+def _seed_sample_dataset(session: Session) -> None:
+    logger.info("Seeding fallback OpenBible geo sample dataset")
+
+    session.execute(delete(GeoPlaceVerse))
+    session.execute(delete(GeoAncientPlace))
+    session.execute(delete(GeoModernLocation))
+    session.execute(delete(GeoGeometry))
+    session.execute(delete(GeoImage))
+
+    _upsert_rows(session, GeoAncientPlace, list(_SAMPLE_ANCIENT_PLACES), ["ancient_id"])
+    _upsert_rows(
+        session,
+        GeoPlaceVerse,
+        list(_SAMPLE_VERSE_LINKS),
+        ["ancient_id", "osis_ref"],
+    )
+    _upsert_rows(
+        session,
+        GeoModernLocation,
+        list(_SAMPLE_MODERN_LOCATIONS),
+        ["modern_id"],
+    )
+
+    session.commit()
+
+    metadata = {
+        "id": "openbible_geo",
+        "license": _LICENSE,
+        "source_url": _SOURCE_URL,
+        "commit_sha": "sample-dataset",
+    }
+    save_setting(session, _METADATA_SETTING_KEY, metadata)
+
+
 def seed_openbible_geo(
     session: Session,
     *,
@@ -161,6 +234,7 @@ def seed_openbible_geo(
 
     if not data_folder.exists():
         logger.warning("OpenBible geo dataset not available at %s", data_folder)
+        _seed_sample_dataset(session)
         return
 
     # 1) Ancient places and verse linkages
