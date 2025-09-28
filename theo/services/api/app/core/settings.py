@@ -103,6 +103,19 @@ class Settings(BaseSettings):
         ),
         description="Allow unauthenticated requests (intended for testing only)",
     )
+    cors_allowed_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://127.0.0.1:3000",
+            "http://localhost:3000",
+        ],
+        validation_alias=AliasChoices(
+            "THEO_CORS_ALLOWED_ORIGINS",
+            "CORS_ALLOWED_ORIGINS",
+        ),
+        description=(
+            "Comma-separated list of allowed CORS origins for the FastAPI service"
+        ),
+    )
 
     @field_validator("api_keys", mode="before")
     @classmethod
@@ -126,6 +139,17 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return value
         raise ValueError("Invalid JWT algorithm configuration")
+    
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value: object) -> list[str]:
+        if value in (None, ""):
+            return []
+        if isinstance(value, str):
+            return [segment.strip() for segment in value.split(",") if segment.strip()]
+        if isinstance(value, list):
+            return value
+        raise ValueError("Invalid CORS origin configuration")
     contradictions_enabled: bool = Field(
         default=True, description="Toggle contradiction search endpoints"
     )
