@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -116,3 +118,20 @@ def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
         assert stored_frontmatter["canonical_url"] == "https://example.com/foo"
     finally:
         settings.storage_root = original_storage
+
+
+@pytest.mark.parametrize(
+    "blocked_url",
+    [
+        "http://localhost/resource",
+        "http://10.0.0.12/secret",
+    ],
+)
+def test_run_pipeline_for_url_blocks_private_targets(monkeypatch, blocked_url) -> None:
+    def unexpected_fetch(*args, **kwargs):  # noqa: ANN001
+        raise AssertionError("Blocked URLs should not be fetched")
+
+    monkeypatch.setattr(pipeline, "_fetch_web_document", unexpected_fetch)
+
+    with pytest.raises(pipeline.UnsupportedSourceError):
+        pipeline.run_pipeline_for_url(object(), blocked_url)

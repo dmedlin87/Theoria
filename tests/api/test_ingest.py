@@ -140,3 +140,61 @@ def test_ingest_file_rejects_upload_exceeding_limit(
     assert called is False
 
 
+def test_ingest_url_allows_http(monkeypatch: pytest.MonkeyPatch, api_client: TestClient) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_pipeline(session, url: str, **kwargs):  # noqa: ANN001
+        captured["url"] = url
+        return _mkdoc()
+
+    monkeypatch.setattr(ingest_module, "run_pipeline_for_url", fake_pipeline)
+
+    response = api_client.post("/ingest/url", json={"url": "https://example.com"})
+
+    assert response.status_code == status.HTTP_200_OK
+    assert captured["url"] == "https://example.com"
+
+
+@pytest.mark.parametrize(
+    "disallowed_url",
+    [
+        "file:///etc/passwd",
+        "gopher://example.com/resource",
+    ],
+)
+def test_ingest_url_rejects_disallowed_scheme(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient, disallowed_url: str
+) -> None:
+    def fail_pipeline(*args, **kwargs):  # noqa: ANN001 - simple assertion helper
+        raise AssertionError("URL validation should prevent pipeline execution")
+
+    monkeypatch.setattr(ingest_module, "run_pipeline_for_url", fail_pipeline)
+
+    response = api_client.post("/ingest/url", json={"url": disallowed_url})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.parametrize(
+    "blocked_url",
+    [
+        "http://localhost/resource",
+        "http://127.0.0.1/secret",
+        "http://192.168.1.10/internal",
+    ],
+)
+def test_ingest_url_blocks_private_targets(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient, blocked_url: str
+) -> None:
+    from theo.services.api.app.ingest import pipeline as pipeline_module
+
+    def unexpected_fetch(*args, **kwargs):  # noqa: ANN001
+        raise AssertionError("Disallowed URLs must not be fetched")
+
+    monkeypatch.setattr(pipeline_module, "_fetch_web_document", unexpected_fetch)
+
+    response = api_client.post("/ingest/url", json={"url": blocked_url})
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()["detail"] == "URL target is not allowed for ingestion"
+
