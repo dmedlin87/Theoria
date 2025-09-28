@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Callable, Optional, cast
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
@@ -30,6 +30,7 @@ from .routes import (
     transcripts,
     verses,
 )
+from .security import require_principal
 from .telemetry import configure_console_tracer
 
 GenerateLatestFn = Callable[[], bytes]
@@ -65,20 +66,64 @@ def create_app() -> FastAPI:
         ErrorReportingMiddleware,
         extra_context={"service": "api"},
     )
-    app.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
-    app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
-    app.include_router(search.router, prefix="/search", tags=["search"])
-    app.include_router(export.router, prefix="/export", tags=["export"])
-    app.include_router(verses.router, prefix="/verses", tags=["verses"])
-    app.include_router(documents.router, prefix="/documents", tags=["documents"])
-    app.include_router(features.router, prefix="/features", tags=["features"])
-    app.include_router(research.router, prefix="/research", tags=["research"])
-    app.include_router(creators.router, prefix="/creators", tags=["creators"])
-    app.include_router(transcripts.router, prefix="/transcripts", tags=["transcripts"])
-    app.include_router(trails.router, prefix="/trails", tags=["trails"])
+    security_dependencies = [Depends(require_principal)]
+    app.include_router(
+        ingest.router, prefix="/ingest", tags=["ingest"], dependencies=security_dependencies
+    )
+    app.include_router(
+        jobs.router, prefix="/jobs", tags=["jobs"], dependencies=security_dependencies
+    )
+    app.include_router(
+        search.router, prefix="/search", tags=["search"], dependencies=security_dependencies
+    )
+    app.include_router(
+        export.router, prefix="/export", tags=["export"], dependencies=security_dependencies
+    )
+    app.include_router(
+        verses.router, prefix="/verses", tags=["verses"], dependencies=security_dependencies
+    )
+    app.include_router(
+        documents.router,
+        prefix="/documents",
+        tags=["documents"],
+        dependencies=security_dependencies,
+    )
+    app.include_router(
+        features.router,
+        prefix="/features",
+        tags=["features"],
+        dependencies=security_dependencies,
+    )
+    app.include_router(
+        research.router,
+        prefix="/research",
+        tags=["research"],
+        dependencies=security_dependencies,
+    )
+    app.include_router(
+        creators.router,
+        prefix="/creators",
+        tags=["creators"],
+        dependencies=security_dependencies,
+    )
+    app.include_router(
+        transcripts.router,
+        prefix="/transcripts",
+        tags=["transcripts"],
+        dependencies=security_dependencies,
+    )
+    app.include_router(
+        trails.router, prefix="/trails", tags=["trails"], dependencies=security_dependencies
+    )
 
-    app.include_router(ai.router, prefix="/ai", tags=["ai"])
-    app.include_router(ai.settings_router, tags=["ai-settings"])
+    app.include_router(
+        ai.router, prefix="/ai", tags=["ai"], dependencies=security_dependencies
+    )
+    app.include_router(
+        ai.settings_router,
+        tags=["ai-settings"],
+        dependencies=security_dependencies,
+    )
 
     if generate_latest is not None:
         metrics_generator = cast(GenerateLatestFn, generate_latest)

@@ -21,6 +21,15 @@ LOGGER = logging.getLogger("theo.api.errors")
 
 
 @dataclass(slots=True)
+class BodyCapture:
+    """Representation of a captured request body preview."""
+
+    preview: bytes
+    total_bytes: int | None = None
+    complete: bool = True
+
+
+@dataclass(slots=True)
 class DebugReport:
     """Container for structured error reports."""
 
@@ -58,7 +67,9 @@ def _filter_headers(headers: Mapping[str, str]) -> dict[str, str]:
     return filtered
 
 
-def _collect_request_context(request: Request, *, body: bytes | None, body_max_bytes: int) -> dict[str, Any]:
+def _collect_request_context(
+    request: Request, *, body: bytes | BodyCapture | None, body_max_bytes: int
+) -> dict[str, Any]:
     client_host, client_port = None, None
     if request.client is not None:
         client_host, client_port = request.client
@@ -72,9 +83,23 @@ def _collect_request_context(request: Request, *, body: bytes | None, body_max_b
         "headers": _filter_headers(request.headers),
     }
 
-    if body:
-        preview = body[:body_max_bytes]
-        truncated = len(body) > body_max_bytes
+    capture: BodyCapture | None
+    if isinstance(body, BodyCapture):
+        capture = body
+    elif isinstance(body, (bytes, bytearray)):
+        capture = BodyCapture(preview=bytes(body), total_bytes=len(body), complete=True)
+    else:
+        capture = None
+
+    if capture:
+        preview = capture.preview[:body_max_bytes]
+        truncated_preview = len(capture.preview) > body_max_bytes
+        total_bytes = capture.total_bytes if capture.total_bytes is not None else len(capture.preview)
+        truncated = (
+            truncated_preview
+            or not capture.complete
+            or (capture.total_bytes is not None and capture.total_bytes > len(capture.preview))
+        )
         try:
             body_text = preview.decode("utf-8", errors="replace")
         except Exception:
@@ -82,7 +107,7 @@ def _collect_request_context(request: Request, *, body: bytes | None, body_max_b
         context["body"] = {
             "truncated": truncated,
             "preview": body_text,
-            "bytes": len(body),
+            "bytes": total_bytes,
         }
     return context
 
@@ -119,7 +144,7 @@ def build_debug_report(
     request: Request,
     *,
     exc: Exception | None,
-    body: bytes | None,
+    body: bytes | BodyCapture | None,
     context: Mapping[str, Any] | None = None,
     env_prefixes: Iterable[str] = SAFE_ENV_PREFIXES,
     body_max_bytes: int = 2048,
@@ -156,4 +181,11 @@ def emit_debug_report(report: DebugReport, *, logger: logging.Logger | None = No
     )
 
 
-__all__ = ["DebugReport", "build_debug_report", "emit_debug_report", "SAFE_ENV_PREFIXES", "SAFE_HEADER_PREFIXES"]
+__all__ = [
+    "BodyCapture",
+    "DebugReport",
+    "build_debug_report",
+    "emit_debug_report",
+    "SAFE_ENV_PREFIXES",
+    "SAFE_HEADER_PREFIXES",
+]

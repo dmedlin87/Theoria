@@ -6,12 +6,13 @@ import json
 import tempfile
 from pathlib import Path
 from uuid import uuid4
-from typing import Any
+from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
+from ..core.settings import get_settings
 from ..ingest.pipeline import (
     UnsupportedSourceError,
     run_pipeline_for_file,
@@ -21,6 +22,9 @@ from ..ingest.pipeline import (
 from ..models.documents import DocumentIngestResponse, UrlIngestRequest
 
 router = APIRouter()
+
+
+_UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 def _parse_frontmatter(raw: str | None) -> dict[str, Any] | None:
@@ -44,6 +48,36 @@ def _unique_safe_path(tmp_dir: Path, filename: str | None, default: str) -> Path
     return tmp_dir / unique_name
 
 
+async def _iter_upload_chunks(
+    upload: UploadFile, chunk_size: int = _UPLOAD_CHUNK_SIZE
+) -> AsyncIterator[bytes]:
+    while True:
+        chunk = await upload.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+
+
+async def _stream_upload_to_path(
+    upload: UploadFile,
+    destination: Path,
+    *,
+    max_bytes: int | None,
+    chunk_size: int = _UPLOAD_CHUNK_SIZE,
+) -> int:
+    written = 0
+    with destination.open("wb") as handle:
+        async for chunk in _iter_upload_chunks(upload, chunk_size=chunk_size):
+            written += len(chunk)
+            if max_bytes is not None and written > max_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    detail="Upload exceeds maximum allowed size",
+                )
+            handle.write(chunk)
+    return written
+
+
 @router.post("/file", response_model=DocumentIngestResponse)
 async def ingest_file(
     file: UploadFile = File(...),
@@ -54,13 +88,15 @@ async def ingest_file(
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="theo-ingest-"))
     tmp_path = _unique_safe_path(tmp_dir, file.filename, "upload.bin")
-    with tmp_path.open("wb") as destination:
-        content = await file.read()
-        destination.write(content)
-
-    parsed_frontmatter = _parse_frontmatter(frontmatter)
+    settings = get_settings()
 
     try:
+        await _stream_upload_to_path(
+            file,
+            tmp_path,
+            max_bytes=getattr(settings, "ingest_upload_max_bytes", None),
+        )
+        parsed_frontmatter = _parse_frontmatter(frontmatter)
         document = run_pipeline_for_file(session, tmp_path, parsed_frontmatter)
     except UnsupportedSourceError as exc:
         raise HTTPException(
@@ -111,16 +147,15 @@ async def ingest_transcript(
     )
     audio_path: Path | None = None
 
+    settings = get_settings()
+    limit = getattr(settings, "ingest_upload_max_bytes", None)
+
     try:
-        transcript_bytes = await transcript.read()
-        with transcript_path.open("wb") as destination:
-            destination.write(transcript_bytes)
+        await _stream_upload_to_path(transcript, transcript_path, max_bytes=limit)
 
         if audio is not None:
             audio_path = _unique_safe_path(tmp_dir, audio.filename, "audio.bin")
-            audio_bytes = await audio.read()
-            with audio_path.open("wb") as destination:
-                destination.write(audio_bytes)
+            await _stream_upload_to_path(audio, audio_path, max_bytes=limit)
 
         parsed_frontmatter = _parse_frontmatter(frontmatter)
 
