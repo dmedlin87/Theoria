@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Sequence
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..ai.rag import (
     CollaborationResponse,
@@ -58,9 +58,22 @@ class LLMModelUpdateRequest(APIModel):
     make_default: bool | None = None
 
 
+MAX_CHAT_MESSAGE_CONTENT_LENGTH = 8_000
+CHAT_SESSION_TOTAL_CHAR_BUDGET = 32_000
+
+
 class ChatSessionMessage(APIModel):
     role: Literal["user", "assistant", "system"]
     content: str
+
+    @field_validator("content")
+    @classmethod
+    def _enforce_max_length(cls, value: str) -> str:
+        if len(value) > MAX_CHAT_MESSAGE_CONTENT_LENGTH:
+            raise ValueError(
+                "Chat message content exceeds the maximum allowed length"
+            )
+        return value
 
 
 class ChatSessionRequest(APIModel):

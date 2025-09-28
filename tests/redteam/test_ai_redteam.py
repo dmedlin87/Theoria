@@ -24,6 +24,10 @@ _OWASP_PROMPT_CASES = [
 ]
 from theo.services.api.app.ai.clients import EchoClient
 from theo.services.api.app.main import app
+from theo.services.api.app.models.ai import (
+    CHAT_SESSION_TOTAL_CHAR_BUDGET,
+    MAX_CHAT_MESSAGE_CONTENT_LENGTH,
+)
 
 pytestmark = pytest.mark.redteam
 
@@ -150,3 +154,72 @@ def test_sermon_workflow_refuses_owasp_prompts(
             "Sermon workflow guardrail metadata has unexpected format for prompt"
             f" {prompt!r} in category {category!r}: {guardrail_profile}"
         )
+
+
+def test_chat_rejects_message_exceeding_max_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Single messages longer than the allowed limit should be rejected early."""
+
+    from theo.services.api.app.core import settings as settings_module
+
+    settings = settings_module.get_settings()
+    monkeypatch.setattr(settings, "auth_allow_anonymous", True, raising=False)
+
+    llm_called = False
+
+    def _unexpected_generate(*args: object, **kwargs: object) -> str:
+        nonlocal llm_called
+        llm_called = True
+        return "LLM invocation should not occur"
+
+    monkeypatch.setattr(EchoClient, "generate", _unexpected_generate, raising=False)
+
+    seed_reference_corpus()
+    with TestClient(app) as client:
+        oversized = "x" * (MAX_CHAT_MESSAGE_CONTENT_LENGTH + 1)
+        response = client.post(
+            "/ai/chat",
+            json={"messages": [{"role": "user", "content": oversized}]},
+        )
+
+    assert response.status_code == 422
+    assert not llm_called
+
+
+def test_chat_rejects_payload_exceeding_total_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cumulative message budgets must be enforced before invoking the LLM."""
+
+    from theo.services.api.app.core import settings as settings_module
+
+    settings = settings_module.get_settings()
+    monkeypatch.setattr(settings, "auth_allow_anonymous", True, raising=False)
+
+    llm_called = False
+
+    def _unexpected_generate(*args: object, **kwargs: object) -> str:
+        nonlocal llm_called
+        llm_called = True
+        return "LLM invocation should not occur"
+
+    monkeypatch.setattr(EchoClient, "generate", _unexpected_generate, raising=False)
+
+    seed_reference_corpus()
+    with TestClient(app) as client:
+        chunk = "x" * (MAX_CHAT_MESSAGE_CONTENT_LENGTH // 2)
+        messages_needed = (CHAT_SESSION_TOTAL_CHAR_BUDGET // len(chunk)) + 1
+        messages = [{"role": "system", "content": chunk}]
+        for index in range(messages_needed - 1):
+            role = "user" if index == messages_needed - 2 else "assistant"
+            messages.append({"role": role, "content": chunk})
+        messages[-1]["role"] = "user"
+
+        response = client.post(
+            "/ai/chat",
+            json={"messages": messages},
+        )
+
+    assert response.status_code == 413
+    assert not llm_called
