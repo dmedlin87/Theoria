@@ -8,13 +8,17 @@ import sys
 from collections.abc import Generator
 from pathlib import Path
 
-import pytest
-
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+import pytest
+from fastapi import Request as FastAPIRequest
+
+from theo.services.api.app.main import app
+from theo.services.api.app.security import require_principal
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -45,3 +49,23 @@ def configure_test_environment(
     shutil.rmtree(storage_root, ignore_errors=True)
     if db_path.exists():
         db_path.unlink()
+
+
+@pytest.fixture(autouse=True)
+def bypass_authentication(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Permit unauthenticated access for API tests unless explicitly disabled."""
+
+    if request.node.get_closest_marker("no_auth_override"):
+        yield
+        return
+
+    def _principal_override(fastapi_request: FastAPIRequest):
+        principal = {"method": "override", "subject": "test"}
+        fastapi_request.state.principal = principal
+        return principal
+
+    app.dependency_overrides[require_principal] = _principal_override
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(require_principal, None)
