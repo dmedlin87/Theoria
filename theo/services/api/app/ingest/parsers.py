@@ -53,7 +53,12 @@ class ParserResult:
 
 
 def read_text_file(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        # Fallback to a lossy decode so ingestion can continue with replacement
+        # characters instead of failing hard on unexpected encodings.
+        return path.read_text(encoding="utf-8", errors="replace")
 
 
 class _PdfExtractionErrorSentinel:
@@ -125,7 +130,7 @@ def parse_transcript_vtt(path: Path) -> list[TranscriptSegment]:
 def parse_transcript_json(path: Path) -> list[TranscriptSegment]:
     """Parse a JSON transcript array."""
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = json.loads(read_text_file(path))
     segments: list[TranscriptSegment] = []
     if isinstance(payload, dict) and "events" in payload:
         payload = payload["events"]
@@ -409,14 +414,30 @@ def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
         parser = "unstructured"
         parser_version = _package_version("unstructured", "0.15.x")
     else:
-        html = read_text_file(path)
+
+        try:
+            raw_html = read_text_file(path)
+        except (UnicodeDecodeError, OSError) as exc:
+            from .pipeline import UnsupportedSourceError
+
+            raise UnsupportedSourceError(
+                f"Unable to decode HTML document '{path.name}'"
+            ) from exc
+
         extractor = _HTMLExtractor()
         try:
-            extractor.feed(html)
+            extractor.feed(raw_html)
         except Exception:
             extractor = _HTMLExtractor()
-            extractor.feed(html)
-        extractor.close()
+            try:
+                extractor.feed(raw_html)
+            except Exception as inner_exc:  # pragma: no cover - defensive
+                from .pipeline import UnsupportedSourceError
+
+                raise UnsupportedSourceError(
+                    f"Unable to parse HTML document '{path.name}'"
+                ) from inner_exc
+
         text, metadata = extractor.result()
         parser = "html_fallback"
         parser_version = "0.1.0"
@@ -520,7 +541,7 @@ def parse_audio_document(
                 if suffix in {".vtt", ".webvtt", ".srt", ".json"}:
                     transcript_segments = load_transcript(candidate)
                 else:
-                    transcript_text = candidate.read_text(encoding="utf-8").strip()
+                    transcript_text = read_text_file(candidate).strip()
 
     if path.suffix.lower() == ".wav":
         try:
