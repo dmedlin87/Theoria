@@ -337,25 +337,28 @@ class EchoClient:
 
         if not passages:
             body = normalized_prompt.strip()
-        else:
-            summary_segments: list[str] = []
-            for passage in passages:
-                snippet = passage["snippet"]
-                if snippet and snippet[-1] not in ".!?":
-                    snippet = f"{snippet}."
-                summary_segments.append(f"[{passage['index']}] {snippet}")
-            summary_text = " ".join(summary_segments)
+            if self._suffix:
+                return f"{body}\n\n{self._suffix}".strip()
+            return body
 
-            sources_entries = [
-                f"[{passage['index']}] {passage['osis']} ({passage['anchor']})"
-                for passage in passages
-            ]
-            sources_text = "\n".join(sources_entries)
-            body = f"{summary_text}\n\nSources: {sources_text}".strip()
+        summary_segments: list[str] = []
+        for passage in passages:
+            snippet = passage["snippet"]
+            if snippet and snippet[-1] not in ".!?":
+                snippet = f"{snippet}."
+            summary_segments.append(f"[{passage['index']}] {snippet}")
+        summary_text = " ".join(summary_segments)
 
+        summary_block = summary_text.strip()
         if self._suffix:
-            return f"{body}\n\n{self._suffix}".strip()
-        return body
+            summary_block = f"{summary_block}\n\n{self._suffix}".strip()
+
+        sources_entries = [
+            f"[{passage['index']}] {passage['osis']} ({passage['anchor']})"
+            for passage in passages
+        ]
+        sources_text = "\n".join(sources_entries)
+        return f"{summary_block}\n\nSources: {sources_text}".strip()
 
 
 def build_client(provider: str, config: dict[str, str]) -> LanguageModelClient:
