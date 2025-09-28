@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -27,7 +29,7 @@ pytestmark = pytest.mark.redteam
 
 
 @pytest.fixture()
-def redteam_harness(monkeypatch: pytest.MonkeyPatch) -> RedTeamHarness:
+def redteam_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[RedTeamHarness]:
     """Provide a harness with a deterministic refusal-only LLM."""
 
     def _safe_generate(
