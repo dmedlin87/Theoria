@@ -234,7 +234,7 @@ def export_documents(
                 enrichment_version=document.enrichment_version,
                 primary_topic=_primary_topic(document),
                 provenance_score=document.provenance_score,
-                metadata=document.bib_json,
+                meta=document.bib_json,
                 passages=passages,
             )
         )

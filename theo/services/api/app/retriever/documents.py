@@ -113,7 +113,7 @@ def get_document(session: Session, document_id: str) -> DocumentDetailResponse:
         topics=document.topics,
         enrichment_version=document.enrichment_version,
         provenance_score=document.provenance_score,
-        metadata=document.bib_json,
+        meta=document.bib_json,
         passages=passage_schemas,
         annotations=[_annotation_to_schema(annotation) for annotation in annotations],
     )
