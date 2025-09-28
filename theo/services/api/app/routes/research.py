@@ -9,23 +9,33 @@ from ..core.database import get_session
 from ..core.settings import get_settings
 from ..models.research import (
     ContradictionSearchResponse,
+    CrossReference,
     CrossReferenceResponse,
+    DssLink,
     DssLinksResponse,
     FallacyDetectRequest,
     FallacyDetectResponse,
+    FallacyDetection,
     GeoPlaceSearchResponse,
     GeoVerseResponse,
+    HistoricityEntry,
     HistoricitySearchResponse,
+    MorphToken,
     MorphologyResponse,
+    OverviewBullet,
     ReliabilityOverviewResponse,
     ReportBuildRequest,
+    ResearchNote,
     ResearchNoteCreate,
     ResearchNoteResponse,
     ResearchNotesResponse,
     ResearchNoteUpdate,
+    ResearchReport,
     ResearchReportResponse,
     ScriptureResponse,
+    ScriptureVerse,
     VariantApparatusResponse,
+    VariantReading,
 )
 from ..research import (
     build_reliability_overview,
@@ -61,17 +71,7 @@ def get_scripture(
     return ScriptureResponse(
         osis=osis,
         translation=translation_code,
-        verses=[
-            {
-                "osis": verse.osis,
-                "translation": verse.translation,
-                "text": verse.text,
-                "book": verse.book,
-                "chapter": verse.chapter,
-                "verse": verse.verse,
-            }
-            for verse in verses
-        ],
+        verses=[ScriptureVerse.model_validate(verse) for verse in verses],
         meta={"count": len(verses)},
     )
 
@@ -84,17 +84,7 @@ def get_crossrefs(
     results = fetch_cross_references(osis, limit=limit)
     return CrossReferenceResponse(
         osis=osis,
-        results=[
-            {
-                "source": item.source,
-                "target": item.target,
-                "weight": item.weight,
-                "relation_type": item.relation_type,
-                "summary": item.summary,
-                "dataset": item.dataset,
-            }
-            for item in results
-        ],
+        results=[CrossReference.model_validate(item) for item in results],
         total=len(results),
     )
 
@@ -117,23 +107,7 @@ def get_variants(
     entries = variants_apparatus(osis, categories=categories, limit=limit)
     return VariantApparatusResponse(
         osis=osis,
-        readings=[
-            {
-                "id": entry.id,
-                "osis": entry.osis,
-                "category": entry.category,
-                "reading": entry.reading,
-                "note": entry.note,
-                "source": entry.source,
-                "witness": entry.witness,
-                "translation": entry.translation,
-                "confidence": entry.confidence,
-                "dataset": entry.dataset,
-                "disputed": entry.disputed,
-                "witness_metadata": entry.witness_metadata,
-            }
-            for entry in entries
-        ],
+        readings=[VariantReading.model_validate(entry) for entry in entries],
         total=len(entries),
     )
 
@@ -145,18 +119,7 @@ def get_dss_links(
     links = fetch_dss_links(osis)
     return DssLinksResponse(
         osis=osis,
-        links=[
-            {
-                "id": entry.id,
-                "osis": entry.osis,
-                "title": entry.title,
-                "url": entry.url,
-                "fragment": entry.fragment,
-                "summary": entry.summary,
-                "dataset": entry.dataset,
-            }
-            for entry in links
-        ],
+        links=[DssLink.model_validate(entry) for entry in links],
         total=len(links),
     )
 
@@ -174,9 +137,9 @@ def get_reliability_overview(
     return ReliabilityOverviewResponse(
         osis=overview.osis,
         mode=overview.mode,
-        consensus=[{"summary": bullet.summary, "citations": bullet.citations} for bullet in overview.consensus],
-        disputed=[{"summary": bullet.summary, "citations": bullet.citations} for bullet in overview.disputed],
-        manuscripts=[{"summary": bullet.summary, "citations": bullet.citations} for bullet in overview.manuscripts],
+        consensus=[OverviewBullet.model_validate(bullet) for bullet in overview.consensus],
+        disputed=[OverviewBullet.model_validate(bullet) for bullet in overview.disputed],
+        manuscripts=[OverviewBullet.model_validate(bullet) for bullet in overview.manuscripts],
     )
 
 
@@ -187,17 +150,7 @@ def get_morphology(
     tokens = fetch_morphology(osis)
     return MorphologyResponse(
         osis=osis,
-        tokens=[
-            {
-                "osis": token.osis,
-                "surface": token.surface,
-                "lemma": token.lemma,
-                "morph": token.morph,
-                "gloss": token.gloss,
-                "position": token.position,
-            }
-            for token in tokens
-        ],
+        tokens=[MorphToken.model_validate(token) for token in tokens],
     )
 
 
@@ -234,7 +187,7 @@ def list_notes(
     )
     return ResearchNotesResponse(
         osis=osis,
-        notes=notes,
+        notes=[ResearchNote.model_validate(note) for note in notes],
         total=len(notes),
     )
 
@@ -261,20 +214,7 @@ def get_historicity(
     )
     return HistoricitySearchResponse(
         query=query,
-        results=[
-            {
-                "id": entry.id,
-                "title": entry.title,
-                "authors": entry.authors,
-                "year": entry.year,
-                "summary": entry.summary,
-                "source": entry.source,
-                "url": entry.url,
-                "tags": entry.tags,
-                "score": entry.score,
-            }
-            for entry in results
-        ],
+        results=[HistoricityEntry.model_validate(entry) for entry in results],
         total=len(results),
     )
 
@@ -298,7 +238,7 @@ def create_note(
         tags=payload.tags,
         evidences=[e.model_dump() for e in payload.evidences or []],
     )
-    return ResearchNoteResponse(note=note)
+    return ResearchNoteResponse(note=ResearchNote.model_validate(note))
 
 
 @router.patch("/notes/{note_id}", response_model=ResearchNoteResponse)
@@ -329,7 +269,7 @@ def patch_note(
         changes=update_data,
         evidences=evidence_payload,
     )
-    return ResearchNoteResponse(note=note)
+    return ResearchNoteResponse(note=ResearchNote.model_validate(note))
 
 
 @router.delete("/notes/{note_id}", status_code=204)
@@ -352,18 +292,7 @@ def detect_fallacies(payload: FallacyDetectRequest) -> FallacyDetectResponse:
     )
     return FallacyDetectResponse(
         text=payload.text,
-        detections=[
-            {
-                "id": hit.id,
-                "name": hit.name,
-                "category": hit.category,
-                "description": hit.description,
-                "severity": hit.severity,
-                "confidence": hit.confidence,
-                "matches": hit.matches,
-            }
-            for hit in detections
-        ],
+        detections=[FallacyDetection.model_validate(hit) for hit in detections],
         total=len(detections),
     )
 
@@ -387,22 +316,7 @@ def build_report(payload: ReportBuildRequest) -> ResearchReportResponse:
         citations_limit=payload.citations_limit,
         min_fallacy_confidence=payload.min_fallacy_confidence,
     )
-    return ResearchReportResponse(
-        report={
-            "osis": report.osis,
-            "stance": report.stance,
-            "summary": report.summary,
-            "sections": [
-                {
-                    "title": section.title,
-                    "summary": section.summary,
-                    "items": section.items,
-                }
-                for section in report.sections
-            ],
-            "meta": report.meta,
-        }
-    )
+    return ResearchReportResponse(report=ResearchReport.model_validate(report))
 
 
 @router.get("/contradictions", response_model=ContradictionSearchResponse)
