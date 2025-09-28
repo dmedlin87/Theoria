@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable, Mapping, cast
 
 from .datasets import report_templates_dataset
 from .fallacies import fallacy_detect, FallacyHit
@@ -15,7 +15,7 @@ from .variants import variants_apparatus
 class ReportSection:
     title: str
     summary: str | None
-    items: list[dict[str, object]]
+    items: list[dict[str, Any]]
 
 
 @dataclass(slots=True)
@@ -24,10 +24,10 @@ class ResearchReport:
     stance: str
     summary: str
     sections: list[ReportSection]
-    meta: dict[str, object]
+    meta: dict[str, Any]
 
 
-def _resolve_template(stance: str) -> dict[str, object]:
+def _resolve_template(stance: str) -> Mapping[str, Any]:
     templates = report_templates_dataset()
     key = stance.lower()
     return templates.get(key) or templates.get("default", {})
@@ -37,7 +37,7 @@ def report_build(
     osis: str,
     *,
     stance: str,
-    claims: Iterable[dict[str, object]] | None = None,
+    claims: Iterable[Mapping[str, Any]] | None = None,
     historicity_query: str | None = None,
     narrative_text: str | None = None,
     include_fallacies: bool = False,
@@ -48,8 +48,10 @@ def report_build(
     """Compile a research report combining textual, historical, and rhetorical data."""
 
     template = _resolve_template(stance)
-    summary_template = template.get("summary", "Research briefing for {osis} ({stance}).")
-    section_names = template.get("sections", {})
+    summary_template = cast(
+        str, template.get("summary", "Research briefing for {osis} ({stance}).")
+    )
+    section_names = cast(Mapping[str, str], template.get("sections", {}))
 
     variant_entries = variants_apparatus(osis, limit=variants_limit)
     variants_section = ReportSection(
