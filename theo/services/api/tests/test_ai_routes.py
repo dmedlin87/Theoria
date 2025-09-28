@@ -283,17 +283,33 @@ def test_verse_copilot_guardrails_when_no_citations() -> None:
 
 def test_sermon_prep_export_markdown() -> None:
     _seed_corpus()
+    with Session(get_engine()) as session:
+        passage = session.get(Passage, "passage-1")
+        assert passage is not None
+        passage.text = (
+            "In John 1:1 the Word is proclaimed as light <script>alert('xss')</script> "
+            "These highlights include a [Click](javascript:alert(1)) example."
+        )
+        session.commit()
     with TestClient(app) as client:
         _register_echo_model(client)
         response = client.post(
             "/ai/sermon-prep/export",
             params={"format": "markdown"},
-            json={"topic": "Logos", "osis": "John.1.1"},
+            json={
+                "topic": "Logos<script>attack()</script>",
+                "osis": "John.1.1",
+            },
         )
         assert response.status_code == 200
-        body = response.text
+        payload = response.json()
+        body = payload["content"]
         assert body.startswith("---\nexport_id:")
         assert "Sermon Prep" in body
+        assert "Logos&lt;script&gt;attack\\(\\)&lt;/script&gt;" in body
+        assert "&lt;script&gt;alert\\('xss'\\)&lt;/script&gt;" in body
+        assert "\\[Click\\]\\(javascript:alert\\(1\\)\\)" in body
+        assert "<script" not in body
 
 
 def test_export_deliverable_sermon_bundle() -> None:
@@ -376,6 +392,33 @@ def test_transcript_export_csv() -> None:
         text = response.text
         assert "export_id=transcript-doc-2" in text
         assert "Student" in text
+
+
+def test_transcript_export_markdown_sanitises_payload() -> None:
+    _seed_corpus()
+    with Session(get_engine()) as session:
+        passage = session.get(Passage, "passage-2")
+        assert passage is not None
+        passage.text = (
+            "Audio highlights exploring [Click](javascript:alert(1)) "
+            "<script>alert('listener')</script>"
+        )
+        passage.meta = {"speaker": "Student<script>alert(1)</script>"}
+        session.commit()
+    with TestClient(app) as client:
+        response = client.post(
+            "/ai/transcript/export",
+            json={"document_id": "doc-2", "format": "markdown"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        body = payload["content"]
+        assert body.startswith("---\nexport_id:")
+        assert "Q&A Transcript" in body
+        assert "Student&lt;script&gt;alert\\(1\\)&lt;/script&gt;" in body
+        assert "\\[Click\\]\\(javascript:alert\\(1\\)\\)" in body
+        assert "&lt;script&gt;alert\\('listener'\\)&lt;/script&gt;" in body
+        assert "<script" not in body
 
 
 def test_export_deliverable_transcript_bundle() -> None:

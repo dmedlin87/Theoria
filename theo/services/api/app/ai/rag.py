@@ -52,6 +52,7 @@ _RAG_TRACER = trace.get_tracer("theo.rag")
 _CACHE_TTL_SECONDS = 30 * 60
 _CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*\((?P<anchor>[^()]+)\)$")
 _SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
+_MARKDOWN_ESCAPE_PATTERN = re.compile(r"([\\`*_{}\[\]()#+.!|\-])")
 
 _redis_client: Any = None
 
@@ -61,6 +62,34 @@ def _normalise_profile_value(value: str | None) -> str | None:
         return None
     text = value.strip().lower()
     return text or None
+
+
+def _escape_markdown_html(value: str) -> str:
+    if not value:
+        return ""
+    escaped = (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    return _MARKDOWN_ESCAPE_PATTERN.sub(r"\\\1", escaped)
+
+
+def _sanitize_markdown_field(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    return _escape_markdown_html(text)
+
+
+def _sanitize_json_structure(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        return {key: _sanitize_json_structure(value) for key, value in payload.items()}
+    if isinstance(payload, (list, tuple, set)):
+        return [_sanitize_json_structure(item) for item in payload]
+    if isinstance(payload, str):
+        return _sanitize_markdown_field(payload)
+    return payload
 
 
 def _extract_topic_domains(meta: Mapping[str, Any] | None) -> set[str]:
@@ -1476,19 +1505,25 @@ def _build_deliverable_manifest(
 def _manifest_front_matter(manifest: DeliverableManifest) -> list[str]:
     lines = [
         "---",
-        f"export_id: {manifest.export_id}",
-        f"schema_version: {manifest.schema_version}",
-        f"generated_at: {manifest.generated_at.isoformat()}",
-        f"type: {manifest.type}",
+        f"export_id: {_sanitize_markdown_field(manifest.export_id)}",
+        f"schema_version: {_sanitize_markdown_field(manifest.schema_version)}",
+        f"generated_at: {_sanitize_markdown_field(manifest.generated_at.isoformat())}",
+        f"type: {_sanitize_markdown_field(manifest.type)}",
     ]
     if manifest.model_preset:
-        lines.append(f"model_preset: {manifest.model_preset}")
+        lines.append(f"model_preset: {_sanitize_markdown_field(manifest.model_preset)}")
     if manifest.git_sha:
-        lines.append(f"git_sha: {manifest.git_sha}")
+        lines.append(f"git_sha: {_sanitize_markdown_field(manifest.git_sha)}")
     if manifest.sources:
-        lines.append(f"sources: {json.dumps(manifest.sources)}")
+        sources = _sanitize_json_structure(list(manifest.sources))
+        lines.append(
+            f"sources: {json.dumps(sources, ensure_ascii=False)}"
+        )
     if manifest.filters:
-        lines.append(f"filters: {json.dumps(manifest.filters, sort_keys=True)}")
+        filters = _sanitize_json_structure(dict(manifest.filters))
+        lines.append(
+            f"filters: {json.dumps(filters, sort_keys=True, ensure_ascii=False)}"
+        )
     lines.append("---\n")
     return lines
 
@@ -1602,25 +1637,30 @@ def _render_sermon_markdown(
     manifest: DeliverableManifest, response: SermonPrepResponse
 ) -> str:
     lines = _manifest_front_matter(manifest)
-    lines.append(f"# Sermon Prep — {response.topic}")
+    lines.append(
+        f"# Sermon Prep — {_sanitize_markdown_field(response.topic)}"
+    )
     if response.osis:
-        lines.append(f"Focus Passage: {response.osis}\n")
+        lines.append(
+            f"Focus Passage: {_sanitize_markdown_field(response.osis)}\n"
+        )
     if response.outline:
         lines.append("## Outline")
         for item in response.outline:
-            lines.append(f"- {item}")
+            lines.append(f"- {_sanitize_markdown_field(item)}")
         lines.append("")
     if response.key_points:
         lines.append("## Key Points")
         for point in response.key_points:
-            lines.append(f"- {point}")
+            lines.append(f"- {_sanitize_markdown_field(point)}")
         lines.append("")
     if response.answer.citations:
         lines.append("## Citations")
         for citation in response.answer.citations:
-            lines.append(
-                f"- {citation.osis} ({citation.anchor}) — {citation.snippet}"
-            )
+            osis = _sanitize_markdown_field(citation.osis)
+            anchor = _sanitize_markdown_field(citation.anchor)
+            snippet = _sanitize_markdown_field(citation.snippet)
+            lines.append(f"- {osis} ({anchor}) — {snippet}")
     return "\n".join(lines).strip() + "\n"
 
 
@@ -1774,12 +1814,16 @@ def _render_transcript_markdown(
     rows: Sequence[dict[str, Any]],
 ) -> str:
     lines = _manifest_front_matter(manifest)
-    lines.append(f"# Q&A Transcript — {title or manifest.filters.get('document_id')}")
+    heading_subject = title or manifest.filters.get("document_id") or ""
+    lines.append(
+        f"# Q&A Transcript — {_sanitize_markdown_field(heading_subject)}"
+    )
     for row in rows:
         anchor = row.get("osis") or row.get("page_no") or row.get("t_start")
-        lines.append(
-            f"- **{row['speaker']}** ({anchor}): {row['text']}"
-        )
+        speaker = _sanitize_markdown_field(row.get("speaker"))
+        anchor_text = _sanitize_markdown_field(anchor)
+        text = _sanitize_markdown_field(row.get("text"))
+        lines.append(f"- **{speaker}** ({anchor_text}): {text}")
     return "\n".join(lines).strip() + "\n"
 
 
