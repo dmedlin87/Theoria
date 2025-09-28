@@ -12,6 +12,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.core.database import get_session  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
+from theo.services.api.app.ingest import parsers as ingest_parsers  # noqa: E402
+from theo.services.api.app.ingest import pipeline as ingest_pipeline  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
 
 
@@ -122,3 +124,67 @@ def test_ingest_transcript_sanitizes_uploaded_files(
     assert audio_path.parent == tmp_dir
     assert audio_path.name.endswith("evil.mp3")
     assert audio_path.resolve().is_relative_to(tmp_dir.resolve())
+
+
+def test_ingest_markdown_with_windows_1252_bytes(
+    tmp_path: Path, monkeypatch, api_client
+) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_pipeline(_session, path: Path, frontmatter):
+        body, _ = ingest_pipeline._parse_text_file(path)
+        captured["body"] = body
+        return _mkdoc()
+
+    monkeypatch.setattr(ingest_module, "run_pipeline_for_file", fake_pipeline)
+
+    tmp_dir = tmp_path / "uploads"
+    tmp_dir.mkdir()
+
+    monkeypatch.setattr(
+        ingest_module.tempfile,
+        "mkdtemp",
+        lambda *args, **kwargs: str(tmp_dir),
+    )
+
+    payload = "Caf\xe9 in Windows-1252".encode("cp1252")
+    response = api_client.post(
+        "/ingest/file",
+        files={"file": ("note.md", payload, "text/markdown")},
+    )
+
+    assert response.status_code == 200
+    assert "body" in captured
+    assert "\ufffd" in captured["body"]
+
+
+def test_ingest_html_with_windows_1252_bytes(
+    tmp_path: Path, monkeypatch, api_client
+) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_pipeline(_session, path: Path, frontmatter):
+        result = ingest_parsers.parse_html_document(path, max_tokens=256)
+        captured["text"] = result.text
+        return _mkdoc()
+
+    monkeypatch.setattr(ingest_module, "run_pipeline_for_file", fake_pipeline)
+
+    tmp_dir = tmp_path / "uploads"
+    tmp_dir.mkdir()
+
+    monkeypatch.setattr(
+        ingest_module.tempfile,
+        "mkdtemp",
+        lambda *args, **kwargs: str(tmp_dir),
+    )
+
+    payload = "<html><body><p>Smart quotes: “hello”</p></body></html>".encode("cp1252")
+    response = api_client.post(
+        "/ingest/file",
+        files={"file": ("snippet.html", payload, "text/html")},
+    )
+
+    assert response.status_code == 200
+    assert "text" in captured
+    assert "\ufffd" in captured["text"]

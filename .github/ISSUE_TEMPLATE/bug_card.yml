@@ -2,7 +2,7 @@ name: "Bug Card"
 description: "File a detailed bug report with risk and remediation context."
 labels:
   - bug
-title: "[Bug]: "
+title: "[Bug]: {bug_title}"
 body:
   - type: input
     id: bug_title

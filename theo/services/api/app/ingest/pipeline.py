@@ -11,14 +11,19 @@ from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+
 from ipaddress import ip_address, ip_network
+
+import socket
+
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import uuid4
 
 import yaml
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
@@ -32,6 +37,7 @@ from ..db.models import (
     TranscriptSegment,
     Video,
 )
+from ..telemetry import instrument_workflow, set_span_attribute
 from .chunking import Chunk, chunk_text, chunk_transcript
 from .embeddings import get_embedding_service, lexical_representation
 from .osis import (
@@ -40,6 +46,7 @@ from .osis import (
     detect_osis_references,
 )
 from .parsers import (
+    PDF_EXTRACTION_UNSUPPORTED,
     ParserResult,
     TranscriptSegment as ParsedTranscriptSegment,
     load_transcript,
@@ -53,6 +60,7 @@ from .parsers import (
 
 class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
+
 
 
 _URL_SCHEME_ERROR = "URL scheme is not allowed for ingestion"
@@ -119,6 +127,23 @@ def _ensure_url_allowed(settings, url: str) -> None:
         for network in _parse_blocked_networks(settings.ingest_url_blocked_ip_networks):
             if ip in network:
                 raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+def _ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
+    """Raise if *sha256* already exists for another document."""
+
+    if not sha256:
+        return
+
+    existing = (
+        session.query(Document.id)
+        .filter(Document.sha256 == sha256)
+        .first()
+    )
+    if existing is not None:
+        raise UnsupportedSourceError("Document already ingested")
+
+
+
 def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
     if not text.startswith("---"):
         return {}, text
@@ -142,7 +167,12 @@ def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
 
 
 def _parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:
-    content = read_text_file(path)
+    try:
+        content = read_text_file(path)
+    except (UnicodeDecodeError, OSError) as exc:
+        raise UnsupportedSourceError(
+            f"Unable to decode text file '{path.name}'"
+        ) from exc
     if path.suffix.lower() in {".md", ".markdown"}:
         fm, body = _parse_frontmatter_from_markdown(content)
         return body, fm
@@ -721,6 +751,10 @@ def _prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
         max_pages=settings.doc_max_pages,
         max_tokens=settings.max_chunk_tokens,
     )
+    if result is PDF_EXTRACTION_UNSUPPORTED:
+        raise UnsupportedSourceError(
+            "Unable to extract text from PDF; the file may be password protected or corrupted."
+        )
     if not result.chunks:
         raise UnsupportedSourceError("PDF contained no extractable text")
     return result
@@ -891,10 +925,61 @@ def _html_to_text(html: str) -> str:
     return extractor.get_text()
 
 
+_WEB_FETCH_CHUNK_SIZE = 64 * 1024
+
+
+class _LoopDetectingRedirectHandler(HTTPRedirectHandler):
+    """HTTP redirect handler that guards against loops and deep chains."""
+
+    def __init__(self, max_redirects: int) -> None:
+        super().__init__()
+        self.max_redirects = max_redirects
+        self.redirect_count = 0
+        self.visited: set[str] = set()
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+        location = headers.get("Location") if headers else None
+        if not location:
+            raise UnsupportedSourceError("Redirect response missing Location header")
+
+        resolved = urljoin(getattr(req, "full_url", req.get_full_url()), location)
+        if resolved in self.visited:
+            raise UnsupportedSourceError("URL redirect loop detected")
+
+        self.redirect_count += 1
+        if self.redirect_count > self.max_redirects:
+            raise UnsupportedSourceError("URL exceeded maximum redirect depth")
+
+        self.visited.add(resolved)
+        redirected = super().redirect_request(req, fp, code, msg, headers, resolved)
+
+        if redirected is not None:
+            timeout = getattr(req, "timeout", None)
+            if timeout is not None:
+                setattr(redirected, "timeout", timeout)
+
+        return redirected
+
+
 def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]:
+
     _ensure_url_allowed(settings, url)
+
+    timeout = getattr(settings, "ingest_web_timeout_seconds", 10.0)
+    max_bytes = getattr(settings, "ingest_web_max_bytes", None)
+    max_redirects = getattr(settings, "ingest_web_max_redirects", 5)
+
+    redirect_handler = _LoopDetectingRedirectHandler(max_redirects)
+    redirect_handler.visited.add(url)
+
+    opener = build_opener(redirect_handler)
+    opener.addheaders = [("User-Agent", settings.user_agent)]
+
+
     request = Request(url, headers={"User-Agent": settings.user_agent})
+
     try:
+
         with urlopen(request) as response:
             final_url = response.geturl()
             _ensure_url_allowed(settings, final_url)
@@ -904,8 +989,44 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
                 html = raw.decode(encoding, errors="replace")
             except LookupError:
                 html = raw.decode("utf-8", errors="replace")
+
+        response = opener.open(request, timeout=timeout)
+    except UnsupportedSourceError:
+        raise
+    except socket.timeout as exc:  # pragma: no cover - handled in read loop tests
+        raise UnsupportedSourceError(
+            f"Fetching URL timed out after {timeout} seconds"
+        ) from exc
+
     except (HTTPError, URLError, TimeoutError, ValueError) as exc:
         raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
+
+    final_url = response.geturl()
+    raw = bytearray()
+
+    try:
+        while True:
+            chunk = response.read(_WEB_FETCH_CHUNK_SIZE)
+            if not chunk:
+                break
+            raw.extend(chunk)
+            if max_bytes is not None and len(raw) > max_bytes:
+                raise UnsupportedSourceError(
+                    "Fetched content exceeded maximum allowed size of "
+                    f"{max_bytes} bytes"
+                )
+    except socket.timeout as exc:
+        raise UnsupportedSourceError(
+            f"Fetching URL timed out after {timeout} seconds"
+        ) from exc
+    finally:
+        response.close()
+
+    encoding = response.headers.get_content_charset() or "utf-8"
+    try:
+        html = raw.decode(encoding, errors="replace")
+    except LookupError:
+        html = raw.decode("utf-8", errors="replace")
 
     metadata = _parse_html_metadata(html)
     metadata.setdefault("canonical_url", final_url)
@@ -921,53 +1042,79 @@ def run_pipeline_for_file(
     """Execute the file ingestion pipeline synchronously."""
 
     settings = get_settings()
-    raw_bytes = path.read_bytes()
-    sha256 = hashlib.sha256(raw_bytes).hexdigest()
+    with instrument_workflow(
+        "ingest.file", source_path=str(path), source_name=path.name
+    ) as span:
+        raw_bytes = path.read_bytes()
+        sha256 = hashlib.sha256(raw_bytes).hexdigest()
 
-    frontmatter = _merge_metadata({}, _load_frontmatter(frontmatter))
-    source_type = _detect_source_type(path, frontmatter)
+        frontmatter = _merge_metadata({}, _load_frontmatter(frontmatter))
+        source_type = _detect_source_type(path, frontmatter)
+        set_span_attribute(span, "ingest.source_type", source_type)
+        set_span_attribute(span, "ingest.cache_status", "n/a")
 
-    parser_result: ParserResult | None = None
-    text_content = ""
+        parser_result: ParserResult | None = None
+        text_content = ""
 
-    if source_type in {"markdown", "txt", "file"}:
-        text_content, parsed_frontmatter = _parse_text_file(path)
-        frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
-        parser_result = _prepare_text_chunks(text_content, settings=settings)
-    elif source_type == "docx":
-        parser_result = parse_docx_document(path, max_tokens=settings.max_chunk_tokens)
-        frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
-        text_content = parser_result.text
-    elif source_type == "html":
-        parser_result = parse_html_document(path, max_tokens=settings.max_chunk_tokens)
-        frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
-        text_content = parser_result.text
-    elif source_type == "pdf":
-        parser_result = _prepare_pdf_chunks(path, settings=settings)
-        text_content = parser_result.text
-    elif source_type == "transcript":
-        segments = load_transcript(path)
-        parser_result = _prepare_transcript_chunks(segments, settings=settings)
-        text_content = parser_result.text
-    elif source_type == "audio":
-        parser_result = parse_audio_document(
-            path,
-            max_tokens=settings.max_chunk_tokens,
-            settings=settings,
-            frontmatter=frontmatter,
-        )
-        frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
-        text_content = parser_result.text
-    else:
-        text_content, parsed_frontmatter = _parse_text_file(path)
-        frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
-        parser_result = _prepare_text_chunks(text_content, settings=settings)
+        if source_type in {"markdown", "txt", "file"}:
+            text_content, parsed_frontmatter = _parse_text_file(path)
+            frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
+            parser_result = _prepare_text_chunks(text_content, settings=settings)
+        elif source_type == "docx":
+            parser_result = parse_docx_document(path, max_tokens=settings.max_chunk_tokens)
+            frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
+            text_content = parser_result.text
+        elif source_type == "html":
+            parser_result = parse_html_document(path, max_tokens=settings.max_chunk_tokens)
+            frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
+            text_content = parser_result.text
+        elif source_type == "pdf":
+            parser_result = _prepare_pdf_chunks(path, settings=settings)
+            text_content = parser_result.text
+        elif source_type == "transcript":
+            segments = load_transcript(path)
+            parser_result = _prepare_transcript_chunks(segments, settings=settings)
+            text_content = parser_result.text
+        elif source_type == "audio":
+            parser_result = parse_audio_document(
+                path,
+                max_tokens=settings.max_chunk_tokens,
+                settings=settings,
+                frontmatter=frontmatter,
+            )
+            frontmatter = _merge_metadata(parser_result.metadata, frontmatter)
+            text_content = parser_result.text
+        else:
+            text_content, parsed_frontmatter = _parse_text_file(path)
+            frontmatter = _merge_metadata(parsed_frontmatter, frontmatter)
+            parser_result = _prepare_text_chunks(text_content, settings=settings)
 
-    if parser_result is None:
-        raise UnsupportedSourceError(f"Unable to parse source type {source_type}")
+        if parser_result is None:
+            raise UnsupportedSourceError(f"Unable to parse source type {source_type}")
 
-    if source_type == "transcript":
-        return _persist_transcript_document(
+        chunk_count = len(parser_result.chunks)
+        set_span_attribute(span, "ingest.chunk_count", chunk_count)
+        set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
+
+        if source_type == "transcript":
+            document = _persist_transcript_document(
+                session,
+                chunks=parser_result.chunks,
+                parser=parser_result.parser,
+                parser_version=parser_result.parser_version,
+                frontmatter=frontmatter,
+                settings=settings,
+                sha256=sha256,
+                source_type="transcript",
+                title=frontmatter.get("title") or path.stem,
+                source_url=frontmatter.get("source_url"),
+                transcript_path=path,
+                transcript_filename=path.name,
+            )
+            set_span_attribute(span, "ingest.document_id", document.id)
+            return document
+
+        document = _persist_text_document(
             session,
             chunks=parser_result.chunks,
             parser=parser_result.parser,
@@ -975,27 +1122,14 @@ def run_pipeline_for_file(
             frontmatter=frontmatter,
             settings=settings,
             sha256=sha256,
-            source_type="transcript",
+            source_type=source_type,
             title=frontmatter.get("title") or path.stem,
             source_url=frontmatter.get("source_url"),
-            transcript_path=path,
-            transcript_filename=path.name,
+            text_content=text_content,
+            original_path=path,
         )
-
-    return _persist_text_document(
-        session,
-        chunks=parser_result.chunks,
-        parser=parser_result.parser,
-        parser_version=parser_result.parser_version,
-        frontmatter=frontmatter,
-        settings=settings,
-        sha256=sha256,
-        source_type=source_type,
-        title=frontmatter.get("title") or path.stem,
-        source_url=frontmatter.get("source_url"),
-        text_content=text_content,
-        original_path=path,
-    )
+        set_span_attribute(span, "ingest.document_id", document.id)
+        return document
 
 
 def _persist_text_document(
@@ -1016,6 +1150,8 @@ def _persist_text_document(
     raw_filename: str | None = None,
 ) -> Document:
     tradition, topic_domains = _extract_guardrail_profile(frontmatter)
+
+    _ensure_unique_document_sha(session, sha256)
 
     document = Document(
         id=str(uuid4()),
@@ -1042,8 +1178,12 @@ def _persist_text_document(
         sha256=sha256,
     )
 
-    session.add(document)
-    session.flush()
+    try:
+        session.add(document)
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise UnsupportedSourceError("Document already ingested") from exc
 
     creator_tags = _ensure_list(frontmatter.get("creator_tags"))
     creator_profile = _get_or_create_creator(
@@ -1292,6 +1432,8 @@ def _persist_transcript_document(
 ) -> Document:
     tradition, topic_domains = _extract_guardrail_profile(frontmatter)
 
+    _ensure_unique_document_sha(session, sha256)
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Transcript",
@@ -1319,8 +1461,12 @@ def _persist_transcript_document(
         sha256=sha256,
     )
 
-    session.add(document)
-    session.flush()
+    try:
+        session.add(document)
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise UnsupportedSourceError("Document already ingested") from exc
 
     creator_tags = _ensure_list(frontmatter.get("creator_tags"))
     creator_profile = _get_or_create_creator(
@@ -1584,9 +1730,14 @@ def run_pipeline_for_url(
     """Ingest supported URLs into the document store."""
 
     settings = get_settings()
-    resolved_source_type = source_type or (
-        "youtube" if _is_youtube_url(url) else "web_page"
-    )
+    with instrument_workflow(
+        "ingest.url", source_url=url, requested_source_type=source_type
+    ) as span:
+        resolved_source_type = source_type or (
+            "youtube" if _is_youtube_url(url) else "web_page"
+        )
+        set_span_attribute(span, "ingest.source_type", resolved_source_type)
+
 
     if resolved_source_type != "youtube":
         _ensure_url_allowed(settings, url)
@@ -1596,14 +1747,77 @@ def run_pipeline_for_url(
         metadata = _load_youtube_metadata(settings, video_id)
         merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
 
-        segments, transcript_path = _load_youtube_transcript(settings, video_id)
-        parser_result = _prepare_transcript_chunks(segments, settings=settings)
+        if resolved_source_type == "youtube":
+            video_id = _extract_youtube_video_id(url)
+            metadata = _load_youtube_metadata(settings, video_id)
+            merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+
+
+            segments, transcript_path = _load_youtube_transcript(settings, video_id)
+            parser_result = _prepare_transcript_chunks(segments, settings=settings)
+            sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
+                "utf-8"
+            )
+            sha256 = hashlib.sha256(sha_payload).hexdigest()
+
+            chunk_count = len(parser_result.chunks)
+            set_span_attribute(span, "ingest.chunk_count", chunk_count)
+            set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
+            cache_status = "hit" if transcript_path else "miss"
+            set_span_attribute(span, "ingest.cache_status", cache_status)
+            if transcript_path:
+                set_span_attribute(span, "ingest.transcript_fixture", transcript_path.name)
+
+            document = _persist_transcript_document(
+                session,
+                chunks=parser_result.chunks,
+                parser=parser_result.parser,
+                parser_version=parser_result.parser_version,
+                frontmatter=merged_frontmatter,
+                settings=settings,
+                sha256=sha256,
+                source_type="youtube",
+                title=merged_frontmatter.get("title")
+                or metadata.get("title")
+                or f"YouTube Video {video_id}",
+                source_url=merged_frontmatter.get("source_url") or url,
+                channel=merged_frontmatter.get("channel") or metadata.get("channel"),
+                video_id=video_id,
+                duration_seconds=merged_frontmatter.get("duration_seconds")
+                or metadata.get("duration_seconds"),
+                transcript_path=transcript_path,
+                transcript_filename=(transcript_path.name if transcript_path else None),
+            )
+            set_span_attribute(span, "ingest.document_id", document.id)
+            return document
+
+        if resolved_source_type not in {"web_page", "html", "website"}:
+            raise UnsupportedSourceError(
+                (
+                    "Unsupported source type for URL ingestion: "
+                    f"{resolved_source_type}. Supported types are: "
+                    "youtube, web_page, html, website"
+                )
+            )
+
+        html, metadata = _fetch_web_document(settings, url)
+        text_content = _html_to_text(html)
+        if not text_content:
+            raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
+
+        merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+        parser_result = _prepare_text_chunks(text_content, settings=settings)
         sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
             "utf-8"
         )
         sha256 = hashlib.sha256(sha_payload).hexdigest()
 
-        return _persist_transcript_document(
+        chunk_count = len(parser_result.chunks)
+        set_span_attribute(span, "ingest.chunk_count", chunk_count)
+        set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
+        set_span_attribute(span, "ingest.cache_status", "n/a")
+
+        document = _persist_text_document(
             session,
             chunks=parser_result.chunks,
             parser=parser_result.parser,
@@ -1611,57 +1825,17 @@ def run_pipeline_for_url(
             frontmatter=merged_frontmatter,
             settings=settings,
             sha256=sha256,
-            source_type="youtube",
-            title=merged_frontmatter.get("title")
-            or metadata.get("title")
-            or f"YouTube Video {video_id}",
-            source_url=merged_frontmatter.get("source_url") or url,
-            channel=merged_frontmatter.get("channel") or metadata.get("channel"),
-            video_id=video_id,
-            duration_seconds=merged_frontmatter.get("duration_seconds")
-            or metadata.get("duration_seconds"),
-            transcript_path=transcript_path,
-            transcript_filename=(transcript_path.name if transcript_path else None),
+            source_type="web_page",
+            title=merged_frontmatter.get("title") or metadata.get("title") or url,
+            source_url=merged_frontmatter.get("source_url")
+            or metadata.get("canonical_url")
+            or url,
+            text_content=parser_result.text,
+            raw_content=html,
+            raw_filename="source.html",
         )
-
-    if resolved_source_type not in {"web_page", "html", "website"}:
-        raise UnsupportedSourceError(
-            (
-                "Unsupported source type for URL ingestion: "
-                f"{resolved_source_type}. Supported types are: "
-                "youtube, web_page, html, website"
-            )
-        )
-
-    html, metadata = _fetch_web_document(settings, url)
-    text_content = _html_to_text(html)
-    if not text_content:
-        raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
-
-    merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
-    parser_result = _prepare_text_chunks(text_content, settings=settings)
-    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
-        "utf-8"
-    )
-    sha256 = hashlib.sha256(sha_payload).hexdigest()
-
-    return _persist_text_document(
-        session,
-        chunks=parser_result.chunks,
-        parser=parser_result.parser,
-        parser_version=parser_result.parser_version,
-        frontmatter=merged_frontmatter,
-        settings=settings,
-        sha256=sha256,
-        source_type="web_page",
-        title=merged_frontmatter.get("title") or metadata.get("title") or url,
-        source_url=merged_frontmatter.get("source_url")
-        or metadata.get("canonical_url")
-        or url,
-        text_content=parser_result.text,
-        raw_content=html,
-        raw_filename="source.html",
-    )
+        set_span_attribute(span, "ingest.document_id", document.id)
+        return document
 
 
 def run_pipeline_for_transcript(
@@ -1676,35 +1850,48 @@ def run_pipeline_for_transcript(
     """Ingest a transcript file and optional audio into the document store."""
 
     settings = get_settings()
-    frontmatter = _merge_metadata({}, _load_frontmatter(frontmatter))
+    with instrument_workflow(
+        "ingest.transcript",
+        transcript_path=str(transcript_path),
+        audio_path=str(audio_path) if audio_path else None,
+    ) as span:
+        frontmatter = _merge_metadata({}, _load_frontmatter(frontmatter))
 
-    segments = load_transcript(transcript_path)
-    parser_result = _prepare_transcript_chunks(segments, settings=settings)
+        segments = load_transcript(transcript_path)
+        parser_result = _prepare_transcript_chunks(segments, settings=settings)
 
-    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
-        "utf-8"
-    )
-    sha256 = hashlib.sha256(sha_payload).hexdigest()
+        sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
+            "utf-8"
+        )
+        sha256 = hashlib.sha256(sha_payload).hexdigest()
 
-    source_type = str(frontmatter.get("source_type") or "transcript")
-    title = frontmatter.get("title") or transcript_path.stem
+        source_type = str(frontmatter.get("source_type") or "transcript")
+        title = frontmatter.get("title") or transcript_path.stem
 
-    return _persist_transcript_document(
-        session,
-        chunks=parser_result.chunks,
-        parser=parser_result.parser,
-        parser_version=parser_result.parser_version,
-        frontmatter=frontmatter,
-        settings=settings,
-        sha256=sha256,
-        source_type=source_type,
-        title=title,
-        source_url=frontmatter.get("source_url"),
-        channel=frontmatter.get("channel"),
-        video_id=frontmatter.get("video_id"),
-        duration_seconds=frontmatter.get("duration_seconds"),
-        transcript_path=transcript_path,
-        audio_path=audio_path,
-        transcript_filename=transcript_filename or transcript_path.name,
-        audio_filename=audio_filename,
-    )
+        chunk_count = len(parser_result.chunks)
+        set_span_attribute(span, "ingest.source_type", source_type)
+        set_span_attribute(span, "ingest.chunk_count", chunk_count)
+        set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
+        set_span_attribute(span, "ingest.cache_status", "n/a")
+
+        document = _persist_transcript_document(
+            session,
+            chunks=parser_result.chunks,
+            parser=parser_result.parser,
+            parser_version=parser_result.parser_version,
+            frontmatter=frontmatter,
+            settings=settings,
+            sha256=sha256,
+            source_type=source_type,
+            title=title,
+            source_url=frontmatter.get("source_url"),
+            channel=frontmatter.get("channel"),
+            video_id=frontmatter.get("video_id"),
+            duration_seconds=frontmatter.get("duration_seconds"),
+            transcript_path=transcript_path,
+            audio_path=audio_path,
+            transcript_filename=transcript_filename or transcript_path.name,
+            audio_filename=audio_filename,
+        )
+        set_span_attribute(span, "ingest.document_id", document.id)
+        return document

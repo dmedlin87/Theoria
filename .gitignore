@@ -13,18 +13,28 @@ theo/services/web/test-results/
 
 # Python virtual environments
 .venv/
+.venv
+.venv*/
 venv/
+env/
+.direnv/
+
+# Testing caches
+.hypothesis/
 
 # Environment variables (keep an .env.example checked in if needed)
 .env
 .env.*
 !.env.example
+.envrc
 
 # Python caches and tooling
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .python-version
+.ipynb_checkpoints/
+*.tsbuildinfo
 
 # Coverage outputs
 .coverage
