@@ -2,50 +2,84 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 from contextlib import contextmanager
 from time import perf_counter
-from typing import Any, Iterable, Iterator
+from typing import Any, ContextManager, Iterable, Iterator, Protocol, cast
+
+
+class SpanProtocol(Protocol):
+    """Subset of the OpenTelemetry span API used by Theo Engine."""
+
+    def set_attribute(self, key: str, value: Any) -> None:
+        ...
+
+    def record_exception(self, exc: BaseException) -> None:
+        ...
+
+    def set_status(self, status: Any) -> None:
+        ...
+
+
+class TracerProtocol(Protocol):
+    """Tracer interface required for workflow instrumentation."""
+
+    def start_as_current_span(self, name: str) -> ContextManager[SpanProtocol]:
+        ...
+
 
 try:  # pragma: no cover - optional dependency
-    from opentelemetry import trace
-    from opentelemetry.trace import Span
-    from opentelemetry.trace.status import Status, StatusCode
+    trace = importlib.import_module("opentelemetry.trace")
 except ImportError:  # pragma: no cover - graceful degradation
-    trace = None  # type: ignore[assignment]
-    Span = Any  # type: ignore[misc, assignment]
-
-    class _NoopSpan:
-        def set_attribute(self, *_: Any, **__: Any) -> None:
-            return
-
-        def record_exception(self, *_: Any, **__: Any) -> None:
-            return
-
-        def set_status(self, *_: Any, **__: Any) -> None:
-            return
-
-    @contextmanager
-    def _noop_span(_: str) -> Iterator[_NoopSpan]:
-        yield _NoopSpan()
-
-    class _NoopTracer:
-        def start_as_current_span(self, name: str):
-            return _noop_span(name)
-
-    def _get_tracer(_: str) -> _NoopTracer:
-        return _NoopTracer()
-
-    Status = None  # type: ignore[assignment]
-    StatusCode = None  # type: ignore[assignment]
+    trace = None
+    Status = None
+    StatusCode = None
 else:
-    def _get_tracer(name: str):  # pragma: no cover - thin wrapper
-        return trace.get_tracer(name)
+    try:  # pragma: no cover - optional dependency
+        status_module = importlib.import_module("opentelemetry.trace.status")
+    except ImportError:  # pragma: no cover - graceful degradation
+        Status = None
+        StatusCode = None
+    else:
+        Status = getattr(status_module, "Status", None)
+        StatusCode = getattr(status_module, "StatusCode", None)
+
 
 try:  # pragma: no cover - optional dependency
-    from prometheus_client import Counter, Histogram
+    prometheus_client = importlib.import_module("prometheus_client")
 except ImportError:  # pragma: no cover - graceful degradation
     Counter = Histogram = None  # type: ignore[assignment]
+else:
+    Counter = cast(Any, getattr(prometheus_client, "Counter", None))
+    Histogram = cast(Any, getattr(prometheus_client, "Histogram", None))
+
+
+class _NoopSpan:
+    def set_attribute(self, *_: Any, **__: Any) -> None:
+        return
+
+    def record_exception(self, *_: Any, **__: Any) -> None:
+        return
+
+    def set_status(self, *_: Any, **__: Any) -> None:
+        return
+
+
+@contextmanager
+def _noop_span(_: str) -> Iterator[SpanProtocol]:
+    yield _NoopSpan()
+
+
+class _NoopTracer:
+    def start_as_current_span(self, name: str) -> ContextManager[SpanProtocol]:
+        return _noop_span(name)
+
+
+def _get_tracer(name: str) -> TracerProtocol:
+    if trace is None:  # pragma: no cover - optional dependency
+        return _NoopTracer()
+    return cast(TracerProtocol, trace.get_tracer(name))
 
 
 LOGGER = logging.getLogger("theo.workflow")
@@ -103,7 +137,7 @@ def _serialise_context(context: dict[str, Any]) -> dict[str, Any]:
 
 
 @contextmanager
-def instrument_workflow(workflow: str, **attributes: Any) -> Iterator[Span]:
+def instrument_workflow(workflow: str, **attributes: Any) -> Iterator[SpanProtocol]:
     """Context manager recording workflow spans, logs, and metrics."""
 
     tracer = _get_tracer("theo.workflow")
@@ -145,7 +179,7 @@ def instrument_workflow(workflow: str, **attributes: Any) -> Iterator[Span]:
             WORKFLOW_RUNS.labels(workflow=workflow, status=status).inc()
 
 
-def set_span_attribute(span: Span | None, key: str, value: Any) -> None:
+def set_span_attribute(span: SpanProtocol | None, key: str, value: Any) -> None:
     """Safely set an attribute on the active workflow span."""
 
     if span is None:
@@ -188,12 +222,19 @@ def configure_console_tracer() -> None:
         return
 
     try:
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+        sdk_trace = importlib.import_module("opentelemetry.sdk.trace")
+        exporter_module = importlib.import_module("opentelemetry.sdk.trace.export")
     except ImportError:  # pragma: no cover - optional dependency
         LOGGER.warning(
             "opentelemetry-sdk missing; run 'pip install opentelemetry-sdk' to emit spans"
         )
+        return
+
+    TracerProvider = getattr(sdk_trace, "TracerProvider", None)
+    SimpleSpanProcessor = getattr(exporter_module, "SimpleSpanProcessor", None)
+    ConsoleSpanExporter = getattr(exporter_module, "ConsoleSpanExporter", None)
+    if None in {TracerProvider, SimpleSpanProcessor, ConsoleSpanExporter}:
+        LOGGER.warning("opentelemetry-sdk is installed but missing tracing exports")
         return
 
     tracer_provider = TracerProvider()
