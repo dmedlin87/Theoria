@@ -18,6 +18,7 @@ from uuid import uuid4
 
 import yaml
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
@@ -52,6 +53,21 @@ from .parsers import (
 
 class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
+
+
+def _ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
+    """Raise if *sha256* already exists for another document."""
+
+    if not sha256:
+        return
+
+    existing = (
+        session.query(Document.id)
+        .filter(Document.sha256 == sha256)
+        .first()
+    )
+    if existing is not None:
+        raise UnsupportedSourceError("Document already ingested")
 
 
 def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
@@ -950,6 +966,8 @@ def _persist_text_document(
 ) -> Document:
     tradition, topic_domains = _extract_guardrail_profile(frontmatter)
 
+    _ensure_unique_document_sha(session, sha256)
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Document",
@@ -975,8 +993,12 @@ def _persist_text_document(
         sha256=sha256,
     )
 
-    session.add(document)
-    session.flush()
+    try:
+        session.add(document)
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise UnsupportedSourceError("Document already ingested") from exc
 
     creator_tags = _ensure_list(frontmatter.get("creator_tags"))
     creator_profile = _get_or_create_creator(
@@ -1225,6 +1247,8 @@ def _persist_transcript_document(
 ) -> Document:
     tradition, topic_domains = _extract_guardrail_profile(frontmatter)
 
+    _ensure_unique_document_sha(session, sha256)
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Transcript",
@@ -1252,8 +1276,12 @@ def _persist_transcript_document(
         sha256=sha256,
     )
 
-    session.add(document)
-    session.flush()
+    try:
+        session.add(document)
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise UnsupportedSourceError("Document already ingested") from exc
 
     creator_tags = _ensure_list(frontmatter.get("creator_tags"))
     creator_profile = _get_or_create_creator(
