@@ -273,7 +273,7 @@ export default function CopilotPage(): JSX.Element {
     setError(null);
     setIsSendingCitations(true);
     try {
-      const payload = await exportCitations(citations, mode.id);
+      const payload = await exportCitations(citations);
       const cslBody = JSON.stringify(payload.csl, null, 2);
       const filename = `${payload.manifest.export_id || "theo-citations"}.csl.json`;
       if (citationManagerEndpoint) {

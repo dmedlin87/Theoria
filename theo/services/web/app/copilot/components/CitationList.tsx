@@ -18,6 +18,9 @@ export default function CitationList({
   if (!citations.length) {
     return null;
   }
+  const hasMissingPassage = citations.some(
+    (citation) => !citation.passage_id || !citation.passage_id.trim(),
+  );
   return (
     <div style={{ marginTop: "1rem" }}>
       <h4>Citations</h4>
@@ -77,9 +80,18 @@ export default function CitationList({
       </ol>
       {onExport && (
         <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <button type="button" onClick={() => onExport(citations)} disabled={exporting}>
+          <button
+            type="button"
+            onClick={() => onExport(citations)}
+            disabled={exporting || hasMissingPassage}
+          >
             {exporting ? "Exporting citations…" : "Export selected citations"}
           </button>
+          {hasMissingPassage ? (
+            <p style={{ margin: 0, color: "#b91c1c" }}>
+              Each citation needs a passage reference before you can export.
+            </p>
+          ) : null}
           {status ? <p style={{ margin: 0, color: "#047857" }}>{status}</p> : null}
         </div>
       )}

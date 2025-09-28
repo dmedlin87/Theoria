@@ -380,17 +380,27 @@ export function useExportWorkflow(client?: TheoApiClient): WorkflowHook<
 }
 
 export type ExportCitationsHook = {
-  exportCitations: (citations: RAGCitation[], model: string) => Promise<import("./types").CitationExportResponse>;
+  exportCitations: (
+    citations: RAGCitation[],
+  ) => Promise<import("./types").CitationExportResponse>;
 };
 
 export function useCitationExporter(client?: TheoApiClient): ExportCitationsHook {
   const api = useApiClient(client);
   const exportCitations = useCallback(
-    async (citations: RAGCitation[], model: string) => {
+    async (citations: RAGCitation[]) => {
       if (!citations.length) {
         throw new Error("No citations available to export.");
       }
-      return api.exportCitations({ citations, model });
+      const invalidCitation = citations.find(
+        (citation) => !citation.passage_id || !citation.passage_id.trim(),
+      );
+      if (invalidCitation) {
+        throw new Error(
+          "Citations must include a passage identifier before exporting.",
+        );
+      }
+      return api.exportCitations({ citations });
     },
     [api],
   );

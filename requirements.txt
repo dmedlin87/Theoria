@@ -18,3 +18,4 @@ opentelemetry-sdk>=1.25.0,<2
 prometheus-client>=0.20,<1
 typing-extensions>=4.9,<5
 PyJWT>=2.9,<3
+schemathesis>=3.21,<4

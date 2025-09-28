@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from "./api";
+import type { components } from "./generated/api";
 
 function buildErrorMessage(status: number, body: string): string {
   if (body) {
@@ -154,10 +155,9 @@ export class TheoApiClient {
     });
   }
 
-  exportCitations(payload: {
-    citations: import("../copilot/components/types").RAGCitation[];
-    model: string;
-  }): Promise<import("../copilot/components/types").CitationExportResponse> {
+  exportCitations(
+    payload: components["schemas"]["CitationExportRequest"],
+  ): Promise<import("../copilot/components/types").CitationExportResponse> {
     return this.request("/ai/citations/export", {
       method: "POST",
       body: JSON.stringify(payload),

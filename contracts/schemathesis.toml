@@ -1,0 +1,48 @@
+[schema]
+path = "/openapi.json"
+
+[[suites]]
+name = "citations-export"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/citations/export"
+
+[[suites]]
+name = "workflows"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/verse"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/sermon-prep"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/sermon-prep/export"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/transcript/export"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/comparative"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/multimedia"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/devotional"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/collaboration"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/curation"
