@@ -1,0 +1,19 @@
+{
+  "ci": {
+    "collect": {
+      "url": ["http://127.0.0.1:3000"],
+      "numberOfRuns": 3,
+      "startServerCommand": "",
+      "settings": {
+        "chromeFlags": "--headless=new --no-sandbox --disable-dev-shm-usage"
+      }
+    },
+    "assert": {
+      "preset": "lighthouse:recommended"
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci"
+    }
+  }
+}

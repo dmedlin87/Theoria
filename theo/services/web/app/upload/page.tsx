@@ -127,7 +127,7 @@ export default function UploadPage(): JSX.Element {
   const [jobError, setJobError] = useState<ErrorDetails | null>(null);
   const fileFormRef = useRef<HTMLFormElement | null>(null);
   const urlFormRef = useRef<HTMLFormElement | null>(null);
-  const fetchJobsRef = useRef<() => Promise<void> | null>(null);
+  const fetchJobsRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
 
@@ -172,7 +172,7 @@ export default function UploadPage(): JSX.Element {
     return () => {
       isMounted = false;
       window.clearInterval(interval);
-      fetchJobsRef.current = null;
+  fetchJobsRef.current = undefined;
     };
   }, [baseUrl]);
 

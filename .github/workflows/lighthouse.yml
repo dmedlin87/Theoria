@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+
       - develop
   pull_request:
     branches:
@@ -81,3 +82,88 @@ jobs:
           path: .lighthouseci/current
           if-no-files-found: error
           retention-days: 14
+
+  pull_request:
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse audit
+    runs-on: ubuntu-latest
+    env:
+      APP_PORT: 3000
+      APP_HOST: 127.0.0.1
+      APP_ORIGIN: 'http://127.0.0.1:3000'
+    defaults:
+      run:
+        working-directory: theo/services/web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: theo/services/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Start Next.js server
+        shell: bash
+        run: |
+          mkdir -p .lighthouseci
+          npm run start -- --hostname 0.0.0.0 --port "$APP_PORT" \
+            > .lighthouseci/server.log 2>&1 &
+
+      - name: Wait for server
+        shell: bash
+        run: |
+          TARGET_URL="${APP_ORIGIN%/}"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --head "$TARGET_URL"; then
+              exit 0
+            fi
+            echo "Attempt $attempt to reach $TARGET_URL failed; retrying in 2 seconds..."
+            sleep 2
+          done
+          echo "Unable to reach $TARGET_URL after multiple attempts." >&2
+          exit 1
+
+      - name: Run Lighthouse CI
+        env:
+          LHCI_COLLECT__URL: ${{ env.APP_ORIGIN }}
+          LHCI_COLLECT__START_SERVER_COMMAND: ""
+          LHCI_COLLECT__NUMBER_OF_RUNS: 3
+          LHCI_COLLECT__CHROME_FLAGS: '--headless=new --no-sandbox --disable-dev-shm-usage'
+          LHCI_ASSERT__PRESET: lighthouse:recommended
+          LHCI_UPLOAD__TARGET: filesystem
+          LHCI_UPLOAD__OUTPUT_DIR: .lighthouseci
+        run: |
+          npx --yes @lhci/cli@0.14.0 autorun --config ../../../lighthouserc.json
+
+      - name: Upload Lighthouse artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results
+          path: theo/services/web/.lighthouseci
+          if-no-files-found: warn
+
+      - name: Stop Next.js server
+        if: always()
+        shell: bash
+        run: |
+          pkill -f "next start" || true
+

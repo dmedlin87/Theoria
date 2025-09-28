@@ -1,6 +1,7 @@
 # TheoEngine Code Audit Report
 
 ## Executive Summary
+
 1. **Copilot page crashes because `mode` is never initialised** – the page uses `mode.id` in every workflow request without ever calling `useMode()`, causing an immediate runtime ReferenceError and blocking the entire feature. 【F:theo/services/web/app/copilot/page.tsx†L451-L517】【0d1eb1†L1-L36】
 2. **Citation quick-start flow references undefined symbols** – `handleQuickStart` posts `citations` and `mode` values that are not defined in scope, so presets and citation exports consistently throw. 【F:theo/services/web/app/copilot/page.tsx†L635-L692】【0d1eb1†L37-L66】
 3. **Sermon result rendering leaks outside its guard** – missing braces leave `result.payload.outline/key_points` executing for every result kind, leading to `.map` on `undefined` and hard crashes for non-sermon workflows. 【F:theo/services/web/app/copilot/page.tsx†L1193-L1311】【0d1eb1†L21-L38】
@@ -39,7 +40,7 @@
 
 | Issue ID | File & Line | Severity | Category | Repro Steps | Suggested Fix |
 |----------|-------------|----------|----------|-------------|---------------|
-| API1 | `ai/rag.py` L147-L156 | Critical | Schema mismatch | POST `/ai/citations/export` without `source_url` (per tests) → 422. | Make `source_url` optional (`str | None`) and default missing values; adjust validation & CSL builder to handle `None`. 【F:theo/services/api/app/ai/rag.py†L147-L156】【c0c158†L1-L25】 |
+| API1 | `ai/rag.py` L147-L156 | Critical | Schema mismatch | POST `/ai/citations/export` without `source_url` (per tests) → 422. | Make `source_url` optional (`str \| None`) and default missing values; adjust validation & CSL builder to handle`None`. 【F:theo/services/api/app/ai/rag.py†L147-L156】【c0c158†L1-L25】 |
 | API2 | `ai/rag.py` L56-L70 | Critical | Functional bug | Call any guarded answer path (e.g., `/ai/multimedia`) → NameError for `Iterable`. | Import `Iterable` from `collections.abc`/`typing` and unit-test `_extract_topic_domains`. 【F:theo/services/api/app/ai/rag.py†L56-L70】【40ec00†L1-L41】 |
 | API3 | `ai/models.py` L179-L210 | High | Schema mismatch | Observe frontend sending `mode` while schemas expect `model`; backend never sees mode preference. | Accept `mode` as alias via `Field(validation_alias=...)` or update frontend to send `model`. Document allowed values. 【F:theo/services/api/app/models/ai.py†L179-L210】【F:theo/services/web/app/copilot/page.tsx†L451-L512】 |
 
@@ -77,11 +78,13 @@
 | ING4 | `routes/ingest.py` L44-L48, L102-L112 | Medium | Reliability | Upload multi-GB file → process reads entire payload into memory. | Stream uploads to disk in chunks, enforce Content-Length limits, and reject oversize files early. 【F:theo/services/api/app/routes/ingest.py†L44-L48】【F:theo/services/api/app/routes/ingest.py†L102-L112】 |
 
 ## Quick Wins (≤ 1 hour)
+
 - Import `Iterable` and add a guardrail unit test to unblock guardrail-powered endpoints. 【F:theo/services/api/app/ai/rag.py†L56-L70】【40ec00†L1-L41】
 - Make `source_url` optional in `RAGCitation` so citation exports stop returning 422s. 【F:theo/services/api/app/ai/rag.py†L147-L156】【c0c158†L1-L25】
 - Sanitize upload filenames by using `Path(name).name` and random prefixes before writing to disk. 【F:theo/services/api/app/routes/ingest.py†L36-L65】【F:theo/services/api/app/routes/ingest.py†L88-L135】
 
 ## Stability First (Critical Correctness)
+
 - Restore `useMode()` wiring and correct JSX blocks so Copilot workflows work without crashing. 【F:theo/services/web/app/copilot/page.tsx†L451-L517】【F:theo/services/web/app/copilot/page.tsx†L1193-L1311】
 - Lock down ingestion URL handling (scheme allow-list + timeout) to prevent SSRF/LFI. 【F:theo/services/api/app/ingest/pipeline.py†L790-L809】
 - Address path traversal in every ingestion entrypoint before accepting untrusted uploads. 【F:theo/services/api/app/routes/ingest.py†L36-L135】

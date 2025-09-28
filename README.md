@@ -12,6 +12,10 @@ Theo Engine now layers grounded generative workflows on top of the deterministic
 
 For usage details run `python -m theo.services.cli.ingest_folder --help` or consult [the CLI guide](docs/CLI.md).
 
+## Performance monitoring
+
+Continuous integration runs Lighthouse to guard against client-side regressions. Review [the performance monitoring policy](docs/performance.md) for guidance on interpreting lab scores, comparing them with Core Web Vitals, and understanding the thresholds that require follow-up.
+
 ## Running the test suite
 
 The application relies on several third-party libraries for its API, ORM, and ingestion pipeline.
