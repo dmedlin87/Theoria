@@ -76,6 +76,9 @@ histogram `theo_workflow_latency_seconds`.
   visualise the counters and histograms.
 - Adjust your logging configuration to forward the `theo.workflow` logger to a
   structured log collector.
+- When you need to follow an issue across the stack, see the
+  [End-to-End Debugging Guide](./debugging-guide.md) for step-by-step tracing
+  instructions that build on the new trace propagation hooks.
 
 With these steps you can locally validate that Theo Engine workflows expose
 healthy telemetry before wiring them into a full observability stack.
