@@ -17,7 +17,7 @@ from ipaddress import ip_address, ip_network
 import socket
 
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import uuid4
 
@@ -65,6 +65,8 @@ class UnsupportedSourceError(ValueError):
 
 _URL_SCHEME_ERROR = "URL scheme is not allowed for ingestion"
 _URL_TARGET_ERROR = "URL target is not allowed for ingestion"
+
+_SAFE_SOURCE_URL_SCHEMES = {"http", "https"}
 
 
 def _normalise_host(host: str) -> str:
@@ -612,6 +614,35 @@ def _normalise_topics_field(*candidates: Any) -> dict | None:
     return {"primary": values[0], "all": values}
 
 
+def _normalise_source_url(value: str | None) -> str | None:
+    if not value:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+
+    if candidate.startswith("/"):
+        return "/" + candidate.lstrip("/")
+
+    parsed = urlparse(candidate)
+
+    if parsed.scheme:
+        scheme = parsed.scheme.lower()
+        if scheme in _SAFE_SOURCE_URL_SCHEMES:
+            normalised = parsed._replace(scheme=scheme)
+            return urlunparse(normalised)
+        return None
+
+    if parsed.netloc:
+        normalised = parsed._replace(scheme="https")
+        return urlunparse(normalised)
+
+    if parsed.path:
+        return "/" + parsed.path.lstrip("/")
+
+    return None
+
+
 def _coerce_int(value: Any) -> int | None:
     if value is None:
         return None
@@ -975,21 +1006,9 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
     opener = build_opener(redirect_handler)
     opener.addheaders = [("User-Agent", settings.user_agent)]
 
-
     request = Request(url, headers={"User-Agent": settings.user_agent})
 
     try:
-
-        with urlopen(request) as response:
-            final_url = response.geturl()
-            _ensure_url_allowed(settings, final_url)
-            raw = response.read()
-            encoding = response.headers.get_content_charset() or "utf-8"
-            try:
-                html = raw.decode(encoding, errors="replace")
-            except LookupError:
-                html = raw.decode("utf-8", errors="replace")
-
         response = opener.open(request, timeout=timeout)
     except UnsupportedSourceError:
         raise
@@ -997,14 +1016,16 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
         raise UnsupportedSourceError(
             f"Fetching URL timed out after {timeout} seconds"
         ) from exc
-
     except (HTTPError, URLError, TimeoutError, ValueError) as exc:
         raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
 
-    final_url = response.geturl()
     raw = bytearray()
+    final_url = url
 
     try:
+        final_url = response.geturl()
+        _ensure_url_allowed(settings, final_url)
+
         while True:
             chunk = response.read(_WEB_FETCH_CHUNK_SIZE)
             if not chunk:
@@ -1153,12 +1174,16 @@ def _persist_text_document(
 
     _ensure_unique_document_sha(session, sha256)
 
+    normalised_source_url = _normalise_source_url(
+        source_url or frontmatter.get("source_url")
+    )
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Document",
         authors=_ensure_list(frontmatter.get("authors")),
         doi=frontmatter.get("doi"),
-        source_url=source_url or frontmatter.get("source_url"),
+        source_url=normalised_source_url,
         source_type=source_type,
         collection=frontmatter.get("collection"),
         pub_date=_coerce_date(frontmatter.get("date")),
@@ -1200,7 +1225,7 @@ def _persist_text_document(
         document=document,
         video_identifier=document.video_id,
         title=document.title,
-        url=document.source_url or frontmatter.get("url"),
+        url=document.source_url or _normalise_source_url(frontmatter.get("url")),
         published_at=frontmatter.get("published_at"),
         duration_seconds=document.duration_seconds,
         license=frontmatter.get("license") or frontmatter.get("video_license"),
@@ -1434,12 +1459,16 @@ def _persist_transcript_document(
 
     _ensure_unique_document_sha(session, sha256)
 
+    normalised_source_url = _normalise_source_url(
+        source_url or frontmatter.get("source_url")
+    )
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Transcript",
         authors=_ensure_list(frontmatter.get("authors")),
         doi=frontmatter.get("doi"),
-        source_url=source_url or frontmatter.get("source_url"),
+        source_url=normalised_source_url,
         source_type=source_type,
         collection=frontmatter.get("collection"),
         pub_date=_coerce_date(frontmatter.get("date")),
@@ -1483,7 +1512,7 @@ def _persist_transcript_document(
         document=document,
         video_identifier=document.video_id,
         title=document.title,
-        url=document.source_url or frontmatter.get("url"),
+        url=document.source_url or _normalise_source_url(frontmatter.get("url")),
         published_at=frontmatter.get("published_at"),
         duration_seconds=document.duration_seconds,
         license=frontmatter.get("license") or frontmatter.get("video_license"),
@@ -1737,21 +1766,14 @@ def run_pipeline_for_url(
             "youtube" if _is_youtube_url(url) else "web_page"
         )
         set_span_attribute(span, "ingest.source_type", resolved_source_type)
-
-
-    if resolved_source_type != "youtube":
         _ensure_url_allowed(settings, url)
-
-    if resolved_source_type == "youtube":
-        video_id = _extract_youtube_video_id(url)
-        metadata = _load_youtube_metadata(settings, video_id)
-        merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
 
         if resolved_source_type == "youtube":
             video_id = _extract_youtube_video_id(url)
             metadata = _load_youtube_metadata(settings, video_id)
-            merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
-
+            merged_frontmatter = _merge_metadata(
+                metadata, _load_frontmatter(frontmatter)
+            )
 
             segments, transcript_path = _load_youtube_transcript(settings, video_id)
             parser_result = _prepare_transcript_chunks(segments, settings=settings)

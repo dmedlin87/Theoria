@@ -11,6 +11,24 @@ interface Props {
   initialDocument: DocumentDetail;
 }
 
+const SAFE_SOURCE_URL_PROTOCOLS = new Set(["http", "https"]);
+
+function isSafeSourceUrl(url?: string | null): boolean {
+  if (!url) {
+    return false;
+  }
+  if (url.startsWith("/")) {
+    return true;
+  }
+  try {
+    const parsed = new URL(url);
+    const protocol = parsed.protocol.replace(/:$/, "").toLowerCase();
+    return SAFE_SOURCE_URL_PROTOCOLS.has(protocol);
+  } catch (error) {
+    return false;
+  }
+}
+
 function formatAuthors(authors?: string[] | null): string {
   return (authors ?? []).join(", ");
 }
@@ -182,11 +200,14 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
       </form>
 
       <div style={{ marginBottom: "1.5rem", display: "grid", gap: "0.35rem" }}>
-        {document.source_url && (
-          <a href={document.source_url} target="_blank" rel="noopener noreferrer">
-            Original source
-          </a>
-        )}
+        {document.source_url &&
+          (isSafeSourceUrl(document.source_url) ? (
+            <a href={document.source_url} target="_blank" rel="noopener noreferrer">
+              Original source
+            </a>
+          ) : (
+            <span>Original source: {document.source_url}</span>
+          ))}
         {document.collection && <p>Collection: {document.collection}</p>}
         {document.source_type && <p>Source type: {document.source_type}</p>}
         {document.authors && document.authors.length > 0 && <p>Authors: {formatAuthors(document.authors)}</p>}
