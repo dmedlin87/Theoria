@@ -1006,21 +1006,9 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
     opener = build_opener(redirect_handler)
     opener.addheaders = [("User-Agent", settings.user_agent)]
 
-
     request = Request(url, headers={"User-Agent": settings.user_agent})
 
     try:
-
-        with urlopen(request) as response:
-            final_url = response.geturl()
-            _ensure_url_allowed(settings, final_url)
-            raw = response.read()
-            encoding = response.headers.get_content_charset() or "utf-8"
-            try:
-                html = raw.decode(encoding, errors="replace")
-            except LookupError:
-                html = raw.decode("utf-8", errors="replace")
-
         response = opener.open(request, timeout=timeout)
     except UnsupportedSourceError:
         raise
@@ -1028,14 +1016,16 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
         raise UnsupportedSourceError(
             f"Fetching URL timed out after {timeout} seconds"
         ) from exc
-
     except (HTTPError, URLError, TimeoutError, ValueError) as exc:
         raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
 
-    final_url = response.geturl()
     raw = bytearray()
+    final_url = url
 
     try:
+        final_url = response.geturl()
+        _ensure_url_allowed(settings, final_url)
+
         while True:
             chunk = response.read(_WEB_FETCH_CHUNK_SIZE)
             if not chunk:
@@ -1776,21 +1766,14 @@ def run_pipeline_for_url(
             "youtube" if _is_youtube_url(url) else "web_page"
         )
         set_span_attribute(span, "ingest.source_type", resolved_source_type)
-
-
-    if resolved_source_type != "youtube":
         _ensure_url_allowed(settings, url)
-
-    if resolved_source_type == "youtube":
-        video_id = _extract_youtube_video_id(url)
-        metadata = _load_youtube_metadata(settings, video_id)
-        merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
 
         if resolved_source_type == "youtube":
             video_id = _extract_youtube_video_id(url)
             metadata = _load_youtube_metadata(settings, video_id)
-            merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
-
+            merged_frontmatter = _merge_metadata(
+                metadata, _load_frontmatter(frontmatter)
+            )
 
             segments, transcript_path = _load_youtube_transcript(settings, video_id)
             parser_result = _prepare_transcript_chunks(segments, settings=settings)
