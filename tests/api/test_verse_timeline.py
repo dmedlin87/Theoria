@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from pathlib import Path
 import sys
@@ -73,13 +74,16 @@ def _seed_documents(session: Session) -> None:
     ]
     session.add_all(passages)
     session.commit()
-
-
-def test_get_verse_timeline_groups_mentions_by_month(tmp_path) -> None:
+@contextmanager
+def _seeded_session(tmp_path: Path):
     engine = _prepare_engine(tmp_path)
     with Session(engine) as session:
         _seed_documents(session)
+        yield session
 
+
+def test_get_verse_timeline_groups_mentions_by_month(tmp_path) -> None:
+    with _seeded_session(tmp_path) as session:
         response = get_verse_timeline(
             session=session,
             osis="John.3.16",
@@ -99,11 +103,8 @@ def test_get_verse_timeline_groups_mentions_by_month(tmp_path) -> None:
     assert labels["2022-12"].count == 1
 
 
-def test_get_verse_timeline_honors_filters_and_limit(tmp_path) -> None:
-    engine = _prepare_engine(tmp_path)
-    with Session(engine) as session:
-        _seed_documents(session)
-
+def test_get_verse_timeline_filters_by_source_type(tmp_path) -> None:
+    with _seeded_session(tmp_path) as session:
         filtered = get_verse_timeline(
             session=session,
             osis="John.3.16",
@@ -111,6 +112,17 @@ def test_get_verse_timeline_honors_filters_and_limit(tmp_path) -> None:
             filters=VerseMentionsFilters(source_type="pdf"),
         )
 
+    assert filtered.total_mentions == 3
+    labels = {bucket.label: bucket for bucket in filtered.buckets}
+    assert set(labels) == {"2023-01", "2022-12"}
+    assert labels["2023-01"].count == 2
+    assert sorted(labels["2023-01"].document_ids) == ["doc-1", "doc-2"]
+    assert labels["2022-12"].count == 1
+    assert labels["2022-12"].document_ids == ["doc-4"]
+
+
+def test_get_verse_timeline_respects_limit(tmp_path) -> None:
+    with _seeded_session(tmp_path) as session:
         limited = get_verse_timeline(
             session=session,
             osis="John.3.16",
@@ -119,11 +131,11 @@ def test_get_verse_timeline_honors_filters_and_limit(tmp_path) -> None:
             filters=VerseMentionsFilters(),
         )
 
-    assert filtered.total_mentions == 3
-    assert all(doc_id != "doc-3" for bucket in filtered.buckets for doc_id in bucket.document_ids)
-
     assert len(limited.buckets) == 2
-    assert all(bucket.label != "2022-12" for bucket in limited.buckets)
+    labels = {bucket.label: bucket for bucket in limited.buckets}
+    assert set(labels) == {"2023-01", "2023-03"}
+    assert labels["2023-01"].count == 2
+    assert labels["2023-03"].count == 1
     assert limited.total_mentions == sum(bucket.count for bucket in limited.buckets)
 
 
