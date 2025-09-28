@@ -93,3 +93,44 @@ def test_router_latency_threshold_triggers_fallback(monkeypatch):
     assert result.model.name == "fast"
     assert router.get_latency("slow") is not None
     assert router.get_latency("slow") > 1.0
+
+
+def test_router_prioritizes_model_hint_over_weight(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="hinted",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[hinted]"},
+            routing={"weight": 0.5},
+        ),
+        make_default=True,
+    )
+    registry.add_model(
+        LLMModel(
+            name="heavy",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[heavy]"},
+            routing={"weight": 5.0},
+        )
+    )
+
+    router = LLMRouterService(registry)
+
+    candidates = router.iter_candidates("chat", model_hint="hinted")
+    first = next(candidates)
+    assert first.name == "hinted"
+
+    class _FailingClient:
+        def generate(self, **_: object) -> str:
+            raise GenerationError("boom")
+
+    # Force the hinted model to fail generation to confirm fallback order.
+    monkeypatch.setattr(registry.models["hinted"], "build_client", lambda: _FailingClient())
+    with pytest.raises(GenerationError):
+        router.execute_generation(workflow="chat", model=first, prompt="hello")
+
+    fallback = next(candidates)
+    assert fallback.name == "heavy"
