@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
+from requests import Response as RequestsResponse
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -76,7 +78,7 @@ class GuardrailProbe:
 
     endpoint: str
     prompt: str
-    response: object
+    response: RequestsResponse
 
     def payload(self) -> dict[str, object]:
         data = self.response.json()
