@@ -1,12 +1,16 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import ErrorCallout from "../components/ErrorCallout";
 import { getApiBaseUrl } from "../lib/api";
+import { type ErrorDetails, parseErrorResponse } from "../lib/errorUtils";
 
 type UploadStatus = {
   kind: "success" | "error" | "info";
   message: string;
+  traceId: string | null;
+  source?: "file" | "url";
 };
 
 type JobStatus = {
@@ -20,31 +24,8 @@ type JobStatus = {
   updated_at: string;
 };
 
-async function readErrorMessage(response: Response, fallback: string): Promise<string> {
-  const text = await response.text();
-  const trimmed = text.trim();
-  if (!trimmed) {
-    return fallback;
-  }
-
-  try {
-    const data = JSON.parse(trimmed) as {
-      detail?: unknown;
-      message?: unknown;
-      error?: unknown;
-    };
-    const detailCandidates = [data.detail, data.message, data.error];
-    for (const candidate of detailCandidates) {
-      if (typeof candidate === "string" && candidate.trim()) {
-        return candidate;
-      }
-    }
-  } catch {
-    // Fall back to the raw response text if parsing fails.
-    return trimmed;
-  }
-
-  return trimmed;
+async function readErrorDetails(response: Response, fallback: string): Promise<ErrorDetails> {
+  return parseErrorResponse(response, fallback);
 }
 
 async function uploadFile({
@@ -66,14 +47,16 @@ async function uploadFile({
   });
 
   if (!response.ok) {
-    const message = await readErrorMessage(response, "Upload failed");
-    return { kind: "error", message };
+    const { message, traceId } = await readErrorDetails(response, "Upload failed");
+    return { kind: "error", message, traceId, source: "file" } satisfies UploadStatus;
   }
 
   const payload = (await response.json()) as { document_id: string; status: string };
   return {
     kind: "success",
     message: `Upload complete. Document ID: ${payload.document_id}`,
+    traceId: null,
+    source: "file",
   };
 }
 
@@ -91,7 +74,12 @@ async function uploadUrl({
     try {
       parsedFrontmatter = JSON.parse(frontmatter);
     } catch (error) {
-      return { kind: "error", message: "Frontmatter must be valid JSON" };
+      return {
+        kind: "error",
+        message: "Frontmatter must be valid JSON",
+        traceId: null,
+        source: "url",
+      } satisfies UploadStatus;
     }
   }
 
@@ -110,14 +98,16 @@ async function uploadUrl({
   });
 
   if (!response.ok) {
-    const message = await readErrorMessage(response, "URL ingestion failed");
-    return { kind: "error", message };
+    const { message, traceId } = await readErrorDetails(response, "URL ingestion failed");
+    return { kind: "error", message, traceId, source: "url" } satisfies UploadStatus;
   }
 
   const data = (await response.json()) as { document_id: string; status: string };
   return {
     kind: "success",
     message: `URL queued. Document ID: ${data.document_id}`,
+    traceId: null,
+    source: "url",
   };
 }
 
@@ -134,7 +124,10 @@ export default function UploadPage(): JSX.Element {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isSubmittingUrl, setIsSubmittingUrl] = useState(false);
   const [jobs, setJobs] = useState<JobStatus[]>([]);
-  const [jobError, setJobError] = useState<string | null>(null);
+  const [jobError, setJobError] = useState<ErrorDetails | null>(null);
+  const fileFormRef = useRef<HTMLFormElement | null>(null);
+  const urlFormRef = useRef<HTMLFormElement | null>(null);
+  const fetchJobsRef = useRef<() => Promise<void> | null>(null);
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
 
@@ -145,7 +138,11 @@ export default function UploadPage(): JSX.Element {
       try {
         const response = await fetch(`${baseUrl}/jobs?limit=25`, { cache: "no-store" });
         if (!response.ok) {
-          throw new Error(await response.text());
+          const details = await readErrorDetails(response, "Unable to load jobs");
+          if (isMounted) {
+            setJobError(details);
+          }
+          return;
         }
         const payload = (await response.json()) as { jobs: JobStatus[] };
         if (isMounted) {
@@ -154,18 +151,54 @@ export default function UploadPage(): JSX.Element {
         }
       } catch (error) {
         if (isMounted) {
-          setJobError((error as Error).message || "Unable to load jobs");
+          const fallbackMessage =
+            error instanceof Error && error.message ? error.message : "Unable to load jobs";
+          const message =
+            error instanceof TypeError && /fetch/i.test(error.message)
+              ? "Unable to reach the ingestion service. Please verify the API is running."
+              : fallbackMessage;
+          const traceId =
+            typeof error === "object" && error && "traceId" in error
+              ? ((error as { traceId?: string | null }).traceId ?? null)
+              : null;
+          setJobError({ message, traceId });
         }
       }
     };
 
+    fetchJobsRef.current = fetchJobs;
     fetchJobs();
     const interval = window.setInterval(fetchJobs, 5000);
     return () => {
       isMounted = false;
       window.clearInterval(interval);
+      fetchJobsRef.current = null;
     };
   }, [baseUrl]);
+
+  const handleShowTraceDetails = useCallback((traceId: string | null) => {
+    const detailMessage = traceId
+      ? `Trace ID: ${traceId}`
+      : "No additional trace information is available.";
+    window.alert(detailMessage);
+  }, []);
+
+  const handleRetryStatus = useCallback(() => {
+    if (!status || status.kind !== "error") {
+      return;
+    }
+    if (status.source === "file") {
+      fileFormRef.current?.requestSubmit();
+    } else if (status.source === "url") {
+      urlFormRef.current?.requestSubmit();
+    }
+  }, [status]);
+
+  const handleRetryJobs = useCallback(() => {
+    if (fetchJobsRef.current) {
+      void fetchJobsRef.current();
+    }
+  }, []);
 
   const handleFileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -177,7 +210,7 @@ export default function UploadPage(): JSX.Element {
     const file = fileInput?.files?.[0];
 
     if (!file) {
-      setStatus({ kind: "error", message: "Please choose a file to upload." });
+      setStatus({ kind: "error", message: "Please choose a file to upload.", traceId: null, source: "file" });
       return;
     }
 
@@ -186,7 +219,9 @@ export default function UploadPage(): JSX.Element {
       const frontmatter = frontmatterInput?.value ?? "";
       const result = await uploadFile({ file, frontmatter });
       setStatus(result);
-      form.reset();
+      if (result.kind === "success") {
+        form.reset();
+      }
     } catch (error) {
       const fallbackMessage =
         error instanceof Error
@@ -198,7 +233,7 @@ export default function UploadPage(): JSX.Element {
         error instanceof TypeError && /fetch/i.test(error.message)
           ? "Unable to reach the ingestion service. Please verify the API is running."
           : fallbackMessage;
-      setStatus({ kind: "error", message });
+      setStatus({ kind: "error", message, traceId: null, source: "file" });
     } finally {
       setIsUploadingFile(false);
     }
@@ -215,7 +250,12 @@ export default function UploadPage(): JSX.Element {
 
     const urlValue = urlInput?.value.trim() ?? "";
     if (!urlValue) {
-      setStatus({ kind: "error", message: "Please provide a URL to ingest." });
+      setStatus({
+        kind: "error",
+        message: "Please provide a URL to ingest.",
+        traceId: null,
+        source: "url",
+      });
       return;
     }
 
@@ -227,7 +267,9 @@ export default function UploadPage(): JSX.Element {
         frontmatter: frontmatterInput?.value ?? "",
       });
       setStatus(result);
-      form.reset();
+      if (result.kind === "success") {
+        form.reset();
+      }
     } catch (error) {
       const fallbackMessage =
         error instanceof Error
@@ -239,7 +281,7 @@ export default function UploadPage(): JSX.Element {
         error instanceof TypeError && /fetch/i.test(error.message)
           ? "Unable to reach the ingestion service. Please verify the API is running."
           : fallbackMessage;
-      setStatus({ kind: "error", message });
+      setStatus({ kind: "error", message, traceId: null, source: "url" });
     } finally {
       setIsSubmittingUrl(false);
     }
@@ -250,7 +292,12 @@ export default function UploadPage(): JSX.Element {
       <h2>Upload</h2>
       <p>Send a local file or a canonical URL to the ingestion pipeline.</p>
 
-      <form onSubmit={handleFileSubmit} aria-label="Upload file" style={{ marginBottom: "2rem" }}>
+      <form
+        ref={fileFormRef}
+        onSubmit={handleFileSubmit}
+        aria-label="Upload file"
+        style={{ marginBottom: "2rem" }}
+      >
         <fieldset disabled={isUploadingFile}>
           <legend>Upload file</legend>
           <label>
@@ -272,7 +319,7 @@ export default function UploadPage(): JSX.Element {
         </fieldset>
       </form>
 
-      <form onSubmit={handleUrlSubmit} aria-label="Ingest URL">
+      <form ref={urlFormRef} onSubmit={handleUrlSubmit} aria-label="Ingest URL">
         <fieldset disabled={isSubmittingUrl}>
           <legend>Ingest URL</legend>
           <label style={{ display: "block" }}>
@@ -302,18 +349,34 @@ export default function UploadPage(): JSX.Element {
         </fieldset>
       </form>
 
-      {status && (
-        <p role={status.kind === "error" ? "alert" : "status"} style={{ marginTop: "1.5rem" }}>
-          {status.message}
-        </p>
+      {status && status.kind === "error" ? (
+        <div style={{ marginTop: "1.5rem" }}>
+          <ErrorCallout
+            message={status.message}
+            traceId={status.traceId}
+            onRetry={handleRetryStatus}
+            onShowDetails={handleShowTraceDetails}
+          />
+        </div>
+      ) : (
+        status && (
+          <p role="status" style={{ marginTop: "1.5rem" }}>
+            {status.message}
+          </p>
+        )
       )}
 
       <section style={{ marginTop: "2.5rem" }}>
         <h3>Recent jobs</h3>
         {jobError && (
-          <p role="alert" style={{ color: "crimson" }}>
-            {jobError}
-          </p>
+          <div style={{ marginBottom: "1rem" }}>
+            <ErrorCallout
+              message={jobError.message}
+              traceId={jobError.traceId}
+              onRetry={handleRetryJobs}
+              onShowDetails={handleShowTraceDetails}
+            />
+          </div>
         )}
         {jobs.length === 0 ? (
           <p>No jobs queued yet.</p>

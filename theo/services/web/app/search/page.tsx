@@ -11,7 +11,9 @@ import {
   useState,
 } from "react";
 
+import ErrorCallout from "../components/ErrorCallout";
 import { buildPassageLink, formatAnchor } from "../lib/api";
+import { type ErrorDetails, parseErrorResponse } from "../lib/errorUtils";
 import { usePersistentSort } from "../lib/usePersistentSort";
 import { sortDocumentGroups, SortableDocumentGroup } from "./groupSorting";
 import { SortControls } from "./SortControls";
@@ -189,12 +191,13 @@ export default function SearchPage(): JSX.Element {
   const [presetSelection, setPresetSelection] = useState<string>(CUSTOM_PRESET_VALUE);
   const [groups, setGroups] = useState<DocumentGroup[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorDetails | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [sortKey, setSortKey] = usePersistentSort();
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [savedSearchName, setSavedSearchName] = useState("");
   const [diffSelection, setDiffSelection] = useState<string[]>([]);
+  const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(null);
 
   const presetIsCustom = presetSelection === CUSTOM_PRESET_VALUE || presetSelection === "";
 
@@ -307,6 +310,7 @@ export default function SearchPage(): JSX.Element {
       setIsSearching(true);
       setError(null);
       setHasSearched(true);
+      setLastSearchFilters(filters);
 
       try {
         const searchQuery = serializeSearchParams(filters);
@@ -314,7 +318,13 @@ export default function SearchPage(): JSX.Element {
           cache: "no-store",
         });
         if (!response.ok) {
-          throw new Error(`Search failed with status ${response.status}`);
+          const errorDetails = await parseErrorResponse(
+            response,
+            `Search failed with status ${response.status}`,
+          );
+          setGroups([]);
+          setError(errorDetails);
+          return;
         }
         const payload = (await response.json()) as SearchResponse;
         const grouped = new Map<string, DocumentGroup>();
@@ -344,7 +354,15 @@ export default function SearchPage(): JSX.Element {
         const sortedGroups = sortDocumentGroups(Array.from(grouped.values()), sortKey);
         setGroups(sortedGroups);
       } catch (fetchError) {
-        setError((fetchError as Error).message);
+        const message =
+          fetchError instanceof Error && fetchError.message
+            ? fetchError.message
+            : "Search failed";
+        const traceId =
+          typeof fetchError === "object" && fetchError && "traceId" in fetchError
+            ? ((fetchError as { traceId?: string | null }).traceId ?? null)
+            : null;
+        setError({ message, traceId });
         setGroups([]);
       } finally {
         setIsSearching(false);
@@ -379,6 +397,19 @@ export default function SearchPage(): JSX.Element {
     },
     [],
   );
+
+  const handleShowErrorDetails = useCallback((traceId: string | null) => {
+    const detailMessage = traceId
+      ? `Trace ID: ${traceId}`
+      : "No additional trace information is available.";
+    window.alert(detailMessage);
+  }, []);
+
+  const handleRetrySearch = useCallback(() => {
+    if (lastSearchFilters) {
+      void runSearch(lastSearchFilters);
+    }
+  }, [lastSearchFilters, runSearch]);
 
   const handlePresetChange = useCallback(
     (value: string) => {
@@ -1025,9 +1056,14 @@ export default function SearchPage(): JSX.Element {
 
       {isSearching && <p role="status">Searching.</p>}
       {error && (
-        <p role="alert" style={{ color: "crimson" }}>
-          {error}
-        </p>
+        <div style={{ marginTop: "1rem" }}>
+          <ErrorCallout
+            message={error.message}
+            traceId={error.traceId}
+            onRetry={handleRetrySearch}
+            onShowDetails={handleShowErrorDetails}
+          />
+        </div>
       )}
       {!isSearching && hasSearched && !error && groups.length === 0 && (
         <p>No results found for the current query.</p>
