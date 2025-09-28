@@ -28,43 +28,48 @@ export const scoreFirstComparator = <T extends SortableDocumentGroup>(a: T, b: T
 };
 
 export const rankFirstComparator = <T extends SortableDocumentGroup>(a: T, b: T): number => {
-  const aHasRank = typeof a.rank === "number";
-  const bHasRank = typeof b.rank === "number";
+  const aRank = typeof a.rank === "number" ? a.rank : null;
+  const bRank = typeof b.rank === "number" ? b.rank : null;
 
-  if (aHasRank && bHasRank) {
-    const rankDifference = (a.rank as number) - (b.rank as number);
+  if (aRank !== null && bRank !== null) {
+    const rankDifference = aRank - bRank;
     if (rankDifference !== 0) {
       return rankDifference;
     }
     return scoreFirstComparator(a, b);
   }
 
-  if (aHasRank) return -1;
-  if (bHasRank) return 1;
+  if (aRank !== null) return -1;
+  if (bRank !== null) return 1;
 
   return scoreFirstComparator(a, b);
 };
 
-const COMPARATORS = {
+export type GroupSortKey = "rank" | "score" | "title";
+
+const COMPARATORS: Record<GroupSortKey, GroupComparator<SortableDocumentGroup>> = {
   rank: rankFirstComparator,
   score: scoreFirstComparator,
   title: titleComparator,
-} as const;
-
-export type GroupSortKey = keyof typeof COMPARATORS;
+};
 
 export function isGroupSortKey(value: unknown): value is GroupSortKey {
   return typeof value === "string" && value in COMPARATORS;
 }
 
+const withGenericComparator = <T extends SortableDocumentGroup>(
+  comparator: GroupComparator<SortableDocumentGroup>
+): GroupComparator<T> => (a, b) => comparator(a, b);
+
 export function getGroupSortComparator<T extends SortableDocumentGroup>(
   key: string | null | undefined
 ): GroupComparator<T> {
   const fallbackKey: GroupSortKey = "rank";
-  if (isGroupSortKey(key)) {
-    return COMPARATORS[key] as GroupComparator<T>;
-  }
-  return COMPARATORS[fallbackKey] as GroupComparator<T>;
+  const comparator = isGroupSortKey(key)
+    ? COMPARATORS[key]
+    : COMPARATORS[fallbackKey];
+
+  return withGenericComparator<T>(comparator);
 }
 
 export function sortDocumentGroups<T extends SortableDocumentGroup>(
