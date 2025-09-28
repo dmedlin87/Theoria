@@ -14,6 +14,7 @@ from ..core.settings import get_settings
 from ..db.models import Document, Passage
 from .chunking import Chunk, chunk_text
 from .embeddings import get_embedding_service, lexical_representation
+from .sanitizer import sanitize_passage_text
 from .osis import detect_osis_references
 from ..telemetry import instrument_workflow, set_span_attribute
 
@@ -239,23 +240,30 @@ def ingest_pilot_corpus(
         set_span_attribute(span, "ingest.cache_status", "n/a")
 
         embedding_service = get_embedding_service()
-        embeddings = embedding_service.embed([chunk.text for chunk in chunks])
+        sanitized_texts = [sanitize_passage_text(chunk.text) for chunk in chunks]
+        embeddings = embedding_service.embed(sanitized_texts)
         average_confidence = _normalise_confidence(confidences) or 0.0
 
         for index, chunk in enumerate(chunks):
             tei_xml, facets = generate_tei_markup(chunk.text)
             meta = _chunk_to_passage_meta(chunk, facets, average_confidence)
             page_no = page_numbers[index] if index < len(page_numbers) else None
+            sanitized_text = (
+                sanitized_texts[index]
+                if index < len(sanitized_texts)
+                else sanitize_passage_text(chunk.text)
+            )
             passage = Passage(
                 document_id=document.id,
                 page_no=page_no,
                 start_char=chunk.start_char,
                 end_char=chunk.end_char,
-                text=chunk.text,
-                tokens=len(chunk.text.split()),
+                text=sanitized_text,
+                raw_text=chunk.text,
+                tokens=len(sanitized_text.split()),
                 osis_ref=meta.get("osis_primary"),
                 embedding=embeddings[index] if index < len(embeddings) else None,
-                lexeme=lexical_representation(session, chunk.text),
+                lexeme=lexical_representation(session, sanitized_text),
                 meta=meta,
                 tei_xml=tei_xml,
             )
