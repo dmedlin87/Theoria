@@ -15,7 +15,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.debug import ErrorReportingMiddleware, build_debug_report  # noqa: E402
+from theo.services.api.app.debug import (  # noqa: E402
+    ErrorReportingMiddleware,
+    build_debug_report,
+    emit_debug_report,
+)
 
 
 async def _receive_with_body(body: bytes) -> Dict[str, Any]:
@@ -94,3 +98,22 @@ def test_error_reporting_middleware_emits_report(caplog: pytest.LogCaptureFixtur
     logged_report = debug_records[0].__dict__["debug_report"]
     assert logged_report["context"]["feature"] == "test"
     assert logged_report["error"]["message"] == "kaboom"
+
+
+def test_debug_report_includes_trace_id(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    trace_id = "1234567890abcdef1234567890abcdef"
+    monkeypatch.setattr(
+        "theo.services.api.app.debug.reporting.get_current_trace_id", lambda: trace_id
+    )
+
+    request = _make_request(b"{}")
+    report = build_debug_report(request, exc=None, body=None)
+    assert report.context["trace_id"] == trace_id
+
+    with caplog.at_level(logging.ERROR, logger="theo.api.errors"):
+        emit_debug_report(report)
+
+    debug_records = [record for record in caplog.records if record.getMessage() == "api.debug_report"]
+    assert debug_records
+    record = debug_records[0]
+    assert getattr(record, "trace_id", None) == trace_id

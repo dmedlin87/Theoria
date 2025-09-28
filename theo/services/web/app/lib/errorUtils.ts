@@ -11,6 +11,7 @@ const TRACE_HEADER_KEYS = [
   "x-trace-id",
   "trace-id",
   "x-request-id",
+  "traceparent",
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -40,8 +41,31 @@ function extractTraceIdFromHeaders(headers: Headers): string | null {
   for (const key of TRACE_HEADER_KEYS) {
     const headerValue = headers.get(key);
     if (headerValue && headerValue.trim()) {
+      if (key === "traceparent") {
+        const traceFromParent = parseTraceparentHeader(headerValue);
+        if (traceFromParent) {
+          return traceFromParent;
+        }
+        continue;
+      }
       return headerValue.trim();
     }
+  }
+  return null;
+}
+
+function parseTraceparentHeader(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parts = trimmed.split("-");
+  if (parts.length < 4) {
+    return null;
+  }
+  const traceId = parts[1]?.trim();
+  if (typeof traceId === "string" && traceId.length === 32) {
+    return traceId.toLowerCase();
   }
   return null;
 }
