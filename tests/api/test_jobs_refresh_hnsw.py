@@ -52,3 +52,38 @@ def test_refresh_hnsw_job_endpoint_enqueues(monkeypatch, tmp_path) -> None:
     assert captured["job_id"] == payload["id"]
     assert captured["sample_queries"] == 5
     assert captured["top_k"] == 3
+
+
+def test_refresh_hnsw_job_endpoint_uses_defaults(monkeypatch, tmp_path) -> None:
+    db_path = tmp_path / "jobs.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+
+    captured: dict[str, object] = {}
+
+    class DummyResult:
+        id = "task-id"
+
+    def fake_delay(job_id: str, sample_queries: int = 25, top_k: int = 10):
+        captured["job_id"] = job_id
+        captured["sample_queries"] = sample_queries
+        captured["top_k"] = top_k
+        return DummyResult()
+
+    monkeypatch.setattr(tasks.refresh_hnsw, "delay", fake_delay)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/jobs/refresh-hnsw",
+            json={},
+        )
+
+    assert response.status_code == 202, response.text
+    payload = response.json()
+    assert payload["payload"]["sample_queries"] == 25
+    assert payload["payload"]["top_k"] == 10
+    assert captured["job_id"] == payload["id"]
+    assert captured["sample_queries"] == 25
+    assert captured["top_k"] == 10

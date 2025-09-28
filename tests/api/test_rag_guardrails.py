@@ -141,6 +141,32 @@ def test_guarded_answer_rejects_mismatched_citations(fake_cache: fakeredis_aiore
     assert asyncio.run(fake_cache.dbsize()) == 0
 
 
+def test_guarded_answer_requires_osis_reference(
+    fake_cache: fakeredis_aioredis.FakeRedis,
+) -> None:
+    completion = "Answer with missing citations.\n\nSources: [1] Unknown"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    results = [
+        _make_result(result_id="passage-1", osis_ref=None, rank=1),
+        _make_result(result_id="passage-2", osis_ref=None, rank=2),
+    ]
+
+    with pytest.raises(GuardrailError):
+        rag._guarded_answer(  # type: ignore[arg-type]
+            session,
+            question="What does the passage say?",
+            results=results,
+            registry=registry,
+            model_hint=model.name,
+            filters=HybridSearchFilters(),
+        )
+
+    assert asyncio.run(fake_cache.dbsize()) == 0
+
+
 def test_guarded_answer_summary_uses_citation_documents(
     fake_cache: fakeredis_aioredis.FakeRedis,
 ) -> None:
@@ -297,3 +323,79 @@ def test_guarded_answer_reuses_cache(fake_cache: fakeredis_aioredis.FakeRedis) -
     assert model.client.call_count == 1, "cached response should skip regeneration"
     assert second.model_output == completion
     assert second.model_name == model.name
+
+
+def test_guarded_answer_invalidates_stale_cache(
+    fake_cache: fakeredis_aioredis.FakeRedis,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    initial_completion = "Stable answer.\n\nSources: [1] John.3.16 (page 2)"
+    refreshed_completion = "Refreshed answer.\n\nSources: [1] John.3.16 (page 2)"
+    model = _DummyModel(initial_completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def record_event(event: str, *, workflow: str, **context: object) -> None:
+        events.append((event, {"workflow": workflow, **context}))
+
+    monkeypatch.setattr(rag, "log_workflow_event", record_event)
+
+    deleted_keys: list[str] = []
+    original_delete = fake_cache.delete
+
+    async def record_delete(*keys: str) -> int:
+        deleted_keys.extend(keys)
+        return await original_delete(*keys)
+
+    monkeypatch.setattr(fake_cache, "delete", record_delete)
+
+    # Populate the cache with a valid answer for the current prompt.
+    rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="Explain John 3:16",
+        results=[_make_result()],
+        registry=registry,
+        model_hint=model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    assert model.client.call_count == 1
+
+    keys = asyncio.run(fake_cache.keys("rag:*"))
+    assert keys
+    cache_key = keys[0]
+    payload_raw = asyncio.run(fake_cache.get(cache_key))
+    assert payload_raw is not None
+    payload = json.loads(payload_raw)
+    payload["answer"]["model_output"] = (
+        "Stale answer.\n\nSources: [1] Luke.1.1 (page 9)"
+    )
+    asyncio.run(fake_cache.set(cache_key, json.dumps(payload)))
+
+    model.client.completion = refreshed_completion
+    deleted_keys.clear()
+    events.clear()
+
+    refreshed = rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="Explain John 3:16",
+        results=[_make_result()],
+        registry=registry,
+        model_hint=model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    assert refreshed.model_output == refreshed_completion
+    assert model.client.call_count == 2
+    assert cache_key in deleted_keys
+    assert any(
+        event == "workflow.guardrails_cache" and data.get("status") == "stale"
+        for event, data in events
+    )
+
+    refreshed_payload_raw = asyncio.run(fake_cache.get(cache_key))
+    assert refreshed_payload_raw is not None
+    refreshed_payload = json.loads(refreshed_payload_raw)
+    assert refreshed_payload["answer"]["model_output"] == refreshed_completion

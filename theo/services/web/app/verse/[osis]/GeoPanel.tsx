@@ -230,7 +230,11 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
             <div style={{ display: "grid", gap: "0.25rem", fontSize: "0.8rem", color: "var(--muted-foreground, #4b5563)" }}>
               <p style={{ margin: 0 }}>
                 Geodata ©{" "}
-                <a href={verseData.attribution.url} target="_blank" rel="noreferrer">
+                <a
+                  href={verseData.attribution.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   {verseData.attribution.source}
                 </a>{" "}
                 — Licensed {verseData.attribution.license}
@@ -240,7 +244,12 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
               </p>
               {verseData.attribution.osm_required ? (
                 <p style={{ margin: 0 }}>
-                  Shapes © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
+                  Shapes ©{' '}
+                  <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     OpenStreetMap contributors
                   </a>{" "}
                   — Licensed ODbL

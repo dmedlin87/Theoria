@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.core.database import Base, get_session
 from theo.services.api.app.db.models import Document, Passage
 from theo.services.api.app.main import app
+from theo.services.api.app.routes.ai import _CSL_TYPE_MAP, _build_csl_entry
 
 
 @pytest.fixture()
@@ -123,6 +124,23 @@ def test_export_citations_allows_missing_source_url(client: TestClient) -> None:
     )
 
     assert response.status_code == 200
+    payload = response.json()
+
+    manifest = payload["manifest"]
+    record = payload["records"][0]
+    csl_entry = payload["csl"][0]
+    manager_items = payload["manager_payload"]["zotero"]["items"][0]
+
+    assert manifest.get("source_url") is None
+    assert record.get("source_url") is None
+    assert "URL" not in csl_entry
+    assert "URL" not in manager_items
+
+    assert record["document_id"] == "doc-1"
+    assert record["doi"] == "10.1234/example"
+    assert record["authors"] == ["Jane Doe"]
+    assert csl_entry["title"] == "Sample Document"
+    assert csl_entry["DOI"] == "10.1234/example"
 
 
 def test_export_citations_rejects_empty_payload(client: TestClient) -> None:
@@ -148,3 +166,46 @@ def test_export_citations_reports_missing_document(client: TestClient) -> None:
         },
     )
     assert response.status_code == 404
+
+
+
+def test_export_citations_requires_document_id(client: TestClient) -> None:
+    citation = {
+        "index": 1,
+        "osis": "John.1.1",
+        "anchor": "John 1:1",
+        "passage_id": "passage-1",
+        "document_title": "Sample Document",
+        "snippet": "In the beginning was the Word.",
+    }
+
+    response = client.post(
+        "/ai/citations/export",
+        json={"citations": [{**citation, "document_id": ""}]},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert "document_id" in payload.get("detail", "")
+    assert "manifest" not in payload
+    assert "records" not in payload
+
+@pytest.mark.parametrize(
+    "source_type, expected",
+    [
+        ("sermon", _CSL_TYPE_MAP["sermon"]),
+        ("video", _CSL_TYPE_MAP["video"]),
+        ("web", _CSL_TYPE_MAP["web"]),
+        ("unknown", "article-journal"),
+    ],
+)
+def test_build_csl_entry_uses_expected_type(source_type: str, expected: str) -> None:
+    record = {
+        "document_id": "doc-type-test",
+        "title": "CSL Type Sample",
+        "source_type": source_type,
+    }
+
+    entry = _build_csl_entry(record, citations=[])
+
+    assert entry["type"] == expected

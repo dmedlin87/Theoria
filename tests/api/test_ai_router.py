@@ -109,6 +109,7 @@ def test_router_generation_error_when_ledger_prepopulated():
                 "latency_threshold_ms": 10.0,
                 "weight": 2.0,
             },
+
         ),
         make_default=True,
     )
@@ -138,3 +139,29 @@ def test_router_generation_error_when_ledger_prepopulated():
         router.execute_generation(workflow="chat", model=model, prompt="hello")
 
     assert router.get_spend("primary") == pytest.approx(1.0)
+            name="heavy",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[heavy]"},
+            routing={"weight": 5.0},
+        )
+    )
+
+    router = LLMRouterService(registry)
+
+    candidates = router.iter_candidates("chat", model_hint="hinted")
+    first = next(candidates)
+    assert first.name == "hinted"
+
+    class _FailingClient:
+        def generate(self, **_: object) -> str:
+            raise GenerationError("boom")
+
+    # Force the hinted model to fail generation to confirm fallback order.
+    monkeypatch.setattr(registry.models["hinted"], "build_client", lambda: _FailingClient())
+    with pytest.raises(GenerationError):
+        router.execute_generation(workflow="chat", model=first, prompt="hello")
+
+    fallback = next(candidates)
+    assert fallback.name == "heavy"
+
