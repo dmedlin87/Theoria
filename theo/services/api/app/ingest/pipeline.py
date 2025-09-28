@@ -40,6 +40,7 @@ from ..db.models import (
 from ..telemetry import instrument_workflow, set_span_attribute
 from .chunking import Chunk, chunk_text, chunk_transcript
 from .embeddings import get_embedding_service, lexical_representation
+from .sanitizer import sanitize_passage_text
 from .osis import (
     DetectedOsis,
     classify_osis_matches,
@@ -1209,12 +1210,24 @@ def _persist_text_document(
 
     chunk_hints = _ensure_list(frontmatter.get("osis_refs"))
     embedding_service = get_embedding_service()
-    embeddings = embedding_service.embed([chunk.text for chunk in chunks])
+
+    raw_texts: list[str] = []
+    sanitized_texts: list[str] = []
+    for chunk in chunks:
+        raw_value = chunk.text
+        sanitized_value = sanitize_passage_text(raw_value)
+        raw_texts.append(raw_value)
+        sanitized_texts.append(sanitized_value)
+
+    embeddings = embedding_service.embed(sanitized_texts)
 
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
     for idx, chunk in enumerate(chunks):
-        detected = detect_osis_references(chunk.text)
+        sanitized_text = sanitized_texts[idx] if idx < len(sanitized_texts) else sanitize_passage_text(chunk.text)
+        raw_text = raw_texts[idx] if idx < len(raw_texts) else chunk.text
+
+        detected = detect_osis_references(sanitized_text)
         meta = _normalise_passage_meta(
             detected,
             chunk_hints,
@@ -1237,11 +1250,12 @@ def _persist_text_document(
             t_end=chunk.t_end,
             start_char=chunk.start_char,
             end_char=chunk.end_char,
-            text=chunk.text,
-            tokens=len(chunk.text.split()),
+            text=sanitized_text,
+            raw_text=raw_text,
+            tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
             embedding=embedding,
-            lexeme=lexical_representation(session, chunk.text),
+            lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
         )
         session.add(passage)
@@ -1259,7 +1273,8 @@ def _persist_text_document(
             video_id=video_record.id if video_record else None,
             t_start=chunk.t_start,
             t_end=chunk.t_end,
-            text=chunk.text,
+            text=sanitized_text,
+            raw_text=raw_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
             topics=None,
@@ -1791,51 +1806,49 @@ def run_pipeline_for_url(
             set_span_attribute(span, "ingest.document_id", document.id)
             return document
 
-        if resolved_source_type not in {"web_page", "html", "website"}:
-            raise UnsupportedSourceError(
-                (
-                    "Unsupported source type for URL ingestion: "
-                    f"{resolved_source_type}. Supported types are: "
-                    "youtube, web_page, html, website"
-                )
+    if resolved_source_type not in {"web_page", "html", "website"}:
+        raise UnsupportedSourceError(
+            (
+                "Unsupported source type for URL ingestion: "
+                f"{resolved_source_type}. Supported types are: "
+                "youtube, web_page, html, website"
             )
-
-        html, metadata = _fetch_web_document(settings, url)
-        text_content = _html_to_text(html)
-        if not text_content:
-            raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
-
-        merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
-        parser_result = _prepare_text_chunks(text_content, settings=settings)
-        sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
-            "utf-8"
         )
-        sha256 = hashlib.sha256(sha_payload).hexdigest()
 
-        chunk_count = len(parser_result.chunks)
-        set_span_attribute(span, "ingest.chunk_count", chunk_count)
-        set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
-        set_span_attribute(span, "ingest.cache_status", "n/a")
+    html, metadata = _fetch_web_document(settings, url)
+    text_content = _html_to_text(html)
+    if not text_content:
+        raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
 
-        document = _persist_text_document(
-            session,
-            chunks=parser_result.chunks,
-            parser=parser_result.parser,
-            parser_version=parser_result.parser_version,
-            frontmatter=merged_frontmatter,
-            settings=settings,
-            sha256=sha256,
-            source_type="web_page",
-            title=merged_frontmatter.get("title") or metadata.get("title") or url,
-            source_url=merged_frontmatter.get("source_url")
-            or metadata.get("canonical_url")
-            or url,
-            text_content=parser_result.text,
-            raw_content=html,
-            raw_filename="source.html",
-        )
-        set_span_attribute(span, "ingest.document_id", document.id)
-        return document
+    merged_frontmatter = _merge_metadata(metadata, _load_frontmatter(frontmatter))
+    parser_result = _prepare_text_chunks(text_content, settings=settings)
+    sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
+    sha256 = hashlib.sha256(sha_payload).hexdigest()
+
+    chunk_count = len(parser_result.chunks)
+    set_span_attribute(span, "ingest.chunk_count", chunk_count)
+    set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
+    set_span_attribute(span, "ingest.cache_status", "n/a")
+
+    document = _persist_text_document(
+        session,
+        chunks=parser_result.chunks,
+        parser=parser_result.parser,
+        parser_version=parser_result.parser_version,
+        frontmatter=merged_frontmatter,
+        settings=settings,
+        sha256=sha256,
+        source_type="web_page",
+        title=merged_frontmatter.get("title") or metadata.get("title") or url,
+        source_url=merged_frontmatter.get("source_url")
+        or metadata.get("canonical_url")
+        or url,
+        text_content=parser_result.text,
+        raw_content=html,
+        raw_filename="source.html",
+    )
+    set_span_attribute(span, "ingest.document_id", document.id)
+    return document
 
 
 def run_pipeline_for_transcript(

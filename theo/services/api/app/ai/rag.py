@@ -27,6 +27,8 @@ from ..core.settings import get_settings
 from ..core.version import get_git_sha
 from ..db.models import Document, Passage
 from ..export.formatters import SCHEMA_VERSION, generate_export_id
+from pydantic import Field
+
 from ..models.base import APIModel
 from ..models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
@@ -192,6 +194,7 @@ class RAGCitation(APIModel):
     document_title: str | None = None
     snippet: str
     source_url: str | None = None
+    raw_snippet: str | None = Field(default=None, exclude=True)
 
 
 class RAGAnswer(APIModel):
@@ -388,23 +391,28 @@ def _iter_sentence_spans(text: str) -> list[tuple[int, int, str]]:
     return spans
 
 
-def _derive_snippet(result: HybridSearchResult) -> str:
-    base_text = result.text or ""
-    fallback = (result.snippet or base_text).strip()
+def _derive_snippet(
+    result: HybridSearchResult,
+    *,
+    text: str | None = None,
+    fallback: str | None = None,
+) -> str:
+    base_text = text if text is not None else result.text or ""
+    fallback_value = (fallback if fallback is not None else result.snippet or base_text).strip()
     if not base_text.strip():
-        return fallback
+        return fallback_value
 
     start_char = getattr(result, "start_char", None)
     end_char = getattr(result, "end_char", None)
     if start_char is None or end_char is None:
-        return fallback
+        return fallback_value
 
     start = max(0, min(len(base_text), start_char))
     end = max(start, min(len(base_text), end_char))
     spans = _iter_sentence_spans(base_text)
     if not spans:
         snippet = base_text[start:end].strip()
-        return snippet or fallback
+        return snippet or fallback_value
 
     selected_sentences = [
         sentence
@@ -413,10 +421,10 @@ def _derive_snippet(result: HybridSearchResult) -> str:
     ]
     if not selected_sentences:
         snippet = base_text[start:end].strip()
-        return snippet or fallback
+        return snippet or fallback_value
 
     snippet = " ".join(selected_sentences).strip()
-    return snippet or fallback
+    return snippet or fallback_value
 
 
 def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
@@ -426,6 +434,12 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
             continue
         anchor = _format_anchor(result)
         snippet = _derive_snippet(result)
+        raw_snippet = None
+        raw_text = getattr(result, "raw_text", None)
+        if raw_text:
+            raw_snippet = _derive_snippet(
+                result, text=raw_text, fallback=raw_text
+            )
         citations.append(
             RAGCitation(
                 index=index,
@@ -436,6 +450,7 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
                 document_title=result.document_title,
                 snippet=snippet,
                 source_url=_build_source_url(result),
+                raw_snippet=raw_snippet,
             )
         )
     return citations

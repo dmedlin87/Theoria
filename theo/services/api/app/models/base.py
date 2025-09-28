@@ -23,6 +23,7 @@ class Passage(APIModel):
     id: str
     document_id: str
     text: str
+    raw_text: str | None = Field(default=None, exclude=True)
     osis_ref: str | None = None
     start_char: int | None = None
     end_char: int | None = None
