@@ -64,6 +64,18 @@ class Settings(BaseSettings):
     notification_timeout_seconds: float = Field(
         default=10.0, description="HTTP timeout when delivering notifications"
     )
+    ingest_web_timeout_seconds: float = Field(
+        default=10.0,
+        description="HTTP timeout when fetching remote URLs for ingestion",
+    )
+    ingest_web_max_bytes: int | None = Field(
+        default=4 * 1024 * 1024,
+        description="Maximum number of bytes fetched when ingesting a web page",
+    )
+    ingest_web_max_redirects: int = Field(
+        default=5,
+        description="Maximum redirect hops allowed when fetching web documents",
+    )
     topic_digest_ttl_seconds: int = Field(
         default=3600,
         description="Time-to-live in seconds before regenerating cached topic digests",

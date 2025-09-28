@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import socket
 from pathlib import Path
 import sys
 
@@ -16,6 +17,7 @@ from theo.services.api.app.core.database import get_session  # noqa: E402
 from theo.services.api.app.core.settings import Settings  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
+from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E402
 
 
 @pytest.fixture()
@@ -45,9 +47,15 @@ def _override_ingest_limit(monkeypatch: pytest.MonkeyPatch, limit: int) -> Setti
     return settings
 
 
+ 
+class _FakeHeaders(dict):
+    def get_content_charset(self, default: str | None = None) -> str | None:
+        return self.get("charset", default)
+ 
 _PDF_EXTRACTION_ERROR = (
     "Unable to extract text from PDF; the file may be password protected or corrupted."
 )
+ 
 
 
 def test_ingest_file_streams_large_upload_without_buffering(
@@ -145,6 +153,177 @@ def test_ingest_file_rejects_upload_exceeding_limit(
     assert called is False
 
 
+ 
+def _install_url_pipeline_stub(
+    monkeypatch: pytest.MonkeyPatch,
+    settings: Settings,
+    opener_factory,
+    *,
+    expected_failure_message: str,
+) -> None:
+    monkeypatch.setattr(pipeline_module, "build_opener", opener_factory)
+
+    def _fake_run(session, url: str, source_type=None, frontmatter=None):  # noqa: ANN001
+        with pytest.raises(
+            pipeline_module.UnsupportedSourceError,
+            match=expected_failure_message,
+        ):
+            pipeline_module._fetch_web_document(settings, url)
+        raise pipeline_module.UnsupportedSourceError(expected_failure_message)
+
+    monkeypatch.setattr(ingest_module, "run_pipeline_for_url", _fake_run)
+
+
+def test_ingest_url_times_out_on_slow_response(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+) -> None:
+    settings = Settings()
+    settings.ingest_web_timeout_seconds = 0.5
+    settings.ingest_web_max_bytes = 1024
+    settings.ingest_web_max_redirects = 3
+
+    class _TimeoutResponse:
+        headers = _FakeHeaders()
+
+        def geturl(self) -> str:
+            return "https://slow.example.com"
+
+        def read(self, size: int | None = None) -> bytes:  # noqa: ARG002
+            raise socket.timeout()
+
+        def close(self) -> None:
+            pass
+
+    class _TimeoutOpener:
+        def __init__(self, handler):  # noqa: ANN001
+            self.handler = handler
+            self.addheaders = []
+
+        def open(self, request, timeout=None):  # noqa: ANN001, D401
+            return _TimeoutResponse()
+
+    _install_url_pipeline_stub(
+        monkeypatch,
+        settings,
+        lambda *handlers: _TimeoutOpener(handlers[0]),
+        expected_failure_message="Fetching URL timed out after 0.5 seconds",
+    )
+
+    response = api_client.post("/ingest/url", json={"url": "https://slow.example.com"})
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()["detail"] == "Fetching URL timed out after 0.5 seconds"
+
+
+def test_ingest_url_rejects_oversized_response(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+) -> None:
+    settings = Settings()
+    settings.ingest_web_timeout_seconds = 1.0
+    settings.ingest_web_max_bytes = 10
+    settings.ingest_web_max_redirects = 3
+
+    class _OversizedResponse:
+        def __init__(self) -> None:
+            self.headers = _FakeHeaders()
+            self._chunks = [b"a" * 8, b"b" * 8, b""]
+
+        def geturl(self) -> str:
+            return "https://large.example.com"
+
+        def read(self, size: int | None = None) -> bytes:  # noqa: ARG002
+            return self._chunks.pop(0)
+
+        def close(self) -> None:
+            pass
+
+    class _OversizedOpener:
+        def __init__(self, handler):  # noqa: ANN001
+            self.handler = handler
+            self.addheaders = []
+
+        def open(self, request, timeout=None):  # noqa: ANN001, D401
+            return _OversizedResponse()
+
+    _install_url_pipeline_stub(
+        monkeypatch,
+        settings,
+        lambda *handlers: _OversizedOpener(handlers[0]),
+        expected_failure_message=(
+            "Fetched content exceeded maximum allowed size of 10 bytes"
+        ),
+    )
+
+    response = api_client.post("/ingest/url", json={"url": "https://large.example.com"})
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        response.json()["detail"]
+        == "Fetched content exceeded maximum allowed size of 10 bytes"
+    )
+
+
+def test_ingest_url_detects_redirect_loop(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+) -> None:
+    settings = Settings()
+    settings.ingest_web_timeout_seconds = 1.0
+    settings.ingest_web_max_bytes = 1024
+    settings.ingest_web_max_redirects = 2
+
+    class _RedirectResponse:
+        def __init__(self, url: str, location: str) -> None:
+            self._url = url
+            self._code = 302
+            self.headers = _FakeHeaders({"Location": location})
+
+        def getcode(self) -> int:
+            return self._code
+
+        def geturl(self) -> str:
+            return self._url
+
+        def read(self, size: int | None = None) -> bytes:  # noqa: ARG002
+            return b""
+
+        def close(self) -> None:
+            pass
+
+    class _RedirectLoopOpener:
+        def __init__(self, handler):  # noqa: ANN001
+            self.handler = handler
+            self.addheaders = []
+            self._responses = [
+                _RedirectResponse("https://loop.example.com", "https://loop.example.com/b"),
+                _RedirectResponse("https://loop.example.com/b", "https://loop.example.com"),
+            ]
+
+        def open(self, request, timeout=None):  # noqa: ANN001, D401
+            if not self._responses:
+                raise RuntimeError("No more responses")
+
+            response = self._responses.pop(0)
+            if response.getcode() in {301, 302, 303, 307, 308}:
+                new_request = self.handler.redirect_request(
+                    request,
+                    response,
+                    response.getcode(),
+                    "Found",
+                    response.headers,
+                    response.headers.get("Location"),
+                )
+                return self.open(new_request, timeout=timeout)
+            return response
+
+    _install_url_pipeline_stub(
+        monkeypatch,
+        settings,
+        lambda *handlers: _RedirectLoopOpener(handlers[0]),
+        expected_failure_message="URL redirect loop detected",
+    )
+
+    response = api_client.post("/ingest/url", json={"url": "https://loop.example.com"})
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()["detail"] == "URL redirect loop detected"
+ 
 def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:
     pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "password_protected.pdf"
     with pdf_path.open("rb") as handle:
@@ -168,4 +347,4 @@ def test_ingest_file_rejects_corrupt_pdf(api_client: TestClient) -> None:
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {"detail": _PDF_EXTRACTION_ERROR}
 
-
+ 
