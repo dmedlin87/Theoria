@@ -73,10 +73,9 @@ export type ExportPreset = {
 
 export type ExportPresetResult = {
   preset: ExportPresetId;
-  label: string;
-  format: string;
-  filename: string | null;
-  mediaType: string | null;
+  format: ExportPreset["format"];
+  filename: string;
+  mediaType: string;
   content: string;
 };
 

@@ -1,5 +1,6 @@
 import RAGAnswerBlock from "./RAGAnswer";
 import type { CopilotResult, RAGCitation } from "./types";
+import { EXPORT_PRESET_LOOKUP } from "./export-presets";
 
 type WorkflowResultPanelProps = {
   result: CopilotResult;
@@ -150,22 +151,26 @@ export default function WorkflowResultPanel({
           </ul>
         </>
       )}
-      {result.kind === "export" && (
-        <>
-          <h3>Export preset: {result.payload.label}</h3>
-          <p>
-            Format: {result.payload.format}
-            {result.payload.filename ? ` · Filename: ${result.payload.filename}` : ""}
-          </p>
-          {result.payload.mediaType && <p>Media type: {result.payload.mediaType}</p>}
-          <details>
-            <summary>Preview content</summary>
-            <pre style={{ background: "#f9fafb", padding: "0.75rem", whiteSpace: "pre-wrap" }}>
-              {result.payload.content}
-            </pre>
-          </details>
-        </>
-      )}
+      {result.kind === "export" && (() => {
+        const preset = EXPORT_PRESET_LOOKUP[result.payload.preset];
+        const label = preset?.label ?? result.payload.preset;
+        return (
+          <>
+            <h3>Export preset: {label}</h3>
+            <p>
+              Format: {result.payload.format}
+              {result.payload.filename ? ` · Filename: ${result.payload.filename}` : ""}
+            </p>
+            {result.payload.mediaType && <p>Media type: {result.payload.mediaType}</p>}
+            <details>
+              <summary>Preview content</summary>
+              <pre style={{ background: "#f9fafb", padding: "0.75rem", whiteSpace: "pre-wrap" }}>
+                {result.payload.content}
+              </pre>
+            </details>
+          </>
+        );
+      })()}
     </section>
   );
 }

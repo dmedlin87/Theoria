@@ -232,6 +232,25 @@ class TranscriptExportRequest(APIModel):
     format: str = Field(default="markdown")
 
 
+ExportPresetId = Literal[
+    "sermon-markdown",
+    "sermon-ndjson",
+    "sermon-csv",
+    "transcript-markdown",
+    "transcript-csv",
+]
+
+
+class ExportDeliverableResponse(APIModel):
+    """Serialized payload returned by the sermon and transcript export presets."""
+
+    preset: ExportPresetId
+    format: Literal["markdown", "ndjson", "csv"]
+    filename: str
+    media_type: str
+    content: str
+
+
 class CitationExportRequest(APIModel):
     """Request payload for exporting citations used by the copilot."""
 
@@ -276,6 +295,8 @@ __all__ = [
     "VerseCopilotRequest",
     "CorpusCurationRequest",
     "TranscriptExportRequest",
+    "ExportDeliverableResponse",
+    "ExportPresetId",
     "CitationExportRequest",
     "CitationExportResponse",
     "AIResponse",

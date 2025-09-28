@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { TheoApiClient, createTheoApiClient } from "../../lib/api-client";
+import { EXPORT_PRESET_LOOKUP } from "./export-presets";
 import type {
   CollaborationResponse,
   ComparativeResponse,
@@ -313,17 +314,6 @@ export function useCurationWorkflow(client?: TheoApiClient): WorkflowHook<
   return { form, setForm, reset, run };
 }
 
-const SERMON_EXPORT_FORMATS: Record<Extract<ExportPresetId, `sermon-${string}`>, string> = {
-  "sermon-markdown": "markdown",
-  "sermon-ndjson": "ndjson",
-  "sermon-csv": "csv",
-};
-
-const TRANSCRIPT_EXPORT_FORMATS: Record<Extract<ExportPresetId, `transcript-${string}`>, string> = {
-  "transcript-markdown": "markdown",
-  "transcript-csv": "csv",
-};
-
 export function useExportWorkflow(client?: TheoApiClient): WorkflowHook<
   ExportFormState,
   ExportPresetResult,
@@ -341,36 +331,30 @@ export function useExportWorkflow(client?: TheoApiClient): WorkflowHook<
     async (model: string, overrides?: Partial<ExportFormState>): Promise<ExportPresetResult> => {
       const nextForm = { ...form, ...(overrides ?? {}) };
       const preset = nextForm.preset;
-      if (preset.startsWith("sermon")) {
+      const presetConfig = EXPORT_PRESET_LOOKUP[preset];
+      if (!presetConfig) {
+        throw new Error("Select an export preset.");
+      }
+      if (presetConfig.type === "sermon") {
         const topic = nextForm.topic.trim();
         if (!topic) {
           throw new Error("Provide a sermon topic to export.");
         }
         const osis = nextForm.osis.trim();
-        const format = SERMON_EXPORT_FORMATS[preset as keyof typeof SERMON_EXPORT_FORMATS];
-        if (!format) {
-          throw new Error("Select an export preset.");
-        }
         return api.runSermonExport({
           model,
           topic,
           osis: osis || null,
-          format,
+          format: presetConfig.format,
         });
       }
       const documentId = nextForm.documentId.trim();
       if (!documentId) {
         throw new Error("Provide a document identifier to export.");
       }
-      const format = TRANSCRIPT_EXPORT_FORMATS[
-        preset as keyof typeof TRANSCRIPT_EXPORT_FORMATS
-      ];
-      if (!format) {
-        throw new Error("Select an export preset.");
-      }
       return api.runTranscriptExport({
         documentId,
-        format,
+        format: presetConfig.format,
       });
     },
     [api, form],

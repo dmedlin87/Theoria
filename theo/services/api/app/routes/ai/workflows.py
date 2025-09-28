@@ -43,6 +43,8 @@ from ...models.ai import (
     ComparativeAnalysisRequest,
     CorpusCurationRequest,
     DevotionalRequest,
+    ExportDeliverableResponse,
+    ExportPresetId,
     LLMDefaultRequest,
     LLMModelRequest,
     LLMModelUpdateRequest,
@@ -819,12 +821,14 @@ def sermon_prep(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/sermon-prep/export")
+# FastAPI coerces literal return types when a response model is provided, so we
+# rely on the schema class directly for OpenAPI generation.
+@router.post("/sermon-prep/export", response_model=ExportDeliverableResponse)
 def sermon_prep_export(
     payload: SermonPrepRequest,
     format: str = Query(default="markdown", description="markdown, ndjson, or csv"),
     session: Session = Depends(get_session),
-) -> Response:
+) -> ExportDeliverableResponse:
     try:
         response = generate_sermon_prep_outline(
             session,
@@ -841,18 +845,26 @@ def sermon_prep_export(
         formats=[normalized],
         filters=payload.filters.model_dump(exclude_none=True),
     )
+    try:
+        preset = _SERMON_PRESET_MAP[normalized]
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail="unsupported sermon export format") from exc
     asset = package.get_asset(normalized)
-    return Response(content=asset.content, media_type=asset.media_type)
+    return ExportDeliverableResponse(
+        preset=preset,
+        format=asset.format,
+        filename=asset.filename,
+        media_type=asset.media_type,
+        content=asset.content,
+    )
 
-
-@router.post(
-    "/transcript/export",
-    responses=_BAD_REQUEST_NOT_FOUND_RESPONSES,
-)
+# See comment above regarding the response model.
+@router.post("/transcript/export", response_model=ExportDeliverableResponse)
+ 
 def transcript_export(
     payload: TranscriptExportRequest,
     session: Session = Depends(get_session),
-) -> Response:
+) -> ExportDeliverableResponse:
     normalized = payload.format.lower()
     try:
         package = build_transcript_deliverable(
@@ -862,8 +874,18 @@ def transcript_export(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        preset = _TRANSCRIPT_PRESET_MAP[normalized]
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail="unsupported transcript export format") from exc
     asset = package.get_asset(normalized)
-    return Response(content=asset.content, media_type=asset.media_type)
+    return ExportDeliverableResponse(
+        preset=preset,
+        format=asset.format,
+        filename=asset.filename,
+        media_type=asset.media_type,
+        content=asset.content,
+    )
 
 
 @router.post(
@@ -1012,4 +1034,15 @@ def corpus_curation(
         recorder.finalize(final_md=digest or None, output_payload=response)
         return response
 
+
+_SERMON_PRESET_MAP: dict[str, ExportPresetId] = {
+    "markdown": "sermon-markdown",
+    "ndjson": "sermon-ndjson",
+    "csv": "sermon-csv",
+}
+
+_TRANSCRIPT_PRESET_MAP: dict[str, ExportPresetId] = {
+    "markdown": "transcript-markdown",
+    "csv": "transcript-csv",
+}
 

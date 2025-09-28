@@ -1909,6 +1909,28 @@ export interface components {
             total: number;
         };
         /**
+         * ExportDeliverableResponse
+         * @description Serialized payload returned by the sermon and transcript export presets.
+         */
+        ExportDeliverableResponse: {
+            /**
+             * Preset
+             * @enum {string}
+             */
+            preset: "sermon-markdown" | "sermon-ndjson" | "sermon-csv" | "transcript-markdown" | "transcript-csv";
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "markdown" | "ndjson" | "csv";
+            /** Filename */
+            filename: string;
+            /** Media Type */
+            media_type: string;
+            /** Content */
+            content: string;
+        };
+        /**
          * ExportManifest
          * @description Common metadata written alongside exported records.
          */
@@ -5576,7 +5598,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ExportDeliverableResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5612,7 +5634,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ExportDeliverableResponse"];
                 };
             };
             /** @description Invalid request */

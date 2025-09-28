@@ -143,11 +143,10 @@ describe("copilot workflow hooks", () => {
     const api = createMockApi();
     const sermonExport: ExportPresetResult = {
       preset: "sermon-markdown",
-      label: "Sermon",
       format: "markdown",
-      filename: null,
-      mediaType: null,
-      content: "",
+      filename: "sermon.md",
+      mediaType: "text/markdown",
+      content: "sermon export",
     };
     api.runSermonExport.mockResolvedValueOnce(sermonExport);
     const { result: sermonResult } = renderHook(() => useExportWorkflow(api as unknown as TheoApiClient));
@@ -162,7 +161,14 @@ describe("copilot workflow hooks", () => {
       format: "markdown",
     });
 
-    const transcriptExport: ExportPresetResult = { ...sermonExport, preset: "transcript-csv", format: "csv" };
+    const transcriptExport: ExportPresetResult = {
+      ...sermonExport,
+      preset: "transcript-csv",
+      format: "csv",
+      filename: "transcript.csv",
+      mediaType: "text/csv",
+      content: "transcript export",
+    };
     api.runTranscriptExport.mockResolvedValueOnce(transcriptExport);
     const { result: transcriptResult } = renderHook(() => useExportWorkflow(api as unknown as TheoApiClient));
     await act(async () => {
@@ -188,10 +194,10 @@ describe("copilot workflow hooks", () => {
       manifest: {
         export_id: "abc",
         schema_version: "1",
-        created_at: "",
+        created_at: "2024-01-01T00:00:00Z",
         type: "search",
         filters: {},
-        totals: {},
+        totals: { records: 0 },
       },
       records: [],
       csl: [],
