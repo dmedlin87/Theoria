@@ -15,6 +15,13 @@ from xml.etree import ElementTree as ET
 
 import webvtt
 from pdfminer.high_level import extract_text
+from pdfminer.pdfdocument import (
+    PDFNoValidXRef,
+    PDFPasswordIncorrect,
+    PDFTextExtractionNotAllowed,
+)
+from pdfminer.pdfparser import PDFSyntaxError
+from pdfminer.psparser import PSEOF
 
 if TYPE_CHECKING:  # pragma: no cover - import-cycle guard
     from .chunking import Chunk
@@ -49,7 +56,16 @@ def read_text_file(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def parse_pdf(path: Path, *, max_pages: int | None = None) -> list[ParsedPage]:
+class _PdfExtractionErrorSentinel:
+    """Sentinel returned when pdfminer cannot extract text."""
+
+    __slots__ = ()
+
+
+PDF_EXTRACTION_UNSUPPORTED = _PdfExtractionErrorSentinel()
+
+
+def parse_pdf(path: Path, *, max_pages: int | None = None) -> list[ParsedPage] | _PdfExtractionErrorSentinel:
     """Extract text from a PDF file page-by-page using pdfminer."""
 
     pages: list[ParsedPage] = []
@@ -57,7 +73,16 @@ def parse_pdf(path: Path, *, max_pages: int | None = None) -> list[ParsedPage]:
     while True:
         if max_pages is not None and page_index >= max_pages:
             break
-        text = extract_text(str(path), page_numbers=[page_index])
+        try:
+            text = extract_text(str(path), page_numbers=[page_index])
+        except (
+            PDFPasswordIncorrect,
+            PDFTextExtractionNotAllowed,
+            PDFSyntaxError,
+            PDFNoValidXRef,
+            PSEOF,
+        ):
+            return PDF_EXTRACTION_UNSUPPORTED
         if not text:
             break
         cleaned = "\n".join(line.rstrip() for line in text.splitlines()).strip()
@@ -383,10 +408,12 @@ def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
 
 def parse_pdf_document(
     path: Path, *, max_pages: int | None, max_tokens: int
-) -> ParserResult:
+) -> ParserResult | _PdfExtractionErrorSentinel:
     from .chunking import chunk_text
 
     pages = parse_pdf(path, max_pages=max_pages)
+    if pages is PDF_EXTRACTION_UNSUPPORTED:
+        return PDF_EXTRACTION_UNSUPPORTED
     if not pages:
         return ParserResult(
             text="", chunks=[], parser="pdfminer", parser_version="0.2.0"

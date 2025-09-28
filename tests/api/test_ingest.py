@@ -45,6 +45,11 @@ def _override_ingest_limit(monkeypatch: pytest.MonkeyPatch, limit: int) -> Setti
     return settings
 
 
+_PDF_EXTRACTION_ERROR = (
+    "Unable to extract text from PDF; the file may be password protected or corrupted."
+)
+
+
 def test_ingest_file_streams_large_upload_without_buffering(
     monkeypatch: pytest.MonkeyPatch, api_client: TestClient
 ) -> None:
@@ -138,5 +143,29 @@ def test_ingest_file_rejects_upload_exceeding_limit(
 
     assert response.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
     assert called is False
+
+
+def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:
+    pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "password_protected.pdf"
+    with pdf_path.open("rb") as handle:
+        response = api_client.post(
+            "/ingest/file",
+            files={"file": (pdf_path.name, handle.read(), "application/pdf")},
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json() == {"detail": _PDF_EXTRACTION_ERROR}
+
+
+def test_ingest_file_rejects_corrupt_pdf(api_client: TestClient) -> None:
+    pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "corrupt_sample.pdf"
+    with pdf_path.open("rb") as handle:
+        response = api_client.post(
+            "/ingest/file",
+            files={"file": (pdf_path.name, handle.read(), "application/pdf")},
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json() == {"detail": _PDF_EXTRACTION_ERROR}
 
 
