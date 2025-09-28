@@ -123,7 +123,8 @@ describe("copilot components", () => {
             anchor: "1",
             snippet: "Snippet",
             document_id: "doc",
-            passage_id: "passage-1",
+            passage_id: "John.1.1",
+ 
           },
         ]}
         onExport={onExport}
