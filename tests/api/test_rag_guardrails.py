@@ -7,7 +7,11 @@ import sys
 from unittest.mock import MagicMock
 
 import pytest
-from fakeredis import aioredis as fakeredis_aioredis
+
+try:
+    from fakeredis import aioredis as fakeredis_aioredis
+except ImportError:  # pragma: no cover - fallback for type-checking environments
+    fakeredis_aioredis = pytest.importorskip("fakeredis.aioredis")
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.ai import rag  # noqa: E402  # import after sys.path mutation
 from theo.services.api.app.ai.rag import GuardrailError  # noqa: E402
-from theo.services.api.app.ai.registry import LLMRegistry  # noqa: E402
+from theo.services.api.app.ai.registry import LLMModel, LLMRegistry  # noqa: E402
 from theo.services.api.app.models.search import (  # noqa: E402
     HybridSearchFilters,
     HybridSearchResult,
@@ -40,14 +44,17 @@ class _DummyClient:
         return self.completion
 
 
-class _DummyModel:
+class _DummyModel(LLMModel):
     def __init__(self, completion: str) -> None:
-        self.name = "dummy"
-        self.model = "dummy-model"
+        super().__init__(
+            name="dummy",
+            provider="dummy",
+            model="dummy-model",
+            routing={},
+        )
         self.client = _DummyClient(completion)
-        self.routing: dict[str, object] = {}
 
-    def build_client(self) -> _DummyClient:
+    def build_client(self) -> _DummyClient:  # type: ignore[override]
         return self.client
 
 
