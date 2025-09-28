@@ -84,6 +84,10 @@ class Settings(BaseSettings):
         default=True,
         description="Toggle verse mention timeline aggregation endpoints",
     )
+    ingest_upload_max_bytes: int = Field(
+        default=16 * 1024 * 1024,
+        description="Maximum allowed size for synchronous ingest uploads in bytes",
+    )
 
 
 @lru_cache
