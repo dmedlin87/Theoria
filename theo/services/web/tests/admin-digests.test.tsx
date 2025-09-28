@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
 import "@testing-library/jest-dom";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import DigestDashboard from "../app/admin/digests/DigestDashboard";
 
@@ -74,7 +74,9 @@ describe("DigestDashboard", () => {
       expect(screen.getByText("Pauline theology")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /refresh digest/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /refresh digest/i }));
+    });
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -166,29 +168,36 @@ describe("DigestDashboard", () => {
     });
 
     fireEvent.change(screen.getByLabelText(/user id/i), { target: { value: "admin" } });
-    fireEvent.click(screen.getByRole("button", { name: /load watchlists/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /load watchlists/i }));
+    });
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("Initial name")).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText(/name for initial name/i), {
-      target: { value: "Updated name" },
+    const nameInput = screen.getByDisplayValue("Initial name");
+    fireEvent.change(nameInput, { target: { value: "Updated name" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
     });
-    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("Updated name")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /run now/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /run now/i }));
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/Run completed/i)).toBeInTheDocument();
       expect(screen.getByText(/John.1.1/)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /view events/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /view events/i }));
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/Showing 1 events/)).toBeInTheDocument();
@@ -246,12 +255,20 @@ describe("DigestDashboard", () => {
     });
 
     fireEvent.change(screen.getByLabelText(/user id/i), { target: { value: "analyst-1" } });
-    fireEvent.click(screen.getByRole("button", { name: /load watchlists/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /load watchlists/i }));
+    });
 
-    fireEvent.change(screen.getByLabelText(/^name$/i), { target: { value: "Daily prophets" } });
-    fireEvent.change(screen.getByLabelText(/^topics$/i), { target: { value: "Prophecy" } });
+    const creationFormHeading = screen.getByRole("heading", { level: 3, name: /create watchlist/i });
+    const creationForm = creationFormHeading.closest("form");
+    expect(creationForm).not.toBeNull();
+    const creation = within(creationForm as HTMLFormElement);
+    fireEvent.change(creation.getByLabelText(/^name$/i), { target: { value: "Daily prophets" } });
+    fireEvent.change(creation.getByLabelText(/topics/i), { target: { value: "Prophecy" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await act(async () => {
+      fireEvent.click(creation.getByRole("button", { name: /create watchlist/i }));
+    });
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("Daily prophets")).toBeInTheDocument();

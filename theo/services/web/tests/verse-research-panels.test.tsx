@@ -741,3 +741,4 @@ describe("ResearchPanels", () => {
     ).toBeInTheDocument();
   });
 });
+/** @jest-environment node */
