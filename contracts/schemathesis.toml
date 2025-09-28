@@ -1,0 +1,17 @@
+[schema]
+path = "../openapi.json"
+
+[[endpoints]]
+method = "POST"
+path = "/ai/citations/export"
+label = "citations_export"
+
+[[endpoints]]
+method = "POST"
+path = "/ai/verse"
+label = "verse_workflow"
+
+[[endpoints]]
+method = "POST"
+path = "/ai/sermon-prep"
+label = "sermon_workflow"

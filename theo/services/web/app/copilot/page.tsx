@@ -1,80 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 
 import ModeChangeBanner from "../components/ModeChangeBanner";
 import { formatEmphasisSummary } from "../mode-config";
 import { useMode } from "../mode-context";
 import { getApiBaseUrl, getCitationManagerEndpoint } from "../lib/api";
+import type { components, operations } from "../lib/generated/api";
+type FeatureFlags =
+  operations["list_features_features__get"]["responses"][200]["content"]["application/json"];
 
-type FeatureFlags = {
-  ai_copilot?: boolean;
-};
-
-type RAGCitation = {
-  index: number;
-  osis: string;
-  anchor: string;
-  snippet: string;
-  document_id: string;
-  document_title?: string | null;
-  passage_id?: string;
-  source_url?: string | null;
-};
-
-type RAGAnswer = {
-  summary: string;
-  citations: RAGCitation[];
-};
-
-type VerseResponse = {
-  osis: string;
-  question?: string | null;
-  answer: RAGAnswer;
-  follow_ups: string[];
-};
-
-type SermonResponse = {
-  topic: string;
-  osis?: string | null;
-  outline: string[];
-  key_points: string[];
-  answer: RAGAnswer;
-};
-
-type ComparativeResponse = {
-  osis: string;
-  participants: string[];
-  comparisons: string[];
-  answer: RAGAnswer;
-};
-
-type MultimediaDigestResponse = {
-  collection: string | null;
-  highlights: string[];
-  answer: RAGAnswer;
-};
-
-type DevotionalResponse = {
-  osis: string;
-  focus: string;
-  reflection: string;
-  prayer: string;
-  answer: RAGAnswer;
-};
-
-type CollaborationResponse = {
-  thread: string;
-  synthesized_view: string;
-  answer: RAGAnswer;
-};
-
-type CorpusCurationReport = {
-  since: string;
-  documents_processed: number;
-  summaries: string[];
-};
+type RAGCitation = components["schemas"]["RAGCitation"];
+type RAGAnswer = components["schemas"]["RAGAnswer"];
+type VerseResponse = components["schemas"]["VerseCopilotResponse"];
+type SermonResponse = components["schemas"]["SermonPrepResponse"];
+type ComparativeResponse = components["schemas"]["ComparativeAnalysisResponse"];
+type MultimediaDigestResponse = components["schemas"]["MultimediaDigestResponse"];
+type DevotionalResponse = components["schemas"]["DevotionalResponse"];
+type CollaborationResponse = components["schemas"]["CollaborationResponse"];
+type CorpusCurationReport = components["schemas"]["CorpusCurationReport"];
 
 type ExportPresetId =
   | "sermon-markdown"
@@ -100,24 +45,10 @@ type ExportPresetResult = {
   content: string;
 };
 
-type ExportManifest = {
-  export_id: string;
-  schema_version: string;
-  created_at: string;
-  type: string;
-  filters: Record<string, unknown>;
-  totals: Record<string, number>;
-  cursor?: string | null;
-  next_cursor?: string | null;
-  mode?: string | null;
-};
+type ExportManifest = components["schemas"]["ExportManifest"];
 
-type CitationExportResponse = {
-  manifest: ExportManifest;
-  records: Array<Record<string, unknown>>;
-  csl: Array<Record<string, unknown>>;
-  manager_payload: Record<string, unknown>;
-};
+type CitationExportResponse = components["schemas"]["CitationExportResponse"];
+type CitationExportRequest = components["schemas"]["CitationExportRequest"];
 
 type CopilotResult =
   | { kind: "verse"; payload: VerseResponse }
@@ -242,6 +173,14 @@ function extractFilename(disposition: string | null): string | null {
   return match ? match[1] : null;
 }
 
+function formatGuardrailLabel(key: string): string {
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
 function renderCitations(
   citations: RAGCitation[],
   options?: {
@@ -344,10 +283,64 @@ function renderRAGAnswer(
   }
 ): JSX.Element {
   const followUps = options?.followUps;
+  const guardrailEntries = Object.entries(answer.guardrail_profile ?? {}).filter(
+    ([, value]) => Boolean(value)
+  );
+  const metadataItems = [
+    answer.model_name ? { label: "Model", value: answer.model_name } : null,
+    ...guardrailEntries.map(([key, value]) => ({
+      label: formatGuardrailLabel(key),
+      value,
+    })),
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
   return (
     <div style={{ marginTop: "1.5rem" }}>
       <h4>Answer</h4>
       <p>{answer.summary}</p>
+      {metadataItems.length > 0 && (
+        <div style={{ marginTop: "0.75rem" }}>
+          <h5 style={{ margin: "0 0 0.25rem", fontSize: "0.95rem", color: "#1f2937" }}>
+            Answer metadata
+          </h5>
+          <dl
+            style={{
+              display: "grid",
+              gridTemplateColumns: "max-content 1fr",
+              columnGap: "0.5rem",
+              rowGap: "0.35rem",
+              margin: 0,
+            }}
+          >
+            {metadataItems.map(({ label, value }, index) => (
+              <Fragment key={`${label}-${value}-${index}`}>
+                <dt style={{ fontWeight: 600, color: "#334155" }}>{label}</dt>
+                <dd style={{ margin: 0, color: "#475569" }}>{value}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        </div>
+      )}
+      {answer.model_output && (
+        <details style={{ marginTop: "0.75rem" }}>
+          <summary style={{ cursor: "pointer", color: "#2563eb" }}>
+            View raw model output
+          </summary>
+          <pre
+            style={{
+              margin: "0.5rem 0 0",
+              padding: "0.75rem",
+              borderRadius: "0.5rem",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              color: "#0f172a",
+            }}
+          >
+            {answer.model_output}
+          </pre>
+        </details>
+      )}
       {renderCitations(answer.citations, {
         onExport: options?.onExport,
         exporting: options?.exporting,
@@ -422,9 +415,9 @@ export default function CopilotPage(): JSX.Element {
         if (!response.ok) {
           throw new Error(await response.text());
         }
-        const payload = (await response.json()) as Record<string, boolean>;
+        const payload = (await response.json()) as FeatureFlags;
         if (isMounted) {
-          setEnabled(Boolean((payload as FeatureFlags).ai_copilot));
+          setEnabled(Boolean(payload?.ai_copilot));
         }
       } catch (fetchError) {
         if (isMounted) {
@@ -675,10 +668,11 @@ export default function CopilotPage(): JSX.Element {
     setError(null);
     setIsSendingCitations(true);
     try {
+      const requestPayload: CitationExportRequest = { citations };
       const response = await fetch(`${baseUrl}/ai/citations/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citations, model: mode.id }),
+        body: JSON.stringify(requestPayload),
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -720,6 +714,15 @@ export default function CopilotPage(): JSX.Element {
   const handleCitationExport = async (citations: RAGCitation[]) => {
     if (!citations.length) {
       setCitationExportStatus("No citations available to export.");
+      return;
+    }
+    const missingPassage = citations.find(
+      (citation) => !citation.passage_id || !citation.passage_id.trim()
+    );
+    if (missingPassage) {
+      setCitationExportStatus(
+        "Citations must include a passage identifier before exporting."
+      );
       return;
     }
     await exportCitations(citations);

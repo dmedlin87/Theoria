@@ -12,6 +12,7 @@ httpx>=0.27,<0.28
 python-multipart>=0.0.7,<0.0.8
 pytest
 fakeredis>=2.23,<3
+schemathesis>=3.23,<4
 cryptography>=41,<43
 opentelemetry-api>=1.25.0,<2
 opentelemetry-sdk>=1.25.0,<2

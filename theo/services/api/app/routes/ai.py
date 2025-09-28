@@ -25,7 +25,18 @@ from ..ai import (
     run_research_reconciliation,
 )
 from ..ai.passage import PassageResolutionError, resolve_passage_reference
-from ..ai.rag import GuardrailError, RAGAnswer, RAGCitation
+from ..ai.rag import (
+    CollaborationResponse,
+    ComparativeAnalysisResponse,
+    CorpusCurationReport,
+    DevotionalResponse,
+    GuardrailError,
+    MultimediaDigestResponse,
+    RAGAnswer,
+    RAGCitation,
+    SermonPrepResponse,
+    VerseCopilotResponse,
+)
 from ..ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
 from ..ai.trails import TrailService
 from ..analytics.topics import (
@@ -731,7 +742,11 @@ CORPUS_CURATION_PLAN = "\n".join(
 )
 
 
-@router.post("/verse", response_model_exclude_none=True)
+@router.post(
+    "/verse",
+    response_model=VerseCopilotResponse,
+    response_model_exclude_none=True,
+)
 def verse_copilot(
     payload: VerseCopilotRequest,
     session: Session = Depends(get_session),
@@ -773,7 +788,11 @@ def verse_copilot(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/sermon-prep", response_model_exclude_none=True)
+@router.post(
+    "/sermon-prep",
+    response_model=SermonPrepResponse,
+    response_model_exclude_none=True,
+)
 def sermon_prep(
     payload: SermonPrepRequest,
     session: Session = Depends(get_session),
@@ -849,7 +868,11 @@ def transcript_export(
     return Response(content=asset.content, media_type=asset.media_type)
 
 
-@router.post("/comparative", response_model_exclude_none=True)
+@router.post(
+    "/comparative",
+    response_model=ComparativeAnalysisResponse,
+    response_model_exclude_none=True,
+)
 def comparative_analysis(
     payload: ComparativeAnalysisRequest,
     session: Session = Depends(get_session),
@@ -867,7 +890,11 @@ def comparative_analysis(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/multimedia", response_model_exclude_none=True)
+@router.post(
+    "/multimedia",
+    response_model=MultimediaDigestResponse,
+    response_model_exclude_none=True,
+)
 def multimedia_digest(
     payload: MultimediaDigestRequest,
     session: Session = Depends(get_session),
@@ -894,7 +921,11 @@ def multimedia_digest(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/devotional", response_model_exclude_none=True)
+@router.post(
+    "/devotional",
+    response_model=DevotionalResponse,
+    response_model_exclude_none=True,
+)
 def devotional_flow(
     payload: DevotionalRequest,
     session: Session = Depends(get_session),
@@ -924,7 +955,11 @@ def devotional_flow(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/collaboration", response_model_exclude_none=True)
+@router.post(
+    "/collaboration",
+    response_model=CollaborationResponse,
+    response_model_exclude_none=True,
+)
 def collaboration(
     payload: CollaborationRequest,
     session: Session = Depends(get_session),
@@ -957,7 +992,11 @@ def collaboration(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/curation", response_model_exclude_none=True)
+@router.post(
+    "/curation",
+    response_model=CorpusCurationReport,
+    response_model_exclude_none=True,
+)
 def corpus_curation(
     payload: CorpusCurationRequest,
     session: Session = Depends(get_session),
