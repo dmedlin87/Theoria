@@ -25,7 +25,7 @@ from ..ai import (
     run_research_reconciliation,
 )
 from ..ai.passage import PassageResolutionError, resolve_passage_reference
-from ..ai.rag import GuardrailError, RAGCitation
+from ..ai.rag import GuardrailError, RAGAnswer, RAGCitation
 from ..ai.registry import LLMModel, LLMRegistry, get_llm_registry, save_llm_registry
 from ..ai.trails import TrailService
 from ..analytics.topics import (
@@ -350,10 +350,15 @@ def export_citations(
         export_id=None,
     )
     record_dicts = [dict(record) for record in records]
-    csl_entries = [
-        _build_csl_entry(record, citation_map.get(record.get("document_id"), []))
-        for record in record_dicts
-    ]
+    csl_entries: list[dict[str, Any]] = []
+    for record in record_dicts:
+        raw_document_id = record.get("document_id")
+        citations = (
+            citation_map.get(raw_document_id, [])
+            if isinstance(raw_document_id, str)
+            else []
+        )
+        csl_entries.append(_build_csl_entry(record, citations))
     manager_payload = {
         "format": "csl-json",
         "export_id": manifest.export_id,
@@ -488,6 +493,9 @@ def chat_turn(
     session_id = payload.session_id or str(uuid4())
     trail_service = TrailService(session)
 
+    message: ChatSessionMessage | None = None
+    answer: RAGAnswer | None = None
+
     try:
         with trail_service.start_trail(
             workflow="chat",
@@ -522,6 +530,9 @@ def chat_turn(
             )
     except GuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if message is None or answer is None:
+        raise HTTPException(status_code=500, detail="failed to compose chat response")
 
     return ChatSessionResponse(session_id=session_id, message=message, answer=answer)
 
