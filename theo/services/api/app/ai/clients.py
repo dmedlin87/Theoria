@@ -24,6 +24,7 @@ class LanguageModelClient(Protocol):
         max_output_tokens: int = 800,
     ) -> str:
         """Return a text completion."""
+        ...
 
 
 @dataclass
