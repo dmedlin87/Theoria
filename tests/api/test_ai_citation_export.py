@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
 import sys
@@ -21,7 +22,7 @@ from theo.services.api.app.routes.ai import _CSL_TYPE_MAP, _build_csl_entry
 
 
 @pytest.fixture()
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -57,7 +58,7 @@ def client() -> TestClient:
         session.add(passage)
         session.commit()
 
-    def _override_session():
+    def _override_session() -> Generator[Session, None, None]:
         db_session = TestingSession()
         try:
             yield db_session
