@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from . import digest, watchlists, workflows
+from ...analytics.topics import TopicDigest
 
 
 router = APIRouter()
@@ -14,5 +15,6 @@ router.include_router(watchlists.router)
 
 settings_router = workflows.settings_router
 
-__all__ = ["router", "settings_router"]
+__all__ = ["router", "settings_router", "TopicDigest"]
+
 
