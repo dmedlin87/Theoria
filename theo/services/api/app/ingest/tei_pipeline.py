@@ -32,6 +32,8 @@ class HTRClientProtocol(Protocol):
     def transcribe(self, path: Path) -> Iterable[HTRResult]:
         """Return recognised text with per-page confidence scores."""
 
+        ...
+
 
 _KNOWN_PLACES = {
     "Alexandria",
