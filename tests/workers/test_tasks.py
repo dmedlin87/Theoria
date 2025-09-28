@@ -277,6 +277,7 @@ def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
     assert digest_doc is not None
     digest_document = digest_doc
     assert digest_document.topics and "Digest Topic" in digest_document.topics
+    assert digest_document.bib_json is not None
     assert digest_document.bib_json["clusters"][0]["document_ids"] == ["source-doc"]
     assert captured["recipients"] == ["alerts@example.com"]
     assert captured["document_id"] == digest_doc.id
@@ -327,6 +328,7 @@ def test_generate_document_summary_creates_summary_document(tmp_path) -> None:
 
     assert summary_doc is not None
     generated_summary = summary_doc
+    assert generated_summary.bib_json is not None
     assert generated_summary.bib_json["generated_from"] == document_id
     assert generated_summary.topics == ["Creation", "John", "Logos"]
     assert job_record is not None and job_record.status == "completed"

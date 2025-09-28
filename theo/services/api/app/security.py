@@ -56,6 +56,19 @@ def _decode_jwt(token: str) -> Principal:
             audience=settings.auth_jwt_audience,
             issuer=settings.auth_jwt_issuer,
         )
+        subject = payload.get("sub")
+        scopes = payload.get("scopes")
+        if isinstance(scopes, str):
+            scopes = [scope.strip() for scope in scopes.split() if scope.strip()]
+        elif not isinstance(scopes, list):
+            scopes = []
+        return {
+            "method": "jwt",
+            "subject": subject,
+            "scopes": scopes,
+            "claims": payload,
+            "token": token,
+        }
     except jwt.ExpiredSignatureError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -63,20 +76,10 @@ def _decode_jwt(token: str) -> Principal:
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     except jwt.InvalidTokenError as exc:
-        _reject_forbidden("Invalid bearer token")
-    subject = payload.get("sub")
-    scopes = payload.get("scopes")
-    if isinstance(scopes, str):
-        scopes = [scope.strip() for scope in scopes.split() if scope.strip()]
-    elif not isinstance(scopes, list):
-        scopes = []
-    return {
-        "method": "jwt",
-        "subject": subject,
-        "scopes": scopes,
-        "claims": payload,
-        "token": token,
-    }
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid bearer token",
+        ) from exc
 
 
 def require_principal(
@@ -86,6 +89,7 @@ def require_principal(
 ) -> Principal:
     """Validate API credentials and attach the resolved principal to the request."""
 
+    principal: Principal | None = None
     if api_key_header:
         principal = _authenticate_api_key(api_key_header)
     elif authorization:
@@ -100,6 +104,9 @@ def require_principal(
             principal = _authenticate_api_key(credentials)
     else:
         _reject_unauthorized("Missing credentials")
+
+    if principal is None:  # pragma: no cover - defensive
+        raise RuntimeError("Failed to resolve principal")
 
     request.state.principal = principal
     return principal

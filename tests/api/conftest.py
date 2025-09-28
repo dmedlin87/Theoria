@@ -1,6 +1,7 @@
 """Shared test configuration for API-level tests."""
-import os
 from __future__ import annotations
+
+import os
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 
 from pathlib import Path

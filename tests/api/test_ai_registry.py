@@ -171,6 +171,7 @@ def test_migrate_plaintext_settings_reencrypts(tmp_path: Path) -> None:
         assert model.config["api_key"] == "plain-key"
 
         providers = load_setting(session, "ai_providers")
+        assert providers is not None
         assert providers["openai"]["api_key"] == "provider-secret"
 
         registry.add_model(
@@ -211,6 +212,7 @@ def test_migrate_plaintext_settings_reencrypts(tmp_path: Path) -> None:
         assert "__encrypted__" in provider_record.value
 
         providers = load_setting(session, "ai_providers")
+        assert providers is not None
         assert providers["openai"]["api_key"] == "rotated"
 
 
