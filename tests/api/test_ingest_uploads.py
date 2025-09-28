@@ -72,9 +72,19 @@ def test_ingest_transcript_sanitizes_uploaded_files(
 ) -> None:
     captured: dict[str, Path | None] = {}
 
-    def fake_pipeline(_session, transcript_path: Path, frontmatter, audio_path: Path | None):
+    def fake_pipeline(
+        _session,
+        transcript_path: Path,
+        frontmatter,
+        audio_path: Path | None,
+        *,
+        transcript_filename: str | None = None,
+        audio_filename: str | None = None,
+    ):
         captured["transcript"] = transcript_path
         captured["audio"] = audio_path
+        captured["transcript_filename"] = transcript_filename
+        captured["audio_filename"] = audio_filename
         return _mkdoc()
 
     monkeypatch.setattr(

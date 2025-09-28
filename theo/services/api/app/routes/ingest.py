@@ -129,6 +129,8 @@ async def ingest_transcript(
             transcript_path,
             frontmatter=parsed_frontmatter,
             audio_path=audio_path,
+            transcript_filename=Path(transcript.filename or "transcript.vtt").name,
+            audio_filename=(Path(audio.filename).name if audio and audio.filename else None),
         )
     except UnsupportedSourceError as exc:
         raise HTTPException(
