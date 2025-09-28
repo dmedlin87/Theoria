@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Protocol
 
 import httpx
@@ -305,7 +306,56 @@ class EchoClient:
         temperature: float = 0.0,
         max_output_tokens: int = 400,
     ) -> str:
-        return f"{prompt.strip()}\n\n{self._suffix}".strip()
+        del model, temperature, max_output_tokens  # Unused but part of the interface
+
+        normalized_prompt = prompt.replace("\\n", "\n")
+
+        passages: list[dict[str, str]] = []
+        in_passages = False
+        for line in normalized_prompt.splitlines():
+            stripped = line.strip()
+            if not in_passages:
+                if stripped == "Passages:":
+                    in_passages = True
+                continue
+            if not stripped or not stripped.startswith("["):
+                break
+            match = re.match(
+                r"^\[(?P<index>\d+)]\s+(?P<snippet>.+?)\s*\(OSIS\s+(?P<osis>[^,]+),\s*(?P<anchor>[^)]+)\)\s*$",
+                stripped,
+            )
+            if not match:
+                continue
+            passages.append(
+                {
+                    "index": match.group("index"),
+                    "snippet": match.group("snippet").strip(),
+                    "osis": match.group("osis").strip(),
+                    "anchor": match.group("anchor").strip(),
+                }
+            )
+
+        if not passages:
+            body = normalized_prompt.strip()
+        else:
+            summary_segments: list[str] = []
+            for passage in passages:
+                snippet = passage["snippet"]
+                if snippet and snippet[-1] not in ".!?":
+                    snippet = f"{snippet}."
+                summary_segments.append(f"[{passage['index']}] {snippet}")
+            summary_text = " ".join(summary_segments)
+
+            sources_entries = [
+                f"[{passage['index']}] {passage['osis']} ({passage['anchor']})"
+                for passage in passages
+            ]
+            sources_text = "\n".join(sources_entries)
+            body = f"{summary_text}\n\nSources: {sources_text}".strip()
+
+        if self._suffix:
+            return f"{body}\n\n{self._suffix}".strip()
+        return body
 
 
 def build_client(provider: str, config: dict[str, str]) -> LanguageModelClient:
