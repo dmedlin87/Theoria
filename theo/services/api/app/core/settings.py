@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     notification_timeout_seconds: float = Field(
         default=10.0, description="HTTP timeout when delivering notifications"
     )
+    topic_digest_ttl_seconds: int = Field(
+        default=3600,
+        description="Time-to-live in seconds before regenerating cached topic digests",
+    )
     settings_secret_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("SETTINGS_SECRET_KEY", "settings_secret_key"),
