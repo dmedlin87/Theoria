@@ -874,7 +874,14 @@ class _LoopDetectingRedirectHandler(HTTPRedirectHandler):
             raise UnsupportedSourceError("URL exceeded maximum redirect depth")
 
         self.visited.add(resolved)
-        return super().redirect_request(req, fp, code, msg, headers, resolved)
+        redirected = super().redirect_request(req, fp, code, msg, headers, resolved)
+
+        if redirected is not None:
+            timeout = getattr(req, "timeout", None)
+            if timeout is not None:
+                setattr(redirected, "timeout", timeout)
+
+        return redirected
 
 
 def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]:
