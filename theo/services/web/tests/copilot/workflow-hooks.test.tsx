@@ -172,7 +172,7 @@ describe("copilot workflow hooks", () => {
     expect(api.runTranscriptExport).toHaveBeenCalledWith({ documentId: "doc-1", format: "csv" });
   });
 
-  it("exports citations with model requirement", async () => {
+  it("exports citations", async () => {
     const api = createMockApi();
     api.exportCitations.mockResolvedValueOnce({
       manifest: {
@@ -188,10 +188,27 @@ describe("copilot workflow hooks", () => {
       manager_payload: {},
     });
     const { result } = renderHook(() => useCitationExporter(api as unknown as TheoApiClient));
-    await result.current.exportCitations([{ index: 1, osis: "John", anchor: "a", snippet: "s", document_id: "d" }], "gpt");
+    await result.current.exportCitations([
+      {
+        index: 1,
+        osis: "John",
+        anchor: "a",
+        snippet: "s",
+        document_id: "d",
+        passage_id: "john.1.1",
+      },
+    ]);
     expect(api.exportCitations).toHaveBeenCalledWith({
-      citations: [{ index: 1, osis: "John", anchor: "a", snippet: "s", document_id: "d" }],
-      model: "gpt",
+      citations: [
+        {
+          index: 1,
+          osis: "John",
+          anchor: "a",
+          snippet: "s",
+          document_id: "d",
+          passage_id: "john.1.1",
+        },
+      ],
     });
   });
 });
