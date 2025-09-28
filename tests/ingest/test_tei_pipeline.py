@@ -90,6 +90,8 @@ def test_ingest_pilot_corpus_emits_tei_metadata(tmp_path) -> None:
         results = hybrid_search(session, request)
 
     assert results, "hybrid search should surface TEI-aware passages"
-    tei_meta = results[0].meta["tei"]
+    result_meta = results[0].meta
+    assert result_meta is not None and "tei" in result_meta
+    tei_meta = result_meta["tei"]
     assert "Alexandria" in tei_meta["places"]
     assert "Athanasius" in tei_meta["persons"]
