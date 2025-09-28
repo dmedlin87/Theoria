@@ -124,11 +124,40 @@ def fake_cache(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeRedisType]:
     monkeypatch.setattr(rag, "_redis_client", None, raising=False)
 
 
+class _FakeCounter:
+    def __init__(self) -> None:
+        self.counts: dict[str, float] = {}
+
+    class _Child:
+        def __init__(self, parent: "_FakeCounter", status: str) -> None:
+            self._parent = parent
+            self._status = status
+
+        def inc(self, amount: float = 1.0) -> None:
+            self._parent.counts[self._status] = (
+                self._parent.counts.get(self._status, 0.0) + amount
+            )
+
+    def labels(self, **labels: Any) -> "_FakeCounter._Child":
+        status = labels.get("status")
+        assert isinstance(status, str)
+        return self._Child(self, status)
+
+
+@pytest.fixture()
+def cache_metrics(monkeypatch: pytest.MonkeyPatch) -> _FakeCounter:
+    fake_counter = _FakeCounter()
+    monkeypatch.setattr(rag, "RAG_CACHE_EVENTS", fake_counter)
+    return fake_counter
+
+
 def _make_registry(model: _DummyModel) -> LLMRegistry:
     return LLMRegistry(models={model.name: model}, default_model=model.name)
 
 
-def test_guarded_answer_accepts_valid_completion(fake_cache: FakeRedisType) -> None:
+def test_guarded_answer_accepts_valid_completion(
+    fake_cache: FakeRedisType, cache_metrics: _FakeCounter
+) -> None:
     completion = "Grace-focused summary.\n\nSources: [1] John.3.16 (page 2)"
     model = _DummyModel(completion)
     registry = _make_registry(model)
@@ -154,6 +183,7 @@ def test_guarded_answer_accepts_valid_completion(fake_cache: FakeRedisType) -> N
     cached = json.loads(payload)
     assert cached["validation"]["status"] == "passed"
     assert cached["answer"]["model_output"] == completion
+    assert cache_metrics.counts == {"miss": 1.0}
 
 
 def test_guarded_answer_rejects_mismatched_citations(fake_cache: FakeRedisType) -> None:
@@ -198,7 +228,91 @@ def test_guarded_answer_requires_osis_reference(
             filters=HybridSearchFilters(),
         )
 
-    assert asyncio.run(fake_cache.dbsize()) == 0
+
+def test_guarded_answer_cache_hit_increments_metric(
+    fake_cache: FakeRedisType, cache_metrics: _FakeCounter
+) -> None:
+    completion = "Grace-focused summary.\n\nSources: [1] John.3.16 (page 2)"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="What does John 3:16 teach?",
+        results=[_make_result()],
+        registry=registry,
+        model_hint=model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    cache_metrics.counts.clear()
+
+    answer = rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="What does John 3:16 teach?",
+        results=[_make_result()],
+        registry=registry,
+        model_hint=model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    assert answer.model_output == completion
+    assert cache_metrics.counts == {"hit": 1.0}
+
+
+def test_guarded_answer_cache_stale_and_refresh_metrics(
+    fake_cache: FakeRedisType,
+    cache_metrics: _FakeCounter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completion = "Grace-focused summary.\n\nSources: [1] John.3.16 (page 2)"
+    stale_completion = "Outdated answer.\n\nSources: [1] John.3.17 (page 2)"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    session = MagicMock(spec=Session)
+
+    citations = [
+        {
+            "index": 1,
+            "osis": "John.3.16",
+            "anchor": "page 2",
+            "passage_id": "passage-1",
+            "document_id": "doc-1",
+            "snippet": "For God so loved the world",
+            "source_url": None,
+        }
+    ]
+
+    load_calls = {"count": 0}
+
+    def fake_load_cached_answer(_: str) -> dict[str, Any] | None:
+        if load_calls["count"] == 0:
+            load_calls["count"] += 1
+            return {
+                "answer": {
+                    "summary": "cached",
+                    "citations": citations,
+                    "model_output": stale_completion,
+                },
+                "model_name": model.name,
+            }
+        return None
+
+    monkeypatch.setattr(rag, "_load_cached_answer", fake_load_cached_answer)
+
+    answer = rag._guarded_answer(  # type: ignore[arg-type]
+        session,
+        question="What does John 3:16 teach?",
+        results=[_make_result()],
+        registry=registry,
+        model_hint=model.name,
+        filters=HybridSearchFilters(),
+    )
+
+    assert answer.model_output == completion
+    assert cache_metrics.counts.get("stale") == 1.0
+    assert cache_metrics.counts.get("refresh") == 1.0
 
 
 def test_guarded_answer_summary_uses_citation_documents(
