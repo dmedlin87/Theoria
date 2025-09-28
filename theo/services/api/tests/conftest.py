@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def configure_test_environment(tmp_path_factory: pytest.TempPathFactory) -> None:
+def configure_test_environment(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Generator[None, None, None]:
     """Configure database and storage paths for tests."""
 
     db_path = tmp_path_factory.mktemp("db") / "test.db"
@@ -30,8 +33,6 @@ def configure_test_environment(tmp_path_factory: pytest.TempPathFactory) -> None
 
     settings_module.get_settings.cache_clear()
     settings = settings_module.get_settings()
-    settings_module.settings = settings
-
     engine = configure_engine(settings.database_url)
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
