@@ -89,7 +89,18 @@ def require_principal(
 ) -> Principal:
     """Validate API credentials and attach the resolved principal to the request."""
 
+    settings = get_settings()
     principal: Principal | None = None
+    if settings.auth_allow_anonymous and not authorization and not api_key_header:
+        principal = {
+            "method": "anonymous",
+            "subject": None,
+            "scopes": [],
+            "claims": {},
+            "token": "",
+        }
+        request.state.principal = principal
+        return principal
     if api_key_header:
         principal = _authenticate_api_key(api_key_header)
     elif authorization:

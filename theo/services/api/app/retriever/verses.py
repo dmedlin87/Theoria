@@ -26,6 +26,28 @@ def _snippet(text: str, max_length: int = 280) -> str:
     return text[: max_length - 3].rstrip() + "..."
 
 
+def _collect_osis_refs(passage: Passage) -> set[str]:
+    """Return all OSIS references associated with *passage*."""
+
+    refs: set[str] = set()
+    if passage.osis_ref:
+        refs.add(passage.osis_ref)
+    meta = passage.meta or {}
+    if isinstance(meta, dict):
+        for key in (
+            "primary_osis",
+            "osis_refs",
+            "osis_refs_all",
+            "osis_refs_detected",
+        ):
+            value = meta.get(key)
+            if isinstance(value, str) and value:
+                refs.add(value)
+            elif isinstance(value, (list, tuple, set)):
+                refs.update(str(item) for item in value if item)
+    return refs
+
+
 def get_mentions_for_osis(
     session: Session,
     osis: str,
@@ -46,9 +68,10 @@ def get_mentions_for_osis(
 
     mentions: list[VerseMention] = []
     for passage, document in query.all():
-        if not passage.osis_ref:
+        refs = _collect_osis_refs(passage)
+        if not refs:
             continue
-        if not osis_intersects(passage.osis_ref, osis):
+        if not any(osis_intersects(ref, osis) for ref in refs):
             continue
 
         if filters and filters.author:
@@ -157,7 +180,8 @@ def get_verse_timeline(
     bucket_map: dict[datetime, _BucketData] = {}
 
     for passage, document in query.all():
-        if not passage.osis_ref or not osis_intersects(passage.osis_ref, osis):
+        refs = _collect_osis_refs(passage)
+        if not refs or not any(osis_intersects(ref, osis) for ref in refs):
             continue
 
         if filters and filters.author:

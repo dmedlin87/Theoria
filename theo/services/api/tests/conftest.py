@@ -29,6 +29,7 @@ def configure_test_environment(
     os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
     os.environ["STORAGE_ROOT"] = str(storage_root)
     os.environ["FIXTURES_ROOT"] = str(PROJECT_ROOT / "fixtures")
+    os.environ["THEO_AUTH_ALLOW_ANONYMOUS"] = "true"
 
     from theo.services.api.app.core import settings as settings_module
     from theo.services.api.app.core.database import Base, configure_engine
