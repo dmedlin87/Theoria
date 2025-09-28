@@ -1,4 +1,7 @@
+"""Shared test configuration for API-level tests."""
+import os
 from __future__ import annotations
+os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 
 from pathlib import Path
 import sys
@@ -12,7 +15,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.main import app
 from theo.services.api.app.security import require_principal
-
 
 @pytest.fixture(autouse=True)
 def _bypass_authentication(request: pytest.FixtureRequest):
@@ -32,3 +34,4 @@ def _bypass_authentication(request: pytest.FixtureRequest):
         yield
     finally:
         app.dependency_overrides.pop(require_principal, None)
+

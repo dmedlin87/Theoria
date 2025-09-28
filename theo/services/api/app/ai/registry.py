@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 from typing import Any, Iterable
 
 from cryptography.fernet import InvalidToken
@@ -22,6 +23,8 @@ SECRET_CONFIG_KEYS = {
     "service_account_key",
 }
 _ENCRYPTED_FIELD = "__encrypted__"
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_metadata(payload: Any) -> dict[str, Any]:
@@ -210,6 +213,20 @@ def _encrypt_config(config: dict[str, Any]) -> dict[str, Any]:
             token = cipher.encrypt(value.encode("utf-8")).decode("utf-8")
             encrypted[key] = {_ENCRYPTED_FIELD: token}
         else:
+            if (
+                cipher is None
+                and key in SECRET_CONFIG_KEYS
+                and isinstance(value, str)
+                and value
+            ):
+                logger.error(
+                    "Cannot persist secret %s for model config without SETTINGS_SECRET_KEY. "
+                    "Set the environment variable before updating the registry.",
+                    key,
+                )
+                raise RuntimeError(
+                    "SETTINGS_SECRET_KEY must be configured to store LLM secrets"
+                )
             encrypted[key] = value
     return encrypted
 
