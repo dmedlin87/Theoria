@@ -70,7 +70,7 @@ def parse_transcript_vtt(path: Path) -> list[TranscriptSegment]:
     """Parse a WebVTT transcript file into structured segments."""
 
     segments: list[TranscriptSegment] = []
-    for entry in webvtt.read(path):
+    for entry in webvtt.read(str(path)):
         text = " ".join(entry.text.split())
         if not text:
             continue
@@ -134,7 +134,7 @@ def load_transcript(path: Path) -> list[TranscriptSegment]:
     if suffix in {".vtt", ".webvtt"}:
         return parse_transcript_vtt(path)
     if suffix == ".srt":
-        vtt = webvtt.from_srt(path)
+        vtt = webvtt.from_srt(str(path))
         segments: list[TranscriptSegment] = []
         for entry in vtt:
             text = " ".join(entry.text.split())
@@ -183,10 +183,11 @@ def _docling_extract_text(path: Path) -> tuple[str, dict[str, Any]] | None:
         exporter = getattr(document, attr, None)
         if callable(exporter):
             try:
-                text = exporter()
+                exported = exporter()
             except Exception:  # pragma: no cover - safety guard
                 continue
-            if text:
+            if exported:
+                text = str(exported)
                 break
 
     if not text:
