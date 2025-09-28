@@ -1,0 +1,91 @@
+name: "Bug Card"
+description: "File a detailed bug report with risk and remediation context."
+labels:
+  - bug
+title: "[Bug]: "
+body:
+  - type: input
+    id: bug_title
+    attributes:
+      label: "Title"
+      description: "Concise, action-oriented summary of the bug."
+      placeholder: "e.g. Checkout fails when applying loyalty code"
+    validations:
+      required: true
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: "Repro steps"
+      description: "Document the numbered steps to consistently reproduce the issue, including any test data or accounts required."
+      placeholder: |-
+        1. Go to ...
+        2. Click ...
+        3. Observe ...
+
+        Test data / accounts:
+        - user:
+        - feature flag:
+    validations:
+      required: true
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: "Expected vs Actual"
+      description: "Clearly state what should happen versus what actually occurs."
+      placeholder: |-
+        **Expected:**
+        - 
+
+        **Actual:**
+        - 
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / Trace IDs"
+      description: "Link to any logs, trace IDs, screenshots, or supporting artifacts."
+      placeholder: "e.g. Trace ID: 1234abcd-5678"
+  - type: input
+    id: service_owner
+    attributes:
+      label: "Route / Service owner"
+      description: "Specify the impacted route, feature area, or owning service team."
+      placeholder: "e.g. /checkout, Payments Platform"
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: "Risk (Impact x Likelihood)"
+      description: "Select the overall risk assessment combining impact and likelihood."
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical
+    validations:
+      required: true
+  - type: textarea
+    id: fix_sketch
+    attributes:
+      label: "Fix sketch"
+      description: "Outline the suspected root cause and potential solution."
+      placeholder: "Describe how you expect to address the bug."
+  - type: dropdown
+    id: test_added
+    attributes:
+      label: "Test added?"
+      description: "Will or did you add automated test coverage for this bug?"
+      options:
+        - "Yes"
+        - "No"
+        - "Not needed"
+    validations:
+      required: true
+  - type: textarea
+    id: rollback_plan
+    attributes:
+      label: "Rollback plan"
+      description: "Describe how to roll back the fix if it introduces regressions."
+      placeholder: "e.g. Revert PR #1234 and disable feature flag XYZ."
