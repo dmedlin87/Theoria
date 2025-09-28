@@ -26,6 +26,12 @@ export default function RAGAnswerBlock({
   exporting,
   status,
 }: RAGAnswerProps): JSX.Element {
+  const citationListProps = {
+    citations: answer.citations,
+    ...(onExport ? { onExport } : {}),
+    ...(exporting !== undefined ? { exporting } : {}),
+    ...(status !== undefined ? { status } : {}),
+  } as const;
   const guardrailEntries = answer.guardrail_profile
     ? Object.entries(answer.guardrail_profile).filter(([, value]) => Boolean(value))
     : [];
@@ -81,7 +87,7 @@ export default function RAGAnswerBlock({
           </div>
         </section>
       ) : null}
-      <CitationList citations={answer.citations} onExport={onExport} exporting={exporting} status={status} />
+      <CitationList {...citationListProps} />
       {followUps?.length ? (
         <div>
           <h4>Suggested follow-ups</h4>

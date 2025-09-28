@@ -274,7 +274,13 @@ export default function CopilotPage(): JSX.Element {
     }
 
     setWorkflow(preset.workflow);
-    await runWorkflow({ workflow: preset.workflow, verse: preset.verse });
+    const overrides: WorkflowOverrides & { workflow: WorkflowId } = {
+      workflow: preset.workflow,
+    };
+    if (preset.verse) {
+      overrides.verse = preset.verse;
+    }
+    await runWorkflow(overrides);
   };
 
   if (enabled === false) {

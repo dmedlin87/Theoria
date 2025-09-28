@@ -38,10 +38,6 @@ export const EXPORT_PRESETS: ExportPreset[] = [
   },
 ];
 
-export const EXPORT_PRESET_LOOKUP: Record<ExportPresetId, ExportPreset> = EXPORT_PRESETS.reduce(
-  (accumulator, preset) => {
-    accumulator[preset.id] = preset;
-    return accumulator;
-  },
-  {} as Record<ExportPresetId, ExportPreset>,
-);
+export const EXPORT_PRESET_LOOKUP = Object.fromEntries(
+  EXPORT_PRESETS.map((preset) => [preset.id, preset] as const),
+) satisfies Record<ExportPresetId, ExportPreset>;

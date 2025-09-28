@@ -17,6 +17,11 @@ export default function WorkflowResultPanel({
   status,
   summary,
 }: WorkflowResultPanelProps): JSX.Element {
+  const ragAnswerProps = {
+    ...(onExport ? { onExport } : {}),
+    ...(exporting !== undefined ? { exporting } : {}),
+    ...(status !== undefined ? { status } : {}),
+  } as const;
   return (
     <section style={{ marginTop: "2rem", background: "#fff", padding: "1.5rem", borderRadius: "0.75rem" }}>
       <p style={{ marginTop: 0, marginBottom: "1rem", color: "#4b5563" }}>{summary}</p>
@@ -26,9 +31,7 @@ export default function WorkflowResultPanel({
           <RAGAnswerBlock
             answer={result.payload.answer}
             followUps={result.payload.follow_ups}
-            onExport={onExport}
-            exporting={exporting}
-            status={status}
+            {...ragAnswerProps}
           />
         </>
       )}
@@ -58,9 +61,7 @@ export default function WorkflowResultPanel({
           ) : null}
           <RAGAnswerBlock
             answer={result.payload.answer}
-            onExport={onExport}
-            exporting={exporting}
-            status={status}
+            {...ragAnswerProps}
           />
         </>
       )}
@@ -76,9 +77,7 @@ export default function WorkflowResultPanel({
           </ul>
           <RAGAnswerBlock
             answer={result.payload.answer}
-            onExport={onExport}
-            exporting={exporting}
-            status={status}
+            {...ragAnswerProps}
           />
         </>
       )}
@@ -98,9 +97,7 @@ export default function WorkflowResultPanel({
           )}
           <RAGAnswerBlock
             answer={result.payload.answer}
-            onExport={onExport}
-            exporting={exporting}
-            status={status}
+            {...ragAnswerProps}
           />
         </>
       )}
@@ -118,9 +115,7 @@ export default function WorkflowResultPanel({
           </pre>
           <RAGAnswerBlock
             answer={result.payload.answer}
-            onExport={onExport}
-            exporting={exporting}
-            status={status}
+            {...ragAnswerProps}
           />
         </>
       )}
@@ -132,9 +127,7 @@ export default function WorkflowResultPanel({
           </pre>
           <RAGAnswerBlock
             answer={result.payload.answer}
-            onExport={onExport}
-            exporting={exporting}
-            status={status}
+            {...ragAnswerProps}
           />
         </>
       )}

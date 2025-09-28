@@ -88,11 +88,16 @@ function readingDisplayName(reading: VariantReading): string {
   );
 }
 
-function formatList(items: string[]): string {
-  if (items.length === 0) return "";
-  if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  const [last, ...restReversed] = items.slice().reverse();
+function formatList(items: Array<string | null | undefined>): string {
+  const filtered = items.filter((item): item is string => Boolean(item && item.trim()));
+  if (filtered.length === 0) return "";
+  if (filtered.length === 1) {
+    return filtered[0]!;
+  }
+  if (filtered.length === 2) {
+    return `${filtered[0]!} and ${filtered[1]!}`;
+  }
+  const [last, ...restReversed] = filtered.slice().reverse();
   const rest = restReversed.reverse();
   return `${rest.join(", ")}, and ${last}`;
 }
@@ -101,8 +106,9 @@ function parseYear(value?: string | null): number | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase();
   const match = normalized.match(/(-?\d{1,4})/);
-  if (!match) return null;
-  const raw = Number.parseInt(match[1], 10);
+  const yearGroup = match?.[1];
+  if (!yearGroup) return null;
+  const raw = Number.parseInt(yearGroup, 10);
   if (Number.isNaN(raw)) return null;
   if (normalized.includes("bc") || normalized.includes("bce")) {
     return -Math.abs(raw);
@@ -355,6 +361,7 @@ export default function TextualVariantsPanel({
   );
 
   const summary = useMemo(() => buildSummary(readings, mode), [readings, mode]);
+  const [firstDssLink, ...otherDssLinks] = dssLinks;
 
   const selectedReadings = useMemo(
     () =>
@@ -459,8 +466,10 @@ export default function TextualVariantsPanel({
     [],
   );
 
-  const minYear = chronology.length > 0 ? chronology[0].year : null;
-  const maxYear = chronology.length > 0 ? chronology[chronology.length - 1].year : null;
+  const firstChronology = chronology[0] ?? null;
+  const lastChronology = chronology.length > 0 ? chronology[chronology.length - 1] ?? null : null;
+  const minYear = firstChronology ? firstChronology.year : null;
+  const maxYear = lastChronology ? lastChronology.year : null;
   const span = minYear !== null && maxYear !== null ? Math.max(maxYear - minYear, 1) : 1;
 
   return (
@@ -498,10 +507,10 @@ export default function TextualVariantsPanel({
             Checking Dead Sea Scrolls links…
           </span>
         ) : null}
-        {dssLinks.length > 0 ? (
+        {firstDssLink ? (
           <div style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
             <a
-              href={dssLinks[0].url}
+              href={firstDssLink.url}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -515,9 +524,9 @@ export default function TextualVariantsPanel({
                 textDecoration: "none",
                 fontWeight: 600,
               }}
-              title={dssLinks
-                .slice(1)
+              title={otherDssLinks
                 .map((link) => link.title || link.fragment || link.url)
+                .filter((entry): entry is string => Boolean(entry))
                 .join("\n")}
             >
               Dead Sea Scrolls
@@ -533,11 +542,11 @@ export default function TextualVariantsPanel({
                 {dssLinks.length}
               </span>
             </a>
-            {dssLinks.length > 1 ? (
+            {otherDssLinks.length > 0 ? (
               <details style={{ fontSize: "0.8rem" }}>
                 <summary style={{ cursor: "pointer" }}>More fragments</summary>
                 <ul style={{ margin: "0.25rem 0 0", paddingLeft: "1.25rem" }}>
-                  {dssLinks.slice(1).map((link) => (
+                  {otherDssLinks.map((link) => (
                     <li key={link.id}>
                       <a href={link.url} target="_blank" rel="noopener noreferrer">
                         {link.fragment || link.title || link.url}

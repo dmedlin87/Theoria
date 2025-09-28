@@ -32,6 +32,22 @@ const KEY_MAP: Record<keyof SearchFilters, string> = {
   preset: "preset",
 };
 
+const FILTER_KEYS: Array<keyof SearchFilters> = [
+  "query",
+  "osis",
+  "collection",
+  "author",
+  "sourceType",
+  "collectionFacets",
+  "datasetFacets",
+  "variantFacets",
+  "dateStart",
+  "dateEnd",
+  "includeVariants",
+  "includeDisputed",
+  "preset",
+];
+
 function normalizeInput(value: string | undefined | null): string {
   return value?.trim() ?? "";
 }
@@ -84,26 +100,30 @@ export function parseSearchParams(
 
 export function serializeSearchParams(filters: Partial<SearchFilters>): string {
   const params = new URLSearchParams();
-  (Object.keys(KEY_MAP) as Array<keyof SearchFilters>).forEach((key) => {
+  FILTER_KEYS.forEach((key) => {
+    const paramKey = KEY_MAP[key];
     const value = filters[key];
     if (typeof value === "string") {
       const trimmed = value.trim();
       if (trimmed) {
-        params.set(KEY_MAP[key], trimmed);
+        params.set(paramKey, trimmed);
       }
       return;
     }
 
     if (Array.isArray(value)) {
       if (value.length > 0) {
-        params.set(KEY_MAP[key], value.map((item) => item.trim()).filter(Boolean).join(","));
+        params.set(
+          paramKey,
+          value.map((item) => item.trim()).filter(Boolean).join(","),
+        );
       }
       return;
     }
 
     if (typeof value === "boolean") {
       if (value) {
-        params.set(KEY_MAP[key], "1");
+        params.set(paramKey, "1");
       }
     }
   });
