@@ -52,6 +52,19 @@ export const EXPORT_PRESETS: ExportPreset[] = [
   },
 ];
 
-export const EXPORT_PRESET_LOOKUP = Object.fromEntries(
-  EXPORT_PRESETS.map((preset) => [preset.id, preset] as const),
-) satisfies Record<ExportPresetId, ExportPreset>;
+type MissingExportPresetIds = Exclude<
+  ExportPresetId,
+  (typeof EXPORT_PRESETS)[number]["id"]
+>;
+
+export const EXPORT_PRESET_LOOKUP = EXPORT_PRESETS.reduce(
+  (lookup, preset) => {
+    lookup[preset.id] = preset;
+    return lookup;
+  },
+  {} as Record<ExportPresetId, ExportPreset>,
+);
+
+const _assertAllExportPresetsCovered: MissingExportPresetIds extends never
+  ? true
+  : MissingExportPresetIds = true;
