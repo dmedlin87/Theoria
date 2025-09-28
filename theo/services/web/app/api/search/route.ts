@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getApiBaseUrl } from "../../lib/api";
+import { forwardTraceHeaders } from "../trace";
 
 function buildTargetUrl(request: NextRequest): URL {
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
@@ -20,10 +21,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     cache: "no-store",
   });
   const body = await response.text();
+  const headers = new Headers();
+  headers.set("content-type", response.headers.get("content-type") ?? "application/json");
+  forwardTraceHeaders(response.headers, headers);
   return new NextResponse(body, {
     status: response.status,
-    headers: {
-      "content-type": response.headers.get("content-type") ?? "application/json",
-    },
+    headers,
   });
 }

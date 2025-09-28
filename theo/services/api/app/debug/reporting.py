@@ -15,6 +15,8 @@ from typing import Any, Iterable, Mapping
 
 from fastapi import Request
 
+from ..tracing import get_current_trace_id
+
 SAFE_HEADER_PREFIXES = ("x-", "cf-", "forwarded")
 SAFE_ENV_PREFIXES = ("THEO_", "APP_", "FEATURE_")
 LOGGER = logging.getLogger("theo.api.errors")
@@ -160,6 +162,10 @@ def build_debug_report(
     report_context = dict(context or {})
     report_context.setdefault("request_id", report_id)
 
+    trace_id = get_current_trace_id()
+    if trace_id and "trace_id" not in report_context:
+        report_context["trace_id"] = trace_id
+
     return DebugReport(
         id=report_id,
         created_at=datetime.now(timezone.utc),
@@ -175,10 +181,12 @@ def emit_debug_report(report: DebugReport, *, logger: logging.Logger | None = No
     """Log the structured report for downstream processing."""
 
     target_logger = logger or LOGGER
-    target_logger.error(
-        "api.debug_report",
-        extra={"debug_report": report.as_dict()},
-    )
+    payload = report.as_dict()
+    trace_id = payload.get("context", {}).get("trace_id") if isinstance(payload.get("context"), dict) else None
+    extra: dict[str, Any] = {"debug_report": payload}
+    if isinstance(trace_id, str) and trace_id:
+        extra["trace_id"] = trace_id
+    target_logger.error("api.debug_report", extra=extra)
 
 
 __all__ = [
