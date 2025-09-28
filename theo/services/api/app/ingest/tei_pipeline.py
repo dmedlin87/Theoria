@@ -15,6 +15,7 @@ from ..db.models import Document, Passage
 from .chunking import Chunk, chunk_text
 from .embeddings import get_embedding_service, lexical_representation
 from .osis import detect_osis_references
+from ..telemetry import instrument_workflow, set_span_attribute
 
 
 @dataclass(slots=True)
@@ -184,76 +185,86 @@ def ingest_pilot_corpus(
 ) -> Document:
     """Ingest a pilot corpus using an OCR/HTR client and emit TEI-aware passages."""
 
-    path = Path(corpus_path)
-    if path.is_dir():
-        inputs = sorted(p for p in path.iterdir() if p.is_file())
-    else:
-        inputs = [path]
+    with instrument_workflow(
+        "ingest.tei", corpus_path=str(corpus_path)
+    ) as span:
+        path = Path(corpus_path)
+        if path.is_dir():
+            inputs = sorted(p for p in path.iterdir() if p.is_file())
+        else:
+            inputs = [path]
 
-    texts: list[str] = []
-    confidences: list[float] = []
-    page_numbers: list[int | None] = []
-    for input_path in inputs:
-        for result in htr_client.transcribe(input_path):
-            cleaned = result.text.strip()
-            if not cleaned:
-                continue
-            texts.append(cleaned)
-            confidences.append(result.confidence)
-            page_numbers.append(result.page_no)
+        texts: list[str] = []
+        confidences: list[float] = []
+        page_numbers: list[int | None] = []
+        for input_path in inputs:
+            for result in htr_client.transcribe(input_path):
+                cleaned = result.text.strip()
+                if not cleaned:
+                    continue
+                texts.append(cleaned)
+                confidences.append(result.confidence)
+                page_numbers.append(result.page_no)
 
-    combined_text = "\n\n".join(texts)
+        combined_text = "\n\n".join(texts)
 
-    title = None
-    authors = None
-    collection = None
-    if document_metadata:
-        title = str(document_metadata.get("title") or "") or path.stem
-        raw_authors = document_metadata.get("authors")
-        if isinstance(raw_authors, str):
-            authors = [raw_authors]
-        elif isinstance(raw_authors, Iterable):
-            authors = [str(author) for author in raw_authors]
-        collection = document_metadata.get("collection")
-    if not title:
-        title = path.stem
+        title = None
+        authors = None
+        collection = None
+        if document_metadata:
+            title = str(document_metadata.get("title") or "") or path.stem
+            raw_authors = document_metadata.get("authors")
+            if isinstance(raw_authors, str):
+                authors = [raw_authors]
+            elif isinstance(raw_authors, Iterable):
+                authors = [str(author) for author in raw_authors]
+            collection = document_metadata.get("collection")
+        if not title:
+            title = path.stem
 
-    document = Document(
-        title=title,
-        authors=authors,
-        collection=str(collection) if collection else None,
-        source_type="tei_pipeline",
-    )
-    session.add(document)
-    session.flush()
-
-    chunks = chunk_text(combined_text)
-    embedding_service = get_embedding_service()
-    embeddings = embedding_service.embed([chunk.text for chunk in chunks])
-    average_confidence = _normalise_confidence(confidences) or 0.0
-
-    for index, chunk in enumerate(chunks):
-        tei_xml, facets = generate_tei_markup(chunk.text)
-        meta = _chunk_to_passage_meta(chunk, facets, average_confidence)
-        page_no = page_numbers[index] if index < len(page_numbers) else None
-        passage = Passage(
-            document_id=document.id,
-            page_no=page_no,
-            start_char=chunk.start_char,
-            end_char=chunk.end_char,
-            text=chunk.text,
-            tokens=len(chunk.text.split()),
-            osis_ref=meta.get("osis_primary"),
-            embedding=embeddings[index] if index < len(embeddings) else None,
-            lexeme=lexical_representation(session, chunk.text),
-            meta=meta,
-            tei_xml=tei_xml,
+        document = Document(
+            title=title,
+            authors=authors,
+            collection=str(collection) if collection else None,
+            source_type="tei_pipeline",
         )
-        session.add(passage)
+        session.add(document)
+        session.flush()
 
-    session.flush()
+        chunks = chunk_text(combined_text)
+        chunk_count = len(chunks)
+        set_span_attribute(span, "ingest.source_type", "tei_pipeline")
+        set_span_attribute(span, "ingest.chunk_count", chunk_count)
+        set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
+        set_span_attribute(span, "ingest.cache_status", "n/a")
 
-    settings = get_settings()
-    document.provenance_score = getattr(settings, "tei_pipeline_provenance", 80)
-    return document
+        embedding_service = get_embedding_service()
+        embeddings = embedding_service.embed([chunk.text for chunk in chunks])
+        average_confidence = _normalise_confidence(confidences) or 0.0
+
+        for index, chunk in enumerate(chunks):
+            tei_xml, facets = generate_tei_markup(chunk.text)
+            meta = _chunk_to_passage_meta(chunk, facets, average_confidence)
+            page_no = page_numbers[index] if index < len(page_numbers) else None
+            passage = Passage(
+                document_id=document.id,
+                page_no=page_no,
+                start_char=chunk.start_char,
+                end_char=chunk.end_char,
+                text=chunk.text,
+                tokens=len(chunk.text.split()),
+                osis_ref=meta.get("osis_primary"),
+                embedding=embeddings[index] if index < len(embeddings) else None,
+                lexeme=lexical_representation(session, chunk.text),
+                meta=meta,
+                tei_xml=tei_xml,
+            )
+            session.add(passage)
+
+        session.flush()
+
+        settings = get_settings()
+        document.provenance_score = getattr(settings, "tei_pipeline_provenance", 80)
+        set_span_attribute(span, "ingest.document_id", document.id)
+        return document
 

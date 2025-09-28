@@ -19,6 +19,7 @@ try:  # pragma: no cover - optional dependency guard
 except ImportError:  # pragma: no cover - redis is optional at runtime
     redis_asyncio = None  # type: ignore[assignment]
 
+from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -45,6 +46,8 @@ if TYPE_CHECKING:  # pragma: no cover - hints only
 
 
 LOGGER = logging.getLogger(__name__)
+
+_RAG_TRACER = trace.get_tracer("theo.rag")
 
 _CACHE_TTL_SECONDS = 30 * 60
 _CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*\((?P<anchor>[^()]+)\)$")
@@ -666,11 +669,76 @@ def _guarded_answer(
             "registry_name": candidate.name,
         }
         try:
-            routed_generation = router.execute_generation(
-                workflow="rag",
-                model=candidate,
-                prompt=prompt,
-            )
+            with _RAG_TRACER.start_as_current_span("rag.execute_generation") as span:
+                span.set_attribute("rag.candidate", candidate.name)
+                span.set_attribute("rag.model_label", candidate.model)
+                span.set_attribute("rag.cache_status", cache_status)
+                if cache_key_suffix:
+                    span.set_attribute("rag.cache_key_suffix", cache_key_suffix)
+                span.set_attribute("rag.prompt_tokens", max(len(prompt) // 4, 0))
+                try:
+                    routed_generation = router.execute_generation(
+                        workflow="rag",
+                        model=candidate,
+                        prompt=prompt,
+                    )
+                except GenerationError as inner_exc:
+                    span.record_exception(inner_exc)
+                    span.set_attribute("rag.guardrails_cache_final", cache_status)
+                    raise
+                span.set_attribute("rag.latency_ms", routed_generation.latency_ms)
+                span.set_attribute("rag.completion_tokens", max(len(routed_generation.output) // 4, 0) if routed_generation.output else 0)
+
+                completion = routed_generation.output
+                if recorder:
+                    recorder.log_step(
+                        tool="llm.generate",
+                        action="generate_grounded_answer",
+                        input_payload=llm_payload,
+                        output_payload={
+                            "completion": completion,
+                            "latency_ms": routed_generation.latency_ms,
+                            "cost": routed_generation.cost,
+                        },
+                        output_digest=f"{len(completion)} characters",
+                    )
+                sources_line = "; ".join(
+                    f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
+                )
+                has_citations_line = bool(re.search(r"Sources:\s*\[\d+]", completion))
+                if not has_citations_line:
+                    completion = completion.strip() + f"\n\nSources: {sources_line}"
+                try:
+                    validation_result = _validate_model_completion(completion, citations)
+                except GuardrailError as exc:
+                    span.record_exception(exc)
+                    log_workflow_event(
+                        "workflow.guardrails_validation",
+                        workflow="rag",
+                        status="failed",
+                        cache_status=cache_status,
+                        cache_key_suffix=cache_key_suffix,
+                    )
+                    if recorder:
+                        recorder.log_step(
+                            tool="guardrails.validate",
+                            action="check_citations",
+                            status="failed",
+                            input_payload={
+                                "cache_status": cache_status,
+                                "cache_key_suffix": cache_key_suffix,
+                            },
+                            output_payload={"completion": completion},
+                            error_message=str(exc),
+                        )
+                    span.set_attribute("rag.guardrails_cache_final", cache_status)
+                    raise
+                model_output = completion
+                model_name = candidate.name
+                if cache_status == "stale":
+                    cache_status = "refresh"
+                span.set_attribute("rag.guardrails_cache_final", cache_status)
+                break
         except GenerationError as exc:
             last_error = exc
             if recorder:
@@ -683,54 +751,6 @@ def _guarded_answer(
                     error_message=str(exc),
                 )
             continue
-
-        completion = routed_generation.output
-        if recorder:
-            recorder.log_step(
-                tool="llm.generate",
-                action="generate_grounded_answer",
-                input_payload=llm_payload,
-                output_payload={
-                    "completion": completion,
-                    "latency_ms": routed_generation.latency_ms,
-                    "cost": routed_generation.cost,
-                },
-                output_digest=f"{len(completion)} characters",
-            )
-        sources_line = "; ".join(
-            f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
-        )
-        has_citations_line = bool(re.search(r"Sources:\s*\[\d+]", completion))
-        if not has_citations_line:
-            completion = completion.strip() + f"\\n\\nSources: {sources_line}"
-        try:
-            validation_result = _validate_model_completion(completion, citations)
-        except GuardrailError as exc:
-            log_workflow_event(
-                "workflow.guardrails_validation",
-                workflow="rag",
-                status="failed",
-                cache_status=cache_status,
-                cache_key_suffix=cache_key_suffix,
-            )
-            if recorder:
-                recorder.log_step(
-                    tool="guardrails.validate",
-                    action="check_citations",
-                    status="failed",
-                    input_payload={
-                        "cache_status": cache_status,
-                        "cache_key_suffix": cache_key_suffix,
-                    },
-                    output_payload={"completion": completion},
-                    error_message=str(exc),
-                )
-            raise
-        model_output = completion
-        model_name = candidate.name
-        if cache_status == "stale":
-            cache_status = "refresh"
-        break
 
     if not model_output:
         if last_error is not None:
