@@ -32,6 +32,36 @@ jobs:
       - name: Install Lighthouse CI
         run: npm install --global @lhci/cli@0.15.1
 
+      - name: Verify staging availability
+        shell: bash
+        env:
+          LHCI_BASIC_AUTH_USER: ${{ secrets.STAGING_BASIC_AUTH_USERNAME }}
+          LHCI_BASIC_AUTH_PASSWORD: ${{ secrets.STAGING_BASIC_AUTH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          URL=$(node -e "const cfg = require('./.lighthouserc.json'); const urls = cfg?.ci?.collect?.url || []; process.stdout.write(urls[0] ?? '');")
+          if [ -z "$URL" ]; then
+            echo 'Unable to determine the Lighthouse target URL from .lighthouserc.json.'
+            exit 1
+          fi
+
+          if [ -n "${LHCI_BASIC_AUTH_USER:-}" ] && [ -n "${LHCI_BASIC_AUTH_PASSWORD:-}" ]; then
+            AUTH_ARGS=(--user "${LHCI_BASIC_AUTH_USER}:${LHCI_BASIC_AUTH_PASSWORD}")
+          else
+            AUTH_ARGS=()
+          fi
+
+          for attempt in {1..5}; do
+            if curl --fail --silent --show-error --location "${AUTH_ARGS[@]}" "$URL" > /dev/null; then
+              exit 0
+            fi
+            echo "Attempt ${attempt} to reach $URL failed; retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "Unable to reach $URL after multiple attempts." >&2
+          exit 1
+
       - name: Run Lighthouse against staging
         env:
           LHCI_GITHUB_TOKEN: ${{ secrets.LHCI_GITHUB_TOKEN }}

@@ -3,7 +3,8 @@
     "collect": {
       "numberOfRuns": 1,
       "settings": {
-        "preset": "desktop"
+        "preset": "desktop",
+        "chromeFlags": "--headless --no-sandbox --disable-dev-shm-usage --ignore-certificate-errors"
       },
       "url": [
         "https://staging.theoengine.com/"

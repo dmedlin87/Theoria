@@ -5,9 +5,12 @@ This repository runs automated Lighthouse audits against the staging site via Gi
 ## Configuration files
 
 - `.lighthouserc.json` defines the staging URL that will be audited along with the minimum
-  category scores enforced by `lhci assert`.
-- `.github/workflows/lighthouse.yml` provisions Node.js, installs `@lhci/cli`, executes
-  `lhci autorun`, and uploads the resulting reports as build artifacts.
+  category scores enforced by `lhci assert`. The configuration also sets Chrome flags that are
+  required in CI (headless execution, sandbox and shared-memory tweaks, plus certificate error
+  suppression) so audits are resilient to staging TLS interstitials.
+- `.github/workflows/lighthouse.yml` provisions Node.js, installs `@lhci/cli`, verifies the
+  staging host is reachable with the configured credentials, executes `lhci autorun`, and
+  uploads the resulting reports as build artifacts.
 - `.lighthouseci/baseline/manifest.json` (not committed) should contain the baseline
   Lighthouse results saved from a known-good deployment. The workflow compares new runs
   against this manifest when it is present.
@@ -39,4 +42,6 @@ matching secrets and map them to the environment variables consumed by Lighthous
    issue creation when Lighthouse performance stays within the acceptable range.
 
 The workflow uploads the most recent reports as build artifacts so they can be inspected without
-rerunning Lighthouse.
+rerunning Lighthouse. If the staging host is ever unreachable, the job now fails fast during the
+connectivity check instead of surfacing the less-actionable Chrome interstitial error later in the
+`lhci` run.
