@@ -63,6 +63,23 @@ describe("admin digest hooks", () => {
     expect(api.refreshDigest).toHaveBeenCalledWith(24);
   });
 
+  it("handles digest errors from non-Error values", async () => {
+    const api = createMockApi();
+    api.getDigest.mockRejectedValueOnce("load failed");
+    const { result } = renderHook(() => useTopicDigest(api as unknown as TheoApiClient));
+    await act(async () => {
+      await result.current.loadDigest();
+    });
+    expect(result.current.error).toBe("load failed");
+    expect(result.current.digest).toBeNull();
+
+    api.refreshDigest.mockRejectedValueOnce("refresh failed");
+    await act(async () => {
+      await result.current.refreshDigest(12);
+    });
+    expect(result.current.error).toBe("refresh failed");
+  });
+
   it("manages watchlist CRUD operations", async () => {
     const api = createMockApi();
     const watchlist: WatchlistResponse = {
@@ -100,7 +117,7 @@ describe("admin digest hooks", () => {
 
   it("captures watchlist load errors", async () => {
     const api = createMockApi();
-    api.listWatchlists.mockRejectedValueOnce(new Error("Watchlist not found"));
+    api.listWatchlists.mockRejectedValueOnce("Watchlist not found");
     const { result } = renderHook(() => useWatchlistCrud(api as unknown as TheoApiClient));
     await act(async () => {
       await result.current.loadWatchlists("user");
@@ -149,6 +166,17 @@ describe("admin digest hooks", () => {
       await result.current.loadEvents("1", "");
     });
     expect(result.current.events).toEqual(events);
+  });
+
+  it("handles watchlist event errors from non-Error values", async () => {
+    const api = createMockApi();
+    api.fetchWatchlistEvents.mockRejectedValueOnce("Events unavailable");
+    const { result } = renderHook(() => useWatchlistEvents(api as unknown as TheoApiClient));
+    await act(async () => {
+      await result.current.loadEvents("1", "");
+    });
+    expect(result.current.eventsError).toBe("Events unavailable");
+    expect(result.current.eventsWatchlistId).toBe("1");
   });
 
   it("provides comma list helpers", () => {
