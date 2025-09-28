@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 import os
+from typing import Callable, Optional, cast
 
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
@@ -29,11 +30,15 @@ from .routes import (
 )
 from .telemetry import configure_console_tracer
 
+GenerateLatestFn = Callable[[], bytes]
+
 try:  # pragma: no cover - optional dependency
-    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest as _generate_latest
 except ImportError:  # pragma: no cover - graceful degradation
     CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
-    generate_latest = None
+    _generate_latest = None
+
+generate_latest: Optional[GenerateLatestFn] = _generate_latest
 
 
 @asynccontextmanager
@@ -71,10 +76,11 @@ def create_app() -> FastAPI:
     app.include_router(ai.settings_router, tags=["ai-settings"])
 
     if generate_latest is not None:
+        metrics_generator = cast(GenerateLatestFn, generate_latest)
 
         @app.get("/metrics", tags=["telemetry"])
         def metrics_endpoint() -> PlainTextResponse:
-            payload = generate_latest()
+            payload = metrics_generator()
             return PlainTextResponse(payload, media_type=CONTENT_TYPE_LATEST)
 
     return app
