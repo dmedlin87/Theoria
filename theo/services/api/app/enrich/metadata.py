@@ -233,6 +233,8 @@ class MetadataEnricher:
         title_value = message.get("title")
         if isinstance(title_value, list) and title_value:
             title_value = title_value[0]
+        if not isinstance(title_value, str):
+            title_value = None
 
         return EnrichmentResult(
             provider="crossref",
