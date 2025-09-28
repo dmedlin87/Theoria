@@ -47,9 +47,15 @@ def _override_ingest_limit(monkeypatch: pytest.MonkeyPatch, limit: int) -> Setti
     return settings
 
 
+ 
 class _FakeHeaders(dict):
     def get_content_charset(self, default: str | None = None) -> str | None:
         return self.get("charset", default)
+ 
+_PDF_EXTRACTION_ERROR = (
+    "Unable to extract text from PDF; the file may be password protected or corrupted."
+)
+ 
 
 
 def test_ingest_file_streams_large_upload_without_buffering(
@@ -147,6 +153,7 @@ def test_ingest_file_rejects_upload_exceeding_limit(
     assert called is False
 
 
+ 
 def _install_url_pipeline_stub(
     monkeypatch: pytest.MonkeyPatch,
     settings: Settings,
@@ -316,4 +323,28 @@ def test_ingest_url_detects_redirect_loop(
     response = api_client.post("/ingest/url", json={"url": "https://loop.example.com"})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["detail"] == "URL redirect loop detected"
+ 
+def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:
+    pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "password_protected.pdf"
+    with pdf_path.open("rb") as handle:
+        response = api_client.post(
+            "/ingest/file",
+            files={"file": (pdf_path.name, handle.read(), "application/pdf")},
+        )
 
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json() == {"detail": _PDF_EXTRACTION_ERROR}
+
+
+def test_ingest_file_rejects_corrupt_pdf(api_client: TestClient) -> None:
+    pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "corrupt_sample.pdf"
+    with pdf_path.open("rb") as handle:
+        response = api_client.post(
+            "/ingest/file",
+            files={"file": (pdf_path.name, handle.read(), "application/pdf")},
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json() == {"detail": _PDF_EXTRACTION_ERROR}
+
+ 

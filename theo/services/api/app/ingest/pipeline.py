@@ -19,6 +19,7 @@ from uuid import uuid4
 
 import yaml
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
@@ -40,6 +41,7 @@ from .osis import (
     detect_osis_references,
 )
 from .parsers import (
+    PDF_EXTRACTION_UNSUPPORTED,
     ParserResult,
     TranscriptSegment as ParsedTranscriptSegment,
     load_transcript,
@@ -53,6 +55,21 @@ from .parsers import (
 
 class UnsupportedSourceError(ValueError):
     """Raised when the pipeline cannot parse an input file."""
+
+
+def _ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
+    """Raise if *sha256* already exists for another document."""
+
+    if not sha256:
+        return
+
+    existing = (
+        session.query(Document.id)
+        .filter(Document.sha256 == sha256)
+        .first()
+    )
+    if existing is not None:
+        raise UnsupportedSourceError("Document already ingested")
 
 
 def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
@@ -657,6 +674,10 @@ def _prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
         max_pages=settings.doc_max_pages,
         max_tokens=settings.max_chunk_tokens,
     )
+    if result is PDF_EXTRACTION_UNSUPPORTED:
+        raise UnsupportedSourceError(
+            "Unable to extract text from PDF; the file may be password protected or corrupted."
+        )
     if not result.chunks:
         raise UnsupportedSourceError("PDF contained no extractable text")
     return result
@@ -1017,6 +1038,8 @@ def _persist_text_document(
 ) -> Document:
     tradition, topic_domains = _extract_guardrail_profile(frontmatter)
 
+    _ensure_unique_document_sha(session, sha256)
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Document",
@@ -1042,8 +1065,12 @@ def _persist_text_document(
         sha256=sha256,
     )
 
-    session.add(document)
-    session.flush()
+    try:
+        session.add(document)
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise UnsupportedSourceError("Document already ingested") from exc
 
     creator_tags = _ensure_list(frontmatter.get("creator_tags"))
     creator_profile = _get_or_create_creator(
@@ -1292,6 +1319,8 @@ def _persist_transcript_document(
 ) -> Document:
     tradition, topic_domains = _extract_guardrail_profile(frontmatter)
 
+    _ensure_unique_document_sha(session, sha256)
+
     document = Document(
         id=str(uuid4()),
         title=title or frontmatter.get("title") or "Transcript",
@@ -1319,8 +1348,12 @@ def _persist_transcript_document(
         sha256=sha256,
     )
 
-    session.add(document)
-    session.flush()
+    try:
+        session.add(document)
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise UnsupportedSourceError("Document already ingested") from exc
 
     creator_tags = _ensure_list(frontmatter.get("creator_tags"))
     creator_profile = _get_or_create_creator(
