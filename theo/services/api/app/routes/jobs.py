@@ -408,6 +408,7 @@ def enqueue_job(
         args_hash=args_hash,
         scheduled_at=schedule_at,
     )
+
     try:
         session.add(job)
         session.flush()
@@ -434,6 +435,25 @@ def enqueue_job(
             .order_by(IngestionJob.created_at.desc())
             .first()
         )
+
+        if fallback is not None:
+            return JobEnqueueResponse(
+                job_id=fallback.id,
+                task=fallback.job_type,
+                args_hash=args_hash,
+                queued_at=fallback.created_at,
+                schedule_at=fallback.scheduled_at,
+                status_url=f"/jobs/{fallback.id}",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to enqueue job",
+        ) from exc
+
+    task_id = getattr(result, "id", None)
+    if task_id:
+        job.task_id = task_id
+
         if existing is None:
             raise
         return JobEnqueueResponse(
@@ -444,6 +464,7 @@ def enqueue_job(
             schedule_at=existing.scheduled_at,
             status_url=f"/jobs/{existing.id}",
         )
+
 
     session.refresh(job)
 
