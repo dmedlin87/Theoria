@@ -20,6 +20,10 @@ function splitCommaList(value: string): string[] {
     .filter(Boolean);
 }
 
+function extractErrorMessage(unknownError: unknown): string {
+  return unknownError instanceof Error ? unknownError.message : String(unknownError);
+}
+
 type TopicDigestState = {
   digest: TopicDigest | null;
   error: string | null;
@@ -45,7 +49,7 @@ export function useTopicDigest(client?: TheoApiClient): TopicDigestState {
       setDigest(payload);
     } catch (loadError) {
       setDigest(null);
-      setError((loadError as Error).message);
+      setError(extractErrorMessage(loadError));
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +64,7 @@ export function useTopicDigest(client?: TheoApiClient): TopicDigestState {
         const payload = await api.getDigest();
         setDigest(payload);
       } catch (refreshError) {
-        setError((refreshError as Error).message);
+        setError(extractErrorMessage(refreshError));
       } finally {
         setIsRefreshing(false);
       }
@@ -92,7 +96,6 @@ export function useWatchlistCrud(client?: TheoApiClient): WatchlistCrudState {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const watchlistOriginalsRef = useRef(new Map<string, WatchlistResponse>());
-
   const loadWatchlists = useCallback(
     async (owner: string) => {
       if (!owner) {
@@ -109,7 +112,7 @@ export function useWatchlistCrud(client?: TheoApiClient): WatchlistCrudState {
       } catch (loadError) {
         setWatchlists([]);
         setLoadedFor(null);
-        setError((loadError as Error).message);
+        setError(extractErrorMessage(loadError));
       } finally {
         setIsLoading(false);
       }
@@ -265,7 +268,6 @@ export function useWatchlistEvents(client?: TheoApiClient): WatchlistEventState 
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [eventsWatchlistId, setEventsWatchlistId] = useState<string | null>(null);
-
   const loadEvents = useCallback(
     async (watchlistId: string, since: string) => {
       setEvents([]);
@@ -276,7 +278,7 @@ export function useWatchlistEvents(client?: TheoApiClient): WatchlistEventState 
         setEvents(payload);
         setEventsWatchlistId(watchlistId);
       } catch (eventsError) {
-        setEventsError((eventsError as Error).message);
+        setEventsError(extractErrorMessage(eventsError));
         setEventsWatchlistId(watchlistId);
       } finally {
         setEventsLoading(false);
