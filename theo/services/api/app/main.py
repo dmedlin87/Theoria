@@ -10,6 +10,7 @@ import os
 from typing import Callable, Optional, cast
 
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
@@ -61,8 +62,23 @@ def create_app() -> FastAPI:
 
     _enforce_secret_requirements()
     app = FastAPI(title="Theo Engine API", version="0.2.0", lifespan=lifespan)
+    settings = get_settings()
     if os.getenv("THEO_ENABLE_CONSOLE_TRACES", "0").lower() in {"1", "true", "yes"}:
         configure_console_tracer()
+    if settings.cors_allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_allowed_origins,
+            allow_credentials=True,
+            allow_methods=["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"],
+            allow_headers=[
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "X-Requested-With",
+            ],
+        )
     app.add_middleware(
         ErrorReportingMiddleware,
         extra_context={"service": "api"},
