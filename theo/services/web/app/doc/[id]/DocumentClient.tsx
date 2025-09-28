@@ -242,9 +242,9 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
           <ol style={{ padding: 0, listStyle: "none", display: "grid", gap: "1rem" }}>
             {document.passages.map((passage) => {
               const anchor = formatAnchor({
-                page_no: passage.page_no ?? undefined,
-                t_start: passage.t_start ?? undefined,
-                t_end: passage.t_end ?? undefined,
+                page_no: passage.page_no ?? null,
+                t_start: passage.t_start ?? null,
+                t_end: passage.t_end ?? null,
               });
               return (
                 <li

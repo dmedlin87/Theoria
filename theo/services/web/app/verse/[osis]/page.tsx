@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
-import DeliverableExportAction from "../../components/DeliverableExportAction";
+import DeliverableExportAction, {
+  type DeliverableRequestPayload,
+} from "../../components/DeliverableExportAction";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
 import ResearchPanels, { type ResearchFeatureFlags } from "./research-panels";
 import ReliabilityOverviewCard from "./ReliabilityOverviewCard";
@@ -294,6 +296,15 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   if (author) {
     deliverableFilters.author = author;
   }
+  const deliverableRequestPayload: DeliverableRequestPayload = {
+    type: "sermon",
+    topic: `Sermon prep for ${osis}`,
+    osis,
+    formats: ["markdown", "ndjson"],
+  };
+  if (Object.keys(deliverableFilters).length > 0) {
+    deliverableRequestPayload.filters = deliverableFilters;
+  }
 
   return (
     <section>
@@ -320,16 +331,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
             preparingText="Generating sermon packet…"
             successText="Sermon packet ready."
             idleText="Create a sermon outline with citations."
-            requestPayload={{
-              type: "sermon",
-              topic: `Sermon prep for ${osis}`,
-              osis,
-              formats: ["markdown", "ndjson"],
-              filters:
-                Object.keys(deliverableFilters).length > 0
-                  ? deliverableFilters
-                  : undefined,
-            }}
+            requestPayload={deliverableRequestPayload}
           />
 
           {error ? (
@@ -398,9 +400,9 @@ export default async function VersePage({ params, searchParams }: VersePageProps
             <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: "1rem" }}>
               {mentions.map((mention) => {
                 const anchor = formatAnchor({
-                  page_no: mention.passage.page_no ?? undefined,
-                  t_start: mention.passage.t_start ?? undefined,
-                  t_end: mention.passage.t_end ?? undefined,
+                  page_no: mention.passage.page_no ?? null,
+                  t_start: mention.passage.t_start ?? null,
+                  t_end: mention.passage.t_end ?? null,
                 });
                 const documentTitle =
                   (mention.passage.meta?.document_title as string | undefined) ?? "Untitled document";
@@ -416,8 +418,8 @@ export default async function VersePage({ params, searchParams }: VersePageProps
                       <footer style={{ marginTop: "0.75rem" }}>
                         <Link
                           href={buildPassageLink(mention.passage.document_id, mention.passage.id, {
-                            pageNo: mention.passage.page_no ?? undefined,
-                            tStart: mention.passage.t_start ?? undefined,
+                            pageNo: mention.passage.page_no ?? null,
+                            tStart: mention.passage.t_start ?? null,
                           })}
                         >
                           Open document

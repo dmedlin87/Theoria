@@ -319,14 +319,20 @@ export default function SearchPage(): JSX.Element {
         const payload = (await response.json()) as SearchResponse;
         const grouped = new Map<string, DocumentGroup>();
         for (const result of payload.results ?? []) {
-          const group = grouped.get(result.document_id) ?? {
-            documentId: result.document_id,
-            title: result.document_title ?? "Untitled document",
-            rank: result.document_rank,
-            score: result.document_score ?? result.score ?? null,
-            passages: [],
-          };
-          group.rank = group.rank ?? result.document_rank;
+          let group = grouped.get(result.document_id);
+          if (!group) {
+            group = {
+              documentId: result.document_id,
+              title: result.document_title ?? "Untitled document",
+              rank: result.document_rank ?? null,
+              score: result.document_score ?? result.score ?? null,
+              passages: [],
+            } satisfies DocumentGroup;
+            grouped.set(result.document_id, group);
+          }
+          if (group.rank == null && typeof result.document_rank === "number") {
+            group.rank = result.document_rank;
+          }
           const candidateScore = result.document_score ?? result.score ?? null;
           if (typeof candidateScore === "number") {
             if (typeof group.score !== "number" || candidateScore > group.score) {
@@ -334,7 +340,6 @@ export default function SearchPage(): JSX.Element {
             }
           }
           group.passages.push(result);
-          grouped.set(result.document_id, group);
         }
         const sortedGroups = sortDocumentGroups(Array.from(grouped.values()), sortKey);
         setGroups(sortedGroups);
@@ -528,7 +533,8 @@ export default function SearchPage(): JSX.Element {
         return current.filter((id) => id !== groupId);
       }
       if (current.length >= 2) {
-        return [current[current.length - 1], groupId];
+        const lastSelected = current[current.length - 1];
+        return lastSelected ? [lastSelected, groupId] : [groupId];
       }
       return [...current, groupId];
     });
@@ -1069,9 +1075,9 @@ export default function SearchPage(): JSX.Element {
               <ul style={{ listStyle: "none", padding: 0, margin: "1rem 0 0", display: "grid", gap: "0.75rem" }}>
                 {group.passages.map((result) => {
                   const anchorDescription = formatAnchor({
-                    page_no: result.page_no ?? undefined,
-                    t_start: result.t_start ?? undefined,
-                    t_end: result.t_end ?? undefined,
+                    page_no: result.page_no ?? null,
+                    t_start: result.t_start ?? null,
+                    t_end: result.t_end ?? null,
                   });
                   return (
                     <li key={result.id} style={{ border: "1px solid #e2e8f0", borderRadius: "0.5rem", padding: "0.75rem" }}>
@@ -1083,8 +1089,8 @@ export default function SearchPage(): JSX.Element {
                           </div>
                           <Link
                             href={buildPassageLink(result.document_id, result.id, {
-                              pageNo: result.page_no ?? undefined,
-                              tStart: result.t_start ?? undefined,
+                              pageNo: result.page_no ?? null,
+                              tStart: result.t_start ?? null,
                             })}
                             style={{ whiteSpace: "nowrap" }}
                           >
