@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterator
 import sys
 
 import pytest
@@ -61,7 +62,7 @@ def _prepare_engine(tmp_path: Path):
 
 
 @pytest.fixture()
-def api_client(tmp_path: Path) -> TestClient:
+def api_client(tmp_path: Path) -> Iterator[TestClient]:
     """Provide a TestClient wired to a temporary SQLite database."""
 
     engine = _prepare_engine(tmp_path)
