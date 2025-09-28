@@ -243,6 +243,13 @@ def _build_document_detail(
 
     title = document.title or (citations[0].document_title if citations else None)
 
+    source_url = document.source_url
+    for citation in citations:
+        fields_set = getattr(citation, "model_fields_set", set())
+        if "source_url" in fields_set:
+            source_url = citation.source_url
+            break
+
     return DocumentDetailResponse(
         id=document.id,
         title=title,
@@ -254,7 +261,7 @@ def _build_document_detail(
         year=document.year,
         created_at=document.created_at,
         updated_at=document.updated_at,
-        source_url=document.source_url,
+        source_url=source_url,
         channel=document.channel,
         video_id=document.video_id,
         duration_seconds=document.duration_seconds,

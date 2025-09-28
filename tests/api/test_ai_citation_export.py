@@ -124,6 +124,23 @@ def test_export_citations_allows_missing_source_url(client: TestClient) -> None:
     )
 
     assert response.status_code == 200
+    payload = response.json()
+
+    manifest = payload["manifest"]
+    record = payload["records"][0]
+    csl_entry = payload["csl"][0]
+    manager_items = payload["manager_payload"]["zotero"]["items"][0]
+
+    assert manifest.get("source_url") is None
+    assert record.get("source_url") is None
+    assert "URL" not in csl_entry
+    assert "URL" not in manager_items
+
+    assert record["document_id"] == "doc-1"
+    assert record["doi"] == "10.1234/example"
+    assert record["authors"] == ["Jane Doe"]
+    assert csl_entry["title"] == "Sample Document"
+    assert csl_entry["DOI"] == "10.1234/example"
 
 
 def test_export_citations_rejects_empty_payload(client: TestClient) -> None:
