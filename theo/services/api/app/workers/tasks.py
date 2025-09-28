@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 import httpx
 from celery import Celery
+from celery.app.task import Task as CeleryTask
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
 from sqlalchemy import func, literal, select, text
@@ -47,7 +48,7 @@ celery.conf.beat_schedule.setdefault(
     "refresh-hnsw-nightly",
     {
         "task": "tasks.refresh_hnsw",
-        "schedule": crontab(hour=3, minute=0),
+        "schedule": crontab(hour="3", minute="0"),
     },
 )
 
@@ -350,6 +351,9 @@ def send_topic_digest_notification(
         raise
 
 
+send_topic_digest_notification = cast(CeleryTask, send_topic_digest_notification)
+
+
 @celery.task(name="tasks.generate_topic_digest")
 def topic_digest(
     hours: int = 168,
@@ -609,6 +613,9 @@ def run_watchlist_alert(watchlist_id: str) -> None:
                 extra={"watchlist_id": watchlist_id},
             )
             raise
+
+
+run_watchlist_alert = cast(CeleryTask, run_watchlist_alert)
 
 
 @celery.task(name="tasks.schedule_watchlist_alerts")
