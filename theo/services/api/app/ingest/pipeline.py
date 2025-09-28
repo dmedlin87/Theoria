@@ -278,6 +278,26 @@ def _normalise_guardrail_collection(value: Any) -> list[str] | None:
     return unique or None
 
 
+def _safe_storage_name(name: str, *, fallback: str) -> str:
+    """Return a safe filename for persisted artifacts.
+
+    The candidate is normalised to its basename and values that would resolve
+    to the current or parent directory are rejected. When the provided name is
+    unsafe we fall back to ``fallback`` (which should originate from a trusted
+    source such as the upload path) before raising ``ValueError`` if no safe
+    option remains.
+    """
+
+    candidate = Path(name).name
+    if candidate in {"", ".", ".."}:
+        candidate = Path(fallback).name
+
+    if candidate in {"", ".", ".."}:
+        raise ValueError("artifact filename resolves outside storage directory")
+
+    return candidate
+
+
 def _extract_guardrail_profile(
     frontmatter: dict[str, Any]
 ) -> tuple[str | None, list[str] | None]:
@@ -1396,7 +1416,10 @@ def _persist_transcript_document(
         artifacts.setdefault("frontmatter", frontmatter_path.name)
 
     if transcript_path and transcript_path.exists():
-        dest_name = Path(transcript_filename or transcript_path.name).name
+        dest_name = _safe_storage_name(
+            transcript_filename or transcript_path.name,
+            fallback=transcript_path.name,
+        )
         dest = storage_dir / dest_name
         shutil.copy(transcript_path, dest)
         artifacts["transcript"] = dest.name
@@ -1417,7 +1440,10 @@ def _persist_transcript_document(
         artifacts["transcript"] = transcript_file.name
 
     if audio_path and audio_path.exists():
-        audio_name = Path(audio_filename or audio_path.name).name
+        audio_name = _safe_storage_name(
+            audio_filename or audio_path.name,
+            fallback=audio_path.name,
+        )
         audio_dest = storage_dir / audio_name
         shutil.copy(audio_path, audio_dest)
         artifacts["audio"] = audio_dest.name
