@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -25,12 +26,23 @@ def _score_entry(query_tokens: Iterable[str], entry: dict[str, object]) -> float
     """Return a simple keyword overlap score for ranking results."""
 
     haystack_parts: list[str] = []
-    title = entry.get("title", "") or ""
-    summary = entry.get("summary", "") or ""
-    tags = " ".join(entry.get("tags", []))
+
+    title_obj = entry.get("title", "")
+    title = title_obj if isinstance(title_obj, str) else ""
+    summary_obj = entry.get("summary", "")
+    summary = summary_obj if isinstance(summary_obj, str) else ""
+    tags_obj = entry.get("tags", [])
+
+    if isinstance(tags_obj, str):
+        tags_iterable: list[str] = [tags_obj]
+    elif isinstance(tags_obj, IterableABC):
+        tags_iterable = [item for item in tags_obj if isinstance(item, str)]
+    else:
+        tags_iterable = []
+
     haystack_parts.append(title)
     haystack_parts.append(summary)
-    haystack_parts.append(tags)
+    haystack_parts.append(" ".join(tags_iterable))
     haystack = " ".join(haystack_parts).lower()
     return sum(1.0 for token in query_tokens if token in haystack)
 
