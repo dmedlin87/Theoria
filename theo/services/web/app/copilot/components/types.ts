@@ -60,15 +60,17 @@ export type ExportPresetId =
   | "sermon-markdown"
   | "sermon-ndjson"
   | "sermon-csv"
+  | "sermon-pdf"
   | "transcript-markdown"
-  | "transcript-csv";
+  | "transcript-csv"
+  | "transcript-pdf";
 
 export type ExportPreset = {
   id: ExportPresetId;
   label: string;
   description: string;
   type: "sermon" | "transcript";
-  format: "markdown" | "ndjson" | "csv";
+  format: "markdown" | "ndjson" | "csv" | "pdf";
 };
 
 export type ExportPresetResult = {

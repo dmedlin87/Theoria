@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime
 from typing import Any, Literal
 
@@ -107,10 +108,10 @@ class DeliverableManifest(APIModel):
 class DeliverableAsset(APIModel):
     """Single file artifact returned by a deliverable export."""
 
-    format: Literal["markdown", "ndjson", "csv"]
+    format: Literal["markdown", "ndjson", "csv", "pdf"]
     filename: str
     media_type: str
-    content: str
+    content: str | bytes
 
 
 class DeliverablePackage(APIModel):
@@ -124,6 +125,14 @@ class DeliverablePackage(APIModel):
             if asset.format == fmt:
                 return asset
         raise ValueError(f"format {fmt!r} not present in deliverable")
+
+
+def serialise_asset_content(content: str | bytes) -> str:
+    """Return a JSON-safe string representation for deliverable content."""
+
+    if isinstance(content, (bytes, bytearray)):
+        return base64.b64encode(bytes(content)).decode("ascii")
+    return content
 
 
 class DeliverableResponse(APIModel):
@@ -140,7 +149,7 @@ class DeliverableRequest(APIModel):
     """Parameters accepted by the deliverable export endpoint."""
 
     type: Literal["sermon", "transcript"]
-    formats: list[Literal["markdown", "ndjson", "csv"]] = Field(
+    formats: list[Literal["markdown", "ndjson", "csv", "pdf"]] = Field(
         default_factory=lambda: ["markdown"]
     )
     topic: str | None = None

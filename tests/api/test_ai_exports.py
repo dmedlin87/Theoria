@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import UTC, datetime
 from typing import Iterator, Literal
 
@@ -18,7 +19,7 @@ from theo.services.api.app.routes.ai import workflows as workflows_module
 
 def _build_package(
     kind: Literal["sermon", "transcript"],
-    formats: list[Literal["markdown", "ndjson", "csv"]],
+    formats: list[Literal["markdown", "ndjson", "csv", "pdf"]],
 ) -> DeliverablePackage:
     manifest = DeliverableManifest(
         export_id="pkg",
@@ -27,15 +28,26 @@ def _build_package(
         type=kind,
         filters={},
     )
-    assets = [
-        DeliverableAsset(
-            format=fmt,
-            filename=f"{kind}.{fmt}",
-            media_type=f"text/{fmt}",
-            content=f"{kind}-{fmt}-content",
-        )
-        for fmt in formats
-    ]
+    assets: list[DeliverableAsset] = []
+    for fmt in formats:
+        if fmt == "pdf":
+            assets.append(
+                DeliverableAsset(
+                    format=fmt,
+                    filename=f"{kind}.pdf",
+                    media_type="application/pdf",
+                    content=f"{kind}-{fmt}-content".encode("utf-8"),
+                )
+            )
+        else:
+            assets.append(
+                DeliverableAsset(
+                    format=fmt,
+                    filename=f"{kind}.{fmt}",
+                    media_type=f"text/{fmt}",
+                    content=f"{kind}-{fmt}-content",
+                )
+            )
     return DeliverablePackage(manifest=manifest, assets=assets)
 
 
@@ -52,7 +64,7 @@ def api_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
         app.dependency_overrides.pop(get_session, None)
 
 
-@pytest.mark.parametrize("export_format", ["markdown", "ndjson", "csv"])
+@pytest.mark.parametrize("export_format", ["markdown", "ndjson", "csv", "pdf"])
 def test_sermon_export_returns_serialised_asset(
     api_client: TestClient, monkeypatch: pytest.MonkeyPatch, export_format: str
 ) -> None:
@@ -72,16 +84,22 @@ def test_sermon_export_returns_serialised_asset(
     )
     assert response.status_code == 200
     payload = response.json()
+    expected_media = "application/pdf" if export_format == "pdf" else f"text/{export_format}"
+    expected_content = (
+        base64.b64encode(b"sermon-pdf-content").decode("ascii")
+        if export_format == "pdf"
+        else f"sermon-{export_format}-content"
+    )
     assert payload == {
         "preset": f"sermon-{export_format}",
         "format": export_format,
         "filename": f"sermon.{export_format}",
-        "media_type": f"text/{export_format}",
-        "content": f"sermon-{export_format}-content",
+        "media_type": expected_media,
+        "content": expected_content,
     }
 
 
-@pytest.mark.parametrize("export_format", ["markdown", "csv"])
+@pytest.mark.parametrize("export_format", ["markdown", "csv", "pdf"])
 def test_transcript_export_returns_serialised_asset(
     api_client: TestClient, monkeypatch: pytest.MonkeyPatch, export_format: str
 ) -> None:
@@ -96,10 +114,16 @@ def test_transcript_export_returns_serialised_asset(
     )
     assert response.status_code == 200
     payload = response.json()
+    expected_media = "application/pdf" if export_format == "pdf" else f"text/{export_format}"
+    expected_content = (
+        base64.b64encode(b"transcript-pdf-content").decode("ascii")
+        if export_format == "pdf"
+        else f"transcript-{export_format}-content"
+    )
     assert payload == {
         "preset": f"transcript-{export_format}",
         "format": export_format,
         "filename": f"transcript.{export_format}",
-        "media_type": f"text/{export_format}",
-        "content": f"transcript-{export_format}-content",
+        "media_type": expected_media,
+        "content": expected_content,
     }

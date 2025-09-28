@@ -1630,7 +1630,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "markdown" | "ndjson" | "csv";
+            format: "markdown" | "ndjson" | "csv" | "pdf";
             /** Filename */
             filename: string;
             /** Media Type */
@@ -1679,7 +1679,7 @@ export interface components {
              */
             type: "sermon" | "transcript";
             /** Formats */
-            formats?: ("markdown" | "ndjson" | "csv")[];
+            formats?: ("markdown" | "ndjson" | "csv" | "pdf")[];
             /** Topic */
             topic?: string | null;
             /** Osis */
@@ -1917,12 +1917,12 @@ export interface components {
              * Preset
              * @enum {string}
              */
-            preset: "sermon-markdown" | "sermon-ndjson" | "sermon-csv" | "transcript-markdown" | "transcript-csv";
+            preset: "sermon-markdown" | "sermon-ndjson" | "sermon-csv" | "sermon-pdf" | "transcript-markdown" | "transcript-csv" | "transcript-pdf";
             /**
              * Format
              * @enum {string}
              */
-            format: "markdown" | "ndjson" | "csv";
+            format: "markdown" | "ndjson" | "csv" | "pdf";
             /** Filename */
             filename: string;
             /** Media Type */
@@ -5576,7 +5576,7 @@ export interface operations {
     sermon_prep_export_ai_sermon_prep_export_post: {
         parameters: {
             query?: {
-                /** @description markdown, ndjson, or csv */
+                /** @description markdown, ndjson, csv, or pdf */
                 format?: string;
             };
             header?: {

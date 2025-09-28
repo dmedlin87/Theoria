@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getApiBaseUrl } from "../lib/api";
 
-type DeliverableFormat = "markdown" | "ndjson" | "csv";
+type DeliverableFormat = "markdown" | "ndjson" | "csv" | "pdf";
 
 interface DeliverableAsset {
   format: DeliverableFormat;
@@ -108,7 +108,16 @@ export default function DeliverableExportAction({
         throw new Error("Export returned no assets");
       }
       const preparedDownloads: DownloadLink[] = payload.assets.map((asset) => {
-        const blob = new Blob([asset.content], { type: asset.media_type });
+        let blobSource: BlobPart = asset.content;
+        if (asset.media_type === "application/pdf" || asset.format === "pdf") {
+          const binary = atob(asset.content);
+          const view = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) {
+            view[index] = binary.charCodeAt(index);
+          }
+          blobSource = view;
+        }
+        const blob = new Blob([blobSource], { type: asset.media_type });
         return {
           url: URL.createObjectURL(blob),
           filename: asset.filename,

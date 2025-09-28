@@ -300,7 +300,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
     type: "sermon",
     topic: `Sermon prep for ${osis}`,
     osis,
-    formats: ["markdown", "ndjson"],
+    formats: ["markdown", "ndjson", "pdf"],
   };
   if (Object.keys(deliverableFilters).length > 0) {
     deliverableRequestPayload.filters = deliverableFilters;

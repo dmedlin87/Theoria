@@ -23,6 +23,13 @@ export const EXPORT_PRESETS: ExportPreset[] = [
     format: "csv",
   },
   {
+    id: "sermon-pdf",
+    label: "Sermon prep (PDF)",
+    description: "Polished PDF outline ready for sharing or printing.",
+    type: "sermon",
+    format: "pdf",
+  },
+  {
     id: "transcript-markdown",
     label: "Transcript (Markdown)",
     description: "Render a transcript with citations in Markdown.",
@@ -35,6 +42,13 @@ export const EXPORT_PRESETS: ExportPreset[] = [
     description: "Generate a CSV bundle of transcript references.",
     type: "transcript",
     format: "csv",
+  },
+  {
+    id: "transcript-pdf",
+    label: "Transcript (PDF)",
+    description: "Printable transcript with inline citations.",
+    type: "transcript",
+    format: "pdf",
   },
 ];
 

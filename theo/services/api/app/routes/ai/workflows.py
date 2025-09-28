@@ -58,6 +58,7 @@ from ...models.ai import (
     DEFAULT_GUARDRAIL_SETTINGS,
 )
 from ...models.base import Passage as PassageSchema
+from ...models.export import serialise_asset_content
 from ...models.documents import DocumentDetailResponse
 from ...models.export import (
     DocumentExportFilters,
@@ -826,7 +827,9 @@ def sermon_prep(
 @router.post("/sermon-prep/export", response_model=ExportDeliverableResponse)
 def sermon_prep_export(
     payload: SermonPrepRequest,
-    format: str = Query(default="markdown", description="markdown, ndjson, or csv"),
+    format: str = Query(
+        default="markdown", description="markdown, ndjson, csv, or pdf"
+    ),
     session: Session = Depends(get_session),
 ) -> ExportDeliverableResponse:
     try:
@@ -855,7 +858,7 @@ def sermon_prep_export(
         format=asset.format,
         filename=asset.filename,
         media_type=asset.media_type,
-        content=asset.content,
+        content=serialise_asset_content(asset.content),
     )
 
 # See comment above regarding the response model.
@@ -884,7 +887,7 @@ def transcript_export(
         format=asset.format,
         filename=asset.filename,
         media_type=asset.media_type,
-        content=asset.content,
+        content=serialise_asset_content(asset.content),
     )
 
 
@@ -1039,10 +1042,12 @@ _SERMON_PRESET_MAP: dict[str, ExportPresetId] = {
     "markdown": "sermon-markdown",
     "ndjson": "sermon-ndjson",
     "csv": "sermon-csv",
+    "pdf": "sermon-pdf",
 }
 
 _TRANSCRIPT_PRESET_MAP: dict[str, ExportPresetId] = {
     "markdown": "transcript-markdown",
     "csv": "transcript-csv",
+    "pdf": "transcript-pdf",
 }
 

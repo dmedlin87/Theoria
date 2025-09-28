@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import re
+import textwrap
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Sequence, TypeVar
@@ -1403,7 +1404,7 @@ def run_research_reconciliation(
         )
 
 
-_SUPPORTED_DELIVERABLE_FORMATS = {"markdown", "ndjson", "csv"}
+_SUPPORTED_DELIVERABLE_FORMATS = {"markdown", "ndjson", "csv", "pdf"}
 
 
 def _normalise_formats(formats: Sequence[str]) -> list[str]:
@@ -1478,6 +1479,93 @@ def _csv_manifest_prefix(manifest: DeliverableManifest) -> str:
     if manifest.filters:
         parts.append(f"filters={json.dumps(manifest.filters, sort_keys=True)}")
     return ",".join(parts) + "\n"
+
+
+def _escape_pdf_text(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _markdown_to_pdf_lines(markdown: str) -> list[str]:
+    lines: list[str] = []
+    for raw_line in markdown.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            lines.append("")
+            continue
+        if stripped.startswith("#"):
+            heading = stripped.lstrip("#").strip()
+            lines.append(heading.upper() if heading else "")
+            lines.append("")
+            continue
+        prefix = ""
+        content = stripped
+        if stripped.startswith(("- ", "* ")):
+            prefix = "• "
+            content = stripped[2:].strip()
+        wrapped = textwrap.wrap(content, width=90) or [""]
+        for idx, item in enumerate(wrapped):
+            if prefix and idx == 0:
+                lines.append(f"{prefix}{item}")
+            elif prefix:
+                lines.append(f"{' ' * len(prefix)}{item}")
+            else:
+                lines.append(item)
+    return lines or [""]
+
+
+def _render_markdown_pdf(markdown: str, *, title: str | None = None) -> bytes:
+    text_lines = _markdown_to_pdf_lines(markdown)
+    heading_lines: list[str] = []
+    if title:
+        clean_title = title.strip()
+        if clean_title:
+            heading_lines = [clean_title, ""]
+    combined = heading_lines + text_lines
+    if not combined:
+        combined = [""]
+
+    commands = [
+        "BT",
+        "/F1 12 Tf",
+        "16 TL",
+        "72 756 Td",
+    ]
+    for idx, line in enumerate(combined):
+        commands.append(f"({_escape_pdf_text(line)}) Tj")
+        if idx != len(combined) - 1:
+            commands.append("T*")
+    commands.append("ET")
+    stream = "\n".join(commands).encode("utf-8")
+
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+
+    pdf = bytearray()
+    pdf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{index} 0 obj\n".encode("ascii"))
+        pdf.extend(obj)
+        if not obj.endswith(b"\n"):
+            pdf.extend(b"\n")
+        pdf.extend(b"endobj\n")
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.extend(b"trailer\n")
+    pdf.extend(f"<< /Size {len(objects) + 1} /Root 1 0 R >>\n".encode("ascii"))
+    pdf.extend(b"startxref\n")
+    pdf.extend(f"{xref_offset}\n".encode("ascii"))
+    pdf.extend(b"%%EOF\n")
+    return bytes(pdf)
 
 
 def _render_sermon_markdown(
@@ -1564,6 +1652,14 @@ def _render_sermon_csv(
     return _csv_manifest_prefix(manifest) + buffer.getvalue()
 
 
+def _render_sermon_pdf(
+    manifest: DeliverableManifest, response: SermonPrepResponse
+) -> bytes:
+    markdown = _render_sermon_markdown(manifest, response)
+    title = f"Sermon Prep — {response.topic}" if response.topic else None
+    return _render_markdown_pdf(markdown, title=title)
+
+
 def build_sermon_deliverable(
     response: SermonPrepResponse,
     *,
@@ -1605,6 +1701,10 @@ def build_sermon_deliverable(
             body = _render_sermon_csv(manifest, response)
             media_type = "text/csv"
             filename = "sermon.csv"
+        elif fmt == "pdf":
+            body = _render_sermon_pdf(manifest, response)
+            media_type = "application/pdf"
+            filename = "sermon.pdf"
         else:  # pragma: no cover - guarded earlier
             raise ValueError(f"Unsupported format: {fmt}")
         assets.append(
@@ -1678,6 +1778,16 @@ def _render_transcript_csv(
     return _csv_manifest_prefix(manifest) + buffer.getvalue()
 
 
+def _render_transcript_pdf(
+    manifest: DeliverableManifest,
+    title: str | None,
+    rows: Sequence[dict[str, Any]],
+) -> bytes:
+    markdown = _render_transcript_markdown(manifest, title, rows)
+    heading = f"Transcript — {title}" if title else "Transcript"
+    return _render_markdown_pdf(markdown, title=heading)
+
+
 def build_transcript_deliverable(
     session: Session,
     document_id: str,
@@ -1721,6 +1831,10 @@ def build_transcript_deliverable(
             body = _render_transcript_csv(manifest, rows)
             media_type = "text/csv"
             filename = "transcript.csv"
+        elif fmt == "pdf":
+            body = _render_transcript_pdf(manifest, document.title, rows)
+            media_type = "application/pdf"
+            filename = "transcript.pdf"
         else:  # pragma: no cover - guarded earlier
             raise ValueError(f"Unsupported format: {fmt}")
         assets.append(
@@ -1736,7 +1850,7 @@ def build_transcript_deliverable(
 
 def build_sermon_prep_package(
     response: SermonPrepResponse, *, format: str
-) -> tuple[str, str]:
+) -> tuple[str | bytes, str]:
     normalised = format.lower()
     package = build_sermon_deliverable(response, formats=[normalised])
     asset = package.get_asset(normalised)
@@ -1748,7 +1862,7 @@ def build_transcript_package(
     document_id: str,
     *,
     format: str,
-) -> tuple[str, str]:
+) -> tuple[str | bytes, str]:
     normalised = format.lower()
     package = build_transcript_deliverable(session, document_id, formats=[normalised])
     asset = package.get_asset(normalised)
