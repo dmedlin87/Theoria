@@ -77,7 +77,12 @@ def _parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
 
 
 def _parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:
-    content = read_text_file(path)
+    try:
+        content = read_text_file(path)
+    except (UnicodeDecodeError, OSError) as exc:
+        raise UnsupportedSourceError(
+            f"Unable to decode text file '{path.name}'"
+        ) from exc
     if path.suffix.lower() in {".md", ".markdown"}:
         fm, body = _parse_frontmatter_from_markdown(content)
         return body, fm
