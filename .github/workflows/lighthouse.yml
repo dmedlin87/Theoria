@@ -1,0 +1,53 @@
+name: Lighthouse CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  audit:
+    name: Run Lighthouse CI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Lighthouse CI
+        run: npm install --global @lhci/cli@0.15.1
+
+      - name: Run Lighthouse against staging
+        env:
+          LHCI_GITHUB_TOKEN: ${{ secrets.LHCI_GITHUB_TOKEN }}
+          LHCI_BASIC_AUTH_USER: ${{ secrets.STAGING_BASIC_AUTH_USERNAME }}
+          LHCI_BASIC_AUTH_PASSWORD: ${{ secrets.STAGING_BASIC_AUTH_PASSWORD }}
+        run: |
+          rm -rf .lighthouseci/current
+          lhci autorun --config=.lighthouserc.json
+
+      - name: Compare scores with baseline
+        run: node scripts/compare-lighthouse-baseline.mjs
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report-${{ github.run_id }}
+          path: .lighthouseci/current
+          if-no-files-found: error
+          retention-days: 14
