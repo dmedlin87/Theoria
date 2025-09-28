@@ -154,24 +154,24 @@ describe("ContradictionsPanel", () => {
 });
 
 describe("GeoPanel", () => {
+  const baseUrl = "http://127.0.0.1:8000";
+
   beforeEach(() => {
     jest.resetAllMocks();
     global.fetch = jest.fn();
   });
 
   it("renders search results", async () => {
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          osis: "Gen.1.1",
-          places: [],
-          attribution: {
-            source: "OpenBible.info",
-            url: "https://www.openbible.info/geo",
-            license: "CC-BY-4.0",
-            commit_sha: "abcdef1",
-            osm_required: false,
+
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        items: [
+          {
+            name: "Jerusalem",
+            lat: 31.78,
+            lng: 35.21,
+            aliases: ["Jebus"],
           },
         }),
         text: async () => "",
@@ -207,42 +207,53 @@ describe("GeoPanel", () => {
       expect(screen.getByText(/Also known as/)).toHaveTextContent("Jebus");
     });
 
-    expect(global.fetch).toHaveBeenNthCalledWith(
-      1,
-      expect.stringContaining("/research/geo/verse"),
-      expect.objectContaining({ method: "GET" }),
-    );
-    expect(global.fetch).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining("/research/geo/search?query=Jerusalem"),
-      expect.objectContaining({ method: "GET" }),
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${baseUrl}/research/geo/search?query=Jerusalem`,
+      { method: "GET" },
     );
   });
 
   it("renders empty state when no results", async () => {
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ osis: "Gen.1.1", places: [], attribution: null }),
-        text: async () => "",
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ items: [] }),
-        text: async () => "",
-      });
 
-    render(
-      <ModeProvider value="neutral">
-        <GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />
-      </ModeProvider>,
-    );
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [] }),
+      text: async () => "",
+    });
+
+    render(<GeoPanel osis="Gen.1.1" features={{ research: true, geo: true }} />);
 
     fireEvent.change(screen.getByLabelText(/Search locations/i), { target: { value: "Nineveh" } });
     fireEvent.click(screen.getByRole("button", { name: /search/i }));
 
     await waitFor(() => {
       expect(screen.getByText("No locations found.")).toBeInTheDocument();
+    });
+  });
+
+  it("normalizes legacy payloads", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            name: "Hebron",
+            coordinates: { lat: 31.53, lng: 35.09 },
+            aliases: ["Kiriath-arba"],
+          },
+        ],
+      }),
+      text: async () => "",
+    });
+
+    render(<GeoPanel osis="Gen.23.2" features={{ research: true, geo: true }} />);
+
+    fireEvent.change(screen.getByLabelText(/Search locations/i), { target: { value: "Hebron" } });
+    fireEvent.click(screen.getByRole("button", { name: /search/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Hebron")).toBeInTheDocument();
+      expect(screen.getByText(/Coordinates:/i)).toHaveTextContent("31.53, 35.09");
     });
   });
 
