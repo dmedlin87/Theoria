@@ -57,6 +57,7 @@ def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
         assert stored.sha256 is not None
         assert len(passages) >= 1
 
+        assert stored.storage_path is not None
         storage_dir = Path(stored.storage_path)
         assert (storage_dir / "content.txt").exists()
         assert (storage_dir / doc_path.name).exists()
@@ -103,6 +104,7 @@ def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
         assert stored.source_url == "https://example.com/foo"
         assert len(passages) >= 1
 
+        assert stored.storage_path is not None
         storage_dir = Path(stored.storage_path)
         assert (storage_dir / "content.txt").exists()
         assert (storage_dir / "source.html").exists()
