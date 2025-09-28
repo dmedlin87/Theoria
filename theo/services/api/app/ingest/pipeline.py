@@ -39,6 +39,7 @@ from .osis import (
     detect_osis_references,
 )
 from .parsers import (
+    PDF_EXTRACTION_UNSUPPORTED,
     ParserResult,
     TranscriptSegment as ParsedTranscriptSegment,
     load_transcript,
@@ -656,6 +657,10 @@ def _prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
         max_pages=settings.doc_max_pages,
         max_tokens=settings.max_chunk_tokens,
     )
+    if result is PDF_EXTRACTION_UNSUPPORTED:
+        raise UnsupportedSourceError(
+            "Unable to extract text from PDF; the file may be password protected or corrupted."
+        )
     if not result.chunks:
         raise UnsupportedSourceError("PDF contained no extractable text")
     return result
