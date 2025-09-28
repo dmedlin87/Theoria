@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any, Iterator
 from uuid import uuid4
 
@@ -15,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from theo.services.api.app.core.database import Base, get_engine
 from theo.services.api.app.db.seeds import seed_reference_data
+from theo.services.api.app.db.models import IngestionJob
 from theo.services.api.app.routes import ingest, jobs as jobs_module
 
 
@@ -126,6 +129,58 @@ def test_enqueue_endpoint_returns_idempotent_response(
     assert second.status_code == 202
     assert second.json() == first_payload
     assert len(captured) == 1, "Duplicate enqueue should not dispatch twice"
+
+
+def test_enqueue_endpoint_is_concurrent_safe(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    call_lock = Lock()
+    call_count = {"count": 0}
+
+    def fake_send_task(
+        task_name: str,
+        kwargs: dict[str, Any] | None = None,
+        eta: datetime | None = None,
+    ) -> Any:
+        with call_lock:
+            call_count["count"] += 1
+
+        class Result:
+            id = "celery-task-concurrent"
+
+        return Result()
+
+    monkeypatch.setattr(jobs_module.celery, "send_task", fake_send_task)
+
+    payload = {
+        "task": "research.concurrent",
+        "args": {"document_id": "doc-concurrent", "force": False},
+    }
+
+    def _enqueue() -> dict[str, Any]:
+        response = client.post("/jobs/enqueue", json=payload)
+        assert response.status_code == 202, response.text
+        return response.json()
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(lambda _: _enqueue(), range(5)))
+
+    first = results[0]
+    for result in results[1:]:
+        assert result == first
+
+    with Session(get_engine()) as session:
+        job_count = (
+            session.query(IngestionJob)
+            .filter(
+                IngestionJob.job_type == payload["task"],
+                IngestionJob.args_hash == first["args_hash"],
+            )
+            .count()
+        )
+
+    assert job_count == 1
+    assert call_count["count"] == 1
 
 
 def test_topic_digest_job_enqueues(

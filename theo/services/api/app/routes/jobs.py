@@ -12,6 +12,7 @@ from typing import Any, Callable, NotRequired, TypedDict, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from celery.result import AsyncResult
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
@@ -380,6 +381,18 @@ def enqueue_job(
             status_url=f"/jobs/{existing.id}",
         )
 
+    stale_jobs = (
+        session.query(IngestionJob)
+        .filter(
+            IngestionJob.job_type == payload.task,
+            IngestionJob.args_hash == args_hash,
+            IngestionJob.created_at < cutoff,
+        )
+        .all()
+    )
+    for stale in stale_jobs:
+        stale.args_hash = None
+
     schedule_at = payload.schedule_at
     if schedule_at is not None and schedule_at.tzinfo is None:
         schedule_at = schedule_at.replace(tzinfo=UTC)
@@ -395,19 +408,43 @@ def enqueue_job(
         args_hash=args_hash,
         scheduled_at=schedule_at,
     )
-    session.add(job)
-    session.flush()
+    try:
+        session.add(job)
+        session.flush()
 
-    send_kwargs: dict[str, Any] = {
-        key: cast(Any, value) for key, value in args.items()
-    }
-    eta = schedule_at
-    result = celery.send_task(payload.task, kwargs=send_kwargs, eta=eta)
-    task_id = getattr(result, "id", None)
-    if task_id:
-        job.task_id = task_id
+        send_kwargs: dict[str, Any] = {
+            key: cast(Any, value) for key, value in args.items()
+        }
+        eta = schedule_at
+        result = celery.send_task(payload.task, kwargs=send_kwargs, eta=eta)
+        task_id = getattr(result, "id", None)
+        if task_id:
+            job.task_id = task_id
 
-    session.commit()
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        existing = (
+            session.query(IngestionJob)
+            .filter(
+                IngestionJob.job_type == payload.task,
+                IngestionJob.args_hash == args_hash,
+                IngestionJob.created_at >= cutoff,
+            )
+            .order_by(IngestionJob.created_at.desc())
+            .first()
+        )
+        if existing is None:
+            raise
+        return JobEnqueueResponse(
+            job_id=existing.id,
+            task=existing.job_type,
+            args_hash=args_hash,
+            queued_at=existing.created_at,
+            schedule_at=existing.scheduled_at,
+            status_url=f"/jobs/{existing.id}",
+        )
+
     session.refresh(job)
 
     return JobEnqueueResponse(

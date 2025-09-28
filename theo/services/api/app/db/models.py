@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -156,6 +157,16 @@ class IngestionJob(Base):
     """Track asynchronous ingestion and enrichment work."""
 
     __tablename__ = "ingestion_jobs"
+    __table_args__ = (
+        Index(
+            "uq_ingestion_jobs_job_type_args_hash",
+            "job_type",
+            "args_hash",
+            unique=True,
+            postgresql_where=text("args_hash IS NOT NULL"),
+            sqlite_where=text("args_hash IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
