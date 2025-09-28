@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.core.database import Base, get_session
 from theo.services.api.app.db.models import Document, Passage
 from theo.services.api.app.main import app
+from theo.services.api.app.routes.ai import _CSL_TYPE_MAP, _build_csl_entry
 
 
 @pytest.fixture()
@@ -148,3 +149,24 @@ def test_export_citations_reports_missing_document(client: TestClient) -> None:
         },
     )
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "source_type, expected",
+    [
+        ("sermon", _CSL_TYPE_MAP["sermon"]),
+        ("video", _CSL_TYPE_MAP["video"]),
+        ("web", _CSL_TYPE_MAP["web"]),
+        ("unknown", "article-journal"),
+    ],
+)
+def test_build_csl_entry_uses_expected_type(source_type: str, expected: str) -> None:
+    record = {
+        "document_id": "doc-type-test",
+        "title": "CSL Type Sample",
+        "source_type": source_type,
+    }
+
+    entry = _build_csl_entry(record, citations=[])
+
+    assert entry["type"] == expected
