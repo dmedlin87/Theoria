@@ -334,6 +334,13 @@ describe("GeoPanel", () => {
       expect(screen.getByText(/Geodata ©/)).toHaveTextContent("commit abcdef1");
       expect(screen.getByText(/Licensed ODbL/)).toBeInTheDocument();
     });
+
+    expect(
+      screen.getByRole("link", { name: "OpenBible.info" }),
+    ).toHaveAttribute("rel", "noopener noreferrer");
+    expect(
+      screen.getByRole("link", { name: "OpenStreetMap contributors" }),
+    ).toHaveAttribute("rel", "noopener noreferrer");
   });
 });
 
