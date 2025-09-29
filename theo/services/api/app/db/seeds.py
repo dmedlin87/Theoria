@@ -84,18 +84,21 @@ def seed_contradiction_claims(session: Session) -> None:
         if not osis_a or not osis_b:
             continue
         source = entry.get("source") or "community"
-        perspective = (entry.get("perspective") or "skeptical").strip().lower()
+        perspective_raw = entry.get("perspective")
+        perspective = (perspective_raw or "skeptical").strip().lower()
+
+        identifier_parts = [
+            str(osis_a).lower(),
+            str(osis_b).lower(),
+            source.lower(),
+        ]
+        if perspective_raw:
+            identifier_parts.append(perspective)
+
         identifier = str(
             uuid5(
                 CONTRADICTION_NAMESPACE,
-                "|".join(
-                    [
-                        str(osis_a).lower(),
-                        str(osis_b).lower(),
-                        source.lower(),
-                        perspective,
-                    ]
-                ),
+                "|".join(identifier_parts),
             )
         )
         seen_ids.add(identifier)
