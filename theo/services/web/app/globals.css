@@ -409,6 +409,36 @@ section + section {
   gap: 1rem;
 }
 
+.chat-session-controls {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  flex-wrap: wrap;
+}
+
+.chat-session-controls button {
+  background: transparent;
+  border: 1px solid rgba(52, 84, 245, 0.25);
+  border-radius: 999px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.chat-session-controls button:hover:enabled,
+.chat-session-controls button:focus-visible {
+  background-color: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.chat-session-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .chat-message {
   display: grid;
   gap: 0.4rem;

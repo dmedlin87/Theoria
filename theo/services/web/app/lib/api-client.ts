@@ -5,6 +5,38 @@ type ExportDeliverableResponse = components["schemas"]["ExportDeliverableRespons
 type ResearchModeId = import("../mode-config").ResearchModeId;
 type RAGAnswer = import("../copilot/components/types").RAGAnswer;
 type RAGCitation = import("../copilot/components/types").RAGCitation;
+export type HybridSearchFilters = components["schemas"]["HybridSearchFilters"];
+
+export type ChatSessionPreferencesPayload = {
+  mode?: string | null;
+  defaultFilters?: HybridSearchFilters | null;
+  frequentlyOpenedPanels?: string[];
+};
+
+export type ChatSessionMemoryEntry = {
+  question: string;
+  answer: string;
+  answerSummary?: string | null;
+  citations: RAGCitation[];
+  documentIds: string[];
+  createdAt: string;
+};
+
+export type ChatSessionState = {
+  sessionId: string;
+  stance?: string | null;
+  summary?: string | null;
+  documentIds: string[];
+  preferences?: {
+    mode?: string | null;
+    defaultFilters?: HybridSearchFilters | null;
+    frequentlyOpenedPanels: string[];
+  } | null;
+  memory: ChatSessionMemoryEntry[];
+  createdAt: string;
+  updatedAt: string;
+  lastInteractionAt: string;
+};
 
 export type ChatWorkflowMessage = {
   role: "user" | "assistant" | "system";
@@ -17,6 +49,8 @@ export type ChatWorkflowRequest = {
   sessionId?: string | null;
   prompt?: string | null;
   osis?: string | null;
+  filters?: HybridSearchFilters | null;
+  preferences?: ChatSessionPreferencesPayload | null;
 };
 
 export type ChatWorkflowStreamEvent =
@@ -189,6 +223,93 @@ function normaliseChatCompletion(
   return { kind: "success", sessionId, answer };
 }
 
+function normaliseChatSessionState(payload: unknown): ChatSessionState | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  const sessionId = toOptionalString(record.session_id ?? record.sessionId ?? record.id);
+  if (!sessionId) {
+    return null;
+  }
+  const stance = toOptionalString(record.stance);
+  const summary = toOptionalString(record.summary);
+  const createdAt = toOptionalString(record.created_at ?? record.createdAt);
+  const updatedAt = toOptionalString(record.updated_at ?? record.updatedAt);
+  const lastInteractionAt = toOptionalString(record.last_interaction_at ?? record.lastInteractionAt);
+
+  const documentIds = Array.isArray(record.document_ids ?? record.documentIds)
+    ? (record.document_ids ?? record.documentIds)
+        .map((value: unknown) => toOptionalString(value))
+        .filter((value): value is string => Boolean(value))
+    : [];
+
+  const memoryItems = Array.isArray(record.memory) ? record.memory : [];
+  const memory: ChatSessionMemoryEntry[] = [];
+  for (const item of memoryItems) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const data = item as Record<string, unknown>;
+    const question = toOptionalString(data.question);
+    const answer = toOptionalString(data.answer);
+    if (!question || !answer) {
+      continue;
+    }
+    const answerSummary = toOptionalString(data.answer_summary ?? data.answerSummary ?? null);
+    const created = toOptionalString(data.created_at ?? data.createdAt) ?? new Date().toISOString();
+    const citationsRaw = Array.isArray(data.citations) ? data.citations : [];
+    const citations: RAGCitation[] = citationsRaw
+      .map((citation) => normaliseCitation(citation))
+      .filter((value): value is RAGCitation => value != null);
+    const documentIdsEntry = Array.isArray(data.document_ids ?? data.documentIds)
+      ? (data.document_ids ?? data.documentIds)
+          .map((value: unknown) => toOptionalString(value))
+          .filter((value): value is string => Boolean(value))
+      : [];
+    memory.push({
+      question,
+      answer,
+      answerSummary,
+      citations,
+      documentIds: documentIdsEntry,
+      createdAt: created,
+    });
+  }
+
+  let preferences: ChatSessionState["preferences"] = null;
+  if (record.preferences && typeof record.preferences === "object") {
+    const pref = record.preferences as Record<string, unknown>;
+    const mode = toOptionalString(pref.mode);
+    const defaultFilters = pref.default_filters ?? pref.defaultFilters ?? null;
+    const panelsSource = pref.frequently_opened_panels ?? pref.frequentlyOpenedPanels;
+    const frequentlyOpenedPanels = Array.isArray(panelsSource)
+      ? panelsSource
+          .map((value: unknown) => toOptionalString(value))
+          .filter((value): value is string => Boolean(value))
+      : [];
+    preferences = {
+      mode,
+      defaultFilters: (defaultFilters ?? null) as HybridSearchFilters | null,
+      frequentlyOpenedPanels,
+    };
+  }
+
+  const fallbackTimestamp = new Date().toISOString();
+
+  return {
+    sessionId,
+    stance,
+    summary,
+    documentIds,
+    preferences,
+    memory,
+    createdAt: createdAt ?? fallbackTimestamp,
+    updatedAt: updatedAt ?? createdAt ?? fallbackTimestamp,
+    lastInteractionAt: lastInteractionAt ?? updatedAt ?? createdAt ?? fallbackTimestamp,
+  };
+}
+
 function interpretStreamChunk(
   chunk: unknown,
   fallbackSessionId: string | null,
@@ -321,18 +442,31 @@ export class TheoApiClient {
     const requestBody: Record<string, unknown> = {
       messages: payload.messages,
       session_id: payload.sessionId ?? null,
-      stance: payload.modeId,
       mode: payload.modeId,
       mode_id: payload.modeId,
     };
+    const stance = payload.preferences?.mode ?? payload.modeId;
+    if (stance) {
+      requestBody.stance = stance;
+    }
     if (payload.prompt != null) {
       requestBody.prompt = payload.prompt;
     }
     if (payload.osis != null) {
       requestBody.osis = payload.osis;
     }
+    if (payload.filters) {
+      requestBody.filters = payload.filters;
+    }
+    if (payload.preferences) {
+      requestBody.preferences = {
+        mode: payload.preferences.mode ?? stance ?? null,
+        default_filters: payload.preferences.defaultFilters ?? null,
+        frequently_opened_panels: payload.preferences.frequentlyOpenedPanels ?? [],
+      };
+    }
 
-    const response = await fetch(`${this.baseUrl}/ai/workflows/chat`, {
+    const response = await fetch(`${this.baseUrl}/ai/chat`, {
       method: "POST",
       cache: "no-store",
       headers: {
@@ -469,6 +603,12 @@ export class TheoApiClient {
     }
 
     throw new Error("Unexpected chat workflow response.");
+  }
+
+  async fetchChatSession(sessionId: string): Promise<ChatSessionState | null> {
+    const payload = await this.request(`/ai/chat/${encodeURIComponent(sessionId)}`);
+    const normalised = normaliseChatSessionState(payload);
+    return normalised;
   }
 
   runVerseWorkflow(payload: {
@@ -654,4 +794,4 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClient {
   return new TheoApiClient(baseUrl);
 }
 
-export type ChatWorkflowClient = Pick<TheoApiClient, "runChatWorkflow">;
+export type ChatWorkflowClient = Pick<TheoApiClient, "runChatWorkflow" | "fetchChatSession">;

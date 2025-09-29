@@ -714,6 +714,7 @@ def _guarded_answer(
     model_hint: str | None = None,
     recorder: "TrailRecorder | None" = None,
     filters: HybridSearchFilters | None = None,
+    memory_context: Sequence[str] | None = None,
     allow_fallback: bool = False,
 ) -> RAGAnswer:
     ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
@@ -773,6 +774,12 @@ def _guarded_answer(
         "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
         "If the passages do not answer the question, state that explicitly.",
     ]
+    if memory_context:
+        prompt_parts.append("Prior conversation highlights:")
+        for idx, snippet in enumerate(memory_context, start=1):
+            sanitized = _scrub_adversarial_language(snippet) or ""
+            if sanitized:
+                prompt_parts.append(f"{idx}. {sanitized}")
     sanitized_question = _scrub_adversarial_language(question)
     if sanitized_question:
         prompt_parts.append(f"Question: {sanitized_question}")
@@ -1160,6 +1167,7 @@ def _guarded_answer_or_refusal(
     model_hint: str | None = None,
     recorder: "TrailRecorder | None" = None,
     filters: HybridSearchFilters | None = None,
+    memory_context: Sequence[str] | None = None,
 ) -> RAGAnswer:
     try:
         return _guarded_answer(
@@ -1170,6 +1178,7 @@ def _guarded_answer_or_refusal(
             model_hint=model_hint,
             recorder=recorder,
             filters=filters,
+            memory_context=memory_context,
         )
     except GuardrailError as exc:
         if not getattr(exc, "safe_refusal", False):
@@ -1203,6 +1212,7 @@ def run_guarded_chat(
     filters: HybridSearchFilters | None = None,
     model_name: str | None = None,
     recorder: "TrailRecorder | None" = None,
+    memory_context: Sequence[str] | None = None,
 ) -> RAGAnswer:
     filters = filters or HybridSearchFilters()
     with instrument_workflow(
@@ -1253,6 +1263,7 @@ def run_guarded_chat(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            memory_context=memory_context,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
