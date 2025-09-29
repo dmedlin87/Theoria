@@ -169,7 +169,9 @@ def test_refresh_creator_rollups_helper_handles_async_failure(
     settings.creator_verse_rollups_async_refresh = True
     try:
         from theo.services.api.app.workers import tasks as worker_tasks
-        from theo.services.api.app.ingest.pipeline import _refresh_creator_verse_rollups
+        from theo.services.api.app.ingest.pipeline.persistence import (
+            refresh_creator_verse_rollups,
+        )
 
         recorded: list[list[str]] = []
 
@@ -199,7 +201,7 @@ def test_refresh_creator_rollups_helper_handles_async_failure(
             cast(TranscriptSegment, SimpleNamespace(osis_refs=["John.3.6", "John.3.5"]))
         ]
 
-        _refresh_creator_verse_rollups(session_stub, segments)
+        refresh_creator_verse_rollups(session_stub, segments)
 
         assert recorded and sorted(recorded[0]) == ["John.3.5", "John.3.6"]
         assert service_calls and service_calls[0] == ["John.3.5", "John.3.6"]

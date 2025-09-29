@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_session
 from ..core.settings import get_settings
-from ..ingest.pipeline import (
-    UnsupportedSourceError,
+from ..ingest.pipeline.exceptions import UnsupportedSourceError
+from ..ingest.pipeline.orchestrator import (
     run_pipeline_for_file,
     run_pipeline_for_transcript,
     run_pipeline_for_url,

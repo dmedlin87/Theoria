@@ -18,7 +18,10 @@ from urllib.parse import urlparse
 from ..api.app.core.database import get_engine
 from ..api.app.db.models import Document
 from ..api.app.enrich import MetadataEnricher
-from ..api.app.ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
+from ..api.app.ingest.pipeline.orchestrator import (
+    run_pipeline_for_file,
+    run_pipeline_for_url,
+)
 from ..api.app.workers import tasks as worker_tasks
 from ..api.app.telemetry import log_workflow_event
 

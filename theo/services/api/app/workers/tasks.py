@@ -31,7 +31,10 @@ from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import Document, IngestionJob, Passage
 from ..db.types import VectorType
 from ..enrich import MetadataEnricher
-from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
+from ..ingest.pipeline.orchestrator import (
+    run_pipeline_for_file,
+    run_pipeline_for_url,
+)
 
 logger = get_task_logger(__name__)
 
