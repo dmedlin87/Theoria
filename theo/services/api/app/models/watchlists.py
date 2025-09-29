@@ -46,7 +46,6 @@ class WatchlistResponse(APIModel):
 class WatchlistCreateRequest(APIModel):
     """Payload required to create a new watchlist."""
 
-    user_id: str
     name: str
     filters: WatchlistFilters | None = None
     cadence: str = "daily"

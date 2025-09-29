@@ -15,6 +15,7 @@ from ...models.watchlists import (
     WatchlistRunResponse,
     WatchlistUpdateRequest,
 )
+from ...security import Principal, require_principal
 
 
 _WATCHLIST_NOT_FOUND_RESPONSE = {
@@ -29,19 +30,30 @@ def _service(session: Session) -> WatchlistsService:
     return WatchlistsService(session)
 
 
+def _require_user_subject(principal: Principal) -> str:
+    subject = principal.get("subject")
+    if not subject:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    return subject
+
+
 @router.get("", response_model=list[WatchlistResponse])
 def list_user_watchlists(
-    user_id: str = Query(..., description="Owning user identifier"),
+    principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
 ) -> list[WatchlistResponse]:
+    user_id = _require_user_subject(principal)
     return _service(session).list(user_id)
 
 
 @router.post("", response_model=WatchlistResponse, status_code=status.HTTP_201_CREATED)
 def create_user_watchlist(
-    payload: WatchlistCreateRequest, session: Session = Depends(get_session)
+    payload: WatchlistCreateRequest,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
 ) -> WatchlistResponse:
-    return _service(session).create(payload)
+    user_id = _require_user_subject(principal)
+    return _service(session).create(user_id, payload)
 
 
 @router.patch(
@@ -52,10 +64,12 @@ def create_user_watchlist(
 def update_user_watchlist(
     watchlist_id: str,
     payload: WatchlistUpdateRequest,
+    principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
 ) -> WatchlistResponse:
     try:
-        return _service(session).update(watchlist_id, payload)
+        user_id = _require_user_subject(principal)
+        return _service(session).update(watchlist_id, payload, user_id)
     except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
 
@@ -67,10 +81,13 @@ def update_user_watchlist(
     responses=_WATCHLIST_NOT_FOUND_RESPONSE,
 )
 def delete_user_watchlist(
-    watchlist_id: str, session: Session = Depends(get_session)
+    watchlist_id: str,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
 ) -> Response:
     try:
-        _service(session).delete(watchlist_id)
+        user_id = _require_user_subject(principal)
+        _service(session).delete(watchlist_id, user_id)
     except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -86,10 +103,12 @@ def list_user_watchlist_events(
     since: datetime | None = Query(
         default=None, description="Return events generated after this timestamp"
     ),
+    principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
 ) -> list[WatchlistRunResponse]:
     try:
-        return _service(session).list_events(watchlist_id, since=since)
+        user_id = _require_user_subject(principal)
+        return _service(session).list_events(watchlist_id, user_id, since=since)
     except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
 
@@ -100,10 +119,13 @@ def list_user_watchlist_events(
     responses=_WATCHLIST_NOT_FOUND_RESPONSE,
 )
 def preview_user_watchlist(
-    watchlist_id: str, session: Session = Depends(get_session)
+    watchlist_id: str,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
 ) -> WatchlistRunResponse:
     try:
-        return _service(session).preview(watchlist_id)
+        user_id = _require_user_subject(principal)
+        return _service(session).preview(watchlist_id, user_id)
     except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
 
@@ -114,10 +136,13 @@ def preview_user_watchlist(
     responses=_WATCHLIST_NOT_FOUND_RESPONSE,
 )
 def run_user_watchlist(
-    watchlist_id: str, session: Session = Depends(get_session)
+    watchlist_id: str,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
 ) -> WatchlistRunResponse:
     try:
-        return _service(session).run(watchlist_id)
+        user_id = _require_user_subject(principal)
+        return _service(session).run(watchlist_id, user_id)
     except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Watchlist not found") from exc
 
