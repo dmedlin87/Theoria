@@ -27,6 +27,26 @@ pip install -r requirements.txt
 
 After the dependencies are installed you can run `pytest` from the repository root to execute the automated test suite.
 
+## Resetting and reseeding the API database
+
+Use the bundled helper to rebuild the schema, apply the raw SQL migrations, seed reference
+datasets, and verify the API is able to return the seeded contradiction data. The script accepts
+optional overrides for the database URL, migration directory, log level, and smoke test OSIS
+reference.
+
+```bash
+# Unix-like environments
+./scripts/reset_reseed_smoke.py --log-level DEBUG
+
+# Windows PowerShell
+./scripts/reset-reseed-smoke.ps1 -LogLevel DEBUG
+```
+
+Both variants default to a local SQLite database. Provide `--database-url`/`-DatabaseUrl` when
+testing against Postgres or other backends. The helper performs an authenticated GET request using
+an API key supplied via `--api-key`/`-ApiKey` (defaults to `local-reset-key`) to confirm the
+`/research/contradictions` endpoint returns data after seeding.
+
 ## Configuring topic digest notifications
 
 Background workers can send a webhook each time a topic digest is generated. Configure the delivery endpoint via environment variables (they map directly to fields in `Settings`).
