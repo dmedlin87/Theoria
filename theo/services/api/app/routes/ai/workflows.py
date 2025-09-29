@@ -30,13 +30,15 @@ from ...ai.registry import LLMModel, LLMRegistry, save_llm_registry
 from ...ai.trails import TrailService
 from ...core.database import get_session
 from ...core.settings_store import load_setting, save_setting
-from ...db.models import Document, Passage
+from ...db.models import ChatSession, Document, Passage
 from ...export.formatters import build_document_export
 from ...models.ai import (
     AIFeaturesResponse,
     ChatSessionMessage,
+    ChatSessionPreferences,
     ChatSessionRequest,
     ChatSessionResponse,
+    ChatSessionState,
     CHAT_SESSION_TOTAL_CHAR_BUDGET,
     CitationExportRequest,
     CitationExportResponse,
@@ -59,12 +61,13 @@ from ...models.ai import (
     DEFAULT_GUARDRAIL_SETTINGS,
 )
 from ...models.base import Passage as PassageSchema
-from ...models.export import serialise_asset_content
 from ...models.documents import DocumentDetailResponse
 from ...models.export import (
     DocumentExportFilters,
     DocumentExportResponse,
+    serialise_asset_content,
 )
+from ...models.search import HybridSearchFilters
 
 _BAD_REQUEST_RESPONSE = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
@@ -506,6 +509,115 @@ def _extract_refusal_text(answer: RAGAnswer) -> str:
     return completion
 
 
+def _clean_memory_snippets(snippets: Sequence[str] | None) -> list[str]:
+    cleaned: list[str] = []
+    if not snippets:
+        return cleaned
+    for snippet in snippets:
+        if isinstance(snippet, str):
+            text = snippet.strip()
+            if text:
+                cleaned.append(text)
+    return cleaned
+
+
+def _select_memory_for_prompt(
+    snippets: Sequence[str] | None, available_budget: int
+) -> list[str]:
+    cleaned = _clean_memory_snippets(snippets)
+    if not cleaned or available_budget <= 0:
+        return []
+    selected: list[str] = []
+    remaining = available_budget
+    for snippet in reversed(cleaned):
+        text = snippet
+        if len(text) > remaining:
+            text = text[-remaining:]
+        length = len(text)
+        if length <= 0:
+            continue
+        selected.append(text)
+        remaining -= length
+        if remaining <= 0:
+            break
+    selected.reverse()
+    return selected
+
+
+def _merge_memory_snippets(
+    existing: Sequence[str] | None, new_snippet: str, budget: int
+) -> list[str]:
+    cleaned_existing = _clean_memory_snippets(existing)
+    snippet = new_snippet.strip()
+    if not snippet:
+        return cleaned_existing
+    if budget <= 0:
+        return []
+    if len(snippet) > budget:
+        snippet = snippet[-budget:]
+    cleaned_existing.append(snippet)
+    merged: list[str] = []
+    remaining = budget
+    for entry in reversed(cleaned_existing):
+        text = entry
+        if len(text) > budget:
+            text = text[-budget:]
+        length = len(text)
+        if length > remaining:
+            text = text[-remaining:]
+            length = len(text)
+        if length <= 0:
+            continue
+        merged.append(text)
+        remaining -= length
+        if remaining <= 0:
+            break
+    merged.reverse()
+    return merged
+
+
+def _derive_stance(filters: HybridSearchFilters | None) -> str | None:
+    if filters is None:
+        return None
+    parts: list[str] = []
+    if filters.theological_tradition:
+        parts.append(f"Tradition: {filters.theological_tradition}")
+    if filters.topic_domain:
+        parts.append(f"Domain: {filters.topic_domain}")
+    if not parts:
+        return None
+    return " | ".join(parts)
+
+
+def _build_session_preferences(
+    record: ChatSession,
+) -> ChatSessionPreferences | None:
+    default_filters_payload = record.default_filters
+    default_filters: HybridSearchFilters | None = None
+    if isinstance(default_filters_payload, Mapping):
+        try:
+            default_filters = HybridSearchFilters.model_validate(
+                default_filters_payload
+            )
+        except Exception:  # pragma: no cover - defensive guard
+            default_filters = HybridSearchFilters()
+    if default_filters and not default_filters.model_dump(exclude_none=True):
+        default_filters = None
+    if not any(
+        [
+            record.mode,
+            default_filters,
+            record.frequently_opened_panels,
+        ]
+    ):
+        return None
+    return ChatSessionPreferences(
+        mode=record.mode,
+        default_filters=default_filters,
+        frequently_opened_panels=record.frequently_opened_panels or None,
+    )
+
+
 @router.post(
     "/chat",
     response_model=ChatSessionResponse,
@@ -534,6 +646,20 @@ def chat_turn(
         raise HTTPException(status_code=400, detail="user message cannot be blank")
 
     session_id = payload.session_id or str(uuid4())
+    existing_chat_session = session.get(ChatSession, session_id)
+    available_memory_budget = max(
+        CHAT_SESSION_TOTAL_CHAR_BUDGET - total_message_chars, 0
+    )
+    memory_for_prompt = _select_memory_for_prompt(
+        existing_chat_session.memory_snippets if existing_chat_session else None,
+        available_memory_budget,
+    )
+    recorder_user_id = (
+        payload.recorder_metadata.user_id
+        if payload.recorder_metadata
+        else None
+    )
+
     trail_service = TrailService(session)
 
     message: ChatSessionMessage | None = None
@@ -558,6 +684,7 @@ def chat_turn(
                 filters=payload.filters,
                 model_name=payload.model,
                 recorder=recorder,
+                memory_snippets=memory_for_prompt,
             )
             ensure_completion_safe(answer.model_output or answer.summary)
             message_text = _extract_refusal_text(answer)
@@ -577,7 +704,80 @@ def chat_turn(
     if message is None or answer is None:
         raise HTTPException(status_code=500, detail="failed to compose chat response")
 
+    chat_session_record = existing_chat_session or ChatSession(id=session_id)
+    now = datetime.now(UTC)
+    if chat_session_record.user_id is None and recorder_user_id:
+        chat_session_record.user_id = recorder_user_id
+    preferred_mode = (
+        payload.preferences.mode
+        if payload.preferences and payload.preferences.mode
+        else None
+    )
+    if preferred_mode:
+        chat_session_record.mode = preferred_mode
+    elif payload.model:
+        chat_session_record.mode = payload.model
+    chat_session_record.summary = answer.summary
+    stance = _derive_stance(payload.filters)
+    if (not stance) and payload.preferences and payload.preferences.default_filters:
+        stance = _derive_stance(payload.preferences.default_filters)
+    chat_session_record.stance = stance
+    chat_session_record.linked_document_ids = sorted(
+        {
+            citation.document_id
+            for citation in answer.citations
+            if citation.document_id
+        }
+    )
+    transcript_snippet = f"User: {question}\nAssistant: {message.content}" if message else question
+    chat_session_record.memory_snippets = _merge_memory_snippets(
+        chat_session_record.memory_snippets,
+        transcript_snippet,
+        CHAT_SESSION_TOTAL_CHAR_BUDGET,
+    )
+    default_filters_payload: dict[str, Any] | None = None
+    if payload.preferences and payload.preferences.default_filters is not None:
+        default_filters_payload = (
+            payload.preferences.default_filters.model_dump(exclude_none=True)
+        )
+    else:
+        default_filters_payload = payload.filters.model_dump(exclude_none=True)
+    chat_session_record.default_filters = default_filters_payload or None
+    if payload.preferences is not None:
+        panels = payload.preferences.frequently_opened_panels
+        chat_session_record.frequently_opened_panels = panels or None
+    chat_session_record.last_turn_at = now
+    chat_session_record.updated_at = now
+    session.add(chat_session_record)
+    session.commit()
+
     return ChatSessionResponse(session_id=session_id, message=message, answer=answer)
+
+
+@router.get(
+    "/chat/{session_id}",
+    response_model=ChatSessionState,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
+)
+def get_chat_session(
+    session_id: str, session: Session = Depends(get_session)
+) -> ChatSessionState:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="chat session not found")
+    preferences = _build_session_preferences(record)
+    return ChatSessionState(
+        session_id=record.id,
+        summary=record.summary,
+        stance=record.stance,
+        linked_document_ids=list(record.linked_document_ids or []),
+        memory_snippets=_clean_memory_snippets(record.memory_snippets),
+        preferences=preferences,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        last_turn_at=record.last_turn_at,
+    )
 
 
 _PROVIDER_SETTINGS_KEY = "ai_providers"

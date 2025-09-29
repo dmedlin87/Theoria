@@ -707,6 +707,8 @@ def _guarded_answer(
     model_hint: str | None = None,
     recorder: "TrailRecorder | None" = None,
     filters: HybridSearchFilters | None = None,
+    requested_osis: str | None = None,
+    memory_snippets: Sequence[str] | None = None,
 ) -> RAGAnswer:
     ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
     citations = _build_citations(ordered_results)
@@ -720,6 +722,9 @@ def _guarded_answer(
         raise GuardrailError(
             "Retrieved passages lacked OSIS references; aborting generation"
         )
+
+    if requested_osis and all(citation.osis != requested_osis for citation in citations):
+        raise GuardrailError("Retrieved passages did not match the requested OSIS reference")
 
     cited_results = [result for result in ordered_results if result.osis_ref]
     summary_lines = []
@@ -765,6 +770,13 @@ def _guarded_answer(
         "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
         "If the passages do not answer the question, state that explicitly.",
     ]
+    if memory_snippets:
+        prompt_parts.append("Prior conversation context:")
+        for snippet in memory_snippets:
+            sanitized = _scrub_adversarial_language(snippet)
+            if not sanitized:
+                continue
+            prompt_parts.append(f"- {sanitized.strip()}")
     sanitized_question = _scrub_adversarial_language(question)
     if sanitized_question:
         prompt_parts.append(f"Question: {sanitized_question}")
@@ -1068,6 +1080,7 @@ def run_guarded_chat(
     filters: HybridSearchFilters | None = None,
     model_name: str | None = None,
     recorder: "TrailRecorder | None" = None,
+    memory_snippets: Sequence[str] | None = None,
 ) -> RAGAnswer:
     filters = filters or HybridSearchFilters()
     with instrument_workflow(
@@ -1117,6 +1130,8 @@ def run_guarded_chat(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            requested_osis=osis,
+            memory_snippets=memory_snippets,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -1189,6 +1204,7 @@ def generate_verse_brief(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            requested_osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -1275,6 +1291,7 @@ def generate_sermon_prep_outline(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            requested_osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -1348,6 +1365,7 @@ def generate_comparative_analysis(
             registry=registry,
             model_hint=model_name,
             filters=filters,
+            requested_osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1496,6 +1514,7 @@ def generate_devotional_flow(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            requested_osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(

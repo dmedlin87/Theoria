@@ -2,6 +2,46 @@ import { getApiBaseUrl } from "./api";
 import type { components } from "./generated/api";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
+type HybridSearchFilters = components["schemas"]["HybridSearchFilters"];
+type RAGAnswer = components["schemas"]["RAGAnswer"];
+
+export type ChatSessionMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+export type ChatSessionPreferences = {
+  mode?: string | null;
+  default_filters?: HybridSearchFilters | null;
+  frequently_opened_panels?: string[] | null;
+};
+
+export type ChatSessionResponse = {
+  session_id: string;
+  message: ChatSessionMessage;
+  answer: RAGAnswer;
+};
+
+export type ChatSessionState = {
+  session_id: string;
+  summary?: string | null;
+  stance?: string | null;
+  linked_document_ids: string[];
+  memory_snippets: string[];
+  preferences?: ChatSessionPreferences | null;
+  created_at: string;
+  updated_at: string;
+  last_turn_at?: string | null;
+};
+
+export type ChatTurnRequest = {
+  messages: ChatSessionMessage[];
+  sessionId?: string | null;
+  model?: string | null;
+  osis?: string | null;
+  filters?: Partial<HybridSearchFilters> | null;
+  preferences?: ChatSessionPreferences | null;
+};
 
 function normaliseExportResponse(
   payload: ExportDeliverableResponse,
@@ -86,6 +126,35 @@ export class TheoApiClient {
 
   fetchFeatures(): Promise<Record<string, boolean>> {
     return this.request<Record<string, boolean>>("/features/");
+  }
+
+  runChatTurn(payload: ChatTurnRequest): Promise<ChatSessionResponse> {
+    const body: Record<string, unknown> = {
+      messages: payload.messages,
+    };
+    if (payload.sessionId) {
+      body.session_id = payload.sessionId;
+    }
+    if (payload.model) {
+      body.model = payload.model;
+    }
+    if (payload.osis) {
+      body.osis = payload.osis;
+    }
+    if (payload.filters) {
+      body.filters = payload.filters;
+    }
+    if (payload.preferences) {
+      body.preferences = payload.preferences;
+    }
+    return this.request("/ai/chat", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  fetchChatSession(sessionId: string): Promise<ChatSessionState> {
+    return this.request(`/ai/chat/${encodeURIComponent(sessionId)}`);
   }
 
   runVerseWorkflow(payload: {

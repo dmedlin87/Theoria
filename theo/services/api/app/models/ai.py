@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal, Sequence
 
 from pydantic import AliasChoices, Field, model_validator
@@ -67,6 +68,24 @@ class ChatSessionMessage(APIModel):
     content: str
 
 
+class ChatSessionPreferences(APIModel):
+    mode: str | None = None
+    default_filters: HybridSearchFilters | None = None
+    frequently_opened_panels: list[str] | None = None
+
+
+class ChatSessionState(APIModel):
+    session_id: str
+    summary: str | None = None
+    stance: str | None = None
+    linked_document_ids: list[str] = Field(default_factory=list)
+    memory_snippets: list[str] = Field(default_factory=list)
+    preferences: ChatSessionPreferences | None = None
+    created_at: datetime
+    updated_at: datetime
+    last_turn_at: datetime | None = None
+
+
 class ChatSessionRequest(APIModel):
     messages: Sequence[ChatSessionMessage]
     session_id: str | None = None
@@ -74,6 +93,7 @@ class ChatSessionRequest(APIModel):
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     recorder_metadata: RecorderMetadata | None = None
+    preferences: ChatSessionPreferences | None = None
 
     @model_validator(mode="after")
     def _enforce_message_lengths(self) -> "ChatSessionRequest":
@@ -299,6 +319,8 @@ __all__ = [
     "ComparativeAnalysisRequest",
     "DevotionalRequest",
     "ChatSessionMessage",
+    "ChatSessionPreferences",
+    "ChatSessionState",
     "ChatSessionRequest",
     "ChatSessionResponse",
     "RecorderMetadata",

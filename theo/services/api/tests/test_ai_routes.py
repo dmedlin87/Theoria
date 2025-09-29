@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.core.database import get_engine
-from theo.services.api.app.db.models import AgentTrail, Document, Passage
+from theo.services.api.app.db.models import AgentTrail, ChatSession, Document, Passage
 from theo.services.api.app.main import app
 from theo.services.cli.batch_intel import main as batch_intel_main
 
@@ -185,7 +185,14 @@ def test_chat_session_returns_guarded_answer_and_trail() -> None:
                     {"role": "user", "content": "Summarise John 1:1 from the library"}
                 ],
                 "osis": "John.1.1",
+                "model": "echo",
+                "filters": {"collection": "Gospels"},
                 "recorder_metadata": {"user_id": "chat-user"},
+                "preferences": {
+                    "mode": "echo",
+                    "default_filters": {"collection": "Gospels"},
+                    "frequently_opened_panels": ["citations", "sources"],
+                },
             },
         )
         assert response.status_code == 200, response.text
@@ -209,6 +216,19 @@ def test_chat_session_returns_guarded_answer_and_trail() -> None:
             )
             assert trail is not None
             assert trail.user_id == "chat-user"
+            chat_session = session.get(ChatSession, payload["session_id"])
+            assert chat_session is not None
+            assert chat_session.summary
+            assert chat_session.mode == "echo"
+            assert chat_session.frequently_opened_panels == [
+                "citations",
+                "sources",
+            ]
+            assert chat_session.memory_snippets
+            assert any(
+                "Summarise John 1:1" in snippet for snippet in chat_session.memory_snippets
+            )
+            assert chat_session.linked_document_ids
 
 
 def test_chat_turn_guardrail_failure_returns_422() -> None:
@@ -226,6 +246,80 @@ def test_chat_turn_guardrail_failure_returns_422() -> None:
             },
         )
         assert response.status_code == 422
+
+
+def test_get_chat_session_returns_preferences_and_memory() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        post_response = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {"role": "user", "content": "Share two highlights from John 1:1"}
+                ],
+                "model": "echo",
+                "filters": {"collection": "Gospels"},
+                "preferences": {
+                    "mode": "echo",
+                    "default_filters": {
+                        "collection": "Gospels",
+                    },
+                    "frequently_opened_panels": ["citations"],
+                },
+            },
+        )
+        assert post_response.status_code == 200, post_response.text
+        session_id = post_response.json()["session_id"]
+        detail = client.get(f"/ai/chat/{session_id}")
+        assert detail.status_code == 200, detail.text
+        payload = detail.json()
+        assert payload["session_id"] == session_id
+        assert payload["summary"]
+        assert payload["memory_snippets"], payload
+        assert payload["linked_document_ids"], payload
+        preferences = payload.get("preferences")
+        assert preferences is not None
+        assert preferences["mode"] == "echo"
+        default_filters = preferences.get("default_filters")
+        assert default_filters is not None
+        assert default_filters.get("collection") == "Gospels"
+
+
+def test_chat_session_records_stance_and_linked_documents() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        post_response = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Summarise John 1:1 and cite your sources",
+                    }
+                ],
+                "model": "echo",
+                "filters": {"collection": "Gospels"},
+                "preferences": {
+                    "default_filters": {
+                        "collection": "Gospels",
+                        "topic_domain": "christology",
+                    }
+                },
+            },
+        )
+        assert post_response.status_code == 200, post_response.text
+        session_id = post_response.json()["session_id"]
+
+        detail = client.get(f"/ai/chat/{session_id}")
+        assert detail.status_code == 200, detail.text
+        payload = detail.json()
+
+        assert payload["session_id"] == session_id
+        assert payload["linked_document_ids"], payload
+        assert sorted(payload["linked_document_ids"]) == payload["linked_document_ids"]
+        assert payload["stance"] == "Domain: christology"
 
 
 def test_provider_settings_crud_flow() -> None:

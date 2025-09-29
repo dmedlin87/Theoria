@@ -614,6 +614,34 @@ class AgentStep(Base):
     trail: Mapped[AgentTrail] = relationship("AgentTrail", back_populates="steps")
 
 
+class ChatSession(Base):
+    """Persisted conversational state for grounded chat sessions."""
+
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    mode: Mapped[str | None] = mapped_column(String, nullable=True)
+    stance: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    memory_snippets: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    linked_document_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    default_filters: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    frequently_opened_panels: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    last_turn_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
 class TrailSource(Base):
     """Source reference used during a trail run."""
 
@@ -819,6 +847,7 @@ __all__ = [
     "AgentTrail",
     "AgentStep",
     "TrailSource",
+    "ChatSession",
     "UserWatchlist",
     "WatchlistEvent",
     "GeoAncientPlace",

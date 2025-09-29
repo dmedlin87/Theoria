@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { href: "/search", label: "Search" },
   { href: "/upload", label: "Upload" },
   { href: "/copilot", label: "Copilot" },
+  { href: "/chat", label: "Chat" },
   { href: "/verse/John.1.1", label: "Verse explorer" },
 ];
 
