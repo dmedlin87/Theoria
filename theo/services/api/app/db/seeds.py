@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterable
 from uuid import NAMESPACE_URL, uuid5
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from theo.services.geo import seed_openbible_geo
@@ -49,10 +50,12 @@ def _coerce_list(value: object) -> list[str] | None:
 def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
 
-    payload = _load_json(SEED_ROOT / "contradictions.json")
-    if not payload:
+    seed_path = SEED_ROOT / "contradictions.json"
+    if not seed_path.exists():
         return
 
+    payload = _load_json(seed_path)
+    seen_ids: set[str] = set()
     for entry in payload:
         osis_a = entry.get("osis_a")
         osis_b = entry.get("osis_b")
@@ -65,6 +68,7 @@ def seed_contradiction_claims(session: Session) -> None:
                 f"{str(osis_a).lower()}|{str(osis_b).lower()}|{source.lower()}",
             )
         )
+        seen_ids.add(identifier)
         record = session.get(ContradictionSeed, identifier)
         tags = _coerce_list(entry.get("tags"))
         weight = float(entry.get("weight", 1.0))
@@ -95,16 +99,21 @@ def seed_contradiction_claims(session: Session) -> None:
             if record.weight != weight:
                 record.weight = weight
 
+    session.execute(
+        delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
+    )
     session.commit()
 
 
 def seed_geo_places(session: Session) -> None:
     """Load geographical reference data."""
 
-    payload = _load_json(SEED_ROOT / "geo_places.json")
-    if not payload:
+    seed_path = SEED_ROOT / "geo_places.json"
+    if not seed_path.exists():
         return
 
+    payload = _load_json(seed_path)
+    seen_slugs: set[str] = set()
     for entry in payload:
         slug = entry.get("slug")
         name = entry.get("name")
@@ -116,6 +125,7 @@ def seed_geo_places(session: Session) -> None:
         lat = entry.get("lat")
         lng = entry.get("lng")
 
+        seen_slugs.add(str(slug))
         record = session.get(GeoPlace, slug)
         if record is None:
             record = GeoPlace(
@@ -155,6 +165,7 @@ def seed_geo_places(session: Session) -> None:
             if changed:
                 record.updated_at = datetime.now(UTC)
 
+    session.execute(delete(GeoPlace).where(~GeoPlace.slug.in_(seen_slugs)))
     session.commit()
 
 
