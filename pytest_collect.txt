@@ -1,0 +1,244 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.6, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\dmedl\Projects\TheoEngine\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\dmedl\Projects\TheoEngine
+configfile: pyproject.toml
+plugins: anyio-4.11.0, hypothesis-6.140.2, cov-7.0.0, subtests-0.14.2, schemathesis-4.1.4
+collecting ... collected 147 items / 1 error / 1 skipped
+
+<Dir TheoEngine>
+  <Package tests>
+    <Dir api>
+      <Module test_ai_citation_export.py>
+        <Function test_export_citations_returns_csl_payload>
+        <Function test_export_citations_allows_missing_source_url>
+        <Function test_export_citations_rejects_empty_payload>
+        <Function test_export_citations_reports_missing_document>
+        <Function test_export_citations_requires_document_id>
+        <Function test_build_csl_entry_uses_expected_type[sermon-speech]>
+        <Function test_build_csl_entry_uses_expected_type[video-motion_picture]>
+        <Function test_build_csl_entry_uses_expected_type[web-webpage]>
+        <Function test_build_csl_entry_uses_expected_type[unknown-article-journal]>
+      <Module test_ai_exports.py>
+        <Function test_sermon_export_returns_serialised_asset[markdown]>
+        <Function test_sermon_export_returns_serialised_asset[ndjson]>
+        <Function test_sermon_export_returns_serialised_asset[csv]>
+        <Function test_sermon_export_returns_serialised_asset[pdf]>
+        <Function test_transcript_export_returns_serialised_asset[markdown]>
+        <Function test_transcript_export_returns_serialised_asset[csv]>
+        <Function test_transcript_export_returns_serialised_asset[pdf]>
+      <Module test_ai_features_endpoint.py>
+        <Function test_ai_features_exposes_guardrail_catalogues>
+      <Module test_ai_registry.py>
+        <Function test_settings_store_encrypts_and_decrypts>
+        <Function test_registry_encrypts_api_keys_and_migrates_plaintext>
+        <Function test_migrate_plaintext_settings_reencrypts>
+        <Function test_build_client_dispatch[openai-config0-OpenAIClient]>
+        <Function test_build_client_dispatch[azure-config1-AzureOpenAIClient]>
+        <Function test_build_client_dispatch[anthropic-config2-AnthropicClient]>
+        <Function test_build_client_dispatch[vertex-config3-VertexAIClient]>
+        <Function test_build_client_dispatch[vllm-config4-LocalVLLMClient]>
+        <Function test_registry_persists_model_metadata>
+        <Function test_llm_routes_persist_metadata>
+        <Function test_llm_routes_openapi_schema>
+        <Function test_retry_backoff_respects_retry_after>
+        <Function test_clients_inject_idempotency_keys_and_cache[<lambda>-payload0-Idempotency-Key-openai]>
+        <Function test_clients_inject_idempotency_keys_and_cache[<lambda>-payload1-x-ms-client-request-id-azure]>
+        <Function test_clients_inject_idempotency_keys_and_cache[<lambda>-payload2-anthropic-idempotency-key-anthropic]>
+        <Function test_clients_inject_idempotency_keys_and_cache[<lambda>-payload3-x-request-id-vertex]>
+        <Function test_clients_inject_idempotency_keys_and_cache[<lambda>-payload4-Idempotency-Key-local]>
+      <Module test_ai_router.py>
+        <Function test_router_logs_warning_when_budget_projection_near_ceiling>
+        <Function test_router_logs_warning_when_latency_projection_near_threshold>
+        <Function test_router_logs_warning_when_budget_exceeded>
+        <Function test_router_logs_warning_when_latency_exceeded>
+        <Function test_router_respects_budget_and_falls_back>
+        <Function test_router_latency_threshold_triggers_fallback>
+        <Function test_router_generation_error_when_ledger_prepopulated>
+        <Function test_router_prefers_model_hint_and_falls_back>
+        <Function test_router_reuses_cache_entry>
+        <Function test_router_deduplicates_inflight_requests>
+      <Module test_debug_reporting.py>
+        <Function test_build_debug_report_filters_sensitive_data>
+        <Function test_error_reporting_middleware_emits_report>
+        <Function test_debug_report_includes_trace_id>
+      <Module test_digest_service.py>
+        <Function test_ensure_latest_returns_cached_when_within_ttl>
+        <Function test_ensure_latest_regenerates_when_expired>
+      <Module test_ingest.py>
+        <Function test_ingest_file_streams_large_upload_without_buffering>
+        <Function test_ingest_file_logs_large_body_as_truncated>
+        <Function test_ingest_file_rejects_upload_exceeding_limit>
+        <Function test_ingest_url_allows_http>
+        <Function test_ingest_url_rejects_disallowed_scheme[file:///etc/passwd]>
+        <Function test_ingest_url_rejects_disallowed_scheme[gopher://example.com/resource]>
+        <Function test_ingest_url_blocks_private_targets[http://localhost/resource]>
+        <Function test_ingest_url_blocks_private_targets[http://127.0.0.1/secret]>
+        <Function test_ingest_url_blocks_private_targets[http://192.168.1.10/internal]>
+        <Function test_ingest_url_times_out_on_slow_response>
+        <Function test_ingest_url_rejects_oversized_response>
+        <Function test_ingest_url_detects_redirect_loop>
+        <Function test_ingest_file_rejects_password_protected_pdf>
+        <Function test_ingest_file_rejects_corrupt_pdf>
+      <Module test_ingest_duplicates.py>
+        <Function test_duplicate_file_ingest_returns_400>
+        <Function test_duplicate_url_ingest_returns_400>
+      <Module test_ingest_uploads.py>
+        <Function test_ingest_file_sanitizes_uploaded_filename>
+        <Function test_ingest_transcript_sanitizes_uploaded_files>
+        <Function test_ingest_markdown_with_windows_1252_bytes>
+        <Function test_ingest_html_with_windows_1252_bytes>
+      <Module test_jobs_refresh_hnsw.py>
+        <Function test_refresh_hnsw_job_endpoint_enqueues>
+        <Function test_refresh_hnsw_job_endpoint_uses_defaults>
+      <Module test_rag_pdf_deliverables.py>
+        <Function test_build_sermon_deliverable_pdf_renders_binary>
+        <Function test_build_transcript_deliverable_pdf_renders_binary>
+      <Module test_research_dss_links.py>
+        <Function test_dss_links_endpoint_returns_matches>
+        <Function test_dss_links_endpoint_handles_ranges>
+        <Function test_dss_links_endpoint_handles_missing_osis>
+      <Module test_security.py>
+        <Function test_missing_credentials_return_unauthorized[post-/ingest/url-kwargs0]>
+        <Function test_missing_credentials_return_unauthorized[get-/ai/llm-kwargs1]>
+        <Function test_missing_credentials_return_unauthorized[post-/ai/digest-kwargs2]>
+        <Function test_missing_credentials_return_unauthorized[get-/documents-kwargs3]>
+        <Function test_missing_credentials_return_unauthorized[get-/jobs-kwargs4]>
+        <Function test_invalid_credentials_return_forbidden[post-/ingest/url-kwargs0]>
+        <Function test_invalid_credentials_return_forbidden[get-/ai/llm-kwargs1]>
+        <Function test_invalid_credentials_return_forbidden[post-/ai/digest-kwargs2]>
+        <Function test_invalid_credentials_return_forbidden[get-/documents-kwargs3]>
+        <Function test_invalid_credentials_return_forbidden[get-/jobs-kwargs4]>
+        <Function test_api_key_allows_access[post-/ingest/url-kwargs0]>
+        <Function test_api_key_allows_access[get-/ai/llm-kwargs1]>
+        <Function test_api_key_allows_access[post-/ai/digest-kwargs2]>
+        <Function test_api_key_allows_access[get-/documents-kwargs3]>
+        <Function test_api_key_allows_access[get-/jobs-kwargs4]>
+        <Function test_jwt_allows_access>
+      <Module test_sql_migrations.py>
+        <Function test_sql_migrations_run_on_startup>
+      <Module test_verse_timeline.py>
+        <Function test_get_verse_timeline_groups_mentions_by_month>
+        <Function test_get_verse_timeline_filters_by_source_type>
+        <Function test_get_verse_timeline_respects_limit>
+        <Function test_get_verse_timeline_rejects_invalid_window>
+        <Function test_get_verse_timeline_filters_by_author_for_week_window>
+      <Module test_workflow_spans.py>
+        <Function test_multimedia_digest_emits_span_and_records_steps>
+        <Function test_devotional_flow_emits_span>
+        <Function test_research_reconciliation_emits_span>
+        <Function test_corpus_curation_emits_span>
+    <Dir cli>
+      <Module test_rag_eval.py>
+        <Function test_rag_eval_reports_failures_and_regressions>
+    <Dir contracts>
+      <Module test_schemathesis.py>
+        Contract tests ensuring OpenAPI schema coverage via Schemathesis.
+        <Function test_contract_endpoints[citations-export:POST /ai/citations/export]>
+        <Function test_contract_endpoints[workflows:POST /ai/verse]>
+        <Function test_contract_endpoints[workflows:POST /ai/sermon-prep]>
+        <Function test_contract_endpoints[workflows:POST /ai/sermon-prep/export]>
+        <Function test_contract_endpoints[workflows:POST /ai/transcript/export]>
+        <Function test_contract_endpoints[workflows:POST /ai/comparative]>
+        <Function test_contract_endpoints[workflows:POST /ai/multimedia]>
+        <Function test_contract_endpoints[workflows:POST /ai/devotional]>
+        <Function test_contract_endpoints[workflows:POST /ai/collaboration]>
+        <Function test_contract_endpoints[workflows:POST /ai/curation]>
+    <Dir db>
+      <Module test_seeds.py>
+        Regression tests for database seed loaders.
+        <Function test_seeders_remove_stale_records>
+    <Dir export>
+      <Module test_cli_export.py>
+        <Function test_search_export_cli_csv_includes_manifest>
+        <Function test_search_export_cli_requests_extra_row>
+        <Function test_search_export_manifest_includes_enrichment_version_without_field>
+        <Function test_document_export_cli_ndjson_contains_metadata>
+        <Function test_document_export_manifest_includes_enrichment_version_without_field>
+        <Function test_document_export_fields_include_parent_from_child_request>
+        <Function test_search_manifest_round_trip>
+    <Dir ingest>
+      <Module test_cli_ingest_folder.py>
+        Tests for the folder ingestion CLI helpers.
+        <Function test_detect_source_type_matches_pipeline_rules[note.md-markdown]>
+        <Function test_detect_source_type_matches_pipeline_rules[README.markdown-markdown]>
+        <Function test_detect_source_type_matches_pipeline_rules[story.txt-txt]>
+        <Function test_detect_source_type_matches_pipeline_rules[page.html-file]>
+        <Function test_detect_source_type_matches_pipeline_rules[slides.htm-file]>
+        <Function test_detect_source_type_matches_pipeline_rules[paper.pdf-pdf]>
+        <Function test_detect_source_type_matches_pipeline_rules[captions.vtt-transcript]>
+        <Function test_detect_source_type_matches_pipeline_rules[captions.json-transcript]>
+        <Function test_detect_source_type_matches_pipeline_rules[thesis.docx-docx]>
+        <Function test_detect_source_type_matches_pipeline_rules[archive.bin-file]>
+        <Function test_is_supported_filters_by_extension[document.md-True]>
+        <Function test_is_supported_filters_by_extension[transcript.webvtt-True]>
+        <Function test_is_supported_filters_by_extension[notes.txt-True]>
+        <Function test_is_supported_filters_by_extension[page.html-True]>
+        <Function test_is_supported_filters_by_extension[slides.pdf-True]>
+        <Function test_is_supported_filters_by_extension[metadata.json-True]>
+        <Function test_is_supported_filters_by_extension[draft.docx-True]>
+        <Function test_is_supported_filters_by_extension[binary.dat-False]>
+        <Function test_walk_folder_discovers_supported_files>
+        <Function test_parse_metadata_overrides_supports_json_values>
+        <Function test_parse_metadata_overrides_rejects_invalid_pairs>
+        <Function test_batched_groups_iterable_by_size>
+        <Function test_ingest_folder_dry_run_lists_batches>
+        <Function test_ingest_folder_uses_selected_backend>
+        <Function test_ingest_folder_help_lists_core_options>
+      <Module test_parsers.py>
+        <Function test_parse_html_document_ignores_script_content>
+
+=================================== ERRORS ====================================
+_______________ ERROR collecting tests/ingest/test_pipeline.py ________________
+.venv\Lib\site-packages\_pytest\python.py:498: in importtestmodule
+    mod = import_path(
+.venv\Lib\site-packages\_pytest\pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+C:\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+.venv\Lib\site-packages\_pytest\assertion\rewrite.py:177: in exec_module
+    source_stat, co = _rewrite_test(fn, self.config)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\_pytest\assertion\rewrite.py:357: in _rewrite_test
+    tree = ast.parse(source, filename=strfn)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python312\Lib\ast.py:52: in parse
+    return compile(source, filename, mode, flags,
+E     File "C:\Users\dmedl\Projects\TheoEngine\tests\ingest\test_pipeline.py", line 142
+E       def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
+E       ^^^
+E   IndentationError: expected an indented block after function definition on line 140
+============================== warnings summary ===============================
+.venv\Lib\site-packages\pydantic\_internal\_fields.py:160
+  C:\Users\dmedl\Projects\TheoEngine\.venv\Lib\site-packages\pydantic\_internal\_fields.py:160: UserWarning: Field "model_preset" has conflict with protected namespace "model_".
+  
+  You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+    warnings.warn(
+
+.venv\Lib\site-packages\pydantic\_internal\_fields.py:160
+  C:\Users\dmedl\Projects\TheoEngine\.venv\Lib\site-packages\pydantic\_internal\_fields.py:160: UserWarning: Field "model_name" has conflict with protected namespace "model_".
+  
+  You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+    warnings.warn(
+
+.venv\Lib\site-packages\pydantic\_internal\_fields.py:160
+  C:\Users\dmedl\Projects\TheoEngine\.venv\Lib\site-packages\pydantic\_internal\_fields.py:160: UserWarning: Field "model_output" has conflict with protected namespace "model_".
+  
+  You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/ingest/test_pipeline.py
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+==================== 147 tests collected, 1 error in 1.73s ====================
