@@ -46,6 +46,8 @@ from ...models.ai import (
     DevotionalRequest,
     ExportDeliverableResponse,
     ExportPresetId,
+    GuardrailAdvisory,
+    GuardrailSuggestion,
     LLMDefaultRequest,
     LLMModelRequest,
     LLMModelUpdateRequest,
@@ -65,6 +67,7 @@ from ...models.export import (
     DocumentExportFilters,
     DocumentExportResponse,
 )
+from ...models.search import HybridSearchFilters
 
 _BAD_REQUEST_RESPONSE = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
@@ -489,6 +492,44 @@ CHAT_PLAN = "\n".join(
 _DEFAULT_REFUSAL_MESSAGE = "I’m sorry, but I cannot help with that request."
 
 
+def _normalise_filters_for_advisory(
+    filters: HybridSearchFilters | None,
+) -> HybridSearchFilters | None:
+    """Remove empty guardrail filters before serialising suggestions."""
+
+    if filters is None:
+        return None
+    data = filters.model_dump(exclude_none=True)
+    if not data:
+        return None
+    return HybridSearchFilters(**data)
+
+
+def _guardrail_advisory(
+    message: str,
+    *,
+    question: str | None,
+    osis: str | None,
+    filters: HybridSearchFilters | None,
+) -> GuardrailAdvisory:
+    """Build a structured guardrail response with actionable follow-ups."""
+
+    normalized_filters = _normalise_filters_for_advisory(filters)
+    suggestion_kwargs: dict[str, object] = {
+        "label": "Search related passages",
+        "description": (
+            "Open the search workspace to inspect passages that match your "
+            "guardrail filters. Adjust them there before retrying the chat turn."
+        ),
+        "query": (question or None),
+        "osis": (osis or None),
+    }
+    if normalized_filters is not None:
+        suggestion_kwargs["filters"] = normalized_filters
+    suggestion = GuardrailSuggestion(**suggestion_kwargs)
+    return GuardrailAdvisory(message=message, suggestions=[suggestion])
+
+
 def _extract_refusal_text(answer: RAGAnswer) -> str:
     """Normalise a guardrailed completion for user-facing chat responses."""
 
@@ -572,7 +613,16 @@ def chat_turn(
                 },
             )
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        advisory = _guardrail_advisory(
+            str(exc),
+            question=question,
+            osis=payload.osis,
+            filters=payload.filters,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=advisory.model_dump(mode="json"),
+        ) from exc
 
     if message is None or answer is None:
         raise HTTPException(status_code=500, detail="failed to compose chat response")
@@ -814,7 +864,16 @@ def verse_copilot(
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        advisory = _guardrail_advisory(
+            str(exc),
+            question=payload.question,
+            osis=resolved_osis,
+            filters=payload.filters,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=advisory.model_dump(mode="json"),
+        ) from exc
 
 
 @router.post("/sermon-prep", response_model_exclude_none=True)

@@ -284,6 +284,42 @@ class CitationExportResponse(APIModel):
     manager_payload: dict[str, Any]
 
 
+class GuardrailSuggestion(APIModel):
+    """Client-side action recommended when guardrails block a response."""
+
+    action: Literal["search"] = Field(
+        default="search",
+        description="The type of UI action that should be rendered.",
+    )
+    label: str = Field(description="Short label to display on the action control.")
+    description: str | None = Field(
+        default=None,
+        description="Optional helper text describing why this suggestion is useful.",
+    )
+    query: str | None = Field(
+        default=None,
+        description="Suggested natural-language query when pivoting into search.",
+    )
+    osis: str | None = Field(
+        default=None,
+        description="OSIS reference that should be pre-filled for follow-up exploration.",
+    )
+    filters: HybridSearchFilters | None = Field(
+        default=None,
+        description="Search filters aligned with the guardrail configuration that failed.",
+    )
+
+
+class GuardrailAdvisory(APIModel):
+    """Structured payload returned when guardrails refuse to answer."""
+
+    message: str = Field(description="Human-readable explanation of the guardrail outcome.")
+    suggestions: Sequence[GuardrailSuggestion] = Field(
+        default_factory=list,
+        description="Interactive follow-up actions that the client can surface.",
+    )
+
+
 AIResponse = (
     VerseCopilotResponse
     | SermonPrepResponse
@@ -322,4 +358,6 @@ __all__ = [
     "GuardrailSettings",
     "AIFeaturesResponse",
     "DEFAULT_GUARDRAIL_SETTINGS",
+    "GuardrailSuggestion",
+    "GuardrailAdvisory",
 ]

@@ -12,9 +12,12 @@ import {
 } from "react";
 
 import ErrorCallout from "../components/ErrorCallout";
+import UiModeToggle from "../components/UiModeToggle";
 import { buildPassageLink, formatAnchor } from "../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../lib/errorUtils";
+import { emitTelemetry } from "../lib/telemetry";
 import { usePersistentSort } from "../lib/usePersistentSort";
+import { useUiModePreference } from "../lib/useUiModePreference";
 import { sortDocumentGroups, SortableDocumentGroup } from "./groupSorting";
 import { SortControls } from "./SortControls";
 import {
@@ -29,6 +32,26 @@ const SOURCE_OPTIONS = [
   { label: "Markdown", value: "markdown" },
   { label: "YouTube", value: "youtube" },
   { label: "Transcript", value: "transcript" },
+];
+
+const TRADITION_OPTIONS = [
+  { label: "Any tradition", value: "" },
+  { label: "Anglican Communion", value: "anglican" },
+  { label: "Baptist", value: "baptist" },
+  { label: "Roman Catholic", value: "catholic" },
+  { label: "Eastern Orthodox", value: "orthodox" },
+  { label: "Reformed", value: "reformed" },
+  { label: "Wesleyan/Methodist", value: "wesleyan" },
+];
+
+const DOMAIN_OPTIONS = [
+  { label: "Any topic", value: "" },
+  { label: "Christology", value: "christology" },
+  { label: "Soteriology", value: "soteriology" },
+  { label: "Ecclesiology", value: "ecclesiology" },
+  { label: "Sacramental Theology", value: "sacramental" },
+  { label: "Biblical Theology", value: "biblical-theology" },
+  { label: "Christian Ethics", value: "ethics" },
 ];
 
 const COLLECTION_FACETS = [
@@ -176,11 +199,15 @@ export default function SearchPage(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const skipNextHydratedSearchRef = useRef(false);
+  const [uiMode, setUiMode] = useUiModePreference();
+  const isAdvancedUi = uiMode === "advanced";
   const [query, setQuery] = useState("");
   const [osis, setOsis] = useState("");
   const [collection, setCollection] = useState("");
   const [author, setAuthor] = useState("");
   const [sourceType, setSourceType] = useState("");
+  const [theologicalTradition, setTheologicalTradition] = useState("");
+  const [topicDomain, setTopicDomain] = useState("");
   const [collectionFacets, setCollectionFacets] = useState<string[]>([]);
   const [datasetFacets, setDatasetFacets] = useState<string[]>([]);
   const [variantFacets, setVariantFacets] = useState<string[]>([]);
@@ -214,6 +241,8 @@ export default function SearchPage(): JSX.Element {
       collection: collection.trim(),
       author: author.trim(),
       sourceType,
+      theologicalTradition: theologicalTradition.trim(),
+      topicDomain: topicDomain.trim(),
       collectionFacets,
       datasetFacets,
       variantFacets,
@@ -231,6 +260,8 @@ export default function SearchPage(): JSX.Element {
       variantFacets,
       dateEnd,
       dateStart,
+      theologicalTradition,
+      topicDomain,
       includeDisputed,
       includeVariants,
       osis,
@@ -264,6 +295,9 @@ export default function SearchPage(): JSX.Element {
     if (collection) chips.push({ label: "Collection", value: collection });
     if (author) chips.push({ label: "Author", value: author });
     if (sourceType) chips.push({ label: "Source", value: sourceType });
+    if (theologicalTradition)
+      chips.push({ label: "Tradition", value: theologicalTradition });
+    if (topicDomain) chips.push({ label: "Topic", value: topicDomain });
     collectionFacets.forEach((facet) => chips.push({ label: "Facet", value: facet }));
     datasetFacets.forEach((facet) =>
       chips.push({ label: "Dataset", value: DATASET_LABELS.get(facet) ?? facet }),
@@ -296,6 +330,8 @@ export default function SearchPage(): JSX.Element {
     presetIsCustom,
     presetSelection,
     sourceType,
+    theologicalTradition,
+    topicDomain,
   ]);
 
   const queryTokens = useMemo(() => {
@@ -312,11 +348,18 @@ export default function SearchPage(): JSX.Element {
       setHasSearched(true);
       setLastSearchFilters(filters);
 
+      const perf = typeof performance !== "undefined" ? performance : null;
+      const requestStart = perf ? perf.now() : null;
+      let retrievalEnd: number | null = null;
+      let renderEnd: number | null = null;
+      let success = false;
+
       try {
         const searchQuery = serializeSearchParams(filters);
         const response = await fetch(`/api/search${searchQuery ? `?${searchQuery}` : ""}`, {
           cache: "no-store",
         });
+        retrievalEnd = perf ? perf.now() : null;
         if (!response.ok) {
           const errorDetails = await parseErrorResponse(
             response,
@@ -324,36 +367,43 @@ export default function SearchPage(): JSX.Element {
           );
           setGroups([]);
           setError(errorDetails);
-          return;
-        }
-        const payload = (await response.json()) as SearchResponse;
-        const grouped = new Map<string, DocumentGroup>();
-        for (const result of payload.results ?? []) {
-          let group = grouped.get(result.document_id);
-          if (!group) {
-            group = {
-              documentId: result.document_id,
-              title: result.document_title ?? "Untitled document",
-              rank: result.document_rank ?? null,
-              score: result.document_score ?? result.score ?? null,
-              passages: [],
-            } satisfies DocumentGroup;
-            grouped.set(result.document_id, group);
-          }
-          if (group.rank == null && typeof result.document_rank === "number") {
-            group.rank = result.document_rank;
-          }
-          const candidateScore = result.document_score ?? result.score ?? null;
-          if (typeof candidateScore === "number") {
-            if (typeof group.score !== "number" || candidateScore > group.score) {
-              group.score = candidateScore;
+          renderEnd = perf ? perf.now() : null;
+        } else {
+          const payload = (await response.json()) as SearchResponse;
+          const grouped = new Map<string, DocumentGroup>();
+          for (const result of payload.results ?? []) {
+            let group = grouped.get(result.document_id);
+            if (!group) {
+              group = {
+                documentId: result.document_id,
+                title: result.document_title ?? "Untitled document",
+                rank: result.document_rank ?? null,
+                score: result.document_score ?? result.score ?? null,
+                passages: [],
+              } satisfies DocumentGroup;
+              grouped.set(result.document_id, group);
             }
+            if (group.rank == null && typeof result.document_rank === "number") {
+              group.rank = result.document_rank;
+            }
+            const candidateScore = result.document_score ?? result.score ?? null;
+            if (typeof candidateScore === "number") {
+              if (typeof group.score !== "number" || candidateScore > group.score) {
+                group.score = candidateScore;
+              }
+            }
+            group.passages.push(result);
           }
-          group.passages.push(result);
+          const sortedGroups = sortDocumentGroups(Array.from(grouped.values()), sortKey);
+          setGroups(sortedGroups);
+          renderEnd = perf ? perf.now() : null;
+          success = true;
         }
-        const sortedGroups = sortDocumentGroups(Array.from(grouped.values()), sortKey);
-        setGroups(sortedGroups);
       } catch (fetchError) {
+        if (retrievalEnd === null && perf) {
+          retrievalEnd = perf.now();
+        }
+        renderEnd = perf ? perf.now() : null;
         const message =
           fetchError instanceof Error && fetchError.message
             ? fetchError.message
@@ -366,6 +416,31 @@ export default function SearchPage(): JSX.Element {
         setGroups([]);
       } finally {
         setIsSearching(false);
+        if (requestStart !== null) {
+          const events: {
+            event: string;
+            durationMs: number;
+            metadata?: Record<string, unknown>;
+          }[] = [];
+          if (retrievalEnd !== null) {
+            events.push({
+              event: "search.retrieval",
+              durationMs: Math.max(0, retrievalEnd - requestStart),
+              metadata: { success },
+            });
+          }
+          if (renderEnd !== null) {
+            const renderStart = retrievalEnd ?? requestStart;
+            events.push({
+              event: "search.results",
+              durationMs: Math.max(0, renderEnd - renderStart),
+              metadata: { success },
+            });
+          }
+          if (events.length) {
+            void emitTelemetry(events, { page: "search" });
+          }
+        }
       }
     },
     [sortKey],
@@ -386,6 +461,8 @@ export default function SearchPage(): JSX.Element {
       setCollection(filters.collection);
       setAuthor(filters.author);
       setSourceType(filters.sourceType);
+      setTheologicalTradition(filters.theologicalTradition);
+      setTopicDomain(filters.topicDomain);
       setCollectionFacets([...filters.collectionFacets]);
       setDatasetFacets([...filters.datasetFacets]);
       setVariantFacets([...filters.variantFacets]);
@@ -395,7 +472,7 @@ export default function SearchPage(): JSX.Element {
       setIncludeDisputed(filters.includeDisputed);
       setPresetSelection(filters.preset ? filters.preset : CUSTOM_PRESET_VALUE);
     },
-    [],
+    [author, collection, collectionFacets, datasetFacets, includeDisputed, includeVariants, sourceType, theologicalTradition, topicDomain, variantFacets, dateEnd, dateStart, presetIsCustom, presetSelection],
   );
 
   const handleShowErrorDetails = useCallback((traceId: string | null) => {
@@ -602,6 +679,251 @@ export default function SearchPage(): JSX.Element {
     };
   }, [diffSelection, groups]);
 
+  const activePreset = useMemo(() => {
+    const value = presetIsCustom ? CUSTOM_PRESET_VALUE : presetSelection;
+    return MODE_PRESETS.find((candidate) => candidate.value === value);
+  }, [presetIsCustom, presetSelection]);
+
+  const advancedFilterControls = (
+    <div style={{ display: "grid", gap: "0.75rem" }}>
+      <div>
+        <label style={{ display: "block" }}>
+          Mode preset
+          <select
+            name="preset"
+            value={presetIsCustom ? CUSTOM_PRESET_VALUE : presetSelection}
+            onChange={(event) => handlePresetChange(event.target.value)}
+            style={{ width: "100%" }}
+          >
+            {MODE_PRESETS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {activePreset?.description && (
+          <p style={{ margin: "0.35rem 0 0", fontSize: "0.85rem", color: "#555" }}>
+            {activePreset.description}
+          </p>
+        )}
+      </div>
+      <label style={{ display: "block" }}>
+        Collection
+        <input
+          name="collection"
+          type="text"
+          value={collection}
+          onChange={(event) => {
+            setCollection(event.target.value);
+            markPresetAsCustom();
+          }}
+          placeholder="Gospels"
+          style={{ width: "100%" }}
+        />
+      </label>
+      <label style={{ display: "block" }}>
+        Author
+        <input
+          name="author"
+          type="text"
+          value={author}
+          onChange={(event) => {
+            setAuthor(event.target.value);
+            markPresetAsCustom();
+          }}
+          placeholder="Jane Doe"
+          style={{ width: "100%" }}
+        />
+      </label>
+      <label style={{ display: "block" }}>
+        Source type
+        <select
+          name="source_type"
+          value={sourceType}
+          onChange={(event) => {
+            setSourceType(event.target.value);
+            markPresetAsCustom();
+          }}
+          style={{ width: "100%" }}
+        >
+          {SOURCE_OPTIONS.map((option) => (
+            <option key={option.value || "any"} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label style={{ display: "block" }}>
+        Theological tradition
+        <select
+          name="theological_tradition"
+          value={theologicalTradition}
+          onChange={(event) => {
+            setTheologicalTradition(event.target.value);
+            markPresetAsCustom();
+          }}
+          style={{ width: "100%" }}
+        >
+          {TRADITION_OPTIONS.map((option) => (
+            <option key={option.value || "any"} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label style={{ display: "block" }}>
+        Topic domain
+        <select
+          name="topic_domain"
+          value={topicDomain}
+          onChange={(event) => {
+            setTopicDomain(event.target.value);
+            markPresetAsCustom();
+          }}
+          style={{ width: "100%" }}
+        >
+          {DOMAIN_OPTIONS.map((option) => (
+            <option key={option.value || "any"} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <fieldset
+        style={{
+          border: "1px solid #e2e8f0",
+          borderRadius: "0.5rem",
+          padding: "0.75rem",
+        }}
+      >
+        <legend style={{ padding: "0 0.35rem" }}>Collection facets</legend>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+          {COLLECTION_FACETS.map((facet) => (
+            <label key={facet} style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <input
+                type="checkbox"
+                checked={collectionFacets.includes(facet)}
+                onChange={() => toggleFacet(facet)}
+              />
+              {facet}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset
+        style={{
+          border: "1px solid #e2e8f0",
+          borderRadius: "0.5rem",
+          padding: "0.75rem",
+        }}
+      >
+        <legend style={{ padding: "0 0.35rem" }}>Dataset facets</legend>
+        <div style={{ display: "grid", gap: "0.5rem" }}>
+          {DATASET_FILTERS.map((dataset) => {
+            const isActive = datasetFacets.includes(dataset.value);
+            return (
+              <label
+                key={dataset.value}
+                style={{ display: "grid", gap: "0.1rem", alignItems: "flex-start" }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={() => toggleDatasetFacet(dataset.value)}
+                  />
+                  <strong>{dataset.label}</strong>
+                </span>
+                <span style={{ fontSize: "0.8rem", color: "#4b5563", marginLeft: "1.75rem" }}>
+                  {dataset.description}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+      <fieldset
+        style={{
+          border: "1px solid #e2e8f0",
+          borderRadius: "0.5rem",
+          padding: "0.75rem",
+        }}
+      >
+        <legend style={{ padding: "0 0.35rem" }}>Variant focus</legend>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+          {VARIANT_FILTERS.map((variant) => (
+            <label
+              key={variant.value}
+              style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
+            >
+              <input
+                type="checkbox"
+                checked={variantFacets.includes(variant.value)}
+                onChange={() => toggleVariantFacet(variant.value)}
+              />
+              {variant.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+        <label style={{ display: "block" }}>
+          Date from
+          <input
+            type="date"
+            name="date_start"
+            value={dateStart}
+            onChange={(event) => {
+              setDateStart(event.target.value);
+              markPresetAsCustom();
+            }}
+            style={{ width: "100%" }}
+          />
+        </label>
+        <label style={{ display: "block" }}>
+          Date to
+          <input
+            type="date"
+            name="date_end"
+            value={dateEnd}
+            onChange={(event) => {
+              setDateEnd(event.target.value);
+              markPresetAsCustom();
+            }}
+            style={{ width: "100%" }}
+          />
+        </label>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <input
+            type="checkbox"
+            name="variants"
+            checked={includeVariants}
+            onChange={(event) => {
+              setIncludeVariants(event.target.checked);
+              markPresetAsCustom();
+            }}
+          />
+          Include textual variants
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <input
+            type="checkbox"
+            name="disputed"
+            checked={includeDisputed}
+            onChange={(event) => {
+              setIncludeDisputed(event.target.checked);
+              markPresetAsCustom();
+            }}
+          />
+          Include disputed readings
+        </label>
+      </div>
+    </div>
+  );
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem(SAVED_SEARCH_STORAGE_KEY);
@@ -627,6 +949,10 @@ export default function SearchPage(): JSX.Element {
     setCollection((current) => (current === filters.collection ? current : filters.collection));
     setAuthor((current) => (current === filters.author ? current : filters.author));
     setSourceType((current) => (current === filters.sourceType ? current : filters.sourceType));
+    setTheologicalTradition((current) =>
+      current === filters.theologicalTradition ? current : filters.theologicalTradition,
+    );
+    setTopicDomain((current) => (current === filters.topicDomain ? current : filters.topicDomain));
     setCollectionFacets((current) =>
       arraysEqual(current, filters.collectionFacets) ? current : filters.collectionFacets,
     );
@@ -661,6 +987,8 @@ export default function SearchPage(): JSX.Element {
           filters.collection ||
           filters.author ||
           filters.sourceType ||
+          filters.theologicalTradition ||
+          filters.topicDomain ||
           filters.dateStart ||
           filters.dateEnd ||
           filters.preset,
@@ -691,39 +1019,20 @@ export default function SearchPage(): JSX.Element {
     );
   }, [groups]);
 
-  const activePreset = useMemo(() => {
-    const value = presetIsCustom ? CUSTOM_PRESET_VALUE : presetSelection;
-    return MODE_PRESETS.find((candidate) => candidate.value === value);
-  }, [presetIsCustom, presetSelection]);
-
-  return (
-    <section>
-      <h2>Search</h2>
+    return (
+      <section>
+        <h2>Search</h2>
       <p>Hybrid search with lexical, vector, and OSIS-aware filtering.</p>
-      <form onSubmit={handleSearch} aria-label="Search corpus" style={{ marginBottom: "1.5rem" }}>
+      <div style={{ margin: "1.5rem 0" }}>
+        <UiModeToggle mode={uiMode} onChange={setUiMode} />
+      </div>
+
+      <form
+        onSubmit={handleSearch}
+        aria-label="Search corpus"
+        style={{ marginBottom: "1.5rem", display: "grid", gap: "1rem" }}
+      >
         <div style={{ display: "grid", gap: "0.75rem" }}>
-          <div>
-            <label style={{ display: "block" }}>
-              Mode preset
-              <select
-                name="preset"
-                value={presetIsCustom ? CUSTOM_PRESET_VALUE : presetSelection}
-                onChange={(event) => handlePresetChange(event.target.value)}
-                style={{ width: "100%" }}
-              >
-                {MODE_PRESETS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {activePreset?.description && (
-              <p style={{ margin: "0.35rem 0 0", fontSize: "0.85rem", color: "#555" }}>
-                {activePreset.description}
-              </p>
-            )}
-          </div>
           <label style={{ display: "block" }}>
             Query
             <input
@@ -746,188 +1055,40 @@ export default function SearchPage(): JSX.Element {
               style={{ width: "100%" }}
             />
           </label>
-          <label style={{ display: "block" }}>
-            Collection
-            <input
-              name="collection"
-              type="text"
-              value={collection}
-              onChange={(event) => {
-                setCollection(event.target.value);
-                markPresetAsCustom();
-              }}
-              placeholder="Gospels"
-              style={{ width: "100%" }}
-            />
-          </label>
-          <label style={{ display: "block" }}>
-            Author
-            <input
-              name="author"
-              type="text"
-              value={author}
-              onChange={(event) => {
-                setAuthor(event.target.value);
-                markPresetAsCustom();
-              }}
-              placeholder="Jane Doe"
-              style={{ width: "100%" }}
-            />
-          </label>
-          <label style={{ display: "block" }}>
-            Source type
-            <select
-              name="source_type"
-              value={sourceType}
-              onChange={(event) => {
-                setSourceType(event.target.value);
-                markPresetAsCustom();
-              }}
-              style={{ width: "100%" }}
-            >
-              {SOURCE_OPTIONS.map((option) => (
-                <option key={option.value || "any"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: "0.5rem",
-              padding: "0.75rem",
-            }}
-          >
-            <legend style={{ padding: "0 0.35rem" }}>Collection facets</legend>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-              {COLLECTION_FACETS.map((facet) => (
-                <label key={facet} style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                  <input
-                    type="checkbox"
-                    checked={collectionFacets.includes(facet)}
-                    onChange={() => toggleFacet(facet)}
-                  />
-                  {facet}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <fieldset
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: "0.5rem",
-              padding: "0.75rem",
-            }}
-          >
-            <legend style={{ padding: "0 0.35rem" }}>Dataset facets</legend>
-            <div style={{ display: "grid", gap: "0.5rem" }}>
-              {DATASET_FILTERS.map((dataset) => {
-                const isActive = datasetFacets.includes(dataset.value);
-                return (
-                  <label
-                    key={dataset.value}
-                    style={{ display: "grid", gap: "0.1rem", alignItems: "flex-start" }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      <input
-                        type="checkbox"
-                        checked={isActive}
-                        onChange={() => toggleDatasetFacet(dataset.value)}
-                      />
-                      <strong>{dataset.label}</strong>
-                    </span>
-                    <span style={{ fontSize: "0.8rem", color: "#4b5563", marginLeft: "1.75rem" }}>
-                      {dataset.description}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-          <fieldset
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: "0.5rem",
-              padding: "0.75rem",
-            }}
-          >
-            <legend style={{ padding: "0 0.35rem" }}>Variant focus</legend>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-              {VARIANT_FILTERS.map((variant) => (
-                <label
-                  key={variant.value}
-                  style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={variantFacets.includes(variant.value)}
-                    onChange={() => toggleVariantFacet(variant.value)}
-                  />
-                  {variant.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-            <label style={{ display: "block" }}>
-              Date from
-              <input
-                type="date"
-                name="date_start"
-                value={dateStart}
-                onChange={(event) => {
-                  setDateStart(event.target.value);
-                  markPresetAsCustom();
-                }}
-                style={{ width: "100%" }}
-              />
-            </label>
-            <label style={{ display: "block" }}>
-              Date to
-              <input
-                type="date"
-                name="date_end"
-                value={dateEnd}
-                onChange={(event) => {
-                  setDateEnd(event.target.value);
-                  markPresetAsCustom();
-                }}
-                style={{ width: "100%" }}
-              />
-            </label>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <input
-                type="checkbox"
-                name="variants"
-                checked={includeVariants}
-                onChange={(event) => {
-                  setIncludeVariants(event.target.checked);
-                  markPresetAsCustom();
-                }}
-              />
-              Include textual variants
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <input
-                type="checkbox"
-                name="disputed"
-                checked={includeDisputed}
-                onChange={(event) => {
-                  setIncludeDisputed(event.target.checked);
-                  markPresetAsCustom();
-                }}
-              />
-              Include disputed readings
-            </label>
-          </div>
         </div>
-        <button type="submit" style={{ marginTop: "1rem" }} disabled={isSearching}>
+
+        {!isAdvancedUi && (
+          <p style={{ margin: 0, color: "#475569" }}>
+            Simple mode shows only the essentials. Open the advanced panel for presets, guardrail filters, and facets.
+          </p>
+        )}
+
+        {isAdvancedUi ? (
+          <div>{advancedFilterControls}</div>
+        ) : (
+          <details
+            style={{
+              border: "1px solid #cbd5f5",
+              borderRadius: "0.75rem",
+              padding: "0.75rem 1rem",
+              background: "#f8fafc",
+            }}
+          >
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+              Advanced filters & presets
+            </summary>
+            <p style={{ margin: "0.75rem 0", fontSize: "0.9rem", color: "#475569" }}>
+              Expand when you need dataset facets, guardrail profiles, or saved presets.
+            </p>
+            {advancedFilterControls}
+          </details>
+        )}
+
+        <button type="submit" style={{ marginTop: "0.5rem" }} disabled={isSearching}>
           {isSearching ? "Searching." : "Search"}
         </button>
       </form>
+
 
       <section aria-label="Saved searches" style={{ margin: "2rem 0" }}>
         <h3 style={{ marginBottom: "0.75rem" }}>Saved searches</h3>

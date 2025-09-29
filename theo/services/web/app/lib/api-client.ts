@@ -3,6 +3,18 @@ import type { components } from "./generated/api";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
 
+export class TheoApiError extends Error {
+  readonly status: number;
+  readonly payload: unknown;
+
+  constructor(message: string, status: number, payload?: unknown) {
+    super(message);
+    this.name = "TheoApiError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
 function normaliseExportResponse(
   payload: ExportDeliverableResponse,
 ): import("../copilot/components/types").ExportPresetResult {
@@ -15,7 +27,7 @@ function normaliseExportResponse(
   };
 }
 
-function buildErrorMessage(status: number, body: string): string {
+function buildErrorMessage(status: number, body: string | null): string {
   if (body) {
     return body;
   }
@@ -39,8 +51,30 @@ async function handleResponse<T>(
   parseJson: boolean,
 ): Promise<T | void> {
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(buildErrorMessage(response.status, body));
+    const bodyText = await response.text();
+    const contentType = response.headers.get("content-type") ?? "";
+    let payload: unknown = bodyText || null;
+    if (contentType.includes("application/json") && bodyText) {
+      try {
+        payload = JSON.parse(bodyText) as unknown;
+      } catch (parseError) {
+        console.warn("Failed to parse error payload", parseError);
+        payload = bodyText;
+      }
+    }
+    let message = buildErrorMessage(response.status, bodyText || null);
+    if (payload && typeof payload === "object") {
+      const detail = (payload as Record<string, unknown>).detail;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (detail && typeof detail === "object") {
+        const nested = (detail as Record<string, unknown>).message;
+        if (typeof nested === "string") {
+          message = nested;
+        }
+      }
+    }
+    throw new TheoApiError(message, response.status, payload ?? bodyText);
   }
   if (!parseJson) {
     return;

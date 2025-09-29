@@ -226,6 +226,15 @@ def test_chat_turn_guardrail_failure_returns_422() -> None:
             },
         )
         assert response.status_code == 422
+        payload = response.json()
+        detail = payload.get("detail")
+        assert isinstance(detail, dict)
+        assert detail.get("message")
+        suggestions = detail.get("suggestions")
+        assert isinstance(suggestions, list) and suggestions
+        first = suggestions[0]
+        assert first.get("action") == "search"
+        assert first.get("label") == "Search related passages"
 
 
 def test_provider_settings_crud_flow() -> None:
@@ -279,6 +288,14 @@ def test_verse_copilot_guardrails_when_no_citations() -> None:
             json={"osis": "Gen.99.1", "question": "Missing?"},
         )
         assert response.status_code == 422
+        payload = response.json()
+        detail = payload.get("detail")
+        assert isinstance(detail, dict)
+        assert detail.get("message")
+        suggestions = detail.get("suggestions")
+        assert isinstance(suggestions, list) and suggestions
+        first = suggestions[0]
+        assert first.get("action") == "search"
 
 
 def test_sermon_prep_export_markdown() -> None:

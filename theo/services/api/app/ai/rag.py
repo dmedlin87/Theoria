@@ -707,13 +707,13 @@ def _guarded_answer(
     model_hint: str | None = None,
     recorder: "TrailRecorder | None" = None,
     filters: HybridSearchFilters | None = None,
+    allow_fallback: bool = False,
 ) -> RAGAnswer:
     ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
     citations = _build_citations(ordered_results)
-    if not citations:
+    if not citations and allow_fallback:
         fallback_result = _load_guardrail_reference(session)
         if fallback_result:
-
             ordered_results = [fallback_result]
             citations = _build_citations(ordered_results)
     if not citations:
