@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal, Sequence
 
 from pydantic import AliasChoices, Field, model_validator
@@ -60,11 +61,27 @@ class LLMModelUpdateRequest(APIModel):
 
 MAX_CHAT_MESSAGE_CONTENT_LENGTH = 8_000
 CHAT_SESSION_TOTAL_CHAR_BUDGET = 32_000
+CHAT_SESSION_MEMORY_CHAR_BUDGET = 4_000
 
 
 class ChatSessionMessage(APIModel):
     role: Literal["user", "assistant", "system"]
     content: str
+
+
+class ChatSessionPreferences(APIModel):
+    mode: str | None = None
+    default_filters: HybridSearchFilters | None = None
+    frequently_opened_panels: list[str] = Field(default_factory=list)
+
+
+class ChatMemoryEntry(APIModel):
+    question: str
+    answer: str
+    answer_summary: str | None = None
+    citations: list[RAGCitation] = Field(default_factory=list)
+    document_ids: list[str] = Field(default_factory=list)
+    created_at: datetime
 
 
 class ChatSessionRequest(APIModel):
@@ -74,6 +91,9 @@ class ChatSessionRequest(APIModel):
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     recorder_metadata: RecorderMetadata | None = None
+    stance: str | None = None
+    mode_id: str | None = None
+    preferences: ChatSessionPreferences | None = None
 
     @model_validator(mode="after")
     def _enforce_message_lengths(self) -> "ChatSessionRequest":
@@ -92,6 +112,18 @@ class ChatSessionResponse(APIModel):
     session_id: str
     message: ChatSessionMessage
     answer: RAGAnswer
+
+
+class ChatSessionState(APIModel):
+    session_id: str
+    stance: str | None = None
+    summary: str | None = None
+    document_ids: list[str] = Field(default_factory=list)
+    preferences: ChatSessionPreferences | None = None
+    memory: list[ChatMemoryEntry] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+    last_interaction_at: datetime
 
 
 class GuardrailProfile(APIModel):

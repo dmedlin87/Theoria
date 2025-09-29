@@ -5,9 +5,12 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 
 import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout";
 import type {
+  ChatSessionPreferencesPayload,
+  ChatSessionState,
   ChatWorkflowClient,
   ChatWorkflowMessage,
   ChatWorkflowStreamEvent,
+  HybridSearchFilters,
 } from "../lib/api-client";
 import { createTheoApiClient } from "../lib/api-client";
 import type { RAGCitation } from "../copilot/components/types";
@@ -33,6 +36,8 @@ type ChatWorkspaceProps = {
   initialPrompt?: string;
   autoSubmit?: boolean;
 };
+
+const CHAT_SESSION_STORAGE_KEY = "theo.chat.lastSessionId";
 
 export default function ChatWorkspace({
   client,
@@ -61,6 +66,9 @@ export default function ChatWorkspace({
   }, [initialPrompt]);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(true);
+  const [frequentlyOpenedPanels, setFrequentlyOpenedPanels] = useState<string[]>([]);
+  const [defaultFilters, setDefaultFilters] = useState<HybridSearchFilters | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
   const [guardrail, setGuardrail] = useState<GuardrailState>(null);
@@ -74,6 +82,90 @@ export default function ChatWorkspace({
       abortControllerRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setIsRestoring(false);
+      return;
+    }
+    let cancelled = false;
+    const storedId = window.localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
+    if (!storedId) {
+      setIsRestoring(false);
+      return;
+    }
+
+    const restoreSession = async () => {
+      try {
+        const state: ChatSessionState | null = await clientRef.current.fetchChatSession(storedId);
+        if (cancelled) {
+          return;
+        }
+        if (!state) {
+          window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+          setIsRestoring(false);
+          return;
+        }
+        setSessionId(state.sessionId);
+        if (state.preferences?.frequentlyOpenedPanels) {
+          setFrequentlyOpenedPanels(state.preferences.frequentlyOpenedPanels);
+        } else {
+          setFrequentlyOpenedPanels([]);
+        }
+        if (state.preferences?.defaultFilters) {
+          setDefaultFilters(state.preferences.defaultFilters);
+        } else {
+          setDefaultFilters(null);
+        }
+        const restoredConversation: ConversationEntry[] = [];
+        state.memory.forEach((entry) => {
+          restoredConversation.push({
+            id: createMessageId(),
+            role: "user",
+            content: entry.question,
+          });
+          restoredConversation.push({
+            id: createMessageId(),
+            role: "assistant",
+            content: entry.answer,
+            citations: entry.citations ?? [],
+          });
+        });
+        if (restoredConversation.length > 0) {
+          const lastUser = restoredConversation
+            .slice()
+            .reverse()
+            .find((entry) => entry.role === "user");
+          setLastQuestion(lastUser?.content ?? null);
+        }
+        setConversation(restoredConversation);
+      } catch (error) {
+        console.warn("Failed to restore chat session", error);
+        window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+      } finally {
+        if (!cancelled) {
+          setIsRestoring(false);
+        }
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClient]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (sessionId) {
+      window.localStorage.setItem(CHAT_SESSION_STORAGE_KEY, sessionId);
+    } else {
+      window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+    }
+  }, [sessionId]);
 
   const updateAssistantEntry = useCallback(
     (id: string, transform: (entry: AssistantConversationEntry) => AssistantConversationEntry) => {
@@ -167,12 +259,19 @@ export default function ChatWorkspace({
       abortControllerRef.current = controller;
 
       try {
+        const preferencesPayload: ChatSessionPreferencesPayload = {
+          mode: mode.id,
+          defaultFilters: defaultFilters ?? null,
+          frequentlyOpenedPanels,
+        };
         const result = await clientRef.current.runChatWorkflow(
           {
             messages: historyMessages,
             modeId: mode.id,
             sessionId,
             prompt: trimmed,
+            filters: defaultFilters ?? undefined,
+            preferences: preferencesPayload,
           },
           {
             signal: controller.signal,
@@ -204,7 +303,15 @@ export default function ChatWorkspace({
         }
       }
     },
-    [applyStreamEvent, mode.id, removeEntryById, sessionId, updateAssistantEntry],
+    [
+      applyStreamEvent,
+      defaultFilters,
+      frequentlyOpenedPanels,
+      mode.id,
+      removeEntryById,
+      sessionId,
+      updateAssistantEntry,
+    ],
   );
 
   const handleSubmit = useCallback(
@@ -216,12 +323,12 @@ export default function ChatWorkspace({
   );
 
   useEffect(() => {
-    if (!autoSubmit || !initialPrompt || autoSubmitRef.current) {
+    if (!autoSubmit || !initialPrompt || autoSubmitRef.current || isRestoring) {
       return;
     }
     autoSubmitRef.current = true;
     void executeChat(initialPrompt);
-  }, [autoSubmit, executeChat, initialPrompt]);
+  }, [autoSubmit, executeChat, initialPrompt, isRestoring]);
 
   const hasTranscript = conversation.length > 0;
 
@@ -250,6 +357,29 @@ export default function ChatWorkspace({
   const guardrailActions: Partial<Pick<ErrorCalloutProps, "onRetry">> = lastQuestion
     ? { onRetry: handleRetry }
     : {};
+
+  const handleResetSession = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setConversation([]);
+    setSessionId(null);
+    setGuardrail(null);
+    setErrorMessage(null);
+    setLastQuestion(null);
+    setIsStreaming(false);
+    setDefaultFilters(null);
+    setFrequentlyOpenedPanels([]);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+    }
+  }, []);
+
+  const handleForkSession = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+    }
+    setSessionId(null);
+  }, []);
 
   return (
     <div className="chat-workspace" aria-live="polite">
@@ -304,6 +434,23 @@ export default function ChatWorkspace({
         )}
       </div>
 
+      <div className="chat-session-controls" aria-label="Session history controls">
+        <button
+          type="button"
+          onClick={handleResetSession}
+          disabled={!hasTranscript || isStreaming || isRestoring}
+        >
+          Reset session
+        </button>
+        <button
+          type="button"
+          onClick={handleForkSession}
+          disabled={!hasTranscript || isStreaming || isRestoring}
+        >
+          Fork conversation
+        </button>
+      </div>
+
       {guardrail ? (
         <ErrorCallout
           message={guardrail.message}
@@ -325,10 +472,10 @@ export default function ChatWorkspace({
           value={inputValue}
           onChange={(event) => setInputValue(event.target.value)}
           placeholder="How does John 1:1 connect with Genesis 1?"
-          disabled={isStreaming}
+          disabled={isStreaming || isRestoring}
         />
         <div className="chat-form-actions">
-          <button type="submit" disabled={!inputValue.trim() || isStreaming}>
+          <button type="submit" disabled={!inputValue.trim() || isStreaming || isRestoring}>
             {isStreaming ? "Generating…" : "Send"}
           </button>
         </div>

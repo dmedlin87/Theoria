@@ -44,6 +44,9 @@ function createStoryClient(
       events.forEach((event) => options?.onEvent?.(event));
       return result;
     },
+    async fetchChatSession() {
+      return null;
+    },
   };
 }
 
@@ -53,6 +56,9 @@ export function Loading(): JSX.Element {
       return new Promise(() => {
         // Intentionally unresolved to showcase loading state.
       });
+    },
+    async fetchChatSession() {
+      return null;
     },
   };
   return (
