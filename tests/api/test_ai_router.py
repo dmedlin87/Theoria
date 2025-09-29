@@ -1,4 +1,5 @@
 import itertools
+from unittest.mock import Mock
 
 import pytest
 
@@ -26,6 +27,115 @@ def _run_generation(router: LLMRouterService, workflow: str = "chat"):
         except GenerationError:
             continue
     raise AssertionError("router failed to produce a generation")
+
+
+def test_router_logs_warning_when_budget_projection_near_ceiling(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[primary]"},
+            pricing={"per_call": 0.6},
+            routing={"spend_ceiling": 1.0, "weight": 5.0},
+        ),
+        make_default=True,
+    )
+    mock_logger = Mock()
+    monkeypatch.setattr(router_module, "LOGGER", mock_logger)
+    router = LLMRouterService(registry)
+
+    with router._ledger.lock:  # type: ignore[attr-defined]
+        router._ledger.spend["primary"] = 0.3  # type: ignore[attr-defined]
+
+    result = router.execute_generation(workflow="chat", model=registry.models["primary"], prompt="hello")
+
+    assert result.model.name == "primary"
+    assert any("projected spend" in call.args[0] for call in mock_logger.warning.call_args_list)
+
+
+def test_router_logs_warning_when_latency_projection_near_threshold(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[primary]"},
+            pricing={"per_call": 0.1},
+            routing={"latency_threshold_ms": 100.0, "weight": 5.0},
+        ),
+        make_default=True,
+    )
+    mock_logger = Mock()
+    monkeypatch.setattr(router_module, "LOGGER", mock_logger)
+    router = LLMRouterService(registry)
+
+    with router._ledger.lock:  # type: ignore[attr-defined]
+        router._ledger.latency["primary"] = 90.0  # type: ignore[attr-defined]
+
+    times = itertools.chain([0.0, 0.0], itertools.repeat(0.0))
+    monkeypatch.setattr(router_module.time, "perf_counter", lambda: next(times))
+
+    result = router.execute_generation(workflow="chat", model=registry.models["primary"], prompt="hello")
+
+    assert result.model.name == "primary"
+    assert any("recent latency" in call.args[0] for call in mock_logger.warning.call_args_list)
+
+
+def test_router_logs_warning_when_budget_exceeded(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[primary]"},
+            pricing={"per_call": 0.1, "completion_tokens": 1.0},
+            routing={"spend_ceiling": 1.0, "weight": 5.0},
+        ),
+        make_default=True,
+    )
+    mock_logger = Mock()
+    monkeypatch.setattr(router_module, "LOGGER", mock_logger)
+    router = LLMRouterService(registry)
+
+    class _ExpensiveClient:
+        def generate(self, **_: object) -> str:
+            return "x" * 4000
+
+    monkeypatch.setattr(registry.models["primary"], "build_client", lambda: _ExpensiveClient())
+
+    with pytest.raises(GenerationError):
+        router.execute_generation(workflow="chat", model=registry.models["primary"], prompt="hello")
+
+    assert any("exceeded ceiling" in call.args[0] for call in mock_logger.warning.call_args_list)
+
+
+def test_router_logs_warning_when_latency_exceeded(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[primary]"},
+            routing={"latency_threshold_ms": 50.0, "weight": 5.0},
+        ),
+        make_default=True,
+    )
+    mock_logger = Mock()
+    monkeypatch.setattr(router_module, "LOGGER", mock_logger)
+    router = LLMRouterService(registry)
+
+    times = itertools.chain([0.0, 0.2], itertools.repeat(0.2))
+    monkeypatch.setattr(router_module.time, "perf_counter", lambda: next(times))
+
+    with pytest.raises(GenerationError):
+        router.execute_generation(workflow="chat", model=registry.models["primary"], prompt="hello")
+
+    assert any("latency" in call.args[0] and "exceeded" in call.args[0] for call in mock_logger.warning.call_args_list)
 
 
 def test_router_respects_budget_and_falls_back():
