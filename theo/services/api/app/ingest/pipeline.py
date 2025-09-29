@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.request import build_opener as _urllib_build_opener
 
 from sqlalchemy.orm import Session
 
@@ -268,7 +269,7 @@ def run_pipeline_for_url(
                 )
             )
 
-        html, metadata = fetch_web_document(settings, url)
+        html, metadata = _fetch_web_document(settings, url)
         text_content = html_to_text(html)
         if not text_content:
             raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
@@ -370,4 +371,11 @@ def run_pipeline_for_transcript(
         )
         set_span_attribute(span, "ingest.document_id", document.id)
         return document
+
+_WEB_FETCH_CHUNK_SIZE = 64 * 1024
+build_opener = _urllib_build_opener
+
+
+def _fetch_web_document(settings, url: str):
+    return fetch_web_document(settings, url, opener_factory=build_opener)
 
