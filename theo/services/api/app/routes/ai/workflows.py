@@ -486,6 +486,26 @@ CHAT_PLAN = "\n".join(
 )
 
 
+_DEFAULT_REFUSAL_MESSAGE = "I’m sorry, but I cannot help with that request."
+
+
+def _extract_refusal_text(answer: RAGAnswer) -> str:
+    """Normalise a guardrailed completion for user-facing chat responses."""
+
+    completion = answer.model_output or ""
+    if completion:
+        lowered = completion.lower()
+        marker_index = lowered.rfind("sources:")
+        if marker_index != -1:
+            completion = completion[:marker_index]
+        completion = completion.strip()
+    if not completion:
+        completion = (answer.summary or "").strip()
+    if not completion:
+        completion = _DEFAULT_REFUSAL_MESSAGE
+    return completion
+
+
 @router.post(
     "/chat",
     response_model=ChatSessionResponse,
@@ -540,12 +560,7 @@ def chat_turn(
                 recorder=recorder,
             )
             ensure_completion_safe(answer.model_output or answer.summary)
-            message_text = answer.model_output or answer.summary
-            if answer.model_output and "Sources:" in answer.model_output:
-                truncated, _, remainder = answer.model_output.partition("Sources:")
-                stripped = truncated.strip()
-                if stripped:
-                    message_text = stripped
+            message_text = _extract_refusal_text(answer)
             message = ChatSessionMessage(role="assistant", content=message_text)
             recorder.finalize(
                 final_md=answer.summary,
