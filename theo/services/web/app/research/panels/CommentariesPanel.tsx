@@ -1,8 +1,12 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
 import ModeChangeBanner from "../../components/ModeChangeBanner";
 import { formatEmphasisSummary } from "../../mode-config";
-import { getActiveMode } from "../../mode-server";
+import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
-import type { ResearchFeatureFlags } from "./research-panels";
+import type { ResearchFeatureFlags } from "../types";
 
 type ResearchEvidence = {
   id?: string;
@@ -37,33 +41,57 @@ interface CommentariesPanelProps {
   features: ResearchFeatureFlags;
 }
 
-export default async function CommentariesPanel({
-  osis,
-  features,
-}: CommentariesPanelProps) {
+export default function CommentariesPanel({ osis, features }: CommentariesPanelProps) {
+  const { mode } = useMode();
+  const [notes, setNotes] = useState<ResearchNote[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+  const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
+
+  useEffect(() => {
+    if (!features?.commentaries) {
+      return;
+    }
+
+    let cancelled = false;
+    const fetchNotes = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `${baseUrl}/research/notes?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error((await response.text()) || response.statusText);
+        }
+        const payload = (await response.json()) as ResearchNotesResponse;
+        const mapped = payload.notes?.filter((note): note is ResearchNote => Boolean(note)) ?? [];
+        if (!cancelled) {
+          setNotes(mapped);
+        }
+      } catch (fetchError) {
+        console.error("Failed to load commentaries", fetchError);
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : "Unknown error");
+          setNotes([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchNotes();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseUrl, features?.commentaries, mode.id, osis]);
+
   if (!features?.commentaries) {
     return null;
-  }
-
-  const mode = getActiveMode();
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-
-  let notes: ResearchNote[] = [];
-  let error: string | null = null;
-
-  try {
-    const response = await fetch(
-      `${baseUrl}/research/notes?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
-      { cache: "no-store" },
-    );
-    if (!response.ok) {
-      throw new Error((await response.text()) || response.statusText);
-    }
-    const payload = (await response.json()) as ResearchNotesResponse;
-    notes = payload.notes?.filter((note): note is ResearchNote => Boolean(note)) ?? [];
-  } catch (fetchError) {
-    console.error("Failed to load commentaries", fetchError);
-    error = fetchError instanceof Error ? fetchError.message : "Unknown error";
   }
 
   return (
@@ -83,10 +111,12 @@ export default async function CommentariesPanel({
         Curated research notes anchored to <strong>{osis}</strong>.
       </p>
       <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.9rem" }}>
-        {formatEmphasisSummary(mode)}
+        {modeSummary}
       </p>
       <ModeChangeBanner area="Commentaries" />
-      {error ? (
+      {loading ? (
+        <p>Loading commentaries…</p>
+      ) : error ? (
         <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
           Unable to load commentaries. {error}
         </p>

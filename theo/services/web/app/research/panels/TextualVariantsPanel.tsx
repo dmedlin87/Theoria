@@ -14,7 +14,7 @@ import {
 } from "../../mode-config";
 import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
-import type { ResearchFeatureFlags } from "./research-panels";
+import type { ResearchFeatureFlags } from "../types";
 
 const MAX_COMPARISON_SELECTIONS = 2;
 

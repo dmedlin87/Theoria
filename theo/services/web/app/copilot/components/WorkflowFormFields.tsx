@@ -21,6 +21,7 @@ type WorkflowFormFieldsProps = {
   collaboration: { form: CollaborationFormState; onChange: (updates: Partial<CollaborationFormState>) => void };
   curation: { form: CurationFormState; onChange: (updates: Partial<CurationFormState>) => void };
   exportPreset: { form: ExportFormState; onChange: (updates: Partial<ExportFormState>) => void };
+  onVerseCommand?: (value: string) => boolean;
 };
 
 export default function WorkflowFormFields({
@@ -34,6 +35,7 @@ export default function WorkflowFormFields({
   collaboration,
   curation,
   exportPreset,
+  onVerseCommand,
 }: WorkflowFormFieldsProps): JSX.Element | null {
   switch (workflow) {
     case "verse":
@@ -85,6 +87,18 @@ export default function WorkflowFormFields({
               type="text"
               value={verse.form.question}
               onChange={(event) => verse.onChange({ question: event.target.value })}
+              onKeyDown={(event) => {
+                if (!onVerseCommand) {
+                  return;
+                }
+                if (event.key === "Enter") {
+                  const handled = onVerseCommand(event.currentTarget.value);
+                  if (handled) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }
+                }
+              }}
               placeholder="What themes emerge in the Beatitudes?"
               style={{ width: "100%" }}
             />
