@@ -2,37 +2,35 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextlib import contextmanager
 from pathlib import Path
 import sys
 from unittest.mock import MagicMock
-import importlib
 from collections.abc import Iterator
 from typing import Any, TYPE_CHECKING
 
 import pytest
 
 try:
-    fakeredis_aioredis = importlib.import_module("fakeredis.aioredis")
+    import fakeredis
 except ModuleNotFoundError:  # pragma: no cover - fallback for type-checking environments
-    fakeredis_aioredis = pytest.importorskip("fakeredis.aioredis")
+    fakeredis = pytest.importorskip("fakeredis")
 
 if TYPE_CHECKING:
     from typing import Protocol
 
     class FakeRedisType(Protocol):  # pragma: no cover - typing helper only
-        async def keys(self, pattern: str, *args: object) -> list[str]: ...
+        def keys(self, pattern: str, *args: object) -> list[str]: ...
 
-        async def get(self, key: str) -> str | None: ...
+        def get(self, key: str) -> str | None: ...
 
-        async def flushdb(self) -> None: ...
+        def flushdb(self) -> None: ...
 
-        async def delete(self, *keys: str) -> int: ...
+        def delete(self, *keys: str) -> int: ...
 
-        async def dbsize(self) -> int: ...
+        def dbsize(self) -> int: ...
 
-        async def set(self, key: str, value: str) -> bool | None: ...
-
-        async def aclose(self) -> None: ...
+        def set(self, key: str, value: str, **kwargs: object) -> bool | None: ...
 
         def close(self) -> None: ...
 else:
@@ -113,15 +111,59 @@ def _make_result(
 
 @pytest.fixture()
 def fake_cache(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeRedisType]:
-    fake = fakeredis_aioredis.FakeRedis(decode_responses=True)
+    fake = fakeredis.FakeStrictRedis(decode_responses=True)
     monkeypatch.setattr(rag, "_redis_client", fake, raising=False)
     yield fake
-    asyncio.run(fake.flushdb())
+    fake.flushdb()
     try:
-        asyncio.run(fake.aclose())
-    except AttributeError:  # pragma: no cover - older fakeredis
         fake.close()
+    except AttributeError:  # pragma: no cover - older fakeredis
+        fake.connection_pool.disconnect()
     monkeypatch.setattr(rag, "_redis_client", None, raising=False)
+
+
+def test_cache_helpers_do_not_create_event_loop(
+    fake_cache: FakeRedisType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        asyncio,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("cache helpers should not invoke asyncio.run"),
+    )
+    monkeypatch.setattr(
+        asyncio,
+        "new_event_loop",
+        lambda *_args, **_kwargs: pytest.fail("cache helpers should not create event loops"),
+    )
+
+    key = "rag:test:loop-guard"
+    answer = rag.RAGAnswer(
+        summary="Cached summary",
+        citations=[
+            rag.RAGCitation(
+                index=1,
+                osis="John.3.16",
+                anchor="page 2",
+                passage_id="passage-1",
+                document_id="doc-1",
+                document_title="Gospel of John",
+                snippet="For God so loved the world",
+                source_url=None,
+            )
+        ],
+        model_name="dummy",
+        model_output="Answer\n\nSources: [1] John.3.16 (page 2)",
+    )
+    validation = {"status": "passed"}
+
+    rag._store_cached_answer(key, answer=answer, validation=validation)
+
+    cached_payload = rag._load_cached_answer(key)
+    assert cached_payload is not None
+    assert cached_payload["validation"] == validation
+
+    rag._run_redis_command(lambda client: client.delete(key))
+    assert fake_cache.get(key) is None
 
 
 class _FakeCounter:
@@ -155,6 +197,20 @@ def _make_registry(model: _DummyModel) -> LLMRegistry:
     return LLMRegistry(models={model.name: model}, default_model=model.name)
 
 
+def _patch_chat_instrumentation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[str, dict[str, object]]]:
+    spans: list[tuple[str, dict[str, object]]] = []
+
+    @contextmanager
+    def _instrument(name: str, **attributes: object):
+        spans.append((name, attributes))
+        yield MagicMock()
+
+    monkeypatch.setattr(rag, "instrument_workflow", _instrument)
+    return spans
+
+
 def test_guarded_answer_accepts_valid_completion(
     fake_cache: FakeRedisType, cache_metrics: _FakeCounter
 ) -> None:
@@ -176,9 +232,9 @@ def test_guarded_answer_accepts_valid_completion(
     assert answer.model_name == model.name
     assert answer.guardrail_profile is None
 
-    keys = asyncio.run(fake_cache.keys("rag:*"))
+    keys = fake_cache.keys("rag:*")
     assert keys
-    payload = asyncio.run(fake_cache.get(keys[0]))
+    payload = fake_cache.get(keys[0])
     assert payload is not None
     cached = json.loads(payload)
     assert cached["validation"]["status"] == "passed"
@@ -202,7 +258,7 @@ def test_guarded_answer_rejects_mismatched_citations(fake_cache: FakeRedisType) 
             filters=HybridSearchFilters(),
         )
 
-    assert asyncio.run(fake_cache.dbsize()) == 0
+    assert fake_cache.dbsize() == 0
 
 
 def test_guarded_answer_requires_osis_reference(
@@ -420,9 +476,9 @@ def test_guarded_answer_uses_echo_model(fake_cache: FakeRedisType) -> None:
     assert answer.model_name == echo_model.name
     assert answer.guardrail_profile is None
 
-    keys = asyncio.run(fake_cache.keys("rag:*"))
+    keys = fake_cache.keys("rag:*")
     assert keys
-    payload_raw = asyncio.run(fake_cache.get(keys[0]))
+    payload_raw = fake_cache.get(keys[0])
     assert payload_raw is not None
     payload = json.loads(payload_raw)
     assert payload["validation"]["status"] == "passed"
@@ -450,7 +506,7 @@ def test_guarded_answer_profile_mismatch_raises_guardrail_error(
             filters=filters,
         )
 
-    assert asyncio.run(fake_cache.dbsize()) == 0
+    assert fake_cache.dbsize() == 0
 
 
 def test_guarded_answer_profile_match_includes_profile(
@@ -541,9 +597,9 @@ def test_guarded_answer_invalidates_stale_cache(
     deleted_keys: list[str] = []
     original_delete = fake_cache.delete
 
-    async def record_delete(*keys: str) -> int:
+    def record_delete(*keys: str) -> int:
         deleted_keys.extend(keys)
-        return await original_delete(*keys)
+        return original_delete(*keys)
 
     monkeypatch.setattr(fake_cache, "delete", record_delete)
 
@@ -559,16 +615,16 @@ def test_guarded_answer_invalidates_stale_cache(
 
     assert model.client.call_count == 1
 
-    keys = asyncio.run(fake_cache.keys("rag:*"))
+    keys = fake_cache.keys("rag:*")
     assert keys
     cache_key = keys[0]
-    payload_raw = asyncio.run(fake_cache.get(cache_key))
+    payload_raw = fake_cache.get(cache_key)
     assert payload_raw is not None
     payload = json.loads(payload_raw)
     payload["answer"]["model_output"] = (
         "Stale answer.\n\nSources: [1] Luke.1.1 (page 9)"
     )
-    asyncio.run(fake_cache.set(cache_key, json.dumps(payload)))
+    fake_cache.set(cache_key, json.dumps(payload))
 
     model.client.completion = refreshed_completion
     deleted_keys.clear()
@@ -591,7 +647,78 @@ def test_guarded_answer_invalidates_stale_cache(
         for event, data in events
     )
 
-    refreshed_payload_raw = asyncio.run(fake_cache.get(cache_key))
+    refreshed_payload_raw = fake_cache.get(cache_key)
     assert refreshed_payload_raw is not None
     refreshed_payload = json.loads(refreshed_payload_raw)
     assert refreshed_payload["answer"]["model_output"] == refreshed_completion
+
+
+def test_run_guarded_chat_reuses_cache(
+    fake_cache: FakeRedisType,
+    cache_metrics: _FakeCounter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completion = "Grace-focused summary.\n\nSources: [1] John.3.16 (page 2)"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    spans = _patch_chat_instrumentation(monkeypatch)
+
+    results = [_make_result()]
+    monkeypatch.setattr(rag, "_search", lambda *_, **__: results)
+    monkeypatch.setattr(rag, "get_llm_registry", lambda _session: registry)
+
+    session = MagicMock(spec=Session)
+
+    first = rag.run_guarded_chat(
+        session,
+        question="What does John 3:16 teach?",
+        filters=HybridSearchFilters(),
+        model_name=model.name,
+    )
+
+    assert first.model_output == completion
+    assert model.client.call_count == 1
+    assert cache_metrics.counts == {"miss": 1.0}
+    assert spans and spans[0][0] == "chat"
+
+    cache_metrics.counts.clear()
+    spans.clear()
+
+    second = rag.run_guarded_chat(
+        session,
+        question="What does John 3:16 teach?",
+        filters=HybridSearchFilters(),
+        model_name=model.name,
+    )
+
+    assert second.model_output == completion
+    assert model.client.call_count == 1
+    assert cache_metrics.counts == {"hit": 1.0}
+    assert spans and spans[0][0] == "chat"
+
+
+def test_run_guarded_chat_guardrail_violation_propagates(
+    fake_cache: FakeRedisType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completion = "Incorrect.\n\nSources: [1] Luke.1.1 (page 2)"
+    model = _DummyModel(completion)
+    registry = _make_registry(model)
+    _patch_chat_instrumentation(monkeypatch)
+
+    results = [_make_result()]
+    monkeypatch.setattr(rag, "_search", lambda *_, **__: results)
+    monkeypatch.setattr(rag, "get_llm_registry", lambda _session: registry)
+
+    session = MagicMock(spec=Session)
+
+    with pytest.raises(GuardrailError):
+        rag.run_guarded_chat(
+            session,
+            question="What does John 3:16 teach?",
+            filters=HybridSearchFilters(),
+            model_name=model.name,
+        )
+
+    assert model.client.call_count == 1
+    assert fake_cache.dbsize() == 0

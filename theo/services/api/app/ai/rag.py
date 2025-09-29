@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging
@@ -11,23 +10,13 @@ import re
 import textwrap
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Callable,
-    Literal,
-    Mapping,
-    Pattern,
-    Sequence,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, Callable, Literal, Mapping, Pattern, Sequence, TypeVar
 from urllib.parse import urlencode
 
 try:  # pragma: no cover - optional dependency guard
-    from redis import asyncio as redis_asyncio
+    import redis
 except ImportError:  # pragma: no cover - redis is optional at runtime
-    redis_asyncio = None  # type: ignore[assignment]
+    redis = None  # type: ignore[assignment]
 
 from opentelemetry import trace
 from sqlalchemy import select
@@ -371,14 +360,14 @@ def _get_cache_client() -> Any:
 
     global _redis_client
 
-    if redis_asyncio is None:
+    if redis is None:
         return None
     if _redis_client is not None:
         return _redis_client
 
     try:
         settings = get_settings()
-        _redis_client = redis_asyncio.from_url(  # type: ignore[assignment]
+        _redis_client = redis.Redis.from_url(  # type: ignore[assignment]
             settings.redis_url,
             encoding="utf-8",
             decode_responses=True,
@@ -389,26 +378,14 @@ def _get_cache_client() -> Any:
     return _redis_client
 
 
-def _run_redis_command(operation: Callable[[Any], Awaitable[T]]) -> T | None:
-    """Execute an async redis command from synchronous code."""
+def _run_redis_command(operation: Callable[[Any], T]) -> T | None:
+    """Execute a redis command using the memoized client."""
 
     client = _get_cache_client()
     if client is None:
         return None
-
-    async def _runner() -> T:
-        return await operation(client)
-
     try:
-        return asyncio.run(_runner())
-    except RuntimeError as exc:  # pragma: no cover - nested loop guard
-        if "running event loop" in str(exc).lower():
-            loop = asyncio.new_event_loop()
-            try:
-                return loop.run_until_complete(_runner())
-            finally:
-                loop.close()
-        raise
+        return operation(client)
     except Exception:  # pragma: no cover - redis failures logged at debug
         LOGGER.debug("redis command failed", exc_info=True)
         return None
