@@ -1,7 +1,11 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
 import { formatEmphasisSummary } from "../../mode-config";
-import { getActiveMode } from "../../mode-server";
+import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
-import type { ResearchFeatureFlags } from "./research-panels";
+import type { ResearchFeatureFlags } from "../types";
 
 type MorphToken = {
   osis: string;
@@ -22,33 +26,57 @@ interface MorphologyPanelProps {
   features: ResearchFeatureFlags;
 }
 
-export default async function MorphologyPanel({
-  osis,
-  features,
-}: MorphologyPanelProps) {
+export default function MorphologyPanel({ osis, features }: MorphologyPanelProps) {
+  const { mode } = useMode();
+  const [tokens, setTokens] = useState<MorphToken[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+  const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
+
+  useEffect(() => {
+    if (!features?.morphology) {
+      return;
+    }
+
+    let cancelled = false;
+    const fetchMorphology = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `${baseUrl}/research/morphology?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error((await response.text()) || response.statusText);
+        }
+        const payload = (await response.json()) as MorphologyResponse;
+        const mapped = payload.tokens?.filter((item): item is MorphToken => Boolean(item)) ?? [];
+        if (!cancelled) {
+          setTokens(mapped);
+        }
+      } catch (fetchError) {
+        console.error("Failed to load morphology", fetchError);
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : "Unknown error");
+          setTokens([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchMorphology();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseUrl, features?.morphology, mode.id, osis]);
+
   if (!features?.morphology) {
     return null;
-  }
-
-  const mode = getActiveMode();
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-
-  let tokens: MorphToken[] = [];
-  let error: string | null = null;
-
-  try {
-    const response = await fetch(
-      `${baseUrl}/research/morphology?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
-      { cache: "no-store" },
-    );
-    if (!response.ok) {
-      throw new Error((await response.text()) || response.statusText);
-    }
-    const payload = (await response.json()) as MorphologyResponse;
-    tokens = payload.tokens?.filter((item): item is MorphToken => Boolean(item)) ?? [];
-  } catch (fetchError) {
-    console.error("Failed to load morphology", fetchError);
-    error = fetchError instanceof Error ? fetchError.message : "Unknown error";
   }
 
   return (
@@ -68,9 +96,11 @@ export default async function MorphologyPanel({
         Analyze lexical and grammatical details for <strong>{osis}</strong>.
       </p>
       <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.875rem" }}>
-        {formatEmphasisSummary(mode)}
+        {modeSummary}
       </p>
-      {error ? (
+      {loading ? (
+        <p>Loading morphology…</p>
+      ) : error ? (
         <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
           Unable to load morphology. {error}
         </p>
