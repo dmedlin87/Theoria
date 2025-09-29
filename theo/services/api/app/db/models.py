@@ -97,6 +97,7 @@ class Passage(Base):
     end_char: Mapped[int | None] = mapped_column(Integer, nullable=True)
     osis_ref: Mapped[str | None] = mapped_column(String, index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     embedding: Mapped[list[float] | None] = mapped_column(
         VectorType(get_settings().embedding_dim), nullable=True
@@ -354,6 +355,7 @@ class TranscriptSegment(Base):
     t_start: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
     t_end: Mapped[float | None] = mapped_column(Float, nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     primary_osis: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
     osis_refs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     topics: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)

@@ -25,7 +25,7 @@ from ...ai import (
     run_research_reconciliation,
 )
 from ...ai.passage import PassageResolutionError, resolve_passage_reference
-from ...ai.rag import GuardrailError, RAGAnswer, RAGCitation
+from ...ai.rag import GuardrailError, RAGAnswer, RAGCitation, ensure_completion_safe
 from ...ai.registry import LLMModel, LLMRegistry, save_llm_registry
 from ...ai.trails import TrailService
 from ...core.database import get_session
@@ -37,6 +37,7 @@ from ...models.ai import (
     ChatSessionMessage,
     ChatSessionRequest,
     ChatSessionResponse,
+    CHAT_SESSION_TOTAL_CHAR_BUDGET,
     CitationExportRequest,
     CitationExportResponse,
     CollaborationRequest,
@@ -496,6 +497,12 @@ def chat_turn(
 ) -> ChatSessionResponse:
     if not payload.messages:
         raise HTTPException(status_code=400, detail="messages cannot be empty")
+    total_message_chars = sum(len(message.content) for message in payload.messages)
+    if total_message_chars > CHAT_SESSION_TOTAL_CHAR_BUDGET:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="chat payload exceeds size limit",
+        )
     last_user = next(
         (message for message in reversed(payload.messages) if message.role == "user"),
         None,
@@ -532,6 +539,7 @@ def chat_turn(
                 model_name=payload.model,
                 recorder=recorder,
             )
+            ensure_completion_safe(answer.model_output or answer.summary)
             message = ChatSessionMessage(
                 role="assistant",
                 content=answer.model_output or answer.summary,

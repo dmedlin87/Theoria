@@ -1,0 +1,11 @@
+{
+  "generated_at": "2024-01-01T00:00:00Z",
+  "metrics": {
+    "faithfulness": 0.92,
+    "groundedness": 0.9,
+    "context_precision": 0.88,
+    "context_recall": 0.9,
+    "answer_relevance": 0.9
+  },
+  "tolerance": 0.02
+}

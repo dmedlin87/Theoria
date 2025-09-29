@@ -11,7 +11,17 @@ import re
 import textwrap
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Sequence, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Literal,
+    Mapping,
+    Pattern,
+    Sequence,
+    TypeVar,
+)
 from urllib.parse import urlencode
 
 try:  # pragma: no cover - optional dependency guard
@@ -27,6 +37,8 @@ from ..core.settings import get_settings
 from ..core.version import get_git_sha
 from ..db.models import Document, Passage
 from ..export.formatters import SCHEMA_VERSION, generate_export_id
+from pydantic import Field
+
 from ..models.base import APIModel
 from ..models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
@@ -52,6 +64,78 @@ _RAG_TRACER = trace.get_tracer("theo.rag")
 _CACHE_TTL_SECONDS = 30 * 60
 _CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*\((?P<anchor>[^()]+)\)$")
 _SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
+_MARKDOWN_ESCAPE_PATTERN = re.compile(r"([\\`*_{}\[\]()#+.!|\-])")
+
+_ADVERSARIAL_REPLACEMENTS: tuple[tuple[Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"\b(?:ignore|disregard|forget)\b[^\n]{0,40}?\b(?:previous|prior|all)\s+instructions?\b",
+            re.IGNORECASE,
+        ),
+        "[filtered-instruction]",
+    ),
+    (
+        re.compile(
+            r"\b(?:override|reset|disable)\b[^\n]{0,40}?\b(?:guardrails?|safety|system)\b",
+            re.IGNORECASE,
+        ),
+        "[filtered-override]",
+    ),
+    (
+        re.compile(r"drop\s+table\b", re.IGNORECASE),
+        "[filtered-sql]",
+    ),
+    (
+        re.compile(r"<\s*/?script\b[^>]*>", re.IGNORECASE),
+        "[filtered-html]",
+    ),
+    (
+        re.compile(r"<\s*/?style\b[^>]*>", re.IGNORECASE),
+        "[filtered-html]",
+    ),
+    (
+        re.compile(r"<!--.*?-->", re.DOTALL),
+        "[filtered-comment]",
+    ),
+    (
+        re.compile(r"```(?:html|javascript|sql)[\s\S]*?```", re.IGNORECASE),
+        "[filtered-code-block]",
+    ),
+)
+
+_DISALLOWED_COMPLETION_PATTERNS: tuple[tuple[Pattern[str], str], ...] = (
+    (
+        re.compile(r"\bselect\b[^\n]+\bfrom\b", re.IGNORECASE),
+        "SQL SELECT pattern",
+    ),
+    (
+        re.compile(
+            r"\b(insert|update|delete|drop|alter|create)\b[^\n]+\btable\b",
+            re.IGNORECASE,
+        ),
+        "SQL modification pattern",
+    ),
+    (
+        re.compile(r"<\s*/?script\b", re.IGNORECASE),
+        "script markup",
+    ),
+    (
+        re.compile(r"password\s*[:=]", re.IGNORECASE),
+        "credential disclosure",
+    ),
+    (
+        re.compile(r"api[-_\s]*key", re.IGNORECASE),
+        "credential disclosure",
+    ),
+    (
+        re.compile(r"access\s*token", re.IGNORECASE),
+        "credential disclosure",
+    ),
+    (
+        re.compile(r"secret\s*(?:key|token)", re.IGNORECASE),
+        "credential disclosure",
+    ),
+)
 
 _redis_client: Any = None
 
@@ -61,6 +145,43 @@ def _normalise_profile_value(value: str | None) -> str | None:
         return None
     text = value.strip().lower()
     return text or None
+
+
+def _escape_markdown_html(value: str) -> str:
+    if not value:
+        return ""
+    escaped = (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    return _MARKDOWN_ESCAPE_PATTERN.sub(r"\\\1", escaped)
+
+
+def _sanitize_markdown_field(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    return _escape_markdown_html(text)
+
+
+def _scrub_adversarial_language(value: str | None) -> str | None:
+    if not value:
+        return value
+    text = value
+    for pattern, replacement in _ADVERSARIAL_REPLACEMENTS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
+def _sanitize_json_structure(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        return {key: _sanitize_json_structure(value) for key, value in payload.items()}
+    if isinstance(payload, (list, tuple, set)):
+        return [_sanitize_json_structure(item) for item in payload]
+    if isinstance(payload, str):
+        return _sanitize_markdown_field(payload)
+    return payload
 
 
 def _extract_topic_domains(meta: Mapping[str, Any] | None) -> set[str]:
@@ -163,6 +284,7 @@ class RAGCitation(APIModel):
     document_title: str | None = None
     snippet: str
     source_url: str | None = None
+    raw_snippet: str | None = Field(default=None, exclude=True)
 
 
 class RAGAnswer(APIModel):
@@ -359,23 +481,28 @@ def _iter_sentence_spans(text: str) -> list[tuple[int, int, str]]:
     return spans
 
 
-def _derive_snippet(result: HybridSearchResult) -> str:
-    base_text = result.text or ""
-    fallback = (result.snippet or base_text).strip()
+def _derive_snippet(
+    result: HybridSearchResult,
+    *,
+    text: str | None = None,
+    fallback: str | None = None,
+) -> str:
+    base_text = text if text is not None else result.text or ""
+    fallback_value = (fallback if fallback is not None else result.snippet or base_text).strip()
     if not base_text.strip():
-        return fallback
+        return fallback_value
 
     start_char = getattr(result, "start_char", None)
     end_char = getattr(result, "end_char", None)
     if start_char is None or end_char is None:
-        return fallback
+        return fallback_value
 
     start = max(0, min(len(base_text), start_char))
     end = max(start, min(len(base_text), end_char))
     spans = _iter_sentence_spans(base_text)
     if not spans:
         snippet = base_text[start:end].strip()
-        return snippet or fallback
+        return snippet or fallback_value
 
     selected_sentences = [
         sentence
@@ -384,10 +511,10 @@ def _derive_snippet(result: HybridSearchResult) -> str:
     ]
     if not selected_sentences:
         snippet = base_text[start:end].strip()
-        return snippet or fallback
+        return snippet or fallback_value
 
     snippet = " ".join(selected_sentences).strip()
-    return snippet or fallback
+    return snippet or fallback_value
 
 
 def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
@@ -397,6 +524,12 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
             continue
         anchor = _format_anchor(result)
         snippet = _derive_snippet(result)
+        raw_snippet = None
+        raw_text = getattr(result, "raw_text", None)
+        if raw_text:
+            raw_snippet = _derive_snippet(
+                result, text=raw_text, fallback=raw_text
+            )
         citations.append(
             RAGCitation(
                 index=index,
@@ -407,6 +540,7 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
                 document_title=result.document_title,
                 snippet=snippet,
                 source_url=_build_source_url(result),
+                raw_snippet=raw_snippet,
             )
         )
     return citations
@@ -491,6 +625,16 @@ def _validate_model_completion(
     }
 
 
+def ensure_completion_safe(completion: str | None) -> None:
+    if not completion:
+        return
+    for pattern, reason in _DISALLOWED_COMPLETION_PATTERNS:
+        if pattern.search(completion):
+            raise GuardrailError(
+                f"Model completion failed safety check: {reason}"
+            )
+
+
 def _guarded_answer(
     session: Session,
     *,
@@ -540,18 +684,21 @@ def _guarded_answer(
     if not candidates:
         raise GenerationError("No language models are available for workflow 'rag'")
 
-    context_lines = [
-        f"[{citation.index}] {citation.snippet} (OSIS {citation.osis}, {citation.anchor})"
-        for citation in citations
-    ]
+    context_lines = []
+    for citation in citations:
+        prompt_snippet = _scrub_adversarial_language(citation.snippet) or ""
+        context_lines.append(
+            f"[{citation.index}] {prompt_snippet.strip()} (OSIS {citation.osis}, {citation.anchor})"
+        )
     prompt_parts = [
         "You are Theo Engine's grounded assistant.",
         "Answer the question strictly from the provided passages.",
         "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
         "If the passages do not answer the question, state that explicitly.",
     ]
-    if question:
-        prompt_parts.append(f"Question: {question}")
+    sanitized_question = _scrub_adversarial_language(question)
+    if sanitized_question:
+        prompt_parts.append(f"Question: {sanitized_question}")
     prompt_parts.append("Passages:")
     prompt_parts.extend(context_lines)
     prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
@@ -596,6 +743,7 @@ def _guarded_answer(
                     validation_result = _validate_model_completion(
                         cache_hit_payload.model_output, citations
                     )
+                    ensure_completion_safe(cache_hit_payload.model_output)
                 except GuardrailError as exc:
                     cache_status = "stale"
                     _run_redis_command(lambda client: client.delete(cache_key))
@@ -710,6 +858,7 @@ def _guarded_answer(
                     completion = completion.strip() + f"\n\nSources: {sources_line}"
                 try:
                     validation_result = _validate_model_completion(completion, citations)
+                    ensure_completion_safe(completion)
                 except GuardrailError as exc:
                     span.record_exception(exc)
                     log_workflow_event(
@@ -1476,19 +1625,25 @@ def _build_deliverable_manifest(
 def _manifest_front_matter(manifest: DeliverableManifest) -> list[str]:
     lines = [
         "---",
-        f"export_id: {manifest.export_id}",
-        f"schema_version: {manifest.schema_version}",
-        f"generated_at: {manifest.generated_at.isoformat()}",
-        f"type: {manifest.type}",
+        f"export_id: {_sanitize_markdown_field(manifest.export_id)}",
+        f"schema_version: {_sanitize_markdown_field(manifest.schema_version)}",
+        f"generated_at: {_sanitize_markdown_field(manifest.generated_at.isoformat())}",
+        f"type: {_sanitize_markdown_field(manifest.type)}",
     ]
     if manifest.model_preset:
-        lines.append(f"model_preset: {manifest.model_preset}")
+        lines.append(f"model_preset: {_sanitize_markdown_field(manifest.model_preset)}")
     if manifest.git_sha:
-        lines.append(f"git_sha: {manifest.git_sha}")
+        lines.append(f"git_sha: {_sanitize_markdown_field(manifest.git_sha)}")
     if manifest.sources:
-        lines.append(f"sources: {json.dumps(manifest.sources)}")
+        sources = _sanitize_json_structure(list(manifest.sources))
+        lines.append(
+            f"sources: {json.dumps(sources, ensure_ascii=False)}"
+        )
     if manifest.filters:
-        lines.append(f"filters: {json.dumps(manifest.filters, sort_keys=True)}")
+        filters = _sanitize_json_structure(dict(manifest.filters))
+        lines.append(
+            f"filters: {json.dumps(filters, sort_keys=True, ensure_ascii=False)}"
+        )
     lines.append("---\n")
     return lines
 
@@ -1602,25 +1757,30 @@ def _render_sermon_markdown(
     manifest: DeliverableManifest, response: SermonPrepResponse
 ) -> str:
     lines = _manifest_front_matter(manifest)
-    lines.append(f"# Sermon Prep — {response.topic}")
+    lines.append(
+        f"# Sermon Prep — {_sanitize_markdown_field(response.topic)}"
+    )
     if response.osis:
-        lines.append(f"Focus Passage: {response.osis}\n")
+        lines.append(
+            f"Focus Passage: {_sanitize_markdown_field(response.osis)}\n"
+        )
     if response.outline:
         lines.append("## Outline")
         for item in response.outline:
-            lines.append(f"- {item}")
+            lines.append(f"- {_sanitize_markdown_field(item)}")
         lines.append("")
     if response.key_points:
         lines.append("## Key Points")
         for point in response.key_points:
-            lines.append(f"- {point}")
+            lines.append(f"- {_sanitize_markdown_field(point)}")
         lines.append("")
     if response.answer.citations:
         lines.append("## Citations")
         for citation in response.answer.citations:
-            lines.append(
-                f"- {citation.osis} ({citation.anchor}) — {citation.snippet}"
-            )
+            osis = _sanitize_markdown_field(citation.osis)
+            anchor = _sanitize_markdown_field(citation.anchor)
+            snippet = _sanitize_markdown_field(citation.snippet)
+            lines.append(f"- {osis} ({anchor}) — {snippet}")
     return "\n".join(lines).strip() + "\n"
 
 
@@ -1774,12 +1934,16 @@ def _render_transcript_markdown(
     rows: Sequence[dict[str, Any]],
 ) -> str:
     lines = _manifest_front_matter(manifest)
-    lines.append(f"# Q&A Transcript — {title or manifest.filters.get('document_id')}")
+    heading_subject = title or manifest.filters.get("document_id") or ""
+    lines.append(
+        f"# Q&A Transcript — {_sanitize_markdown_field(heading_subject)}"
+    )
     for row in rows:
         anchor = row.get("osis") or row.get("page_no") or row.get("t_start")
-        lines.append(
-            f"- **{row['speaker']}** ({anchor}): {row['text']}"
-        )
+        speaker = _sanitize_markdown_field(row.get("speaker"))
+        anchor_text = _sanitize_markdown_field(anchor)
+        text = _sanitize_markdown_field(row.get("text"))
+        lines.append(f"- **{speaker}** ({anchor_text}): {text}")
     return "\n".join(lines).strip() + "\n"
 
 
