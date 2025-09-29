@@ -1,0 +1,22 @@
+- osis_a: "John.19.14"
+  osis_b: "Mark.15.25"
+  summary: >-
+    Harmonisation proposals argue John uses Roman civil reckoning while Mark retains the Jewish day,
+    making the sixth and third hours align once calendars are reconciled.
+  source: "seed:harmony:passion"
+  tags:
+    - chronology
+    - passion
+  weight: 0.7
+  perspective: apologetic
+- osis_a: "Matthew.27.5"
+  osis_b: "Acts.1.18"
+  summary: >-
+    Apologetic readings merge Matthew and Acts by suggesting Judas first hanged himself and later fell
+    when the rope or branch failed, integrating both death scenes.
+  source: "seed:harmony:judas"
+  tags:
+    - judas
+    - synthesis
+  weight: 0.66
+  perspective: apologetic

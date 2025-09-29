@@ -1,21 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import type { ContradictionRecord } from "./ContradictionsPanel";
 
-type ViewingMode = "neutral" | "skeptical" | "apologetic";
+export type ViewingMode = "neutral" | "skeptical" | "apologetic";
 
-type ModeState = Record<ViewingMode, boolean>;
+export type ModeState = Record<ViewingMode, boolean>;
 
-const viewingModes: { id: ViewingMode; label: string }[] = [
+export const viewingModes: { id: ViewingMode; label: string }[] = [
   { id: "neutral", label: "Neutral" },
   { id: "skeptical", label: "Skeptical" },
   { id: "apologetic", label: "Apologetic" },
 ];
 
-function initializeModeState(): ModeState {
+export function initializeModeState(): ModeState {
   return {
     neutral: true,
     skeptical: true,
@@ -25,6 +25,10 @@ function initializeModeState(): ModeState {
 
 interface ContradictionsPanelClientProps {
   contradictions: ContradictionRecord[];
+  viewingMode: ViewingMode;
+  onViewingModeChange: (mode: ViewingMode) => void;
+  modeState: ModeState;
+  onModeStateChange: (state: ModeState) => void;
 }
 
 function isLikelyUrl(value: string): boolean {
@@ -38,23 +42,11 @@ function isLikelyUrl(value: string): boolean {
 
 export default function ContradictionsPanelClient({
   contradictions,
+  viewingMode,
+  onViewingModeChange,
+  modeState,
+  onModeStateChange,
 }: ContradictionsPanelClientProps) {
-  const [viewingMode, setViewingMode] = useState<ViewingMode>("neutral");
-  const [modeState, setModeState] = useState<ModeState>(() => initializeModeState());
-
-  useEffect(() => {
-    setModeState((previous) => {
-      switch (viewingMode) {
-        case "skeptical":
-          return { neutral: true, skeptical: true, apologetic: false };
-        case "apologetic":
-          return { neutral: true, skeptical: false, apologetic: true };
-        default:
-          return { neutral: true, skeptical: true, apologetic: true };
-      }
-    });
-  }, [viewingMode]);
-
   const visibleContradictions = useMemo(() => {
     return contradictions.filter((item) => {
       const perspective = (item.perspective ?? "neutral").toLowerCase();
@@ -89,7 +81,7 @@ export default function ContradictionsPanelClient({
           <select
             aria-label="Select viewing mode"
             value={viewingMode}
-            onChange={(event) => setViewingMode(event.target.value as ViewingMode)}
+            onChange={(event) => onViewingModeChange(event.target.value as ViewingMode)}
             style={{
               padding: "0.25rem 0.5rem",
               borderRadius: "0.375rem",
@@ -120,10 +112,10 @@ export default function ContradictionsPanelClient({
                   type="checkbox"
                   checked={modeState[mode.id]}
                   onChange={(event) =>
-                    setModeState((prev) => ({
-                      ...prev,
+                    onModeStateChange({
+                      ...modeState,
                       [mode.id]: event.target.checked,
-                    }))
+                    })
                   }
                   aria-label={`Show contradictions in ${mode.label} mode`}
                 />

@@ -24,13 +24,30 @@ type CommentaryResponse = {
   total?: number | null;
 };
 
-type PerspectiveFilter = "all" | "skeptical" | "apologetic" | "neutral";
+type CommentaryPerspective = "skeptical" | "apologetic" | "neutral";
 
-const perspectiveOptions: { id: PerspectiveFilter; label: string }[] = [
-  { id: "all", label: "All perspectives" },
-  { id: "skeptical", label: "Skeptical only" },
-  { id: "apologetic", label: "Apologetic only" },
-  { id: "neutral", label: "Neutral only" },
+type CommentaryPerspectiveState = Record<CommentaryPerspective, boolean>;
+
+const commentaryPerspectiveOptions: {
+  id: CommentaryPerspective;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "skeptical",
+    label: "Skeptical",
+    description: "critical readings and historical challenges",
+  },
+  {
+    id: "apologetic",
+    label: "Apologetic",
+    description: "harmonies and confessional defences",
+  },
+  {
+    id: "neutral",
+    label: "Neutral",
+    description: "lexical or background notes",
+  },
 ];
 
 interface CommentariesPanelProps {
@@ -43,12 +60,36 @@ export default function CommentariesPanel({ osis, features }: CommentariesPanelP
   const [commentaries, setCommentaries] = useState<CommentaryExcerpt[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [perspectiveFilter, setPerspectiveFilter] = useState<PerspectiveFilter>("all");
+  const [perspectiveState, setPerspectiveState] = useState<CommentaryPerspectiveState>(() => ({
+    skeptical: true,
+    apologetic: true,
+    neutral: true,
+  }));
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
+  const activePerspectives = useMemo(() => {
+    const perspectives: CommentaryPerspective[] = [];
+    if (perspectiveState.skeptical) {
+      perspectives.push("skeptical");
+    }
+    if (perspectiveState.apologetic) {
+      perspectives.push("apologetic");
+    }
+    if (perspectiveState.neutral) {
+      perspectives.push("neutral");
+    }
+    return perspectives;
+  }, [perspectiveState]);
 
   useEffect(() => {
     if (!features?.commentaries) {
+      return;
+    }
+
+    if (activePerspectives.length === 0) {
+      setCommentaries([]);
+      setError(null);
+      setLoading(false);
       return;
     }
 
@@ -60,9 +101,7 @@ export default function CommentariesPanel({ osis, features }: CommentariesPanelP
         const params = new URLSearchParams();
         params.append("osis", osis);
         params.append("mode", mode.id);
-        if (perspectiveFilter !== "all") {
-          params.append("perspective", perspectiveFilter);
-        }
+        activePerspectives.forEach((perspective) => params.append("perspective", perspective));
         const response = await fetch(`${baseUrl}/research/commentaries?${params.toString()}`, {
           cache: "no-store",
         });
@@ -92,7 +131,13 @@ export default function CommentariesPanel({ osis, features }: CommentariesPanelP
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, features?.commentaries, mode.id, osis, perspectiveFilter]);
+  }, [
+    activePerspectives,
+    baseUrl,
+    features?.commentaries,
+    mode.id,
+    osis,
+  ]);
 
   if (!features?.commentaries) {
     return null;
@@ -126,28 +171,49 @@ export default function CommentariesPanel({ osis, features }: CommentariesPanelP
           marginBottom: "1rem",
         }}
       >
-        <label style={{ display: "grid", gap: "0.25rem" }}>
-          <span style={{ fontWeight: 600, fontSize: "0.875rem" }}>Perspective filter</span>
-          <select
-            value={perspectiveFilter}
-            onChange={(event) => setPerspectiveFilter(event.target.value as PerspectiveFilter)}
-            style={{
-              padding: "0.35rem 0.75rem",
-              borderRadius: "0.375rem",
-              border: "1px solid var(--border, #d1d5db)",
-              fontSize: "0.875rem",
-            }}
-          >
-            {perspectiveOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <fieldset
+          style={{
+            display: "grid",
+            gap: "0.5rem",
+            padding: "0.75rem",
+            borderRadius: "0.5rem",
+            border: "1px solid var(--border, #d1d5db)",
+            minWidth: "16rem",
+            margin: 0,
+          }}
+        >
+          <legend style={{ fontWeight: 600, fontSize: "0.875rem" }}>Perspectives</legend>
+          {commentaryPerspectiveOptions.map((option) => (
+            <label
+              key={option.id}
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem" }}
+            >
+              <input
+                type="checkbox"
+                checked={perspectiveState[option.id]}
+                onChange={(event) =>
+                  setPerspectiveState((prev) => ({
+                    ...prev,
+                    [option.id]: event.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <strong>{option.label}</strong>
+                <span style={{ color: "var(--muted-foreground, #6b7280)", display: "block" }}>
+                  {option.description}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
         <ModeChangeBanner area="Commentaries" />
       </div>
-      {loading ? (
+      {activePerspectives.length === 0 ? (
+        <p style={{ margin: 0, color: "var(--muted-foreground, #6b7280)" }}>
+          All perspectives are hidden. Enable at least one checkbox to surface commentary excerpts.
+        </p>
+      ) : loading ? (
         <p>Loading commentaries…</p>
       ) : error ? (
         <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
