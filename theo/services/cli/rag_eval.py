@@ -11,7 +11,10 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import click
-from datasets import Dataset as HFDataset
+try:  # pragma: no cover - datasets is optional for unit tests
+    from datasets import Dataset as HFDataset
+except ImportError:  # pragma: no cover - allows stubbing in tests
+    HFDataset = None  # type: ignore[assignment]
 from sqlalchemy.orm import Session
 
 from ..api.app.ai import rag as rag_service
@@ -127,6 +130,8 @@ def _refresh_contexts(record: EvaluationRecord, session: Session) -> None:
 
 
 def _build_dataset(records: Sequence[EvaluationRecord]) -> HFDataset:
+    if HFDataset is None:
+        raise click.ClickException("datasets is not installed; cannot build evaluation dataset.")
     data = {
         "question": [item.question for item in records],
         "answer": [item.answer for item in records],

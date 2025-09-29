@@ -7,13 +7,33 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
-from datasets import Dataset as HFDataset
+try:
+    from datasets import Dataset as HFDataset
+except ImportError:  # pragma: no cover - tests can supply a stub
+    HFDataset = None  # type: ignore[assignment]
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from theo.services.cli import rag_eval as rag_eval_module
+
+
+class DummyDataset:
+    def __init__(self, data: dict[str, list[Any]]):
+        self._data = {key: list(value) for key, value in data.items()}
+        self.column_names = list(self._data.keys())
+
+    @classmethod
+    def from_dict(cls, data: dict[str, list[Any]]) -> "DummyDataset":
+        return cls(data)
+
+    def to_dict(self) -> dict[str, list[Any]]:
+        return self._data
+
+
+if HFDataset is None:  # pragma: no cover - executed only when datasets missing
+    HFDataset = DummyDataset
 
 
 class StubMetric:
@@ -90,6 +110,8 @@ def test_rag_eval_reports_failures_and_regressions(tmp_path: Path, monkeypatch: 
         ),
         encoding="utf-8",
     )
+
+    monkeypatch.setattr(rag_eval_module, "HFDataset", HFDataset)
 
     scores = HFDataset.from_dict(
         {
