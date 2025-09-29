@@ -84,9 +84,14 @@ uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
 ```powershell
 cd .\theo\services\web
 $Env:NEXT_PUBLIC_API_BASE_URL = "http://127.0.0.1:8000"
+$Env:THEO_SEARCH_API_KEY = "Bearer <search-api-token>"  # omit "Bearer" to send the key via X-API-Key
 npm install   # first time only
 npm run dev
 ```
+
+The web proxy that backs `/api/search` reads `THEO_SEARCH_API_KEY` on every request. If the value starts with `Bearer` the proxy
+forwards it as an `Authorization` header; otherwise it is sent via `X-API-Key`. Missing the environment variable will cause the
+proxy to surface `401 Unauthorized` responses from the upstream API.
 
 1. Open <http://localhost:3000> in your browser.
 
