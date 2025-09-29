@@ -78,6 +78,9 @@ class ChatSessionRequest(APIModel):
     @model_validator(mode="after")
     def _enforce_message_lengths(self) -> "ChatSessionRequest":
         for message in self.messages:
+            if message.role != "user":
+                continue
+
             if len(message.content) > MAX_CHAT_MESSAGE_CONTENT_LENGTH:
                 raise ValueError(
                     "Chat message content exceeds the maximum allowed length"
