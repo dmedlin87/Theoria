@@ -19,3 +19,6 @@ prometheus-client>=0.20,<1
 typing-extensions>=4.9,<5
 PyJWT>=2.9,<3
 schemathesis>=3.21,<4
+datasets>=2.19,<3
+evaluate>=0.4,<1
+ragas>=0.1.13,<0.2
