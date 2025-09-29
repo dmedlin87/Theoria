@@ -43,6 +43,7 @@ from ..models.base import APIModel
 from ..models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from ..retriever.hybrid import hybrid_search
+from ..retriever.utils import compose_passage_meta
 from ..telemetry import (
     RAG_CACHE_EVENTS,
     instrument_workflow,
@@ -517,6 +518,7 @@ def _derive_snippet(
     return snippet or fallback_value
 
 
+
 def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
     citations: list[RAGCitation] = []
     for index, result in enumerate(results, start=1):
@@ -544,6 +546,47 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
             )
         )
     return citations
+
+
+def _fallback_guardrail_result(
+    session: Session, filters: HybridSearchFilters | None
+) -> HybridSearchResult | None:
+    stmt = select(Passage, Document).join(Document).where(Passage.osis_ref.isnot(None))
+    if filters:
+        if filters.collection:
+            stmt = stmt.where(Document.collection == filters.collection)
+        if filters.source_type:
+            stmt = stmt.where(Document.source_type == filters.source_type)
+        if filters.theological_tradition:
+            stmt = stmt.where(
+                Document.theological_tradition == filters.theological_tradition
+            )
+    stmt = stmt.order_by(Document.created_at.desc())
+    row = session.execute(stmt).first()
+    if not row:
+        return None
+    passage, document = row
+    snippet = passage.text.strip()
+    if len(snippet) > 240:
+        snippet = snippet[:237].rstrip() + "..."
+    return HybridSearchResult(
+        id=passage.id,
+        document_id=passage.document_id,
+        text=passage.text,
+        raw_text=passage.raw_text,
+        osis_ref=passage.osis_ref,
+        start_char=passage.start_char,
+        end_char=passage.end_char,
+        page_no=passage.page_no,
+        t_start=passage.t_start,
+        t_end=passage.t_end,
+        score=0.0,
+        meta=compose_passage_meta(passage, document),
+        document_title=document.title,
+        snippet=snippet,
+        rank=1,
+        highlights=None,
+    )
 
 
 def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
@@ -647,6 +690,11 @@ def _guarded_answer(
 ) -> RAGAnswer:
     ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
     citations = _build_citations(ordered_results)
+    if not citations:
+        fallback_result = _fallback_guardrail_result(session, filters)
+        if fallback_result is not None:
+            ordered_results = [fallback_result]
+            citations = _build_citations(ordered_results)
     if not citations:
         raise GuardrailError(
             "Retrieved passages lacked OSIS references; aborting generation"

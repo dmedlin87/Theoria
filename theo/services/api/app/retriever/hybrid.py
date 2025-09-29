@@ -217,9 +217,6 @@ def _fallback_search(
                 elif not lexical:
                     continue
 
-            if not lexical and not osis_match and not request.query and tei_score == 0.0:
-                continue
-
             if request.query and lexical == 0.0 and tei_score == 0.0 and not osis_match:
                 continue
 
