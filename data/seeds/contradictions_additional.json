@@ -1,0 +1,20 @@
+[
+  {
+    "osis_a": "John.20.1-10",
+    "osis_b": "Luke.24.1-12",
+    "summary": "Resurrection narratives vary on who reached the tomb first and what they witnessed, fuelling skeptical critiques of eyewitness agreement.",
+    "source": "seed:resurrection",
+    "tags": ["resurrection", "eyewitness"],
+    "perspective": "skeptical",
+    "weight": 0.82
+  },
+  {
+    "osis_a": "Acts.9.7",
+    "osis_b": "Acts.22.9",
+    "summary": "Companions of Paul are described as hearing but not seeing, versus not hearing the voice—an oft-cited tension in Damascus road accounts.",
+    "source": "seed:acts",
+    "tags": ["damascus", "voice"],
+    "perspective": "skeptical",
+    "weight": 0.77
+  }
+]

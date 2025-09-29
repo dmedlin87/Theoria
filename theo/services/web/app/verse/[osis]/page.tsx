@@ -5,7 +5,9 @@ import DeliverableExportAction, {
   type DeliverableRequestPayload,
 } from "../../components/DeliverableExportAction";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
-import ResearchPanels, { type ResearchFeatureFlags } from "./research-panels";
+import ResearchPanels from "../../research/ResearchPanels";
+import { fetchResearchFeatures } from "../../research/features";
+import type { ResearchFeatureFlags } from "../../research/types";
 import ReliabilityOverviewCard from "./ReliabilityOverviewCard";
 
 const TIMELINE_WINDOWS = ["week", "month", "quarter", "year"] as const;
@@ -50,28 +52,6 @@ interface VerseTimelineResponse {
   window: TimelineWindow;
   buckets: VerseTimelineBucket[];
   total_mentions: number;
-}
-
-async function fetchDiscoveryFeatures(): Promise<ResearchFeatureFlags> {
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-  try {
-    const response = await fetch(`${baseUrl}/features/discovery`, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-    const payload = (await response.json()) as unknown;
-    if (payload && typeof payload === "object" && "features" in payload) {
-      const { features } = payload as { features?: ResearchFeatureFlags | null };
-      return features ?? {};
-    }
-    if (payload && typeof payload === "object") {
-      return payload as ResearchFeatureFlags;
-    }
-    return {};
-  } catch (error) {
-    console.error("Failed to load discovery features", error);
-    return {};
-  }
 }
 
 function getParamValue(
@@ -264,7 +244,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   try {
     const [mentionsResponse, featureFlags] = await Promise.all([
       fetchMentions(params.osis, searchParams),
-      fetchDiscoveryFeatures(),
+      fetchResearchFeatures(),
     ]);
     data = mentionsResponse;
     features = featureFlags;

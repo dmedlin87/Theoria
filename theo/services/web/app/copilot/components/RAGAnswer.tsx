@@ -1,7 +1,7 @@
 import React from "react";
 
 import CitationList from "./CitationList";
-import type { RAGAnswer, RAGCitation } from "./types";
+import type { RAGAnswer, RAGCitation, WorkflowId } from "./types";
 
 function formatGuardrailLabel(key: string): string {
   return key
@@ -17,6 +17,7 @@ type RAGAnswerProps = {
   onExport?: (citations: RAGCitation[]) => void;
   exporting?: boolean;
   status?: string | null;
+  workflowId?: WorkflowId;
 };
 
 export default function RAGAnswerBlock({
@@ -25,9 +26,12 @@ export default function RAGAnswerBlock({
   onExport,
   exporting,
   status,
+  workflowId,
 }: RAGAnswerProps): JSX.Element {
   const citationListProps = {
     citations: answer.citations,
+    summaryText: answer.summary,
+    ...(workflowId ? { workflowId } : {}),
     ...(onExport ? { onExport } : {}),
     ...(exporting !== undefined ? { exporting } : {}),
     ...(status !== undefined ? { status } : {}),

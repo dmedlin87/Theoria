@@ -1,7 +1,11 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
 import { formatEmphasisSummary } from "../../mode-config";
-import { getActiveMode } from "../../mode-server";
+import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
-import type { ResearchFeatureFlags } from "./research-panels";
+import type { ResearchFeatureFlags } from "../types";
 
 type CrossReferenceItem = {
   source: string;
@@ -23,33 +27,57 @@ interface CrossReferencesPanelProps {
   features: ResearchFeatureFlags;
 }
 
-export default async function CrossReferencesPanel({
-  osis,
-  features,
-}: CrossReferencesPanelProps) {
+export default function CrossReferencesPanel({ osis, features }: CrossReferencesPanelProps) {
+  const { mode } = useMode();
+  const [items, setItems] = useState<CrossReferenceItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+  const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
+
+  useEffect(() => {
+    if (!features?.cross_references) {
+      return;
+    }
+
+    let cancelled = false;
+    const fetchCrossReferences = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `${baseUrl}/research/crossrefs?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error((await response.text()) || response.statusText);
+        }
+        const payload = (await response.json()) as CrossReferenceResponse;
+        const mapped = payload.results?.filter((entry): entry is CrossReferenceItem => Boolean(entry)) ?? [];
+        if (!cancelled) {
+          setItems(mapped);
+        }
+      } catch (fetchError) {
+        console.error("Failed to load cross-references", fetchError);
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : "Unknown error");
+          setItems([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchCrossReferences();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseUrl, features?.cross_references, mode.id, osis]);
+
   if (!features?.cross_references) {
     return null;
-  }
-
-  const mode = getActiveMode();
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-
-  let items: CrossReferenceItem[] = [];
-  let error: string | null = null;
-
-  try {
-    const response = await fetch(
-      `${baseUrl}/research/crossrefs?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
-      { cache: "no-store" },
-    );
-    if (!response.ok) {
-      throw new Error((await response.text()) || response.statusText);
-    }
-    const payload = (await response.json()) as CrossReferenceResponse;
-    items = payload.results?.filter((entry): entry is CrossReferenceItem => Boolean(entry)) ?? [];
-  } catch (fetchError) {
-    console.error("Failed to load cross-references", fetchError);
-    error = fetchError instanceof Error ? fetchError.message : "Unknown error";
   }
 
   return (
@@ -69,9 +97,11 @@ export default async function CrossReferencesPanel({
         Connections cited with <strong>{osis}</strong>.
       </p>
       <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.875rem" }}>
-        {formatEmphasisSummary(mode)}
+        {modeSummary}
       </p>
-      {error ? (
+      {loading ? (
+        <p>Loading cross-references…</p>
+      ) : error ? (
         <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
           Unable to load cross-references. {error}
         </p>

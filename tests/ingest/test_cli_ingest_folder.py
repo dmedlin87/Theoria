@@ -40,6 +40,12 @@ def test_detect_source_type_matches_pipeline_rules(
     assert cli._detect_source_type(path) == expected
 
 
+def test_detect_url_source_type_matches_expected_hosts() -> None:
+    assert cli._detect_url_source_type("https://youtu.be/demo") == "youtube"
+    assert cli._detect_url_source_type("https://www.youtube.com/watch?v=abc") == "youtube"
+    assert cli._detect_url_source_type("https://example.com/article") == "web_page"
+
+
 @pytest.mark.parametrize(
     "name, is_supported",
     [
@@ -73,6 +79,24 @@ def test_walk_folder_discovers_supported_files(tmp_path: Path) -> None:
     assert all(item.source_type for item in discovered)
 
 
+def test_discover_items_supports_urls(tmp_path: Path) -> None:
+    local_file = tmp_path / "local.txt"
+    local_file.write_text("content", encoding="utf-8")
+    sources = [str(local_file), "https://example.com/resource"]
+    items = cli._discover_items(sources)
+    assert len(items) == 2
+    assert {item.label for item in items} == {
+        str(local_file),
+        "https://example.com/resource",
+    }
+    assert any(item.is_remote for item in items)
+
+
+def test_discover_items_rejects_missing_paths() -> None:
+    with pytest.raises(ValueError):
+        cli._discover_items(["/definitely/missing/path.txt"])
+
+
 def test_parse_metadata_overrides_supports_json_values() -> None:
     overrides = cli._parse_metadata_overrides(
         ("count=3", "enabled=true", 'tags=["a","b"]')
@@ -85,9 +109,17 @@ def test_parse_metadata_overrides_rejects_invalid_pairs() -> None:
         cli._parse_metadata_overrides(("missing_delimiter",))
 
 
+def test_apply_default_metadata_sets_baseline_values() -> None:
+    defaults = cli._apply_default_metadata({})
+    assert defaults["collection"] == cli.DEFAULT_COLLECTION
+    assert defaults["author"] == cli.DEFAULT_AUTHOR
+    with_authors = cli._apply_default_metadata({"authors": ["Existing"]})
+    assert "author" not in with_authors
+
+
 def test_batched_groups_iterable_by_size() -> None:
     items = [
-        cli.FolderItem(path=Path(f"file-{idx}.txt"), source_type="txt")
+        cli.IngestItem(path=Path(f"file-{idx}.txt"), source_type="txt")
         for idx in range(5)
     ]
     batches = list(cli._batched(items, size=2))
@@ -97,11 +129,11 @@ def test_batched_groups_iterable_by_size() -> None:
 
 def test_ingest_folder_dry_run_lists_batches(monkeypatch, tmp_path: Path) -> None:
     items = [
-        cli.FolderItem(path=tmp_path / "first.md", source_type="markdown"),
-        cli.FolderItem(path=tmp_path / "second.txt", source_type="txt"),
+        cli.IngestItem(path=tmp_path / "first.md", source_type="markdown"),
+        cli.IngestItem(path=tmp_path / "second.txt", source_type="txt"),
     ]
 
-    monkeypatch.setattr(cli, "_walk_folder", lambda path: iter(items))
+    monkeypatch.setattr(cli, "_discover_items", lambda sources: items)
     monkeypatch.setattr(cli, "_batched", lambda iterable, size: iter([items]))
 
     runner = CliRunner()
@@ -117,15 +149,15 @@ def test_ingest_folder_dry_run_lists_batches(monkeypatch, tmp_path: Path) -> Non
 
 def test_ingest_folder_uses_selected_backend(monkeypatch, tmp_path: Path) -> None:
     items = [
-        cli.FolderItem(path=tmp_path / "first.md", source_type="markdown"),
-        cli.FolderItem(path=tmp_path / "second.txt", source_type="txt"),
+        cli.IngestItem(path=tmp_path / "first.md", source_type="markdown"),
+        cli.IngestItem(path=tmp_path / "second.txt", source_type="txt"),
     ]
 
-    monkeypatch.setattr(cli, "_walk_folder", lambda path: iter(items))
+    monkeypatch.setattr(cli, "_discover_items", lambda sources: items)
     monkeypatch.setattr(cli, "_batched", lambda iterable, size: iter([items]))
 
-    ingested_batches: list[list[cli.FolderItem]] = []
-    queued_batches: list[list[cli.FolderItem]] = []
+    ingested_batches: list[list[cli.IngestItem]] = []
+    queued_batches: list[list[cli.IngestItem]] = []
     api_overrides: list[dict[str, object]] = []
     worker_overrides: list[dict[str, object]] = []
 
@@ -155,8 +187,12 @@ def test_ingest_folder_uses_selected_backend(monkeypatch, tmp_path: Path) -> Non
     assert worker_result.exit_code == 0
     assert len(ingested_batches) == 1
     assert len(queued_batches) == 1
-    assert api_overrides == [{"flag": True}]
-    assert worker_overrides == [{}]
+    assert api_overrides == [
+        {"flag": True, "collection": cli.DEFAULT_COLLECTION, "author": cli.DEFAULT_AUTHOR}
+    ]
+    assert worker_overrides == [
+        {"collection": cli.DEFAULT_COLLECTION, "author": cli.DEFAULT_AUTHOR}
+    ]
 
 
 def test_ingest_folder_help_lists_core_options() -> None:

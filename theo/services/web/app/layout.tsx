@@ -16,14 +16,17 @@ export const metadata = {
   description: "Research engine for theology",
 };
 
-const NAV_LINKS = [
+type NavItem = { href: string; label: string; variant?: "primary" };
+
+const NAV_LINKS: NavItem[] = [
+  { href: "/chat", label: "Chat", variant: "primary" },
   { href: "/search", label: "Search" },
-  { href: "/upload", label: "Upload" },
-  { href: "/copilot", label: "Copilot" },
   { href: "/verse/John.1.1", label: "Verse explorer" },
+  { href: "/copilot", label: "Copilot" },
+  { href: "/upload", label: "Upload" },
 ];
 
-const adminLinks =
+const adminLinks: NavItem[] =
   process.env.NEXT_PUBLIC_ENABLE_ADMIN === "true"
     ? [{ href: "/admin/digests", label: "Admin" }]
     : [];
@@ -46,7 +49,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </Link>
               <nav className="site-nav" aria-label="Primary">
                 {[...NAV_LINKS, ...adminLinks].map((item) => (
-                  <Link key={item.href} href={item.href} className="nav-link">
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={item.variant === "primary" ? "nav-link nav-link--primary" : "nav-link"}
+                  >
                     {item.label}
                   </Link>
                 ))}

@@ -78,6 +78,13 @@ test.describe("Theo Engine UI", () => {
       assertion: (page: Page) => Promise<void>;
     }> = [
       {
+        href: "/chat",
+        label: "Chat",
+        assertion: async (pageInstance) => {
+          await expect(pageInstance.getByRole("heading", { name: "Chat" })).toBeVisible();
+        },
+      },
+      {
         href: "/search",
         label: "Search",
         assertion: async (pageInstance) => {

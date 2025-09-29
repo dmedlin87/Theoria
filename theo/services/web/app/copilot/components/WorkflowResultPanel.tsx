@@ -1,5 +1,5 @@
 import RAGAnswerBlock from "./RAGAnswer";
-import type { CopilotResult, RAGCitation } from "./types";
+import type { CopilotResult, RAGCitation, WorkflowId } from "./types";
 import { EXPORT_PRESET_LOOKUP } from "./export-presets";
 
 type WorkflowResultPanelProps = {
@@ -8,6 +8,7 @@ type WorkflowResultPanelProps = {
   exporting?: boolean;
   status?: string | null;
   summary: string;
+  workflowId: WorkflowId;
 };
 
 export default function WorkflowResultPanel({
@@ -16,11 +17,13 @@ export default function WorkflowResultPanel({
   exporting,
   status,
   summary,
+  workflowId,
 }: WorkflowResultPanelProps): JSX.Element {
   const ragAnswerProps = {
     ...(onExport ? { onExport } : {}),
     ...(exporting !== undefined ? { exporting } : {}),
     ...(status !== undefined ? { status } : {}),
+    workflowId,
   } as const;
   return (
     <section style={{ marginTop: "2rem", background: "#fff", padding: "1.5rem", borderRadius: "0.75rem" }}>

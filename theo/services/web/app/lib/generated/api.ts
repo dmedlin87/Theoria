@@ -1722,8 +1722,22 @@ export interface components {
         };
         /** DocumentAnnotationCreate */
         DocumentAnnotationCreate: {
+            /** Type */
+            type?: "claim" | "evidence" | "question" | "note" | null;
+            /** Text */
+            text?: string | null;
+            /** Stance */
+            stance?: string | null;
+            /** Passage Ids */
+            passage_ids?: string[];
+            /** Group Id */
+            group_id?: string | null;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
             /** Body */
-            body: string;
+            body?: string | null;
         };
         /** DocumentAnnotationResponse */
         DocumentAnnotationResponse: {
@@ -1731,8 +1745,26 @@ export interface components {
             id: string;
             /** Document Id */
             document_id: string;
+            /** Type */
+            type: "claim" | "evidence" | "question" | "note";
             /** Body */
             body: string;
+            /** Stance */
+            stance?: string | null;
+            /** Passage Ids */
+            passage_ids: string[];
+            /** Group Id */
+            group_id?: string | null;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
+            /** Raw */
+            raw?: {
+                [key: string]: unknown;
+            } | null;
+            /** Legacy */
+            legacy: boolean;
             /**
              * Created At
              * Format: date-time

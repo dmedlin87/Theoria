@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ContradictionRecord } from "./ContradictionsPanel";
 
@@ -19,7 +19,7 @@ function initializeModeState(): ModeState {
   return {
     neutral: true,
     skeptical: true,
-    apologetic: false,
+    apologetic: true,
   };
 }
 
@@ -42,19 +42,36 @@ export default function ContradictionsPanelClient({
   const [viewingMode, setViewingMode] = useState<ViewingMode>("neutral");
   const [modeState, setModeState] = useState<ModeState>(() => initializeModeState());
 
-  const shouldShowContradictions = useMemo(() => {
-    if (viewingMode !== "apologetic") {
-      return true;
-    }
-    return modeState.apologetic;
-  }, [modeState.apologetic, viewingMode]);
+  useEffect(() => {
+    setModeState((previous) => {
+      switch (viewingMode) {
+        case "skeptical":
+          return { neutral: true, skeptical: true, apologetic: false };
+        case "apologetic":
+          return { neutral: true, skeptical: false, apologetic: true };
+        default:
+          return { neutral: true, skeptical: true, apologetic: true };
+      }
+    });
+  }, [viewingMode]);
 
   const visibleContradictions = useMemo(() => {
-    if (!shouldShowContradictions) {
-      return [] as ContradictionRecord[];
-    }
-    return contradictions;
-  }, [contradictions, shouldShowContradictions]);
+    return contradictions.filter((item) => {
+      const perspective = (item.perspective ?? "neutral").toLowerCase();
+      if (perspective === "skeptical") {
+        return modeState.skeptical;
+      }
+      if (perspective === "apologetic") {
+        return modeState.apologetic;
+      }
+      return modeState.neutral;
+    });
+  }, [contradictions, modeState]);
+
+  const allHidden = useMemo(() => {
+    const anySelected = Object.values(modeState).some(Boolean);
+    return !anySelected;
+  }, [modeState]);
 
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
@@ -116,21 +133,21 @@ export default function ContradictionsPanelClient({
               </label>
             ))}
             <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted-foreground, #475569)" }}>
-              Toggle modes to tailor how contradictions appear. For example, enable Apologetic
-              visibility to audit harmonization strategies without leaving this view.
+              Toggle modes to tailor how contradictions and harmonies appear. For example, enable
+              Apologetic visibility to inspect harmonization strategies alongside skeptical critiques.
             </p>
           </div>
         </fieldset>
 
       </div>
 
-      {!shouldShowContradictions ? (
+      {allHidden ? (
         <p
           data-testid="contradictions-apologetic-hidden"
           style={{ margin: 0, color: "var(--muted-foreground, #475569)" }}
         >
-          Contradictions are currently hidden in <strong>Apologetic</strong> mode. Enable the toggle above
-          to include them while emphasizing harmonization evidence.
+          All perspectives are currently hidden. Re-enable at least one toggle to surface contradictions and
+          harmonies.
         </p>
       ) : visibleContradictions.length === 0 ? (
         <p style={{ margin: 0 }}>No contradictions match the selected filters.</p>
@@ -166,6 +183,39 @@ export default function ContradictionsPanelClient({
                 >
                   {item.osis[0]} ⇄ {item.osis[1]}
                 </p>
+                {item.perspective ? (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color:
+                        item.perspective === "apologetic"
+                          ? "#047857"
+                          : item.perspective === "skeptical"
+                          ? "#b91c1c"
+                          : "#1e293b",
+                    }}
+                  >
+                    Perspective:
+                    <span
+                      style={{
+                        borderRadius: "999px",
+                        padding: "0.125rem 0.5rem",
+                        background:
+                          item.perspective === "apologetic"
+                            ? "rgba(16, 185, 129, 0.15)"
+                            : item.perspective === "skeptical"
+                            ? "rgba(239, 68, 68, 0.12)"
+                            : "rgba(148, 163, 184, 0.2)",
+                      }}
+                    >
+                      {item.perspective}
+                    </span>
+                  </span>
+                ) : null}
               </header>
 
               {item.weight != null ? (
