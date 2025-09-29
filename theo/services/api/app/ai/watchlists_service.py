@@ -37,34 +37,40 @@ class WatchlistsService:
     def list(self, user_id: str) -> list[WatchlistResponse]:
         return list_watchlists(self._session, user_id)
 
-    def create(self, payload: WatchlistCreateRequest) -> WatchlistResponse:
-        return create_watchlist(self._session, payload)
+    def create(self, user_id: str, payload: WatchlistCreateRequest) -> WatchlistResponse:
+        return create_watchlist(self._session, user_id, payload)
 
-    def update(self, watchlist_id: str, payload: WatchlistUpdateRequest) -> WatchlistResponse:
-        watchlist = self._require_watchlist(watchlist_id)
+    def update(
+        self, watchlist_id: str, payload: WatchlistUpdateRequest, user_id: str
+    ) -> WatchlistResponse:
+        watchlist = self._require_watchlist(watchlist_id, user_id)
         return update_watchlist(self._session, watchlist, payload)
 
-    def delete(self, watchlist_id: str) -> None:
-        watchlist = self._require_watchlist(watchlist_id)
+    def delete(self, watchlist_id: str, user_id: str) -> None:
+        watchlist = self._require_watchlist(watchlist_id, user_id)
         delete_watchlist(self._session, watchlist)
 
     def list_events(
-        self, watchlist_id: str, *, since: datetime | None = None
+        self,
+        watchlist_id: str,
+        user_id: str,
+        *,
+        since: datetime | None = None,
     ) -> list[WatchlistRunResponse]:
-        watchlist = self._require_watchlist(watchlist_id)
+        watchlist = self._require_watchlist(watchlist_id, user_id)
         return list_watchlist_events(self._session, watchlist, since=since)
 
-    def preview(self, watchlist_id: str) -> WatchlistRunResponse:
-        watchlist = self._require_watchlist(watchlist_id)
+    def preview(self, watchlist_id: str, user_id: str) -> WatchlistRunResponse:
+        watchlist = self._require_watchlist(watchlist_id, user_id)
         return run_watchlist(self._session, watchlist, persist=False)
 
-    def run(self, watchlist_id: str) -> WatchlistRunResponse:
-        watchlist = self._require_watchlist(watchlist_id)
+    def run(self, watchlist_id: str, user_id: str) -> WatchlistRunResponse:
+        watchlist = self._require_watchlist(watchlist_id, user_id)
         return run_watchlist(self._session, watchlist, persist=True)
 
-    def _require_watchlist(self, watchlist_id: str) -> UserWatchlist:
+    def _require_watchlist(self, watchlist_id: str, user_id: str) -> UserWatchlist:
         watchlist = get_watchlist(self._session, watchlist_id)
-        if watchlist is None:
+        if watchlist is None or watchlist.user_id != user_id:
             raise WatchlistNotFoundError(watchlist_id)
         return watchlist
 

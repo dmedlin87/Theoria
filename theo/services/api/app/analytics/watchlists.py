@@ -268,11 +268,11 @@ def get_watchlist(session: Session, watchlist_id: str) -> UserWatchlist | None:
 
 
 def create_watchlist(
-    session: Session, payload: WatchlistCreateRequest
+    session: Session, user_id: str, payload: WatchlistCreateRequest
 ) -> WatchlistResponse:
     filters = payload.filters or WatchlistFilters()
     watchlist = UserWatchlist(
-        user_id=payload.user_id,
+        user_id=user_id,
         name=payload.name,
         filters=filters.model_dump(mode="json"),
         cadence=payload.cadence,
