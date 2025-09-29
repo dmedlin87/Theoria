@@ -19,6 +19,27 @@ def disable_unstructured(monkeypatch):
     monkeypatch.setattr(parsers, "_parse_html_with_unstructured", lambda path: None)
 
 
+def test_repro_html_unstructured_signature(tmp_path, monkeypatch):
+    """``parse_html_document`` should tolerate legacy helper signatures."""
+
+    monkeypatch.setattr(parsers, "_parse_html_with_unstructured", lambda path: None)
+
+    html = """
+    <html>
+      <head><title>Sample</title></head>
+      <body><p>Hello!</p></body>
+    </html>
+    """
+
+    path = tmp_path / "sample.html"
+    path.write_text(html, encoding="utf-8")
+
+    result = parsers.parse_html_document(path, max_tokens=1000)
+
+    assert result.parser == "html_fallback"
+    assert "Hello!" in result.text
+
+
 def test_parse_html_document_ignores_script_content(tmp_path, disable_unstructured):
     html = """
     <html>
