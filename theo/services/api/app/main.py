@@ -121,6 +121,7 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     """Create FastAPI application instance."""
 
+    _enforce_authentication_requirements()
     _enforce_secret_requirements()
     app = FastAPI(title="Theo Engine API", version="0.2.0", lifespan=lifespan)
     settings = get_settings()
@@ -257,6 +258,20 @@ def create_app() -> FastAPI:
             return PlainTextResponse(payload, media_type=CONTENT_TYPE_LATEST)
 
     return app
+
+
+def _enforce_authentication_requirements() -> None:
+    settings = get_settings()
+    if settings.auth_allow_anonymous:
+        return
+    if settings.api_keys or settings.auth_jwt_secret:
+        return
+    message = (
+        "API authentication is not configured. Set THEO_API_KEYS or JWT settings before "
+        "starting the service, or enable THEO_AUTH_ALLOW_ANONYMOUS for local testing."
+    )
+    logger.critical(message)
+    raise RuntimeError(message)
 
 
 def _enforce_secret_requirements() -> None:

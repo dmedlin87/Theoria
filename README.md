@@ -12,6 +12,15 @@ Theo Engine now layers grounded generative workflows on top of the deterministic
 
 For usage details run `python -m theo.services.cli.ingest_folder --help` or consult [the CLI guide](docs/CLI.md).
 
+## API authentication configuration
+
+The API refuses to start unless authentication credentials are configured. Set one or more
+API keys via `THEO_API_KEYS` or provide JWT settings (`THEO_AUTH_JWT_SECRET` and optional
+issuer/audience) **before** booting the FastAPI service. For automated tests or local
+exploration you can opt into anonymous access by exporting `THEO_AUTH_ALLOW_ANONYMOUS=1`.
+When anonymous access is disabled and no credentials are supplied, requests now fail with
+HTTP 403.
+
 ## Performance monitoring
 
 Continuous integration runs Lighthouse to guard against client-side regressions. Review [the performance monitoring policy](docs/performance.md) for guidance on interpreting lab scores, comparing them with Core Web Vitals, and understanding the thresholds that require follow-up.

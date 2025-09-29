@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
+os.environ.setdefault("THEO_API_KEYS", '["pytest-default-key"]')
 
 from pathlib import Path
 import sys

@@ -107,17 +107,18 @@ def require_principal(
     principal: Principal | None = None
 
     credentials_configured = bool(settings.api_keys) or bool(settings.auth_jwt_secret)
-    allow_anonymous = settings.auth_allow_anonymous or not credentials_configured
+    allow_anonymous = settings.auth_allow_anonymous
 
+    if not credentials_configured:
+        if not allow_anonymous:
+            _reject_forbidden("Authentication is not configured")
+        if not authorization and not api_key_header:
+            principal = _anonymous_principal()
+            request.state.principal = principal
+            return principal
 
     if allow_anonymous and not authorization and not api_key_header:
-        principal = {
-            "method": "anonymous",
-            "subject": None,
-            "scopes": [],
-            "claims": {},
-            "token": "",
-        }
+        principal = _anonymous_principal()
         request.state.principal = principal
         return principal
     if api_key_header:

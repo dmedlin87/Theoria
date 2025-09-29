@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
+os.environ.setdefault("THEO_AUTH_ALLOW_ANONYMOUS", "1")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
