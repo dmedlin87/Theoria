@@ -6,7 +6,11 @@ import { formatEmphasisSummary } from "../../mode-config";
 import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
 import type { ResearchFeatureFlags } from "../types";
-import ContradictionsPanelClient from "./ContradictionsPanelClient";
+import ContradictionsPanelClient, {
+  initializeModeState,
+  type ModeState,
+  type ViewingMode,
+} from "./ContradictionsPanelClient";
 
 export type ContradictionRecord = {
   id: string;
@@ -73,11 +77,46 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
   const [error, setError] = useState<string | null>(null);
   const [contradictions, setContradictions] = useState<ContradictionRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [viewingMode, setViewingMode] = useState<ViewingMode>("neutral");
+  const [modeState, setModeState] = useState<ModeState>(() => initializeModeState());
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
+  const activePerspectives = useMemo(() => {
+    const perspectives: string[] = [];
+    if (modeState.skeptical) {
+      perspectives.push("skeptical");
+    }
+    if (modeState.apologetic) {
+      perspectives.push("apologetic");
+    }
+    if (modeState.neutral) {
+      perspectives.push("neutral");
+    }
+    return perspectives;
+  }, [modeState]);
+
+  useEffect(() => {
+    setModeState(() => {
+      switch (viewingMode) {
+        case "skeptical":
+          return { neutral: true, skeptical: true, apologetic: false };
+        case "apologetic":
+          return { neutral: true, skeptical: false, apologetic: true };
+        default:
+          return { neutral: true, skeptical: true, apologetic: true };
+      }
+    });
+  }, [viewingMode]);
 
   useEffect(() => {
     if (!features?.contradictions) {
+      return;
+    }
+
+    if (activePerspectives.length === 0) {
+      setContradictions([]);
+      setError(null);
+      setLoading(false);
       return;
     }
 
@@ -86,10 +125,13 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(
-          `${baseUrl}/research/contradictions?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
-          { cache: "no-store" },
-        );
+        const params = new URLSearchParams();
+        params.append("osis", osis);
+        params.append("mode", mode.id);
+        activePerspectives.forEach((perspective) => params.append("perspective", perspective));
+        const response = await fetch(`${baseUrl}/research/contradictions?${params.toString()}`, {
+          cache: "no-store",
+        });
         if (!response.ok) {
           throw new Error((await response.text()) || response.statusText);
         }
@@ -118,7 +160,13 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, features?.contradictions, mode.id, osis]);
+  }, [
+    activePerspectives,
+    baseUrl,
+    features?.contradictions,
+    mode.id,
+    osis,
+  ]);
 
   if (!features?.contradictions) {
     return null;
@@ -149,7 +197,13 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
       ) : contradictions.length === 0 ? (
         <p>No contradictions found.</p>
       ) : (
-        <ContradictionsPanelClient contradictions={contradictions} />
+        <ContradictionsPanelClient
+          contradictions={contradictions}
+          viewingMode={viewingMode}
+          onViewingModeChange={setViewingMode}
+          modeState={modeState}
+          onModeStateChange={setModeState}
+        />
       )}
     </section>
   );

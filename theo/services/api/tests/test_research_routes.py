@@ -350,6 +350,24 @@ def test_contradictions_filter_by_perspective_returns_harmonies() -> None:
         assert ("Acts.9.7", "Acts.22.9") in osis_pairs
 
 
+def test_contradictions_catalog_includes_judas_entry() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/contradictions",
+            params=[("osis", "Matthew.27.5"), ("perspective", "skeptical")],
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["items"], "Expected Judas contradictions to be present"
+        judas_entries = [
+            item
+            for item in payload["items"]
+            if item["osis_a"] == "Matthew.27.5" and item["osis_b"] == "Acts.1.18"
+        ]
+        assert judas_entries, "Missing Judas contradiction seed"
+        assert judas_entries[0]["perspective"] == "skeptical"
+
+
 def test_commentaries_endpoint_returns_seeded_excerpt() -> None:
     with TestClient(app) as client:
         response = client.get(
@@ -361,6 +379,34 @@ def test_commentaries_endpoint_returns_seeded_excerpt() -> None:
         assert payload["items"], "Expected seeded commentaries for Luke 2"
         perspectives = {item["perspective"] for item in payload["items"]}
         assert {"skeptical", "apologetic"}.issubset(perspectives)
+
+
+def test_commentaries_endpoint_returns_new_catalogue_entries() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/commentaries",
+            params=[("osis", "Acts.1.18"), ("perspective", "skeptical")],
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        excerpts = payload["items"]
+        assert excerpts, "Expected skeptical Judas commentary"
+        assert any(
+            item["title"] == "Judas' demise as composite tradition" and item["perspective"] == "skeptical"
+            for item in excerpts
+        )
+
+        passion = client.get(
+            "/research/commentaries",
+            params=[("osis", "Mark.15.25"), ("perspective", "apologetic")],
+        )
+        assert passion.status_code == 200, passion.text
+        passion_payload = passion.json()
+        assert passion_payload["items"], "Expected passion harmonisation commentary"
+        assert any(
+            item["osis"] == "Mark.15.25" and item["perspective"] == "apologetic"
+            for item in passion_payload["items"]
+        )
 
 
 def test_geo_lookup_returns_places_with_confidence_and_aliases() -> None:

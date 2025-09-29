@@ -204,9 +204,11 @@ CREATE INDEX ix_passages_doc ON passages (document_id);
 
 Theo Engine bundles a lightweight catalogue of verse-level tensions, harmonies, and commentary excerpts to keep the research panels deterministic in fresh deployments:
 
-* `data/seeds/contradictions.json` and `data/seeds/contradictions_additional.json` populate the `contradiction_seeds` table. Entries are normalised to OSIS pairs and tagged with a `perspective` (`skeptical` by default) so the UI can filter skeptical critiques separately from harmonisation notes.
-* `data/seeds/harmonies.yaml` feeds the `harmony_seeds` table. These harmonies are tagged `apologetic` and surfaced alongside contradictions with toggleable filters in the reader.
-* `data/seeds/commentaries.yaml` hydrates `commentary_excerpt_seeds`, exposing short-form commentary paragraphs keyed by OSIS and perspective. The `/research/commentaries` endpoint returns these records and supports perspective query parameters for the Commentaries panel.
+* `data/seeds/contradictions.json`, `data/seeds/contradictions_additional.json`, and `data/seeds/contradictions_catalog.yaml` populate the `contradiction_seeds` table. Entries are normalised to OSIS pairs and tagged with an explicit `perspective` (skeptical or apologetic) so the UI can filter skeptical critiques separately from harmonisation notes.
+* `data/seeds/harmonies.yaml` and `data/seeds/harmonies_additional.yaml` feed the `harmony_seeds` table. These harmonies are tagged `apologetic` and surfaced alongside contradictions with toggleable filters in the reader.
+* `data/seeds/commentaries.yaml` and `data/seeds/commentaries_additional.yaml` hydrate `commentary_excerpt_seeds`, exposing short-form commentary paragraphs keyed by OSIS and perspective. The `/research/commentaries` endpoint returns these records and supports perspective query parameters for the Commentaries panel.
+
+Perspective-aware fetchers in the web app call `/research/contradictions` and `/research/commentaries` with one query parameter per selected perspective. When no perspective is selected the panels intentionally short-circuit, preventing misleading "no data" states.
 
 All seed loaders live in `theo/services/api/app/db/seeds.py` and are idempotent; running them repeatedly keeps tables in sync with the bundled JSON/YAML without producing duplicates.
 

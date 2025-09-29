@@ -1,0 +1,22 @@
+- osis_a: "John.19.14"
+  osis_b: "Mark.15.25"
+  summary: >-
+    John timestamps the crucifixion at the sixth hour while Mark records it at the third, creating a
+    chronology clash around the Passion proceedings.
+  source: "seed:contradiction:passion"
+  tags:
+    - chronology
+    - passion
+  weight: 0.78
+  perspective: skeptical
+- osis_a: "Matthew.27.5"
+  osis_b: "Acts.1.18"
+  summary: >-
+    Matthew says Judas hanged himself, whereas Acts describes him falling headlong with burst entrails,
+    fuelling debates over whether Luke preserves an alternate death tradition.
+  source: "seed:contradiction:judas"
+  tags:
+    - judas
+    - death
+  weight: 0.82
+  perspective: skeptical

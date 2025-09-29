@@ -75,6 +75,7 @@ def seed_contradiction_claims(session: Session) -> None:
     payload = _iter_seed_entries(
         SEED_ROOT / "contradictions.json",
         SEED_ROOT / "contradictions_additional.json",
+        SEED_ROOT / "contradictions_catalog.yaml",
     )
     seen_ids: set[str] = set()
     for entry in payload:
@@ -141,7 +142,11 @@ def seed_contradiction_claims(session: Session) -> None:
 def seed_harmony_claims(session: Session) -> None:
     """Load harmony seeds from bundled YAML/JSON files."""
 
-    payload = _iter_seed_entries(SEED_ROOT / "harmonies.yaml", SEED_ROOT / "harmonies.json")
+    payload = _iter_seed_entries(
+        SEED_ROOT / "harmonies.yaml",
+        SEED_ROOT / "harmonies.json",
+        SEED_ROOT / "harmonies_additional.yaml",
+    )
     if not payload:
         return
 
@@ -218,7 +223,11 @@ def seed_harmony_claims(session: Session) -> None:
 def seed_commentary_excerpts(session: Session) -> None:
     """Seed curated commentary excerpts into the catalogue."""
 
-    payload = _iter_seed_entries(SEED_ROOT / "commentaries.yaml", SEED_ROOT / "commentaries.json")
+    payload = _iter_seed_entries(
+        SEED_ROOT / "commentaries.yaml",
+        SEED_ROOT / "commentaries.json",
+        SEED_ROOT / "commentaries_additional.yaml",
+    )
     if not payload:
         return
 

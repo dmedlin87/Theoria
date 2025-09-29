@@ -1,0 +1,41 @@
+- osis: "John.19.14"
+  title: "Passion chronology under Roman hours"
+  excerpt: >-
+    Skeptical commentators note that even if Roman civil reckoning is invoked, the sixth hour still
+    conflicts with Mark's third-hour crucifixion, suggesting John reshapes the schedule for theological
+    motifs around the Passover lamb.
+  source: "seed:commentary:passion:skeptical"
+  perspective: skeptical
+  tags:
+    - passion
+    - chronology
+- osis: "Mark.15.25"
+  title: "Integrating hour reckonings"
+  excerpt: >-
+    Harmonising notes appeal to multiple clock systems and narrative compression, arguing Mark highlights
+    the traditional third-hour sacrifice window while John timestamps the Roman sentencing milestone.
+  source: "seed:commentary:passion:apologetic"
+  perspective: apologetic
+  tags:
+    - passion
+    - harmonization
+- osis: "Acts.1.18"
+  title: "Judas' demise as composite tradition"
+  excerpt: >-
+    Redaction critics argue Acts preserves a separate community memory of Judas' death, making Luke's
+    account irreconcilable with Matthew and revealing theological storytelling in the early church.
+  source: "seed:commentary:judas:skeptical"
+  perspective: skeptical
+  tags:
+    - judas
+    - death
+- osis: "Matthew.27.5"
+  title: "Two-stage reading of Judas' end"
+  excerpt: >-
+    Apologetic writers synthesise the accounts by proposing Judas hanged himself near the Hinnom cliffs
+    and later fell when the rope snapped, which explains both Matthew's hanging and Acts' grisly detail.
+  source: "seed:commentary:judas:apologetic"
+  perspective: apologetic
+  tags:
+    - judas
+    - synthesis
