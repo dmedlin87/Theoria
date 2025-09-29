@@ -77,6 +77,22 @@ test.describe("Chat workspace", () => {
           type: "guardrail_violation",
           message: "Request blocked by safeguards.",
           trace_id: "guard-99",
+          suggestions: [
+            {
+              action: "search",
+              label: "Search related passages",
+              description: "Inspect related passages in the search workspace.",
+              query: "List conspiracies",
+            },
+          ],
+          metadata: {
+            code: "test_guardrail",
+            guardrail: "retrieval",
+            suggested_action: "search",
+            filters: null,
+            safe_refusal: false,
+            reason: "Playwright stub",
+          },
         }),
       });
     });
@@ -87,5 +103,24 @@ test.describe("Chat workspace", () => {
 
     await expect(page.getByText("Request blocked by safeguards.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Rephrase question" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Search related passages" })).toBeVisible();
+  });
+
+  test("suggests recovery actions for invalid chat requests", async ({ page }) => {
+    await page.route("**/ai/workflows/chat", async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "messages cannot be empty" }),
+      });
+    });
+
+    await page.goto("/chat");
+    await page.fill("textarea[name='question']", "Why was the request invalid?");
+    await page.click("button[type='submit']");
+
+    await expect(page.getByText("messages cannot be empty")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Search related passages" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Upload supporting documents" })).toBeVisible();
   });
 });

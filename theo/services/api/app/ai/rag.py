@@ -262,6 +262,11 @@ def _apply_guardrail_profile(
         raise GuardrailError(
             "No passages matched the requested guardrail profile",
             safe_refusal=True,
+            metadata={
+                "code": "guardrail_profile_no_match",
+                "guardrail": "retrieval",
+                "suggested_action": "search",
+            },
         )
 
     payload = {
@@ -278,9 +283,16 @@ def _apply_guardrail_profile(
 class GuardrailError(GenerationError):
     """Raised when an answer violates grounding requirements."""
 
-    def __init__(self, message: str, *, safe_refusal: bool = False) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        safe_refusal: bool = False,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.safe_refusal = safe_refusal
+        self.metadata = metadata or {}
 
 
 class RAGCitation(APIModel):
@@ -633,19 +645,47 @@ def _validate_model_completion(
     citations: Sequence[RAGCitation],
 ) -> dict[str, Any]:
     if not completion or not completion.strip():
-        raise GuardrailError("Model completion was empty")
+        raise GuardrailError(
+            "Model completion was empty",
+            metadata={
+                "code": "generation_empty_completion",
+                "guardrail": "generation",
+                "suggested_action": "search",
+            },
+        )
 
     marker_index = completion.lower().rfind("sources:")
     if marker_index == -1:
-        raise GuardrailError("Model completion missing 'Sources:' line")
+        raise GuardrailError(
+            "Model completion missing 'Sources:' line",
+            metadata={
+                "code": "generation_missing_sources_line",
+                "guardrail": "generation",
+                "suggested_action": "search",
+            },
+        )
 
     sources_text = completion[marker_index + len("Sources:") :].strip()
     if not sources_text:
-        raise GuardrailError("Model completion missing citations after 'Sources:'")
+        raise GuardrailError(
+            "Model completion missing citations after 'Sources:'",
+            metadata={
+                "code": "generation_missing_citations",
+                "guardrail": "generation",
+                "suggested_action": "search",
+            },
+        )
 
     entries = [entry.strip() for entry in re.split(r";|\n", sources_text) if entry.strip()]
     if not entries:
-        raise GuardrailError("Model completion missing citations after 'Sources:'")
+        raise GuardrailError(
+            "Model completion missing citations after 'Sources:'",
+            metadata={
+                "code": "generation_missing_citations",
+                "guardrail": "generation",
+                "suggested_action": "search",
+            },
+        )
 
     expected = {citation.index: citation for citation in citations}
     mismatches: list[str] = []
@@ -680,11 +720,24 @@ def _validate_model_completion(
             )
 
     if not cited_indices:
-        raise GuardrailError("Model completion did not include any recognised citations")
+        raise GuardrailError(
+            "Model completion did not include any recognised citations",
+            metadata={
+                "code": "generation_unrecognised_citations",
+                "guardrail": "generation",
+                "suggested_action": "search",
+            },
+        )
 
     if mismatches:
         raise GuardrailError(
-            "Model citations failed guardrails: " + "; ".join(mismatches)
+            "Model citations failed guardrails: " + "; ".join(mismatches),
+            metadata={
+                "code": "generation_citation_mismatch",
+                "guardrail": "generation",
+                "suggested_action": "search",
+                "reason": "; ".join(mismatches),
+            },
         )
 
     return {
@@ -701,7 +754,13 @@ def ensure_completion_safe(completion: str | None) -> None:
     for pattern, reason in _DISALLOWED_COMPLETION_PATTERNS:
         if pattern.search(completion):
             raise GuardrailError(
-                f"Model completion failed safety check: {reason}"
+                f"Model completion failed safety check: {reason}",
+                metadata={
+                    "code": "safety_pattern_detected",
+                    "guardrail": "safety",
+                    "suggested_action": "search",
+                    "reason": reason,
+                },
             )
 
 
@@ -727,7 +786,11 @@ def _guarded_answer(
     if not citations:
         raise GuardrailError(
             "Retrieved passages lacked OSIS references; aborting generation",
-            safe_refusal=True,
+            metadata={
+                "code": "retrieval_missing_osis",
+                "guardrail": "retrieval",
+                "suggested_action": "upload",
+            },
         )
 
     cited_results = [result for result in ordered_results if result.osis_ref]
@@ -2214,7 +2277,15 @@ def build_transcript_deliverable(
 
     document = session.get(Document, document_id)
     if document is None:
-        raise GuardrailError(f"Document {document_id} not found")
+        raise GuardrailError(
+            f"Document {document_id} not found",
+            metadata={
+                "code": "ingest_document_missing",
+                "guardrail": "ingest",
+                "suggested_action": "upload",
+                "reason": document_id,
+            },
+        )
     passages = (
         session.query(Passage)
         .filter(Passage.document_id == document_id)

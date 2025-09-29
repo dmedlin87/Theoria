@@ -235,6 +235,10 @@ def test_chat_turn_guardrail_failure_returns_422() -> None:
         first = suggestions[0]
         assert first.get("action") == "search"
         assert first.get("label") == "Search related passages"
+        metadata = detail.get("metadata")
+        assert isinstance(metadata, dict)
+        assert metadata.get("suggested_action") in {"search", "upload"}
+        assert metadata.get("guardrail") in {"retrieval", "generation", "safety", "ingest", "unknown"}
 
 
 def test_provider_settings_crud_flow() -> None:

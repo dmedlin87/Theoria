@@ -28,11 +28,13 @@ export async function emitTelemetry(
     events: events.map((event) => ({
       event: event.event,
       duration_ms: Math.max(0, event.durationMs),
-      workflow: event.workflow,
-      metadata: event.metadata,
+      ...(event.workflow ? { workflow: event.workflow } : {}),
+      ...(event.metadata ? { metadata: event.metadata } : {}),
     })),
-    page: context?.page ?? undefined,
   };
+  if (context && "page" in context) {
+    payload.page = context.page ?? null;
+  }
   try {
     await fetch("/api/analytics/telemetry", {
       method: "POST",

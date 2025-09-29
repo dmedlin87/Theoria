@@ -8,20 +8,7 @@ export type RAGCitation = components["schemas"]["RAGCitation"];
 
 export type RAGAnswer = components["schemas"]["RAGAnswer"];
 
-export type GuardrailSuggestion = {
-  action: "search";
-  label: string;
-  description?: string | null;
-  query?: string | null;
-  osis?: string | null;
-  filters?: {
-    collection?: string | null;
-    author?: string | null;
-    source_type?: string | null;
-    theological_tradition?: string | null;
-    topic_domain?: string | null;
-  } | null;
-};
+export type { GuardrailSuggestion } from "../../lib/guardrails";
 
 export type VerseResponse = {
   osis: string;

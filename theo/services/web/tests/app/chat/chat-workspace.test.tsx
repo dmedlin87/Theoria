@@ -56,6 +56,7 @@ describe("ChatWorkspace", () => {
         events.forEach((event) => options?.onEvent?.(event));
         return successResult;
       }),
+      fetchChatSession: jest.fn(async () => null),
     };
 
     render(<ChatWorkspace client={client} />);
@@ -86,6 +87,8 @@ describe("ChatWorkspace", () => {
       kind: "guardrail",
       message: "Blocked by safeguards",
       traceId: "trace-123",
+      suggestions: [],
+      metadata: null,
     };
     const client: ChatWorkflowClient = {
       runChatWorkflow: jest.fn(async (_payload, options) => {
@@ -93,10 +96,13 @@ describe("ChatWorkspace", () => {
           type: "guardrail_violation",
           message: "Blocked by safeguards",
           traceId: "trace-123",
+          suggestions: [],
+          metadata: null,
         };
         options?.onEvent?.(guardrailEvent);
         return guardrailResult;
       }),
+      fetchChatSession: jest.fn(async () => null),
     };
 
     render(<ChatWorkspace client={client} />);

@@ -319,7 +319,7 @@ class CitationExportResponse(APIModel):
 class GuardrailSuggestion(APIModel):
     """Client-side action recommended when guardrails block a response."""
 
-    action: Literal["search"] = Field(
+    action: Literal["search", "upload"] = Field(
         default="search",
         description="The type of UI action that should be rendered.",
     )
@@ -340,6 +340,36 @@ class GuardrailSuggestion(APIModel):
         default=None,
         description="Search filters aligned with the guardrail configuration that failed.",
     )
+    collection: str | None = Field(
+        default=None,
+        description="Optional collection identifier when directing the user to upload data.",
+    )
+
+
+class GuardrailFailureMetadata(APIModel):
+    """Structured metadata describing a guardrail refusal."""
+
+    code: str = Field(description="Stable identifier for the guardrail condition.")
+    guardrail: Literal["retrieval", "generation", "safety", "ingest", "unknown"] = Field(
+        default="unknown",
+        description="High-level guardrail category that blocked the response.",
+    )
+    suggested_action: Literal["search", "upload", "retry", "none"] = Field(
+        default="search",
+        description="Client hint describing the most helpful follow-up action.",
+    )
+    filters: HybridSearchFilters | None = Field(
+        default=None,
+        description="Resolved filters that contributed to the guardrail decision.",
+    )
+    safe_refusal: bool = Field(
+        default=False,
+        description="Indicates whether a fallback refusal message was considered safe to surface.",
+    )
+    reason: str | None = Field(
+        default=None,
+        description="Optional human-readable reason emitted by the guardrail subsystem.",
+    )
 
 
 class GuardrailAdvisory(APIModel):
@@ -349,6 +379,10 @@ class GuardrailAdvisory(APIModel):
     suggestions: Sequence[GuardrailSuggestion] = Field(
         default_factory=list,
         description="Interactive follow-up actions that the client can surface.",
+    )
+    metadata: GuardrailFailureMetadata | None = Field(
+        default=None,
+        description="Machine-readable metadata about the guardrail failure.",
     )
 
 
@@ -391,5 +425,6 @@ __all__ = [
     "AIFeaturesResponse",
     "DEFAULT_GUARDRAIL_SETTINGS",
     "GuardrailSuggestion",
+    "GuardrailFailureMetadata",
     "GuardrailAdvisory",
 ]
