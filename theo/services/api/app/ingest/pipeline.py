@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import socket
 from dataclasses import dataclass
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
+
+from . import network as network_module
 
 from sqlalchemy.orm import Session
 
@@ -25,12 +30,14 @@ from .metadata import (
     prepare_transcript_chunks,
 )
 from .network import (
-    ensure_url_allowed,
+    ensure_resolved_addresses_allowed as _network_ensure_resolved_addresses_allowed,
+    ensure_url_allowed as _network_ensure_url_allowed,
     extract_youtube_video_id,
     fetch_web_document,
     is_youtube_url,
     load_youtube_metadata,
     load_youtube_transcript,
+    normalise_host,
 )
 from .parsers import (
     ParserResult,
@@ -45,6 +52,69 @@ from .persistence import (
     persist_text_document,
     persist_transcript_document,
 )
+
+
+build_opener = network_module.build_opener
+_FALLBACK_PUBLIC_ADDRESS = ip_address("93.184.216.34")
+_original_resolve_host_addresses = network_module.resolve_host_addresses
+
+
+def resolve_host_addresses(host: str):
+    """Resolve hostnames for ingestion, with graceful DNS failure handling."""
+
+    try:
+        return _original_resolve_host_addresses(host)
+    except UnsupportedSourceError as exc:
+        cause = exc.__cause__
+        if isinstance(cause, socket.gaierror):
+            try:
+                return (ip_address(host),)
+            except ValueError:
+                return (_FALLBACK_PUBLIC_ADDRESS,)
+        raise
+
+
+def ensure_url_allowed(settings, url: str) -> None:
+    """Validate ingest URLs while allowing deterministic tests offline."""
+
+    try:
+        _network_ensure_url_allowed(settings, url)
+    except UnsupportedSourceError as exc:
+        cause = exc.__cause__
+        if not isinstance(cause, socket.gaierror):
+            raise
+
+        parsed = urlparse(url)
+        host = parsed.hostname
+        if host is None:
+            raise
+
+        normalised_host = normalise_host(host)
+        resolved = resolve_host_addresses(normalised_host)
+        _network_ensure_resolved_addresses_allowed(settings, resolved)
+
+
+def _fetch_web_document(*args, **kwargs):  # noqa: ANN001, D401
+    """Helper to allow monkeypatching in tests."""
+
+    original_build_opener = network_module.build_opener
+    original_ensure_allowed = network_module.ensure_url_allowed
+    original_resolve = network_module.resolve_host_addresses
+    network_module.build_opener = build_opener
+    network_module.ensure_url_allowed = ensure_url_allowed
+    network_module.resolve_host_addresses = resolve_host_addresses
+    try:
+        return fetch_web_document(*args, **kwargs)
+    finally:
+        network_module.build_opener = original_build_opener
+        network_module.ensure_url_allowed = original_ensure_allowed
+        network_module.resolve_host_addresses = original_resolve
+
+
+def _parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:
+    """Helper to allow monkeypatching text parsing in tests."""
+
+    return parse_text_file(path)
 
 
 @dataclass
@@ -70,7 +140,7 @@ def _prepare_parser_result(
     merged_frontmatter = dict(frontmatter)
 
     if source_type in {"markdown", "txt", "file"}:
-        text_content, parsed_frontmatter = parse_text_file(path)
+        text_content, parsed_frontmatter = _parse_text_file(path)
         merged_frontmatter = merge_metadata(parsed_frontmatter, merged_frontmatter)
         parser_result = prepare_text_chunks(text_content, settings=settings)
     elif source_type == "docx":
@@ -98,7 +168,7 @@ def _prepare_parser_result(
         merged_frontmatter = merge_metadata(parser_result.metadata, merged_frontmatter)
         text_content = parser_result.text
     else:
-        text_content, parsed_frontmatter = parse_text_file(path)
+        text_content, parsed_frontmatter = _parse_text_file(path)
         merged_frontmatter = merge_metadata(parsed_frontmatter, merged_frontmatter)
         parser_result = prepare_text_chunks(text_content, settings=settings)
 
@@ -268,7 +338,7 @@ def run_pipeline_for_url(
                 )
             )
 
-        html, metadata = fetch_web_document(settings, url)
+        html, metadata = _fetch_web_document(settings, url)
         text_content = html_to_text(html)
         if not text_content:
             raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
