@@ -1,11 +1,20 @@
 import itertools
+
 from unittest.mock import Mock
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
 
 import pytest
 
 from theo.services.api.app.ai.clients import GenerationError
 from theo.services.api.app.ai.registry import LLMModel, LLMRegistry
-from theo.services.api.app.ai.router import LLMRouterService, reset_router_state
+from theo.services.api.app.ai.router import (
+    LLMRouterService,
+    RoutedGeneration,
+    reset_router_state,
+)
 from theo.services.api.app.ai import router as router_module
 
 
@@ -291,4 +300,89 @@ def test_router_prefers_model_hint_and_falls_back(monkeypatch):
 
     fallback = next(candidates)
     assert fallback.name == "heavy"
+
+
+def test_router_reuses_cache_entry(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="cached",
+            provider="echo",
+            model="echo",
+            config={},
+            pricing={"per_call": 0.5},
+            routing={
+                "cache_enabled": True,
+                "cache_ttl_seconds": 120,
+                "cache_max_entries": 8,
+                "weight": 1.0,
+            },
+        ),
+        make_default=True,
+    )
+
+    router = LLMRouterService(registry)
+
+    call_count = 0
+
+    class _CountingClient:
+        def generate(self, **_: object) -> str:
+            nonlocal call_count
+            call_count += 1
+            return "cached-output"
+
+    monkeypatch.setattr(registry.models["cached"], "build_client", lambda: _CountingClient())
+
+    model = registry.get()
+    first = router.execute_generation(workflow="chat", model=model, prompt="hello")
+    second = router.execute_generation(workflow="chat", model=model, prompt="hello")
+
+    assert call_count == 1
+    assert second.output == first.output
+    assert router.get_spend("cached") == pytest.approx(first.cost)
+
+
+def test_router_deduplicates_inflight_requests(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={},
+            pricing={"per_call": 0.3},
+            routing={"weight": 1.0},
+        ),
+        make_default=True,
+    )
+
+    router = LLMRouterService(registry)
+    model = registry.get()
+
+    call_count = 0
+    call_lock = threading.Lock()
+
+    class _SlowClient:
+        def generate(self, **_: object) -> str:
+            nonlocal call_count
+            with call_lock:
+                call_count += 1
+            time.sleep(0.05)
+            return "shared-output"
+
+    monkeypatch.setattr(model, "build_client", lambda: _SlowClient())
+
+    start_barrier = threading.Barrier(3)
+
+    def _invoke() -> RoutedGeneration:
+        start_barrier.wait()
+        return router.execute_generation(workflow="chat", model=model, prompt="simultaneous")
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(_invoke) for _ in range(3)]
+        results = [future.result() for future in futures]
+
+    assert call_count == 1
+    assert {result.output for result in results} == {"shared-output"}
+    assert router.get_spend("primary") == pytest.approx(results[0].cost)
 
