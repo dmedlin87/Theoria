@@ -256,11 +256,28 @@ class LLMRouterService:
                     raise
 
                 latency_ms = (time.perf_counter() - start) * 1000.0
+                latency_threshold = self._as_float(config.get("latency_threshold_ms"))
                 with self._ledger.lock:
                     self._ledger.latency[model.name] = latency_ms
-                latency_threshold = self._as_float(config.get("latency_threshold_ms"))
-                if latency_threshold is not None and latency_ms > latency_threshold:
 
+                if (
+                    latency_threshold is not None
+                    and warning_ratio > 0.0
+                    and latency_threshold > 0.0
+                    and latency_ms >= latency_threshold * warning_ratio
+                ):
+                    LOGGER.warning(
+                        (
+                            "Model %s (workflow %s) latency %.1fms is %.0f%% of "
+                            "threshold %.1fms"
+                        ),
+                        model.name,
+                        workflow,
+                        latency_ms,
+                        warning_ratio * 100,
+                        latency_threshold,
+                    )
+                if latency_threshold is not None and latency_ms > latency_threshold:
                     error = GenerationError(
                         "Latency threshold exceeded for model "
                         f"{model.name}: {latency_ms:.1f}ms > {latency_threshold:.1f}ms"
@@ -270,112 +287,60 @@ class LLMRouterService:
                     span.record_exception(error)
                     LOGGER.warning(
                         (
-                            "Model %s (workflow %s) projected spend %.2f exceeded "
-                            "ceiling %.2f before generation"
+                            "Model %s (workflow %s) latency %.1fms exceeded threshold %.1fms"
                         ),
                         model.name,
                         workflow,
-                        projected_spend,
-                        ceiling,
+                        latency_ms,
+                        latency_threshold,
                     )
                     raise error
 
-                completion_tokens = max(len(output) // 4, 0) if isinstance(output, str) else 0
+                completion_tokens = (
+                    max(len(output) // 4, 0) if isinstance(output, str) else 0
+                )
                 cost = self._estimate_cost(model, prompt, output)
                 with self._ledger.lock:
                     spent = self._ledger.spend[model.name]
-                    if ceiling is not None and spent + cost > ceiling:
+                    total_spend = spent + cost
+                    if (
+                        ceiling is not None
+                        and warning_ratio > 0.0
+                        and ceiling > 0.0
+                        and total_spend >= ceiling * warning_ratio
+                    ):
+                        LOGGER.warning(
+                            (
+                                "Model %s (workflow %s) spend %.2f is %.0f%% of ceiling %.2f "
+                                "after generation"
+                            ),
+                            model.name,
+                            workflow,
+                            total_spend,
+                            warning_ratio * 100,
+                            ceiling,
+                        )
+                    if ceiling is not None and total_spend > ceiling:
                         self._ledger.spend[model.name] = ceiling
                         error = GenerationError(
                             "Budget exhausted for model "
-                            f"{model.name} (spent {spent + cost:.2f} > {ceiling:.2f})"
+                            f"{model.name} (spent {total_spend:.2f} > {ceiling:.2f})"
                         )
                         span.set_attribute("llm.budget_status", "postcheck_blocked")
                         span.record_exception(error)
+                        LOGGER.warning(
+                            (
+                                "Model %s (workflow %s) spend %.2f exceeded ceiling %.2f after "
+                                "generation"
+                            ),
+                            model.name,
+                            workflow,
+                            total_spend,
+                            ceiling,
+                        )
                         raise error
-                    self._ledger.spend[model.name] = spent + cost
+                    self._ledger.spend[model.name] = total_spend
 
-            latency_ms = (time.perf_counter() - start) * 1000.0
-            with self._ledger.lock:
-                self._ledger.latency[model.name] = latency_ms
-            if (
-                latency_threshold is not None
-                and warning_ratio > 0.0
-                and latency_threshold > 0.0
-                and latency_ms >= latency_threshold * warning_ratio
-            ):
-                LOGGER.warning(
-                    (
-                        "Model %s (workflow %s) latency %.1fms is %.0f%% of "
-                        "threshold %.1fms"
-                    ),
-                    model.name,
-                    workflow,
-                    latency_ms,
-                    warning_ratio * 100,
-                    latency_threshold,
-                )
-            if latency_threshold is not None and latency_ms > latency_threshold:
-                error = GenerationError(
-                    "Latency threshold exceeded for model "
-                    f"{model.name}: {latency_ms:.1f}ms > {latency_threshold:.1f}ms"
-                )
-                span.set_attribute("llm.latency_threshold", latency_threshold)
-                span.set_attribute("llm.latency_ms", round(latency_ms, 2))
-                span.record_exception(error)
-                LOGGER.warning(
-                    (
-                        "Model %s (workflow %s) latency %.1fms exceeded threshold %.1fms"
-                    ),
-                    model.name,
-                    workflow,
-                    latency_ms,
-                    latency_threshold,
-                )
-                raise error
-
-            completion_tokens = max(len(output) // 4, 0) if isinstance(output, str) else 0
-            cost = self._estimate_cost(model, prompt, output)
-            with self._ledger.lock:
-                spent = self._ledger.spend[model.name]
-                total_spend = spent + cost
-                if (
-                    ceiling is not None
-                    and warning_ratio > 0.0
-                    and ceiling > 0.0
-                    and total_spend >= ceiling * warning_ratio
-                ):
-                    LOGGER.warning(
-                        (
-                            "Model %s (workflow %s) spend %.2f is %.0f%% of ceiling %.2f "
-                            "after generation"
-                        ),
-                        model.name,
-                        workflow,
-                        total_spend,
-                        warning_ratio * 100,
-                        ceiling,
-                    )
-                if ceiling is not None and total_spend > ceiling:
-                    self._ledger.spend[model.name] = ceiling
-                    error = GenerationError(
-                        "Budget exhausted for model "
-                        f"{model.name} (spent {spent + cost:.2f} > {ceiling:.2f})"
-                    )
-                    span.set_attribute("llm.budget_status", "postcheck_blocked")
-                    span.record_exception(error)
-                    LOGGER.warning(
-                        (
-                            "Model %s (workflow %s) spend %.2f exceeded ceiling %.2f after "
-                            "generation"
-                        ),
-                        model.name,
-                        workflow,
-                        total_spend,
-                        ceiling,
-                    )
-                    raise error
-                self._ledger.spend[model.name] = total_spend
                 span.set_attribute("llm.latency_ms", round(latency_ms, 2))
                 span.set_attribute("llm.completion_tokens", completion_tokens)
                 span.set_attribute("llm.cost", cost)
