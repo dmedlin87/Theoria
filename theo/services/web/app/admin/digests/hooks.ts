@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { TheoApiClient, createTheoApiClient } from "../../lib/api-client";
+import type { TheoApiClient } from "../../lib/api-client";
+import { createTheoApiClient } from "../../lib/api-client";
 import type {
   CreateWatchlistPayload,
   TopicDigest,

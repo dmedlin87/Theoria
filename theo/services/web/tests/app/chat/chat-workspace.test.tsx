@@ -7,7 +7,7 @@ import type {
   ChatWorkflowClient,
   ChatWorkflowResult,
   ChatWorkflowStreamEvent,
-} from "../../../app/lib/api-client";
+} from "../../../app/lib/chat-client";
 import ChatWorkspace from "../../../app/chat/ChatWorkspace";
 
 const sampleAnswer = {
