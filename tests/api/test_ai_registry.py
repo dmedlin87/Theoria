@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Iterator
 import sys
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -13,11 +14,17 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.ai.clients import (  # noqa: E402
+    AIClientSettings,
     AnthropicClient,
+    AnthropicConfig,
     AzureOpenAIClient,
+    AzureOpenAIConfig,
     LocalVLLMClient,
+    LocalVLLMConfig,
     OpenAIClient,
+    OpenAIConfig,
     VertexAIClient,
+    VertexAIConfig,
     build_client,
 )
 from theo.services.api.app.ai.registry import (  # noqa: E402
@@ -62,6 +69,31 @@ def _prepare_engine(tmp_path: Path):
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     return engine
+
+
+class StubHTTPXClient:
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = []
+
+    def request(self, method: str, url: str, **kwargs):
+        if not self._responses:
+            raise AssertionError("No more responses configured")
+        factory = self._responses.pop(0)
+        self.calls.append((method, url, kwargs))
+        if isinstance(factory, Exception):
+            raise factory
+        return factory(method, url, kwargs)
+
+
+def json_response(
+    status_code: int, payload: dict, headers: dict | None = None
+):
+    def _factory(method: str, url: str, kwargs: dict):
+        request = httpx.Request(method, f"https://example.test{url}")
+        return httpx.Response(status_code, headers=headers, json=payload, request=request)
+
+    return _factory
 
 
 @pytest.fixture()
@@ -324,3 +356,129 @@ def test_llm_routes_openapi_schema(api_client: TestClient) -> None:
     llm_model = schema["paths"].get("/ai/llm/{name}")
     assert llm_model is not None
     assert set(llm_model.keys()) == {"patch", "delete"}
+
+
+def test_retry_backoff_respects_retry_after() -> None:
+    fake_time = [0.0]
+    sleep_calls: list[float] = []
+
+    def fake_clock() -> float:
+        return fake_time[0]
+
+    def fake_sleep(duration: float) -> None:
+        sleep_calls.append(duration)
+        fake_time[0] += duration
+
+    settings = AIClientSettings(
+        max_attempts=3,
+        backoff_initial=1.0,
+        backoff_multiplier=2.0,
+        backoff_max=10.0,
+        total_timeout=20.0,
+        request_timeout=5.0,
+        read_timeout=5.0,
+        clock=fake_clock,
+        sleep=fake_sleep,
+    )
+
+    client = AnthropicClient(AnthropicConfig(api_key="test"), settings=settings)
+    responses = [
+        json_response(429, {"error": "rate"}, headers={"Retry-After": "2"}),
+        json_response(503, {"error": "busy"}, headers={"retry-after-ms": "1500"}),
+        json_response(200, {"content": [{"text": "final"}]}),
+    ]
+    stub = StubHTTPXClient(responses)
+    client._client = stub  # type: ignore[attr-defined]
+
+    result = client.generate(prompt="hello", model="claude-3")
+
+    assert result == "final"
+    assert len(stub.calls) == 3
+    assert sleep_calls == pytest.approx([2.0, 1.5])
+
+
+@pytest.mark.parametrize(
+    "factory, payload, header_name, expected",
+    [
+        (
+            lambda settings: OpenAIClient(
+                OpenAIConfig(api_key="key", base_url="https://openai.example"),
+                settings=settings,
+            ),
+            {"choices": [{"message": {"content": "openai"}}]},
+            "Idempotency-Key",
+            "openai",
+        ),
+        (
+            lambda settings: AzureOpenAIClient(
+                AzureOpenAIConfig(
+                    api_key="key",
+                    endpoint="https://azure.example",
+                    deployment="deploy",
+                ),
+                settings=settings,
+            ),
+            {"choices": [{"message": {"content": "azure"}}]},
+            "x-ms-client-request-id",
+            "azure",
+        ),
+        (
+            lambda settings: AnthropicClient(
+                AnthropicConfig(api_key="key"),
+                settings=settings,
+            ),
+            {"content": [{"text": "anthropic"}]},
+            "anthropic-idempotency-key",
+            "anthropic",
+        ),
+        (
+            lambda settings: VertexAIClient(
+                VertexAIConfig(
+                    project_id="proj",
+                    location="us-central1",
+                    model="text-model",
+                    access_token="token",
+                ),
+                settings=settings,
+            ),
+            {"predictions": [{"content": "vertex"}]},
+            "x-request-id",
+            "vertex",
+        ),
+        (
+            lambda settings: LocalVLLMClient(
+                LocalVLLMConfig(base_url="https://local.example"),
+                settings=settings,
+            ),
+            {"choices": [{"message": {"content": "local"}}]},
+            "Idempotency-Key",
+            "local",
+        ),
+    ],
+)
+def test_clients_inject_idempotency_keys_and_cache(
+    factory, payload, header_name, expected
+) -> None:
+    fake_time = [0.0]
+
+    settings = AIClientSettings(
+        max_attempts=1,
+        total_timeout=30.0,
+        request_timeout=5.0,
+        read_timeout=5.0,
+        clock=lambda: fake_time[0],
+        sleep=lambda _: None,
+    )
+
+    client = factory(settings)
+    stub = StubHTTPXClient([json_response(200, payload)])
+    client._client = stub  # type: ignore[attr-defined]
+
+    result_one = client.generate(prompt="hello", model="model", cache_key="cache-key")
+    result_two = client.generate(prompt="hello", model="model", cache_key="cache-key")
+
+    assert result_one == expected
+    assert result_two == expected
+    assert len(stub.calls) == 1
+    headers = stub.calls[0][2]["headers"]
+    assert headers[header_name] == "cache-key"
