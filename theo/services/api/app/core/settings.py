@@ -31,11 +31,22 @@ class Settings(BaseSettings):
     storage_root: Path = Field(
         default=Path("./storage"), description="Location for persisted artifacts"
     )
+    storage_public_base_url: str | None = Field(
+        default=None,
+        description="Optional base URL for referencing persisted artifacts",
+    )
     embedding_model: str = Field(default="BAAI/bge-m3")
     embedding_dim: int = Field(default=1024)
     max_chunk_tokens: int = Field(default=900)
     doc_max_pages: int = Field(default=5000)
     transcript_max_window: float = Field(default=40.0)
+    ingest_normalized_snapshot_max_bytes: int | None = Field(
+        default=1_000_000,
+        description=(
+            "Maximum number of bytes embedded into normalized snapshots before"
+            " switching to an external manifest"
+        ),
+    )
     fixtures_root: Path | None = Field(
         default=None, description="Optional fixtures path for offline resources"
     )

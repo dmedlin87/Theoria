@@ -120,6 +120,93 @@ def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
         settings.storage_root = original_storage
 
 
+def test_run_pipeline_for_file_inlines_snapshot_when_small(tmp_path) -> None:
+    """Smaller ingests include inline text and chunk snapshots."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    original_threshold = settings.ingest_normalized_snapshot_max_bytes
+    storage_root = tmp_path / "storage"
+    settings.storage_root = storage_root
+    settings.ingest_normalized_snapshot_max_bytes = 10_000_000
+
+    try:
+        markdown = """---\ntitle: Inline Doc\n---\n\nShort content."""
+        doc_path = tmp_path / "inline.md"
+        doc_path.write_text(markdown, encoding="utf-8")
+
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document_id = document.id
+
+        with Session(engine) as session:
+            stored = session.get(Document, document_id)
+
+        assert stored is not None
+        assert stored.storage_path is not None
+        storage_dir = Path(stored.storage_path)
+        normalized_path = storage_dir / "normalized.json"
+        assert normalized_path.exists()
+
+        normalized_payload = json.loads(normalized_path.read_text("utf-8"))
+        assert normalized_payload["document"]["text"].strip().startswith("Short content")
+        assert "chunks" in normalized_payload
+        assert normalized_payload["chunks"]
+        assert "snapshot_manifest" not in normalized_payload
+    finally:
+        settings.storage_root = original_storage
+        settings.ingest_normalized_snapshot_max_bytes = original_threshold
+
+
+def test_run_pipeline_for_large_file_uses_snapshot_manifest(tmp_path) -> None:
+    """Large snapshots omit inline text in favour of artifact manifests."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    original_threshold = settings.ingest_normalized_snapshot_max_bytes
+    storage_root = tmp_path / "storage"
+    settings.storage_root = storage_root
+    settings.ingest_normalized_snapshot_max_bytes = 512
+
+    try:
+        large_text = "Lorem ipsum dolor sit amet. " * 200
+        markdown = "---\ntitle: Large Doc\n---\n\n" + large_text
+        doc_path = tmp_path / "large.md"
+        doc_path.write_text(markdown, encoding="utf-8")
+
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document_id = document.id
+
+        with Session(engine) as session:
+            stored = session.get(Document, document_id)
+
+        assert stored is not None
+        assert stored.storage_path is not None
+        storage_dir = Path(stored.storage_path)
+        normalized_path = storage_dir / "normalized.json"
+        assert normalized_path.exists()
+
+        normalized_payload = json.loads(normalized_path.read_text("utf-8"))
+        assert "text" not in normalized_payload["document"]
+        assert "chunks" not in normalized_payload
+        manifest = normalized_payload.get("snapshot_manifest")
+        assert manifest is not None
+        assert "artifacts" in manifest and manifest["artifacts"]
+        sample_manifest_entry = next(iter(manifest["artifacts"].values()))
+        assert "uri" in sample_manifest_entry
+        assert sample_manifest_entry["filename"]
+    finally:
+        settings.storage_root = original_storage
+        settings.ingest_normalized_snapshot_max_bytes = original_threshold
+
+
 def test_run_pipeline_for_url_rejects_disallowed_scheme(monkeypatch) -> None:
     settings = get_settings()
     original_schemes = list(settings.ingest_url_allowed_schemes)

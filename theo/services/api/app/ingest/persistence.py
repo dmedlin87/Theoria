@@ -150,6 +150,76 @@ def get_or_create_creator(
     return creator
 
 
+def _calculate_snapshot_size(
+    text_content: str | None, chunks: Sequence[Any]
+) -> int:
+    """Estimate the number of bytes required for normalized text snapshots."""
+
+    total = 0
+    if text_content:
+        total += len(text_content.encode("utf-8"))
+
+    for chunk in chunks:
+        chunk_text = getattr(chunk, "text", "") or ""
+        if chunk_text:
+            total += len(chunk_text.encode("utf-8"))
+
+    return total
+
+
+def _should_embed_snapshot(
+    *, text_content: str | None, chunks: Sequence[Any], settings: Any
+) -> bool:
+    """Return ``True`` when normalized snapshots should inline text data."""
+
+    threshold = getattr(settings, "ingest_normalized_snapshot_max_bytes", None)
+    if threshold in (None, 0):
+        return True
+
+    try:
+        limit = int(threshold)
+    except (TypeError, ValueError):
+        return True
+
+    if limit <= 0:
+        return True
+
+    return _calculate_snapshot_size(text_content, chunks) <= limit
+
+
+def _build_snapshot_manifest(
+    *,
+    document_id: str,
+    artifacts: dict[str, str],
+    storage_dir: Path,
+    settings: Any,
+) -> dict[str, Any] | None:
+    """Construct a manifest that references stored artifacts for large ingests."""
+
+    if not artifacts:
+        return None
+
+    base_url = getattr(settings, "storage_public_base_url", None)
+    manifest_entries: dict[str, dict[str, str]] = {}
+
+    for label, filename in artifacts.items():
+        entry: dict[str, str] = {
+            "filename": filename,
+            "relative_path": filename,
+        }
+        if base_url:
+            entry["uri"] = "/".join(
+                segment.strip("/")
+                for segment in (base_url, document_id, filename)
+                if segment
+            )
+        else:
+            entry["uri"] = str(storage_dir / filename)
+        manifest_entries[label] = entry
+
+    return {"artifacts": manifest_entries}
+
+
 def get_or_create_video(
     session: Session,
     *,
@@ -481,24 +551,18 @@ def persist_text_document(
             target_path.write_text(raw_content, encoding="utf-8")
             artifacts.setdefault("raw", safe_name)
 
+        embed_snapshot = _should_embed_snapshot(
+            text_content=text_content, chunks=chunks, settings=settings
+        )
+        snapshot_manifest: dict[str, Any] | None = None
+
         normalized_payload = {
             "document": {
                 "id": document.id,
                 "title": document.title,
                 "source_url": document.source_url,
                 "source_type": document.source_type,
-                "text": text_content,
             },
-            "chunks": [
-                {
-                    "index": chunk.index,
-                    "text": chunk.text,
-                    "t_start": chunk.t_start,
-                    "t_end": chunk.t_end,
-                    "page_no": chunk.page_no,
-                }
-                for chunk in chunks
-            ],
             "passages": [
                 {
                     "id": passage.id,
@@ -520,6 +584,26 @@ def persist_text_document(
             ],
         }
 
+        if embed_snapshot:
+            normalized_payload["document"]["text"] = text_content
+            normalized_payload["chunks"] = [
+                {
+                    "index": chunk.index,
+                    "text": chunk.text,
+                    "t_start": chunk.t_start,
+                    "t_end": chunk.t_end,
+                    "page_no": chunk.page_no,
+                }
+                for chunk in chunks
+            ]
+        else:
+            snapshot_manifest = _build_snapshot_manifest(
+                document_id=document.id,
+                artifacts=artifacts,
+                storage_dir=storage_dir,
+                settings=settings,
+            )
+
         if artifacts:
             normalized_payload["artifacts"] = artifacts
 
@@ -527,6 +611,7 @@ def persist_text_document(
             temp_dir_path,
             frontmatter=frontmatter,
             normalized_payload=normalized_payload,
+            snapshot_manifest=snapshot_manifest,
         )
 
         if storage_dir.exists():
@@ -553,6 +638,7 @@ def _write_document_metadata(
     *,
     frontmatter: dict[str, Any],
     normalized_payload: dict[str, Any],
+    snapshot_manifest: dict[str, Any] | None = None,
 ) -> None:
     """Write frontmatter and normalized payload metadata files."""
 
@@ -560,8 +646,12 @@ def _write_document_metadata(
         serialise_frontmatter(frontmatter), encoding="utf-8"
     )
 
+    payload = dict(normalized_payload)
+    if snapshot_manifest:
+        payload["snapshot_manifest"] = snapshot_manifest
+
     target_dir.joinpath("normalized.json").write_text(
-        json.dumps(normalized_payload, indent=2), encoding="utf-8"
+        json.dumps(payload, indent=2), encoding="utf-8"
     )
 
 
@@ -810,6 +900,11 @@ def persist_transcript_document(
                 shutil.copyfile(audio_path, destination)
             artifacts.setdefault("audio", safe_name)
 
+        embed_snapshot = _should_embed_snapshot(
+            text_content=None, chunks=chunks, settings=settings
+        )
+        snapshot_manifest: dict[str, Any] | None = None
+
         normalized_payload = {
             "document": {
                 "id": document.id,
@@ -817,16 +912,6 @@ def persist_transcript_document(
                 "source_url": document.source_url,
                 "source_type": document.source_type,
             },
-            "chunks": [
-                {
-                    "index": chunk.index,
-                    "text": chunk.text,
-                    "t_start": chunk.t_start,
-                    "t_end": chunk.t_end,
-                    "page_no": chunk.page_no,
-                }
-                for chunk in chunks
-            ],
             "passages": [
                 {
                     "id": passage.id,
@@ -848,6 +933,25 @@ def persist_transcript_document(
             ],
         }
 
+        if embed_snapshot:
+            normalized_payload["chunks"] = [
+                {
+                    "index": chunk.index,
+                    "text": chunk.text,
+                    "t_start": chunk.t_start,
+                    "t_end": chunk.t_end,
+                    "page_no": chunk.page_no,
+                }
+                for chunk in chunks
+            ]
+        else:
+            snapshot_manifest = _build_snapshot_manifest(
+                document_id=document.id,
+                artifacts=artifacts,
+                storage_dir=storage_dir,
+                settings=settings,
+            )
+
         if artifacts:
             normalized_payload["artifacts"] = artifacts
 
@@ -855,6 +959,7 @@ def persist_transcript_document(
             temp_dir_path,
             frontmatter=frontmatter,
             normalized_payload=normalized_payload,
+            snapshot_manifest=snapshot_manifest,
         )
 
         if storage_dir.exists():
