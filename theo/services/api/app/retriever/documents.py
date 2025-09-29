@@ -16,6 +16,7 @@ from ..models.documents import (
     DocumentSummary,
     DocumentUpdateRequest,
 )
+from .annotations import annotation_to_schema, prepare_annotation_body
 
 
 def _passage_to_schema(passage: Passage) -> PassageSchema:
@@ -30,17 +31,6 @@ def _passage_to_schema(passage: Passage) -> PassageSchema:
         score=None,
         meta=passage.meta,
     )
-
-
-def _annotation_to_schema(annotation: DocumentAnnotation) -> DocumentAnnotationResponse:
-    return DocumentAnnotationResponse(
-        id=annotation.id,
-        document_id=annotation.document_id,
-        body=annotation.body,
-        created_at=annotation.created_at,
-        updated_at=annotation.updated_at,
-    )
-
 
 def list_documents(
     session: Session, *, limit: int = 20, offset: int = 0
@@ -115,7 +105,7 @@ def get_document(session: Session, document_id: str) -> DocumentDetailResponse:
         provenance_score=document.provenance_score,
         meta=document.bib_json,
         passages=passage_schemas,
-        annotations=[_annotation_to_schema(annotation) for annotation in annotations],
+        annotations=[annotation_to_schema(annotation) for annotation in annotations],
     )
 
 
@@ -209,7 +199,7 @@ def list_annotations(
         .order_by(DocumentAnnotation.created_at.asc())
         .all()
     )
-    return [_annotation_to_schema(annotation) for annotation in annotations]
+    return [annotation_to_schema(annotation) for annotation in annotations]
 
 
 def create_annotation(
@@ -221,11 +211,12 @@ def create_annotation(
     if document is None:
         raise KeyError(f"Document {document_id} not found")
 
-    annotation = DocumentAnnotation(document_id=document_id, body=payload.body)
+    body = prepare_annotation_body(payload)
+    annotation = DocumentAnnotation(document_id=document_id, body=body)
     session.add(annotation)
     session.commit()
     session.refresh(annotation)
-    return _annotation_to_schema(annotation)
+    return annotation_to_schema(annotation)
 
 
 def delete_annotation(session: Session, document_id: str, annotation_id: str) -> None:

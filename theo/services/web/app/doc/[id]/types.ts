@@ -1,7 +1,16 @@
+export type DocumentAnnotationType = "claim" | "evidence" | "question" | "note";
+
 export interface DocumentAnnotation {
   id: string;
   document_id: string;
+  type: DocumentAnnotationType;
   body: string;
+  stance?: string | null;
+  passage_ids: string[];
+  group_id?: string | null;
+  metadata?: Record<string, unknown> | null;
+  raw?: Record<string, unknown> | null;
+  legacy: boolean;
   created_at: string;
   updated_at: string;
 }

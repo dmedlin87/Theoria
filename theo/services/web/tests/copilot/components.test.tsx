@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 
 import CitationList from "../../app/copilot/components/CitationList";
 import QuickStartPresets from "../../app/copilot/components/QuickStartPresets";
@@ -36,6 +36,19 @@ const EXPORT_PRESETS: ExportPreset[] = [
     format: "csv",
   },
 ];
+
+beforeEach(() => {
+  (globalThis as typeof globalThis & { fetch: jest.Mock }).fetch = jest
+    .fn()
+    .mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    });
+});
+
+afterEach(() => {
+  jest.resetAllMocks();
+});
 
 describe("copilot components", () => {
   it("renders workflow selector and triggers selection", () => {
@@ -97,6 +110,7 @@ describe("copilot components", () => {
         exporting={false}
         status={null}
         onExport={jest.fn()}
+        workflowId="verse"
         result={{
           kind: "verse",
           payload: {
@@ -112,24 +126,29 @@ describe("copilot components", () => {
     expect(screen.getByText(/Verse brief/)).toBeInTheDocument();
   });
 
-  it("renders citation list and triggers export", () => {
+  it("renders citation list and triggers export", async () => {
     const onExport = jest.fn();
-    render(
-      <CitationList
-        citations={[
-          {
-            index: 1,
-            osis: "John",
-            anchor: "1",
-            snippet: "Snippet",
-            document_id: "doc",
-            passage_id: "John.1.1",
- 
-          },
-        ]}
-        onExport={onExport}
-      />,
-    );
+    await act(async () => {
+      render(
+        <CitationList
+          citations={[
+            {
+              index: 1,
+              osis: "John",
+              anchor: "1",
+              snippet: "Snippet",
+              document_id: "doc",
+              passage_id: "John.1.1",
+              document_title: "Document",
+              source_url: "https://example.com",
+            },
+          ]}
+          summaryText="Summary"
+          workflowId="verse"
+          onExport={onExport}
+        />,
+      );
+    });
     fireEvent.click(screen.getByRole("button", { name: /export/i }));
     expect(onExport).toHaveBeenCalled();
   });

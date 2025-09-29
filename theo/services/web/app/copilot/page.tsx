@@ -658,6 +658,7 @@ export default function CopilotPage(): JSX.Element {
           exporting={isSendingCitations}
           status={citationExportStatus}
           summary={formatEmphasisSummary(mode)}
+          workflowId={workflow}
         />
       )}
     </section>
