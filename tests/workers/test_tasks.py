@@ -6,7 +6,6 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
-
 from sqlalchemy.orm import Session
 
 from celery.app.task import Task
@@ -22,15 +21,21 @@ from theo.services.api.app.core.database import (  # noqa: E402  (import after p
     get_settings,
 )
 from theo.services.api.app.db.models import (  # noqa: E402
+    ChatSession,
     Document,
     IngestionJob,
     Passage,
 )
+
 from theo.services.api.app.models.export import (  # noqa: E402
     DeliverableAsset,
     DeliverableManifest,
     DeliverablePackage,
 )
+
+from theo.services.api.app.ai.rag import RAGCitation  # noqa: E402
+from theo.services.api.app.models.ai import ChatMemoryEntry  # noqa: E402
+from theo.services.api.app.models.search import HybridSearchResult  # noqa: E402
 from theo.services.api.app.workers import tasks  # noqa: E402
 
 
@@ -38,6 +43,25 @@ def _task(obj: Any) -> Task:
     """Return a Celery task with typing information for static analysis."""
 
     return cast(Task, obj)
+
+
+class _FakeMetric:
+    def __init__(self) -> None:
+        self.counts: dict[str, float] = {}
+
+    class _Child:
+        def __init__(self, parent: "_FakeMetric", status: str) -> None:
+            self._parent = parent
+            self._status = status
+
+        def inc(self, amount: float = 1.0) -> None:
+            self._parent.counts[self._status] = (
+                self._parent.counts.get(self._status, 0.0) + amount
+            )
+
+    def labels(self, **labels: Any) -> "_FakeMetric._Child":
+        status = labels.get("status", "unknown")
+        return self._Child(self, str(status))
 
 
 def test_process_url_ingests_fixture_url(tmp_path) -> None:
@@ -460,3 +484,166 @@ def test_refresh_hnsw_executes_rebuild_sql(monkeypatch) -> None:
     assert any("USING hnsw" in statement for statement in executed)
     assert any("ANALYZE passages" in statement for statement in executed)
     assert metrics["sample_size"] == 0
+
+def test_validate_citations_passes_and_updates_job(monkeypatch, tmp_path) -> None:
+    db_path = tmp_path / "validate-success.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+
+    now = datetime.now(UTC)
+    citation = RAGCitation(
+        index=1,
+        osis="John.3.16",
+        anchor="page 2",
+        passage_id="passage-1",
+        document_id="doc-1",
+        document_title="Gospel of John",
+        snippet="For God so loved the world",
+        source_url="/doc/doc-1#passage-passage-1",
+    )
+    entry = ChatMemoryEntry(
+        question="What does John 3:16 teach?",
+        answer="For God so loved the world.",
+        answer_summary="God loves the world",
+        citations=[citation],
+        document_ids=["doc-1"],
+        created_at=now,
+    )
+
+    with Session(engine) as session:
+        session_record = ChatSession(
+            id="session-success",
+            user_id="user-1",
+            stance=None,
+            summary=entry.answer_summary,
+            memory_snippets=[entry.model_dump(mode="json")],
+            document_ids=entry.document_ids,
+            preferences=None,
+            created_at=now,
+            updated_at=now,
+            last_interaction_at=now,
+        )
+        job = IngestionJob(job_type="validate_citations", status="queued")
+        session.add_all([session_record, job])
+        session.commit()
+        job_id = job.id
+
+    def fake_hybrid_search(_: Session, __: Any) -> list[HybridSearchResult]:
+        return [
+            HybridSearchResult(
+                id="passage-1",
+                document_id="doc-1",
+                text="For God so loved the world",
+                raw_text=None,
+                osis_ref="John.3.16",
+                start_char=None,
+                end_char=None,
+                page_no=2,
+                t_start=None,
+                t_end=None,
+                score=0.9,
+                meta={},
+                document_title="Gospel of John",
+                snippet="For God so loved the world",
+                rank=1,
+            )
+        ]
+
+    metric = _FakeMetric()
+    monkeypatch.setattr(tasks, "CITATION_DRIFT_EVENTS", metric)
+    monkeypatch.setattr(tasks, "hybrid_search", fake_hybrid_search)
+
+    result = _task(tasks.validate_citations).run(job_id=job_id, limit=1)
+
+    assert result["passed"] == 1
+    assert result["failed"] == 0
+    assert result["discrepancies"] == []
+    assert metric.counts == {"passed": 1.0}
+
+    with Session(engine) as session:
+        job_record = session.get(IngestionJob, job_id)
+        assert job_record is not None
+        assert job_record.status == "completed"
+        assert job_record.payload is not None
+        assert job_record.payload.get("passed") == 1
+        assert job_record.payload.get("limit") == 1
+
+
+def test_validate_citations_logs_mismatch(monkeypatch, tmp_path, caplog) -> None:
+    db_path = tmp_path / "validate-failure.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+
+    now = datetime.now(UTC)
+    citation = RAGCitation(
+        index=1,
+        osis="John.3.16",
+        anchor="page 2",
+        passage_id="passage-1",
+        document_id="doc-1",
+        document_title="Gospel of John",
+        snippet="For God so loved the world",
+        source_url="/doc/doc-1#passage-passage-1",
+    )
+    entry = ChatMemoryEntry(
+        question="What does John 3:16 teach?",
+        answer="For God so loved the world.",
+        citations=[citation],
+        document_ids=["doc-1"],
+        created_at=now,
+    )
+
+    with Session(engine) as session:
+        session_record = ChatSession(
+            id="session-failure",
+            user_id="user-2",
+            stance=None,
+            summary=entry.answer,
+            memory_snippets=[entry.model_dump(mode="json")],
+            document_ids=entry.document_ids,
+            preferences=None,
+            created_at=now,
+            updated_at=now,
+            last_interaction_at=now,
+        )
+        session.add(session_record)
+        session.commit()
+
+    def mismatched_search(_: Session, __: Any) -> list[HybridSearchResult]:
+        return [
+            HybridSearchResult(
+                id="passage-1",
+                document_id="doc-1",
+                text="For God so loved the world",
+                raw_text=None,
+                osis_ref="John.3.16",
+                start_char=None,
+                end_char=None,
+                page_no=3,
+                t_start=None,
+                t_end=None,
+                score=0.9,
+                meta={},
+                document_title="Gospel of John",
+                snippet="For God so loved the world",
+                rank=1,
+            )
+        ]
+
+    metric = _FakeMetric()
+    monkeypatch.setattr(tasks, "CITATION_DRIFT_EVENTS", metric)
+    monkeypatch.setattr(tasks, "hybrid_search", mismatched_search)
+
+    caplog.set_level("WARNING")
+    result = _task(tasks.validate_citations).run(limit=1)
+
+    assert result["failed"] == 1
+    assert result["passed"] == 0
+    assert metric.counts == {"failed": 1.0}
+    assert result["discrepancies"]
+    assert result["discrepancies"][0]["status"] == "failed"
+    assert "Citation validation mismatch" in caplog.text

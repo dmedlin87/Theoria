@@ -17,6 +17,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -635,6 +636,12 @@ class AgentTrail(Base):
     sources: Mapped[list["TrailSource"]] = relationship(
         "TrailSource", back_populates="trail", cascade="all, delete-orphan"
     )
+    retrieval_snapshots: Mapped[list["TrailRetrievalSnapshot"]] = relationship(
+        "TrailRetrievalSnapshot",
+        back_populates="trail",
+        cascade="all, delete-orphan",
+        order_by="TrailRetrievalSnapshot.turn_index",
+    )
 
 
 class ChatSession(Base):
@@ -696,6 +703,11 @@ class AgentStep(Base):
     )
 
     trail: Mapped[AgentTrail] = relationship("AgentTrail", back_populates="steps")
+    retrieval_snapshot: Mapped["TrailRetrievalSnapshot | None"] = relationship(
+        "TrailRetrievalSnapshot",
+        back_populates="step",
+        uselist=False,
+    )
 
 
 class TrailSource(Base):
@@ -723,6 +735,47 @@ class TrailSource(Base):
     )
 
     trail: Mapped[AgentTrail] = relationship("AgentTrail", back_populates="sources")
+
+
+class TrailRetrievalSnapshot(Base):
+    """Snapshot of passages and identifiers used to ground a turn."""
+
+    __tablename__ = "trail_retrieval_snapshots"
+    __table_args__ = (
+        UniqueConstraint("trail_id", "turn_index", name="uq_trail_retrieval_turn"),
+        Index("ix_trail_retrieval_trail", "trail_id"),
+        Index("ix_trail_retrieval_hash", "retrieval_hash"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    trail_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_trails.id", ondelete="CASCADE")
+    )
+    step_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("agent_steps.id", ondelete="SET NULL"), nullable=True
+    )
+    turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    retrieval_hash: Mapped[str] = mapped_column(String, nullable=False)
+    passage_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    osis_refs: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    trail: Mapped[AgentTrail] = relationship(
+        "AgentTrail", back_populates="retrieval_snapshots"
+    )
+    step: Mapped[AgentStep | None] = relationship(
+        "AgentStep", back_populates="retrieval_snapshot"
+    )
 
 
 class UserWatchlist(Base):

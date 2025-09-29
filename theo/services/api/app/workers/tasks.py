@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 import time
 from pathlib import Path
-from typing import Any, Iterable, cast
+from typing import Any, Iterable, Sequence, cast
 
 import httpx
 from celery import Celery
@@ -33,12 +33,18 @@ from ..analytics.watchlists import (
 from ..core.database import get_engine
 from ..core.settings import get_settings
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
-from ..db.models import Document, IngestionJob, Passage
+from ..db.models import ChatSession, Document, IngestionJob, Passage
 from ..db.types import VectorType
 from ..models.export import DeliverableDownload
 from ..models.search import HybridSearchFilters
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
+from ..models.ai import ChatMemoryEntry
+from ..models.search import HybridSearchFilters, HybridSearchRequest
+from ..retriever.hybrid import hybrid_search
+from ..telemetry import CITATION_DRIFT_EVENTS, log_workflow_event
+from ..ai import rag
+from ..ai.rag import GuardrailError, RAGCitation
 
 logger = get_task_logger(__name__)
 
@@ -58,6 +64,234 @@ celery.conf.beat_schedule.setdefault(
         "schedule": crontab(hour="3", minute="0"),
     },
 )
+
+celery.conf.beat_schedule.setdefault(
+    "validate-citations-nightly",
+    {
+        "task": "tasks.validate_citations",
+        "schedule": crontab(hour="2", minute="30"),
+        "kwargs": {"limit": 50},
+    },
+)
+
+
+_CITATION_VALIDATION_TOP_K = 8
+_DEFAULT_CITATION_SESSION_LIMIT = 25
+
+
+def _load_chat_entries(record: ChatSession) -> list[ChatMemoryEntry]:
+    entries: list[ChatMemoryEntry] = []
+    raw_entries = record.memory_snippets or []
+    for raw in raw_entries:
+        try:
+            entry = ChatMemoryEntry.model_validate(raw)
+        except Exception:  # pragma: no cover - defensive parsing
+            logger.debug(
+                "Invalid chat memory entry for session %s", record.id, exc_info=True
+            )
+            continue
+        entries.append(entry)
+    return entries
+
+
+def _normalise_cached_citations(
+    citations: Sequence[RAGCitation],
+) -> list[RAGCitation]:
+    normalised: list[RAGCitation] = []
+    for citation in citations:
+        if not isinstance(citation.index, int):
+            return []
+        if not citation.osis or not citation.anchor:
+            return []
+        normalised.append(citation)
+    return sorted(normalised, key=lambda item: item.index)
+
+
+def _compose_cached_completion(
+    entry: ChatMemoryEntry, citations: Sequence[RAGCitation]
+) -> str:
+    base_text = entry.answer.strip()
+    if not base_text and entry.answer_summary:
+        base_text = entry.answer_summary.strip()
+    if not base_text and entry.question:
+        base_text = entry.question.strip()
+    if not base_text:
+        base_text = "Cached answer unavailable."
+
+    sources = "; ".join(
+        f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
+    )
+    return f"{base_text}\n\nSources: {sources}"
+
+
+@celery.task(name="tasks.validate_citations")
+def validate_citations(
+    job_id: str | None = None,
+    *,
+    limit: int = _DEFAULT_CITATION_SESSION_LIMIT,
+) -> dict[str, Any]:
+    """Re-run retrieval for cached chat entries and ensure citations still align."""
+
+    session_limit = max(1, limit)
+    metrics: dict[str, Any] = {
+        "limit": session_limit,
+        "sessions": 0,
+        "entries": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
+    discrepancies: list[dict[str, Any]] = []
+
+    engine = get_engine()
+
+    if job_id:
+        with Session(engine) as session:
+            _update_job_status(session, job_id, status="processing")
+            session.commit()
+
+    try:
+        with Session(engine) as session:
+            stmt = (
+                select(ChatSession)
+                .order_by(ChatSession.updated_at.desc())
+                .limit(session_limit)
+            )
+            chat_sessions = session.execute(stmt).scalars().all()
+
+            for record in chat_sessions:
+                entries = _load_chat_entries(record)
+                if not entries:
+                    continue
+                metrics["sessions"] += 1
+
+                for entry in entries:
+                    question = (entry.question or "").strip()
+                    if not question:
+                        metrics["skipped"] += 1
+                        CITATION_DRIFT_EVENTS.labels(status="skipped").inc()
+                        continue
+
+                    cached_citations = _normalise_cached_citations(entry.citations)
+                    if not cached_citations:
+                        metrics["skipped"] += 1
+                        CITATION_DRIFT_EVENTS.labels(status="skipped").inc()
+                        continue
+
+                    metrics["entries"] += 1
+
+                    try:
+                        request = HybridSearchRequest(
+                            query=question,
+                            osis=None,
+                            filters=HybridSearchFilters(),
+                            k=_CITATION_VALIDATION_TOP_K,
+                        )
+                        results = hybrid_search(session, request)
+                    except Exception as exc:  # pragma: no cover - defensive logging
+                        error_message = str(exc)
+                        logger.warning(
+                            "Citation validation retrieval error",
+                            extra={"session_id": record.id, "error": error_message},
+                        )
+                        discrepancies.append(
+                            {
+                                "session_id": record.id,
+                                "question": question,
+                                "status": "retrieval_error",
+                                "error": error_message,
+                            }
+                        )
+                        metrics["failed"] += 1
+                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
+                        continue
+
+                    expected_citations = rag._build_citations(results)
+                    if not expected_citations:
+                        logger.warning(
+                            "Citation validation missing retrieval citations",
+                            extra={"session_id": record.id, "question": question},
+                        )
+                        discrepancies.append(
+                            {
+                                "session_id": record.id,
+                                "question": question,
+                                "status": "missing_retrieval",
+                                "error": "no citations returned",
+                            }
+                        )
+                        metrics["failed"] += 1
+                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
+                        continue
+
+                    completion = _compose_cached_completion(entry, cached_citations)
+
+                    try:
+                        rag._validate_model_completion(completion, expected_citations)
+                    except GuardrailError as exc:
+                        error_message = str(exc)
+                        logger.warning(
+                            "Citation validation mismatch",
+                            extra={
+                                "session_id": record.id,
+                                "question": question,
+                                "error": error_message,
+                                "cited_indices": [citation.index for citation in cached_citations],
+                            },
+                        )
+                        log_workflow_event(
+                            "workflow.citation_drift",
+                            workflow="citation_validation",
+                            status="failed",
+                            session_id=record.id,
+                            question=question,
+                            error=error_message,
+                        )
+                        discrepancies.append(
+                            {
+                                "session_id": record.id,
+                                "question": question,
+                                "status": "failed",
+                                "error": error_message,
+                            }
+                        )
+                        metrics["failed"] += 1
+                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
+                        continue
+
+                    metrics["passed"] += 1
+                    CITATION_DRIFT_EVENTS.labels(status="passed").inc()
+                    log_workflow_event(
+                        "workflow.citation_drift",
+                        workflow="citation_validation",
+                        status="passed",
+                        session_id=record.id,
+                        question=question,
+                    )
+
+    except Exception as exc:  # pragma: no cover - surfaced via job failure
+        if job_id:
+            with Session(engine) as session:
+                _update_job_status(
+                    session,
+                    job_id,
+                    status="failed",
+                    error=str(exc),
+                )
+                session.commit()
+        raise
+
+    metrics["discrepancies"] = discrepancies
+
+    if job_id:
+        with Session(engine) as session:
+            job = session.get(IngestionJob, job_id)
+            if job is not None:
+                job.payload = metrics
+            _update_job_status(session, job_id, status="completed")
+            session.commit()
+
+    return metrics
 
 
 _DELIVERABLE_ASSET_MAP: dict[str, dict[str, tuple[str, str]]] = {
