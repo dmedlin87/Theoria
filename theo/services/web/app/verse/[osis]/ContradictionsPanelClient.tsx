@@ -23,6 +23,28 @@ function initializeModeState(): ModeState {
   };
 }
 
+function normalizePerspective(value: string | null | undefined): ViewingMode {
+  const trimmed = value?.trim().toLowerCase();
+  if (trimmed === "skeptical") {
+    return "skeptical";
+  }
+  if (trimmed === "apologetic") {
+    return "apologetic";
+  }
+  return "neutral";
+}
+
+function formatPerspectiveLabel(value: ViewingMode): string {
+  switch (value) {
+    case "skeptical":
+      return "Skeptical";
+    case "apologetic":
+      return "Apologetic";
+    default:
+      return "Neutral";
+  }
+}
+
 interface ContradictionsPanelClientProps {
   contradictions: ContradictionRecord[];
 }
@@ -53,8 +75,17 @@ export default function ContradictionsPanelClient({
     if (!shouldShowContradictions) {
       return [] as ContradictionRecord[];
     }
-    return contradictions;
-  }, [contradictions, shouldShowContradictions]);
+    return contradictions.filter((item) => {
+      const perspective = normalizePerspective(item.perspective);
+      if (perspective === "skeptical") {
+        return modeState.skeptical;
+      }
+      if (perspective === "apologetic") {
+        return modeState.apologetic;
+      }
+      return modeState.neutral;
+    });
+  }, [contradictions, modeState.apologetic, modeState.neutral, modeState.skeptical, shouldShowContradictions]);
 
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
@@ -166,6 +197,17 @@ export default function ContradictionsPanelClient({
                 >
                   {item.osis[0]} ⇄ {item.osis[1]}
                 </p>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontSize: "0.75rem",
+                    color: "var(--muted-foreground, #475569)",
+                  }}
+                >
+                  <strong>Perspective:</strong> {formatPerspectiveLabel(normalizePerspective(item.perspective))}
+                </span>
               </header>
 
               {item.weight != null ? (

@@ -1,0 +1,14 @@
+- osis_a: "Luke.24.13-35"
+  osis_b: "Mark.16.12-13"
+  summary: "Two disciples recount Emmaus and the longer ending of Mark amplifies the same witness, highlighting harmony between narratives rather than contradiction."
+  source: "seed_catalogue"
+  tags: ["resurrection", "witness"]
+  weight: 0.6
+  perspective: "apologetic"
+- osis_a: "Matthew.28.1-10"
+  osis_b: "John.20.11-18"
+  summary: "Women encounter the risen Christ at different moments; harmonization emphasizes sequential revelation rather than competing reports."
+  source: "seed_catalogue"
+  tags: ["resurrection", "chronology"]
+  weight: 0.65
+  perspective: "apologetic"

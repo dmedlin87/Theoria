@@ -11,6 +11,7 @@ export type ContradictionRecord = {
   source?: string | null;
   tags?: string[] | null;
   weight?: number | null;
+  perspective?: string | null;
 };
 
 type ContradictionsResponse = {
@@ -25,6 +26,7 @@ type ContradictionsApiItem = {
   source?: string | null;
   tags?: string[] | null;
   weight?: number | string | null;
+  perspective?: string | null;
 };
 
 function mapContradictionItem(item: ContradictionsApiItem): ContradictionRecord | null {
@@ -53,6 +55,7 @@ function mapContradictionItem(item: ContradictionsApiItem): ContradictionRecord 
     source: item.source?.trim() ?? null,
     tags: item.tags ?? null,
     weight,
+    perspective: item.perspective?.trim().toLowerCase() ?? null,
   };
 }
 
@@ -76,10 +79,14 @@ export default async function ContradictionsPanel({
   let contradictions: ContradictionRecord[] = [];
 
   try {
-    const response = await fetch(
-      `${baseUrl}/research/contradictions?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
-      { cache: "no-store" },
-    );
+    const params = new URLSearchParams();
+    params.append("osis", osis);
+    params.append("mode", mode.id);
+    params.append("perspective", "skeptical");
+    params.append("perspective", "apologetic");
+    const response = await fetch(`${baseUrl}/research/contradictions?${params.toString()}`, {
+      cache: "no-store",
+    });
     if (!response.ok) {
       throw new Error((await response.text()) || response.statusText);
     }

@@ -1,0 +1,20 @@
+[
+  {
+    "osis_a": "John.20.24-25",
+    "osis_b": "John.20.26-29",
+    "summary": "Thomas refuses belief without empirical proof but immediately confesses upon seeing the risen Christ, a tension between skepticism and testimony.",
+    "source": "seed_catalogue",
+    "tags": ["resurrection", "witness"],
+    "weight": 0.7,
+    "perspective": "skeptical"
+  },
+  {
+    "osis_a": "Acts.9.7",
+    "osis_b": "Acts.22.9",
+    "summary": "Companions of Saul hear a sound yet do not grasp the voice, prompting questions about narrative consistency.",
+    "source": "seed_catalogue",
+    "tags": ["acts", "testimony"],
+    "weight": 0.8,
+    "perspective": "skeptical"
+  }
+]

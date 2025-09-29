@@ -1,0 +1,16 @@
+- osis: "Luke.24.13-35"
+  title: "Emmaus testimony defended"
+  excerpt: |
+    Patristic commentators observe that Luke intentionally names Cleopas to root the account in eyewitness memory, a detail harmonizers leverage to explain divergent resurrection summaries.
+  source: "patristic-digest"
+  citation: "Eusebius, Ecclesiastical History 3.5"
+  tags: ["resurrection", "witness"]
+  perspective: "apologetic"
+- osis: "Acts.9.1-19"
+  title: "Skeptical reading of the Damascus voice"
+  excerpt: |
+    Critical scholars note that Luke reshapes the call narrative across retellings, suggesting theological redaction. The oscillation between hearing and not hearing is cited as literary tension.
+  source: "critical-companion"
+  citation: "Johnson, Acts, pp. 166-168"
+  tags: ["acts", "conversion"]
+  perspective: "skeptical"

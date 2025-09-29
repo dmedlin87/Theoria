@@ -383,6 +383,15 @@ def search(q: str, osis: str | None, filters: dict, k: int):
 
 ```
 
+### 11.1) Research Reference Seed Catalogue
+
+- **Seed files:** `data/seeds/contradictions.json`, `data/seeds/contradictions_additional.json`, `data/seeds/harmonies.yaml`, and `data/seeds/commentaries.yaml` curate OSIS-normalised claims and excerpts. The JSON/YAML payloads include `osis*` ranges, `summary`/`excerpt`, `source`, `tags`, `weight` (for ranking), and a `perspective` flag (`skeptical` vs `apologetic`).
+- **Tables:** Seed loaders populate dedicated tables — `contradiction_seeds`, `harmony_seeds`, and `commentary_seeds` — via `seed_reference_data`. IDs are deterministic (`uuid5`) so updates stay idempotent, and stale rows are pruned when entries leave the catalogue.
+- **API:**
+  - `GET /research/contradictions` now merges both contradiction and harmony seeds, returns a `perspective` field, and accepts repeated `perspective=` filters to focus on apologetic or skeptical readings alongside the existing `topic` tag filter.
+  - `GET /research/commentaries` surfaces curated excerpts with optional `perspective` and `tag` filters so the Verse Aggregator can present harmonised/apologetic versus critical/skeptical notes side-by-side.
+- **Front-end:** The verse research panels request both apologetic and skeptical datasets by default, exposing client-side toggles (contradictions) and dropdown/text filters (commentaries) so analysts can pivot quickly between harmonisation strategies and tension summaries without extra round-trips.
+
 ## 12) Definition of Done (MVP)
 
 Ingest PDF and YouTube URL successfully → passages created with correct anchors.

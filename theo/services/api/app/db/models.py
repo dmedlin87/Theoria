@@ -531,6 +531,48 @@ class ContradictionSeed(Base):
     source: Mapped[str | None] = mapped_column(String, nullable=True)
     tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    perspective: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+
+class HarmonySeed(Base):
+    """Seeded reconciliation notes emphasizing harmonization between passages."""
+
+    __tablename__ = "harmony_seeds"
+    __table_args__ = (
+        Index("ix_harmony_seeds_osis_a", "osis_a"),
+        Index("ix_harmony_seeds_osis_b", "osis_b"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    osis_a: Mapped[str] = mapped_column(String, nullable=False)
+    osis_b: Mapped[str] = mapped_column(String, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(String, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    perspective: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+
+class CommentarySeed(Base):
+    """Curated commentary excerpts anchored to OSIS references."""
+
+    __tablename__ = "commentary_seeds"
+    __table_args__ = (Index("ix_commentary_seeds_osis", "osis"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    osis: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    excerpt: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str | None] = mapped_column(String, nullable=True)
+    citation: Mapped[str | None] = mapped_column(String, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    perspective: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )

@@ -10,6 +10,7 @@ import CrossReferencesPanel from "../app/verse/[osis]/CrossReferencesPanel";
 import GeoPanel from "../app/verse/[osis]/GeoPanel";
 import MorphologyPanel from "../app/verse/[osis]/MorphologyPanel";
 import TextualVariantsPanel from "../app/verse/[osis]/TextualVariantsPanel";
+import { DEFAULT_MODE_ID } from "../app/mode-config";
 import { ModeProvider } from "../app/context/ModeContext";
 import ResearchPanels, {
   type ResearchFeatureFlags,
@@ -26,6 +27,13 @@ jest.mock("../app/mode-context", () => {
   };
 });
 
+jest.mock("../app/mode-server", () => {
+  const { RESEARCH_MODES, DEFAULT_MODE_ID } = require("../app/mode-config");
+  return {
+    getActiveMode: () => RESEARCH_MODES[DEFAULT_MODE_ID],
+  };
+});
+
 describe("ContradictionsPanel", () => {
   const baseUrl = "http://127.0.0.1:8000";
 
@@ -39,22 +47,24 @@ describe("ContradictionsPanel", () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
-        contradictions: [
+        items: [
           {
+            id: "contra-1",
+            osis_a: "Gen.1.1",
+            osis_b: "Gen.1.2",
             summary: "Summary",
-            osis: ["Gen.1.1", "Gen.1.2"],
-            severity: "high",
-            sources: [
-              { label: "Skeptical commentary", url: "https://example.com/contradiction" },
-            ],
-            snippet_pairs: [
-              {
-                left: { osis: "Gen.1.1", text: "In the beginning God created" },
-                right: { osis: "Gen.1.2", text: "The earth was without form" },
-              },
-            ],
+            source: "https://example.com/contradiction",
+            tags: ["creation"],
+            weight: 0.9,
+            perspective: "skeptical",
           },
-          { summary: "Another summary", osis: ["Gen.2.1", "Gen.2.2"] },
+          {
+            id: "contra-2",
+            osis_a: "Gen.2.1",
+            osis_b: "Gen.2.2",
+            summary: "Another summary",
+            perspective: "apologetic",
+          },
         ],
       }),
       text: async () => "",
@@ -63,29 +73,30 @@ describe("ContradictionsPanel", () => {
     const element = await ContradictionsPanel({ osis: "Gen.1.1", features: mockFlags });
     render(element ?? <></>);
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      `${baseUrl}/research/contradictions?osis=Gen.1.1`,
-      { cache: "no-store" },
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe(
+      `${baseUrl}/research/contradictions?osis=Gen.1.1&mode=${DEFAULT_MODE_ID}&perspective=skeptical&perspective=apologetic`,
     );
+    expect(options).toEqual({ cache: "no-store" });
     expect(screen.getByText("Potential contradictions")).toBeInTheDocument();
     expect(screen.getByText("Summary")).toBeInTheDocument();
     expect(screen.getByText("Gen.1.1 ⇄ Gen.1.2")).toBeInTheDocument();
-    expect(screen.getByText("Severity: High")).toBeInTheDocument();
+    const perspectiveElements = screen.getAllByText((_, element) =>
+      (element?.textContent ?? "").includes("Perspective:")
+    );
     expect(
-      screen.getByRole("link", { name: "Skeptical commentary" }),
-    ).toHaveAttribute("href", "https://example.com/contradiction");
-    expect(
-      screen.getByRole("link", { name: "Skeptical commentary" }),
-    ).toHaveAttribute("rel", "noopener noreferrer");
-    expect(screen.getAllByText("Open verse").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/In the beginning God created/)).toBeInTheDocument();
+      perspectiveElements.some((element) =>
+        (element.textContent ?? "").toLowerCase().includes("skeptical"),
+      ),
+    ).toBe(true);
+    expect(screen.getByText(/Source:/)).toHaveTextContent("https://example.com/contradiction");
   });
 
   it("renders empty state when no contradictions", async () => {
     const mockFlags: ResearchFeatureFlags = { research: true, contradictions: true };
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ contradictions: [] }),
+      json: async () => ({ items: [] }),
       text: async () => "",
     });
 
@@ -114,11 +125,13 @@ describe("ContradictionsPanel", () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
-        contradictions: [
+        items: [
           {
+            id: "contra-apologetic",
+            osis_a: "Gen.1.1",
+            osis_b: "Gen.1.2",
             summary: "Summary",
-            osis: ["Gen.1.1", "Gen.1.2"],
-            severity: "medium",
+            perspective: "apologetic",
           },
         ],
       }),
@@ -143,7 +156,7 @@ describe("ContradictionsPanel", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("contradictions-apologetic-hidden")).not.toBeInTheDocument();
     });
-    expect(screen.getByText("Severity: Medium")).toBeInTheDocument();
+    expect(screen.getByText("Summary")).toBeInTheDocument();
   });
 
   it("returns null when contradictions feature disabled", async () => {
@@ -391,7 +404,7 @@ describe("CrossReferencesPanel", () => {
     render(element ?? <></>);
 
     expect(global.fetch).toHaveBeenCalledWith(
-      `${baseUrl}/research/crossrefs?osis=Gen.1.1`,
+      `${baseUrl}/research/crossrefs?osis=Gen.1.1&mode=${DEFAULT_MODE_ID}`,
       { cache: "no-store" },
     );
     expect(screen.getByText("Cross-references")).toBeInTheDocument();
@@ -499,7 +512,7 @@ describe("TextualVariantsPanel", () => {
     expect(screen.getByText("Loading textual variants…")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText("Papyrus 66")).toBeInTheDocument();
+      expect(screen.getAllByText("Papyrus 66").length).toBeGreaterThan(0);
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -510,7 +523,7 @@ describe("TextualVariantsPanel", () => {
       }),
     );
     expect(screen.getByText("Mainstream vs. competing readings")).toBeInTheDocument();
-    expect(screen.getByText(/Papyrus 66/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Papyrus 66/)[0]).toBeInTheDocument();
     expect(screen.getByText(/Alternative reading/)).toBeInTheDocument();
     expect(screen.getByText("Disputed")).toBeInTheDocument();
   });
@@ -601,7 +614,7 @@ describe("MorphologyPanel", () => {
     render(element ?? <></>);
 
     expect(global.fetch).toHaveBeenCalledWith(
-      `${baseUrl}/research/morphology?osis=Gen.1.1`,
+      `${baseUrl}/research/morphology?osis=Gen.1.1&mode=${DEFAULT_MODE_ID}`,
       { cache: "no-store" },
     );
     expect(screen.getByText("בְּרֵאשִׁית")).toBeInTheDocument();
@@ -661,25 +674,17 @@ describe("CommentariesPanel", () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
-        osis: "Gen.1.1",
-        notes: [
+        osis: ["Gen.1.1"],
+        items: [
           {
-            id: "note-1",
+            id: "comm-1",
+            osis: "Gen.1.1",
             title: "Creation prologue",
-            body: "Commentary body",
-            stance: "apologetic",
-            claim_type: "theological",
-            confidence: 0.8,
+            excerpt: "Commentary body",
+            perspective: "apologetic",
             tags: ["creation"],
-            evidences: [
-              {
-                id: "ev-1",
-                source_type: "crossref",
-                source_ref: "John.1.1",
-                snippet: "In the beginning was the Word",
-                osis_refs: ["John.1.1"],
-              },
-            ],
+            citation: "Author, Work",
+            source: "seed",
           },
         ],
       }),
@@ -692,18 +697,21 @@ describe("CommentariesPanel", () => {
     });
     render(element ?? <></>);
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      `${baseUrl}/research/notes?osis=Gen.1.1`,
-      { cache: "no-store" },
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe(
+      `${baseUrl}/research/commentaries?osis=Gen.1.1&mode=${DEFAULT_MODE_ID}&perspective=skeptical&perspective=apologetic`,
     );
+    expect(options).toEqual({ cache: "no-store" });
     expect(screen.getByText("Creation prologue")).toBeInTheDocument();
-    expect(screen.getByText(/In the beginning was the Word/)).toBeInTheDocument();
+    expect(screen.getByText(/Commentary body/)).toBeInTheDocument();
+    expect(screen.getByText(/Perspective:/)).toHaveTextContent("Apologetic");
+    expect(screen.getByText(/Citation:/)).toHaveTextContent("Author, Work");
   });
 
   it("renders empty state when no notes", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ osis: "Gen.1.1", notes: [] }),
+      json: async () => ({ osis: ["Gen.1.1"], items: [] }),
       text: async () => "",
     });
 
