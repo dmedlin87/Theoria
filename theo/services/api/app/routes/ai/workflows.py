@@ -540,10 +540,13 @@ def chat_turn(
                 recorder=recorder,
             )
             ensure_completion_safe(answer.model_output or answer.summary)
-            message = ChatSessionMessage(
-                role="assistant",
-                content=answer.model_output or answer.summary,
-            )
+            message_text = answer.model_output or answer.summary
+            if answer.model_output and "Sources:" in answer.model_output:
+                truncated, _, remainder = answer.model_output.partition("Sources:")
+                stripped = truncated.strip()
+                if stripped:
+                    message_text = stripped
+            message = ChatSessionMessage(role="assistant", content=message_text)
             recorder.finalize(
                 final_md=answer.summary,
                 output_payload={
