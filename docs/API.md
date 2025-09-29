@@ -615,9 +615,23 @@ The API immediately returns a job descriptor:
 ```json
 {
   "export_id": "01J2Y3A7Z8X4C6V0B7N9P",
+  "job_id": "4cb93c2f-5565-4df9-a4f4-178d5f6e1a45",
   "status": "queued",
-  "formats": ["md", "ndjson", "csv"],
-  "manifest_path": "/exports/01J2Y3A7Z8X4C6V0B7N9P/manifest.json"
+  "manifest_path": "/exports/01J2Y3A7Z8X4C6V0B7N9P/manifest.json",
+  "assets": [
+    {
+      "format": "markdown",
+      "filename": "sermon.md",
+      "storage_path": "/exports/01J2Y3A7Z8X4C6V0B7N9P/sermon.md",
+      "signed_url": "/exports/01J2Y3A7Z8X4C6V0B7N9P/sermon.md"
+    },
+    {
+      "format": "ndjson",
+      "filename": "sermon.ndjson",
+      "storage_path": "/exports/01J2Y3A7Z8X4C6V0B7N9P/sermon.ndjson",
+      "signed_url": "/exports/01J2Y3A7Z8X4C6V0B7N9P/sermon.ndjson"
+    }
+  ]
 }
 ```
 

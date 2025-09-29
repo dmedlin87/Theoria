@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -25,6 +26,11 @@ from theo.services.api.app.db.models import (  # noqa: E402
     IngestionJob,
     Passage,
 )
+from theo.services.api.app.models.export import (  # noqa: E402
+    DeliverableAsset,
+    DeliverableManifest,
+    DeliverablePackage,
+)
 from theo.services.api.app.workers import tasks  # noqa: E402
 
 
@@ -44,9 +50,11 @@ def test_process_url_ingests_fixture_url(tmp_path) -> None:
 
     settings = get_settings()
     original_storage = settings.storage_root
+    original_task_storage = tasks.settings.storage_root
     storage_root = tmp_path / "storage"
     storage_root.mkdir(parents=True, exist_ok=True)
     settings.storage_root = storage_root
+    tasks.settings.storage_root = storage_root
 
     try:
         frontmatter = {
@@ -60,6 +68,7 @@ def test_process_url_ingests_fixture_url(tmp_path) -> None:
         )
     finally:
         settings.storage_root = original_storage
+        tasks.settings.storage_root = original_task_storage
 
     with Session(engine) as session:
         documents = session.query(Document).all()
@@ -81,9 +90,11 @@ def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
 
     settings = get_settings()
     original_storage = settings.storage_root
+    original_task_storage = tasks.settings.storage_root
     storage_root = tmp_path / "storage"
     storage_root.mkdir(parents=True, exist_ok=True)
     settings.storage_root = storage_root
+    tasks.settings.storage_root = storage_root
 
     with Session(engine) as session:
         job = IngestionJob(job_type="url_ingest", status="queued")
@@ -152,6 +163,76 @@ def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
     assert document is not None
     assert document.title == "Job Status Theo Title"
     assert retry_calls == []
+
+
+def test_build_deliverable_task_writes_assets(monkeypatch, tmp_path) -> None:
+    """Deliverable tasks persist manifests and assets under the export root."""
+
+    db_path = tmp_path / "deliverable.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    original_task_storage = tasks.settings.storage_root
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir(parents=True, exist_ok=True)
+    settings.storage_root = storage_root
+    tasks.settings.storage_root = storage_root
+
+    manifest = DeliverableManifest(
+        export_id="sermon-initial",
+        schema_version="1",
+        generated_at=datetime.now(UTC),
+        type="sermon",
+        filters={"topic": "Hope"},
+    )
+    asset = DeliverableAsset(
+        format="markdown",
+        filename="sermon.md",
+        media_type="text/markdown",
+        content="---\nexport_id: sermon-initial\n",
+    )
+    package = DeliverablePackage(manifest=manifest, assets=[asset])
+
+    def fake_outline(session: Session, **_: Any) -> object:
+        return object()
+
+    def fake_package(*_: Any, **__: Any) -> DeliverablePackage:
+        return package
+
+    monkeypatch.setattr(tasks, "generate_sermon_prep_outline", fake_outline)
+    monkeypatch.setattr(tasks, "build_sermon_deliverable", fake_package)
+
+    try:
+        result = _task(tasks.build_deliverable).run(
+            export_type="sermon",
+            formats=["markdown"],
+            export_id="sermon-export",
+            topic="Hope",
+            osis="John.1.1",
+            filters={"collection": "Gospels"},
+            model="echo",
+            document_id=None,
+        )
+    finally:
+        settings.storage_root = original_storage
+        tasks.settings.storage_root = original_task_storage
+
+    export_dir = storage_root / "exports" / "sermon-export"
+    manifest_path = export_dir / "manifest.json"
+    asset_path = export_dir / "sermon.md"
+
+    assert export_dir.exists()
+    assert manifest_path.is_file()
+    assert asset_path.read_text(encoding="utf-8").startswith("---\nexport_id: sermon-initial")
+
+    assert result["export_id"] == "sermon-export"
+    assert result["manifest"]["export_id"] == "sermon-export"
+    assert result["manifest_path"] == "/exports/sermon-export/manifest.json"
+    assert result["assets"][0]["storage_path"] == "/exports/sermon-export/sermon.md"
+    assert result["assets"][0]["size_bytes"] == len(asset.content.encode("utf-8"))
 
 
 def test_enrich_document_populates_metadata(tmp_path) -> None:

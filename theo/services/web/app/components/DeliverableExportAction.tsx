@@ -1,16 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { getApiBaseUrl } from "../lib/api";
 
 type DeliverableFormat = "markdown" | "ndjson" | "csv" | "pdf";
 
-interface DeliverableAsset {
+interface DeliverableDownloadDescriptor {
   format: DeliverableFormat;
   filename: string;
   media_type: string;
-  content: string;
+  storage_path: string;
+  public_url?: string | null;
+  signed_url?: string | null;
 }
 
 interface DeliverableManifest {
@@ -25,8 +27,10 @@ interface DeliverableManifest {
 interface DeliverableResponsePayload {
   export_id: string;
   status: "queued" | "processing" | "completed" | "failed";
-  manifest: DeliverableManifest;
-  assets: DeliverableAsset[];
+  manifest?: DeliverableManifest | null;
+  manifest_path?: string | null;
+  job_id?: string | null;
+  assets: DeliverableDownloadDescriptor[];
   message?: string | null;
 }
 
@@ -41,7 +45,7 @@ export interface DeliverableRequestPayload {
 }
 
 interface DownloadLink {
-  url: string;
+  href: string;
   filename: string;
   mediaType: string;
 }
@@ -52,10 +56,6 @@ interface DeliverableExportActionProps {
   preparingText?: string;
   successText?: string;
   idleText?: string;
-}
-
-function revokeUrls(links: DownloadLink[]) {
-  links.forEach((link) => URL.revokeObjectURL(link.url));
 }
 
 export default function DeliverableExportAction({
@@ -73,8 +73,6 @@ export default function DeliverableExportAction({
   const [manifest, setManifest] = useState<DeliverableManifest | null>(null);
   const [downloads, setDownloads] = useState<DownloadLink[]>([]);
 
-  useEffect(() => () => revokeUrls(downloads), [downloads]);
-
   const handleClick = useCallback(async () => {
     if (status === "loading") {
       return;
@@ -82,10 +80,7 @@ export default function DeliverableExportAction({
     setStatus("loading");
     setMessage(preparingText);
     setManifest(null);
-    setDownloads((previous) => {
-      revokeUrls(previous);
-      return [];
-    });
+    setDownloads([]);
 
     try {
       const response = await fetch(`${baseUrl}/export/deliverable`, {
@@ -101,33 +96,38 @@ export default function DeliverableExportAction({
         throw new Error(errorText || response.statusText);
       }
       const payload = (await response.json()) as DeliverableResponsePayload;
-      if (payload.status !== "completed") {
-        throw new Error(payload.message || "Export did not complete");
-      }
       if (!payload.assets || payload.assets.length === 0) {
         throw new Error("Export returned no assets");
       }
-      const preparedDownloads: DownloadLink[] = payload.assets.map((asset) => {
-        let blobSource: BlobPart = asset.content;
-        if (asset.media_type === "application/pdf" || asset.format === "pdf") {
-          const binary = atob(asset.content);
-          const view = new Uint8Array(binary.length);
-          for (let index = 0; index < binary.length; index += 1) {
-            view[index] = binary.charCodeAt(index);
-          }
-          blobSource = view;
+      const toAbsoluteUrl = (url: string) => {
+        if (/^https?:\/\//.test(url)) {
+          return url;
         }
-        const blob = new Blob([blobSource], { type: asset.media_type });
-        return {
-          url: URL.createObjectURL(blob),
-          filename: asset.filename,
-          mediaType: asset.media_type,
-        };
-      });
+        if (url.startsWith("/")) {
+          return `${baseUrl}${url}`;
+        }
+        return `${baseUrl}/${url}`;
+      };
+      const preparedDownloads: DownloadLink[] = payload.assets
+        .map((asset) => {
+          const candidate = asset.signed_url || asset.public_url || asset.storage_path;
+          if (!candidate) {
+            return null;
+          }
+          return {
+            href: toAbsoluteUrl(candidate),
+            filename: asset.filename,
+            mediaType: asset.media_type,
+          };
+        })
+        .filter((entry): entry is DownloadLink => Boolean(entry));
+      if (preparedDownloads.length === 0) {
+        throw new Error("Export did not include downloadable URLs");
+      }
       setDownloads(preparedDownloads);
-      setManifest(payload.manifest);
+      setManifest(payload.manifest ?? null);
       setStatus("success");
-      setMessage(successText);
+      setMessage(payload.message || (payload.status === "queued" ? "Export queued." : successText));
     } catch (error) {
       setStatus("error");
       setMessage((error as Error).message || "Unable to generate export");
@@ -159,7 +159,7 @@ export default function DeliverableExportAction({
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.35rem" }}>
           {downloads.map((download) => (
             <li key={download.filename}>
-              <a href={download.url} download={download.filename}>
+              <a href={download.href} download={download.filename}>
                 Download {download.filename}
               </a>
             </li>

@@ -20,6 +20,11 @@ from ..analytics.topics import (
     store_topic_digest,
     upsert_digest_document,
 )
+from ..ai.rag import (
+    build_sermon_deliverable,
+    build_transcript_deliverable,
+    generate_sermon_prep_outline,
+)
 from ..analytics.watchlists import (
     get_watchlist,
     iter_due_watchlists,
@@ -30,6 +35,8 @@ from ..core.settings import get_settings
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import Document, IngestionJob, Passage
 from ..db.types import VectorType
+from ..models.export import DeliverableDownload
+from ..models.search import HybridSearchFilters
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
 
@@ -51,6 +58,73 @@ celery.conf.beat_schedule.setdefault(
         "schedule": crontab(hour="3", minute="0"),
     },
 )
+
+
+_DELIVERABLE_ASSET_MAP: dict[str, dict[str, tuple[str, str]]] = {
+    "sermon": {
+        "markdown": ("sermon.md", "text/markdown"),
+        "ndjson": ("sermon.ndjson", "application/x-ndjson"),
+        "csv": ("sermon.csv", "text/csv"),
+        "pdf": ("sermon.pdf", "application/pdf"),
+    },
+    "transcript": {
+        "markdown": ("transcript.md", "text/markdown"),
+        "ndjson": ("transcript.ndjson", "application/x-ndjson"),
+        "csv": ("transcript.csv", "text/csv"),
+        "pdf": ("transcript.pdf", "application/pdf"),
+    },
+}
+
+
+def _normalise_deliverable_formats(formats: Iterable[str]) -> list[str]:
+    """Return lower-cased unique deliverable formats preserving order."""
+
+    normalised: list[str] = []
+    for fmt in formats:
+        lowered = fmt.lower()
+        if lowered not in normalised:
+            normalised.append(lowered)
+    return normalised
+
+
+def _resolve_deliverable_asset(
+    export_type: str, fmt: str
+) -> tuple[str, str]:
+    """Return the filename and media type for *fmt* under *export_type*."""
+
+    try:
+        type_map = _DELIVERABLE_ASSET_MAP[export_type]
+    except KeyError as exc:  # pragma: no cover - guarded by validation
+        raise ValueError(f"Unsupported deliverable type: {export_type}") from exc
+    try:
+        return type_map[fmt]
+    except KeyError as exc:
+        raise ValueError(
+            f"Unsupported format {fmt!r} for deliverable type {export_type!r}"
+        ) from exc
+
+
+def plan_deliverable_outputs(
+    export_type: str, formats: Iterable[str], export_id: str
+) -> list[DeliverableDownload]:
+    """Describe the stored artifact layout for a deliverable job."""
+
+    downloads: list[DeliverableDownload] = []
+    for fmt in _normalise_deliverable_formats(formats):
+        filename, media_type = _resolve_deliverable_asset(export_type, fmt)
+        storage_path = f"/exports/{export_id}/{filename}"
+        downloads.append(
+            DeliverableDownload(
+                format=fmt,
+                filename=filename,
+                media_type=media_type,
+                storage_path=storage_path,
+                public_url=storage_path,
+                signed_url=storage_path,
+                size_bytes=None,
+            )
+        )
+    return downloads
 
 
 def _update_job_status(
@@ -618,6 +692,96 @@ def run_watchlist_alert(watchlist_id: str) -> None:
 
 
 run_watchlist_alert_task = cast(CeleryTask, run_watchlist_alert)
+
+
+@celery.task(name="tasks.build_deliverable")
+def build_deliverable(
+    *,
+    export_type: str,
+    formats: Iterable[str],
+    export_id: str | None = None,
+    topic: str | None = None,
+    osis: str | None = None,
+    filters: dict[str, Any] | None = None,
+    model: str | None = None,
+    document_id: str | None = None,
+) -> dict[str, Any]:
+    """Render deliverable assets, persist them, and expose download URLs."""
+
+    engine = get_engine()
+    normalised_formats = _normalise_deliverable_formats(formats)
+
+    with Session(engine) as session:
+        if export_type == "sermon":
+            if not topic:
+                raise ValueError("topic is required for sermon deliverables")
+            filter_model = HybridSearchFilters.model_validate(filters or {})
+            response = generate_sermon_prep_outline(
+                session,
+                topic=topic,
+                osis=osis,
+                filters=filter_model,
+                model_name=model,
+            )
+            package = build_sermon_deliverable(
+                response,
+                formats=normalised_formats,
+                filters=filter_model.model_dump(exclude_none=True),
+            )
+        elif export_type == "transcript":
+            if not document_id:
+                raise ValueError("document_id is required for transcript deliverables")
+            package = build_transcript_deliverable(
+                session,
+                document_id,
+                formats=normalised_formats,
+            )
+        else:
+            raise ValueError(f"Unsupported deliverable type: {export_type}")
+
+    manifest = package.manifest
+    if export_id:
+        manifest = manifest.model_copy(update={"export_id": export_id})
+    export_id = manifest.export_id
+
+    export_dir = settings.storage_root / "exports" / export_id
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest_payload = manifest.model_dump(mode="json")
+    manifest_path = export_dir / "manifest.json"
+    manifest_json = manifest.model_dump_json(indent=2, exclude_none=True)
+    manifest_path.write_text(manifest_json, encoding="utf-8")
+
+    downloads: list[dict[str, Any]] = []
+    for asset in package.assets:
+        filename = asset.filename
+        asset_path = export_dir / filename
+        if isinstance(asset.content, (bytes, bytearray)):
+            data = bytes(asset.content)
+            asset_path.write_bytes(data)
+        else:
+            data = asset.content.encode("utf-8")
+            asset_path.write_text(asset.content, encoding="utf-8")
+        relative_path = f"/exports/{export_id}/{filename}"
+        downloads.append(
+            {
+                "format": asset.format,
+                "filename": filename,
+                "media_type": asset.media_type,
+                "storage_path": relative_path,
+                "public_url": relative_path,
+                "signed_url": relative_path,
+                "size_bytes": len(data),
+            }
+        )
+
+    return {
+        "export_id": export_id,
+        "status": "completed",
+        "manifest": manifest_payload,
+        "manifest_path": f"/exports/{export_id}/manifest.json",
+        "assets": downloads,
+    }
 
 
 @celery.task(name="tasks.schedule_watchlist_alerts")
