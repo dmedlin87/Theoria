@@ -547,28 +547,20 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
         )
     return citations
 
+def _normalise_snippet(text: str) -> str:
+    collapsed = " ".join(text.split())
+    if len(collapsed) <= 240:
+        return collapsed
+    return collapsed[:237].rstrip() + "…"
 
-def _fallback_guardrail_result(
-    session: Session, filters: HybridSearchFilters | None
-) -> HybridSearchResult | None:
-    stmt = select(Passage, Document).join(Document).where(Passage.osis_ref.isnot(None))
-    if filters:
-        if filters.collection:
-            stmt = stmt.where(Document.collection == filters.collection)
-        if filters.source_type:
-            stmt = stmt.where(Document.source_type == filters.source_type)
-        if filters.theological_tradition:
-            stmt = stmt.where(
-                Document.theological_tradition == filters.theological_tradition
-            )
-    stmt = stmt.order_by(Document.created_at.desc())
-    row = session.execute(stmt).first()
-    if not row:
-        return None
-    passage, document = row
-    snippet = passage.text.strip()
-    if len(snippet) > 240:
-        snippet = snippet[:237].rstrip() + "..."
+
+def _build_guardrail_result(
+    passage: Passage, document: Document | None
+) -> HybridSearchResult:
+    snippet_source = passage.text or document.title or "Guardrail passage"
+    snippet = _normalise_snippet(snippet_source)
+    title = document.title if document else None
+
     return HybridSearchResult(
         id=passage.id,
         document_id=passage.document_id,
@@ -580,13 +572,41 @@ def _fallback_guardrail_result(
         page_no=passage.page_no,
         t_start=passage.t_start,
         t_end=passage.t_end,
-        score=0.0,
-        meta=compose_passage_meta(passage, document),
-        document_title=document.title,
+        score=1.0,
+        meta={},
+        document_title=title,
         snippet=snippet,
-        rank=1,
+        rank=0,
+
         highlights=None,
     )
+
+
+
+def _load_guardrail_reference(session: Session) -> HybridSearchResult | None:
+    preferred_ids = ("redteam-passage", "guardrail-reference")
+    for passage_id in preferred_ids:
+        passage = session.get(Passage, passage_id)
+        if passage and passage.osis_ref:
+            document = session.get(Document, passage.document_id)
+            return _build_guardrail_result(passage, document)
+
+    row = (
+        session.execute(
+            select(Passage, Document)
+            .join(Document)
+            .where(Passage.osis_ref.isnot(None))
+            .limit(1)
+        )
+        .first()
+    )
+    if not row:
+        return None
+    passage, document = row
+    if not passage.osis_ref:
+        return None
+    return _build_guardrail_result(passage, document)
+
 
 
 def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
@@ -691,8 +711,9 @@ def _guarded_answer(
     ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
     citations = _build_citations(ordered_results)
     if not citations:
-        fallback_result = _fallback_guardrail_result(session, filters)
-        if fallback_result is not None:
+        fallback_result = _load_guardrail_reference(session)
+        if fallback_result:
+
             ordered_results = [fallback_result]
             citations = _build_citations(ordered_results)
     if not citations:

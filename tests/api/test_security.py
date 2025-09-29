@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from contextlib import contextmanager
 import sys
 from typing import Any
 
@@ -55,47 +56,61 @@ def secure_env(monkeypatch) -> dict[str, str]:
 
 @pytest.fixture
 def api_client(monkeypatch, secure_env):
+    with _client_context(monkeypatch) as client:
+        yield client
+
+
+@pytest.fixture
+def anonymous_client(monkeypatch):
+    monkeypatch.delenv("THEO_API_KEYS", raising=False)
+    monkeypatch.delenv("THEO_AUTH_JWT_SECRET", raising=False)
+    with _client_context(monkeypatch) as client:
+        yield client
+
+
+@contextmanager
+def _client_context(monkeypatch):
     def _override_session():
         yield _DummySession()
 
     app.dependency_overrides[get_session] = _override_session
+    try:
+        def _fake_pipeline(session, url, **kwargs):  # noqa: ANN001 - signature controlled by patch
+            class _Doc:
+                id = "doc-1"
 
-    def _fake_pipeline(session, url, **kwargs):  # noqa: ANN001 - signature controlled by patch
-        class _Doc:
-            id = "doc-1"
+            return _Doc()
 
-        return _Doc()
+        monkeypatch.setattr(ingest_module, "run_pipeline_for_url", _fake_pipeline)
 
-    monkeypatch.setattr(ingest_module, "run_pipeline_for_url", _fake_pipeline)
+        class _Registry:
+            def to_response(self) -> dict[str, Any]:
+                return {"models": [], "default_model": None}
 
-    class _Registry:
-        def to_response(self) -> dict[str, Any]:
-            return {"models": [], "default_model": None}
+        monkeypatch.setattr(ai_module, "get_llm_registry", lambda session: _Registry())
 
-    monkeypatch.setattr(ai_module, "get_llm_registry", lambda session: _Registry())
+        def _fake_digest(session, since):
+            return ai_module.TopicDigest(
+                generated_at=datetime.now(UTC),
+                window_start=datetime.now(UTC) - timedelta(hours=1),
+                topics=[],
+            )
 
-    def _fake_digest(session, since):
-        return ai_module.TopicDigest(
-            generated_at=datetime.now(UTC),
-            window_start=datetime.now(UTC) - timedelta(hours=1),
-            topics=[],
-        )
+        monkeypatch.setattr(ai_module, "generate_topic_digest", _fake_digest)
+        monkeypatch.setattr(ai_module, "upsert_digest_document", lambda *args, **kwargs: None)
+        monkeypatch.setattr(ai_module, "store_topic_digest", lambda *args, **kwargs: None)
 
-    monkeypatch.setattr(ai_module, "generate_topic_digest", _fake_digest)
-    monkeypatch.setattr(ai_module, "upsert_digest_document", lambda *args, **kwargs: None)
-    monkeypatch.setattr(ai_module, "store_topic_digest", lambda *args, **kwargs: None)
+        def _fake_list_documents(session, limit: int, offset: int):
+            return documents_module.DocumentListResponse(
+                items=[], total=0, limit=limit, offset=offset
+            )
 
-    def _fake_list_documents(session, limit: int, offset: int):
-        return documents_module.DocumentListResponse(
-            items=[], total=0, limit=limit, offset=offset
-        )
+        monkeypatch.setattr(documents_module, "list_documents", _fake_list_documents)
 
-    monkeypatch.setattr(documents_module, "list_documents", _fake_list_documents)
-
-    with TestClient(app) as client:
-        yield client
-
-    app.dependency_overrides.pop(get_session, None)
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.dependency_overrides.pop(get_session, None)
 
 
 @pytest.mark.parametrize(
@@ -150,4 +165,9 @@ def test_api_key_allows_access(api_client, method: str, path: str, kwargs: dict[
 def test_jwt_allows_access(api_client):
     token = jwt.encode({"sub": "test-user"}, "shared-secret", algorithm="HS256")
     response = api_client.get("/documents", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+
+
+def test_anonymous_access_allowed_when_auth_unconfigured(anonymous_client):
+    response = anonymous_client.get("/documents")
     assert response.status_code == 200
