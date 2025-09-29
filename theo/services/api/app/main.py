@@ -20,6 +20,7 @@ from starlette.responses import Response
 
 from .core.database import Base, get_engine
 from .core.settings import get_settings
+from .db.run_sql_migrations import run_sql_migrations
 from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware
 from .routes import (
@@ -57,6 +58,7 @@ else:
 async def lifespan(_: FastAPI):
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
+    run_sql_migrations(engine)
     with Session(engine) as session:
         seed_reference_data(session)
     yield
