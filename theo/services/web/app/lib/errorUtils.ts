@@ -1,6 +1,8 @@
 export type ErrorDetails = {
   message: string;
   traceId: string | null;
+  code?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 const MESSAGE_KEYS = ["detail", "message", "error", "title"] as const;
@@ -76,12 +78,14 @@ export async function parseErrorResponse(
 ): Promise<ErrorDetails> {
   let traceId = extractTraceIdFromHeaders(response.headers);
   let message = fallbackMessage;
+  let code: string | null = null;
+  let metadata: Record<string, unknown> | null = null;
 
   let bodyText: string | null = null;
   try {
     bodyText = await response.text();
   } catch {
-    return { message, traceId };
+    return { message, traceId, code, metadata };
   }
 
   const trimmed = bodyText.trim();
@@ -91,12 +95,40 @@ export async function parseErrorResponse(
 
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    const candidates = MESSAGE_KEYS.map((key) => parsed[key]);
-    const messageCandidate = pickFirstString(candidates);
-    if (messageCandidate) {
-      message = messageCandidate;
+    const detail = ((): unknown => {
+      if ("detail" in parsed) {
+        return parsed.detail;
+      }
+      return parsed;
+    })();
+
+    if (typeof detail === "string") {
+      message = detail;
+    } else if (isRecord(detail)) {
+      const detailMessage = pickFirstString([
+        detail.message,
+        detail.detail,
+        ...MESSAGE_KEYS.map((key) => detail[key]),
+      ]);
+      if (detailMessage) {
+        message = detailMessage;
+      }
+      const detailCode = detail.code;
+      if (typeof detailCode === "string" && detailCode.trim()) {
+        code = detailCode.trim();
+      }
+      const detailMetadata = detail.metadata;
+      if (isRecord(detailMetadata)) {
+        metadata = detailMetadata;
+      }
     } else {
-      message = trimmed;
+      const candidates = MESSAGE_KEYS.map((key) => parsed[key]);
+      const messageCandidate = pickFirstString(candidates);
+      if (messageCandidate) {
+        message = messageCandidate;
+      } else {
+        message = trimmed;
+      }
     }
 
     const traceCandidate = pickFirstString(TRACE_KEYS.map((key) => parsed[key]));
@@ -107,5 +139,5 @@ export async function parseErrorResponse(
     message = trimmed;
   }
 
-  return { message, traceId };
+  return { message, traceId, code, metadata };
 }

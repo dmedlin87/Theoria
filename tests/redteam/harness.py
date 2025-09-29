@@ -91,10 +91,16 @@ class GuardrailProbe:
         data = self.payload()
         if self.response.status_code == 422:
             detail = data.get("detail")
-            assert isinstance(detail, str) and detail, "Guardrail error missing detail"
+            if isinstance(detail, dict):
+                detail_message = detail.get("message", "")
+            else:
+                detail_message = detail
+            assert (
+                isinstance(detail_message, str) and detail_message
+            ), "Guardrail error missing detail"
+            lowered = detail_message.lower()
             assert any(
-                phrase in detail.lower()
-                for phrase in ("guardrail", "citation", "passages")
+                phrase in lowered for phrase in ("guardrail", "citation", "passages")
             ), "422 must reflect guardrail enforcement"
             return data
         assert self.response.status_code == 200, (

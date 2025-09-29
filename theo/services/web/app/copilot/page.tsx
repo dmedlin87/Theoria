@@ -1,12 +1,21 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import ModeChangeBanner from "../components/ModeChangeBanner";
+import ErrorCallout from "../components/ErrorCallout";
 import { formatEmphasisSummary } from "../mode-config";
 import { useMode } from "../mode-context";
 import { getCitationManagerEndpoint } from "../lib/api";
 import { createTheoApiClient } from "../lib/api-client";
+import {
+  dispatchSuggestionAction,
+  extractTraceId,
+  suggestionFromError,
+  type FailureContext,
+  type FailureSuggestion,
+} from "../lib/failure-suggestions";
 
 import QuickStartPresets from "./components/QuickStartPresets";
 import WorkflowFormFields from "./components/WorkflowFormFields";
@@ -136,15 +145,39 @@ type WorkflowOverrides = {
 
 export default function CopilotPage(): JSX.Element {
   const { mode } = useMode();
+  const router = useRouter();
   const apiClient = useMemo(() => createTheoApiClient(), []);
   const citationManagerEndpoint = useMemo(() => getCitationManagerEndpoint(), []);
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowId>("verse");
   const [result, setResult] = useState<CopilotResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{
+    message: string;
+    suggestion: FailureSuggestion | null;
+    traceId: string | null;
+  } | null>(null);
   const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
   const [isSendingCitations, setIsSendingCitations] = useState(false);
+
+  const clearError = useCallback(() => {
+    setErrorState(null);
+  }, []);
+
+  const recordError = useCallback(
+    (error: unknown, fallbackMessage: string, context: FailureContext) => {
+      const suggestion = suggestionFromError(error, context);
+      const message =
+        error instanceof Error && error.message ? error.message : fallbackMessage;
+      const traceId = extractTraceId(error);
+      setErrorState({
+        message,
+        suggestion,
+        traceId: traceId ?? null,
+      });
+    },
+    [],
+  );
 
   const verseWorkflow = useVerseWorkflow(apiClient);
   const sermonWorkflow = useSermonWorkflow(apiClient);
@@ -156,6 +189,150 @@ export default function CopilotPage(): JSX.Element {
   const exportWorkflow = useExportWorkflow(apiClient);
   const { exportCitations } = useCitationExporter(apiClient);
 
+  const resolveFailureContext = useCallback(
+    (
+      selected: WorkflowId,
+      overrides?: WorkflowOverrides & { workflow?: WorkflowId },
+    ): FailureContext => {
+      switch (selected) {
+        case "verse": {
+          const base = verseWorkflow.form;
+          const extra = overrides?.verse ?? {};
+          return {
+            question:
+              extra.question ?? base.question ?? extra.passage ?? base.passage ?? undefined,
+            osis: extra.osis ?? base.osis ?? undefined,
+          };
+        }
+        case "sermon": {
+          const base = sermonWorkflow.form;
+          const extra = overrides?.sermon ?? {};
+          return {
+            question: extra.topic ?? base.topic ?? undefined,
+            osis: extra.osis ?? base.osis ?? undefined,
+          };
+        }
+        case "comparative": {
+          const base = comparativeWorkflow.form;
+          const extra = overrides?.comparative ?? {};
+          return {
+            question: extra.participants ?? base.participants ?? undefined,
+            osis: extra.osis ?? base.osis ?? undefined,
+          };
+        }
+        case "multimedia": {
+          const base = multimediaWorkflow.form;
+          const extra = overrides?.multimedia ?? {};
+          return {
+            question: extra.collection ?? base.collection ?? undefined,
+          };
+        }
+        case "devotional": {
+          const base = devotionalWorkflow.form;
+          const extra = overrides?.devotional ?? {};
+          return {
+            question: extra.focus ?? base.focus ?? undefined,
+            osis: extra.osis ?? base.osis ?? undefined,
+          };
+        }
+        case "collaboration": {
+          const base = collaborationWorkflow.form;
+          const extra = overrides?.collaboration ?? {};
+          return {
+            question: extra.thread ?? base.thread ?? undefined,
+            osis: extra.osis ?? base.osis ?? undefined,
+          };
+        }
+        case "curation": {
+          const base = curationWorkflow.form;
+          const extra = overrides?.curation ?? {};
+          return {
+            question: extra.since ?? base.since ?? undefined,
+          };
+        }
+        case "export": {
+          const base = exportWorkflow.form;
+          const extra = overrides?.exportPreset ?? {};
+          return {
+            question: extra.topic ?? base.topic ?? undefined,
+            osis: extra.osis ?? base.osis ?? undefined,
+          };
+        }
+        default:
+          return {};
+      }
+    },
+    [
+      verseWorkflow.form,
+      sermonWorkflow.form,
+      comparativeWorkflow.form,
+      multimediaWorkflow.form,
+      devotionalWorkflow.form,
+      collaborationWorkflow.form,
+      curationWorkflow.form,
+      exportWorkflow.form,
+    ],
+  );
+
+  const handleSuggestionAction = useCallback(
+    (suggestion: FailureSuggestion) => {
+      dispatchSuggestionAction(suggestion.action, {
+        openSearchPanel: ({ query, osis }) => {
+          const params = new URLSearchParams();
+          if (query) {
+            params.set("q", query);
+          }
+          if (osis) {
+            params.set("osis", osis);
+          }
+          const queryString = params.toString();
+          router.push(queryString ? `/search?${queryString}` : "/search");
+        },
+        openUploadPanel: () => {
+          router.push("/upload");
+        },
+        focusInput: () => {
+          const form = document.querySelector<HTMLFormElement>("form");
+          const field = form?.querySelector<HTMLElement>("input, textarea");
+          field?.focus();
+        },
+      });
+    },
+    [router],
+  );
+
+  const renderSuggestionAction = useCallback(
+    (suggestion: FailureSuggestion) => {
+      const defaultLabel =
+        suggestion.action.label ??
+        (suggestion.action.kind === "open-search"
+          ? "Open search"
+          : suggestion.action.kind === "open-upload"
+          ? "Open upload"
+          : "Edit prompt");
+      return (
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => handleSuggestionAction(suggestion)}
+        >
+          {defaultLabel}
+        </button>
+      );
+    },
+    [handleSuggestionAction],
+  );
+
+  const errorCallout = errorState ? (
+    <ErrorCallout
+      message={errorState.message}
+      traceId={errorState.traceId}
+      actions={
+        errorState.suggestion ? renderSuggestionAction(errorState.suggestion) : undefined
+      }
+    />
+  ) : null;
+
   useEffect(() => {
     let active = true;
     const loadFeatures = async () => {
@@ -163,11 +340,12 @@ export default function CopilotPage(): JSX.Element {
         const payload = await apiClient.fetchFeatures();
         if (active) {
           setEnabled(Boolean((payload as FeatureFlags).ai_copilot));
+          clearError();
         }
       } catch (fetchError) {
         if (active) {
           setEnabled(false);
-          setError((fetchError as Error).message || "Unable to load feature flags");
+          recordError(fetchError, "Unable to load feature flags", {});
         }
       }
     };
@@ -175,18 +353,18 @@ export default function CopilotPage(): JSX.Element {
     return () => {
       active = false;
     };
-  }, [apiClient]);
+  }, [apiClient, clearError, recordError]);
 
   const runWorkflow = async (
     overrides?: WorkflowOverrides & { workflow?: WorkflowId },
   ): Promise<void> => {
     setIsRunning(true);
-    setError(null);
+    clearError();
     setResult(null);
     setCitationExportStatus(null);
 
+    const selectedWorkflow = overrides?.workflow ?? workflow;
     try {
-      const selectedWorkflow = overrides?.workflow ?? workflow;
       if (selectedWorkflow === "verse") {
         const payload = await verseWorkflow.run(mode.id, overrides?.verse);
         setResult({ kind: "verse", payload });
@@ -215,7 +393,11 @@ export default function CopilotPage(): JSX.Element {
         throw new Error("Unsupported workflow selection.");
       }
     } catch (submitError) {
-      setError((submitError as Error).message || "Unable to run the workflow");
+      recordError(
+        submitError,
+        "Unable to run the workflow",
+        resolveFailureContext(selectedWorkflow, overrides),
+      );
     } finally {
       setIsRunning(false);
     }
@@ -232,7 +414,7 @@ export default function CopilotPage(): JSX.Element {
       return;
     }
     setCitationExportStatus(null);
-    setError(null);
+    clearError();
     setIsSendingCitations(true);
     try {
       const payload = await exportCitations(citations);
@@ -247,7 +429,7 @@ export default function CopilotPage(): JSX.Element {
       }
     } catch (exportError) {
       setCitationExportStatus(null);
-      setError((exportError as Error).message || "Unable to export citations");
+      recordError(exportError, "Unable to export citations", {});
     } finally {
       setIsSendingCitations(false);
     }
@@ -288,7 +470,7 @@ export default function CopilotPage(): JSX.Element {
       <section>
         <h2>Copilot</h2>
         <p>The AI copilot is not enabled for this deployment.</p>
-        {error && <p role="alert">{error}</p>}
+        {errorCallout}
       </section>
     );
   }
@@ -409,11 +591,7 @@ export default function CopilotPage(): JSX.Element {
         }
       `}</style>
 
-      {error && (
-        <p role="alert" style={{ color: "crimson", marginTop: "1rem" }}>
-          {error}
-        </p>
-      )}
+      {errorCallout && <div style={{ marginTop: "1rem" }}>{errorCallout}</div>}
 
       {result && (
         <WorkflowResultPanel

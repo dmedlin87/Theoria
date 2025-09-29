@@ -259,7 +259,15 @@ def _apply_guardrail_profile(
                 "topic_domain": filters.topic_domain,
             },
         )
-        raise GuardrailError("No passages matched the requested guardrail profile")
+        raise GuardrailError(
+            "No passages matched the requested guardrail profile",
+            code="guardrail_profile_no_match",
+            metadata={
+                "filters": filters.model_dump(exclude_none=True)
+                if filters
+                else {},
+            },
+        )
 
     payload = {
         key: value
@@ -274,6 +282,30 @@ def _apply_guardrail_profile(
 
 class GuardrailError(GenerationError):
     """Raised when an answer violates grounding requirements."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "guardrail_violation",
+        metadata: Mapping[str, Any] | None = None,
+        answer: "RAGAnswer | None" = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.metadata: dict[str, Any] = dict(metadata or {})
+        self.answer = answer
+
+    def to_detail(self) -> dict[str, Any]:
+        detail: dict[str, Any] = {
+            "message": str(self),
+            "code": self.code,
+        }
+        if self.metadata:
+            detail["metadata"] = self.metadata
+        if self.answer is not None:
+            detail["answer"] = self.answer.model_dump(mode="json")
+        return detail
 
 
 class RAGCitation(APIModel):
@@ -608,6 +640,26 @@ def _load_guardrail_reference(session: Session) -> HybridSearchResult | None:
     return _build_guardrail_result(passage, document)
 
 
+def _compose_summary_text(
+    citations: Sequence[RAGCitation],
+    results: Sequence[HybridSearchResult],
+) -> str:
+    cited_results = [result for result in results if result.osis_ref]
+    summary_lines: list[str] = []
+    for idx, citation in enumerate(citations):
+        result = cited_results[idx] if idx < len(cited_results) else None
+        document_title = (
+            citation.document_title
+            or (result.document_title if result else None)
+            or citation.document_id
+        )
+        summary_lines.append(
+            f"[{citation.index}] {citation.snippet} — {document_title}"
+            f" ({citation.osis}, {citation.anchor})"
+        )
+    return "\n".join(summary_lines)
+
+
 
 def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
     digest = hashlib.sha256()
@@ -626,19 +678,31 @@ def _validate_model_completion(
     citations: Sequence[RAGCitation],
 ) -> dict[str, Any]:
     if not completion or not completion.strip():
-        raise GuardrailError("Model completion was empty")
+        raise GuardrailError(
+            "Model completion was empty",
+            code="completion_empty",
+        )
 
     marker_index = completion.lower().rfind("sources:")
     if marker_index == -1:
-        raise GuardrailError("Model completion missing 'Sources:' line")
+        raise GuardrailError(
+            "Model completion missing 'Sources:' line",
+            code="completion_missing_sources_section",
+        )
 
     sources_text = completion[marker_index + len("Sources:") :].strip()
     if not sources_text:
-        raise GuardrailError("Model completion missing citations after 'Sources:'")
+        raise GuardrailError(
+            "Model completion missing citations after 'Sources:'",
+            code="completion_missing_citations",
+        )
 
     entries = [entry.strip() for entry in re.split(r";|\n", sources_text) if entry.strip()]
     if not entries:
-        raise GuardrailError("Model completion missing citations after 'Sources:'")
+        raise GuardrailError(
+            "Model completion missing citations after 'Sources:'",
+            code="completion_missing_citations",
+        )
 
     expected = {citation.index: citation for citation in citations}
     mismatches: list[str] = []
@@ -673,11 +737,16 @@ def _validate_model_completion(
             )
 
     if not cited_indices:
-        raise GuardrailError("Model completion did not include any recognised citations")
+        raise GuardrailError(
+            "Model completion did not include any recognised citations",
+            code="completion_unrecognized_citations",
+        )
 
     if mismatches:
         raise GuardrailError(
-            "Model citations failed guardrails: " + "; ".join(mismatches)
+            "Model citations failed guardrails: " + "; ".join(mismatches),
+            code="completion_citation_mismatch",
+            metadata={"violations": mismatches},
         )
 
     return {
@@ -694,7 +763,9 @@ def ensure_completion_safe(completion: str | None) -> None:
     for pattern, reason in _DISALLOWED_COMPLETION_PATTERNS:
         if pattern.search(completion):
             raise GuardrailError(
-                f"Model completion failed safety check: {reason}"
+                f"Model completion failed safety check: {reason}",
+                code="completion_safety_violation",
+                metadata={"reason": reason},
             )
 
 
@@ -709,6 +780,41 @@ def _guarded_answer(
     filters: HybridSearchFilters | None = None,
 ) -> RAGAnswer:
     ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
+    if not ordered_results:
+        fallback_answer: RAGAnswer | None = None
+        fallback_result = _load_guardrail_reference(session)
+        if fallback_result:
+            fallback_citations = _build_citations([fallback_result])
+            if fallback_citations:
+                fallback_summary = _compose_summary_text(
+                    fallback_citations, [fallback_result]
+                )
+                sources_line = "; ".join(
+                    f"[{citation.index}] {citation.osis} ({citation.anchor})"
+                    for citation in fallback_citations
+                )
+                refusal_completion = (
+                    "I’m sorry, but I cannot help with that request.\n\n"
+                    f"Sources: {sources_line}"
+                )
+                fallback_answer = RAGAnswer(
+                    summary=fallback_summary,
+                    citations=fallback_citations,
+                    model_name=None,
+                    model_output=refusal_completion,
+                    guardrail_profile=None,
+                )
+        raise GuardrailError(
+            "No grounded passages were retrieved for this request",
+            code="retrieval_no_results",
+            metadata={
+                "filters": filters.model_dump(exclude_none=True)
+                if filters
+                else {},
+                "question": question,
+            },
+            answer=fallback_answer,
+        )
     citations = _build_citations(ordered_results)
     if not citations:
         fallback_result = _load_guardrail_reference(session)
@@ -718,23 +824,12 @@ def _guarded_answer(
             citations = _build_citations(ordered_results)
     if not citations:
         raise GuardrailError(
-            "Retrieved passages lacked OSIS references; aborting generation"
+            "Retrieved passages lacked OSIS references; aborting generation",
+            code="retrieval_missing_osis",
         )
 
-    cited_results = [result for result in ordered_results if result.osis_ref]
-    summary_lines = []
-    for idx, citation in enumerate(citations):
-        result = cited_results[idx] if idx < len(cited_results) else None
-        document_title = (
-            citation.document_title
-            or (result.document_title if result else None)
-            or citation.document_id
-        )
-        summary_lines.append(
-            f"[{citation.index}] {citation.snippet} — {document_title}"
-            f" ({citation.osis}, {citation.anchor})"
-        )
-    summary_text = "\n".join(summary_lines)
+    summary_text = _compose_summary_text(citations, ordered_results)
+    summary_lines = summary_text.splitlines() if summary_text else []
 
     model_output = None
     model_name = None
@@ -2061,7 +2156,11 @@ def build_transcript_deliverable(
 
     document = session.get(Document, document_id)
     if document is None:
-        raise GuardrailError(f"Document {document_id} not found")
+        raise GuardrailError(
+            f"Document {document_id} not found",
+            code="guardrail_document_missing",
+            metadata={"document_id": document_id},
+        )
     passages = (
         session.query(Passage)
         .filter(Passage.document_id == document_id)

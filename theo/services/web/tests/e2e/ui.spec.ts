@@ -78,6 +78,13 @@ test.describe("Theo Engine UI", () => {
       assertion: (page: Page) => Promise<void>;
     }> = [
       {
+        href: "/chat",
+        label: "Chat",
+        assertion: async (pageInstance) => {
+          await expect(pageInstance.getByRole("heading", { name: "Chat" })).toBeVisible();
+        },
+      },
+      {
         href: "/search",
         label: "Search",
         assertion: async (pageInstance) => {
@@ -481,6 +488,37 @@ test.describe("Theo Engine UI", () => {
         "transcript-csv",
         "transcript-markdown",
       ].sort()
+    );
+  });
+
+  test("chat refusals surface actionable search guidance", async ({ page }) => {
+    await page.route("**/ai/chat", async (route) => {
+      await route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({
+          detail: {
+            message: "No passages matched the requested guardrail profile",
+            code: "guardrail_profile_no_match",
+          },
+        }),
+      });
+    });
+
+    await page.goto("/chat");
+    await page.fill("textarea", "Who cites John 1:1?");
+    await page.click("button:has-text('Send')");
+
+    const callout = page.getByRole("alert");
+    await expect(callout).toContainText("No passages matched the requested guardrail profile");
+    const searchAction = callout.getByRole("button", { name: /Open search/i });
+    await expect(searchAction).toBeVisible();
+    await searchAction.click();
+
+    const searchPanel = page.getByRole("complementary", { name: "Search follow-up" });
+    await expect(searchPanel).toBeVisible();
+    await expect(searchPanel.getByRole("textbox", { name: /Search query/i })).toHaveValue(
+      "Who cites John 1:1?",
     );
   });
 

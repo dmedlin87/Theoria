@@ -17,6 +17,7 @@ export const metadata = {
 };
 
 const NAV_LINKS = [
+  { href: "/chat", label: "Chat" },
   { href: "/search", label: "Search" },
   { href: "/upload", label: "Upload" },
   { href: "/copilot", label: "Copilot" },

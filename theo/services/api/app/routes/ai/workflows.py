@@ -8,7 +8,7 @@ from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -65,6 +65,7 @@ from ...models.export import (
     DocumentExportFilters,
     DocumentExportResponse,
 )
+from .._errors import build_error_detail
 
 _BAD_REQUEST_RESPONSE = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
@@ -514,24 +515,46 @@ def _extract_refusal_text(answer: RAGAnswer) -> str:
 )
 def chat_turn(
     payload: ChatSessionRequest, session: Session = Depends(get_session)
-) -> ChatSessionResponse:
+) -> ChatSessionResponse | JSONResponse:
     if not payload.messages:
-        raise HTTPException(status_code=400, detail="messages cannot be empty")
+        raise HTTPException(
+            status_code=400,
+            detail=build_error_detail(
+                "messages cannot be empty",
+                code="chat_empty_messages",
+            ),
+        )
     total_message_chars = sum(len(message.content) for message in payload.messages)
     if total_message_chars > CHAT_SESSION_TOTAL_CHAR_BUDGET:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="chat payload exceeds size limit",
+            detail=build_error_detail(
+                "chat payload exceeds size limit",
+                code="chat_payload_too_large",
+                metadata={"limit": CHAT_SESSION_TOTAL_CHAR_BUDGET},
+            ),
         )
     last_user = next(
         (message for message in reversed(payload.messages) if message.role == "user"),
         None,
     )
     if last_user is None:
-        raise HTTPException(status_code=400, detail="missing user message")
+        raise HTTPException(
+            status_code=400,
+            detail=build_error_detail(
+                "missing user message",
+                code="chat_missing_user_message",
+            ),
+        )
     question = last_user.content.strip()
     if not question:
-        raise HTTPException(status_code=400, detail="user message cannot be blank")
+        raise HTTPException(
+            status_code=400,
+            detail=build_error_detail(
+                "user message cannot be blank",
+                code="chat_blank_user_message",
+            ),
+        )
 
     session_id = payload.session_id or str(uuid4())
     trail_service = TrailService(session)
@@ -572,10 +595,25 @@ def chat_turn(
                 },
             )
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        refusal_answer = answer if answer is not None else getattr(exc, "answer", None)
+        refusal_text = _DEFAULT_REFUSAL_MESSAGE
+        if refusal_answer is not None:
+            refusal_text = _extract_refusal_text(refusal_answer)
+        message_payload = ChatSessionMessage(role="assistant", content=refusal_text)
+        response_body: dict[str, object] = {
+            "session_id": session_id,
+            "message": message_payload.model_dump(mode="json"),
+            "detail": exc.to_detail(),
+        }
+        if refusal_answer is not None:
+            response_body["answer"] = refusal_answer.model_dump(mode="json")
+        return JSONResponse(response_body, status_code=422)
 
     if message is None or answer is None:
-        raise HTTPException(status_code=500, detail="failed to compose chat response")
+        raise HTTPException(
+            status_code=500,
+            detail="failed to compose chat response",
+        )
 
     return ChatSessionResponse(session_id=session_id, message=message, answer=answer)
 
@@ -788,9 +826,18 @@ def verse_copilot(
             resolve_passage_reference(passage_value) if passage_value else None
         )
     except PassageResolutionError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=422,
+            detail=build_error_detail(str(exc), code="passage_resolution_failed"),
+        ) from exc
     if not resolved_osis:
-        raise HTTPException(status_code=422, detail="Provide an OSIS reference or passage.")
+        raise HTTPException(
+            status_code=422,
+            detail=build_error_detail(
+                "Provide an OSIS reference or passage.",
+                code="verse_missing_reference",
+            ),
+        )
     try:
         with trail_service.start_trail(
             workflow="verse_copilot",
@@ -814,7 +861,7 @@ def verse_copilot(
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=exc.to_detail()) from exc
 
 
 @router.post("/sermon-prep", response_model_exclude_none=True)
@@ -846,7 +893,7 @@ def sermon_prep(
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=exc.to_detail()) from exc
 
 
 # FastAPI coerces literal return types when a response model is provided, so we
@@ -868,7 +915,7 @@ def sermon_prep_export(
             model_name=payload.model,
         )
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=exc.to_detail()) from exc
     normalized = format.lower()
     package = build_sermon_deliverable(
         response,
@@ -901,9 +948,12 @@ def transcript_export(
             session, payload.document_id, formats=[normalized]
         )
     except GuardrailError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=404, detail=exc.to_detail()) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=400,
+            detail=build_error_detail(str(exc), code="transcript_export_invalid"),
+        ) from exc
     try:
         preset = _TRANSCRIPT_PRESET_MAP[normalized]
     except KeyError as exc:
@@ -937,7 +987,7 @@ def comparative_analysis(
             model_name=payload.model,
         )
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=exc.to_detail()) from exc
 
 
 @router.post("/multimedia", response_model_exclude_none=True)
@@ -964,7 +1014,7 @@ def multimedia_digest(
             recorder.finalize(final_md=final_md, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=exc.to_detail()) from exc
 
 
 @router.post("/devotional", response_model_exclude_none=True)
@@ -994,7 +1044,7 @@ def devotional_flow(
             )
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=exc.to_detail()) from exc
 
 
 @router.post(
@@ -1007,7 +1057,13 @@ def collaboration(
     session: Session = Depends(get_session),
 ):
     if not payload.viewpoints:
-        raise HTTPException(status_code=400, detail="viewpoints cannot be empty")
+        raise HTTPException(
+            status_code=400,
+            detail=build_error_detail(
+                "viewpoints cannot be empty",
+                code="collaboration_missing_viewpoints",
+            ),
+        )
     trail_service = TrailService(session)
     try:
         with trail_service.start_trail(
@@ -1031,7 +1087,7 @@ def collaboration(
             )
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=exc.to_detail()) from exc
 
 
 @router.post(
@@ -1049,7 +1105,11 @@ def corpus_curation(
             since_dt = datetime.fromisoformat(payload.since)
         except ValueError as exc:
             raise HTTPException(
-                status_code=400, detail="since must be ISO formatted"
+                status_code=400,
+                detail=build_error_detail(
+                    "since must be ISO formatted",
+                    code="curation_invalid_since",
+                ),
             ) from exc
     trail_service = TrailService(session)
     with trail_service.start_trail(

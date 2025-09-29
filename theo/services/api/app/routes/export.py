@@ -31,6 +31,7 @@ from ..models.export import (
     DocumentExportFilters,
     serialise_asset_content,
 )
+from ._errors import build_error_detail
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.export import export_documents, export_search_results
 
@@ -86,7 +87,10 @@ def export_deliverable(
             if not payload.topic:
                 raise HTTPException(
                     status_code=400,
-                    detail="topic is required for sermon deliverables",
+                    detail=build_error_detail(
+                        "topic is required for sermon deliverables",
+                        code="deliverable_missing_topic",
+                    ),
                 )
             response = generate_sermon_prep_outline(
                 session,
@@ -104,7 +108,10 @@ def export_deliverable(
             if not payload.document_id:
                 raise HTTPException(
                     status_code=400,
-                    detail="document_id is required for transcript deliverables",
+                    detail=build_error_detail(
+                        "document_id is required for transcript deliverables",
+                        code="deliverable_missing_document_id",
+                    ),
                 )
             package = build_transcript_deliverable(
                 session,
@@ -115,9 +122,12 @@ def export_deliverable(
             raise HTTPException(status_code=400, detail="Unsupported deliverable type")
     except GuardrailError as exc:
         status_code = 422 if payload.type == "sermon" else 404
-        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+        raise HTTPException(status_code=status_code, detail=exc.to_detail()) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=400,
+            detail=build_error_detail(str(exc), code="deliverable_invalid"),
+        ) from exc
 
     encoded_assets = [
         DeliverableAsset(

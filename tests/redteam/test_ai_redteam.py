@@ -353,6 +353,11 @@ def test_chat_guard_rejects_sql_leak(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     assert response.status_code == 422, response.text
-    detail = str(response.json().get("detail", "")).lower()
-    assert "safety" in detail or "guardrail" in detail
+    payload = response.json()
+    detail_field = payload.get("detail", "")
+    if isinstance(detail_field, dict):
+      detail_text = str(detail_field.get("message", "")).lower()
+    else:
+      detail_text = str(detail_field).lower()
+    assert "safety" in detail_text or "guardrail" in detail_text
  

@@ -1,7 +1,11 @@
 import { getApiBaseUrl } from "./api";
+import { ApiError } from "./api-error";
+import { parseErrorResponse } from "./errorUtils";
 import type { components } from "./generated/api";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
+type ChatSessionRequest = components["schemas"]["ChatSessionRequest"];
+type ChatSessionResponse = components["schemas"]["ChatSessionResponse"];
 
 function normaliseExportResponse(
   payload: ExportDeliverableResponse,
@@ -13,13 +17,6 @@ function normaliseExportResponse(
     mediaType: payload.media_type,
     content: payload.content,
   };
-}
-
-function buildErrorMessage(status: number, body: string): string {
-  if (body) {
-    return body;
-  }
-  return `Request failed with status ${status}`;
 }
 
 async function handleResponse(
@@ -39,8 +36,14 @@ async function handleResponse<T>(
   parseJson: boolean,
 ): Promise<T | void> {
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(buildErrorMessage(response.status, body));
+    const { message, traceId, code, metadata } = await parseErrorResponse(
+      response,
+      `Request failed with status ${response.status}`,
+    );
+    throw new ApiError(
+      response.status,
+      { message, code, metadata, traceId },
+    );
   }
   if (!parseJson) {
     return;
@@ -86,6 +89,13 @@ export class TheoApiClient {
 
   fetchFeatures(): Promise<Record<string, boolean>> {
     return this.request<Record<string, boolean>>("/features/");
+  }
+
+  runChatTurn(payload: ChatSessionRequest): Promise<ChatSessionResponse> {
+    return this.request("/ai/chat", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   }
 
   runVerseWorkflow(payload: {
