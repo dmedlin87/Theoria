@@ -57,7 +57,10 @@ class Document(Base):
     enrichment_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     provenance_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+        index=True,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -814,6 +817,13 @@ class WatchlistEvent(Base):
     """Execution record of a watchlist evaluation run."""
 
     __tablename__ = "watchlist_events"
+    __table_args__ = (
+        Index(
+            "ix_watchlist_events_watchlist_id_run_started",
+            "watchlist_id",
+            "run_started",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
