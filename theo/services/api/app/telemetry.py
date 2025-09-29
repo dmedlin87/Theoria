@@ -100,6 +100,7 @@ if Counter is None or Histogram is None:  # pragma: no cover - metrics disabled
     WORKFLOW_RUNS = _NoopMetric()
     WORKFLOW_LATENCY = _NoopMetric()
     RAG_CACHE_EVENTS = _NoopMetric()
+    CITATION_DRIFT_EVENTS = _NoopMetric()
 else:
     WORKFLOW_RUNS = Counter(
         "theo_workflow_runs_total",
@@ -115,6 +116,11 @@ else:
     RAG_CACHE_EVENTS = Counter(
         "theo_rag_cache_events_total",
         "Theo Engine RAG cache events by status.",
+        labelnames=("status",),
+    )
+    CITATION_DRIFT_EVENTS = Counter(
+        "theo_citation_drift_events_total",
+        "Theo Engine cached citation validation outcomes.",
         labelnames=("status",),
     )
 
@@ -221,6 +227,7 @@ __all__ = [
     "log_workflow_event",
     "set_span_attribute",
     "RAG_CACHE_EVENTS",
+    "CITATION_DRIFT_EVENTS",
 ]
 
 
