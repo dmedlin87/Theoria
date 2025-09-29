@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, Sequence
@@ -449,87 +452,117 @@ def persist_text_document(
                 )
                 session.add(claim)
 
-    session.commit()
+    storage_root = settings.storage_root
+    storage_dir = storage_root / document.id
+    temp_dir_path: Path | None = None
+    moved_to_final = False
 
-    storage_dir = settings.storage_root / document.id
-    storage_dir.mkdir(parents=True, exist_ok=True)
-
-    artifacts: dict[str, str] = {}
-
-    if original_path:
-        safe_name = _safe_storage_name(
-            original_path.name, fallback=original_path.name
+    try:
+        storage_root.mkdir(parents=True, exist_ok=True)
+        temp_dir_path = Path(
+            tempfile.mkdtemp(prefix=f".{document.id}-", dir=storage_root)
         )
-        destination = storage_dir / safe_name
-        if original_path != destination:
-            from shutil import copyfile
 
-            copyfile(original_path, destination)
-        artifacts.setdefault("original", safe_name)
+        artifacts: dict[str, str] = {}
 
-    if raw_content:
-        filename = raw_filename or "raw.txt"
-        safe_name = _safe_storage_name(filename, fallback=filename)
-        target_path = storage_dir / safe_name
-        target_path.write_text(raw_content, encoding="utf-8")
-        artifacts.setdefault("raw", safe_name)
+        if original_path:
+            safe_name = _safe_storage_name(
+                original_path.name, fallback=original_path.name
+            )
+            destination = temp_dir_path / safe_name
+            if original_path != destination:
+                shutil.copyfile(original_path, destination)
+            artifacts.setdefault("original", safe_name)
 
-    storage_dir.joinpath("frontmatter.json").write_text(
+        if raw_content:
+            filename = raw_filename or "raw.txt"
+            safe_name = _safe_storage_name(filename, fallback=filename)
+            target_path = temp_dir_path / safe_name
+            target_path.write_text(raw_content, encoding="utf-8")
+            artifacts.setdefault("raw", safe_name)
+
+        normalized_payload = {
+            "document": {
+                "id": document.id,
+                "title": document.title,
+                "source_url": document.source_url,
+                "source_type": document.source_type,
+                "text": text_content,
+            },
+            "chunks": [
+                {
+                    "index": chunk.index,
+                    "text": chunk.text,
+                    "t_start": chunk.t_start,
+                    "t_end": chunk.t_end,
+                    "page_no": chunk.page_no,
+                }
+                for chunk in chunks
+            ],
+            "passages": [
+                {
+                    "id": passage.id,
+                    "osis_ref": passage.osis_ref,
+                    "tokens": passage.tokens,
+                }
+                for passage in passages
+            ],
+            "segments": [
+                {
+                    "id": segment.id,
+                    "text": segment.text,
+                    "primary_osis": segment.primary_osis,
+                    "osis_refs": segment.osis_refs,
+                    "t_start": segment.t_start,
+                    "t_end": segment.t_end,
+                }
+                for segment in segments
+            ],
+        }
+
+        if artifacts:
+            normalized_payload["artifacts"] = artifacts
+
+        _write_document_metadata(
+            temp_dir_path,
+            frontmatter=frontmatter,
+            normalized_payload=normalized_payload,
+        )
+
+        if storage_dir.exists():
+            shutil.rmtree(storage_dir)
+        shutil.move(str(temp_dir_path), storage_dir)
+        moved_to_final = True
+
+        document.storage_path = str(storage_dir)
+        session.add(document)
+        session.commit()
+    except Exception:
+        session.rollback()
+        if moved_to_final:
+            shutil.rmtree(storage_dir, ignore_errors=True)
+        elif temp_dir_path is not None:
+            shutil.rmtree(temp_dir_path, ignore_errors=True)
+        raise
+
+    return document
+
+
+def _write_document_metadata(
+    target_dir: Path,
+    *,
+    frontmatter: dict[str, Any],
+    normalized_payload: dict[str, Any],
+) -> None:
+    """Write frontmatter and normalized payload metadata files."""
+
+    target_dir.joinpath("frontmatter.json").write_text(
         serialise_frontmatter(frontmatter), encoding="utf-8"
     )
 
-    normalized_payload = {
-        "document": {
-            "id": document.id,
-            "title": document.title,
-            "source_url": document.source_url,
-            "source_type": document.source_type,
-            "text": text_content,
-        },
-        "chunks": [
-            {
-                "index": chunk.index,
-                "text": chunk.text,
-                "t_start": chunk.t_start,
-                "t_end": chunk.t_end,
-                "page_no": chunk.page_no,
-            }
-            for chunk in chunks
-        ],
-        "passages": [
-            {
-                "id": passage.id,
-                "osis_ref": passage.osis_ref,
-                "tokens": passage.tokens,
-            }
-            for passage in passages
-        ],
-        "segments": [
-            {
-                "id": segment.id,
-                "text": segment.text,
-                "primary_osis": segment.primary_osis,
-                "osis_refs": segment.osis_refs,
-                "t_start": segment.t_start,
-                "t_end": segment.t_end,
-            }
-            for segment in segments
-        ],
-    }
-
-    if artifacts:
-        normalized_payload["artifacts"] = artifacts
-
-    normalized_path = storage_dir / "normalized.json"
-    normalized_path.write_text(
-        __import__("json").dumps(normalized_payload, indent=2), encoding="utf-8"
+    target_dir.joinpath("normalized.json").write_text(
+        json.dumps(normalized_payload, indent=2), encoding="utf-8"
     )
-
-    document.storage_path = str(storage_dir)
-    session.add(document)
-    session.commit()
-
-    return document
 
 
 def persist_transcript_document(
@@ -747,88 +780,98 @@ def persist_transcript_document(
                 )
                 session.add(claim)
 
-    session.commit()
+    storage_root = settings.storage_root
+    storage_dir = storage_root / document.id
+    temp_dir_path: Path | None = None
+    moved_to_final = False
 
-    storage_dir = settings.storage_root / document.id
-    storage_dir.mkdir(parents=True, exist_ok=True)
-
-    artifacts: dict[str, str] = {}
-
-    if transcript_path:
-        safe_name = _safe_storage_name(
-            transcript_filename or transcript_path.name,
-            fallback=transcript_path.name,
+    try:
+        storage_root.mkdir(parents=True, exist_ok=True)
+        temp_dir_path = Path(
+            tempfile.mkdtemp(prefix=f".{document.id}-", dir=storage_root)
         )
-        destination = storage_dir / safe_name
-        if transcript_path != destination:
-            from shutil import copyfile
+        artifacts: dict[str, str] = {}
 
-            copyfile(transcript_path, destination)
-        artifacts.setdefault("transcript", safe_name)
+        if transcript_path:
+            safe_name = _safe_storage_name(
+                transcript_filename or transcript_path.name,
+                fallback=transcript_path.name,
+            )
+            destination = temp_dir_path / safe_name
+            if transcript_path != destination:
+                shutil.copyfile(transcript_path, destination)
+            artifacts.setdefault("transcript", safe_name)
 
-    if audio_path:
-        filename = audio_filename or audio_path.name
-        safe_name = _safe_storage_name(filename, fallback=audio_path.name)
-        destination = storage_dir / safe_name
-        if audio_path != destination:
-            from shutil import copyfile
+        if audio_path:
+            filename = audio_filename or audio_path.name
+            safe_name = _safe_storage_name(filename, fallback=audio_path.name)
+            destination = temp_dir_path / safe_name
+            if audio_path != destination:
+                shutil.copyfile(audio_path, destination)
+            artifacts.setdefault("audio", safe_name)
 
-            copyfile(audio_path, destination)
-        artifacts.setdefault("audio", safe_name)
+        normalized_payload = {
+            "document": {
+                "id": document.id,
+                "title": document.title,
+                "source_url": document.source_url,
+                "source_type": document.source_type,
+            },
+            "chunks": [
+                {
+                    "index": chunk.index,
+                    "text": chunk.text,
+                    "t_start": chunk.t_start,
+                    "t_end": chunk.t_end,
+                    "page_no": chunk.page_no,
+                }
+                for chunk in chunks
+            ],
+            "passages": [
+                {
+                    "id": passage.id,
+                    "osis_ref": passage.osis_ref,
+                    "tokens": passage.tokens,
+                }
+                for passage in passages
+            ],
+            "segments": [
+                {
+                    "id": segment.id,
+                    "text": segment.text,
+                    "primary_osis": segment.primary_osis,
+                    "osis_refs": segment.osis_refs,
+                    "t_start": segment.t_start,
+                    "t_end": segment.t_end,
+                }
+                for segment in segments
+            ],
+        }
 
-    storage_dir.joinpath("frontmatter.json").write_text(
-        serialise_frontmatter(frontmatter), encoding="utf-8"
-    )
+        if artifacts:
+            normalized_payload["artifacts"] = artifacts
 
-    normalized_payload = {
-        "document": {
-            "id": document.id,
-            "title": document.title,
-            "source_url": document.source_url,
-            "source_type": document.source_type,
-        },
-        "chunks": [
-            {
-                "index": chunk.index,
-                "text": chunk.text,
-                "t_start": chunk.t_start,
-                "t_end": chunk.t_end,
-                "page_no": chunk.page_no,
-            }
-            for chunk in chunks
-        ],
-        "passages": [
-            {
-                "id": passage.id,
-                "osis_ref": passage.osis_ref,
-                "tokens": passage.tokens,
-            }
-            for passage in passages
-        ],
-        "segments": [
-            {
-                "id": segment.id,
-                "text": segment.text,
-                "primary_osis": segment.primary_osis,
-                "osis_refs": segment.osis_refs,
-                "t_start": segment.t_start,
-                "t_end": segment.t_end,
-            }
-            for segment in segments
-        ],
-    }
+        _write_document_metadata(
+            temp_dir_path,
+            frontmatter=frontmatter,
+            normalized_payload=normalized_payload,
+        )
 
-    if artifacts:
-        normalized_payload["artifacts"] = artifacts
+        if storage_dir.exists():
+            shutil.rmtree(storage_dir)
+        shutil.move(str(temp_dir_path), storage_dir)
+        moved_to_final = True
 
-    normalized_path = storage_dir / "normalized.json"
-    normalized_path.write_text(
-        __import__("json").dumps(normalized_payload, indent=2), encoding="utf-8"
-    )
-
-    document.storage_path = str(storage_dir)
-    session.add(document)
-    session.commit()
+        document.storage_path = str(storage_dir)
+        session.add(document)
+        session.commit()
+    except Exception:
+        session.rollback()
+        if moved_to_final:
+            shutil.rmtree(storage_dir, ignore_errors=True)
+        elif temp_dir_path is not None:
+            shutil.rmtree(temp_dir_path, ignore_errors=True)
+        raise
 
     refresh_creator_verse_rollups(session, segments)
 
