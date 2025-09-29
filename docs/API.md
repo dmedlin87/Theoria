@@ -771,6 +771,13 @@ back to the next available model when budgets, latency thresholds, or provider
 failures occur. When every candidate violates routing constraints the service
 raises a `GenerationError`, surfaced to clients as a 503 with a clear message.
 
+Per-workflow caches can be enabled using the routing config. Setting
+`cache_enabled: true` instructs the router to memoise identical prompt/model
+combinations, bounded by `cache_ttl_seconds` (expiry, defaults to five minutes)
+and `cache_max_entries` (LRU size, defaults to 128 entries when caching is
+enabled). Set `cache_enabled: false` for workflows that must always fetch a
+fresh completion.
+
 Guardrails continue to run on the chosen completion. Cached responses are
 revalidated before reuse, stale entries are invalidated, and fresh completions
 are persisted only when validation passes. If a completion fails guardrail
