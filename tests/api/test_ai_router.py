@@ -1,4 +1,5 @@
 import itertools
+import multiprocessing as mp
 
 from unittest.mock import Mock
 import threading
@@ -9,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from theo.services.api.app.ai.clients import GenerationError
+from theo.services.api.app.ai.ledger import SharedLedger
 from theo.services.api.app.ai.registry import LLMModel, LLMRegistry
 from theo.services.api.app.ai.router import (
     LLMRouterService,
@@ -38,6 +40,91 @@ def _run_generation(router: LLMRouterService, workflow: str = "chat"):
     raise AssertionError("router failed to produce a generation")
 
 
+def _process_budget_run(ledger_path: str, result_queue: mp.Queue) -> None:
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[primary]"},
+            pricing={"per_call": 0.6},
+            routing={"spend_ceiling": 1.0, "weight": 10.0},
+        ),
+        make_default=True,
+    )
+    registry.add_model(
+        LLMModel(
+            name="backup",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[backup]"},
+            pricing={"per_call": 0.4},
+            routing={"weight": 1.0},
+        )
+    )
+    router = LLMRouterService(registry, ledger=SharedLedger(ledger_path))
+    result = _run_generation(router)
+    result_queue.put(
+        {
+            "model": result.model.name,
+            "primary_spend": router.get_spend("primary"),
+            "backup_spend": router.get_spend("backup"),
+        }
+    )
+
+
+def _process_latency_run(
+    ledger_path: str, result_queue: mp.Queue, *, delay: float
+) -> None:
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="slow",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[slow]"},
+            routing={"latency_threshold_ms": 30.0, "weight": 5.0},
+        ),
+        make_default=True,
+    )
+    registry.add_model(
+        LLMModel(
+            name="fast",
+            provider="echo",
+            model="echo",
+            config={"suffix": "[fast]"},
+            routing={"weight": 1.0},
+        )
+    )
+
+    slow_calls = 0
+
+    class _SlowClient:
+        def generate(self, **_: object) -> str:
+            nonlocal slow_calls
+            slow_calls += 1
+            time.sleep(delay)
+            return "slow-response"
+
+    class _FastClient:
+        def generate(self, **_: object) -> str:
+            return "fast-response"
+
+    registry.models["slow"].build_client = lambda: _SlowClient()
+    registry.models["fast"].build_client = lambda: _FastClient()
+
+    router = LLMRouterService(registry, ledger=SharedLedger(ledger_path))
+    result = _run_generation(router)
+    result_queue.put(
+        {
+            "model": result.model.name,
+            "slow_calls": slow_calls,
+            "slow_latency": router.get_latency("slow"),
+        }
+    )
+
+
 def test_router_logs_warning_when_budget_projection_near_ceiling(monkeypatch):
     registry = LLMRegistry()
     registry.add_model(
@@ -55,8 +142,8 @@ def test_router_logs_warning_when_budget_projection_near_ceiling(monkeypatch):
     monkeypatch.setattr(router_module, "LOGGER", mock_logger)
     router = LLMRouterService(registry)
 
-    with router._ledger.lock:  # type: ignore[attr-defined]
-        router._ledger.spend["primary"] = 0.3  # type: ignore[attr-defined]
+    with router._ledger.transaction() as txn:
+        txn.set_spend("primary", 0.3)
 
     result = router.execute_generation(workflow="chat", model=registry.models["primary"], prompt="hello")
 
@@ -81,8 +168,8 @@ def test_router_logs_warning_when_latency_projection_near_threshold(monkeypatch)
     monkeypatch.setattr(router_module, "LOGGER", mock_logger)
     router = LLMRouterService(registry)
 
-    with router._ledger.lock:  # type: ignore[attr-defined]
-        router._ledger.latency["primary"] = 90.0  # type: ignore[attr-defined]
+    with router._ledger.transaction() as txn:
+        txn.set_latency("primary", 90.0)
 
     times = itertools.chain([0.0, 0.0], itertools.repeat(0.0))
     monkeypatch.setattr(router_module.time, "perf_counter", lambda: next(times))
@@ -249,10 +336,10 @@ def test_router_generation_error_when_ledger_prepopulated():
     )
     router = LLMRouterService(registry)
 
-    with router._ledger.lock:  # type: ignore[attr-defined]
+    with router._ledger.transaction() as txn:
         for model in registry.models.values():
-            router._ledger.spend[model.name] = 1.5  # type: ignore[attr-defined]
-            router._ledger.latency[model.name] = 50.0  # type: ignore[attr-defined]
+            txn.set_spend(model.name, 1.5)
+            txn.set_latency(model.name, 50.0)
 
     model = registry.models["primary"]
     with pytest.raises(GenerationError):
@@ -385,4 +472,67 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
     assert call_count == 1
     assert {result.output for result in results} == {"shared-output"}
     assert router.get_spend("primary") == pytest.approx(results[0].cost)
+
+
+def test_router_shared_spend_across_processes(tmp_path):
+    ledger_path = tmp_path / "shared-ledger.db"
+    SharedLedger(str(ledger_path)).reset()
+    results: mp.Queue = mp.Queue()
+
+    first = mp.Process(target=_process_budget_run, args=(str(ledger_path), results))
+    first.start()
+    first.join()
+    assert first.exitcode == 0
+    first_result = results.get(timeout=5)
+
+    assert first_result["model"] == "primary"
+    assert first_result["primary_spend"] == pytest.approx(0.6, rel=1e-2)
+    assert first_result["backup_spend"] == pytest.approx(0.0, rel=1e-2)
+
+    second = mp.Process(target=_process_budget_run, args=(str(ledger_path), results))
+    second.start()
+    second.join()
+    assert second.exitcode == 0
+    second_result = results.get(timeout=5)
+
+    assert second_result["model"] == "backup"
+    assert second_result["primary_spend"] == pytest.approx(1.0, rel=1e-2)
+    assert second_result["backup_spend"] > 0.0
+
+
+def test_router_shared_latency_across_processes(tmp_path):
+    ledger_path = tmp_path / "latency-ledger.db"
+    SharedLedger(str(ledger_path)).reset()
+    results: mp.Queue = mp.Queue()
+
+    first = mp.Process(
+        target=_process_latency_run,
+        args=(str(ledger_path), results),
+        kwargs={"delay": 0.05},
+    )
+    first.start()
+    first.join()
+    assert first.exitcode == 0
+    first_result = results.get(timeout=5)
+
+    assert first_result["model"] == "fast"
+    assert first_result["slow_calls"] == 1
+    assert first_result["slow_latency"] is not None
+    assert first_result["slow_latency"] > 0.0
+
+    second = mp.Process(
+        target=_process_latency_run,
+        args=(str(ledger_path), results),
+        kwargs={"delay": 0.05},
+    )
+    second.start()
+    second.join()
+    assert second.exitcode == 0
+    second_result = results.get(timeout=5)
+
+    assert second_result["model"] == "fast"
+    assert second_result["slow_calls"] == 0
+    assert second_result["slow_latency"] == pytest.approx(
+        first_result["slow_latency"], rel=1e-2
+    )
 

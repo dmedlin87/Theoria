@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
 import logging
-import threading
 import time
 from typing import Any, Iterator
 
@@ -13,6 +11,7 @@ from opentelemetry import trace
 from sqlalchemy.orm import Session
 
 from .clients import GenerationError
+from .ledger import CacheRecord, SharedLedger
 from .registry import LLMModel, LLMRegistry, get_llm_registry
 
 
@@ -27,23 +26,6 @@ class RoutedGeneration:
 
 
 @dataclass
-class _CacheEntry:
-    """Cached routed generation along with its creation timestamp."""
-
-    generation: RoutedGeneration
-    created_at: float
-
-
-@dataclass
-class _InflightRecord:
-    """Tracks an in-flight generation so callers can wait for completion."""
-
-    event: threading.Event
-    result: RoutedGeneration | None = None
-    error: Exception | None = None
-
-
-@dataclass
 class _CacheSettings:
     """Resolved cache configuration for the current workflow."""
 
@@ -52,20 +34,7 @@ class _CacheSettings:
     max_entries: int
 
 
-@dataclass
-class _RoutingLedger:
-    spend: defaultdict[str, float]
-    latency: dict[str, float]
-    lock: threading.Lock
-    cache: dict[tuple[str, str, str, float, int], _CacheEntry]
-    inflight: dict[tuple[str, str, str, float, int], _InflightRecord]
-
-    @classmethod
-    def create(cls) -> "_RoutingLedger":
-        return cls(defaultdict(float), {}, threading.Lock(), {}, {})
-
-
-_LEDGER = _RoutingLedger.create()
+_LEDGER = SharedLedger()
 
 
 LOGGER = logging.getLogger(__name__)
@@ -83,7 +52,7 @@ class LLMRouterService:
     DEFAULT_CACHE_TTL = 300.0
     DEFAULT_CACHE_MAX_ENTRIES = 128
 
-    def __init__(self, registry: LLMRegistry, ledger: _RoutingLedger | None = None) -> None:
+    def __init__(self, registry: LLMRegistry, ledger: SharedLedger | None = None) -> None:
         self.registry = registry
         self._ledger = ledger or _LEDGER
 
@@ -150,16 +119,18 @@ class LLMRouterService:
             warning_ratio = self._warning_ratio(config)
 
             cache_settings = self._cache_settings(config)
-            cache_key = (model.name, workflow, prompt, float(temperature), int(max_output_tokens))
+            cache_key = self._ledger.encode_cache_key(
+                (model.name, workflow, prompt, float(temperature), int(max_output_tokens))
+            )
             cache_status = "bypass"
             now = time.monotonic()
-            record: _InflightRecord | None
 
-            with self._ledger.lock:
-                spent = self._ledger.spend[model.name]
+            stale_status: str | None = None
+            with self._ledger.transaction() as txn:
+                spent = txn.get_spend(model.name)
                 span.set_attribute("llm.spent_before_call", spent)
                 projected_spend = spent + estimated_cost
-                last_latency = self._ledger.latency.get(model.name)
+                last_latency = txn.get_latency(model.name)
                 if (
                     ceiling is not None
                     and warning_ratio > 0.0
@@ -198,46 +169,59 @@ class LLMRouterService:
                         latency_threshold,
                     )
                 if ceiling is not None and projected_spend > ceiling:
-                    self._ledger.spend[model.name] = ceiling
+                    txn.set_spend(model.name, ceiling)
 
                 if cache_settings.enabled:
-                    self._purge_expired_cache(now, cache_settings.ttl_seconds)
-                    cached = self._ledger.cache.get(cache_key)
-                    if cached:
+                    txn.purge_expired_cache(now, cache_settings.ttl_seconds)
+                    cached_record = txn.get_cache_entry(cache_key)
+                    if cached_record:
                         span.set_attribute("llm.cache_status", "hit")
-                        return cached.generation
+                        return self._record_to_generation(cached_record)
 
-                record = self._ledger.inflight.get(cache_key)
-                if record is None:
-                    record = _InflightRecord(threading.Event())
-                    self._ledger.inflight[cache_key] = record
+                inflight = txn.get_inflight(cache_key)
+                if inflight is None:
+                    txn.create_inflight(
+                        cache_key, model_name=model.name, workflow=workflow
+                    )
                     cache_status = "miss" if cache_settings.enabled else "bypass"
-                else:
+                    owns_inflight = True
+                elif inflight.status == "waiting":
                     cache_status = "wait"
+                    owns_inflight = False
+                else:
+                    stale_status = inflight.status
+                    owns_inflight = False
 
-            assert record is not None  # For type-checkers
+            if stale_status is not None:
+                try:
+                    self._ledger.wait_for_inflight(cache_key)
+                except GenerationError:
+                    pass
+                with self._ledger.transaction() as txn:
+                    txn.create_inflight(
+                        cache_key, model_name=model.name, workflow=workflow
+                    )
+                cache_status = "miss" if cache_settings.enabled else "bypass"
+                owns_inflight = True
 
-            if cache_status == "wait":
+            if not owns_inflight:
                 span.set_attribute("llm.cache_status", cache_status)
-                record.event.wait()
-                if record.error is not None:
-                    raise record.error
-                if record.result is None:
-                    raise GenerationError("Deduplicated generation completed without a result")
-                return record.result
+                record = self._ledger.wait_for_inflight(cache_key)
+                return self._record_to_generation(record)
 
             span.set_attribute("llm.cache_status", cache_status)
 
             try:
-                with self._ledger.lock:
-                    spent = self._ledger.spend[model.name]
+                with self._ledger.transaction() as txn:
+                    spent = txn.get_spend(model.name)
                     span.set_attribute("llm.spent_before_call", spent)
                     if ceiling is not None and spent + estimated_cost > ceiling:
-                        self._ledger.spend[model.name] = ceiling
+                        txn.set_spend(model.name, ceiling)
                         error = GenerationError(
                             "Budget exhausted for model "
                             f"{model.name} (spent {spent:.2f} >= {ceiling:.2f})"
                         )
+                        txn.mark_inflight_error(cache_key, str(error))
                         span.set_attribute("llm.budget_status", "precheck_blocked")
                         span.record_exception(error)
                         raise error
@@ -253,12 +237,14 @@ class LLMRouterService:
                     )
                 except Exception as exc:  # pragma: no cover - propagate client errors
                     span.record_exception(exc)
+                    with self._ledger.transaction() as txn:
+                        txn.mark_inflight_error(cache_key, str(exc))
                     raise
 
                 latency_ms = (time.perf_counter() - start) * 1000.0
                 latency_threshold = self._as_float(config.get("latency_threshold_ms"))
-                with self._ledger.lock:
-                    self._ledger.latency[model.name] = latency_ms
+                with self._ledger.transaction() as txn:
+                    txn.set_latency(model.name, latency_ms)
 
                 if (
                     latency_threshold is not None
@@ -294,14 +280,16 @@ class LLMRouterService:
                         latency_ms,
                         latency_threshold,
                     )
+                    with self._ledger.transaction() as txn:
+                        txn.mark_inflight_error(cache_key, str(error))
                     raise error
 
                 completion_tokens = (
                     max(len(output) // 4, 0) if isinstance(output, str) else 0
                 )
                 cost = self._estimate_cost(model, prompt, output)
-                with self._ledger.lock:
-                    spent = self._ledger.spend[model.name]
+                with self._ledger.transaction() as txn:
+                    spent = txn.get_spend(model.name)
                     total_spend = spent + cost
                     if (
                         ceiling is not None
@@ -321,11 +309,12 @@ class LLMRouterService:
                             ceiling,
                         )
                     if ceiling is not None and total_spend > ceiling:
-                        self._ledger.spend[model.name] = ceiling
+                        txn.set_spend(model.name, ceiling)
                         error = GenerationError(
                             "Budget exhausted for model "
                             f"{model.name} (spent {total_spend:.2f} > {ceiling:.2f})"
                         )
+                        txn.mark_inflight_error(cache_key, str(error))
                         span.set_attribute("llm.budget_status", "postcheck_blocked")
                         span.record_exception(error)
                         LOGGER.warning(
@@ -339,7 +328,7 @@ class LLMRouterService:
                             ceiling,
                         )
                         raise error
-                    self._ledger.spend[model.name] = total_spend
+                    txn.set_spend(model.name, total_spend)
 
                 span.set_attribute("llm.latency_ms", round(latency_ms, 2))
                 span.set_attribute("llm.completion_tokens", completion_tokens)
@@ -350,34 +339,51 @@ class LLMRouterService:
                     model=model, output=output, latency_ms=latency_ms, cost=cost
                 )
 
+                with self._ledger.transaction() as txn:
+                    txn.mark_inflight_success(
+                        cache_key,
+                        model_name=model.name,
+                        workflow=workflow,
+                        output=output if isinstance(output, str) else str(output),
+                        latency_ms=latency_ms,
+                        cost=cost,
+                    )
+                    if cache_settings.enabled:
+                        current = time.monotonic()
+                        txn.purge_expired_cache(current, cache_settings.ttl_seconds)
+                        while txn.cache_size() >= cache_settings.max_entries:
+                            txn.pop_oldest_cache_entry()
+                        txn.store_cache_entry(
+                            CacheRecord(
+                                cache_key=cache_key,
+                                model_name=model.name,
+                                workflow=workflow,
+                                prompt=prompt,
+                                temperature=float(temperature),
+                                max_output_tokens=int(max_output_tokens),
+                                output=output if isinstance(output, str) else str(output),
+                                latency_ms=latency_ms,
+                                cost=cost,
+                                created_at=current,
+                            )
+                        )
 
+                return generation
             except Exception as exc:
-                with self._ledger.lock:
-                    record.error = exc
-                    record.event.set()
-                    self._ledger.inflight.pop(cache_key, None)
+                with self._ledger.transaction() as txn:
+                    txn.mark_inflight_error(cache_key, str(exc))
                 raise
-
-            with self._ledger.lock:
-                record.result = generation
-                if cache_settings.enabled:
-                    self._purge_expired_cache(time.monotonic(), cache_settings.ttl_seconds)
-                    self._store_cache_entry(cache_key, generation, cache_settings)
-                record.event.set()
-                self._ledger.inflight.pop(cache_key, None)
-
-            return generation
 
     # ------------------------------------------------------------------
     # Introspection utilities
     # ------------------------------------------------------------------
     def get_spend(self, model_name: str) -> float:
-        with self._ledger.lock:
-            return self._ledger.spend.get(model_name, 0.0)
+        with self._ledger.transaction() as txn:
+            return txn.get_spend(model_name)
 
     def get_latency(self, model_name: str) -> float | None:
-        with self._ledger.lock:
-            return self._ledger.latency.get(model_name)
+        with self._ledger.transaction() as txn:
+            return txn.get_latency(model_name)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -397,14 +403,13 @@ class LLMRouterService:
         config = self._workflow_config(model, workflow)
         ceiling = self._as_float(config.get("spend_ceiling"))
         latency_threshold = self._as_float(config.get("latency_threshold_ms"))
-        with self._ledger.lock:
-            if ceiling is not None and self._ledger.spend.get(model.name, 0.0) >= ceiling:
+        with self._ledger.transaction() as txn:
+            if ceiling is not None and txn.get_spend(model.name) >= ceiling:
                 return False
-            if (
-                latency_threshold is not None
-                and self._ledger.latency.get(model.name, 0.0) > latency_threshold
-            ):
-                return False
+            if latency_threshold is not None:
+                last_latency = txn.get_latency(model.name)
+                if last_latency is not None and last_latency > latency_threshold:
+                    return False
         return True
 
     @staticmethod
@@ -473,32 +478,16 @@ class LLMRouterService:
 
         return _CacheSettings(enabled=True, ttl_seconds=ttl_seconds, max_entries=max_entries)
 
-    def _purge_expired_cache(self, now: float, ttl: float) -> None:
-        if ttl <= 0:
-            return
-        expired_keys = [
-            key for key, entry in self._ledger.cache.items() if now - entry.created_at > ttl
-        ]
-        for key in expired_keys:
-            self._ledger.cache.pop(key, None)
-
-    def _store_cache_entry(
-        self,
-        key: tuple[str, str, str, float, int],
-        generation: RoutedGeneration,
-        settings: _CacheSettings,
-    ) -> None:
-        if not settings.enabled:
-            return
-        if settings.max_entries <= 0:
-            return
-        while len(self._ledger.cache) >= settings.max_entries:
-            oldest_key, _ = min(
-                self._ledger.cache.items(), key=lambda item: item[1].created_at
-            )
-            self._ledger.cache.pop(oldest_key, None)
-        self._ledger.cache[key] = _CacheEntry(generation=generation, created_at=time.monotonic())
-
+    def _record_to_generation(self, record: CacheRecord) -> RoutedGeneration:
+        model = self.registry.models.get(record.model_name)
+        if model is None:
+            raise GenerationError(f"Unknown model in ledger cache: {record.model_name}")
+        return RoutedGeneration(
+            model=model,
+            output=record.output,
+            latency_ms=record.latency_ms,
+            cost=record.cost,
+        )
 
 def get_router(session: Session, registry: LLMRegistry | None = None) -> LLMRouterService:
     """Return a router service backed by the shared ledger."""
@@ -511,11 +500,7 @@ def get_router(session: Session, registry: LLMRegistry | None = None) -> LLMRout
 def reset_router_state() -> None:
     """Reset routing telemetry (used by tests)."""
 
-    with _LEDGER.lock:
-        _LEDGER.spend.clear()
-        _LEDGER.latency.clear()
-        _LEDGER.cache.clear()
-        _LEDGER.inflight.clear()
+    _LEDGER.reset()
 
 
 __all__ = ["LLMRouterService", "RoutedGeneration", "get_router", "reset_router_state"]
