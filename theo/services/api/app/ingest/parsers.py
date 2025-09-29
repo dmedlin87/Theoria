@@ -428,7 +428,7 @@ def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
     try:
         raw_html = read_text_file(path)
     except OSError as exc:
-        from .pipeline import UnsupportedSourceError
+        from .exceptions import UnsupportedSourceError
 
         raise UnsupportedSourceError(
             f"Unable to read HTML document '{path.name}'"
@@ -470,7 +470,7 @@ def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
             try:
                 extractor.feed(raw_html)
             except Exception as inner_exc:  # pragma: no cover - defensive
-                from .pipeline import UnsupportedSourceError
+                from .exceptions import UnsupportedSourceError
 
                 raise UnsupportedSourceError(
                     f"Unable to parse HTML document '{path.name}'"
