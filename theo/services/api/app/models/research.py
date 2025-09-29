@@ -253,10 +253,27 @@ class ContradictionItem(APIModel):
     source: str | None = None
     tags: list[str] | None = None
     weight: float = 1.0
+    perspective: str | None = None
 
 
 class ContradictionSearchResponse(APIModel):
     items: list[ContradictionItem] = Field(default_factory=list)
+
+
+class CommentaryExcerptItem(APIModel):
+    id: str
+    osis: str
+    title: str | None = None
+    excerpt: str
+    source: str | None = None
+    perspective: str | None = None
+    tags: list[str] | None = None
+
+
+class CommentarySearchResponse(APIModel):
+    osis: str
+    items: list[CommentaryExcerptItem] = Field(default_factory=list)
+    total: int = 0
 
 
 class GeoPlaceItem(APIModel):

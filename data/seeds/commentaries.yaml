@@ -1,0 +1,30 @@
+- osis: "Luke.2.1-7"
+  title: "Nativity census chronology"
+  excerpt: >-
+    Skeptical commentators emphasise the ten-year gap between Quirinius and Herod, framing Luke's census as a
+    theological motif rather than precise history.
+  source: "seed:commentary:skeptical"
+  perspective: skeptical
+  tags:
+    - nativity
+    - census
+- osis: "Luke.2.1-7"
+  title: "Harmonizing census references"
+  excerpt: >-
+    Apologetic harmonies cite earlier administrative enrollments under Quirinius to argue Luke compresses overlapping
+    imperial policies, preserving historical plausibility.
+  source: "seed:commentary:apologetic"
+  perspective: apologetic
+  tags:
+    - nativity
+    - harmonization
+- osis: "Acts.9.7"
+  title: "Damascus road auditory nuance"
+  excerpt: >-
+    Linguistic surveys note Luke toggles between akouo constructions to distinguish hearing a sound from
+    understanding speech, softening the apparent conflict.
+  source: "seed:commentary:linguistics"
+  perspective: apologetic
+  tags:
+    - damascus
+    - linguistics

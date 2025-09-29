@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..core.settings import get_settings
 from ..models.research import (
+    CommentarySearchResponse,
     ContradictionSearchResponse,
     CrossReference,
     CrossReferenceResponse,
@@ -51,6 +52,7 @@ from ..research import (
     lookup_geo_places,
     places_for_osis,
     report_build,
+    search_commentaries,
     search_contradictions,
     update_research_note,
     variants_apparatus,
@@ -323,6 +325,10 @@ def build_report(payload: ReportBuildRequest) -> ResearchReportResponse:
 def list_contradictions(
     osis: list[str] = Query(..., description="OSIS reference or list of references"),
     topic: str | None = Query(default=None, description="Optional topic tag filter"),
+    perspective: list[str] | None = Query(
+        default=None,
+        description="Filter by interpretive perspective (apologetic, skeptical, neutral)",
+    ),
     limit: int = Query(default=25, ge=1, le=100),
     session: Session = Depends(get_session),
 ) -> ContradictionSearchResponse:
@@ -330,8 +336,40 @@ def list_contradictions(
     if not getattr(settings, "contradictions_enabled", True):
         return ContradictionSearchResponse(items=[])
 
-    items = search_contradictions(session, osis=osis, topic=topic, limit=limit)
+    items = search_contradictions(
+        session,
+        osis=osis,
+        topic=topic,
+        perspectives=perspective,
+        limit=limit,
+    )
     return ContradictionSearchResponse(items=items)
+
+
+@router.get("/commentaries", response_model=CommentarySearchResponse)
+def list_commentaries(
+    osis: list[str] = Query(..., description="OSIS reference or list of references"),
+    perspective: list[str] | None = Query(
+        default=None,
+        description="Filter by interpretive perspective (apologetic, skeptical, neutral)",
+    ),
+    limit: int = Query(default=50, ge=1, le=250),
+    session: Session = Depends(get_session),
+) -> CommentarySearchResponse:
+    excerpts = search_commentaries(
+        session,
+        osis=osis,
+        perspectives=perspective,
+        limit=limit,
+    )
+    anchor = osis[0] if isinstance(osis, list) and osis else osis
+    if isinstance(anchor, list):
+        anchor = anchor[0] if anchor else ""
+    return CommentarySearchResponse(
+        osis=str(anchor) if anchor else "",
+        items=excerpts,
+        total=len(excerpts),
+    )
 
 
 @router.get("/geo/search", response_model=GeoPlaceSearchResponse)

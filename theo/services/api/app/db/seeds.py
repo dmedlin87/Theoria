@@ -8,23 +8,36 @@ from pathlib import Path
 from typing import Iterable
 from uuid import NAMESPACE_URL, uuid5
 
+import yaml
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from theo.services.geo import seed_openbible_geo
 
-from .models import ContradictionSeed, GeoPlace
+from .models import (
+    CommentaryExcerptSeed,
+    ContradictionSeed,
+    GeoPlace,
+    HarmonySeed,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
 SEED_ROOT = PROJECT_ROOT / "data" / "seeds"
 CONTRADICTION_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/contradictions")
+HARMONY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/harmonies")
+COMMENTARY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/commentaries")
 
 
-def _load_json(path: Path) -> list[dict]:
+def _load_structured(path: Path) -> list[dict]:
     if not path.exists():
         return []
-    with path.open("r", encoding="utf-8") as handle:
-        payload = json.load(handle)
+
+    if path.suffix.lower() in {".yaml", ".yml"}:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = yaml.safe_load(handle) or []
+    else:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
     if isinstance(payload, dict):
         return list(payload.values())
     if isinstance(payload, list):
@@ -47,14 +60,22 @@ def _coerce_list(value: object) -> list[str] | None:
     return None
 
 
+def _iter_seed_entries(*paths: Path) -> list[dict]:
+    entries: list[dict] = []
+    for path in paths:
+        if not path.exists():
+            continue
+        entries.extend(_load_structured(path))
+    return entries
+
+
 def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
 
-    seed_path = SEED_ROOT / "contradictions.json"
-    if not seed_path.exists():
-        return
-
-    payload = _load_json(seed_path)
+    payload = _iter_seed_entries(
+        SEED_ROOT / "contradictions.json",
+        SEED_ROOT / "contradictions_additional.json",
+    )
     seen_ids: set[str] = set()
     for entry in payload:
         osis_a = entry.get("osis_a")
@@ -62,10 +83,18 @@ def seed_contradiction_claims(session: Session) -> None:
         if not osis_a or not osis_b:
             continue
         source = entry.get("source") or "community"
+        perspective = (entry.get("perspective") or "skeptical").strip().lower()
         identifier = str(
             uuid5(
                 CONTRADICTION_NAMESPACE,
-                f"{str(osis_a).lower()}|{str(osis_b).lower()}|{source.lower()}",
+                "|".join(
+                    [
+                        str(osis_a).lower(),
+                        str(osis_b).lower(),
+                        source.lower(),
+                        perspective,
+                    ]
+                ),
             )
         )
         seen_ids.add(identifier)
@@ -83,6 +112,7 @@ def seed_contradiction_claims(session: Session) -> None:
                 source=source,
                 tags=tags,
                 weight=weight,
+                perspective=perspective,
             )
             session.add(record)
         else:
@@ -98,10 +128,157 @@ def seed_contradiction_claims(session: Session) -> None:
                 record.tags = tags
             if record.weight != weight:
                 record.weight = weight
+            if record.perspective != perspective:
+                record.perspective = perspective
 
-    session.execute(
-        delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
-    )
+    if seen_ids:
+        session.execute(
+            delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
+        )
+    session.commit()
+
+
+def seed_harmony_claims(session: Session) -> None:
+    """Load harmony seeds from bundled YAML/JSON files."""
+
+    payload = _iter_seed_entries(SEED_ROOT / "harmonies.yaml", SEED_ROOT / "harmonies.json")
+    if not payload:
+        return
+
+    seen_ids: set[str] = set()
+    for entry in payload:
+        osis_a = entry.get("osis_a")
+        osis_b = entry.get("osis_b")
+        summary = entry.get("summary")
+        if not osis_a or not osis_b or not summary:
+            continue
+        source = entry.get("source") or "community"
+        perspective = (entry.get("perspective") or "apologetic").strip().lower()
+        identifier = str(
+            uuid5(
+                HARMONY_NAMESPACE,
+                "|".join(
+                    [
+                        str(osis_a).lower(),
+                        str(osis_b).lower(),
+                        source.lower(),
+                        perspective,
+                    ]
+                ),
+            )
+        )
+        seen_ids.add(identifier)
+        record = session.get(HarmonySeed, identifier)
+        tags = _coerce_list(entry.get("tags"))
+        weight = float(entry.get("weight", 1.0))
+
+        if record is None:
+            record = HarmonySeed(
+                id=identifier,
+                osis_a=str(osis_a),
+                osis_b=str(osis_b),
+                summary=summary,
+                source=source,
+                tags=tags,
+                weight=weight,
+                perspective=perspective,
+            )
+            session.add(record)
+        else:
+            updated = False
+            if record.osis_a != osis_a:
+                record.osis_a = str(osis_a)
+                updated = True
+            if record.osis_b != osis_b:
+                record.osis_b = str(osis_b)
+                updated = True
+            if record.summary != summary:
+                record.summary = summary
+                updated = True
+            if record.source != source:
+                record.source = source
+                updated = True
+            if record.tags != tags:
+                record.tags = tags
+                updated = True
+            if record.weight != weight:
+                record.weight = weight
+                updated = True
+            if record.perspective != perspective:
+                record.perspective = perspective
+                updated = True
+            if updated:
+                record.updated_at = datetime.now(UTC)
+
+    if seen_ids:
+        session.execute(delete(HarmonySeed).where(~HarmonySeed.id.in_(seen_ids)))
+    session.commit()
+
+
+def seed_commentary_excerpts(session: Session) -> None:
+    """Seed curated commentary excerpts into the catalogue."""
+
+    payload = _iter_seed_entries(SEED_ROOT / "commentaries.yaml", SEED_ROOT / "commentaries.json")
+    if not payload:
+        return
+
+    seen_ids: set[str] = set()
+    for entry in payload:
+        osis = entry.get("osis")
+        excerpt = entry.get("excerpt")
+        if not osis or not excerpt:
+            continue
+        source = entry.get("source") or "community"
+        perspective = (entry.get("perspective") or "neutral").strip().lower()
+        identifier = str(
+            uuid5(
+                COMMENTARY_NAMESPACE,
+                "|".join([str(osis).lower(), source.lower(), perspective, excerpt[:64].lower()]),
+            )
+        )
+        seen_ids.add(identifier)
+        record = session.get(CommentaryExcerptSeed, identifier)
+        tags = _coerce_list(entry.get("tags"))
+        title = entry.get("title")
+
+        if record is None:
+            record = CommentaryExcerptSeed(
+                id=identifier,
+                osis=str(osis),
+                title=title,
+                excerpt=excerpt,
+                source=source,
+                perspective=perspective,
+                tags=tags,
+            )
+            session.add(record)
+        else:
+            updated = False
+            if record.osis != osis:
+                record.osis = str(osis)
+                updated = True
+            if record.title != title:
+                record.title = title
+                updated = True
+            if record.excerpt != excerpt:
+                record.excerpt = excerpt
+                updated = True
+            if record.source != source:
+                record.source = source
+                updated = True
+            if record.perspective != perspective:
+                record.perspective = perspective
+                updated = True
+            if record.tags != tags:
+                record.tags = tags
+                updated = True
+            if updated:
+                record.updated_at = datetime.now(UTC)
+
+    if seen_ids:
+        session.execute(
+            delete(CommentaryExcerptSeed).where(~CommentaryExcerptSeed.id.in_(seen_ids))
+        )
     session.commit()
 
 
@@ -112,7 +289,7 @@ def seed_geo_places(session: Session) -> None:
     if not seed_path.exists():
         return
 
-    payload = _load_json(seed_path)
+    payload = _load_structured(seed_path)
     seen_slugs: set[str] = set()
     for entry in payload:
         slug = entry.get("slug")
@@ -173,5 +350,7 @@ def seed_reference_data(session: Session) -> None:
     """Entry point for loading all bundled reference datasets."""
 
     seed_contradiction_claims(session)
+    seed_harmony_claims(session)
+    seed_commentary_excerpts(session)
     seed_geo_places(session)
     seed_openbible_geo(session)

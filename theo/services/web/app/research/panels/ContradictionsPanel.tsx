@@ -15,6 +15,7 @@ export type ContradictionRecord = {
   source?: string | null;
   tags?: string[] | null;
   weight?: number | null;
+  perspective?: string | null;
 };
 
 type ContradictionsResponse = {
@@ -29,6 +30,7 @@ type ContradictionsApiItem = {
   source?: string | null;
   tags?: string[] | null;
   weight?: number | string | null;
+  perspective?: string | null;
 };
 
 function mapContradictionItem(item: ContradictionsApiItem): ContradictionRecord | null {
@@ -57,6 +59,7 @@ function mapContradictionItem(item: ContradictionsApiItem): ContradictionRecord 
     source: item.source?.trim() ?? null,
     tags: item.tags ?? null,
     weight,
+    perspective: item.perspective?.trim().toLowerCase() ?? null,
   };
 }
 

@@ -1,0 +1,22 @@
+- osis_a: "John.20.1-10"
+  osis_b: "Matthew.28.1-10"
+  summary: >-
+    Harmonies reconcile the resurrection timelines by suggesting multiple visits to the tomb, aligning John and
+    Matthew through sequencing rather than contradiction.
+  source: "seed:harmony:resurrection"
+  tags:
+    - resurrection
+    - harmonization
+  perspective: apologetic
+  weight: 0.68
+- osis_a: "Acts.9.7"
+  osis_b: "Acts.22.9"
+  summary: >-
+    Apologetic readings argue Luke telescopes different sensory verbs, so the companions both heard the sound and
+    failed to comprehend the articulated voice.
+  source: "seed:harmony:acts"
+  tags:
+    - damascus
+    - semantics
+  perspective: apologetic
+  weight: 0.64
