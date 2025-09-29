@@ -391,6 +391,9 @@ def persist_text_document(
 
     raw_texts, sanitized_texts = sanitise_chunks(chunks)
     embeddings = dependencies.embedding_service.embed(sanitized_texts)
+    sanitized_document_text = "\n\n".join(
+        text for text in sanitized_texts if text
+    ) or sanitize_passage_text(text_content)
 
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
@@ -425,11 +428,12 @@ def persist_text_document(
             t_end=chunk.t_end,
             start_char=chunk.start_char,
             end_char=chunk.end_char,
-            text=chunk.text,
-            tokens=len(chunk.text.split()),
+            text=sanitized_text,
+            raw_text=raw_text,
+            tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
             embedding=embedding,
-            lexeme=lexical_representation(session, chunk.text),
+            lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
         )
         session.add(passage)
@@ -447,7 +451,7 @@ def persist_text_document(
             video_id=video_record.id if video_record else None,
             t_start=chunk.t_start,
             t_end=chunk.t_end,
-            text=chunk.text,
+            text=sanitized_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
             topics=None,
@@ -552,7 +556,9 @@ def persist_text_document(
             artifacts.setdefault("raw", safe_name)
 
         embed_snapshot = _should_embed_snapshot(
-            text_content=text_content, chunks=chunks, settings=settings
+            text_content=sanitized_document_text,
+            chunks=chunks,
+            settings=settings,
         )
         snapshot_manifest: dict[str, Any] | None = None
 
@@ -584,17 +590,25 @@ def persist_text_document(
             ],
         }
 
+        if sanitized_document_text:
+            content_filename = "content.txt"
+            content_path = temp_dir_path / content_filename
+            content_path.write_text(sanitized_document_text, encoding="utf-8")
+            artifacts.setdefault("content", content_filename)
+
         if embed_snapshot:
-            normalized_payload["document"]["text"] = text_content
+            normalized_payload["document"]["text"] = sanitized_document_text
             normalized_payload["chunks"] = [
                 {
                     "index": chunk.index,
-                    "text": chunk.text,
+                    "text": sanitized_texts[idx]
+                    if idx < len(sanitized_texts)
+                    else sanitize_passage_text(chunk.text),
                     "t_start": chunk.t_start,
                     "t_end": chunk.t_end,
                     "page_no": chunk.page_no,
                 }
-                for chunk in chunks
+                for idx, chunk in enumerate(chunks)
             ]
         else:
             snapshot_manifest = _build_snapshot_manifest(
@@ -745,12 +759,23 @@ def persist_transcript_document(
     )
 
     chunk_hints = ensure_list(frontmatter.get("osis_refs"))
-    embeddings = dependencies.embedding_service.embed([chunk.text for chunk in chunks])
+    raw_texts, sanitized_texts = sanitise_chunks(chunks)
+    embeddings = dependencies.embedding_service.embed(sanitized_texts)
+    sanitized_document_text = "\n\n".join(
+        text for text in sanitized_texts if text
+    )
 
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
     for idx, chunk in enumerate(chunks):
-        detected = detect_osis_references(chunk.text)
+        sanitized_text = (
+            sanitized_texts[idx]
+            if idx < len(sanitized_texts)
+            else sanitize_passage_text(chunk.text)
+        )
+        raw_text = raw_texts[idx] if idx < len(raw_texts) else chunk.text
+
+        detected = detect_osis_references(sanitized_text)
         meta = normalise_passage_meta(
             detected,
             chunk_hints,
@@ -773,11 +798,12 @@ def persist_transcript_document(
             t_end=chunk.t_end,
             start_char=chunk.start_char,
             end_char=chunk.end_char,
-            text=chunk.text,
-            tokens=len(chunk.text.split()),
+            text=sanitized_text,
+            raw_text=raw_text,
+            tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
             embedding=embedding,
-            lexeme=lexical_representation(session, chunk.text),
+            lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
         )
         session.add(passage)
@@ -795,7 +821,7 @@ def persist_transcript_document(
             video_id=video_record.id if video_record else None,
             t_start=chunk.t_start,
             t_end=chunk.t_end,
-            text=chunk.text,
+            text=sanitized_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
             topics=None,
@@ -901,7 +927,9 @@ def persist_transcript_document(
             artifacts.setdefault("audio", safe_name)
 
         embed_snapshot = _should_embed_snapshot(
-            text_content=None, chunks=chunks, settings=settings
+            text_content=sanitized_document_text,
+            chunks=chunks,
+            settings=settings,
         )
         snapshot_manifest: dict[str, Any] | None = None
 
@@ -933,16 +961,25 @@ def persist_transcript_document(
             ],
         }
 
+        if sanitized_document_text:
+            content_filename = "content.txt"
+            content_path = temp_dir_path / content_filename
+            content_path.write_text(sanitized_document_text, encoding="utf-8")
+            artifacts.setdefault("content", content_filename)
+
         if embed_snapshot:
+            normalized_payload["document"]["text"] = sanitized_document_text
             normalized_payload["chunks"] = [
                 {
                     "index": chunk.index,
-                    "text": chunk.text,
+                    "text": sanitized_texts[idx]
+                    if idx < len(sanitized_texts)
+                    else sanitize_passage_text(chunk.text),
                     "t_start": chunk.t_start,
                     "t_end": chunk.t_end,
                     "page_no": chunk.page_no,
                 }
-                for chunk in chunks
+                for idx, chunk in enumerate(chunks)
             ]
         else:
             snapshot_manifest = _build_snapshot_manifest(

@@ -166,7 +166,12 @@ class LoopDetectingRedirectHandler(HTTPRedirectHandler):
         return redirected
 
 
-def fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]:
+def fetch_web_document(
+    settings,
+    url: str,
+    *,
+    opener_factory=build_opener,
+) -> tuple[str, dict[str, str | None]]:
     ensure_url_allowed(settings, url)
 
     timeout = getattr(settings, "ingest_web_timeout_seconds", 10.0)
@@ -176,7 +181,7 @@ def fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]:
     redirect_handler = LoopDetectingRedirectHandler(max_redirects, settings)
     redirect_handler.visited.add(url)
 
-    opener = build_opener(redirect_handler)
+    opener = opener_factory(redirect_handler)
     opener.addheaders = [("User-Agent", settings.user_agent)]
 
     request = Request(url, headers={"User-Agent": settings.user_agent})
