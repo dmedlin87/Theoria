@@ -247,11 +247,17 @@ def _document_to_record(
             if "passages" not in allowed_fields and not passage_fields:
                 include_passages = False
         if include_passages:
+            include_passage_text = include_text
+            if not include_passage_text and passage_fields:
+                include_passage_text = any(
+                    field == "text" or field.startswith("text.")
+                    for field in passage_fields
+                )
             base_record["passages"] = [
                 dict(
                     _passage_to_dict(
                         passage,
-                        include_text,
+                        include_passage_text,
                         passage_fields if passage_fields else None,
                     )
                 )
