@@ -9,7 +9,12 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..db.models import AgentStep, AgentTrail, TrailSource
+from ..db.models import (
+    AgentStep,
+    AgentTrail,
+    TrailRetrievalSnapshot,
+    TrailSource,
+)
 from ..models.search import HybridSearchFilters
 
 
@@ -42,6 +47,12 @@ class TrailRecorder:
         self._session = session
         self.trail = trail
         self._next_step_index = len(trail.steps)
+        existing_turns = [
+            snapshot.turn_index
+            for snapshot in getattr(trail, "retrieval_snapshots", [])
+            if snapshot.turn_index is not None
+        ]
+        self._next_snapshot_index = (max(existing_turns) + 1) if existing_turns else 0
         self._finalized = False
 
     def __enter__(self) -> "TrailRecorder":
@@ -121,6 +132,43 @@ class TrailRecorder:
                 "snippet": getattr(citation, "snippet", None),
             }
             self.add_source(source_type="passage", reference=str(reference), meta=meta)
+
+    def record_retrieval_snapshot(
+        self,
+        *,
+        retrieval_hash: str,
+        passage_ids: Sequence[str] | None = None,
+        osis_refs: Sequence[str] | None = None,
+        step: AgentStep | None = None,
+    ) -> TrailRetrievalSnapshot:
+        if not retrieval_hash:
+            raise ValueError("retrieval_hash must be provided")
+
+        def _normalise_list(values: Sequence[str] | None) -> list[str]:
+            ordered: list[str] = []
+            if not values:
+                return ordered
+            for value in values:
+                text = str(value).strip()
+                if not text or text in ordered:
+                    continue
+                ordered.append(text)
+            return ordered
+
+        snapshot = TrailRetrievalSnapshot(
+            trail_id=self.trail.id,
+            turn_index=self._next_snapshot_index,
+            retrieval_hash=retrieval_hash,
+            passage_ids=_normalise_list(passage_ids),
+            osis_refs=_normalise_list(osis_refs),
+        )
+        if step is not None:
+            snapshot.step = step
+        self._next_snapshot_index += 1
+        self.trail.retrieval_snapshots.append(snapshot)
+        self._session.add(snapshot)
+        self._session.flush()
+        return snapshot
 
     def finalize(
         self,
