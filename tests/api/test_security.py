@@ -64,6 +64,7 @@ def api_client(monkeypatch, secure_env):
 def anonymous_client(monkeypatch):
     monkeypatch.delenv("THEO_API_KEYS", raising=False)
     monkeypatch.delenv("THEO_AUTH_JWT_SECRET", raising=False)
+    monkeypatch.setenv("THEO_AUTH_ALLOW_ANONYMOUS", "1")
     with _client_context(monkeypatch) as client:
         yield client
 
