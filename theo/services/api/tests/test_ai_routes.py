@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from theo.services.api.app.core.database import get_engine
 from theo.services.api.app.db.models import AgentTrail, Document, Passage
 from theo.services.api.app.main import app
+from theo.services.api.app.workers import tasks as worker_tasks
 from theo.services.cli.batch_intel import main as batch_intel_main
 
 
@@ -333,8 +334,23 @@ def test_sermon_prep_export_markdown() -> None:
         assert "<script" not in body
 
 
-def test_export_deliverable_sermon_bundle() -> None:
+def test_export_deliverable_sermon_bundle(monkeypatch) -> None:
     _seed_corpus()
+    recorded: dict[str, object] = {}
+
+    class FakeAsyncResult:
+        id = "celery-abc"
+
+    def fake_apply_async(*, kwargs):
+        recorded.update(kwargs)
+        return FakeAsyncResult()
+
+    monkeypatch.setattr(
+        worker_tasks.build_deliverable,
+        "apply_async",
+        fake_apply_async,
+    )
+
     with TestClient(app) as client:
         _register_echo_model(client)
         response = client.post(
@@ -346,16 +362,25 @@ def test_export_deliverable_sermon_bundle() -> None:
                 "formats": ["markdown", "ndjson"],
             },
         )
-        assert response.status_code == 200, response.text
-        payload = response.json()
-        assert payload["status"] == "completed"
-        assert payload["manifest"]["type"] == "sermon"
-        assert payload["manifest"]["filters"]["topic"] == "Logos"
-        assert len(payload["assets"]) == 2
-        formats = {asset["format"] for asset in payload["assets"]}
-        assert {"markdown", "ndjson"} == formats
-        markdown_asset = next(asset for asset in payload["assets"] if asset["format"] == "markdown")
-        assert markdown_asset["content"].startswith("---\nexport_id:")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "queued"
+    assert payload["job_id"] == "celery-abc"
+    assert payload["export_id"]
+    assert payload["manifest"] is None
+    assert payload["manifest_path"] == f"/exports/{payload['export_id']}/manifest.json"
+    asset_formats = {asset["format"] for asset in payload["assets"]}
+    assert asset_formats == {"markdown", "ndjson"}
+    for asset in payload["assets"]:
+        assert asset["signed_url"].endswith(asset["filename"])
+        assert asset["storage_path"].startswith("/exports/")
+
+    assert recorded["export_type"] == "sermon"
+    assert recorded["formats"] == ["markdown", "ndjson"]
+    assert recorded["export_id"] == payload["export_id"]
+    assert recorded["topic"] == "Logos"
+    assert recorded["osis"] == "John.1.1"
 
 
 def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
@@ -442,8 +467,23 @@ def test_transcript_export_markdown_sanitises_payload() -> None:
         assert "<script" not in body
 
 
-def test_export_deliverable_transcript_bundle() -> None:
+def test_export_deliverable_transcript_bundle(monkeypatch) -> None:
     _seed_corpus()
+    recorded: dict[str, object] = {}
+
+    class FakeAsyncResult:
+        id = "celery-transcript"
+
+    def fake_apply_async(*, kwargs):
+        recorded.update(kwargs)
+        return FakeAsyncResult()
+
+    monkeypatch.setattr(
+        worker_tasks.build_deliverable,
+        "apply_async",
+        fake_apply_async,
+    )
+
     with TestClient(app) as client:
         response = client.post(
             "/export/deliverable",
@@ -453,15 +493,20 @@ def test_export_deliverable_transcript_bundle() -> None:
                 "formats": ["csv"],
             },
         )
-        assert response.status_code == 200, response.text
-        payload = response.json()
-        assert payload["status"] == "completed"
-        assert payload["manifest"]["type"] == "transcript"
-        assert payload["manifest"]["filters"]["document_id"] == "doc-2"
-        assert payload["assets"]
-        csv_asset = payload["assets"][0]
-        assert csv_asset["format"] == "csv"
-        assert csv_asset["content"].startswith("export_id=transcript-doc-2")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "queued"
+    assert payload["job_id"] == "celery-transcript"
+    assert payload["export_id"].startswith("transcript-doc-2")
+    assert payload["manifest"] is None
+    assert payload["assets"]
+    csv_asset = payload["assets"][0]
+    assert csv_asset["format"] == "csv"
+    assert csv_asset["filename"] == "transcript.csv"
+    assert csv_asset["signed_url"].endswith("transcript.csv")
+    assert recorded["document_id"] == "doc-2"
+    assert recorded["export_id"] == payload["export_id"]
 
 
 def test_comparative_analysis_returns_citations_and_comparisons() -> None:

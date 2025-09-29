@@ -11,28 +11,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from ..ai.rag import (
-    GuardrailError,
-    build_sermon_deliverable,
-    build_transcript_deliverable,
-    generate_sermon_prep_outline,
-)
 from ..core.database import get_session
 from ..export.formatters import (
     DEFAULT_FILENAME_PREFIX,
     build_document_export,
     build_search_export,
+    generate_export_id,
     render_bundle,
 )
 from ..models.export import (
-    DeliverableAsset,
     DeliverableRequest,
     DeliverableResponse,
     DocumentExportFilters,
-    serialise_asset_content,
 )
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.export import export_documents, export_search_results
+from ..workers import tasks as worker_tasks
 
 _BAD_REQUEST_RESPONSE = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
@@ -63,6 +57,12 @@ def _build_filename(export_type: str, extension: str) -> str:
     return f"{DEFAULT_FILENAME_PREFIX}_{export_type}_{timestamp}.{extension}"
 
 
+def _determine_export_id(payload: DeliverableRequest) -> str:
+    if payload.type == "transcript" and payload.document_id:
+        return f"transcript-{payload.document_id}"
+    return generate_export_id()
+
+
 def _normalise_formats(formats: Sequence[str] | None) -> list[str]:
     if not formats:
         return ["markdown"]
@@ -74,13 +74,13 @@ def _normalise_formats(formats: Sequence[str] | None) -> list[str]:
     response_model=DeliverableResponse,
     responses=_DELIVERABLE_ERROR_RESPONSES,
 )
-def export_deliverable(
-    payload: DeliverableRequest,
-    session: Session = Depends(get_session),
-) -> DeliverableResponse:
+def export_deliverable(payload: DeliverableRequest) -> DeliverableResponse:
     """Generate sermon or transcript deliverables under a unified schema."""
 
     formats = _normalise_formats(payload.formats)
+    filters = payload.filters.model_dump(exclude_none=True)
+    export_id = _determine_export_id(payload)
+
     try:
         if payload.type == "sermon":
             if not payload.topic:
@@ -88,53 +88,45 @@ def export_deliverable(
                     status_code=400,
                     detail="topic is required for sermon deliverables",
                 )
-            response = generate_sermon_prep_outline(
-                session,
-                topic=payload.topic,
-                osis=payload.osis,
-                filters=payload.filters,
-                model_name=payload.model,
-            )
-            package = build_sermon_deliverable(
-                response,
-                formats=formats,
-                filters=payload.filters.model_dump(exclude_none=True),
-            )
         elif payload.type == "transcript":
             if not payload.document_id:
                 raise HTTPException(
                     status_code=400,
                     detail="document_id is required for transcript deliverables",
                 )
-            package = build_transcript_deliverable(
-                session,
-                payload.document_id,
-                formats=formats,
-            )
         else:  # pragma: no cover - payload validation guards this
             raise HTTPException(status_code=400, detail="Unsupported deliverable type")
-    except GuardrailError as exc:
-        status_code = 422 if payload.type == "sermon" else 404
-        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
-    except ValueError as exc:
+    except ValueError as exc:  # pragma: no cover - format guard
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    encoded_assets = [
-        DeliverableAsset(
-            format=asset.format,
-            filename=asset.filename,
-            media_type=asset.media_type,
-            content=serialise_asset_content(asset.content),
+    try:
+        asset_plan = worker_tasks.plan_deliverable_outputs(
+            payload.type, formats, export_id
         )
-        for asset in package.assets
-    ]
+    except ValueError as exc:  # pragma: no cover - guarded above
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    task_kwargs = {
+        "export_type": payload.type,
+        "formats": formats,
+        "export_id": export_id,
+        "topic": payload.topic,
+        "osis": payload.osis,
+        "filters": filters,
+        "model": payload.model,
+        "document_id": payload.document_id,
+    }
+    result = worker_tasks.build_deliverable.apply_async(kwargs=task_kwargs)
+    job_id = getattr(result, "id", None)
 
     return DeliverableResponse(
-        export_id=package.manifest.export_id,
-        status="completed",
-        manifest=package.manifest,
-        assets=encoded_assets,
-        message=f"Generated {payload.type} deliverable",
+        export_id=export_id,
+        status="queued",
+        manifest=None,
+        manifest_path=f"/exports/{export_id}/manifest.json",
+        job_id=job_id,
+        assets=asset_plan,
+        message=f"Queued {payload.type} deliverable",
     )
 
 

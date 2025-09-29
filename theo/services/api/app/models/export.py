@@ -140,9 +140,23 @@ class DeliverableResponse(APIModel):
 
     export_id: str
     status: Literal["queued", "processing", "completed", "failed"]
-    manifest: DeliverableManifest
-    assets: list[DeliverableAsset]
+    manifest: DeliverableManifest | None = None
+    manifest_path: str | None = None
+    job_id: str | None = None
+    assets: list["DeliverableDownload"]
     message: str | None = None
+
+
+class DeliverableDownload(APIModel):
+    """Metadata describing a persisted deliverable artifact."""
+
+    format: Literal["markdown", "ndjson", "csv", "pdf"]
+    filename: str
+    media_type: str
+    storage_path: str
+    public_url: str | None = None
+    signed_url: str | None = None
+    size_bytes: int | None = None
 
 
 class DeliverableRequest(APIModel):

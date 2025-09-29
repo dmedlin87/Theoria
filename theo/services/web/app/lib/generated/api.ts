@@ -1639,6 +1639,29 @@ export interface components {
             content: string;
         };
         /**
+         * DeliverableDownload
+         * @description Metadata describing a persisted deliverable artifact.
+         */
+        DeliverableDownload: {
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "markdown" | "ndjson" | "csv" | "pdf";
+            /** Filename */
+            filename: string;
+            /** Media Type */
+            media_type: string;
+            /** Storage Path */
+            storage_path: string;
+            /** Public Url */
+            public_url?: string | null;
+            /** Signed Url */
+            signed_url?: string | null;
+            /** Size Bytes */
+            size_bytes?: number | null;
+        };
+        /**
          * DeliverableManifest
          * @description Metadata describing an export-ready deliverable payload.
          */
@@ -1702,9 +1725,13 @@ export interface components {
              * @enum {string}
              */
             status: "queued" | "processing" | "completed" | "failed";
-            manifest: components["schemas"]["DeliverableManifest"];
+            manifest?: components["schemas"]["DeliverableManifest"] | null;
+            /** Manifest Path */
+            manifest_path?: string | null;
+            /** Job Id */
+            job_id?: string | null;
             /** Assets */
-            assets: components["schemas"]["DeliverableAsset"][];
+            assets: components["schemas"]["DeliverableDownload"][];
             /** Message */
             message?: string | null;
         };
