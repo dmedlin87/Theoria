@@ -6,6 +6,7 @@ import tomllib
 
 import pytest
 import schemathesis
+from schemathesis import experimental
 from schemathesis import openapi as schemathesis_openapi
 from fastapi import Request as FastAPIRequest
 from fastapi.testclient import TestClient
@@ -98,6 +99,7 @@ def _override_authentication():
 
 @pytest.fixture(scope="session")
 def openapi_schema(contract_client: TestClient):
+    experimental.OPEN_API_3_1.enable()
     return schemathesis_openapi.from_asgi("/openapi.json", app)
 
 
@@ -109,8 +111,9 @@ def test_contract_endpoints(
     openapi_schema: BaseSchema,
     contract_client: TestClient,
 ) -> None:
-    operation = openapi_schema.get(path, method).get(method)
-    case = openapi_schema.make_case(operation=operation)
+    method_key = method.lower()
+    operation = openapi_schema.get(path, method_key)[method_key]
+    case = operation.make_case()
     case.call_and_validate(
         session=contract_client,
         checks=(schemathesis.checks.not_a_server_error,),
