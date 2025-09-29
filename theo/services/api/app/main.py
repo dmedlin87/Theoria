@@ -27,6 +27,7 @@ from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware
 from .routes import (
     ai,
+    analytics,
     creators,
     documents,
     export,
@@ -229,6 +230,13 @@ def create_app() -> FastAPI:
     )
     app.include_router(
         trails.router, prefix="/trails", tags=["trails"], dependencies=security_dependencies
+    )
+
+    app.include_router(
+        analytics.router,
+        prefix="/analytics",
+        tags=["analytics"],
+        dependencies=security_dependencies,
     )
 
     app.include_router(

@@ -6,6 +6,8 @@ export type SearchFilters = {
   collection: string;
   author: string;
   sourceType: string;
+  theologicalTradition: string;
+  topicDomain: string;
   collectionFacets: string[];
   datasetFacets: string[];
   variantFacets: string[];
@@ -22,6 +24,8 @@ const KEY_MAP: Record<keyof SearchFilters, string> = {
   collection: "collection",
   author: "author",
   sourceType: "source_type",
+  theologicalTradition: "theological_tradition",
+  topicDomain: "topic_domain",
   collectionFacets: "collection_facets",
   datasetFacets: "dataset",
   variantFacets: "variant",
@@ -38,6 +42,8 @@ const FILTER_KEYS: Array<keyof SearchFilters> = [
   "collection",
   "author",
   "sourceType",
+  "theologicalTradition",
+  "topicDomain",
   "collectionFacets",
   "datasetFacets",
   "variantFacets",
@@ -87,6 +93,8 @@ export function parseSearchParams(
     collection: normalizeInput(params.get(KEY_MAP.collection)),
     author: normalizeInput(params.get(KEY_MAP.author)),
     sourceType: normalizeInput(params.get(KEY_MAP.sourceType)),
+    theologicalTradition: normalizeInput(params.get(KEY_MAP.theologicalTradition)),
+    topicDomain: normalizeInput(params.get(KEY_MAP.topicDomain)),
     collectionFacets: normalizeList(params.get(KEY_MAP.collectionFacets)),
     datasetFacets: normalizeList(params.get(KEY_MAP.datasetFacets)),
     variantFacets: normalizeList(params.get(KEY_MAP.variantFacets)),

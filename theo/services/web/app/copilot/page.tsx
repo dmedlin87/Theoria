@@ -1,8 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
+import ErrorCallout from "../components/ErrorCallout";
 import ModeChangeBanner from "../components/ModeChangeBanner";
+import UiModeToggle from "../components/UiModeToggle";
 import { ADVANCED_TOOLS, type AdvancedToolId } from "../chat/tools";
 import ResearchPanels from "../research/ResearchPanels";
 import { fetchResearchFeatures } from "../research/features";
@@ -10,7 +13,10 @@ import type { ResearchFeatureFlags } from "../research/types";
 import { formatEmphasisSummary } from "../mode-config";
 import { useMode } from "../mode-context";
 import { getCitationManagerEndpoint } from "../lib/api";
-import { createTheoApiClient } from "../lib/api-client";
+import { createTheoApiClient, TheoApiError } from "../lib/api-client";
+import { useUiModePreference } from "../lib/useUiModePreference";
+import { emitTelemetry } from "../lib/telemetry";
+import { serializeSearchParams, type SearchFilters } from "../search/searchParams";
 
 import QuickStartPresets from "./components/QuickStartPresets";
 import WorkflowFormFields from "./components/WorkflowFormFields";
@@ -19,6 +25,7 @@ import WorkflowSelector from "./components/WorkflowSelector";
 import type {
   CopilotResult,
   FeatureFlags,
+  GuardrailSuggestion,
   QuickStartPreset,
   RAGCitation,
   WorkflowId,
@@ -144,14 +151,17 @@ type WorkflowOverrides = {
 };
 
 export default function CopilotPage(): JSX.Element {
+  const router = useRouter();
   const { mode } = useMode();
   const apiClient = useMemo(() => createTheoApiClient(), []);
   const citationManagerEndpoint = useMemo(() => getCitationManagerEndpoint(), []);
+  const [uiMode, setUiMode] = useUiModePreference();
+  const isAdvancedUi = uiMode === "advanced";
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowId>("verse");
   const [result, setResult] = useState<CopilotResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; suggestions?: GuardrailSuggestion[] } | null>(null);
   const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
   const [isSendingCitations, setIsSendingCitations] = useState(false);
   const [researchFeatures, setResearchFeatures] = useState<ResearchFeatureFlags | null>(null);
@@ -189,7 +199,11 @@ export default function CopilotPage(): JSX.Element {
       } catch (fetchError) {
         if (active) {
           setEnabled(false);
-          setError((fetchError as Error).message || "Unable to load feature flags");
+          const message =
+            fetchError instanceof Error && fetchError.message
+              ? fetchError.message
+              : "Unable to load feature flags";
+          setError({ message });
         }
       }
     };
@@ -200,6 +214,12 @@ export default function CopilotPage(): JSX.Element {
   }, [apiClient]);
 
   useEffect(() => {
+
+    if (!isAdvancedUi && workflow !== "verse") {
+      setWorkflow("verse");
+    }
+  }, [isAdvancedUi, workflow]);
+
     let active = true;
     const loadResearchFeatures = async () => {
       try {
@@ -243,39 +263,111 @@ export default function CopilotPage(): JSX.Element {
     setResult(null);
     setCitationExportStatus(null);
 
+    const perf = typeof performance !== "undefined" ? performance : null;
+    const requestStart = perf ? perf.now() : null;
+    let retrievalEnd: number | null = null;
+    let renderEnd: number | null = null;
+    let telemetryWorkflow: WorkflowId | null = null;
+    let telemetrySuccess = false;
+
     try {
       const selectedWorkflow = overrides?.workflow ?? workflow;
+      telemetryWorkflow = selectedWorkflow;
       if (selectedWorkflow === "verse") {
         const payload = await verseWorkflow.run(mode.id, overrides?.verse);
+        retrievalEnd = perf ? perf.now() : null;
         setResult({ kind: "verse", payload });
       } else if (selectedWorkflow === "sermon") {
         const payload = await sermonWorkflow.run(mode.id, overrides?.sermon);
+        retrievalEnd = perf ? perf.now() : null;
         setResult({ kind: "sermon", payload });
       } else if (selectedWorkflow === "comparative") {
         const payload = await comparativeWorkflow.run(mode.id, overrides?.comparative);
+        retrievalEnd = perf ? perf.now() : null;
         setResult({ kind: "comparative", payload });
       } else if (selectedWorkflow === "multimedia") {
         const payload = await multimediaWorkflow.run(mode.id, overrides?.multimedia);
+        retrievalEnd = perf ? perf.now() : null;
         setResult({ kind: "multimedia", payload });
       } else if (selectedWorkflow === "devotional") {
         const payload = await devotionalWorkflow.run(mode.id, overrides?.devotional);
+        retrievalEnd = perf ? perf.now() : null;
         setResult({ kind: "devotional", payload });
       } else if (selectedWorkflow === "collaboration") {
         const payload = await collaborationWorkflow.run(mode.id, overrides?.collaboration);
+        retrievalEnd = perf ? perf.now() : null;
         setResult({ kind: "collaboration", payload });
       } else if (selectedWorkflow === "curation") {
         const payload = await curationWorkflow.run(mode.id, overrides?.curation);
+        retrievalEnd = perf ? perf.now() : null;
         setResult({ kind: "curation", payload });
       } else if (selectedWorkflow === "export") {
         const payload = await exportWorkflow.run(mode.id, overrides?.exportPreset);
+        retrievalEnd = perf ? perf.now() : null;
         setResult({ kind: "export", payload });
       } else {
         throw new Error("Unsupported workflow selection.");
       }
+      telemetrySuccess = true;
+      renderEnd = perf ? perf.now() : null;
     } catch (submitError) {
-      setError((submitError as Error).message || "Unable to run the workflow");
+      if (retrievalEnd === null && perf) {
+        retrievalEnd = perf.now();
+      }
+      renderEnd = perf ? perf.now() : null;
+      if (submitError instanceof TheoApiError) {
+        const payload = submitError.payload;
+        let message = submitError.message || "Unable to run the workflow";
+        let suggestions: GuardrailSuggestion[] | undefined;
+        if (payload && typeof payload === "object") {
+          const detail = (payload as Record<string, unknown>).detail;
+          if (detail && typeof detail === "object") {
+            const detailObject = detail as Record<string, unknown>;
+            if (typeof detailObject.message === "string") {
+              message = detailObject.message;
+            }
+            const candidate = detailObject.suggestions;
+            if (Array.isArray(candidate)) {
+              suggestions = candidate as GuardrailSuggestion[];
+            }
+          }
+        }
+        setError({ message, suggestions });
+      } else {
+        const fallbackMessage =
+          submitError instanceof Error && submitError.message
+            ? submitError.message
+            : "Unable to run the workflow";
+        setError({ message: fallbackMessage });
+      }
     } finally {
       setIsRunning(false);
+      if (requestStart !== null && telemetryWorkflow) {
+        const events: {
+          event: string;
+          durationMs: number;
+          workflow?: string;
+          metadata?: Record<string, unknown>;
+        }[] = [];
+        if (retrievalEnd !== null) {
+          events.push({
+            event: "copilot.retrieval",
+            durationMs: Math.max(0, retrievalEnd - requestStart),
+            workflow: telemetryWorkflow,
+            metadata: { success: telemetrySuccess },
+          });
+        }
+        if (renderEnd !== null) {
+          const generationStart = retrievalEnd ?? requestStart;
+          events.push({
+            event: "copilot.generation",
+            durationMs: Math.max(0, renderEnd - generationStart),
+            workflow: telemetryWorkflow,
+            metadata: { success: telemetrySuccess },
+          });
+        }
+        void emitTelemetry(events, { page: "copilot" });
+      }
     }
   };
 
@@ -305,7 +397,11 @@ export default function CopilotPage(): JSX.Element {
       }
     } catch (exportError) {
       setCitationExportStatus(null);
-      setError((exportError as Error).message || "Unable to export citations");
+      const message =
+        exportError instanceof Error && exportError.message
+          ? exportError.message
+          : "Unable to export citations";
+      setError({ message });
     } finally {
       setIsSendingCitations(false);
     }
@@ -340,6 +436,40 @@ export default function CopilotPage(): JSX.Element {
     }
     await runWorkflow(overrides);
   };
+
+  const handleSuggestionAction = useCallback(
+    (suggestion: GuardrailSuggestion) => {
+      if (suggestion.action !== "search") {
+        return;
+      }
+      const filters = suggestion.filters ?? {};
+      const params: Partial<SearchFilters> = {
+        query: suggestion.query ?? "",
+        osis: suggestion.osis ?? "",
+        collection: filters.collection ?? "",
+        author: filters.author ?? "",
+        sourceType: filters.source_type ?? "",
+        theologicalTradition: filters.theological_tradition ?? "",
+        topicDomain: filters.topic_domain ?? "",
+      };
+      const queryString = serializeSearchParams(params);
+      setUiMode("advanced");
+      router.push(`/search${queryString ? `?${queryString}` : ""}`);
+    },
+    [router, setUiMode],
+  );
+
+  const workflowControls = (
+    <>
+      <WorkflowSelector
+        options={WORKFLOWS}
+        selected={workflow}
+        onSelect={(value) => setWorkflow(value as WorkflowId)}
+      />
+
+      <QuickStartPresets presets={QUICK_START_PRESETS} onSelect={handleQuickStart} disabled={isRunning} />
+    </>
+  );
 
   const openResearchPanels = (osisHint?: string | null) => {
     setActiveTool({ id: "verse-research", osis: osisHint ?? null });
@@ -381,7 +511,7 @@ export default function CopilotPage(): JSX.Element {
       <section>
         <h2>Copilot</h2>
         <p>The AI copilot is not enabled for this deployment.</p>
-        {error && <p role="alert">{error}</p>}
+        {error && <p role="alert">{error.message}</p>}
       </section>
     );
   }
@@ -402,13 +532,37 @@ export default function CopilotPage(): JSX.Element {
       <p style={{ marginTop: "0.5rem", color: "#4b5563" }}>{formatEmphasisSummary(mode)}</p>
       <ModeChangeBanner area="Copilot workspace" />
 
-      <WorkflowSelector
-        options={WORKFLOWS}
-        selected={workflow}
-        onSelect={(value) => setWorkflow(value as WorkflowId)}
-      />
+      <div style={{ margin: "1.5rem 0" }}>
+        <UiModeToggle mode={uiMode} onChange={setUiMode} />
+      </div>
 
-      <QuickStartPresets presets={QUICK_START_PRESETS} onSelect={handleQuickStart} disabled={isRunning} />
+      {isAdvancedUi ? (
+        workflowControls
+      ) : (
+        <details
+          style={{
+            border: "1px solid #cbd5f5",
+            borderRadius: "0.75rem",
+            padding: "0.75rem 1rem",
+            background: "#f8fafc",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+            Advanced workflows & presets
+          </summary>
+          <p style={{ margin: "0.75rem 0", fontSize: "0.9rem", color: "#475569" }}>
+            Open this panel when you need sermon prep, exports, or quick-start presets. Everything stays one click away.
+          </p>
+          <div style={{ display: "grid", gap: "1rem" }}>{workflowControls}</div>
+        </details>
+      )}
+
+      {!isAdvancedUi && (
+        <p style={{ marginBottom: "1rem", color: "#475569" }}>
+          Simple mode focuses on verse briefs. Expand the advanced panel to switch workflows.
+        </p>
+      )}
 
       <section
         aria-label="Advanced tools"
@@ -646,9 +800,27 @@ export default function CopilotPage(): JSX.Element {
       )}
 
       {error && (
-        <p role="alert" style={{ color: "crimson", marginTop: "1rem" }}>
-          {error}
-        </p>
+        <div style={{ marginTop: "1rem" }}>
+          <ErrorCallout
+            message={error.message}
+            actions={
+              error.suggestions ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {error.suggestions.map((suggestion, index) => (
+                    <button
+                      key={`${suggestion.action}-${index}`}
+                      type="button"
+                      onClick={() => handleSuggestionAction(suggestion)}
+                      title={suggestion.description ?? undefined}
+                    >
+                      {suggestion.label}
+                    </button>
+                  ))}
+                </div>
+              ) : undefined
+            }
+          />
+        </div>
       )}
 
       {result && (
