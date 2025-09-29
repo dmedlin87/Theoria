@@ -1,11 +1,16 @@
 import { getApiBaseUrl } from "./api";
 import type { components } from "./generated/api";
+import type {
+  GuardrailFailureMetadata,
+  GuardrailSuggestion,
+  HybridSearchFilters,
+} from "./guardrails";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
 type ResearchModeId = import("../mode-config").ResearchModeId;
 type RAGAnswer = import("../copilot/components/types").RAGAnswer;
 type RAGCitation = import("../copilot/components/types").RAGCitation;
-export type HybridSearchFilters = components["schemas"]["HybridSearchFilters"];
+export type { HybridSearchFilters } from "./guardrails";
 
 export type ChatSessionPreferencesPayload = {
   mode?: string | null;
@@ -56,11 +61,23 @@ export type ChatWorkflowRequest = {
 export type ChatWorkflowStreamEvent =
   | { type: "answer_fragment"; content: string }
   | { type: "complete"; response: { sessionId: string; answer: RAGAnswer } }
-  | { type: "guardrail_violation"; message: string; traceId?: string | null };
+  | {
+      type: "guardrail_violation";
+      message: string;
+      traceId?: string | null;
+      suggestions?: GuardrailSuggestion[];
+      metadata?: GuardrailFailureMetadata | null;
+    };
 
 export type ChatWorkflowSuccess = { kind: "success"; sessionId: string; answer: RAGAnswer };
 
-export type ChatWorkflowGuardrail = { kind: "guardrail"; message: string; traceId?: string | null };
+export type ChatWorkflowGuardrail = {
+  kind: "guardrail";
+  message: string;
+  traceId?: string | null;
+  suggestions: GuardrailSuggestion[];
+  metadata: GuardrailFailureMetadata | null;
+};
 
 export type ChatWorkflowResult = ChatWorkflowSuccess | ChatWorkflowGuardrail;
 
@@ -108,20 +125,154 @@ function toOptionalString(value: unknown): string | null {
   return trimmed ? trimmed : null;
 }
 
-function parseGuardrailPayload(payload: unknown): { message: string; traceId: string | null } | null {
+function coerceStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => toOptionalString(entry))
+    .filter((entry): entry is string => entry !== null);
+}
+
+const GUARDRAIL_ACTIONS = new Set(["search", "upload", "retry", "none"]);
+const GUARDRAIL_KINDS = new Set(["retrieval", "generation", "safety", "ingest"]);
+
+function parseHybridFilters(value: unknown): HybridSearchFilters | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const filters: HybridSearchFilters = {};
+  let hasValue = false;
+  const assign = (key: keyof HybridSearchFilters, candidate: unknown) => {
+    if (typeof candidate === "string") {
+      const normalized = candidate.trim();
+      if (normalized) {
+        filters[key] = normalized;
+        hasValue = true;
+      }
+    }
+  };
+  assign("collection", record.collection);
+  assign("author", record.author);
+  assign("source_type", record.source_type);
+  assign("theological_tradition", record.theological_tradition);
+  assign("topic_domain", record.topic_domain);
+  return hasValue ? filters : null;
+}
+
+function parseGuardrailSuggestion(value: unknown): GuardrailSuggestion | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const label = toOptionalString(record.label);
+  if (!label) {
+    return null;
+  }
+  const action = (toOptionalString(record.action) ?? "search").toLowerCase();
+  const description = toOptionalString(record.description);
+  if (action === "upload") {
+    return {
+      action: "upload",
+      label,
+      description,
+      collection: toOptionalString(record.collection),
+    } satisfies GuardrailSuggestion;
+  }
+  return {
+    action: "search",
+    label,
+    description,
+    query: toOptionalString(record.query),
+    osis: toOptionalString(record.osis),
+    filters: parseHybridFilters(record.filters ?? null),
+  } satisfies GuardrailSuggestion;
+}
+
+function parseGuardrailMetadata(value: unknown): GuardrailFailureMetadata | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const code = toOptionalString(record.code) ?? "guardrail_violation";
+  const guardrailRaw = toOptionalString(record.guardrail)?.toLowerCase();
+  const guardrail = guardrailRaw && GUARDRAIL_KINDS.has(guardrailRaw)
+    ? (guardrailRaw as GuardrailFailureMetadata["guardrail"])
+    : "unknown";
+  const suggestedRaw =
+    toOptionalString(record.suggested_action ?? record.suggestedAction)?.toLowerCase() ??
+    (guardrail === "ingest" ? "upload" : "search");
+  const suggestedAction = GUARDRAIL_ACTIONS.has(suggestedRaw)
+    ? (suggestedRaw as GuardrailFailureMetadata["suggestedAction"])
+    : (guardrail === "ingest" ? "upload" : "search");
+  const safeRefusal =
+    typeof record.safe_refusal === "boolean"
+      ? record.safe_refusal
+      : typeof record.safeRefusal === "boolean"
+      ? record.safeRefusal
+      : false;
+  return {
+    code,
+    guardrail,
+    suggestedAction,
+    filters: parseHybridFilters(record.filters ?? null),
+    safeRefusal,
+    reason: toOptionalString(record.reason),
+  } satisfies GuardrailFailureMetadata;
+}
+
+function buildGuardrailPayload(record: Record<string, unknown>) {
+  const detailValue = record.detail;
+  const detailRecord =
+    detailValue && typeof detailValue === "object" ? (detailValue as Record<string, unknown>) : record;
+  const detailString =
+    typeof detailValue === "string" ? toOptionalString(detailValue) : undefined;
+  const message =
+    toOptionalString(detailRecord.message) ??
+    detailString ??
+    toOptionalString(record.message) ??
+    "Response was blocked by content guardrails.";
+  const traceId =
+    toOptionalString(
+      detailRecord.trace_id ??
+        detailRecord.traceId ??
+        detailRecord.trace ??
+        record.trace_id ??
+        record.traceId ??
+        record.trace ??
+        record.id ??
+        record.reference,
+    ) ?? null;
+  const suggestionsSource =
+    Array.isArray(detailRecord.suggestions) ? detailRecord.suggestions : [];
+  const suggestions = suggestionsSource
+    .map((entry) => parseGuardrailSuggestion(entry))
+    .filter((entry): entry is GuardrailSuggestion => entry !== null);
+  const metadataValue =
+    detailRecord.metadata ??
+    detailRecord.guardrail_metadata ??
+    record.metadata ??
+    null;
+  const metadata = parseGuardrailMetadata(metadataValue);
+  return { message, traceId, suggestions, metadata } satisfies {
+    message: string;
+    traceId: string | null;
+    suggestions: GuardrailSuggestion[];
+    metadata: GuardrailFailureMetadata | null;
+  };
+}
+
+function parseGuardrailPayload(
+  payload: unknown,
+): { message: string; traceId: string | null; suggestions: GuardrailSuggestion[]; metadata: GuardrailFailureMetadata | null } | null {
   if (!payload || typeof payload !== "object") {
     return null;
   }
   const record = payload as Record<string, unknown>;
   const typeValue = toOptionalString(record.type) ?? toOptionalString(record.reason);
   if (typeValue && typeValue.toLowerCase().includes("guardrail")) {
-    const message =
-      toOptionalString(record.message) ??
-      toOptionalString(record.detail) ??
-      "Response was blocked by content guardrails.";
-    const traceId =
-      toOptionalString(record.trace_id ?? record.traceId ?? record.trace ?? record.id ?? record.reference) ?? null;
-    return { message, traceId };
+    return buildGuardrailPayload(record);
   }
 
   if (typeof record.guardrail === "object" && record.guardrail) {
@@ -238,11 +389,7 @@ function normaliseChatSessionState(payload: unknown): ChatSessionState | null {
   const updatedAt = toOptionalString(record.updated_at ?? record.updatedAt);
   const lastInteractionAt = toOptionalString(record.last_interaction_at ?? record.lastInteractionAt);
 
-  const documentIds = Array.isArray(record.document_ids ?? record.documentIds)
-    ? (record.document_ids ?? record.documentIds)
-        .map((value: unknown) => toOptionalString(value))
-        .filter((value): value is string => Boolean(value))
-    : [];
+  const documentIds = coerceStringList(record.document_ids ?? record.documentIds);
 
   const memoryItems = Array.isArray(record.memory) ? record.memory : [];
   const memory: ChatSessionMemoryEntry[] = [];
@@ -262,11 +409,7 @@ function normaliseChatSessionState(payload: unknown): ChatSessionState | null {
     const citations: RAGCitation[] = citationsRaw
       .map((citation) => normaliseCitation(citation))
       .filter((value): value is RAGCitation => value != null);
-    const documentIdsEntry = Array.isArray(data.document_ids ?? data.documentIds)
-      ? (data.document_ids ?? data.documentIds)
-          .map((value: unknown) => toOptionalString(value))
-          .filter((value): value is string => Boolean(value))
-      : [];
+    const documentIdsEntry = coerceStringList(data.document_ids ?? data.documentIds);
     memory.push({
       question,
       answer,
@@ -316,7 +459,13 @@ function interpretStreamChunk(
 ): ChatWorkflowStreamEvent | ChatWorkflowGuardrail | null {
   const guardrail = parseGuardrailPayload(chunk);
   if (guardrail) {
-    return { kind: "guardrail", message: guardrail.message, traceId: guardrail.traceId };
+    return {
+      kind: "guardrail",
+      message: guardrail.message,
+      traceId: guardrail.traceId,
+      suggestions: guardrail.suggestions,
+      metadata: guardrail.metadata,
+    } satisfies ChatWorkflowGuardrail;
   }
 
   if (chunk && typeof chunk === "object") {
@@ -492,13 +641,26 @@ export class TheoApiClient {
       }
       const guardrail = parseGuardrailPayload(parsed);
       if (guardrail) {
-        return { kind: "guardrail", message: guardrail.message, traceId: guardrail.traceId };
+        return {
+          kind: "guardrail",
+          message: guardrail.message,
+          traceId: guardrail.traceId,
+          suggestions: guardrail.suggestions,
+          metadata: guardrail.metadata,
+        } satisfies ChatWorkflowGuardrail;
       }
-      const errorMessage =
-        (parsed && typeof parsed === "object" && "message" in parsed && typeof parsed.message === "string"
-          ? parsed.message
-          : undefined) ?? buildErrorMessage(response.status, "");
-      throw new Error(errorMessage);
+      let extracted: string | null = null;
+      if (parsed && typeof parsed === "object") {
+        const record = parsed as Record<string, unknown>;
+        if (typeof record.message === "string") {
+          extracted = toOptionalString(record.message);
+        }
+        if (!extracted && typeof record.detail === "string") {
+          extracted = toOptionalString(record.detail);
+        }
+      }
+      const errorMessage = extracted ?? buildErrorMessage(response.status, null);
+      throw new TheoApiError(errorMessage, response.status, parsed);
     }
 
     const contentType = response.headers.get("content-type") ?? "";
@@ -527,11 +689,14 @@ export class TheoApiClient {
               const interpreted = interpretStreamChunk(parsed, fallbackSessionId);
               if (interpreted) {
                 if ("kind" in interpreted) {
-                  options?.onEvent?.({
+                  const guardrailEvent: ChatWorkflowStreamEvent = {
                     type: "guardrail_violation",
                     message: interpreted.message,
                     traceId: interpreted.traceId ?? null,
-                  });
+                    suggestions: interpreted.suggestions,
+                    metadata: interpreted.metadata,
+                  };
+                  options?.onEvent?.(guardrailEvent);
                   return interpreted;
                 }
                 if (interpreted.type === "complete") {
@@ -558,11 +723,14 @@ export class TheoApiClient {
           const interpreted = interpretStreamChunk(parsed, fallbackSessionId);
           if (interpreted) {
             if ("kind" in interpreted) {
-              options?.onEvent?.({
+              const guardrailEvent: ChatWorkflowStreamEvent = {
                 type: "guardrail_violation",
                 message: interpreted.message,
                 traceId: interpreted.traceId ?? null,
-              });
+                suggestions: interpreted.suggestions,
+                metadata: interpreted.metadata,
+              };
+              options?.onEvent?.(guardrailEvent);
               return interpreted;
             }
             if (interpreted.type === "complete") {
@@ -591,7 +759,13 @@ export class TheoApiClient {
     }
     const guardrail = parseGuardrailPayload(jsonPayload);
     if (guardrail) {
-      return { kind: "guardrail", message: guardrail.message, traceId: guardrail.traceId };
+      return {
+        kind: "guardrail",
+        message: guardrail.message,
+        traceId: guardrail.traceId,
+        suggestions: guardrail.suggestions,
+        metadata: guardrail.metadata,
+      } satisfies ChatWorkflowGuardrail;
     }
     const completion = normaliseChatCompletion(jsonPayload, fallbackSessionId);
     if (completion) {

@@ -12,7 +12,12 @@ import type {
   ChatWorkflowStreamEvent,
   HybridSearchFilters,
 } from "../lib/api-client";
-import { createTheoApiClient } from "../lib/api-client";
+import { TheoApiError, createTheoApiClient } from "../lib/api-client";
+import {
+  type GuardrailFailureMetadata,
+  type GuardrailSuggestion,
+  useGuardrailActions,
+} from "../lib/guardrails";
 import type { RAGCitation } from "../copilot/components/types";
 import { useMode } from "../mode-context";
 
@@ -29,7 +34,14 @@ type ConversationEntry =
 
 type AssistantConversationEntry = Extract<ConversationEntry, { role: "assistant" }>;
 
-type GuardrailState = { message: string; traceId: string | null } | null;
+type GuardrailState =
+  | {
+      message: string;
+      traceId: string | null;
+      suggestions: GuardrailSuggestion[];
+      metadata: GuardrailFailureMetadata | null;
+    }
+  | null;
 
 type ChatWorkspaceProps = {
   client?: ChatWorkflowClient;
@@ -45,6 +57,7 @@ export default function ChatWorkspace({
   autoSubmit = false,
 }: ChatWorkspaceProps): JSX.Element {
   const { mode } = useMode();
+  const handleGuardrailSuggestion = useGuardrailActions();
   const [fallbackClient] = useState(() => createTheoApiClient());
   const activeClient = client ?? fallbackClient;
   const clientRef = useRef<ChatWorkflowClient>(activeClient);
@@ -185,6 +198,28 @@ export default function ChatWorkspace({
     setConversation((previous) => previous.filter((entry) => entry.id !== id));
   }, []);
 
+  const buildFallbackSuggestions = useCallback(
+    (questionHint: string | null): GuardrailSuggestion[] => {
+      const searchSuggestion: GuardrailSuggestion = {
+        action: "search",
+        label: "Search related passages",
+        description:
+          "Open the search workspace to inspect passages that align with your guardrail settings before retrying.",
+        query: questionHint ?? null,
+        osis: null,
+        filters: defaultFilters ?? null,
+      };
+      const uploadSuggestion: GuardrailSuggestion = {
+        action: "upload",
+        label: "Upload supporting documents",
+        description: "Add material covering this topic so Theo Engine has grounded sources next time.",
+        collection: defaultFilters?.collection ?? null,
+      };
+      return [searchSuggestion, uploadSuggestion];
+    },
+    [defaultFilters],
+  );
+
   const applyStreamEvent = useCallback(
     (assistantId: string, event: ChatWorkflowStreamEvent) => {
       if (event.type === "answer_fragment") {
@@ -199,6 +234,8 @@ export default function ChatWorkspace({
         setGuardrail({
           message: event.message,
           traceId: event.traceId ?? null,
+          suggestions: event.suggestions ?? [],
+          metadata: event.metadata ?? null,
         });
         setActiveAssistantId(null);
         setIsStreaming(false);
@@ -270,7 +307,7 @@ export default function ChatWorkspace({
             modeId: mode.id,
             sessionId,
             prompt: trimmed,
-            filters: defaultFilters ?? undefined,
+            filters: defaultFilters ?? null,
             preferences: preferencesPayload,
           },
           {
@@ -288,13 +325,36 @@ export default function ChatWorkspace({
           }));
         } else if (result.kind === "guardrail") {
           removeEntryById(assistantId);
-          setGuardrail({ message: result.message, traceId: result.traceId ?? null });
+          setGuardrail({
+            message: result.message,
+            traceId: result.traceId ?? null,
+            suggestions: result.suggestions ?? [],
+            metadata: result.metadata ?? null,
+          });
         }
       } catch (error) {
         removeEntryById(assistantId);
-        const message =
-          error instanceof Error ? error.message : "We couldn’t complete that chat request.";
-        setErrorMessage(message);
+        if (error instanceof TheoApiError && error.status === 400) {
+          const suggestions = buildFallbackSuggestions(trimmed);
+          setGuardrail({
+            message: error.message,
+            traceId: null,
+            suggestions,
+            metadata: {
+              code: "chat_request_invalid",
+              guardrail: "unknown",
+              suggestedAction: suggestions[0]?.action ?? "search",
+              filters: defaultFilters ?? null,
+              safeRefusal: false,
+              reason: error.message,
+            },
+          });
+          setErrorMessage(null);
+        } else {
+          const message =
+            error instanceof Error ? error.message : "We couldn’t complete that chat request.";
+          setErrorMessage(message);
+        }
       } finally {
         setIsStreaming(false);
         setActiveAssistantId((current) => (current === assistantId ? null : current));
@@ -305,6 +365,7 @@ export default function ChatWorkspace({
     },
     [
       applyStreamEvent,
+      buildFallbackSuggestions,
       defaultFilters,
       frequentlyOpenedPanels,
       mode.id,
@@ -354,9 +415,28 @@ export default function ChatWorkspace({
     setGuardrail(null);
   }, [lastQuestion]);
 
-  const guardrailActions: Partial<Pick<ErrorCalloutProps, "onRetry">> = lastQuestion
-    ? { onRetry: handleRetry }
-    : {};
+  const guardrailActions: Partial<Pick<ErrorCalloutProps, "onRetry" | "actions">> = {};
+  if (lastQuestion) {
+    guardrailActions.onRetry = handleRetry;
+  }
+  if (guardrail && guardrail.suggestions.length) {
+    guardrailActions.actions = (
+      <div className="guardrail-actions" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {guardrail.suggestions.map((suggestion, index) => (
+          <button
+            key={`${suggestion.action}-${index}-${suggestion.label}`}
+            type="button"
+            onClick={() => {
+              handleGuardrailSuggestion(suggestion);
+              setGuardrail(null);
+            }}
+          >
+            {suggestion.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   const handleResetSession = useCallback(() => {
     abortControllerRef.current?.abort();

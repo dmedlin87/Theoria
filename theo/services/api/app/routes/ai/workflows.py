@@ -58,6 +58,7 @@ from ...models.ai import (
     ExportDeliverableResponse,
     ExportPresetId,
     GuardrailAdvisory,
+    GuardrailFailureMetadata,
     GuardrailSuggestion,
     LLMDefaultRequest,
     LLMModelRequest,
@@ -690,6 +691,77 @@ def _normalise_filters_for_advisory(
     if not data:
         return None
     return HybridSearchFilters(**data)
+_GUARDRAIL_KIND_MAP = {
+    "retrieval": "retrieval",
+    "generation": "generation",
+    "safety": "safety",
+    "ingest": "ingest",
+}
+
+_SUGGESTED_ACTIONS = {"search", "upload", "retry", "none"}
+
+
+def _coerce_filters(value: object) -> HybridSearchFilters | None:
+    if isinstance(value, HybridSearchFilters):
+        return value if _has_filters(value) else None
+    if isinstance(value, Mapping):
+        try:
+            candidate = HybridSearchFilters.model_validate(value)
+        except Exception:  # pragma: no cover - defensive
+            return None
+        return candidate if _has_filters(candidate) else None
+    return None
+
+
+def _build_guardrail_metadata(
+    exc: GuardrailError, filters: HybridSearchFilters | None
+) -> GuardrailFailureMetadata:
+    raw_metadata = getattr(exc, "metadata", None)
+    payload: Mapping[str, Any] | None = None
+    if isinstance(raw_metadata, Mapping):
+        payload = raw_metadata
+    elif isinstance(raw_metadata, dict):
+        payload = raw_metadata
+
+    code = "guardrail_violation"
+    guardrail_value = "unknown"
+    suggested_action = None
+    reason: str | None = None
+    embedded_filters: HybridSearchFilters | None = None
+
+    if payload:
+        if "code" in payload and isinstance(payload["code"], str):
+            code = payload["code"].strip() or code
+        raw_guardrail = payload.get("guardrail") or payload.get("category")
+        if isinstance(raw_guardrail, str):
+            guardrail_key = raw_guardrail.strip().lower()
+            guardrail_value = _GUARDRAIL_KIND_MAP.get(guardrail_key, "unknown")
+        raw_action = payload.get("suggested_action") or payload.get("action")
+        if isinstance(raw_action, str):
+            candidate_action = raw_action.strip().lower()
+            if candidate_action in _SUGGESTED_ACTIONS:
+                suggested_action = candidate_action
+        raw_reason = payload.get("reason")
+        if raw_reason is not None:
+            reason = str(raw_reason)
+        embedded_filters = _coerce_filters(payload.get("filters"))
+
+    resolved_filters = _normalise_filters_for_advisory(embedded_filters or filters)
+
+    if suggested_action not in _SUGGESTED_ACTIONS:
+        if guardrail_value == "ingest":
+            suggested_action = "upload"
+        else:
+            suggested_action = "search"
+
+    return GuardrailFailureMetadata(
+        code=code,
+        guardrail=guardrail_value,  # type: ignore[arg-type]
+        suggested_action=suggested_action,  # type: ignore[arg-type]
+        filters=resolved_filters,
+        safe_refusal=getattr(exc, "safe_refusal", False),
+        reason=reason,
+    )
 
 
 def _guardrail_advisory(
@@ -698,23 +770,78 @@ def _guardrail_advisory(
     question: str | None,
     osis: str | None,
     filters: HybridSearchFilters | None,
+    metadata: GuardrailFailureMetadata | None,
 ) -> GuardrailAdvisory:
     """Build a structured guardrail response with actionable follow-ups."""
 
-    normalized_filters = _normalise_filters_for_advisory(filters)
-    suggestion_kwargs: dict[str, object] = {
-        "label": "Search related passages",
-        "description": (
-            "Open the search workspace to inspect passages that match your "
-            "guardrail filters. Adjust them there before retrying the chat turn."
-        ),
-        "query": (question or None),
-        "osis": (osis or None),
-    }
+    failure_metadata = metadata or GuardrailFailureMetadata(
+        code="guardrail_violation",
+        guardrail="unknown",
+        suggested_action="search",
+        filters=_normalise_filters_for_advisory(filters),
+        safe_refusal=False,
+        reason=None,
+    )
+
+    normalized_filters = failure_metadata.filters or _normalise_filters_for_advisory(filters)
     if normalized_filters is not None:
-        suggestion_kwargs["filters"] = normalized_filters
-    suggestion = GuardrailSuggestion(**suggestion_kwargs)
-    return GuardrailAdvisory(message=message, suggestions=[suggestion])
+        failure_metadata = failure_metadata.model_copy(update={"filters": normalized_filters})
+
+    suggestions: list[GuardrailSuggestion] = []
+
+    if failure_metadata.suggested_action in {"search", "retry", "none", "upload"}:
+        suggestions.append(
+            GuardrailSuggestion(
+                action="search",
+                label="Search related passages",
+                description=(
+                    "Open the search workspace to inspect passages that align with your question and guardrail settings."
+                ),
+                query=question or None,
+                osis=osis or None,
+                filters=normalized_filters,
+            )
+        )
+
+    if failure_metadata.suggested_action == "upload":
+        suggestions.append(
+            GuardrailSuggestion(
+                action="upload",
+                label="Upload supporting documents",
+                description=(
+                    "Add source material to your corpus so Theo Engine can ground future answers."
+                ),
+                collection=(
+                    normalized_filters.collection if normalized_filters else None
+                ),
+            )
+        )
+
+    return GuardrailAdvisory(
+        message=message,
+        suggestions=suggestions,
+        metadata=failure_metadata,
+    )
+
+
+def _guardrail_http_exception(
+    exc: GuardrailError,
+    *,
+    question: str | None,
+    osis: str | None,
+    filters: HybridSearchFilters | None,
+) -> HTTPException:
+    failure_metadata = _build_guardrail_metadata(exc, filters)
+    advisory = _guardrail_advisory(
+        str(exc),
+        question=question,
+        osis=osis,
+        filters=filters,
+        metadata=failure_metadata,
+    )
+    detail = advisory.model_dump(mode="json")
+    detail["type"] = "guardrail_refusal"
+    return HTTPException(status_code=422, detail=detail)
 
 
 def _extract_refusal_text(answer: RAGAnswer) -> str:
@@ -840,15 +967,11 @@ def chat_turn(
                 },
             )
     except GuardrailError as exc:
-        advisory = _guardrail_advisory(
-            str(exc),
+        raise _guardrail_http_exception(
+            exc,
             question=question,
             osis=payload.osis,
             filters=payload.filters,
-        )
-        raise HTTPException(
-            status_code=422,
-            detail=advisory.model_dump(mode="json"),
         ) from exc
 
     if message is None or answer is None:
@@ -1104,15 +1227,11 @@ def verse_copilot(
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
             return response
     except GuardrailError as exc:
-        advisory = _guardrail_advisory(
-            str(exc),
+        raise _guardrail_http_exception(
+            exc,
             question=payload.question,
             osis=resolved_osis,
             filters=payload.filters,
-        )
-        raise HTTPException(
-            status_code=422,
-            detail=advisory.model_dump(mode="json"),
         ) from exc
 
 
@@ -1145,7 +1264,12 @@ def sermon_prep(
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise _guardrail_http_exception(
+            exc,
+            question=None,
+            osis=payload.osis,
+            filters=payload.filters,
+        ) from exc
 
 
 # FastAPI coerces literal return types when a response model is provided, so we
@@ -1167,7 +1291,12 @@ def sermon_prep_export(
             model_name=payload.model,
         )
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise _guardrail_http_exception(
+            exc,
+            question=None,
+            osis=payload.osis,
+            filters=payload.filters,
+        ) from exc
     normalized = format.lower()
     package = build_sermon_deliverable(
         response,
@@ -1236,7 +1365,12 @@ def comparative_analysis(
             model_name=payload.model,
         )
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise _guardrail_http_exception(
+            exc,
+            question=None,
+            osis=payload.osis,
+            filters=None,
+        ) from exc
 
 
 @router.post("/multimedia", response_model_exclude_none=True)
@@ -1263,7 +1397,12 @@ def multimedia_digest(
             recorder.finalize(final_md=final_md, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise _guardrail_http_exception(
+            exc,
+            question=payload.collection,
+            osis=None,
+            filters=None,
+        ) from exc
 
 
 @router.post("/devotional", response_model_exclude_none=True)
@@ -1293,7 +1432,12 @@ def devotional_flow(
             )
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise _guardrail_http_exception(
+            exc,
+            question=payload.focus,
+            osis=payload.osis,
+            filters=None,
+        ) from exc
 
 
 @router.post(
@@ -1330,7 +1474,12 @@ def collaboration(
             )
             return response
     except GuardrailError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise _guardrail_http_exception(
+            exc,
+            question="; ".join(payload.viewpoints) if payload.viewpoints else None,
+            osis=payload.osis,
+            filters=None,
+        ) from exc
 
 
 @router.post(

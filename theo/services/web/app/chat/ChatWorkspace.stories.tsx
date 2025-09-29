@@ -85,8 +85,50 @@ export function Success(): JSX.Element {
 
 export function Guardrail(): JSX.Element {
   const client = createStoryClient(
-    [{ type: "guardrail_violation", message: "This request was blocked by policy safeguards.", traceId: "guard-42" }],
-    { kind: "guardrail", message: "This request was blocked by policy safeguards.", traceId: "guard-42" },
+    [
+      {
+        type: "guardrail_violation",
+        message: "This request was blocked by policy safeguards.",
+        traceId: "guard-42",
+        suggestions: [
+          {
+            action: "search",
+            label: "Search related passages",
+            description: "Open the search workspace to review relevant sources.",
+            query: "List controversial conspiracies",
+          },
+        ],
+        metadata: {
+          code: "story_guardrail",
+          guardrail: "retrieval",
+          suggestedAction: "search",
+          filters: null,
+          safeRefusal: false,
+          reason: "Storybook guardrail",
+        },
+      },
+    ],
+    {
+      kind: "guardrail",
+      message: "This request was blocked by policy safeguards.",
+      traceId: "guard-42",
+      suggestions: [
+        {
+          action: "search",
+          label: "Search related passages",
+          description: "Open the search workspace to review relevant sources.",
+          query: "List controversial conspiracies",
+        },
+      ],
+      metadata: {
+        code: "story_guardrail",
+        guardrail: "retrieval",
+        suggestedAction: "search",
+        filters: null,
+        safeRefusal: false,
+        reason: "Storybook guardrail",
+      },
+    },
   );
   return (
     <StoryShell>

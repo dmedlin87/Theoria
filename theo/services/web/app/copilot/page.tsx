@@ -16,7 +16,7 @@ import { getCitationManagerEndpoint } from "../lib/api";
 import { createTheoApiClient, TheoApiError } from "../lib/api-client";
 import { useUiModePreference } from "../lib/useUiModePreference";
 import { emitTelemetry } from "../lib/telemetry";
-import { serializeSearchParams, type SearchFilters } from "../search/searchParams";
+import { useGuardrailActions } from "../lib/guardrails";
 
 import QuickStartPresets from "./components/QuickStartPresets";
 import WorkflowFormFields from "./components/WorkflowFormFields";
@@ -213,37 +213,37 @@ export default function CopilotPage(): JSX.Element {
     };
   }, [apiClient]);
 
-  useEffect(() => {
-
-    if (!isAdvancedUi && workflow !== "verse") {
-      setWorkflow("verse");
-    }
-  }, [isAdvancedUi, workflow]);
-
-    let active = true;
-    const loadResearchFeatures = async () => {
-      try {
-        const flags = await fetchResearchFeatures();
-        if (active) {
-          setResearchFeatures(flags);
-          setResearchFeaturesError(null);
-        }
-      } catch (fetchError) {
-        console.error("Failed to load research features", fetchError);
-        if (active) {
-          setResearchFeatures({});
-          setResearchFeaturesError(
-            (fetchError as Error).message || "Unable to load research capabilities",
-          );
-        }
+    useEffect(() => {
+      if (!isAdvancedUi && workflow !== "verse") {
+        setWorkflow("verse");
       }
-    };
+    }, [isAdvancedUi, workflow]);
 
-    void loadResearchFeatures();
-    return () => {
-      active = false;
-    };
-  }, []);
+    useEffect(() => {
+      let active = true;
+      const loadResearchFeatures = async () => {
+        try {
+          const flags = await fetchResearchFeatures();
+          if (active) {
+            setResearchFeatures(flags);
+            setResearchFeaturesError(null);
+          }
+        } catch (fetchError) {
+          console.error("Failed to load research features", fetchError);
+          if (active) {
+            setResearchFeatures({});
+            setResearchFeaturesError(
+              (fetchError as Error).message || "Unable to load research capabilities",
+            );
+          }
+        }
+      };
+
+      void loadResearchFeatures();
+      return () => {
+        active = false;
+      };
+    }, []);
 
   useEffect(() => {
     if (activeTool?.id !== "verse-research") {
@@ -332,7 +332,10 @@ export default function CopilotPage(): JSX.Element {
             }
           }
         }
-        setError({ message, suggestions });
+        setError({
+          message,
+          ...(suggestions && suggestions.length ? { suggestions } : {}),
+        });
       } else {
         const fallbackMessage =
           submitError instanceof Error && submitError.message
@@ -437,27 +440,15 @@ export default function CopilotPage(): JSX.Element {
     await runWorkflow(overrides);
   };
 
-  const handleSuggestionAction = useCallback(
-    (suggestion: GuardrailSuggestion) => {
-      if (suggestion.action !== "search") {
-        return;
-      }
-      const filters = suggestion.filters ?? {};
-      const params: Partial<SearchFilters> = {
-        query: suggestion.query ?? "",
-        osis: suggestion.osis ?? "",
-        collection: filters.collection ?? "",
-        author: filters.author ?? "",
-        sourceType: filters.source_type ?? "",
-        theologicalTradition: filters.theological_tradition ?? "",
-        topicDomain: filters.topic_domain ?? "",
-      };
-      const queryString = serializeSearchParams(params);
+  const handleSuggestionAction = useGuardrailActions({
+    onSearchNavigate: (url) => {
       setUiMode("advanced");
-      router.push(`/search${queryString ? `?${queryString}` : ""}`);
+      router.push(url);
     },
-    [router, setUiMode],
-  );
+    onUploadNavigate: () => {
+      router.push("/upload");
+    },
+  });
 
   const workflowControls = (
     <>
@@ -480,16 +471,19 @@ export default function CopilotPage(): JSX.Element {
     setDrawerOsis("");
   };
 
-  const handleVerseCommand = (rawInput: string): boolean => {
-    const trimmed = rawInput.trim();
-    if (!trimmed.startsWith("/")) {
-      return false;
-    }
-    const [command, ...rest] = trimmed.slice(1).split(/\s+/);
-    const normalized = command.toLowerCase();
-    if (normalized === "research" || normalized === "r") {
-      const candidate =
-        rest.join(" ").trim() ||
+    const handleVerseCommand = (rawInput: string): boolean => {
+      const trimmed = rawInput.trim();
+      if (!trimmed.startsWith("/")) {
+        return false;
+      }
+      const [commandRaw, ...rest] = trimmed.slice(1).split(/\s+/);
+      const normalized = (commandRaw ?? "").toLowerCase();
+      if (!normalized) {
+        return false;
+      }
+      if (normalized === "research" || normalized === "r") {
+        const candidate =
+          rest.join(" ").trim() ||
         (verseWorkflow.form.useAdvanced ? verseWorkflow.form.osis.trim() : "");
       openResearchPanels(candidate || null);
       if (candidate) {
