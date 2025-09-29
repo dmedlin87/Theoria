@@ -151,3 +151,7 @@ class TopicDigestJobRequest(APIModel):
 class HNSWRefreshJobRequest(APIModel):
     sample_queries: int = Field(default=25, ge=1, le=500)
     top_k: int = Field(default=10, ge=1, le=200)
+
+
+class CitationValidationJobRequest(APIModel):
+    limit: int = Field(default=25, ge=1, le=500)

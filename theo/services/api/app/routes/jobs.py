@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..db.models import Document, IngestionJob
 from ..models.jobs import (
+    CitationValidationJobRequest,
     HNSWRefreshJobRequest,
     JobEnqueueRequest,
     JobEnqueueResponse,
@@ -35,6 +36,7 @@ from ..workers.tasks import (
     process_file,
     refresh_hnsw as refresh_hnsw_task,
     topic_digest as topic_digest_task,
+    validate_citations as validate_citations_task,
 )
 
 router = APIRouter()
@@ -326,6 +328,38 @@ def enqueue_topic_digest_job(
         kwargs["notify"] = notify
 
     async_result: AsyncResult = cast(Any, topic_digest_task).delay(**kwargs)
+    task_id = getattr(async_result, "id", None)
+    if task_id:
+        job.task_id = task_id
+        session.add(job)
+        session.commit()
+
+    session.refresh(job)
+    return _serialize_job(job)
+
+
+@router.post(
+    "/validate_citations",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobStatus,
+)
+def enqueue_citation_validation_job(
+    payload: CitationValidationJobRequest,
+    session: Session = Depends(get_session),
+) -> JobStatus:
+    """Queue a background job to validate cached citation integrity."""
+
+    job = IngestionJob(
+        job_type="validate_citations",
+        status="queued",
+        payload={"limit": payload.limit},
+    )
+    session.add(job)
+    session.commit()
+
+    async_result: AsyncResult = cast(Any, validate_citations_task).delay(
+        job.id, limit=payload.limit
+    )
     task_id = getattr(async_result, "id", None)
     if task_id:
         job.task_id = task_id
