@@ -7,6 +7,7 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from .settings import get_settings
 
@@ -20,9 +21,14 @@ def _create_engine(database_url: str) -> Engine:
     connect_args = (
         {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     )
-    return create_engine(
-        database_url, future=True, echo=False, connect_args=connect_args
-    )
+    engine_kwargs: dict[str, object] = {
+        "future": True,
+        "echo": False,
+        "connect_args": connect_args,
+    }
+    if database_url.startswith("sqlite"):
+        engine_kwargs["poolclass"] = NullPool
+    return create_engine(database_url, **engine_kwargs)
 
 
 def configure_engine(database_url: str | None = None) -> Engine:

@@ -379,14 +379,33 @@ class _HTMLExtractor(HTMLParser):
         return text, metadata
 
 
-def _parse_html_with_unstructured(path: Path) -> tuple[str, dict[str, Any]] | None:
+def _parse_html_with_unstructured(
+    path: Path, raw_html: str | None = None
+) -> tuple[str, dict[str, Any]] | None:
     try:
         from unstructured.partition.html import partition_html
     except Exception:  # pragma: no cover - optional dependency
         return None
 
+    kwargs: dict[str, Any]
+    if raw_html is not None:
+        kwargs = {"text": raw_html, "metadata_filename": path.name}
+    else:
+        kwargs = {"filename": str(path)}
     try:
-        elements = partition_html(filename=str(path))
+
+        # Decode the HTML upfront so we can fall back to replacement characters when
+        # encountering unexpected encodings (for example Windows-1252 smart quotes).
+        # Passing the decoded text into ``partition_html`` avoids the library trying
+        # to re-open the file using a strict UTF-8 decode, which previously caused
+        # guardrail tests to miss lossy substitutions that our pipeline expects.
+        html_text = read_text_file(path)
+    except OSError:
+        return None
+
+    try:
+        elements = partition_html(text=html_text)
+
     except Exception:  # pragma: no cover - runtime guard
         return None
 
@@ -408,22 +427,21 @@ def _parse_html_with_unstructured(path: Path) -> tuple[str, dict[str, Any]] | No
 def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
     from .chunking import chunk_text
 
-    parsed = _parse_html_with_unstructured(path)
+    try:
+        raw_html = read_text_file(path)
+    except OSError as exc:
+        from .pipeline import UnsupportedSourceError
+
+        raise UnsupportedSourceError(
+            f"Unable to read HTML document '{path.name}'"
+        ) from exc
+
+    parsed = _parse_html_with_unstructured(path, raw_html)
     if parsed:
         text, metadata = parsed
         parser = "unstructured"
         parser_version = _package_version("unstructured", "0.15.x")
     else:
-
-        try:
-            raw_html = read_text_file(path)
-        except (UnicodeDecodeError, OSError) as exc:
-            from .pipeline import UnsupportedSourceError
-
-            raise UnsupportedSourceError(
-                f"Unable to decode HTML document '{path.name}'"
-            ) from exc
-
         extractor = _HTMLExtractor()
         try:
             extractor.feed(raw_html)

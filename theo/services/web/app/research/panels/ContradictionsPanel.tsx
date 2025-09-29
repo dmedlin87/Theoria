@@ -1,7 +1,11 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
 import { formatEmphasisSummary } from "../../mode-config";
-import { getActiveMode } from "../../mode-server";
+import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
-import type { ResearchFeatureFlags } from "./research-panels";
+import type { ResearchFeatureFlags } from "../types";
 import ContradictionsPanelClient from "./ContradictionsPanelClient";
 
 export type ContradictionRecord = {
@@ -61,36 +65,60 @@ interface ContradictionsPanelProps {
   features: ResearchFeatureFlags;
 }
 
-export default async function ContradictionsPanel({
-  osis,
-  features,
-}: ContradictionsPanelProps) {
+export default function ContradictionsPanel({ osis, features }: ContradictionsPanelProps) {
+  const { mode } = useMode();
+  const [error, setError] = useState<string | null>(null);
+  const [contradictions, setContradictions] = useState<ContradictionRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+  const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
+
+  useEffect(() => {
+    if (!features?.contradictions) {
+      return;
+    }
+
+    let cancelled = false;
+    const fetchContradictions = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `${baseUrl}/research/contradictions?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error((await response.text()) || response.statusText);
+        }
+        const payload = (await response.json()) as ContradictionsResponse;
+        const mapped =
+          payload.items
+            ?.map((item) => mapContradictionItem(item))
+            .filter((item): item is ContradictionRecord => Boolean(item)) ?? [];
+        if (!cancelled) {
+          setContradictions(mapped);
+        }
+      } catch (fetchError) {
+        console.error("Failed to load contradictions", fetchError);
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : "Unknown error");
+          setContradictions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchContradictions();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseUrl, features?.contradictions, mode.id, osis]);
+
   if (!features?.contradictions) {
     return null;
-  }
-
-  const mode = getActiveMode();
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-
-  let error: string | null = null;
-  let contradictions: ContradictionRecord[] = [];
-
-  try {
-    const response = await fetch(
-      `${baseUrl}/research/contradictions?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
-      { cache: "no-store" },
-    );
-    if (!response.ok) {
-      throw new Error((await response.text()) || response.statusText);
-    }
-    const payload = (await response.json()) as ContradictionsResponse;
-    contradictions =
-      payload.items
-        ?.map((item) => mapContradictionItem(item))
-        .filter((item): item is ContradictionRecord => Boolean(item)) ?? [];
-  } catch (fetchError) {
-    console.error("Failed to load contradictions", fetchError);
-    error = fetchError instanceof Error ? fetchError.message : "Unknown error";
   }
 
   return (
@@ -107,9 +135,11 @@ export default async function ContradictionsPanel({
         Potential contradictions
       </h3>
       <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
-        {formatEmphasisSummary(mode)}
+        {modeSummary}
       </p>
-      {error ? (
+      {loading ? (
+        <p>Loading contradictions…</p>
+      ) : error ? (
         <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
           Unable to load contradictions. {error}
         </p>

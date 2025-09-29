@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { formatEmphasisSummary } from "../../mode-config";
 import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
-import type { ResearchFeatureFlags } from "./research-panels";
+import type { ResearchFeatureFlags } from "../types";
 
 type GeoPlaceItem = {
   modern_id?: string | null;

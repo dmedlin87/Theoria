@@ -17,6 +17,7 @@ from ..db.types import VectorType
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import osis_intersects
 from ..models.search import HybridSearchRequest, HybridSearchResult
+from .annotations import index_annotations_by_passage, load_annotations_for_documents
 from .utils import compose_passage_meta
 
 
@@ -201,6 +202,11 @@ def _fallback_search(
         stmt = stmt.limit(limit)
 
         rows = session.execute(stmt).all()
+        doc_ids = [document.id for _passage, document in rows]
+        annotations_by_document = load_annotations_for_documents(session, doc_ids)
+        annotations_by_passage = index_annotations_by_passage(
+            annotations_by_document
+        )
 
         heap: list[tuple[float, int, HybridSearchResult]] = []
         counter = 0
@@ -208,7 +214,12 @@ def _fallback_search(
             if not _passes_author_filter(document, request.filters.author):
                 continue
 
-            lexical = _lexical_score(passage.text, query_tokens)
+            annotation_notes = annotations_by_passage.get(passage.id, [])
+            note_texts = [note.body for note in annotation_notes if note.body]
+            combined_text = (
+                " \n".join([passage.text, *note_texts]) if note_texts else passage.text
+            )
+            lexical = _lexical_score(combined_text, query_tokens)
             tei_score = _tei_match_score(passage, query_tokens)
             osis_match = False
             if request.osis:
@@ -216,9 +227,6 @@ def _fallback_search(
                     osis_match = True
                 elif not lexical:
                     continue
-
-            if not lexical and not osis_match and not request.query and tei_score == 0.0:
-                continue
 
             if request.query and lexical == 0.0 and tei_score == 0.0 and not osis_match:
                 continue
@@ -228,6 +236,13 @@ def _fallback_search(
                 score += 5.0
             if request.query and passage.lexeme:
                 score += 0.1 * len(request.query)
+
+            meta = compose_passage_meta(passage, document)
+            if annotation_notes:
+                meta = {**(meta or {})}
+                meta["annotations"] = [
+                    note.model_dump(mode="json") for note in annotation_notes
+                ]
 
             result = HybridSearchResult(
                 id=passage.id,
@@ -241,7 +256,7 @@ def _fallback_search(
                 t_start=passage.t_start,
                 t_end=passage.t_end,
                 score=score,
-                meta=compose_passage_meta(passage, document),
+                meta=meta,
                 document_title=document.title,
                 snippet=_snippet(passage.text),
                 rank=0,
@@ -419,6 +434,12 @@ def _postgres_hybrid_search(
             span.set_attribute("retrieval.latency_ms", round(latency_ms, 2))
             return results
 
+        doc_ids = [candidate.document.id for candidate in candidates.values()]
+        annotations_by_document = load_annotations_for_documents(session, doc_ids)
+        annotations_by_passage = index_annotations_by_passage(
+            annotations_by_document
+        )
+
         VECTOR_WEIGHT = 0.65
         LEXICAL_WEIGHT = 0.35
         OSIS_BONUS = 0.2 if request.osis else 0.0
@@ -433,6 +454,13 @@ def _postgres_hybrid_search(
                 score += VECTOR_WEIGHT * candidate.vector_score
             if candidate.lexical_score:
                 score += LEXICAL_WEIGHT * candidate.lexical_score
+            annotation_notes = annotations_by_passage.get(passage.id, [])
+            if request.query and annotation_notes:
+                note_text = " \n".join(
+                    note.body for note in annotation_notes if note.body
+                )
+                if note_text:
+                    score += LEXICAL_WEIGHT * _lexical_score(note_text, query_tokens)
             if (
                 request.query
                 and candidate.lexical_score == 0.0
@@ -452,6 +480,12 @@ def _postgres_hybrid_search(
                 score += 0.35 * tei_score
             if candidate.osis_match:
                 score += OSIS_BONUS
+            meta = compose_passage_meta(passage, document)
+            if annotation_notes:
+                meta = {**(meta or {})}
+                meta["annotations"] = [
+                    note.model_dump(mode="json") for note in annotation_notes
+                ]
             result = HybridSearchResult(
                 id=passage.id,
                 document_id=passage.document_id,
@@ -464,7 +498,7 @@ def _postgres_hybrid_search(
                 t_start=passage.t_start,
                 t_end=passage.t_end,
                 score=score,
-                meta=compose_passage_meta(passage, document),
+                meta=meta,
                 document_title=document.title,
                 snippet=_snippet(passage.text),
                 rank=0,

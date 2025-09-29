@@ -3,6 +3,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import ModeChangeBanner from "../components/ModeChangeBanner";
+import { ADVANCED_TOOLS, type AdvancedToolId } from "../chat/tools";
+import ResearchPanels from "../research/ResearchPanels";
+import { fetchResearchFeatures } from "../research/features";
+import type { ResearchFeatureFlags } from "../research/types";
 import { formatEmphasisSummary } from "../mode-config";
 import { useMode } from "../mode-context";
 import { getCitationManagerEndpoint } from "../lib/api";
@@ -84,6 +88,11 @@ const QUICK_START_PRESETS: QuickStartPreset[] = [
   },
 ];
 
+type ActiveToolState = {
+  id: AdvancedToolId;
+  osis?: string | null;
+};
+
 function extractCitationsFromResult(result: CopilotResult | null): RAGCitation[] {
   if (!result) {
     return [];
@@ -145,6 +154,10 @@ export default function CopilotPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
   const [isSendingCitations, setIsSendingCitations] = useState(false);
+  const [researchFeatures, setResearchFeatures] = useState<ResearchFeatureFlags | null>(null);
+  const [researchFeaturesError, setResearchFeaturesError] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<ActiveToolState | null>(null);
+  const [drawerOsis, setDrawerOsis] = useState<string>("");
 
   const verseWorkflow = useVerseWorkflow(apiClient);
   const sermonWorkflow = useSermonWorkflow(apiClient);
@@ -155,6 +168,15 @@ export default function CopilotPage(): JSX.Element {
   const curationWorkflow = useCurationWorkflow(apiClient);
   const exportWorkflow = useExportWorkflow(apiClient);
   const { exportCitations } = useCitationExporter(apiClient);
+  const verseResearchTool = useMemo(
+    () => ADVANCED_TOOLS.find((tool) => tool.id === "verse-research"),
+    [],
+  );
+  const researchLoading = researchFeatures === null && !researchFeaturesError;
+  const researchEnabled = Boolean(researchFeatures?.research);
+  const currentFormOsis = verseWorkflow.form.useAdvanced
+    ? (verseWorkflow.form.osis ?? "").trim()
+    : "";
 
   useEffect(() => {
     let active = true;
@@ -176,6 +198,42 @@ export default function CopilotPage(): JSX.Element {
       active = false;
     };
   }, [apiClient]);
+
+  useEffect(() => {
+    let active = true;
+    const loadResearchFeatures = async () => {
+      try {
+        const flags = await fetchResearchFeatures();
+        if (active) {
+          setResearchFeatures(flags);
+          setResearchFeaturesError(null);
+        }
+      } catch (fetchError) {
+        console.error("Failed to load research features", fetchError);
+        if (active) {
+          setResearchFeatures({});
+          setResearchFeaturesError(
+            (fetchError as Error).message || "Unable to load research capabilities",
+          );
+        }
+      }
+    };
+
+    void loadResearchFeatures();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeTool?.id !== "verse-research") {
+      return;
+    }
+    const hintedOsis =
+      (activeTool.osis && activeTool.osis.trim()) ||
+      (verseWorkflow.form.useAdvanced ? verseWorkflow.form.osis.trim() : "");
+    setDrawerOsis(hintedOsis);
+  }, [activeTool, verseWorkflow.form.osis, verseWorkflow.form.useAdvanced]);
 
   const runWorkflow = async (
     overrides?: WorkflowOverrides & { workflow?: WorkflowId },
@@ -283,6 +341,41 @@ export default function CopilotPage(): JSX.Element {
     await runWorkflow(overrides);
   };
 
+  const openResearchPanels = (osisHint?: string | null) => {
+    setActiveTool({ id: "verse-research", osis: osisHint ?? null });
+  };
+
+  const closeActiveTool = () => {
+    setActiveTool(null);
+    setDrawerOsis("");
+  };
+
+  const handleVerseCommand = (rawInput: string): boolean => {
+    const trimmed = rawInput.trim();
+    if (!trimmed.startsWith("/")) {
+      return false;
+    }
+    const [command, ...rest] = trimmed.slice(1).split(/\s+/);
+    const normalized = command.toLowerCase();
+    if (normalized === "research" || normalized === "r") {
+      const candidate =
+        rest.join(" ").trim() ||
+        (verseWorkflow.form.useAdvanced ? verseWorkflow.form.osis.trim() : "");
+      openResearchPanels(candidate || null);
+      if (candidate) {
+        verseWorkflow.setForm({ osis: candidate, useAdvanced: true });
+      }
+      verseWorkflow.setForm({ question: "" });
+      return true;
+    }
+    if (normalized === "brief") {
+      setWorkflow("verse");
+      void runWorkflow({ workflow: "verse" });
+      return true;
+    }
+    return false;
+  };
+
   if (enabled === false) {
     return (
       <section>
@@ -317,6 +410,58 @@ export default function CopilotPage(): JSX.Element {
 
       <QuickStartPresets presets={QUICK_START_PRESETS} onSelect={handleQuickStart} disabled={isRunning} />
 
+      <section
+        aria-label="Advanced tools"
+        style={{
+          marginTop: "1.5rem",
+          padding: "1.25rem",
+          border: "1px solid #e2e8f0",
+          borderRadius: "0.75rem",
+          background: "#f8fafc",
+          display: "grid",
+          gap: "0.75rem",
+        }}
+      >
+        <header style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", justifyContent: "space-between" }}>
+          <div style={{ maxWidth: "48ch" }}>
+            <h3 style={{ margin: 0 }}>Advanced tools</h3>
+            <p style={{ margin: "0.25rem 0 0", color: "#475569", fontSize: "0.9rem" }}>
+              Launch research modules inline or trigger them with slash commands like <code>/research</code> from the
+              question box.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-start" }}>
+            <button
+              type="button"
+              className="workflow-button"
+              style={{ minWidth: "220px" }}
+              disabled={!researchEnabled || researchLoading}
+              onClick={() => openResearchPanels(currentFormOsis || null)}
+            >
+              <span className="workflow-header">
+                <span>{verseResearchTool?.label ?? "Verse research panels"}</span>
+              </span>
+              <span className="workflow-description">
+                {researchLoading
+                  ? "Loading research capabilities…"
+                  : verseResearchTool?.description ?? "Inspect contradictions and variants inline."}
+              </span>
+            </button>
+          </div>
+        </header>
+        {researchFeaturesError ? (
+          <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+            Unable to load research capabilities. {researchFeaturesError}
+          </p>
+        ) : null}
+        {researchEnabled ? (
+          <p style={{ margin: 0, color: "#64748b", fontSize: "0.85rem" }}>
+            Tip: try <code>/research {currentFormOsis || "John.1.1"}</code> in the question field to open these panels
+            without leaving the workspace.
+          </p>
+        ) : null}
+      </section>
+
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem", maxWidth: 600 }}>
         <WorkflowFormFields
           workflow={workflow}
@@ -329,6 +474,7 @@ export default function CopilotPage(): JSX.Element {
           collaboration={{ form: collaborationWorkflow.form, onChange: collaborationWorkflow.setForm }}
           curation={{ form: curationWorkflow.form, onChange: curationWorkflow.setForm }}
           exportPreset={{ form: exportWorkflow.form, onChange: exportWorkflow.setForm }}
+          onVerseCommand={handleVerseCommand}
         />
 
         <div className="workflow-status">
@@ -397,6 +543,40 @@ export default function CopilotPage(): JSX.Element {
           margin-bottom: 1rem;
         }
 
+        .advanced-tool-drawer {
+          margin-top: 2rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 0.75rem;
+          padding: 1.25rem;
+          background: #fff;
+          display: grid;
+          gap: 1rem;
+        }
+
+        .drawer-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+
+        .drawer-content {
+          display: grid;
+          gap: 1rem;
+        }
+
+        .drawer-input {
+          display: grid;
+          gap: 0.5rem;
+          font-weight: 600;
+        }
+
+        .drawer-input input {
+          padding: 0.5rem 0.75rem;
+          border-radius: 0.5rem;
+          border: 1px solid #cbd5f5;
+        }
+
         .sr-only {
           border: 0;
           clip: rect(0 0 0 0);
@@ -408,6 +588,62 @@ export default function CopilotPage(): JSX.Element {
           width: 1px;
         }
       `}</style>
+
+      {activeTool?.id === "verse-research" && (
+        <aside className="advanced-tool-drawer" aria-label="Verse research panels drawer">
+          <div className="drawer-header">
+            <div>
+              <h3 style={{ margin: 0 }}>Verse research panels</h3>
+              <p style={{ margin: "0.25rem 0 0", color: "#475569" }}>
+                Inspect contradictions, cross-references, morphology, and commentaries inline while you chat.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeActiveTool}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#1d4ed8",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Close
+            </button>
+          </div>
+          <div className="drawer-content">
+            <label className="drawer-input">
+              <span>OSIS reference</span>
+              <input
+                type="text"
+                value={drawerOsis}
+                onChange={(event) => setDrawerOsis(event.target.value)}
+                placeholder="John.1.1-5"
+              />
+            </label>
+
+            {researchFeaturesError ? (
+              <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+                {researchFeaturesError}
+              </p>
+            ) : null}
+
+            {researchLoading ? (
+              <p>Loading research capabilities…</p>
+            ) : !researchEnabled ? (
+              <p>
+                Research panels are disabled for this deployment. Visit the verse explorer for the full dashboard, or
+                contact an admin to enable research features.
+              </p>
+            ) : drawerOsis.trim() ? (
+              <ResearchPanels osis={drawerOsis.trim()} features={researchFeatures ?? {}} />
+            ) : (
+              <p>Enter an OSIS reference above to load the verse research stack.</p>
+            )}
+          </div>
+        </aside>
+      )}
 
       {error && (
         <p role="alert" style={{ color: "crimson", marginTop: "1rem" }}>
@@ -422,6 +658,7 @@ export default function CopilotPage(): JSX.Element {
           exporting={isSendingCitations}
           status={citationExportStatus}
           summary={formatEmphasisSummary(mode)}
+          workflowId={workflow}
         />
       )}
     </section>

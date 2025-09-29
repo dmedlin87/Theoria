@@ -37,4 +37,44 @@ describe("DocumentClient source URL safety", () => {
     expect(screen.queryByRole("link", { name: "Original source" })).not.toBeInTheDocument();
     expect(screen.getByText("Original source: javascript:alert(1)")).toBeInTheDocument();
   });
+
+  it("renders structured annotations with linked passages", () => {
+    const timestamp = new Date().toISOString();
+    const document = buildDocument({
+      passages: [
+        {
+          id: "passage-1",
+          document_id: "doc-123",
+          text: "Example passage",
+          osis_ref: null,
+          page_no: 4,
+          t_start: null,
+          t_end: null,
+          meta: null,
+        },
+      ],
+      annotations: [
+        {
+          id: "ann-1",
+          document_id: "doc-123",
+          type: "claim",
+          body: "The speaker affirms the thesis.",
+          stance: "supportive",
+          passage_ids: ["passage-1"],
+          group_id: "bundle-1",
+          metadata: null,
+          raw: null,
+          legacy: false,
+          created_at: timestamp,
+          updated_at: timestamp,
+        },
+      ],
+    });
+
+    render(<DocumentClient initialDocument={document} />);
+
+    expect(screen.getByText("Claim")).toBeInTheDocument();
+    expect(screen.getByText("The speaker affirms the thesis.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Page 4/ })).toBeInTheDocument();
+  });
 });

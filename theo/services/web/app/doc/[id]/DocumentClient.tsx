@@ -5,7 +5,12 @@ import { FormEvent, useMemo, useState } from "react";
 
 import DeliverableExportAction from "../../components/DeliverableExportAction";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
-import type { DocumentAnnotation, DocumentDetail } from "./types";
+import type {
+  DocumentAnnotation,
+  DocumentAnnotationType,
+  DocumentDetail,
+  Passage,
+} from "./types";
 
 interface Props {
   initialDocument: DocumentDetail;
@@ -52,6 +57,27 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
   const [annotationError, setAnnotationError] = useState<string | null>(null);
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+  const passageLookup = useMemo(() => {
+    const lookup = new Map<string, Passage>();
+    for (const passage of document.passages) {
+      lookup.set(passage.id, passage);
+    }
+    return lookup;
+  }, [document.passages]);
+
+  const typeLabels: Record<DocumentAnnotationType, string> = {
+    claim: "Claim",
+    evidence: "Evidence",
+    question: "Question",
+    note: "Note",
+  };
+
+  const typeBadgeStyles: Record<DocumentAnnotationType, { background: string; color: string }> = {
+    claim: { background: "#f97316", color: "#fff" },
+    evidence: { background: "#2563eb", color: "#fff" },
+    question: { background: "#14b8a6", color: "#fff" },
+    note: { background: "#94a3b8", color: "#111827" },
+  };
 
   const handleMetadataSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -107,7 +133,7 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
       const response = await fetch(`${baseUrl}/documents/${document.id}/annotations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: newAnnotation.trim() }),
+        body: JSON.stringify({ type: "note", text: newAnnotation.trim() }),
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -240,17 +266,90 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
           <p style={{ marginTop: "1rem" }}>No annotations yet.</p>
         ) : (
           <ul style={{ listStyle: "none", margin: "1rem 0 0", padding: 0, display: "grid", gap: "0.75rem" }}>
-            {document.annotations.map((annotation) => (
-              <li key={annotation.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "0.5rem", padding: "0.75rem" }}>
-                <p style={{ margin: "0 0 0.25rem" }}>{annotation.body}</p>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem", color: "#555" }}>
-                  <span>{formatTimestamp(annotation.updated_at)}</span>
-                  <button type="button" onClick={() => handleDeleteAnnotation(annotation.id)} style={{ color: "crimson", background: "none", border: "none", cursor: "pointer" }}>
-                    Delete
-                  </button>
+            {document.annotations.map((annotation) => {
+              const badgeStyle = typeBadgeStyles[annotation.type] ?? typeBadgeStyles.note;
+              const badges = (
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: "0.75rem",
+                      padding: "0.125rem 0.5rem",
+                      borderRadius: "999px",
+                      fontWeight: 600,
+                      background: badgeStyle.background,
+                      color: badgeStyle.color,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                    }}
+                  >
+                    {typeLabels[annotation.type]}
+                  </span>
+                  {annotation.stance ? (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        fontSize: "0.75rem",
+                        padding: "0.125rem 0.5rem",
+                        borderRadius: "999px",
+                        fontWeight: 600,
+                        background: "#f8fafc",
+                        color: "#0f172a",
+                        border: "1px solid #cbd5f5",
+                        letterSpacing: "0.03em",
+                      }}
+                    >
+                      {annotation.stance}
+                    </span>
+                  ) : null}
                 </div>
-              </li>
-            ))}
+              );
+
+              return (
+                <li key={annotation.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "0.5rem", padding: "0.75rem" }}>
+                  {badges}
+                  <p style={{ margin: "0 0 0.5rem", whiteSpace: "pre-wrap" }}>{annotation.body}</p>
+                  {annotation.passage_ids.length > 0 ? (
+                    <div style={{ marginBottom: "0.5rem" }}>
+                      <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#475569" }}>Linked passages</span>
+                      <ul style={{ margin: "0.25rem 0 0", paddingLeft: "1rem", display: "grid", gap: "0.25rem" }}>
+                        {annotation.passage_ids.map((passageId, index) => {
+                          const passage = passageLookup.get(passageId);
+                          const anchorLabel = passage ? formatAnchor({
+                            page_no: passage.page_no ?? null,
+                            t_start: passage.t_start ?? null,
+                            t_end: passage.t_end ?? null,
+                          }) : null;
+                          const href = buildPassageLink(document.id, passageId, {
+                            pageNo: passage?.page_no ?? null,
+                            tStart: passage?.t_start ?? null,
+                          });
+                          return (
+                            <li key={`${annotation.id}-passage-${passageId}-${index}`}>
+                              <Link
+                                href={href}
+                                prefetch={false}
+                                style={{ color: "#2563eb", textDecoration: "underline" }}
+                              >
+                                {anchorLabel || `Passage ${index + 1}`}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem", color: "#555" }}>
+                    <span>{formatTimestamp(annotation.updated_at)}</span>
+                    <button type="button" onClick={() => handleDeleteAnnotation(annotation.id)} style={{ color: "crimson", background: "none", border: "none", cursor: "pointer" }}>
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

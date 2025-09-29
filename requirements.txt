@@ -10,7 +10,7 @@ webvtt-py>=0.4.6,<1
 PyYAML>=6.0,<7
 httpx>=0.27,<0.28
 python-multipart>=0.0.7,<0.0.8
-pytest
+pytest>=8.3,<9
 fakeredis>=2.23,<3
 cryptography>=41,<43
 opentelemetry-api>=1.25.0,<2

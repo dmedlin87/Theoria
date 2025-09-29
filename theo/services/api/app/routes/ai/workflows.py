@@ -492,6 +492,26 @@ CHAT_PLAN = "\n".join(
 )
 
 
+_DEFAULT_REFUSAL_MESSAGE = "I’m sorry, but I cannot help with that request."
+
+
+def _extract_refusal_text(answer: RAGAnswer) -> str:
+    """Normalise a guardrailed completion for user-facing chat responses."""
+
+    completion = answer.model_output or ""
+    if completion:
+        lowered = completion.lower()
+        marker_index = lowered.rfind("sources:")
+        if marker_index != -1:
+            completion = completion[:marker_index]
+        completion = completion.strip()
+    if not completion:
+        completion = (answer.summary or "").strip()
+    if not completion:
+        completion = _DEFAULT_REFUSAL_MESSAGE
+    return completion
+
+
 @router.post(
     "/chat",
     response_model=ChatSessionResponse,
@@ -506,7 +526,7 @@ def chat_turn(
     total_message_chars = sum(len(message.content) for message in payload.messages)
     if total_message_chars > CHAT_SESSION_TOTAL_CHAR_BUDGET:
         raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="chat payload exceeds size limit",
         )
     last_user = next(
@@ -546,12 +566,9 @@ def chat_turn(
                 recorder=recorder,
             )
             ensure_completion_safe(answer.model_output or answer.summary)
-            content = (
-                answer.summary
-                if answer.model_name == REFUSAL_MODEL_NAME
-                else (answer.model_output or answer.summary)
-            )
-            message = ChatSessionMessage(role="assistant", content=content)
+
+            message_text = _extract_refusal_text(answer)
+            message = ChatSessionMessage(role="assistant", content=message_text)
             recorder.finalize(
                 final_md=answer.summary,
                 output_payload={
