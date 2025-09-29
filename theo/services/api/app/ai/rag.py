@@ -561,61 +561,6 @@ def _normalise_snippet(text: str) -> str:
     return collapsed[:237].rstrip() + "…"
 
 
-def _build_guardrail_result(
-    passage: Passage, document: Document | None
-) -> HybridSearchResult:
-    snippet_source = passage.text or document.title or "Guardrail passage"
-    snippet = _normalise_snippet(snippet_source)
-    title = document.title if document else None
-
-    return HybridSearchResult(
-        id=passage.id,
-        document_id=passage.document_id,
-        text=passage.text,
-        raw_text=passage.raw_text,
-        osis_ref=passage.osis_ref,
-        start_char=passage.start_char,
-        end_char=passage.end_char,
-        page_no=passage.page_no,
-        t_start=passage.t_start,
-        t_end=passage.t_end,
-        score=1.0,
-        meta={},
-        document_title=title,
-        snippet=snippet,
-        rank=0,
-
-        highlights=None,
-    )
-
-
-
-def _load_guardrail_reference(session: Session) -> HybridSearchResult | None:
-    preferred_ids = ("redteam-passage", "guardrail-reference")
-    for passage_id in preferred_ids:
-        passage = session.get(Passage, passage_id)
-        if passage and passage.osis_ref:
-            document = session.get(Document, passage.document_id)
-            return _build_guardrail_result(passage, document)
-
-    row = (
-        session.execute(
-            select(Passage, Document)
-            .join(Document)
-            .where(Passage.osis_ref.isnot(None))
-            .limit(1)
-        )
-        .first()
-    )
-    if not row:
-        return None
-    passage, document = row
-    if not passage.osis_ref:
-        return None
-    return _build_guardrail_result(passage, document)
-
-
-
 def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
     digest = hashlib.sha256()
     for result in results:
@@ -714,15 +659,16 @@ def _guarded_answer(
     model_hint: str | None = None,
     recorder: "TrailRecorder | None" = None,
     filters: HybridSearchFilters | None = None,
+    memory_snippets: Sequence[str] | None = None,
 ) -> RAGAnswer:
     ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
-    citations = _build_citations(ordered_results)
-    if not citations:
-        fallback_result = _load_guardrail_reference(session)
-        if fallback_result:
+    if not ordered_results:
+        raise GuardrailError(
+            "No passages were retrieved for the request; aborting generation",
+            safe_refusal=True,
+        )
 
-            ordered_results = [fallback_result]
-            citations = _build_citations(ordered_results)
+    citations = _build_citations(ordered_results)
     if not citations:
         raise GuardrailError(
             "Retrieved passages lacked OSIS references; aborting generation",
@@ -773,6 +719,17 @@ def _guarded_answer(
         "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
         "If the passages do not answer the question, state that explicitly.",
     ]
+    if memory_snippets:
+        memory_lines: list[str] = []
+        for index, snippet in enumerate(memory_snippets, start=1):
+            sanitized = _scrub_adversarial_language(snippet) or ""
+            sanitized = sanitized.strip()
+            if not sanitized:
+                continue
+            memory_lines.append(f"{index}. {sanitized}")
+        if memory_lines:
+            prompt_parts.append("Conversation memory:")
+            prompt_parts.extend(memory_lines)
     sanitized_question = _scrub_adversarial_language(question)
     if sanitized_question:
         prompt_parts.append(f"Question: {sanitized_question}")
@@ -1160,6 +1117,7 @@ def _guarded_answer_or_refusal(
     model_hint: str | None = None,
     recorder: "TrailRecorder | None" = None,
     filters: HybridSearchFilters | None = None,
+    memory_snippets: Sequence[str] | None = None,
 ) -> RAGAnswer:
     try:
         return _guarded_answer(
@@ -1170,17 +1128,17 @@ def _guarded_answer_or_refusal(
             model_hint=model_hint,
             recorder=recorder,
             filters=filters,
+            memory_snippets=memory_snippets,
         )
     except GuardrailError as exc:
-        if not getattr(exc, "safe_refusal", False):
-            raise
-        LOGGER.warning(
-            "Guardrail enforcement failed for %s: %s",
-            context,
-            exc,
-            extra={"workflow": context},
-        )
-        return build_guardrail_refusal(session, reason=str(exc))
+        if getattr(exc, "safe_refusal", False):
+            LOGGER.warning(
+                "Guardrail enforcement failed for %s: %s",
+                context,
+                exc,
+                extra={"workflow": context},
+            )
+        raise
 
 
 def _search(
@@ -1202,6 +1160,7 @@ def run_guarded_chat(
     osis: str | None = None,
     filters: HybridSearchFilters | None = None,
     model_name: str | None = None,
+    memory_snippets: Sequence[str] | None = None,
     recorder: "TrailRecorder | None" = None,
 ) -> RAGAnswer:
     filters = filters or HybridSearchFilters()
@@ -1215,6 +1174,8 @@ def run_guarded_chat(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
+        if memory_snippets:
+            set_span_attribute(span, "workflow.memory_snippet_count", len(memory_snippets))
         results = _search(session, query=question, osis=osis, filters=filters)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
@@ -1253,6 +1214,7 @@ def run_guarded_chat(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            memory_snippets=memory_snippets,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))

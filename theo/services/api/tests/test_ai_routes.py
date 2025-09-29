@@ -10,7 +10,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.core.database import get_engine
-from theo.services.api.app.db.models import AgentTrail, Document, Passage
+from theo.services.api.app.db.models import (
+    AgentTrail,
+    ChatSession,
+    ChatSessionMessage,
+    Document,
+    Passage,
+)
 from theo.services.api.app.main import app
 from theo.services.cli.batch_intel import main as batch_intel_main
 
@@ -209,6 +215,22 @@ def test_chat_session_returns_guarded_answer_and_trail() -> None:
             )
             assert trail is not None
             assert trail.user_id == "chat-user"
+            chat_session = session.get(ChatSession, payload["session_id"])
+            assert chat_session is not None
+            assert chat_session.summary
+            assert chat_session.memory_snippets
+            messages = (
+                session.execute(
+                    select(ChatSessionMessage)
+                    .where(ChatSessionMessage.session_id == chat_session.id)
+                    .order_by(ChatSessionMessage.sequence.asc())
+                )
+                .scalars()
+                .all()
+            )
+            assert len(messages) >= 2
+            assert messages[-1].role == "assistant"
+            assert chat_session.linked_document_ids
 
 
 def test_chat_turn_guardrail_failure_returns_422() -> None:
@@ -226,6 +248,35 @@ def test_chat_turn_guardrail_failure_returns_422() -> None:
             },
         )
         assert response.status_code == 422
+
+
+def test_chat_session_detail_endpoint_returns_state() -> None:
+    _seed_corpus()
+    with TestClient(app) as client:
+        _register_echo_model(client)
+        initial = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {"role": "user", "content": "What does John 1:1 teach?"}
+                ],
+                "osis": "John.1.1",
+                "recorder_metadata": {"user_id": "history-user"},
+            },
+        )
+        assert initial.status_code == 200, initial.text
+        session_id = initial.json()["session_id"]
+
+        detail = client.get(f"/ai/chat/{session_id}")
+        assert detail.status_code == 200, detail.text
+        payload = detail.json()
+        assert payload["session_id"] == session_id
+        assert payload["messages"], payload
+        assert payload["memory"]["snippets"], payload
+        assert payload["preferences"]["modeId"] is None or isinstance(
+            payload["preferences"]["modeId"], str
+        )
+        assert payload["linked_document_ids"], payload
 
 
 def test_provider_settings_crud_flow() -> None:

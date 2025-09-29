@@ -8,8 +8,8 @@ from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import Response
-from sqlalchemy import select
+from fastapi.responses import JSONResponse, Response
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ...ai import (
@@ -36,13 +36,22 @@ from ...ai.registry import LLMModel, LLMRegistry, save_llm_registry
 from ...ai.trails import TrailService
 from ...core.database import get_session
 from ...core.settings_store import load_setting, save_setting
-from ...db.models import Document, Passage
+from ...db.models import (
+    ChatSession,
+    ChatSessionMessage as ChatSessionMessageRecord,
+    Document,
+    Passage,
+)
 from ...export.formatters import build_document_export
 from ...models.ai import (
     AIFeaturesResponse,
+    ChatSessionDetailResponse,
     ChatSessionMessage,
+    ChatSessionMemory,
+    ChatSessionPreferences,
     ChatSessionRequest,
     ChatSessionResponse,
+    ChatSessionTranscriptMessage,
     CHAT_SESSION_TOTAL_CHAR_BUDGET,
     CitationExportRequest,
     CitationExportResponse,
@@ -88,11 +97,76 @@ router = APIRouter()
 settings_router = APIRouter(prefix="/settings/ai", tags=["ai-settings"])
 
 
+_CHAT_MEMORY_PROMPT_CHAR_BUDGET = 1_200
+_CHAT_MEMORY_MAX_SNIPPETS = 12
+_CHAT_MEMORY_SNIPPET_MAX_LENGTH = 320
+_CHAT_TRANSCRIPT_SEED_LIMIT = 40
+
+
 @router.get("/features", response_model=AIFeaturesResponse)
 def list_ai_features() -> AIFeaturesResponse:
     """Expose guardrail catalogues for client selection."""
 
     return AIFeaturesResponse(guardrails=DEFAULT_GUARDRAIL_SETTINGS)
+
+
+def _normalise_panels(panels: Sequence[str]) -> list[str]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for panel in panels:
+        if not isinstance(panel, str):
+            continue
+        trimmed = panel.strip()
+        if not trimmed or trimmed in seen:
+            continue
+        seen.add(trimmed)
+        unique.append(trimmed)
+    return unique
+
+
+def _truncate_memory_store(snippets: Sequence[str]) -> list[str]:
+    if not snippets:
+        return []
+    trimmed: list[str] = []
+    window = max(_CHAT_MEMORY_MAX_SNIPPETS * 2, _CHAT_MEMORY_MAX_SNIPPETS)
+    for snippet in list(snippets)[-window:]:
+        if not isinstance(snippet, str):
+            continue
+        cleaned = snippet.strip()
+        if not cleaned:
+            continue
+        trimmed.append(cleaned[:_CHAT_MEMORY_SNIPPET_MAX_LENGTH])
+    if len(trimmed) > _CHAT_MEMORY_MAX_SNIPPETS:
+        trimmed = trimmed[-_CHAT_MEMORY_MAX_SNIPPETS:]
+    return trimmed
+
+
+def _prepare_memory_context(snippets: Sequence[str] | None) -> list[str]:
+    if not snippets:
+        return []
+    remaining = _CHAT_MEMORY_PROMPT_CHAR_BUDGET
+    context: list[str] = []
+    for snippet in reversed(snippets):
+        if not isinstance(snippet, str):
+            continue
+        cleaned = snippet.strip()
+        if not cleaned:
+            continue
+        normalized = cleaned[:_CHAT_MEMORY_SNIPPET_MAX_LENGTH]
+        needed = len(normalized)
+        if not context and needed > remaining:
+            normalized = normalized[:remaining]
+            needed = len(normalized)
+        if needed == 0:
+            continue
+        if needed > remaining:
+            break
+        context.append(normalized)
+        remaining -= needed + 1
+        if remaining <= 0:
+            break
+    context.reverse()
+    return context
 
 
 def _persist_and_respond(
@@ -512,6 +586,229 @@ def _extract_refusal_text(answer: RAGAnswer) -> str:
     return completion
 
 
+@router.get(
+    "/chat/{session_id}",
+    response_model=ChatSessionDetailResponse,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
+)
+def get_chat_session(
+    session_id: str, session: Session = Depends(get_session)
+) -> ChatSessionDetailResponse:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="chat session not found")
+
+    stored_messages = (
+        session.execute(
+            select(ChatSessionMessageRecord)
+            .where(ChatSessionMessageRecord.session_id == session_id)
+            .order_by(ChatSessionMessageRecord.sequence.asc())
+        )
+        .scalars()
+        .all()
+    )
+    transcript: list[ChatSessionTranscriptMessage] = []
+    for entry in stored_messages:
+        citations: list[RAGCitation] = []
+        if isinstance(entry.citations, list):
+            for citation in entry.citations:
+                if not isinstance(citation, dict):
+                    continue
+                try:
+                    citations.append(RAGCitation.model_validate(citation))
+                except Exception:
+                    continue
+        transcript.append(
+            ChatSessionTranscriptMessage(
+                id=entry.id,
+                role=entry.role,
+                content=entry.content,
+                citations=citations,
+                created_at=entry.created_at,
+            )
+        )
+
+    preferences_payload = record.preferences if isinstance(record.preferences, dict) else {}
+    default_filters_payload = (
+        preferences_payload.get("default_filters") if isinstance(preferences_payload, dict) else None
+    )
+    panels_payload = (
+        preferences_payload.get("frequently_opened_panels")
+        if isinstance(preferences_payload, dict)
+        else []
+    )
+    mode_preference = (
+        preferences_payload.get("mode_id") if isinstance(preferences_payload, dict) else None
+    )
+
+    memory_snippets = (
+        record.memory_snippets if isinstance(record.memory_snippets, list) else []
+    )
+    memory = ChatSessionMemory(
+        summary=record.summary,
+        snippets=_truncate_memory_store(memory_snippets),
+    )
+
+    preferences = ChatSessionPreferences(
+        mode_id=mode_preference if isinstance(mode_preference, str) else record.mode_id,
+        default_filters=default_filters_payload,
+        frequently_opened_panels=_normalise_panels(panels_payload or []),
+    )
+
+    linked_document_ids = _normalise_panels(  # reuse dedup helper for strings
+        record.linked_document_ids if isinstance(record.linked_document_ids, list) else []
+    )
+
+    response = ChatSessionDetailResponse(
+        session_id=record.id,
+        stance=record.stance,
+        mode_id=record.mode_id or (mode_preference if isinstance(mode_preference, str) else None),
+        summary=record.summary,
+        memory=memory,
+        preferences=preferences,
+        messages=transcript,
+        linked_document_ids=linked_document_ids,
+        updated_at=record.updated_at,
+    )
+
+    content = response.model_dump(mode="json", by_alias=True, exclude_none=True)
+    preferences_payload = content.setdefault("preferences", {})
+    preferences_payload["modeId"] = response.preferences.mode_id
+
+    return JSONResponse(content=content)
+
+
+def _seed_chat_transcript(
+    session: Session,
+    chat_session: ChatSession,
+    messages: Sequence[ChatSessionMessage],
+) -> None:
+    if not messages:
+        return
+    existing_count = (
+        session.execute(
+            select(func.count(ChatSessionMessageRecord.id)).where(
+                ChatSessionMessageRecord.session_id == chat_session.id
+            )
+        )
+        .scalar()
+        or 0
+    )
+    if existing_count:
+        return
+    sequence = 1
+    seed_messages = list(messages)
+    if seed_messages and seed_messages[-1].role == "user":
+        seed_messages = seed_messages[:-1]
+    for payload in seed_messages[-_CHAT_TRANSCRIPT_SEED_LIMIT:]:
+        content = payload.content.strip()
+        if not content:
+            continue
+        record = ChatSessionMessageRecord(
+            session_id=chat_session.id,
+            role=payload.role,
+            content=content,
+            sequence=sequence,
+        )
+        session.add(record)
+        sequence += 1
+    session.flush()
+
+
+def _persist_chat_turn(
+    session: Session,
+    chat_session: ChatSession,
+    *,
+    question: str,
+    response: ChatSessionMessage,
+    answer: RAGAnswer,
+    payload: ChatSessionRequest,
+    memory_preview: Sequence[str] | None = None,
+) -> None:
+    max_sequence = (
+        session.execute(
+            select(func.max(ChatSessionMessageRecord.sequence)).where(
+                ChatSessionMessageRecord.session_id == chat_session.id
+            )
+        )
+        .scalar()
+        or 0
+    )
+    user_sequence = max_sequence + 1
+    assistant_sequence = user_sequence + 1
+
+    user_entry = ChatSessionMessageRecord(
+        session_id=chat_session.id,
+        role="user",
+        content=question,
+        sequence=user_sequence,
+    )
+    assistant_entry = ChatSessionMessageRecord(
+        session_id=chat_session.id,
+        role="assistant",
+        content=response.content,
+        citations=[
+            citation.model_dump(exclude_none=True)
+            for citation in answer.citations
+        ],
+        sequence=assistant_sequence,
+    )
+    session.add_all([user_entry, assistant_entry])
+
+    existing_snippets = (
+        chat_session.memory_snippets if isinstance(chat_session.memory_snippets, list) else []
+    )
+    updated_snippets = list(existing_snippets)
+    updated_snippets.append(f"User: {question}")
+    updated_snippets.append(f"Theo: {response.content}")
+    if memory_preview is not None:
+        chat_session.memory_snippets = list(memory_preview)
+    else:
+        chat_session.memory_snippets = _truncate_memory_store(updated_snippets)
+    chat_session.summary = answer.summary or response.content
+
+    existing_documents = set()
+    if isinstance(chat_session.linked_document_ids, list):
+        existing_documents.update(
+            doc_id.strip()
+            for doc_id in chat_session.linked_document_ids
+            if isinstance(doc_id, str) and doc_id.strip()
+        )
+    for citation in answer.citations:
+        if citation.document_id:
+            existing_documents.add(citation.document_id)
+    chat_session.linked_document_ids = sorted(existing_documents)
+
+    if payload.stance:
+        chat_session.stance = payload.stance
+    if payload.mode_id:
+        chat_session.mode_id = payload.mode_id
+    metadata = payload.recorder_metadata
+    if metadata and metadata.user_id and not chat_session.user_id:
+        chat_session.user_id = metadata.user_id
+
+    preference_payload = (
+        chat_session.preferences if isinstance(chat_session.preferences, dict) else {}
+    ).copy()
+    if payload.mode_id:
+        preference_payload["mode_id"] = payload.mode_id
+    elif chat_session.mode_id:
+        preference_payload["mode_id"] = chat_session.mode_id
+    elif payload.stance:
+        preference_payload["mode_id"] = payload.stance
+    preference_payload["default_filters"] = (
+        payload.filters.model_dump(exclude_none=True)
+    )
+    preference_payload["frequently_opened_panels"] = payload.frequently_opened_panels
+    chat_session.preferences = preference_payload
+
+    chat_session.last_turn_at = datetime.now(UTC)
+    chat_session.updated_at = datetime.now(UTC)
+
+    session.commit()
+
+
 @router.post(
     "/chat",
     response_model=ChatSessionResponse,
@@ -540,10 +837,44 @@ def chat_turn(
         raise HTTPException(status_code=400, detail="user message cannot be blank")
 
     session_id = payload.session_id or str(uuid4())
+
+    chat_session = session.get(ChatSession, session_id)
+    metadata = payload.recorder_metadata
+    user_id = metadata.user_id if metadata and metadata.user_id else None
+    created_session = False
+    if chat_session is None:
+        chat_session = ChatSession(
+            id=session_id,
+            user_id=user_id,
+            stance=payload.stance or payload.mode_id,
+            mode_id=payload.mode_id,
+            memory_snippets=[],
+            linked_document_ids=[],
+            preferences={
+                "mode_id": payload.mode_id or payload.stance,
+                "default_filters": payload.filters.model_dump(exclude_none=True),
+                "frequently_opened_panels": payload.frequently_opened_panels,
+            },
+        )
+        session.add(chat_session)
+        session.flush()
+        created_session = True
+    else:
+        if user_id and not chat_session.user_id:
+            chat_session.user_id = user_id
+
+    if created_session:
+        _seed_chat_transcript(session, chat_session, payload.messages)
+
+    memory_context = _prepare_memory_context(
+        chat_session.memory_snippets if isinstance(chat_session.memory_snippets, list) else []
+    )
+
     trail_service = TrailService(session)
 
     message: ChatSessionMessage | None = None
     answer: RAGAnswer | None = None
+    memory_preview: list[str] | None = None
 
     try:
         with trail_service.start_trail(
@@ -564,17 +895,32 @@ def chat_turn(
                 filters=payload.filters,
                 model_name=payload.model,
                 recorder=recorder,
+                memory_snippets=memory_context,
             )
             ensure_completion_safe(answer.model_output or answer.summary)
+            if answer.model_name == REFUSAL_MODEL_NAME:
+                raise GuardrailError(answer.summary or "chat request refused", safe_refusal=True)
 
             message_text = _extract_refusal_text(answer)
             message = ChatSessionMessage(role="assistant", content=message_text)
+            existing_memory = (
+                chat_session.memory_snippets
+                if isinstance(chat_session.memory_snippets, list)
+                else []
+            )
+            memory_preview = _truncate_memory_store(
+                list(existing_memory)
+                + [f"User: {question}", f"Theo: {message_text}"]
+            )
             recorder.finalize(
                 final_md=answer.summary,
                 output_payload={
                     "session_id": session_id,
                     "answer": answer,
                     "message": message,
+                    "memory_snippets": memory_preview
+                    if memory_preview is not None
+                    else chat_session.memory_snippets,
                 },
             )
     except GuardrailError as exc:
@@ -582,6 +928,16 @@ def chat_turn(
 
     if message is None or answer is None:
         raise HTTPException(status_code=500, detail="failed to compose chat response")
+
+    _persist_chat_turn(
+        session,
+        chat_session,
+        question=question,
+        response=message,
+        answer=answer,
+        payload=payload,
+        memory_preview=memory_preview,
+    )
 
     return ChatSessionResponse(session_id=session_id, message=message, answer=answer)
 

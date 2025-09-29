@@ -17,6 +17,7 @@ export type ChatWorkflowRequest = {
   sessionId?: string | null;
   prompt?: string | null;
   osis?: string | null;
+  frequentlyOpenedPanels?: string[] | null;
 };
 
 export type ChatWorkflowStreamEvent =
@@ -33,6 +34,37 @@ export type ChatWorkflowResult = ChatWorkflowSuccess | ChatWorkflowGuardrail;
 export type ChatWorkflowOptions = {
   signal?: AbortSignal;
   onEvent?: (event: ChatWorkflowStreamEvent) => void;
+};
+
+export type ChatSessionTranscriptEntry = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  citations: RAGCitation[];
+  createdAt?: string;
+};
+
+export type ChatSessionMemoryState = {
+  summary: string | null;
+  snippets: string[];
+};
+
+export type ChatSessionPreferencesState = {
+  modeId: string | null;
+  defaultFilters: components["schemas"]["HybridSearchFilters"] | null;
+  frequentlyOpenedPanels: string[];
+};
+
+export type ChatSessionDetails = {
+  sessionId: string;
+  stance: string | null;
+  modeId: string | null;
+  summary: string | null;
+  memory: ChatSessionMemoryState;
+  preferences: ChatSessionPreferencesState;
+  messages: ChatSessionTranscriptEntry[];
+  linkedDocumentIds: string[];
+  updatedAt: string | null;
 };
 
 function normaliseExportResponse(
@@ -60,6 +92,23 @@ function toOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function normaliseStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of value) {
+    const text = toOptionalString(item);
+    if (!text || seen.has(text)) {
+      continue;
+    }
+    seen.add(text);
+    result.push(text);
+  }
+  return result;
 }
 
 function parseGuardrailPayload(payload: unknown): { message: string; traceId: string | null } | null {
@@ -177,6 +226,96 @@ function normaliseChatCompletion(
   return { kind: "success", sessionId, answer };
 }
 
+function normaliseChatTranscriptEntry(value: unknown): ChatSessionTranscriptEntry | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = toOptionalString(record.id);
+  const role = toOptionalString(record.role);
+  if (!id || !role || (role !== "user" && role !== "assistant" && role !== "system")) {
+    return null;
+  }
+  const content = toOptionalString(record.content) ?? "";
+  const citations = Array.isArray(record.citations)
+    ? record.citations
+        .map(normaliseCitation)
+        .filter((citation): citation is RAGCitation => citation !== null)
+    : [];
+  const createdAt = toOptionalString(record.created_at ?? record.createdAt ?? null);
+  return {
+    id,
+    role: role as ChatSessionTranscriptEntry["role"],
+    content,
+    citations,
+    createdAt: createdAt ?? undefined,
+  };
+}
+
+function normaliseChatSessionDetails(payload: unknown): ChatSessionDetails | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  const sessionId =
+    toOptionalString(record.session_id ?? record.sessionId ?? record.id ?? null) ?? null;
+  if (!sessionId) {
+    return null;
+  }
+  const stance = toOptionalString(record.stance ?? null);
+  const modeId = toOptionalString(record.mode_id ?? record.modeId ?? null);
+  const summary = toOptionalString(record.summary ?? null);
+
+  const memoryRecord =
+    record.memory && typeof record.memory === "object"
+      ? (record.memory as Record<string, unknown>)
+      : {};
+  const memorySummary = toOptionalString(memoryRecord.summary ?? null);
+  const memorySnippets = normaliseStringArray(memoryRecord.snippets ?? []);
+
+  const preferencesRecord =
+    record.preferences && typeof record.preferences === "object"
+      ? (record.preferences as Record<string, unknown>)
+      : {};
+  const preferenceModeId =
+    toOptionalString(preferencesRecord.mode_id ?? preferencesRecord.modeId ?? null) ?? modeId;
+  const defaultFiltersRaw =
+    preferencesRecord.default_filters ?? preferencesRecord.defaultFilters ?? null;
+  const defaultFilters =
+    defaultFiltersRaw && typeof defaultFiltersRaw === "object"
+      ? (defaultFiltersRaw as components["schemas"]["HybridSearchFilters"])
+      : null;
+  const frequentPanels = normaliseStringArray(
+    preferencesRecord.frequently_opened_panels ?? preferencesRecord.frequentlyOpenedPanels ?? [],
+  );
+
+  const messagesRaw = Array.isArray(record.messages) ? record.messages : [];
+  const messages = messagesRaw
+    .map((item) => normaliseChatTranscriptEntry(item))
+    .filter((entry): entry is ChatSessionTranscriptEntry => entry !== null);
+
+  const linkedDocumentIds = normaliseStringArray(
+    record.linked_document_ids ?? record.linkedDocumentIds ?? [],
+  );
+  const updatedAt = toOptionalString(record.updated_at ?? record.updatedAt ?? null);
+
+  return {
+    sessionId,
+    stance: stance ?? null,
+    modeId: preferenceModeId ?? modeId ?? null,
+    summary: summary ?? null,
+    memory: { summary: memorySummary ?? null, snippets: memorySnippets },
+    preferences: {
+      modeId: preferenceModeId ?? modeId ?? null,
+      defaultFilters,
+      frequentlyOpenedPanels: frequentPanels,
+    },
+    messages,
+    linkedDocumentIds,
+    updatedAt: updatedAt ?? null,
+  };
+}
+
 function interpretStreamChunk(
   chunk: unknown,
   fallbackSessionId: string | null,
@@ -290,6 +429,7 @@ export class TheoApiClient {
       stance: payload.modeId,
       mode: payload.modeId,
       mode_id: payload.modeId,
+      frequently_opened_panels: payload.frequentlyOpenedPanels ?? [],
     };
     if (payload.prompt != null) {
       requestBody.prompt = payload.prompt;
@@ -435,6 +575,33 @@ export class TheoApiClient {
     }
 
     throw new Error("Unexpected chat workflow response.");
+  }
+
+  async getChatSession(sessionId: string): Promise<ChatSessionDetails | null> {
+    const trimmed = toOptionalString(sessionId);
+    if (!trimmed) {
+      return null;
+    }
+    const response = await fetch(`${this.baseUrl}/ai/chat/${encodeURIComponent(trimmed)}`, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    if (response.status === 404) {
+      return null;
+    }
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(buildErrorMessage(response.status, body));
+    }
+    const payload = (await response.json()) as unknown;
+    const details = normaliseChatSessionDetails(payload);
+    if (!details) {
+      throw new Error("Received malformed chat session payload");
+    }
+    return details;
   }
 
   runVerseWorkflow(payload: {
@@ -620,4 +787,4 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClient {
   return new TheoApiClient(baseUrl);
 }
 
-export type ChatWorkflowClient = Pick<TheoApiClient, "runChatWorkflow">;
+export type ChatWorkflowClient = Pick<TheoApiClient, "runChatWorkflow" | "getChatSession">;

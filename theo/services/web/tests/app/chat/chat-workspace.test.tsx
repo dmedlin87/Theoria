@@ -56,6 +56,7 @@ describe("ChatWorkspace", () => {
         events.forEach((event) => options?.onEvent?.(event));
         return successResult;
       }),
+      getChatSession: jest.fn(async () => null),
     };
 
     render(<ChatWorkspace client={client} />);
@@ -97,6 +98,7 @@ describe("ChatWorkspace", () => {
         options?.onEvent?.(guardrailEvent);
         return guardrailResult;
       }),
+      getChatSession: jest.fn(async () => null),
     };
 
     render(<ChatWorkspace client={client} />);

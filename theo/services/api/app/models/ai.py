@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal, Sequence
 
 from pydantic import AliasChoices, Field, model_validator
@@ -74,6 +75,9 @@ class ChatSessionRequest(APIModel):
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     recorder_metadata: RecorderMetadata | None = None
+    stance: str | None = None
+    mode_id: str | None = None
+    frequently_opened_panels: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _enforce_message_lengths(self) -> "ChatSessionRequest":
@@ -85,6 +89,18 @@ class ChatSessionRequest(APIModel):
                 raise ValueError(
                     "Chat message content exceeds the maximum allowed length"
                 )
+        if self.frequently_opened_panels:
+            unique: list[str] = []
+            seen: set[str] = set()
+            for panel in self.frequently_opened_panels:
+                if not isinstance(panel, str):
+                    continue
+                trimmed = panel.strip()
+                if not trimmed or trimmed in seen:
+                    continue
+                seen.add(trimmed)
+                unique.append(trimmed)
+            object.__setattr__(self, "frequently_opened_panels", unique)
         return self
 
 
@@ -92,6 +108,39 @@ class ChatSessionResponse(APIModel):
     session_id: str
     message: ChatSessionMessage
     answer: RAGAnswer
+
+
+class ChatSessionMemory(APIModel):
+    summary: str | None = None
+    snippets: list[str] = Field(default_factory=list)
+
+
+class ChatSessionPreferences(APIModel):
+    mode_id: str | None = Field(default=None, serialization_alias="modeId")
+    default_filters: HybridSearchFilters | None = Field(
+        default=None, serialization_alias="defaultFilters"
+    )
+    frequently_opened_panels: list[str] = Field(
+        default_factory=list, serialization_alias="frequentlyOpenedPanels"
+    )
+
+
+class ChatSessionTranscriptMessage(ChatSessionMessage):
+    id: str
+    citations: list[RAGCitation] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
+class ChatSessionDetailResponse(APIModel):
+    session_id: str
+    stance: str | None = None
+    mode_id: str | None = None
+    summary: str | None = None
+    memory: ChatSessionMemory = Field(default_factory=ChatSessionMemory)
+    preferences: ChatSessionPreferences = Field(default_factory=ChatSessionPreferences)
+    messages: list[ChatSessionTranscriptMessage] = Field(default_factory=list)
+    linked_document_ids: list[str] = Field(default_factory=list)
+    updated_at: datetime | None = None
 
 
 class GuardrailProfile(APIModel):
@@ -301,6 +350,10 @@ __all__ = [
     "ChatSessionMessage",
     "ChatSessionRequest",
     "ChatSessionResponse",
+    "ChatSessionDetailResponse",
+    "ChatSessionMemory",
+    "ChatSessionPreferences",
+    "ChatSessionTranscriptMessage",
     "RecorderMetadata",
     "LLMModelRequest",
     "LLMModelUpdateRequest",
