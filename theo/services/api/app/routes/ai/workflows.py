@@ -25,7 +25,13 @@ from ...ai import (
     run_research_reconciliation,
 )
 from ...ai.passage import PassageResolutionError, resolve_passage_reference
-from ...ai.rag import GuardrailError, RAGAnswer, RAGCitation, ensure_completion_safe
+from ...ai.rag import (
+    GuardrailError,
+    RAGAnswer,
+    RAGCitation,
+    REFUSAL_MODEL_NAME,
+    ensure_completion_safe,
+)
 from ...ai.registry import LLMModel, LLMRegistry, save_llm_registry
 from ...ai.trails import TrailService
 from ...core.database import get_session
@@ -540,10 +546,12 @@ def chat_turn(
                 recorder=recorder,
             )
             ensure_completion_safe(answer.model_output or answer.summary)
-            message = ChatSessionMessage(
-                role="assistant",
-                content=answer.model_output or answer.summary,
+            content = (
+                answer.summary
+                if answer.model_name == REFUSAL_MODEL_NAME
+                else (answer.model_output or answer.summary)
             )
+            message = ChatSessionMessage(role="assistant", content=content)
             recorder.finalize(
                 final_md=answer.summary,
                 output_payload={
