@@ -1,0 +1,20 @@
+[
+  {
+    "osis_a": "Luke.2.1-7",
+    "osis_b": "Luke.3.1-2",
+    "summary": "Luke ties the census decree to broader imperial edicts spanning years, an internal clue often used to reconcile Luke's and Matthew's nativity timelines.",
+    "source": "community",
+    "tags": ["chronology", "governance"],
+    "weight": 0.6,
+    "perspective": "apologetic"
+  },
+  {
+    "osis_a": "Matthew.27.5",
+    "osis_b": "Acts.1.18",
+    "summary": "Apologists harmonize Judas's death by proposing a hanging that led to a later fall, blending Matthew and Acts into a two-stage narrative.",
+    "source": "apologetics-study",
+    "tags": ["passion", "judas", "narrative"],
+    "weight": 0.7,
+    "perspective": "apologetic"
+  }
+]

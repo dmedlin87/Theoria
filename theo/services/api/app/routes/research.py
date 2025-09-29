@@ -9,6 +9,7 @@ from ..core.database import get_session
 from ..core.settings import get_settings
 from ..models.research import (
     ContradictionSearchResponse,
+    CommentaryExcerptResponse,
     CrossReference,
     CrossReferenceResponse,
     DssLink,
@@ -41,6 +42,7 @@ from ..research import (
     build_reliability_overview,
     create_research_note,
     delete_research_note,
+    get_commentary_excerpts,
     fallacy_detect,
     fetch_cross_references,
     fetch_dss_links,
@@ -323,6 +325,10 @@ def build_report(payload: ReportBuildRequest) -> ResearchReportResponse:
 def list_contradictions(
     osis: list[str] = Query(..., description="OSIS reference or list of references"),
     topic: str | None = Query(default=None, description="Optional topic tag filter"),
+    perspective: list[str] | None = Query(
+        default=None,
+        description="Optional perspective filter (skeptical, apologetic)",
+    ),
     limit: int = Query(default=25, ge=1, le=100),
     session: Session = Depends(get_session),
 ) -> ContradictionSearchResponse:
@@ -330,8 +336,32 @@ def list_contradictions(
     if not getattr(settings, "contradictions_enabled", True):
         return ContradictionSearchResponse(items=[])
 
-    items = search_contradictions(session, osis=osis, topic=topic, limit=limit)
+    items = search_contradictions(
+        session,
+        osis=osis,
+        topic=topic,
+        perspectives=perspective,
+        limit=limit,
+    )
     return ContradictionSearchResponse(items=items)
+
+
+@router.get("/commentaries", response_model=CommentaryExcerptResponse)
+def list_commentaries(
+    osis: str = Query(..., description="OSIS reference to retrieve commentaries for"),
+    perspective: list[str] | None = Query(
+        default=None,
+        description="Optional perspective filter (apologetic, skeptical)",
+    ),
+    limit: int = Query(default=25, ge=1, le=100),
+    session: Session = Depends(get_session),
+) -> CommentaryExcerptResponse:
+    return get_commentary_excerpts(
+        session,
+        osis=osis,
+        perspectives=perspective,
+        limit=limit,
+    )
 
 
 @router.get("/geo/search", response_model=GeoPlaceSearchResponse)

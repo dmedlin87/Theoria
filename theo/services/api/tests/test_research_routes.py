@@ -328,11 +328,44 @@ def test_contradictions_by_osis_returns_items_and_is_stable_shape() -> None:
         assert first["osis_a"] == "Luke.2.1-7"
         assert first["osis_b"] == "Matthew.2.1-12"
         assert first["tags"] == ["chronology", "nativity"]
+        assert first["perspective"] == "skeptical"
         assert (
             first["weight"] >= payload["items"][1]["weight"]
             if len(payload["items"]) > 1
             else True
         )
+        if len(payload["items"]) > 1:
+            second = payload["items"][1]
+            assert second["perspective"] == "apologetic"
+
+
+def test_contradictions_perspective_filter_limits_results() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/contradictions",
+            params=[
+                ("osis", "Matthew.27.5"),
+                ("perspective", "apologetic"),
+            ],
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["items"], "Expected harmonies for Judas narrative"
+        assert all(item["perspective"] == "apologetic" for item in payload["items"])
+
+
+def test_commentary_excerpts_endpoint_returns_seeded_samples() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/commentaries",
+            params={"osis": "Acts.1.18"},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["items"], "Expected commentary excerpts for Acts 1"
+        sample = payload["items"][0]
+        assert sample["perspective"] == "skeptical"
+        assert "Judas" in sample["excerpt"]
 
 
 def test_geo_lookup_returns_places_with_confidence_and_aliases() -> None:

@@ -15,6 +15,7 @@ export type ContradictionRecord = {
   source?: string | null;
   tags?: string[] | null;
   weight?: number | null;
+  perspective?: string | null;
 };
 
 type ContradictionsResponse = {
@@ -29,6 +30,7 @@ type ContradictionsApiItem = {
   source?: string | null;
   tags?: string[] | null;
   weight?: number | string | null;
+  perspective?: string | null;
 };
 
 function mapContradictionItem(item: ContradictionsApiItem): ContradictionRecord | null {
@@ -57,6 +59,7 @@ function mapContradictionItem(item: ContradictionsApiItem): ContradictionRecord 
     source: item.source?.trim() ?? null,
     tags: item.tags ?? null,
     weight,
+    perspective: item.perspective?.trim() ?? null,
   };
 }
 
@@ -70,6 +73,10 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
   const [error, setError] = useState<string | null>(null);
   const [contradictions, setContradictions] = useState<ContradictionRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([
+    "skeptical",
+    "apologetic",
+  ]);
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
 
@@ -83,10 +90,17 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(
-          `${baseUrl}/research/contradictions?osis=${encodeURIComponent(osis)}&mode=${encodeURIComponent(mode.id)}`,
-          { cache: "no-store" },
-        );
+        const params = new URLSearchParams();
+        params.set("osis", osis);
+        params.set("mode", mode.id);
+        selectedPerspectives.forEach((perspective) => {
+          if (perspective) {
+            params.append("perspective", perspective);
+          }
+        });
+        const response = await fetch(`${baseUrl}/research/contradictions?${params.toString()}`, {
+          cache: "no-store",
+        });
         if (!response.ok) {
           throw new Error((await response.text()) || response.statusText);
         }
@@ -115,7 +129,7 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, features?.contradictions, mode.id, osis]);
+  }, [baseUrl, features?.contradictions, mode.id, osis, selectedPerspectives]);
 
   if (!features?.contradictions) {
     return null;
@@ -146,7 +160,11 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
       ) : contradictions.length === 0 ? (
         <p>No contradictions found.</p>
       ) : (
-        <ContradictionsPanelClient contradictions={contradictions} />
+        <ContradictionsPanelClient
+          contradictions={contradictions}
+          selectedPerspectives={selectedPerspectives}
+          onPerspectivesChange={setSelectedPerspectives}
+        />
       )}
     </section>
   );

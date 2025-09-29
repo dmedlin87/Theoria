@@ -2,17 +2,19 @@
   {
     "osis_a": "Luke.2.1-7",
     "osis_b": "Matthew.2.1-12",
-    "summary": "Luke situates Jesus' birth during the census of Quirinius while Matthew frames it around Herod's reign, creating a classic chronology tension.",
+    "summary": "Luke situates Jesus' birth during the census of Quirinius while Matthew frames it under Herod, yielding a classic chronology tension in nativity harmonies.",
     "source": "community",
     "tags": ["chronology", "nativity"],
-    "weight": 0.9
+    "weight": 0.9,
+    "perspective": "skeptical"
   },
   {
-    "osis_a": "Luke.2.1-7",
-    "osis_b": "Luke.3.1-2",
-    "summary": "Internal Luke references highlight the multi-year scope of imperial decrees, offering a harmony reading of the census account.",
+    "osis_a": "Matthew.28.1",
+    "osis_b": "John.20.1",
+    "summary": "Resurrection accounts vary on which women came to the tomb and at what time, creating a surface discrepancy leveraged by critical readers.",
     "source": "community",
-    "tags": ["chronology", "governance"],
-    "weight": 0.6
+    "tags": ["resurrection", "gospels"],
+    "weight": 0.88,
+    "perspective": "skeptical"
   }
 ]

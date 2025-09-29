@@ -198,6 +198,16 @@ CREATE TABLE passages (
 CREATE INDEX ix_passages_embedding_hnsw ON passages USING hnsw (embedding vector_l2_ops);
 CREATE INDEX ix_passages_lexeme ON passages USING gin (lexeme);
 CREATE INDEX ix_passages_osis ON passages (osis_ref);
+
+### Seeded research catalogues
+
+Reference datasets bundled in `data/seeds/` extend the launch catalogue for the research panels:
+
+* `contradiction_seeds` – skeptical tension claims with optional topical tags and weights. Each entry records a `perspective` column so apologetic harmonies can be queried separately.
+* `harmony_seeds` – apologetic harmonization proposals mirroring the contradiction schema. Seeds surface in the Contradictions panel when the Apologetic filter is enabled.
+* `commentary_excerpts` – curated commentary snippets (title, excerpt, source, tradition, tags) normalized to OSIS. Entries are tagged by perspective to let the UI present critical vs. devotional readings side by side.
+
+These tables are maintained via the idempotent loader in `theo/services/api/app/db/seeds.py` and power the `/research/contradictions` and `/research/commentaries` endpoints.
 CREATE INDEX ix_passages_doc ON passages (document_id);
 
 ## 6) Chunking & Normalization (algorithms)

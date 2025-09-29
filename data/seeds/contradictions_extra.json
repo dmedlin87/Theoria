@@ -1,0 +1,20 @@
+[
+  {
+    "osis_a": "Matthew.27.5",
+    "osis_b": "Acts.1.18",
+    "summary": "Matthew records Judas throwing the silver in the temple and hanging himself, while Acts describes him falling headlong and bursting open, raising doubts about the death narrative.",
+    "source": "community",
+    "tags": ["passion", "judas", "historicity"],
+    "weight": 0.95,
+    "perspective": "skeptical"
+  },
+  {
+    "osis_a": "Exodus.9.6",
+    "osis_b": "Exodus.9.19-25",
+    "summary": "Exodus reports that the livestock of Egypt died in the plague, yet later implies surviving herds that can be sheltered, a surface-level inconsistency often cited in critical readings.",
+    "source": "secondary",
+    "tags": ["plagues", "torah", "narrative"],
+    "weight": 0.82,
+    "perspective": "skeptical"
+  }
+]

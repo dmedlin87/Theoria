@@ -1,5 +1,6 @@
 """Research data access helpers for scripture, cross-references, and notes."""
 
+from .commentaries import get_commentary_excerpts
 from .contradictions import search_contradictions
 from .crossrefs import fetch_cross_references
 from .fallacies import fallacy_detect
@@ -27,6 +28,7 @@ __all__ = [
     "update_research_note",
     "delete_research_note",
     "search_contradictions",
+    "get_commentary_excerpts",
     "lookup_geo_places",
     "places_for_osis",
     "variants_apparatus",

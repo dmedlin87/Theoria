@@ -1,0 +1,18 @@
+- osis: "Luke.2.1-7"
+  title: "Augustine on the census of Quirinius"
+  excerpt: |
+    Augustine reads Luke's census as providential timing, noting that the decree gathered the empire so that Christ's birth would be registered under Caesar's rule while fulfilling Micah's prophecy.
+  source: "Augustine, Sermon 196"
+  citation: "Nicene/Post-Nicene Fathers, Series 1"
+  tradition: "Patristic"
+  tags: ["incarnation", "nativity"]
+  perspective: "apologetic"
+- osis: "Acts.1.18"
+  title: "Modern critical commentary on Judas's death"
+  excerpt: |
+    Contemporary critical scholars highlight the divergent death traditions for Judas as independent community memories, seeing the tension as evidence of early narrative fluidity rather than contradiction to be reconciled.
+  source: "Critical Acts Commentary"
+  citation: "2020 ed., pp. 112-113"
+  tradition: "Critical"
+  tags: ["judas", "passion"]
+  perspective: "skeptical"
