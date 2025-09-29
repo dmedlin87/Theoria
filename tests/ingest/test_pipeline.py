@@ -137,8 +137,6 @@ def test_run_pipeline_for_url_rejects_disallowed_scheme(monkeypatch) -> None:
         settings.ingest_url_allowed_schemes = original_schemes
 
 
-def test_run_pipeline_for_url_blocks_private_ip_targets(monkeypatch) -> None:
-
 def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
     """Unsafe source URLs are stripped during file ingestion."""
 
@@ -224,7 +222,7 @@ def test_run_pipeline_for_url_blocks_private_targets(monkeypatch, blocked_url) -
     monkeypatch.setattr(pipeline, "_fetch_web_document", unexpected_fetch)
 
     with pytest.raises(pipeline.UnsupportedSourceError):
- 
+
         pipeline.run_pipeline_for_url(object(), blocked_url)
 
 
@@ -310,8 +308,7 @@ def test_pipeline_sanitises_adversarial_html(tmp_path, monkeypatch) -> None:
         assert "USER:" in raw_blob
     finally:
         settings.storage_root = original_storage
- 
-        pipeline.run_pipeline_for_url(object(), "https://10.0.0.12/secret")
+
 
 
 def test_run_pipeline_for_url_rejects_oversized_responses(monkeypatch) -> None:
@@ -363,4 +360,3 @@ def test_run_pipeline_for_url_rejects_oversized_responses(monkeypatch) -> None:
             pipeline.run_pipeline_for_url(object(), "https://example.com/large")
     finally:
         settings.ingest_web_max_bytes = original_max_bytes
- 
