@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from urllib.parse import urlparse
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from ..core.settings import get_settings
 
@@ -90,16 +90,94 @@ class DocumentPassagesResponse(APIModel):
     offset: int
 
 
+AnnotationType = Literal["claim", "evidence", "question", "note"]
+
+
 class DocumentAnnotationResponse(APIModel):
     id: str
     document_id: str
+    type: AnnotationType
     body: str
+    stance: str | None = None
+    passage_ids: list[str] = Field(default_factory=list)
+    group_id: str | None = None
+    metadata: dict[str, Any] | None = None
+    raw: dict[str, Any] | None = None
+    legacy: bool = False
     created_at: datetime
     updated_at: datetime
 
 
 class DocumentAnnotationCreate(APIModel):
-    body: str
+    type: AnnotationType | None = Field(
+        default=None, description="Structured annotation type"
+    )
+    text: str | None = Field(
+        default=None, description="Primary text body for the annotation"
+    )
+    stance: str | None = Field(
+        default=None, description="Optional stance label for the annotation"
+    )
+    passage_ids: list[str] = Field(
+        default_factory=list,
+        description="Passage identifiers referenced by this annotation",
+    )
+    group_id: str | None = Field(
+        default=None, description="Shared identifier to link related annotations"
+    )
+    metadata: dict[str, Any] | None = Field(
+        default=None, description="Arbitrary structured metadata for the annotation"
+    )
+    body: str | None = Field(
+        default=None,
+        description="Legacy free-form annotation text (alias for text)",
+    )
+
+    @field_validator("passage_ids", mode="before")
+    @classmethod
+    def _normalise_passage_ids(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            candidate = value.strip()
+            return [candidate] if candidate else []
+        cleaned: list[str] = []
+        for item in value:
+            candidate = str(item).strip()
+            if candidate:
+                cleaned.append(candidate)
+        return cleaned
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def _ensure_metadata_dict(
+        cls, value: Any
+    ) -> dict[str, Any] | None:  # pragma: no cover - defensive
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            return value
+        raise TypeError("metadata must be an object")
+
+    @model_validator(mode="after")
+    def _coerce_text(self) -> "DocumentAnnotationCreate":
+        text = (self.text or "").strip()
+        body = (self.body or "").strip()
+        if text and not body:
+            self.body = text
+        elif body and not text:
+            self.text = body
+        elif text and body and text != body:
+            # Prefer explicit text when both values are supplied.
+            self.body = text
+        final_text = (self.text or "").strip()
+        if not final_text:
+            raise ValueError("Annotation text cannot be empty")
+        self.text = final_text
+        self.body = final_text
+        if self.type is None:
+            self.type = "note"
+        return self
 
 
 class DocumentUpdateRequest(APIModel):
