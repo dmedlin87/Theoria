@@ -25,6 +25,7 @@ from .metadata import (
     prepare_transcript_chunks,
 )
 from .network import (
+    ensure_url_allowed,
     extract_youtube_video_id,
     fetch_web_document,
     is_youtube_url,
@@ -209,6 +210,8 @@ def run_pipeline_for_url(
             "youtube" if is_youtube_url(url) else "web_page"
         )
         set_span_attribute(span, "ingest.source_type", resolved_source_type)
+
+        ensure_url_allowed(settings, url)
 
         if resolved_source_type == "youtube":
             video_id = extract_youtube_video_id(url)
