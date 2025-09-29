@@ -216,6 +216,9 @@ def test_enqueue_collapses_concurrent_retries(
     instrumented_send_task.fail_after(1, lambda: RuntimeError("should not re-dispatch"))
 
     def enqueue_again() -> dict[str, Any]:
+        response = client.post("/jobs/enqueue", json=payload)
+        assert response.status_code == 202, response.text
+        return response.json()
 
 def test_enqueue_endpoint_is_concurrent_safe(
     monkeypatch: pytest.MonkeyPatch, client: TestClient

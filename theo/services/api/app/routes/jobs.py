@@ -423,7 +423,7 @@ def enqueue_job(
             job.task_id = task_id
 
         session.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         session.rollback()
         existing = (
             session.query(IngestionJob)
@@ -436,35 +436,19 @@ def enqueue_job(
             .first()
         )
 
-        if fallback is not None:
+        if existing is not None:
             return JobEnqueueResponse(
-                job_id=fallback.id,
-                task=fallback.job_type,
+                job_id=existing.id,
+                task=existing.job_type,
                 args_hash=args_hash,
-                queued_at=fallback.created_at,
-                schedule_at=fallback.scheduled_at,
-                status_url=f"/jobs/{fallback.id}",
+                queued_at=existing.created_at,
+                schedule_at=existing.scheduled_at,
+                status_url=f"/jobs/{existing.id}",
             )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Unable to enqueue job",
         ) from exc
-
-    task_id = getattr(result, "id", None)
-    if task_id:
-        job.task_id = task_id
-
-        if existing is None:
-            raise
-        return JobEnqueueResponse(
-            job_id=existing.id,
-            task=existing.job_type,
-            args_hash=args_hash,
-            queued_at=existing.created_at,
-            schedule_at=existing.scheduled_at,
-            status_url=f"/jobs/{existing.id}",
-        )
-
 
     session.refresh(job)
 
