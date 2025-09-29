@@ -92,8 +92,10 @@ def require_principal(
     settings = get_settings()
     principal: Principal | None = None
 
+
     credentials_configured = bool(settings.api_keys) or bool(settings.auth_jwt_secret)
     allow_anonymous = settings.auth_allow_anonymous or not credentials_configured
+
 
     if allow_anonymous and not authorization and not api_key_header:
         principal = {

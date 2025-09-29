@@ -43,6 +43,7 @@ from ..models.base import APIModel
 from ..models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from ..retriever.hybrid import hybrid_search
+from ..retriever.utils import compose_passage_meta
 from ..telemetry import (
     RAG_CACHE_EVENTS,
     instrument_workflow,
@@ -517,6 +518,7 @@ def _derive_snippet(
     return snippet or fallback_value
 
 
+
 def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
     citations: list[RAGCitation] = []
     for index, result in enumerate(results, start=1):
@@ -545,7 +547,6 @@ def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]
         )
     return citations
 
-
 def _normalise_snippet(text: str) -> str:
     collapsed = " ".join(text.split())
     if len(collapsed) <= 240:
@@ -559,6 +560,7 @@ def _build_guardrail_result(
     snippet_source = passage.text or document.title or "Guardrail passage"
     snippet = _normalise_snippet(snippet_source)
     title = document.title if document else None
+
     return HybridSearchResult(
         id=passage.id,
         document_id=passage.document_id,
@@ -575,8 +577,10 @@ def _build_guardrail_result(
         document_title=title,
         snippet=snippet,
         rank=0,
+
         highlights=None,
     )
+
 
 
 def _load_guardrail_reference(session: Session) -> HybridSearchResult | None:
@@ -602,6 +606,7 @@ def _load_guardrail_reference(session: Session) -> HybridSearchResult | None:
     if not passage.osis_ref:
         return None
     return _build_guardrail_result(passage, document)
+
 
 
 def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
@@ -708,6 +713,7 @@ def _guarded_answer(
     if not citations:
         fallback_result = _load_guardrail_reference(session)
         if fallback_result:
+
             ordered_results = [fallback_result]
             citations = _build_citations(ordered_results)
     if not citations:

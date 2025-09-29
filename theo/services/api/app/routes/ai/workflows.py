@@ -520,7 +520,7 @@ def chat_turn(
     total_message_chars = sum(len(message.content) for message in payload.messages)
     if total_message_chars > CHAT_SESSION_TOTAL_CHAR_BUDGET:
         raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="chat payload exceeds size limit",
         )
     last_user = next(
@@ -562,6 +562,7 @@ def chat_turn(
             ensure_completion_safe(answer.model_output or answer.summary)
             message_text = _extract_refusal_text(answer)
             message = ChatSessionMessage(role="assistant", content=message_text)
+
             recorder.finalize(
                 final_md=answer.summary,
                 output_payload={
