@@ -6,6 +6,7 @@ import importlib
 import logging
 from contextlib import contextmanager
 from time import perf_counter
+from collections.abc import Mapping
 from typing import Any, ContextManager, Iterable, Iterator, Protocol, cast
 
 
@@ -123,6 +124,13 @@ def _serialise_value(value: Any) -> Any:
         return None
     if isinstance(value, (str, bool, int, float)):
         return value
+    if isinstance(value, Mapping):
+        serialised_mapping: dict[Any, Any] = {}
+        for key, item in value.items():
+            serialised_item = _serialise_value(item)
+            if serialised_item is not None:
+                serialised_mapping[key] = serialised_item
+        return serialised_mapping
     if isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
         serialised: list[Any] = []
         for item in value:
