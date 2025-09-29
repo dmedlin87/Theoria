@@ -9,7 +9,9 @@ import zipfile
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
+from ipaddress import ip_address
 from pathlib import Path
+from unittest.mock import patch
 from xml.sax.saxutils import escape
 
 from fastapi.testclient import TestClient
@@ -357,6 +359,22 @@ def test_html_url_ingestion_and_searchable() -> None:
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+def test_url_ingest_rejects_domain_resolving_to_blocked_network() -> None:
+    with TestClient(app) as client:
+        with patch(
+            "theo.services.api.app.ingest.pipeline._resolve_host_addresses",
+            return_value=(ip_address("127.0.0.1"),),
+        ) as resolver:
+            response = client.post(
+                "/ingest/url", json={"url": "http://blocked.example/resource"}
+            )
+
+        resolver.assert_called()
+        assert response.status_code == 400
+        payload = response.json()
+        assert payload["detail"] == "URL target is not allowed for ingestion"
 
 
 def test_docx_ingestion_uses_doc_parser() -> None:

@@ -7,6 +7,7 @@ import json
 import re
 import shutil
 from datetime import date, datetime, timezone
+from functools import lru_cache
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
@@ -84,6 +85,68 @@ def _parse_blocked_networks(networks: list[str]) -> list[ip_network]:
     return parsed
 
 
+@lru_cache(maxsize=32)
+def _cached_blocked_networks(networks: tuple[str, ...]) -> tuple[ip_network, ...]:
+    return tuple(_parse_blocked_networks(list(networks)))
+
+
+@lru_cache(maxsize=128)
+def _resolve_host_addresses(host: str) -> tuple[ip_address, ...]:
+    normalised = _normalise_host(host)
+
+    try:
+        return (ip_address(normalised),)
+    except ValueError:
+        pass
+
+    try:
+        addr_info = socket.getaddrinfo(normalised, None)
+    except socket.gaierror as exc:
+        raise UnsupportedSourceError(_URL_TARGET_ERROR) from exc
+
+    addresses: list[ip_address] = []
+    for info in addr_info:
+        sockaddr = info[4]
+        if not sockaddr:
+            continue
+        raw_address = sockaddr[0]
+        if "%" in raw_address:
+            raw_address = raw_address.split("%", 1)[0]
+        try:
+            resolved = ip_address(raw_address)
+        except ValueError:
+            continue
+        addresses.append(resolved)
+
+    if not addresses:
+        raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+    unique = tuple(dict.fromkeys(addresses))
+    return unique
+
+
+def _ensure_resolved_addresses_allowed(settings, addresses: tuple[ip_address, ...]) -> None:
+    if not addresses:
+        raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+    blocked_networks = _cached_blocked_networks(
+        tuple(settings.ingest_url_blocked_ip_networks)
+    )
+
+    for resolved in addresses:
+        if settings.ingest_url_block_private_networks and (
+            resolved.is_loopback
+            or resolved.is_private
+            or resolved.is_reserved
+            or resolved.is_link_local
+        ):
+            raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+        for network in blocked_networks:
+            if resolved in network:
+                raise UnsupportedSourceError(_URL_TARGET_ERROR)
+
+
 def _ensure_url_allowed(settings, url: str) -> None:
     parsed = urlparse(url)
     if not parsed.scheme or not parsed.netloc:
@@ -116,20 +179,8 @@ def _ensure_url_allowed(settings, url: str) -> None:
     if normalised_host in blocked_hosts and not host_is_allowed:
         raise UnsupportedSourceError(_URL_TARGET_ERROR)
 
-    try:
-        ip = ip_address(normalised_host)
-    except ValueError:
-        ip = None
-
-    if ip is not None and not host_is_allowed:
-        if settings.ingest_url_block_private_networks and (
-            ip.is_loopback or ip.is_private or ip.is_reserved or ip.is_link_local
-        ):
-            raise UnsupportedSourceError(_URL_TARGET_ERROR)
-
-        for network in _parse_blocked_networks(settings.ingest_url_blocked_ip_networks):
-            if ip in network:
-                raise UnsupportedSourceError(_URL_TARGET_ERROR)
+    addresses = _resolve_host_addresses(normalised_host)
+    _ensure_resolved_addresses_allowed(settings, addresses)
 
 def _ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
     """Raise if *sha256* already exists for another document."""
@@ -963,11 +1014,12 @@ _WEB_FETCH_CHUNK_SIZE = 64 * 1024
 class _LoopDetectingRedirectHandler(HTTPRedirectHandler):
     """HTTP redirect handler that guards against loops and deep chains."""
 
-    def __init__(self, max_redirects: int) -> None:
+    def __init__(self, max_redirects: int, settings) -> None:
         super().__init__()
         self.max_redirects = max_redirects
         self.redirect_count = 0
         self.visited: set[str] = set()
+        self._settings = settings
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
         location = headers.get("Location") if headers else None
@@ -977,6 +1029,8 @@ class _LoopDetectingRedirectHandler(HTTPRedirectHandler):
         resolved = urljoin(getattr(req, "full_url", req.get_full_url()), location)
         if resolved in self.visited:
             raise UnsupportedSourceError("URL redirect loop detected")
+
+        _ensure_url_allowed(self._settings, resolved)
 
         self.redirect_count += 1
         if self.redirect_count > self.max_redirects:
@@ -1001,7 +1055,7 @@ def _fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]
     max_bytes = getattr(settings, "ingest_web_max_bytes", None)
     max_redirects = getattr(settings, "ingest_web_max_redirects", 5)
 
-    redirect_handler = _LoopDetectingRedirectHandler(max_redirects)
+    redirect_handler = _LoopDetectingRedirectHandler(max_redirects, settings)
     redirect_handler.visited.add(url)
 
     opener = build_opener(redirect_handler)
