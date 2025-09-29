@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { TheoApiClient, createTheoApiClient } from "../../lib/api-client";
+import type { TheoApiClient } from "../../lib/api-client";
+import { createTheoApiClient } from "../../lib/api-client";
 import { EXPORT_PRESET_LOOKUP } from "./export-presets";
 import type {
   CollaborationResponse,

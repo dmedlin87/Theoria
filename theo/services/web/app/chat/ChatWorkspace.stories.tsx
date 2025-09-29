@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 
 import ChatWorkspace from "./ChatWorkspace";
-import type { ChatWorkflowClient, ChatWorkflowResult, ChatWorkflowStreamEvent } from "../lib/api-client";
+import type { ChatWorkflowClient, ChatWorkflowResult, ChatWorkflowStreamEvent } from "../lib/chat-client";
 import { DEFAULT_MODE_ID } from "../mode-config";
 import { ModeProvider } from "../mode-context";
 

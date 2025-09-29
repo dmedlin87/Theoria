@@ -4,15 +4,11 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout";
-import type {
-  ChatSessionPreferencesPayload,
-  ChatSessionState,
-  ChatWorkflowClient,
-  ChatWorkflowMessage,
-  ChatWorkflowStreamEvent,
-  HybridSearchFilters,
-} from "../lib/api-client";
-import { TheoApiError, createTheoApiClient } from "../lib/api-client";
+import type { ChatSessionPreferencesPayload, ChatSessionState } from "../lib/api-normalizers";
+import type { ChatWorkflowClient, ChatWorkflowMessage, ChatWorkflowStreamEvent } from "../lib/chat-client";
+import { createTheoApiClient } from "../lib/api-client";
+import { TheoApiError } from "../lib/http";
+import type { HybridSearchFilters } from "../lib/guardrails";
 import {
   type GuardrailFailureMetadata,
   type GuardrailSuggestion,
