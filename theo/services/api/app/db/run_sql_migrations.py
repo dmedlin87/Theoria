@@ -33,6 +33,20 @@ def _migration_key(filename: str) -> str:
     return f"{_MIGRATION_KEY_PREFIX}{filename}"
 
 
+def _requires_autocommit(sql: str) -> bool:
+    return "CONCURRENTLY" in sql.upper()
+
+
+def _execute_autocommit(engine: Engine, sql: str) -> None:
+    statements = [part.strip() for part in sql.split(";") if part.strip()]
+    if not statements:
+        return
+
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+        for statement in statements:
+            connection.exec_driver_sql(statement)
+
+
 def run_sql_migrations(
     engine: Engine | None = None,
     migrations_path: Path | None = None,
@@ -82,8 +96,14 @@ def run_sql_migrations(
                 continue
 
             logger.info("Applying SQL migration: %s", migration_name)
-            connection = session.connection()
-            connection.exec_driver_sql(sql)
+            if _requires_autocommit(sql):
+                session.flush()
+                session.commit()
+                _execute_autocommit(engine, sql)
+            else:
+                connection = session.connection()
+                connection.exec_driver_sql(sql)
+
             session.add(
                 AppSetting(
                     key=key,
@@ -93,8 +113,7 @@ def run_sql_migrations(
                     },
                 )
             )
+            session.commit()
             applied.append(migration_name)
-
-        session.commit()
 
     return applied

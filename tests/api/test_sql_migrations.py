@@ -64,3 +64,46 @@ def test_sql_migrations_run_on_startup(tmp_path: Path, monkeypatch: pytest.Monke
     assert not any("INSERT INTO test_table" in stmt for stmt in executed_statements)
 
     configure_engine("sqlite://")
+
+
+def test_cli_entry_point_invokes_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cli_module = importlib.import_module("scripts.run_sql_migrations")
+
+    class DummyEngine:
+        pass
+
+    captured: dict[str, object] = {}
+
+    def _configure(url: str | None = None):
+        captured["database_url"] = url
+        return DummyEngine()
+
+    def _run(engine, migrations_path=None, force=False):  # type: ignore[no-untyped-def]
+        captured["engine"] = engine
+        captured["migrations_path"] = migrations_path
+        captured["force"] = force
+        return ["20250115_watchlist_timestamp_indexes.sql"]
+
+    monkeypatch.setattr(cli_module, "configure_engine", _configure)
+    monkeypatch.setattr(cli_module, "run_sql_migrations", _run)
+
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+
+    exit_code = cli_module.main(
+        [
+            "--database-url",
+            "postgresql://localhost/theo",  # pragma: allowlist secret
+            "--path",
+            str(migrations_dir),
+            "--force",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured["database_url"] == "postgresql://localhost/theo"
+    assert captured["migrations_path"] == migrations_dir
+    assert captured["force"] is True
+    assert isinstance(captured["engine"], DummyEngine)
