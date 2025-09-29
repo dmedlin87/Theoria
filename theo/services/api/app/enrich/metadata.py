@@ -376,7 +376,7 @@ def _normalise_doi(raw: Any) -> str | None:
 
 
 def _extract_doi_from_url(url: str) -> str | None:
-    if "doi.org" not in url:
+    if "doi.org" not in url.lower():
         return None
     path = urlsplit(url).path
     if not path:
