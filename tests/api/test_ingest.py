@@ -7,6 +7,8 @@ import sys
 
 import pytest
 from fastapi import status
+import json
+
 from fastapi.testclient import TestClient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -211,6 +213,61 @@ def test_ingest_url_blocks_private_targets(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["detail"] == "URL target is not allowed for ingestion"
+
+
+def test_simple_ingest_streams_progress(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+) -> None:
+    items = [
+        ingest_module.cli_ingest.IngestItem(path=Path("/tmp/file.md"), source_type="markdown"),
+        ingest_module.cli_ingest.IngestItem(url="https://example.com", source_type="web_page"),
+    ]
+
+    monkeypatch.setattr(ingest_module.cli_ingest, "_discover_items", lambda sources: items)
+    monkeypatch.setattr(ingest_module.cli_ingest, "_batched", lambda iterable, size: iter([list(iterable)]))
+
+    captured_overrides: list[dict[str, object]] = []
+
+    def fake_ingest(batch, overrides, post_batch_steps):  # noqa: ANN001 - test helper
+        captured_overrides.append(dict(overrides))
+        assert len(batch) == len(items)
+        assert post_batch_steps == set()
+        return [f"doc-{idx}" for idx, _ in enumerate(batch, start=1)]
+
+    monkeypatch.setattr(ingest_module.cli_ingest, "_ingest_batch_via_api", fake_ingest)
+
+    with api_client.stream(
+        "POST",
+        "/ingest/simple",
+        json={"sources": ["/data"], "metadata": {"collection": "archive"}},
+    ) as response:
+        assert response.status_code == 200
+        payload = [line for line in response.iter_lines() if line]
+
+    events = [json.loads(line) for line in payload]
+    event_names = [event.get("event") for event in events]
+    assert "start" in event_names
+    assert any(event.get("event") == "discovered" for event in events)
+    assert "batch" in event_names
+    assert "processed" in event_names
+    assert event_names[-1] == "complete"
+    assert captured_overrides == [
+        {"collection": "archive", "author": ingest_module.cli_ingest.DEFAULT_AUTHOR}
+    ]
+
+
+def test_simple_ingest_rejects_bad_source(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+) -> None:
+    def fail_discovery(_sources):  # noqa: ANN001 - simple failure helper
+        raise ValueError("Path 'missing' does not exist")
+
+    monkeypatch.setattr(ingest_module.cli_ingest, "_discover_items", fail_discovery)
+
+    response = api_client.post("/ingest/simple", json={"sources": ["missing"]})
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "does not exist" in response.json()["detail"]
 
 
 

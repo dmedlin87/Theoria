@@ -44,6 +44,43 @@ class UrlIngestRequest(APIModel):
         return value
 
 
+class SimpleIngestRequest(APIModel):
+    sources: list[str] = Field(min_length=1)
+    mode: Literal["api", "worker"] = "api"
+    batch_size: int = Field(default=10, ge=1)
+    metadata: dict[str, Any] | None = None
+    post_batch: list[str] | None = None
+    dry_run: bool = False
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def _normalise_sources(cls, value: object) -> list[str]:
+        if isinstance(value, str):
+            segments = [segment.strip() for segment in value.splitlines() if segment.strip()]
+            if not segments:
+                raise ValueError("At least one source is required")
+            return segments
+        if isinstance(value, (list, tuple, set)):
+            segments = [str(item).strip() for item in value if str(item).strip()]
+            if not segments:
+                raise ValueError("At least one source is required")
+            return segments
+        raise ValueError("Sources must be provided as a list or newline-delimited string")
+
+    @field_validator("post_batch", mode="before")
+    @classmethod
+    def _normalise_post_batch(cls, value: object) -> list[str] | None:
+        if value in (None, ""):
+            return None
+        if isinstance(value, str):
+            segments = [segment.strip() for segment in value.split(",") if segment.strip()]
+            return segments or None
+        if isinstance(value, (list, tuple, set)):
+            segments = [str(item).strip() for item in value if str(item).strip()]
+            return segments or None
+        raise ValueError("Invalid post-batch configuration")
+
+
 class DocumentSummary(APIModel):
     id: str
     title: str | None = None

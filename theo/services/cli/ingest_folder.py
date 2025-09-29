@@ -7,31 +7,47 @@ import os
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, cast
+from typing import Any, Callable, Iterable, Iterator, Sequence, cast
 from uuid import uuid4
 
 import click
 import httpx
 from sqlalchemy.orm import Session
+from urllib.parse import urlparse
 
 from ..api.app.core.database import get_engine
 from ..api.app.db.models import Document
 from ..api.app.enrich import MetadataEnricher
-from ..api.app.ingest.pipeline import run_pipeline_for_file
+from ..api.app.ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
 from ..api.app.workers import tasks as worker_tasks
+from ..api.app.telemetry import log_workflow_event
 
 SUPPORTED_TRANSCRIPT_EXTENSIONS = {".vtt", ".webvtt", ".srt"}
 SUPPORTED_TEXT_EXTENSIONS = {".md", ".markdown", ".txt", ".html", ".htm"}
 
 POST_BATCH_CHOICES = {"tags", "summaries", "biblio"}
 
+DEFAULT_COLLECTION = "uploads"
+DEFAULT_AUTHOR = "Theo Engine"
+
 
 @dataclass(frozen=True)
-class FolderItem:
-    """Represents a discovered file eligible for ingestion."""
+class IngestItem:
+    """Represents a discovered ingestion target."""
 
-    path: Path
     source_type: str
+    path: Path | None = None
+    url: str | None = None
+
+    @property
+    def is_remote(self) -> bool:
+        return self.url is not None
+
+    @property
+    def label(self) -> str:
+        if self.path is not None:
+            return str(self.path)
+        return str(self.url or "")
 
 
 def _detect_source_type(path: Path) -> str:
@@ -51,6 +67,18 @@ def _detect_source_type(path: Path) -> str:
     return "file"
 
 
+def _detect_url_source_type(url: str) -> str:
+    host = urlparse(url).netloc.lower()
+    if "youtube" in host or "youtu.be" in host:
+        return "youtube"
+    return "web_page"
+
+
+def _looks_like_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return bool(parsed.scheme and parsed.netloc)
+
+
 def _is_supported(path: Path) -> bool:
     if not path.is_file():
         return False
@@ -63,7 +91,30 @@ def _is_supported(path: Path) -> bool:
     )
 
 
-def _walk_folder(path: Path) -> Iterator[FolderItem]:
+def _discover_items(sources: Sequence[str]) -> list[IngestItem]:
+    """Expand a list of user-supplied sources into ingestable items."""
+
+    items: list[IngestItem] = []
+    for raw_source in sources:
+        source = raw_source.strip()
+        if not source:
+            continue
+        if _looks_like_url(source):
+            items.append(
+                IngestItem(url=source, source_type=_detect_url_source_type(source))
+            )
+            continue
+
+        path = Path(source).expanduser()
+        if not path.exists():
+            raise ValueError(f"Path '{source}' does not exist")
+        if not path.is_dir() and not _is_supported(path):
+            continue
+        items.extend(_walk_folder(path))
+    return items
+
+
+def _walk_folder(path: Path) -> Iterator[IngestItem]:
     candidates: Iterable[Path]
     if path.is_file():
         candidates = [path]
@@ -72,7 +123,7 @@ def _walk_folder(path: Path) -> Iterator[FolderItem]:
     for candidate in candidates:
         if not candidate.is_file() or not _is_supported(candidate):
             continue
-        yield FolderItem(path=candidate, source_type=_detect_source_type(candidate))
+        yield IngestItem(path=candidate, source_type=_detect_source_type(candidate))
 
 
 def _parse_metadata_overrides(pairs: tuple[str, ...]) -> dict[str, object]:
@@ -93,13 +144,23 @@ def _parse_metadata_overrides(pairs: tuple[str, ...]) -> dict[str, object]:
     return overrides
 
 
-def _batched(iterable: Iterable[FolderItem], size: int) -> Iterator[list[FolderItem]]:
+def _batched(iterable: Iterable[IngestItem], size: int) -> Iterator[list[IngestItem]]:
     iterator = iter(iterable)
     while True:
         batch = list(islice(iterator, size))
         if not batch:
             return
         yield batch
+
+
+def _apply_default_metadata(overrides: dict[str, object]) -> dict[str, object]:
+    """Ensure CLI ingests provide baseline metadata for discovery."""
+
+    enriched = dict(overrides)
+    enriched.setdefault("collection", DEFAULT_COLLECTION)
+    if "author" not in enriched and "authors" not in enriched:
+        enriched["author"] = DEFAULT_AUTHOR
+    return enriched
 
 
 def _parse_post_batch_steps(values: tuple[str, ...]) -> set[str]:
@@ -199,7 +260,7 @@ def _run_post_batch_operations(
 
 
 def _ingest_batch_via_api(
-    batch: list[FolderItem],
+    batch: list[IngestItem],
     overrides: dict[str, object],
     post_batch_steps: set[str] | None = None,
 ) -> list[str]:
@@ -208,7 +269,17 @@ def _ingest_batch_via_api(
     with Session(engine) as session:
         for item in batch:
             frontmatter = dict(overrides)
-            document = run_pipeline_for_file(session, item.path, frontmatter)
+            if item.is_remote:
+                document = run_pipeline_for_url(
+                    session,
+                    cast(str, item.url),
+                    source_type=item.source_type,
+                    frontmatter=frontmatter,
+                )
+            else:
+                document = run_pipeline_for_file(
+                    session, cast(Path, item.path), frontmatter
+                )
             document_ids.append(document.id)
         if post_batch_steps:
             _run_post_batch_operations(session, document_ids, post_batch_steps)
@@ -216,21 +287,30 @@ def _ingest_batch_via_api(
 
 
 def _queue_batch_via_worker(
-    batch: list[FolderItem], overrides: dict[str, object]
+    batch: list[IngestItem], overrides: dict[str, object]
 ) -> list[str]:
     task_ids: list[str] = []
     process_file_task = cast(Any, worker_tasks.process_file)
+    process_url_task = cast(Any, worker_tasks.process_url)
     for item in batch:
         frontmatter = dict(overrides)
-        async_result = process_file_task.delay(
-            str(uuid4()), str(item.path), frontmatter
-        )
+        if item.is_remote:
+            async_result = process_url_task.delay(
+                str(uuid4()),
+                cast(str, item.url),
+                item.source_type,
+                frontmatter,
+            )
+        else:
+            async_result = process_file_task.delay(
+                str(uuid4()), str(cast(Path, item.path)), frontmatter
+            )
         task_ids.append(async_result.id if hasattr(async_result, "id") else "queued")
     return task_ids
 
 
 @click.command()
-@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.argument("source", type=str)
 @click.option(
     "--mode",
     type=click.Choice(["api", "worker"], case_sensitive=False),
@@ -262,7 +342,7 @@ def _queue_batch_via_worker(
     ),
 )
 def ingest_folder(
-    path: Path,
+    source: str,
     *,
     mode: str,
     batch_size: int,
@@ -270,23 +350,55 @@ def ingest_folder(
     metadata_overrides: tuple[str, ...],
     post_batch_steps: tuple[str, ...],
 ) -> None:
-    """Queue every supported file in PATH for ingestion."""
+    """Queue every supported source (path or URL) for ingestion."""
 
-    overrides = _parse_metadata_overrides(metadata_overrides)
-    items = list(_walk_folder(path))
+    overrides = _apply_default_metadata(
+        _parse_metadata_overrides(metadata_overrides)
+    )
+    try:
+        items = _discover_items([source])
+    except ValueError as exc:
+        raise click.BadParameter(str(exc)) from exc
     normalized_post_batch = _parse_post_batch_steps(post_batch_steps)
     if not items:
         click.echo("No supported files found.")
+        log_workflow_event(
+            "cli.ingest.empty",
+            workflow="cli.ingest_folder",
+            source=source,
+        )
         return
 
-    click.echo(f"Discovered {len(items)} supported file(s) in {path}.")
+    click.echo(f"Discovered {len(items)} supported source(s) from {source}.")
+    log_workflow_event(
+        "cli.ingest.started",
+        workflow="cli.ingest_folder",
+        source=source,
+        mode=mode,
+        dry_run=dry_run,
+        batch_size=batch_size,
+        item_count=len(items),
+    )
     for batch_number, batch in enumerate(_batched(items, batch_size), start=1):
-        click.echo(f"Batch {batch_number}: {len(batch)} file(s).")
+        click.echo(f"Batch {batch_number}: {len(batch)} item(s).")
+        log_workflow_event(
+            "cli.ingest.batch",
+            workflow="cli.ingest_folder",
+            source=source,
+            batch_number=batch_number,
+            batch_size=len(batch),
+        )
         for item in batch:
-            click.echo(f" - [{item.source_type}] {item.path}")
+            click.echo(f" - [{item.source_type}] {item.label}")
 
         if dry_run:
             click.echo("Dry-run enabled; skipping ingestion.")
+            log_workflow_event(
+                "cli.ingest.dry_run",
+                workflow="cli.ingest_folder",
+                source=source,
+                batch_number=batch_number,
+            )
             continue
 
         if mode.lower() == "api":
@@ -294,13 +406,37 @@ def ingest_folder(
                 batch, overrides, normalized_post_batch
             )
             for item, doc_id in zip(batch, document_ids):
-                click.echo(f"   Processed {item.path} → document {doc_id}")
+                click.echo(f"   Processed {item.label} → document {doc_id}")
+                log_workflow_event(
+                    "cli.ingest.processed",
+                    workflow="cli.ingest_folder",
+                    source=source,
+                    backend="api",
+                    target=item.label,
+                    document_id=doc_id,
+                )
         else:
             if normalized_post_batch:
                 click.echo("   Post-batch steps require API mode; skipping.")
             task_ids = _queue_batch_via_worker(batch, overrides)
             for item, task_id in zip(batch, task_ids):
-                click.echo(f"   Queued {item.path} → task {task_id}")
+                click.echo(f"   Queued {item.label} → task {task_id}")
+                log_workflow_event(
+                    "cli.ingest.queued",
+                    workflow="cli.ingest_folder",
+                    source=source,
+                    backend="worker",
+                    target=item.label,
+                    task_id=task_id,
+                )
+
+    log_workflow_event(
+        "cli.ingest.completed",
+        workflow="cli.ingest_folder",
+        source=source,
+        mode=mode,
+        dry_run=dry_run,
+    )
 
 
 if __name__ == "__main__":
