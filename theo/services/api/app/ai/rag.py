@@ -1097,7 +1097,7 @@ def _guarded_answer(
             )
 
     if recorder:
-        recorder.log_step(
+        compose_step = recorder.log_step(
             tool="rag.compose",
             action="compose_answer",
             input_payload={
@@ -1121,6 +1121,21 @@ def _guarded_answer(
                 "validation": validation_result,
             },
             output_digest=f"{len(summary_lines)} summary lines",
+        )
+
+        passage_ids = [
+            citation.passage_id
+            for citation in citations
+            if getattr(citation, "passage_id", None)
+        ]
+        osis_refs = [
+            citation.osis for citation in citations if getattr(citation, "osis", None)
+        ]
+        recorder.record_retrieval_snapshot(
+            retrieval_hash=retrieval_digest,
+            passage_ids=passage_ids,
+            osis_refs=osis_refs,
+            step=compose_step,
         )
 
     return answer
