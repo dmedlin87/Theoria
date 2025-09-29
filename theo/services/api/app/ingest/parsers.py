@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import re
 import wave
@@ -387,24 +388,21 @@ def _parse_html_with_unstructured(
     except Exception:  # pragma: no cover - optional dependency
         return None
 
-    kwargs: dict[str, Any]
     if raw_html is not None:
-        kwargs = {"text": raw_html, "metadata_filename": path.name}
+        html_text = raw_html
     else:
-        kwargs = {"filename": str(path)}
-    try:
-
-        # Decode the HTML upfront so we can fall back to replacement characters when
-        # encountering unexpected encodings (for example Windows-1252 smart quotes).
-        # Passing the decoded text into ``partition_html`` avoids the library trying
-        # to re-open the file using a strict UTF-8 decode, which previously caused
-        # guardrail tests to miss lossy substitutions that our pipeline expects.
-        html_text = read_text_file(path)
-    except OSError:
-        return None
+        try:
+            # Decode the HTML upfront so we can fall back to replacement characters when
+            # encountering unexpected encodings (for example Windows-1252 smart quotes).
+            # Passing the decoded text into ``partition_html`` avoids the library trying
+            # to re-open the file using a strict UTF-8 decode, which previously caused
+            # guardrail tests to miss lossy substitutions that our pipeline expects.
+            html_text = read_text_file(path)
+        except OSError:
+            return None
 
     try:
-        elements = partition_html(text=html_text)
+        elements = partition_html(text=html_text, metadata_filename=path.name)
 
     except Exception:  # pragma: no cover - runtime guard
         return None
@@ -436,7 +434,29 @@ def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
             f"Unable to read HTML document '{path.name}'"
         ) from exc
 
-    parsed = _parse_html_with_unstructured(path, raw_html)
+    parse_callable = _parse_html_with_unstructured
+    parsed: tuple[str, dict[str, Any]] | None
+    try:
+        signature = inspect.signature(parse_callable)
+    except (TypeError, ValueError):  # pragma: no cover - builtins or C extensions
+        signature = None
+
+    if signature is not None:
+        parameters = list(signature.parameters.values())
+        accepts_multiple_args = any(
+            param.kind in {param.VAR_POSITIONAL, param.VAR_KEYWORD}
+            for param in parameters
+        ) or len(parameters) > 1
+        if accepts_multiple_args:
+            parsed = parse_callable(path, raw_html)
+        else:
+            parsed = parse_callable(path)
+    else:  # pragma: no cover - fallback for dynamic callables
+        try:
+            parsed = parse_callable(path, raw_html)
+        except TypeError:
+            parsed = parse_callable(path)
+
     if parsed:
         text, metadata = parsed
         parser = "unstructured"
