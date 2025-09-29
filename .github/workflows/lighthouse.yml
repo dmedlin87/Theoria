@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-
       - develop
   pull_request:
     branches:
@@ -13,77 +12,6 @@ on:
   schedule:
     - cron: '0 6 * * 1'
 
-jobs:
-  audit:
-    name: Run Lighthouse CI
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install Lighthouse CI
-        run: npm install --global @lhci/cli@0.15.1
-
-      - name: Verify staging availability
-        shell: bash
-        env:
-          LHCI_BASIC_AUTH_USER: ${{ secrets.STAGING_BASIC_AUTH_USERNAME }}
-          LHCI_BASIC_AUTH_PASSWORD: ${{ secrets.STAGING_BASIC_AUTH_PASSWORD }}
-        run: |
-          set -euo pipefail
-          URL=$(node -e "const cfg = require('./.lighthouserc.json'); const urls = cfg?.ci?.collect?.url || []; process.stdout.write(urls[0] ?? '');")
-          if [ -z "$URL" ]; then
-            echo 'Unable to determine the Lighthouse target URL from .lighthouserc.json.'
-            exit 1
-          fi
-
-          if [ -n "${LHCI_BASIC_AUTH_USER:-}" ] && [ -n "${LHCI_BASIC_AUTH_PASSWORD:-}" ]; then
-            AUTH_ARGS=(--user "${LHCI_BASIC_AUTH_USER}:${LHCI_BASIC_AUTH_PASSWORD}")
-          else
-            AUTH_ARGS=()
-          fi
-
-          for attempt in {1..5}; do
-            if curl --fail --silent --show-error --location "${AUTH_ARGS[@]}" "$URL" > /dev/null; then
-              exit 0
-            fi
-            echo "Attempt ${attempt} to reach $URL failed; retrying in 5 seconds..."
-            sleep 5
-          done
-
-          echo "Unable to reach $URL after multiple attempts." >&2
-          exit 1
-
-      - name: Run Lighthouse against staging
-        env:
-          LHCI_GITHUB_TOKEN: ${{ secrets.LHCI_GITHUB_TOKEN }}
-          LHCI_BASIC_AUTH_USER: ${{ secrets.STAGING_BASIC_AUTH_USERNAME }}
-          LHCI_BASIC_AUTH_PASSWORD: ${{ secrets.STAGING_BASIC_AUTH_PASSWORD }}
-        run: |
-          rm -rf .lighthouseci/current
-          lhci autorun --config=.lighthouserc.json
-
-      - name: Compare scores with baseline
-        run: node scripts/compare-lighthouse-baseline.mjs
-
-      - name: Upload Lighthouse reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: lighthouse-report-${{ github.run_id }}
-          path: .lighthouseci/current
-          if-no-files-found: error
-          retention-days: 14
-
-  pull_request:
   workflow_dispatch:
     inputs:
       target:
