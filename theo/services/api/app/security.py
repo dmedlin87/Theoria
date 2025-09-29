@@ -8,7 +8,7 @@ import jwt
 from fastapi import Header, HTTPException, Request, status
 from fastapi.security.utils import get_authorization_scheme_param
 
-from .core.settings import get_settings
+from .core.settings import Settings, get_settings
 
 
 class Principal(TypedDict, total=False):
@@ -82,6 +82,20 @@ def _decode_jwt(token: str) -> Principal:
         ) from exc
 
 
+def _anonymous_principal() -> Principal:
+    return {
+        "method": "anonymous",
+        "subject": None,
+        "scopes": [],
+        "claims": {},
+        "token": "",
+    }
+
+
+def _auth_configured(settings: Settings) -> bool:
+    return bool(settings.api_keys or settings.auth_jwt_secret)
+
+
 def require_principal(
     request: Request,
     authorization: str | None = Header(default=None),
@@ -91,7 +105,6 @@ def require_principal(
 
     settings = get_settings()
     principal: Principal | None = None
-
 
     credentials_configured = bool(settings.api_keys) or bool(settings.auth_jwt_secret)
     allow_anonymous = settings.auth_allow_anonymous or not credentials_configured

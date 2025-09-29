@@ -259,7 +259,10 @@ def _apply_guardrail_profile(
                 "topic_domain": filters.topic_domain,
             },
         )
-        raise GuardrailError("No passages matched the requested guardrail profile")
+        raise GuardrailError(
+            "No passages matched the requested guardrail profile",
+            safe_refusal=True,
+        )
 
     payload = {
         key: value
@@ -274,6 +277,10 @@ def _apply_guardrail_profile(
 
 class GuardrailError(GenerationError):
     """Raised when an answer violates grounding requirements."""
+
+    def __init__(self, message: str, *, safe_refusal: bool = False) -> None:
+        super().__init__(message)
+        self.safe_refusal = safe_refusal
 
 
 class RAGCitation(APIModel):
@@ -718,7 +725,8 @@ def _guarded_answer(
             citations = _build_citations(ordered_results)
     if not citations:
         raise GuardrailError(
-            "Retrieved passages lacked OSIS references; aborting generation"
+            "Retrieved passages lacked OSIS references; aborting generation",
+            safe_refusal=True,
         )
 
     cited_results = [result for result in ordered_results if result.osis_ref]
@@ -1048,6 +1056,133 @@ def _guarded_answer(
     return answer
 
 
+_REFUSAL_OSIS = "John.1.1"
+_REFUSAL_FALLBACK_ANCHOR = "John 1:1"
+_REFUSAL_FALLBACK_TITLE = "Guardrail Reference"
+_REFUSAL_FALLBACK_SNIPPET = (
+    "John 1:1 affirms the Word as divine and life-giving; our responses must remain "
+    "grounded in that hope."
+)
+REFUSAL_MODEL_NAME = "guardrail.refusal"
+REFUSAL_MESSAGE = "I’m sorry, but I cannot help with that request."
+
+
+def _load_refusal_reference(session: Session) -> tuple[Passage | None, Document | None]:
+    try:
+        record = (
+            session.execute(
+                select(Passage, Document)
+                .join(Document)
+                .where(Passage.osis_ref == _REFUSAL_OSIS)
+                .limit(1)
+            )
+            .first()
+        )
+    except Exception:  # pragma: no cover - defensive fallback
+        LOGGER.debug("failed to load guardrail refusal reference", exc_info=True)
+        return None, None
+    if not record:
+        return None, None
+    passage, document = record
+    return passage, document
+
+
+def _build_refusal_citation(session: Session) -> RAGCitation:
+    passage, document = _load_refusal_reference(session)
+    document_title = _REFUSAL_FALLBACK_TITLE
+    anchor = _REFUSAL_FALLBACK_ANCHOR
+    snippet = _REFUSAL_FALLBACK_SNIPPET
+    passage_id = "guardrail-passage"
+    document_id = "guardrail-document"
+
+    if passage is not None:
+        document_title = getattr(document, "title", None) or _REFUSAL_FALLBACK_TITLE
+        passage_id = passage.id
+        document_id = passage.document_id
+        result = HybridSearchResult(
+            id=passage.id,
+            document_id=passage.document_id,
+            text=passage.text or _REFUSAL_FALLBACK_SNIPPET,
+            raw_text=getattr(passage, "raw_text", None),
+            osis_ref=passage.osis_ref or _REFUSAL_OSIS,
+            start_char=passage.start_char,
+            end_char=passage.end_char,
+            page_no=passage.page_no,
+            t_start=passage.t_start,
+            t_end=passage.t_end,
+            score=1.0,
+            meta=getattr(passage, "meta", None),
+            document_title=document_title,
+            snippet=passage.text or _REFUSAL_FALLBACK_SNIPPET,
+            rank=1,
+            highlights=None,
+        )
+        snippet = _derive_snippet(result, fallback=_REFUSAL_FALLBACK_SNIPPET)
+        anchor = _format_anchor(result)
+
+    return RAGCitation(
+        index=1,
+        osis=_REFUSAL_OSIS,
+        anchor=anchor,
+        passage_id=passage_id,
+        document_id=document_id,
+        document_title=document_title,
+        snippet=snippet,
+        source_url=None,
+    )
+
+
+def build_guardrail_refusal(
+    session: Session, *, reason: str | None = None
+) -> RAGAnswer:
+    citation = _build_refusal_citation(session)
+    sources_line = f"[{citation.index}] {citation.osis} ({citation.anchor})"
+    model_output = f"{REFUSAL_MESSAGE}\n\nSources: {sources_line}"
+    guardrail_profile = {"status": "refused"}
+    if reason:
+        guardrail_profile["reason"] = reason
+    return RAGAnswer(
+        summary=REFUSAL_MESSAGE,
+        citations=[citation],
+        model_name=REFUSAL_MODEL_NAME,
+        model_output=model_output,
+        guardrail_profile=guardrail_profile,
+    )
+
+
+def _guarded_answer_or_refusal(
+    session: Session,
+    *,
+    context: str,
+    question: str | None,
+    results: Sequence[HybridSearchResult],
+    registry: LLMRegistry,
+    model_hint: str | None = None,
+    recorder: "TrailRecorder | None" = None,
+    filters: HybridSearchFilters | None = None,
+) -> RAGAnswer:
+    try:
+        return _guarded_answer(
+            session,
+            question=question,
+            results=results,
+            registry=registry,
+            model_hint=model_hint,
+            recorder=recorder,
+            filters=filters,
+        )
+    except GuardrailError as exc:
+        if not getattr(exc, "safe_refusal", False):
+            raise
+        LOGGER.warning(
+            "Guardrail enforcement failed for %s: %s",
+            context,
+            exc,
+            extra={"workflow": context},
+        )
+        return build_guardrail_refusal(session, reason=str(exc))
+
+
 def _search(
     session: Session,
     *,
@@ -1109,8 +1244,9 @@ def run_guarded_chat(
                 ],
                 output_digest=f"{len(results)} passages",
             )
-        answer = _guarded_answer(
+        answer = _guarded_answer_or_refusal(
             session,
+            context="chat",
             question=question,
             results=results,
             registry=registry,
@@ -1181,8 +1317,9 @@ def generate_verse_brief(
                 ],
                 output_digest=f"{len(results)} passages",
             )
-        answer = _guarded_answer(
+        answer = _guarded_answer_or_refusal(
             session,
+            context="verse_copilot",
             question=question,
             results=results,
             registry=registry,
@@ -1267,8 +1404,9 @@ def generate_sermon_prep_outline(
                 ],
                 output_digest=f"{len(results)} passages",
             )
-        answer = _guarded_answer(
+        answer = _guarded_answer_or_refusal(
             session,
+            context="sermon_prep",
             question=query,
             results=results,
             registry=registry,
@@ -1341,8 +1479,9 @@ def generate_comparative_analysis(
             result_count=len(results),
         )
         registry = get_llm_registry(session)
-        answer = _guarded_answer(
+        answer = _guarded_answer_or_refusal(
             session,
+            context="comparative_analysis",
             question=f"How do {', '.join(participants)} interpret {osis}?",
             results=results,
             registry=registry,
@@ -1417,8 +1556,9 @@ def generate_multimedia_digest(
                 output_digest=f"{len(results)} passages",
             )
         registry = get_llm_registry(session)
-        answer = _guarded_answer(
+        answer = _guarded_answer_or_refusal(
             session,
+            context="multimedia_digest",
             question="What are the key audio/video insights?",
             results=results,
             registry=registry,
@@ -1488,8 +1628,9 @@ def generate_devotional_flow(
                 output_digest=f"{len(results)} passages",
             )
         registry = get_llm_registry(session)
-        answer = _guarded_answer(
+        answer = _guarded_answer_or_refusal(
             session,
+            context="devotional",
             question=f"Devotional focus: {focus}",
             results=results,
             registry=registry,
@@ -1626,8 +1767,9 @@ def run_research_reconciliation(
                 output_digest=f"{len(results)} passages",
             )
         registry = get_llm_registry(session)
-        answer = _guarded_answer(
+        answer = _guarded_answer_or_refusal(
             session,
+            context="research_reconciliation",
             question=f"Reconcile viewpoints for {osis} in {thread}",
             results=results,
             registry=registry,
@@ -2138,6 +2280,8 @@ __all__ = [
     "CorpusCurationReport",
     "DevotionalResponse",
     "GuardrailError",
+    "REFUSAL_MODEL_NAME",
+    "REFUSAL_MESSAGE",
     "MultimediaDigestResponse",
     "RAGAnswer",
     "RAGCitation",
@@ -2145,6 +2289,7 @@ __all__ = [
     "VerseCopilotResponse",
     "build_sermon_deliverable",
     "build_sermon_prep_package",
+    "build_guardrail_refusal",
     "build_transcript_deliverable",
     "build_transcript_package",
     "generate_comparative_analysis",
