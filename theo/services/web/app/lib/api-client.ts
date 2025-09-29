@@ -2,6 +2,38 @@ import { getApiBaseUrl } from "./api";
 import type { components } from "./generated/api";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
+type ResearchModeId = import("../mode-config").ResearchModeId;
+type RAGAnswer = import("../copilot/components/types").RAGAnswer;
+type RAGCitation = import("../copilot/components/types").RAGCitation;
+
+export type ChatWorkflowMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+export type ChatWorkflowRequest = {
+  messages: ChatWorkflowMessage[];
+  modeId: ResearchModeId;
+  sessionId?: string | null;
+  prompt?: string | null;
+  osis?: string | null;
+};
+
+export type ChatWorkflowStreamEvent =
+  | { type: "answer_fragment"; content: string }
+  | { type: "complete"; response: { sessionId: string; answer: RAGAnswer } }
+  | { type: "guardrail_violation"; message: string; traceId?: string | null };
+
+export type ChatWorkflowSuccess = { kind: "success"; sessionId: string; answer: RAGAnswer };
+
+export type ChatWorkflowGuardrail = { kind: "guardrail"; message: string; traceId?: string | null };
+
+export type ChatWorkflowResult = ChatWorkflowSuccess | ChatWorkflowGuardrail;
+
+export type ChatWorkflowOptions = {
+  signal?: AbortSignal;
+  onEvent?: (event: ChatWorkflowStreamEvent) => void;
+};
 
 function normaliseExportResponse(
   payload: ExportDeliverableResponse,
@@ -20,6 +52,166 @@ function buildErrorMessage(status: number, body: string): string {
     return body;
   }
   return `Request failed with status ${status}`;
+}
+
+function toOptionalString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function parseGuardrailPayload(payload: unknown): { message: string; traceId: string | null } | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  const typeValue = toOptionalString(record.type) ?? toOptionalString(record.reason);
+  if (typeValue && typeValue.toLowerCase().includes("guardrail")) {
+    const message =
+      toOptionalString(record.message) ??
+      toOptionalString(record.detail) ??
+      "Response was blocked by content guardrails.";
+    const traceId =
+      toOptionalString(record.trace_id ?? record.traceId ?? record.trace ?? record.id ?? record.reference) ?? null;
+    return { message, traceId };
+  }
+
+  if (typeof record.guardrail === "object" && record.guardrail) {
+    const nested = parseGuardrailPayload(record.guardrail);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  if (Array.isArray(record.detail)) {
+    for (const item of record.detail) {
+      const nested = parseGuardrailPayload(item);
+      if (nested) {
+        return nested;
+      }
+    }
+  } else if (record.detail && typeof record.detail === "object") {
+    const nested = parseGuardrailPayload(record.detail);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function normaliseCitation(value: unknown): RAGCitation | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const index = typeof record.index === "number" ? record.index : null;
+  const osis = toOptionalString(record.osis);
+  const anchor = toOptionalString(record.anchor);
+  const passageId = toOptionalString(record.passage_id);
+  const documentId = toOptionalString(record.document_id);
+  const snippet = toOptionalString(record.snippet);
+  if (
+    index == null ||
+    !osis ||
+    !anchor ||
+    !passageId ||
+    !documentId ||
+    !snippet
+  ) {
+    return null;
+  }
+  return {
+    index,
+    osis,
+    anchor,
+    passage_id: passageId,
+    document_id: documentId,
+    snippet,
+    document_title: toOptionalString(record.document_title),
+    source_url: toOptionalString(record.source_url),
+  };
+}
+
+function normaliseAnswer(value: unknown): RAGAnswer | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const summary = toOptionalString(record.summary) ?? "";
+  const citations = Array.isArray(record.citations)
+    ? record.citations.map(normaliseCitation).filter((citation): citation is RAGCitation => citation !== null)
+    : [];
+  const modelName = toOptionalString(record.model_name);
+  const modelOutput = toOptionalString(record.model_output);
+  const guardrailProfile =
+    record.guardrail_profile && typeof record.guardrail_profile === "object"
+      ? (record.guardrail_profile as Record<string, string>)
+      : null;
+
+  return {
+    summary,
+    citations,
+    model_name: modelName ?? null,
+    model_output: modelOutput ?? null,
+    guardrail_profile: guardrailProfile,
+  };
+}
+
+function normaliseChatCompletion(
+  payload: unknown,
+  fallbackSessionId: string | null,
+): ChatWorkflowSuccess | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  const answer = normaliseAnswer(record.answer ?? record.result ?? null);
+  if (!answer) {
+    return null;
+  }
+  const sessionId =
+    toOptionalString(record.session_id ?? record.sessionId ?? record.id) ?? fallbackSessionId ?? "session";
+  return { kind: "success", sessionId, answer };
+}
+
+function interpretStreamChunk(
+  chunk: unknown,
+  fallbackSessionId: string | null,
+): ChatWorkflowStreamEvent | ChatWorkflowGuardrail | null {
+  const guardrail = parseGuardrailPayload(chunk);
+  if (guardrail) {
+    return { kind: "guardrail", message: guardrail.message, traceId: guardrail.traceId };
+  }
+
+  if (chunk && typeof chunk === "object") {
+    const record = chunk as Record<string, unknown>;
+    const fragment =
+      toOptionalString(record.delta) ??
+      toOptionalString(record.text) ??
+      toOptionalString(record.content) ??
+      toOptionalString(record.token);
+    if (fragment) {
+      return { type: "answer_fragment", content: fragment };
+    }
+  }
+
+  const completion = normaliseChatCompletion(chunk, fallbackSessionId);
+  if (completion) {
+    return { type: "complete", response: { sessionId: completion.sessionId, answer: completion.answer } };
+  }
+
+  return null;
+}
+
+function parseJsonLine(input: string): unknown {
+  try {
+    return JSON.parse(input);
+  } catch {
+    return null;
+  }
 }
 
 async function handleResponse(
@@ -86,6 +278,163 @@ export class TheoApiClient {
 
   fetchFeatures(): Promise<Record<string, boolean>> {
     return this.request<Record<string, boolean>>("/features/");
+  }
+
+  async runChatWorkflow(
+    payload: ChatWorkflowRequest,
+    options?: ChatWorkflowOptions,
+  ): Promise<ChatWorkflowResult> {
+    const requestBody: Record<string, unknown> = {
+      messages: payload.messages,
+      session_id: payload.sessionId ?? null,
+      stance: payload.modeId,
+      mode: payload.modeId,
+      mode_id: payload.modeId,
+    };
+    if (payload.prompt != null) {
+      requestBody.prompt = payload.prompt;
+    }
+    if (payload.osis != null) {
+      requestBody.osis = payload.osis;
+    }
+
+    const response = await fetch(`${this.baseUrl}/ai/workflows/chat`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+      signal: options?.signal ?? null,
+    });
+
+    const fallbackSessionId = payload.sessionId ?? null;
+
+    if (!response.ok) {
+      let parsed: unknown = null;
+      try {
+        parsed = await response.json();
+      } catch {
+        try {
+          const text = await response.text();
+          parsed = text ? JSON.parse(text) : null;
+        } catch {
+          parsed = null;
+        }
+      }
+      const guardrail = parseGuardrailPayload(parsed);
+      if (guardrail) {
+        return { kind: "guardrail", message: guardrail.message, traceId: guardrail.traceId };
+      }
+      const errorMessage =
+        (parsed && typeof parsed === "object" && "message" in parsed && typeof parsed.message === "string"
+          ? parsed.message
+          : undefined) ?? buildErrorMessage(response.status, "");
+      throw new Error(errorMessage);
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    const isStreaming = Boolean(response.body) && /jsonl|ndjson|event-stream/i.test(contentType);
+
+    if (isStreaming && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalResult: ChatWorkflowSuccess | null = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex !== -1) {
+          const rawLine = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+          const sanitized = rawLine.startsWith("data:") ? rawLine.slice(5).trim() : rawLine;
+          if (sanitized) {
+            const parsed = parseJsonLine(sanitized);
+            if (parsed != null) {
+              const interpreted = interpretStreamChunk(parsed, fallbackSessionId);
+              if (interpreted) {
+                if ("kind" in interpreted) {
+                  options?.onEvent?.({
+                    type: "guardrail_violation",
+                    message: interpreted.message,
+                    traceId: interpreted.traceId ?? null,
+                  });
+                  return interpreted;
+                }
+                if (interpreted.type === "complete") {
+                  finalResult = {
+                    kind: "success",
+                    sessionId: interpreted.response.sessionId,
+                    answer: interpreted.response.answer,
+                  };
+                }
+                options?.onEvent?.(interpreted);
+              }
+            }
+          }
+          newlineIndex = buffer.indexOf("\n");
+        }
+      }
+
+      buffer += decoder.decode();
+      const trailingLine = buffer.trim();
+      const trailing = trailingLine.startsWith("data:") ? trailingLine.slice(5).trim() : trailingLine;
+      if (trailing) {
+        const parsed = parseJsonLine(trailing);
+        if (parsed != null) {
+          const interpreted = interpretStreamChunk(parsed, fallbackSessionId);
+          if (interpreted) {
+            if ("kind" in interpreted) {
+              options?.onEvent?.({
+                type: "guardrail_violation",
+                message: interpreted.message,
+                traceId: interpreted.traceId ?? null,
+              });
+              return interpreted;
+            }
+            if (interpreted.type === "complete") {
+              finalResult = {
+                kind: "success",
+                sessionId: interpreted.response.sessionId,
+                answer: interpreted.response.answer,
+              };
+            }
+            options?.onEvent?.(interpreted);
+          }
+        }
+      }
+
+      if (finalResult) {
+        return finalResult;
+      }
+      throw new Error("Chat workflow completed without a final response.");
+    }
+
+    let jsonPayload: unknown = null;
+    try {
+      jsonPayload = await response.json();
+    } catch {
+      jsonPayload = null;
+    }
+    const guardrail = parseGuardrailPayload(jsonPayload);
+    if (guardrail) {
+      return { kind: "guardrail", message: guardrail.message, traceId: guardrail.traceId };
+    }
+    const completion = normaliseChatCompletion(jsonPayload, fallbackSessionId);
+    if (completion) {
+      options?.onEvent?.({
+        type: "complete",
+        response: { sessionId: completion.sessionId, answer: completion.answer },
+      });
+      return completion;
+    }
+
+    throw new Error("Unexpected chat workflow response.");
   }
 
   runVerseWorkflow(payload: {
@@ -270,3 +619,5 @@ export class TheoApiClient {
 export function createTheoApiClient(baseUrl?: string): TheoApiClient {
   return new TheoApiClient(baseUrl);
 }
+
+export type ChatWorkflowClient = Pick<TheoApiClient, "runChatWorkflow">;
