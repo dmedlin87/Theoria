@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Sequence
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, model_validator
 
 from ..ai.rag import (
     CollaborationResponse,
@@ -66,15 +66,6 @@ class ChatSessionMessage(APIModel):
     role: Literal["user", "assistant", "system"]
     content: str
 
-    @field_validator("content")
-    @classmethod
-    def _enforce_max_length(cls, value: str) -> str:
-        if len(value) > MAX_CHAT_MESSAGE_CONTENT_LENGTH:
-            raise ValueError(
-                "Chat message content exceeds the maximum allowed length"
-            )
-        return value
-
 
 class ChatSessionRequest(APIModel):
     messages: Sequence[ChatSessionMessage]
@@ -83,6 +74,15 @@ class ChatSessionRequest(APIModel):
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     recorder_metadata: RecorderMetadata | None = None
+
+    @model_validator(mode="after")
+    def _enforce_message_lengths(self) -> "ChatSessionRequest":
+        for message in self.messages:
+            if len(message.content) > MAX_CHAT_MESSAGE_CONTENT_LENGTH:
+                raise ValueError(
+                    "Chat message content exceeds the maximum allowed length"
+                )
+        return self
 
 
 class ChatSessionResponse(APIModel):
