@@ -34,6 +34,26 @@ Key options:
 - `--meta key=value` &mdash; apply metadata overrides to every file. Values are parsed as JSON when possible (e.g. `--meta 'authors=["Jane"]'`).
 - `--post-batch steps` &mdash; request comma-separated post-ingest operations (`summaries`, `tags`, `biblio`) after each API batch. Ignored when running in `worker` mode.
 
+## Network safety for URL ingestion
+
+The CLI and API share the same SSRF protections when ingesting URLs. Each
+hostname is resolved via DNS before any HTTP request is issued. The resulting IP
+addresses are rejected when they fall within private, loopback, link-local, or
+user-specified blocked CIDR ranges. Configure these safeguards via environment
+variables or settings overrides:
+
+- `ingest_url_block_private_networks` &mdash; toggle the automatic rejection of
+  private, loopback, link-local, and reserved ranges. Enabled by default.
+- `ingest_url_blocked_ip_networks` &mdash; extend (or narrow) the blocked CIDR
+  ranges. The default list covers the common RFC 1918 and RFC 4193 networks.
+- `ingest_url_allowed_hosts` &mdash; optional hostname allowlist. When populated,
+  only the listed hosts are eligible for ingestion **after** passing the network
+  checks above.
+
+The resolver caches DNS lookups for the lifetime of the process to avoid
+repeated queries while still ensuring that every redirect target is validated
+against the configured policy.
+
 ## Examples
 
 Dry-run a directory to inspect what would be ingested:
