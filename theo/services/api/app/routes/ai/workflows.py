@@ -859,7 +859,7 @@ def _guardrail_http_exception(
     answer = build_guardrail_refusal(session, reason=summary)
     headers = {
         "X-Guardrail-Advisory": json.dumps(
-            advisory_payload, ensure_ascii=False, separators=(",", ":")
+            advisory_payload, separators=(",", ":")
         )
     }
     content = {
