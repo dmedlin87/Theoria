@@ -9,12 +9,23 @@ from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from collections.abc import Mapping
 
 import yaml
 
 from .exceptions import UnsupportedSourceError
 from .osis import DetectedOsis, classify_osis_matches
-from .parsers import PDF_EXTRACTION_UNSUPPORTED, ParserResult, TranscriptSegment as ParsedTranscriptSegment, load_transcript, parse_audio_document, parse_docx_document, parse_html_document, parse_pdf_document, read_text_file
+from .parsers import (
+    PDF_EXTRACTION_UNSUPPORTED,
+    ParserResult,
+    TranscriptSegment as ParsedTranscriptSegment,
+    load_transcript,
+    parse_audio_document,
+    parse_docx_document,
+    parse_html_document,
+    parse_pdf_document,
+    read_text_file,
+)
 from .chunking import Chunk, chunk_text, chunk_transcript
 from .sanitizer import sanitize_passage_text
 
@@ -91,7 +102,14 @@ def merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str,
     """Merge metadata dictionaries preferring override values when present."""
 
     combined = {**base}
-    combined.update({k: v for k, v in overrides.items() if v is not None})
+    for key, override_value in overrides.items():
+        if override_value is None:
+            continue
+        base_value = combined.get(key)
+        if isinstance(base_value, Mapping) and isinstance(override_value, Mapping):
+            combined[key] = merge_metadata(dict(base_value), dict(override_value))
+        else:
+            combined[key] = override_value
     return combined
 
 
