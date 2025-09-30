@@ -295,6 +295,12 @@ def parse_docx_document(path: Path, *, max_tokens: int) -> ParserResult:
         text, metadata = docling_payload
         parser = "docling"
         parser_version = _package_version("docling", "2.x")
+        if not metadata:
+            try:
+                with zipfile.ZipFile(path) as handle:
+                    metadata = _extract_docx_metadata(handle)
+            except Exception:
+                metadata = {}
     else:
         text, metadata = _fallback_docx_text(path)
         parser = "docx_fallback"

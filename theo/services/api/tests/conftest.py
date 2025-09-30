@@ -12,7 +12,7 @@ import pytest
 from fastapi import Request as FastAPIRequest
 
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
-os.environ.setdefault("THEO_AUTH_ALLOW_ANONYMOUS", "1")
+os.environ.setdefault("THEO_API_KEYS", "[\"pytest-default-key\"]")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 if str(PROJECT_ROOT) not in sys.path:
@@ -31,10 +31,19 @@ def configure_test_environment(
     db_path = tmp_path_factory.mktemp("db") / "test.db"
     storage_root = tmp_path_factory.mktemp("storage")
 
-    os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
-    os.environ["STORAGE_ROOT"] = str(storage_root)
-    os.environ["FIXTURES_ROOT"] = str(PROJECT_ROOT / "fixtures")
-    os.environ["THEO_AUTH_ALLOW_ANONYMOUS"] = "1"
+    env_overrides = {
+        "DATABASE_URL": f"sqlite:///{db_path}",
+        "STORAGE_ROOT": str(storage_root),
+        "FIXTURES_ROOT": str(PROJECT_ROOT / "fixtures"),
+        "INGEST_URL_BLOCK_PRIVATE_NETWORKS": "false",
+        "INGEST_URL_BLOCKED_IP_NETWORKS": "[]",
+        "INGEST_URL_BLOCKED_HOSTS": "[]",
+        "INGEST_URL_ALLOWED_HOSTS": "[]",
+    }
+    original_env = {key: os.environ.get(key) for key in env_overrides}
+
+    for key, value in env_overrides.items():
+        os.environ[key] = value
 
     from theo.services.api.app.core import settings as settings_module
     from theo.services.api.app.core.database import Base, configure_engine
@@ -45,16 +54,21 @@ def configure_test_environment(
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
-    yield
-
-    Base.metadata.drop_all(bind=engine)
-    shutil.rmtree(storage_root, ignore_errors=True)
-    if db_path.exists():
-        db_path.unlink()
+    try:
+        yield
+    finally:
+        Base.metadata.drop_all(bind=engine)
+        shutil.rmtree(storage_root, ignore_errors=True)
+        if db_path.exists():
+            db_path.unlink()
+        for key, value in original_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 @pytest.fixture(autouse=True)
-
 def bypass_authentication(request: pytest.FixtureRequest) -> Generator[None, None, None]:
     """Permit unauthenticated access for API tests unless explicitly disabled."""
 
@@ -72,3 +86,8 @@ def bypass_authentication(request: pytest.FixtureRequest) -> Generator[None, Non
         yield
     finally:
         app.dependency_overrides.pop(require_principal, None)
+
+
+
+
+

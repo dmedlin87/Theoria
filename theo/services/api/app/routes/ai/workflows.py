@@ -843,9 +843,16 @@ def _guardrail_http_exception(
         metadata=failure_metadata,
     )
     summary = str(exc).strip() or "Guardrail enforcement prevented a response."
-    detail = f"Guardrail refusal: {summary}"
+    detail_text = f"Guardrail refusal: {summary}"
     advisory_payload = advisory.model_dump(mode="json")
     advisory_payload.update({"type": "guardrail_refusal", "message": summary})
+    detail_payload = {
+        "type": advisory_payload.get("type"),
+        "message": detail_text,
+        "summary": summary,
+        "metadata": advisory_payload.get("metadata"),
+        "suggestions": advisory_payload.get("suggestions") or [],
+    }
     answer = build_guardrail_refusal(session, reason=summary)
     headers = {
         "X-Guardrail-Advisory": json.dumps(
@@ -853,10 +860,11 @@ def _guardrail_http_exception(
         )
     }
     content = {
-        "detail": detail,
+        "detail": detail_payload,
         "message": {"role": "assistant", "content": _DEFAULT_REFUSAL_MESSAGE},
         "answer": answer.model_dump(mode="json"),
         "guardrail_advisory": advisory_payload,
+        "detail_text": detail_text,
     }
     return JSONResponse(status_code=422, content=content, headers=headers)
 

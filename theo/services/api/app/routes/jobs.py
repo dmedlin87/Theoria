@@ -483,6 +483,12 @@ def enqueue_job(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Unable to enqueue job",
         ) from exc
+    except Exception as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to enqueue job",
+        ) from exc
 
     session.refresh(job)
 

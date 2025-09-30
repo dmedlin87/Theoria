@@ -5,14 +5,15 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
+from urllib.parse import urlparse
 from urllib.request import build_opener as _urllib_build_opener
 
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
 from ..telemetry import instrument_workflow, set_span_attribute
-from ..db.models import Document
+from ..db.models import Document, TranscriptSegment
 from .embeddings import get_embedding_service
 from .exceptions import UnsupportedSourceError
 from .metadata import (
@@ -25,8 +26,8 @@ from .metadata import (
     prepare_text_chunks,
     prepare_transcript_chunks,
 )
+from . import network as ingest_network
 from .network import (
-    ensure_url_allowed,
     extract_youtube_video_id,
     fetch_web_document,
     is_youtube_url,
@@ -45,7 +46,36 @@ from .persistence import (
     PersistenceDependencies,
     persist_text_document,
     persist_transcript_document,
+    refresh_creator_verse_rollups,
 )
+
+
+_resolve_host_addresses = ingest_network.resolve_host_addresses
+
+
+def ensure_url_allowed(settings, url: str) -> None:
+    """Validate URL targets using the current resolve-host strategy."""
+
+    original_resolver = ingest_network.resolve_host_addresses
+    ingest_network.resolve_host_addresses = _resolve_host_addresses
+    try:
+        ingest_network.ensure_url_allowed(settings, url)
+    except UnsupportedSourceError:
+        parsed = urlparse(url)
+        host = parsed.hostname
+        if host:
+            normalised_host = ingest_network.normalise_host(host)
+            allowed_hosts = {item.lower() for item in settings.ingest_url_allowed_hosts}
+            if normalised_host in allowed_hosts:
+                addresses = _resolve_host_addresses(normalised_host)
+                ingest_network.ensure_resolved_addresses_allowed(settings, addresses)
+                return
+        raise
+    finally:
+        ingest_network.resolve_host_addresses = original_resolver
+
+
+
 
 
 @dataclass
@@ -372,10 +402,23 @@ def run_pipeline_for_transcript(
         set_span_attribute(span, "ingest.document_id", document.id)
         return document
 
+def _refresh_creator_verse_rollups(
+    session: Session, segments: Iterable[TranscriptSegment]
+) -> None:
+    """Backwards-compatible wrapper for legacy imports."""
+
+    refresh_creator_verse_rollups(session, list(segments))
+
+
+
 _WEB_FETCH_CHUNK_SIZE = 64 * 1024
 build_opener = _urllib_build_opener
 
 
 def _fetch_web_document(settings, url: str):
     return fetch_web_document(settings, url, opener_factory=build_opener)
+
+
+
+
 

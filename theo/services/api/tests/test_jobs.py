@@ -223,7 +223,7 @@ def test_enqueue_collapses_concurrent_retries(
 def test_enqueue_endpoint_is_concurrent_safe(
     monkeypatch: pytest.MonkeyPatch, client: TestClient
 ) -> None:
-    call_lock = Lock()
+    call_lock = threading.Lock()
     call_count = {"count": 0}
 
     def fake_send_task(
@@ -247,34 +247,30 @@ def test_enqueue_endpoint_is_concurrent_safe(
     }
 
     def _enqueue() -> dict[str, Any]:
-
         response = client.post("/jobs/enqueue", json=payload)
         assert response.status_code == 202, response.text
         return response.json()
 
+    first_payload = _enqueue()
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = [executor.submit(enqueue_again) for _ in range(8)]
+        futures = [executor.submit(_enqueue) for _ in range(8)]
         results = [future.result() for future in futures]
 
     assert all(result == first_payload for result in results)
-    assert len(instrumented_send_task.calls) == 1
-
+    assert call_count["count"] == 1
 
     with Session(get_engine()) as session:
         job_count = (
             session.query(IngestionJob)
             .filter(
                 IngestionJob.job_type == payload["task"],
-
                 IngestionJob.args_hash == first_payload["args_hash"],
-
             )
             .count()
         )
 
     assert job_count == 1
-
 
 
 def test_enqueue_backpressure_returns_throttled_status(
@@ -351,3 +347,4 @@ def test_summary_job_enqueues(
 
     assert captured["document_id"] == document_id
     assert captured["job_id"] == payload["id"]
+

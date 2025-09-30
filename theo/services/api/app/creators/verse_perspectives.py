@@ -168,13 +168,18 @@ class CreatorVersePerspectiveService:
     def _rank_quotes(
         self, quotes: Iterable[TranscriptQuote]
     ) -> list[TranscriptQuote]:
-        ordered = sorted(
-            quotes,
-            key=lambda quote: (
-                -(quote.salience or 0.0),
-                quote.created_at,
-            ),
-        )
+        def _sort_key(quote: TranscriptQuote) -> tuple[float, datetime]:
+            salience_key = -(quote.salience or 0.0)
+            created_at = quote.created_at
+            if created_at is None:
+                normalised = datetime.min.replace(tzinfo=UTC)
+            elif created_at.tzinfo is None:
+                normalised = created_at.replace(tzinfo=UTC)
+            else:
+                normalised = created_at
+            return salience_key, normalised
+
+        ordered = sorted(quotes, key=_sort_key)
         return ordered[: self.MAX_STORED_QUOTES]
 
     def _average_confidence(self, values: Iterable[float]) -> float | None:
