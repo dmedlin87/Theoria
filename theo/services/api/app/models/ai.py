@@ -69,6 +69,12 @@ class ChatSessionMessage(APIModel):
     content: str
 
 
+class IntentTagPayload(APIModel):
+    intent: str
+    stance: str | None = None
+    confidence: float | None = None
+
+
 class ChatSessionPreferences(APIModel):
     mode: str | None = None
     default_filters: HybridSearchFilters | None = None
@@ -112,6 +118,7 @@ class ChatSessionResponse(APIModel):
     session_id: str
     message: ChatSessionMessage
     answer: RAGAnswer
+    intent_tags: list[IntentTagPayload] | None = None
 
 
 class ChatSessionState(APIModel):

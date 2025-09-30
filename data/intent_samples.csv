@@ -1,0 +1,13 @@
+text,intent,stance
+"What does John 3:16 mean for salvation?","passage_question","neutral"
+"Prepare a sermon outline on hope from Romans 5","sermon_prep","supportive"
+"Give me a devotional reflection on Psalm 23","devotional_request","supportive"
+"Summarise Paul's teaching on grace in Ephesians","study_summary","supportive"
+"Compare Paul's and James's views on faith and works","comparative_analysis","neutral"
+"List historical context for Revelation 2","research_request","neutral"
+"Challenge the idea of predestination using scripture","doctrinal_challenge","critical"
+"Find verses that critique the prosperity gospel","apologetics","critical"
+"Suggest practical applications from the Beatitudes","application_request","supportive"
+"Help me plan small group questions on Mark 4","discussion_guidance","supportive"
+"Identify tensions between Romans 9 and human freedom","tension_analysis","critical"
+"Offer a prayer of encouragement for a grieving family","pastoral_care","supportive"
