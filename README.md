@@ -12,6 +12,32 @@ Theo Engine now layers grounded generative workflows on top of the deterministic
 
 For usage details run `python -m theo.services.cli.ingest_folder --help` or consult [the CLI guide](docs/CLI.md).
 
+## Reranker and intent tagger workflows
+
+Early reranker and intent tagger experiments live behind feature flags so they can be
+developed without impacting production retrieval quality. Start by reviewing the
+[reranker MVP plan](docs/reranker_mvp.md) for dataset expectations and export
+conventions. Two key commands support the experimentation loop:
+
+- Train candidate models with the scikit-learn pipelines described in
+  `configs/reranker.yaml` and `configs/intent.yaml`:
+
+  ```bash
+  python -m theo.experiments.reranker.train --config configs/reranker.yaml
+  python -m theo.experiments.intent.train --config configs/intent.yaml
+  ```
+
+- Capture before/after retrieval metrics using the bench script:
+
+  ```bash
+  python -m theo.services.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
+    --trace-path data/eval/production_traces.jsonl \
+    --output data/eval/reranker_candidate.json
+  ```
+
+Document the resulting metrics in pull requests and release notes before toggling the
+feature flags in staging or production.
+
 ## API authentication configuration
 
 The API refuses to start unless authentication credentials are configured. Set one or more
