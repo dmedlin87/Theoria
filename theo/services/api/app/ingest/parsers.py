@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 import re
 import wave
 import zipfile
@@ -26,6 +27,36 @@ from pdfminer.psparser import PSEOF
 
 if TYPE_CHECKING:  # pragma: no cover - import-cycle guard
     from .chunking import Chunk
+
+
+LOGGER = logging.getLogger(__name__)
+
+_LOGGED_EVENTS: set[str] = set()
+_UNSTRUCTURED_FAILURE_REASON: str | None = None
+_DOCLING_FAILURE_REASON: str | None = None
+
+
+def _log_parser_event(
+    event: str,
+    reason: str,
+    *,
+    path: Path | None = None,
+    exc: Exception | None = None,
+    once: bool = False,
+    level: int = logging.WARNING,
+) -> None:
+    """Log parser fallback telemetry while avoiding repeated noise."""
+
+    if once:
+        key = f"{event}:{reason}"
+        if key in _LOGGED_EVENTS:
+            return
+        _LOGGED_EVENTS.add(key)
+
+    extra: dict[str, Any] = {"event": event, "reason": reason}
+    if path is not None:
+        extra["path"] = str(path)
+    LOGGER.log(level, "%s (reason=%s)", event, reason, exc_info=exc, extra=extra)
 
 
 @dataclass(slots=True)
@@ -194,15 +225,32 @@ def _package_version(distribution: str, fallback: str) -> str:
 
 
 def _docling_extract_text(path: Path) -> tuple[str, dict[str, Any]] | None:
+    global _DOCLING_FAILURE_REASON
+
     try:
         from docling.document_converter import DocumentConverter
-    except Exception:  # pragma: no cover - dependency optional
+    except Exception as exc:  # pragma: no cover - dependency optional
+        _DOCLING_FAILURE_REASON = "import_error"
+        _log_parser_event(
+            "ingest.parsers.docling_unavailable",
+            _DOCLING_FAILURE_REASON,
+            exc=exc,
+            once=True,
+        )
         return None
 
     try:
         converter = DocumentConverter()
         result = converter.convert(str(path))
-    except Exception:  # pragma: no cover - runtime safety
+    except Exception as exc:  # pragma: no cover - runtime safety
+        _DOCLING_FAILURE_REASON = "conversion_error"
+        _log_parser_event(
+            "ingest.parsers.docling_failed",
+            _DOCLING_FAILURE_REASON,
+            path=path,
+            exc=exc,
+            once=True,
+        )
         return None
 
     document = getattr(result, "document", None)
@@ -224,6 +272,7 @@ def _docling_extract_text(path: Path) -> tuple[str, dict[str, Any]] | None:
     if not text:
         text = str(document)
 
+    _DOCLING_FAILURE_REASON = None
     return text, {}
 
 
@@ -302,6 +351,13 @@ def parse_docx_document(path: Path, *, max_tokens: int) -> ParserResult:
             except Exception:
                 metadata = {}
     else:
+        reason = _DOCLING_FAILURE_REASON or "docling_returned_none"
+        _log_parser_event(
+            "ingest.parsers.docx_fallback",
+            reason,
+            path=path,
+            level=logging.INFO,
+        )
         text, metadata = _fallback_docx_text(path)
         parser = "docx_fallback"
         parser_version = "0.1.0"
@@ -389,9 +445,18 @@ class _HTMLExtractor(HTMLParser):
 def _parse_html_with_unstructured(
     path: Path, raw_html: str | None = None
 ) -> tuple[str, dict[str, Any]] | None:
+    global _UNSTRUCTURED_FAILURE_REASON
+
     try:
         from unstructured.partition.html import partition_html
-    except Exception:  # pragma: no cover - optional dependency
+    except Exception as exc:  # pragma: no cover - optional dependency
+        _UNSTRUCTURED_FAILURE_REASON = "import_error"
+        _log_parser_event(
+            "ingest.parsers.unstructured_unavailable",
+            _UNSTRUCTURED_FAILURE_REASON,
+            exc=exc,
+            once=True,
+        )
         return None
 
     if raw_html is not None:
@@ -404,13 +469,29 @@ def _parse_html_with_unstructured(
             # to re-open the file using a strict UTF-8 decode, which previously caused
             # guardrail tests to miss lossy substitutions that our pipeline expects.
             html_text = read_text_file(path)
-        except OSError:
+        except OSError as exc:
+            _UNSTRUCTURED_FAILURE_REASON = "read_error"
+            _log_parser_event(
+                "ingest.parsers.unstructured_failed",
+                _UNSTRUCTURED_FAILURE_REASON,
+                path=path,
+                exc=exc,
+                once=True,
+            )
             return None
 
     try:
         elements = partition_html(text=html_text, metadata_filename=path.name)
 
-    except Exception:  # pragma: no cover - runtime guard
+    except Exception as exc:  # pragma: no cover - runtime guard
+        _UNSTRUCTURED_FAILURE_REASON = "partition_error"
+        _log_parser_event(
+            "ingest.parsers.unstructured_failed",
+            _UNSTRUCTURED_FAILURE_REASON,
+            path=path,
+            exc=exc,
+            once=True,
+        )
         return None
 
     text_chunks: list[str] = []
@@ -425,6 +506,7 @@ def _parse_html_with_unstructured(
             metadata["title"] = title
 
     combined = "\n\n".join(text_chunks).strip()
+    _UNSTRUCTURED_FAILURE_REASON = None
     return combined, metadata
 
 
@@ -468,6 +550,13 @@ def parse_html_document(path: Path, *, max_tokens: int) -> ParserResult:
         parser = "unstructured"
         parser_version = _package_version("unstructured", "0.15.x")
     else:
+        reason = _UNSTRUCTURED_FAILURE_REASON or "unstructured_returned_none"
+        _log_parser_event(
+            "ingest.parsers.html_fallback",
+            reason,
+            path=path,
+            level=logging.INFO,
+        )
         extractor = _HTMLExtractor()
         try:
             extractor.feed(raw_html)
