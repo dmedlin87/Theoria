@@ -16,7 +16,7 @@ import {
 } from "../lib/guardrails";
 import type { RAGCitation } from "../copilot/components/types";
 import { useMode } from "../mode-context";
-import { submitFeedback, type FeedbackAction } from "../lib/telemetry";
+import { emitTelemetry, submitFeedback, type FeedbackAction } from "../lib/telemetry";
 
 function createMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -81,6 +81,7 @@ export default function ChatWorkspace({
   const [pendingFeedbackIds, setPendingFeedbackIds] = useState<Set<string>>(new Set());
 
   const [inputValue, setInputValue] = useState(initialPrompt ?? "");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     if (typeof initialPrompt === "string") {
       setInputValue(initialPrompt);
@@ -98,6 +99,36 @@ export default function ChatWorkspace({
   const [lastQuestion, setLastQuestion] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoSubmitRef = useRef(false);
+
+  const sampleQuestions = useMemo(
+    () => [
+      "How does John 1:1 connect with Genesis 1?",
+      "What does Romans 8 teach about life in the Spirit?",
+      "Summarize the Beatitudes in Matthew 5.",
+      "Where else does Scripture describe the New Covenant?",
+    ],
+    [],
+  );
+
+  const handleSampleQuestionClick = (prompt: string, index: number) => {
+    setInputValue(prompt);
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.focus();
+      const caret = prompt.length;
+      textarea.setSelectionRange(caret, caret);
+    }
+    void emitTelemetry(
+      [
+        {
+          event: "chat.sample_question_click",
+          durationMs: 0,
+          metadata: { index, prompt },
+        },
+      ],
+      { page: "chat" },
+    );
+  };
 
   useEffect(() => {
     return () => {
@@ -610,6 +641,23 @@ export default function ChatWorkspace({
           <div className="chat-empty-state">
             <h3>Start the conversation</h3>
             <p>Ask about a passage, doctrine, or theme and we’ll respond with cited insights.</p>
+            <div className="chat-empty-state-actions">
+              {sampleQuestions.map((question, index) => (
+                <button
+                  key={question}
+                  type="button"
+                  className="chat-empty-state-chip"
+                  onClick={() => handleSampleQuestionClick(question, index)}
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
+            <p className="chat-empty-state-links">
+              Prefer browsing? Explore the <Link href="/search">Search</Link> and
+              {" "}
+              <Link href="/verse">Verse explorer</Link>.
+            </p>
           </div>
         )}
       </div>
@@ -653,6 +701,7 @@ export default function ChatWorkspace({
           onChange={(event) => setInputValue(event.target.value)}
           placeholder="How does John 1:1 connect with Genesis 1?"
           disabled={isStreaming || isRestoring}
+          ref={textareaRef}
         />
         <div className="chat-form-actions">
           <button type="submit" disabled={!inputValue.trim() || isStreaming || isRestoring}>
