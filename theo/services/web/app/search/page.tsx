@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 
 import ErrorCallout from "../components/ErrorCallout";
@@ -84,9 +85,302 @@ const VARIANT_FILTERS = [
 
 const DATASET_LABELS = new Map(DATASET_FILTERS.map((option) => [option.value, option.label] as const));
 const VARIANT_LABELS = new Map(VARIANT_FILTERS.map((option) => [option.value, option.label] as const));
+const SOURCE_LABELS = new Map(SOURCE_OPTIONS.map((option) => [option.value, option.label] as const));
+const TRADITION_LABELS = new Map(
+  TRADITION_OPTIONS.map((option) => [option.value, option.label] as const),
+);
+const DOMAIN_LABELS = new Map(DOMAIN_OPTIONS.map((option) => [option.value, option.label] as const));
 
 const CUSTOM_PRESET_VALUE = "custom";
 const SAVED_SEARCH_STORAGE_KEY = "theo.search.saved";
+const FILTER_FIELD_KEYS: Array<keyof SearchFilters> = [
+  "query",
+  "osis",
+  "collection",
+  "author",
+  "sourceType",
+  "theologicalTradition",
+  "topicDomain",
+  "collectionFacets",
+  "datasetFacets",
+  "variantFacets",
+  "dateStart",
+  "dateEnd",
+  "includeVariants",
+  "includeDisputed",
+  "preset",
+];
+const VISUALLY_HIDDEN_STYLES: CSSProperties = {
+  border: 0,
+  clip: "rect(0 0 0 0)",
+  height: "1px",
+  margin: "-1px",
+  overflow: "hidden",
+  padding: 0,
+  position: "absolute",
+  width: "1px",
+  whiteSpace: "nowrap",
+};
+const SAVED_SEARCH_CHIP_CONTAINER_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "0.35rem",
+  marginTop: "0.35rem",
+};
+const SAVED_SEARCH_CHIP_STYLE: CSSProperties = {
+  background: "#e2e8f0",
+  borderRadius: "999px",
+  color: "#1e293b",
+  display: "inline-flex",
+  fontSize: "0.75rem",
+  fontWeight: 500,
+  lineHeight: 1.2,
+  padding: "0.2rem 0.55rem",
+};
+const EMPTY_FILTERS: SearchFilters = {
+  query: "",
+  osis: "",
+  collection: "",
+  author: "",
+  sourceType: "",
+  theologicalTradition: "",
+  topicDomain: "",
+  collectionFacets: [],
+  datasetFacets: [],
+  variantFacets: [],
+  dateStart: "",
+  dateEnd: "",
+  includeVariants: false,
+  includeDisputed: false,
+  preset: "",
+};
+
+type SavedSearchFilterChip = {
+  id: string;
+  text: string;
+};
+
+type FilterDisplay = {
+  chips: SavedSearchFilterChip[];
+  description: string;
+};
+
+function createEmptyFilters(): SearchFilters {
+  return {
+    ...EMPTY_FILTERS,
+    collectionFacets: [],
+    datasetFacets: [],
+    variantFacets: [],
+  };
+}
+
+function normalizeBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return ["1", "true", "yes", "on"].includes(normalized);
+  }
+  return false;
+}
+
+function normalizeString(value: unknown): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  return "";
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "")))
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeFiltersFromPartial(filters?: Partial<SearchFilters> | null): SearchFilters {
+  const normalized = createEmptyFilters();
+  if (!filters) {
+    return normalized;
+  }
+
+  normalized.query = normalizeString(filters.query);
+  normalized.osis = normalizeString(filters.osis);
+  normalized.collection = normalizeString(filters.collection);
+  normalized.author = normalizeString(filters.author);
+  normalized.sourceType = normalizeString(filters.sourceType);
+  normalized.theologicalTradition = normalizeString(filters.theologicalTradition);
+  normalized.topicDomain = normalizeString(filters.topicDomain);
+  normalized.collectionFacets = normalizeStringArray(filters.collectionFacets);
+  normalized.datasetFacets = normalizeStringArray(filters.datasetFacets);
+  normalized.variantFacets = normalizeStringArray(filters.variantFacets);
+  normalized.dateStart = normalizeString(filters.dateStart);
+  normalized.dateEnd = normalizeString(filters.dateEnd);
+  normalized.includeVariants = normalizeBoolean(filters.includeVariants);
+  normalized.includeDisputed = normalizeBoolean(filters.includeDisputed);
+  normalized.preset = normalizeString(filters.preset);
+
+  return normalized;
+}
+
+function extractFiltersFromLegacySavedSearch(
+  raw: Partial<SavedSearch> & Record<string, unknown>,
+): SearchFilters {
+  const candidateFilters = raw.filters as unknown;
+  if (typeof candidateFilters === "string") {
+    return normalizeFiltersFromPartial(parseSearchParams(candidateFilters));
+  }
+  if (candidateFilters && typeof candidateFilters === "object") {
+    return normalizeFiltersFromPartial(candidateFilters as Partial<SearchFilters>);
+  }
+
+  const queryString = raw.queryString;
+  if (typeof queryString === "string" && queryString.trim()) {
+    return normalizeFiltersFromPartial(parseSearchParams(queryString));
+  }
+
+  const inlineFilters: Partial<SearchFilters> = {};
+  FILTER_FIELD_KEYS.forEach((key) => {
+    const value = raw[key as keyof typeof raw];
+    if (value !== undefined) {
+      (inlineFilters as Record<string, unknown>)[key] = value as unknown;
+    }
+  });
+
+  if (Object.keys(inlineFilters).length > 0) {
+    return normalizeFiltersFromPartial(inlineFilters);
+  }
+
+  return createEmptyFilters();
+}
+
+function normalizeSavedSearchEntry(entry: unknown): SavedSearch | null {
+  if (typeof entry === "string" && entry.trim()) {
+    const timestamp = Date.now();
+    return {
+      id: `legacy-${timestamp}`,
+      name: "Recovered search",
+      filters: normalizeFiltersFromPartial(parseSearchParams(entry)),
+      createdAt: timestamp,
+    };
+  }
+
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  const raw = entry as Partial<SavedSearch> & Record<string, unknown>;
+  const filters = extractFiltersFromLegacySavedSearch(raw);
+  const createdAtValue = raw.createdAt;
+  const createdAt =
+    typeof createdAtValue === "number" && Number.isFinite(createdAtValue)
+      ? createdAtValue
+      : Date.now();
+  const rawId = raw.id;
+  const id =
+    typeof rawId === "string" && rawId.trim()
+      ? rawId.trim()
+      : `legacy-${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
+  const potentialName =
+    typeof raw.name === "string" && raw.name.trim()
+      ? raw.name.trim()
+      : typeof raw.title === "string" && raw.title.trim()
+        ? raw.title.trim()
+        : "Recovered search";
+
+  return {
+    id,
+    name: potentialName,
+    filters,
+    createdAt,
+  };
+}
+
+function formatSavedSearchFilters(filters: SearchFilters): FilterDisplay {
+  const chips: SavedSearchFilterChip[] = [];
+  const pushChip = (text: string) => {
+    if (text) {
+      chips.push({ id: `${chips.length}-${text}`, text });
+    }
+  };
+
+  if (filters.query) {
+    pushChip(`Query: ${filters.query}`);
+  }
+  if (filters.osis) {
+    pushChip(`Passage: ${filters.osis}`);
+  }
+  if (filters.collection) {
+    pushChip(`Collection: ${filters.collection}`);
+  }
+  if (filters.author) {
+    pushChip(`Author: ${filters.author}`);
+  }
+  if (filters.sourceType) {
+    const label = SOURCE_LABELS.get(filters.sourceType) ?? filters.sourceType;
+    pushChip(`Source: ${label}`);
+  }
+  if (filters.theologicalTradition) {
+    const label =
+      TRADITION_LABELS.get(filters.theologicalTradition) ?? filters.theologicalTradition;
+    pushChip(`Tradition: ${label}`);
+  }
+  if (filters.topicDomain) {
+    const label = DOMAIN_LABELS.get(filters.topicDomain) ?? filters.topicDomain;
+    pushChip(`Topic: ${label}`);
+  }
+  if (filters.collectionFacets.length > 0) {
+    pushChip(`Collection facets: ${filters.collectionFacets.join(", ")}`);
+  }
+  if (filters.datasetFacets.length > 0) {
+    const labels = filters.datasetFacets.map(
+      (value) => DATASET_LABELS.get(value) ?? value,
+    );
+    pushChip(`Datasets: ${labels.join(", ")}`);
+  }
+  if (filters.variantFacets.length > 0) {
+    const labels = filters.variantFacets.map((value) => VARIANT_LABELS.get(value) ?? value);
+    pushChip(`Variant facets: ${labels.join(", ")}`);
+  }
+  if (filters.dateStart || filters.dateEnd) {
+    let range = "";
+    if (filters.dateStart && filters.dateEnd) {
+      range = `${filters.dateStart}–${filters.dateEnd}`;
+    } else if (filters.dateStart) {
+      range = `From ${filters.dateStart}`;
+    } else if (filters.dateEnd) {
+      range = `Until ${filters.dateEnd}`;
+    }
+    if (range) {
+      pushChip(`Date: ${range}`);
+    }
+  }
+  if (filters.includeVariants) {
+    pushChip("Variants on");
+  }
+  if (filters.includeDisputed) {
+    pushChip("Disputed readings on");
+  }
+  if (filters.preset) {
+    pushChip(`Preset: ${getPresetLabel(filters.preset)}`);
+  }
+
+  const description = chips.map((chip) => chip.text).join("; ");
+
+  return { chips, description };
+}
 
 type ModePreset = {
   value: string;
@@ -141,6 +435,11 @@ const MODE_PRESETS: ModePreset[] = [
     },
   },
 ];
+
+function getPresetLabel(value: string): string {
+  const preset = MODE_PRESETS.find((item) => item.value === value);
+  return preset ? preset.label : value;
+}
 
 type SavedSearch = {
   id: string;
@@ -949,9 +1248,18 @@ export default function SearchPage(): JSX.Element {
     try {
       const stored = localStorage.getItem(SAVED_SEARCH_STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as SavedSearch[];
+        const parsed = JSON.parse(stored) as unknown;
         if (Array.isArray(parsed)) {
-          setSavedSearches(parsed);
+          const normalized = parsed
+            .map((entry) => normalizeSavedSearchEntry(entry))
+            .filter((entry): entry is SavedSearch => entry !== null)
+            .sort((a, b) => b.createdAt - a.createdAt);
+          setSavedSearches(normalized);
+        } else {
+          const normalized = normalizeSavedSearchEntry(parsed);
+          if (normalized) {
+            setSavedSearches([normalized]);
+          }
         }
       }
     } catch (storageError) {
@@ -1131,36 +1439,65 @@ export default function SearchPage(): JSX.Element {
           </p>
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: "0.75rem 0 0", display: "grid", gap: "0.5rem" }}>
-            {savedSearches.map((saved) => (
-              <li
-                key={saved.id}
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "0.5rem",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "0.5rem",
-                  padding: "0.5rem 0.75rem",
-                }}
-              >
-                <div>
-                  <strong>{saved.name}</strong>
-                  <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#555" }}>
-                    {serializeSearchParams(saved.filters)}
-                  </p>
-                </div>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <button type="button" onClick={() => void handleApplySavedSearch(saved)}>
-                    Run
-                  </button>
-                  <button type="button" onClick={() => handleDeleteSavedSearch(saved.id)}>
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
+            {savedSearches.map((saved) => {
+              const filterDisplay = formatSavedSearchFilters(saved.filters);
+              const filtersDescriptionId = `saved-search-${saved.id}-filters`;
+              const runButtonLabel = filterDisplay.description
+                ? `Run saved search ${saved.name} with filters: ${filterDisplay.description}`
+                : `Run saved search ${saved.name}`;
+              return (
+                <li
+                  key={saved.id}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.5rem",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "0.5rem",
+                    padding: "0.5rem 0.75rem",
+                  }}
+                >
+                  <div style={{ position: "relative", flex: "1 1 auto", minWidth: "200px" }}>
+                    <strong>{saved.name}</strong>
+                    {filterDisplay.chips.length > 0 ? (
+                      <>
+                        <span id={filtersDescriptionId} style={VISUALLY_HIDDEN_STYLES}>
+                          Active filters: {filterDisplay.description}
+                        </span>
+                        <div style={SAVED_SEARCH_CHIP_CONTAINER_STYLE} aria-hidden="true">
+                          {filterDisplay.chips.map((chip) => (
+                            <span key={chip.id} style={SAVED_SEARCH_CHIP_STYLE}>
+                              {chip.text}
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#555" }}>
+                        No filters stored with this search.
+                      </p>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => void handleApplySavedSearch(saved)}
+                      aria-label={runButtonLabel}
+                      aria-describedby={
+                        filterDisplay.chips.length > 0 ? filtersDescriptionId : undefined
+                      }
+                    >
+                      Run
+                    </button>
+                    <button type="button" onClick={() => handleDeleteSavedSearch(saved.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
