@@ -1,0 +1,294 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.6, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\dmedl\Projects\TheoEngine\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\dmedl\Projects\TheoEngine
+configfile: pyproject.toml
+plugins: anyio-4.11.0, hypothesis-6.140.2, cov-7.0.0, subtests-0.14.2, schemathesis-3.39.16
+collecting ... collected 134 items
+
+tests/api/test_ai_citation_export.py::test_export_citations_returns_csl_payload ERROR [  0%]
+tests/api/test_ai_citation_export.py::test_export_citations_allows_missing_source_url ERROR [  1%]
+tests/api/test_ai_citation_export.py::test_export_citations_rejects_empty_payload ERROR [  2%]
+tests/api/test_ai_citation_export.py::test_export_citations_reports_missing_document ERROR [  2%]
+tests/api/test_ai_citation_export.py::test_export_citations_requires_document_id ERROR [  3%]
+tests/api/test_ai_citation_export.py::test_build_csl_entry_uses_expected_type[sermon-speech] PASSED [  4%]
+tests/api/test_ai_citation_export.py::test_build_csl_entry_uses_expected_type[video-motion_picture] PASSED [  5%]
+tests/api/test_ai_citation_export.py::test_build_csl_entry_uses_expected_type[web-webpage] PASSED [  5%]
+tests/api/test_ai_citation_export.py::test_build_csl_entry_uses_expected_type[unknown-article-journal] PASSED [  6%]
+tests/api/test_ai_exports.py::test_sermon_export_returns_serialised_asset[markdown] ERROR [  7%]
+tests/api/test_ai_exports.py::test_sermon_export_returns_serialised_asset[ndjson] ERROR [  8%]
+tests/api/test_ai_exports.py::test_sermon_export_returns_serialised_asset[csv] ERROR [  8%]
+tests/api/test_ai_exports.py::test_sermon_export_returns_serialised_asset[pdf] ERROR [  9%]
+tests/api/test_ai_exports.py::test_transcript_export_returns_serialised_asset[markdown] ERROR [ 10%]
+tests/api/test_ai_exports.py::test_transcript_export_returns_serialised_asset[csv] ERROR [ 11%]
+tests/api/test_ai_exports.py::test_transcript_export_returns_serialised_asset[pdf] ERROR [ 11%]
+tests/api/test_ai_features_endpoint.py::test_ai_features_exposes_guardrail_catalogues FAILED [ 12%]
+tests/api/test_ai_registry.py::test_settings_store_encrypts_and_decrypts PASSED [ 13%]
+tests/api/test_ai_registry.py::test_registry_encrypts_api_keys_and_migrates_plaintext PASSED [ 14%]
+tests/api/test_ai_registry.py::test_migrate_plaintext_settings_reencrypts PASSED [ 14%]
+tests/api/test_ai_registry.py::test_build_client_dispatch[openai-config0-OpenAIClient] PASSED [ 15%]
+tests/api/test_ai_registry.py::test_build_client_dispatch[azure-config1-AzureOpenAIClient] PASSED [ 16%]
+tests/api/test_ai_registry.py::test_build_client_dispatch[anthropic-config2-AnthropicClient] PASSED [ 17%]
+tests/api/test_ai_registry.py::test_build_client_dispatch[vertex-config3-VertexAIClient] PASSED [ 17%]
+tests/api/test_ai_registry.py::test_build_client_dispatch[vllm-config4-LocalVLLMClient] PASSED [ 18%]
+tests/api/test_ai_registry.py::test_registry_persists_model_metadata PASSED [ 19%]
+tests/api/test_ai_registry.py::test_llm_routes_persist_metadata PASSED   [ 20%]
+tests/api/test_ai_registry.py::test_llm_routes_openapi_schema PASSED     [ 20%]
+tests/api/test_ai_registry.py::test_retry_backoff_respects_retry_after PASSED [ 21%]
+tests/api/test_ai_registry.py::test_clients_inject_idempotency_keys_and_cache[<lambda>-payload0-Idempotency-Key-openai] PASSED [ 22%]
+tests/api/test_ai_registry.py::test_clients_inject_idempotency_keys_and_cache[<lambda>-payload1-x-ms-client-request-id-azure] PASSED [ 23%]
+tests/api/test_ai_registry.py::test_clients_inject_idempotency_keys_and_cache[<lambda>-payload2-anthropic-idempotency-key-anthropic] PASSED [ 23%]
+tests/api/test_ai_registry.py::test_clients_inject_idempotency_keys_and_cache[<lambda>-payload3-x-request-id-vertex] PASSED [ 24%]
+tests/api/test_ai_registry.py::test_clients_inject_idempotency_keys_and_cache[<lambda>-payload4-Idempotency-Key-local] PASSED [ 25%]
+tests/api/test_ai_router.py::test_router_logs_warning_when_budget_projection_near_ceiling PASSED [ 26%]
+tests/api/test_ai_router.py::test_router_logs_warning_when_latency_projection_near_threshold PASSED [ 26%]
+tests/api/test_ai_router.py::test_router_logs_warning_when_budget_exceeded PASSED [ 27%]
+tests/api/test_ai_router.py::test_router_logs_warning_when_latency_exceeded PASSED [ 28%]
+tests/api/test_ai_router.py::test_router_respects_budget_and_falls_back PASSED [ 29%]
+tests/api/test_ai_router.py::test_router_latency_threshold_triggers_fallback PASSED [ 29%]
+tests/api/test_ai_router.py::test_router_generation_error_when_ledger_prepopulated PASSED [ 30%]
+tests/api/test_ai_router.py::test_router_prefers_model_hint_and_falls_back PASSED [ 31%]
+tests/api/test_ai_router.py::test_router_reuses_cache_entry PASSED       [ 32%]
+tests/api/test_ai_router.py::test_router_deduplicates_inflight_requests PASSED [ 32%]
+tests/api/test_ai_router.py::test_router_shared_spend_across_processes PASSED [ 33%]
+tests/api/test_ai_router.py::test_router_shared_latency_across_processes PASSED [ 34%]
+tests/api/test_ai_trails.py::test_trail_recorder_persists_retrieval_snapshots PASSED [ 35%]
+tests/api/test_ai_trails.py::test_trail_replay_retains_retrieval_snapshots PASSED [ 35%]
+tests/api/test_ai_watchlists.py::test_create_watchlist_assigns_principal_subject PASSED [ 36%]
+tests/api/test_ai_watchlists.py::test_list_watchlists_filters_by_principal_subject PASSED [ 37%]
+tests/api/test_ai_watchlists.py::test_other_user_watchlist_returns_not_found PASSED [ 38%]
+tests/api/test_debug_reporting.py::test_build_debug_report_filters_sensitive_data PASSED [ 38%]
+tests/api/test_debug_reporting.py::test_error_reporting_middleware_emits_report PASSED [ 39%]
+tests/api/test_debug_reporting.py::test_debug_report_includes_trace_id PASSED [ 40%]
+tests/api/test_digest_service.py::test_ensure_latest_returns_cached_when_within_ttl PASSED [ 41%]
+tests/api/test_digest_service.py::test_ensure_latest_regenerates_when_expired PASSED [ 41%]
+tests/api/test_ingest.py::test_ingest_file_streams_large_upload_without_buffering PASSED [ 42%]
+tests/api/test_ingest.py::test_ingest_file_logs_large_body_as_truncated PASSED [ 43%]
+tests/api/test_ingest.py::test_ingest_file_rejects_upload_exceeding_limit PASSED [ 44%]
+tests/api/test_ingest.py::test_ingest_url_allows_http PASSED             [ 44%]
+tests/api/test_ingest.py::test_ingest_url_rejects_disallowed_scheme[file:///etc/passwd] PASSED [ 45%]
+tests/api/test_ingest.py::test_ingest_url_rejects_disallowed_scheme[gopher://example.com/resource] PASSED [ 46%]
+tests/api/test_ingest.py::test_ingest_url_blocks_private_targets[http://localhost/resource] PASSED [ 47%]
+tests/api/test_ingest.py::test_ingest_url_blocks_private_targets[http://127.0.0.1/secret] PASSED [ 47%]
+tests/api/test_ingest.py::test_ingest_url_blocks_private_targets[http://192.168.1.10/internal] PASSED [ 48%]
+tests/api/test_ingest.py::test_simple_ingest_streams_progress PASSED     [ 49%]
+tests/api/test_ingest.py::test_simple_ingest_rejects_bad_source PASSED   [ 50%]
+tests/api/test_ingest.py::test_ingest_url_times_out_on_slow_response FAILED [ 50%]
+tests/api/test_ingest.py::test_ingest_url_rejects_oversized_response FAILED [ 51%]
+tests/api/test_ingest.py::test_ingest_url_detects_redirect_loop FAILED   [ 52%]
+tests/api/test_ingest.py::test_ingest_file_rejects_password_protected_pdf PASSED [ 52%]
+tests/api/test_ingest.py::test_ingest_file_rejects_corrupt_pdf PASSED    [ 53%]
+tests/api/test_ingest_duplicates.py::test_duplicate_file_ingest_returns_400 PASSED [ 54%]
+tests/api/test_ingest_duplicates.py::test_duplicate_url_ingest_returns_400 PASSED [ 55%]
+tests/api/test_ingest_uploads.py::test_ingest_file_sanitizes_uploaded_filename PASSED [ 55%]
+tests/api/test_ingest_uploads.py::test_ingest_transcript_sanitizes_uploaded_files PASSED [ 56%]
+tests/api/test_ingest_uploads.py::test_ingest_markdown_with_windows_1252_bytes PASSED [ 57%]
+tests/api/test_ingest_uploads.py::test_ingest_html_with_windows_1252_bytes PASSED [ 58%]
+tests/api/test_jobs_enqueue_regression.py::test_repro_enqueue_job_runtime_error PASSED [ 58%]
+tests/api/test_jobs_refresh_hnsw.py::test_refresh_hnsw_job_endpoint_enqueues PASSED [ 59%]
+tests/api/test_jobs_refresh_hnsw.py::test_refresh_hnsw_job_endpoint_uses_defaults PASSED [ 60%]
+tests/api/test_jobs_validate_citations.py::test_validate_citations_job_endpoint_enqueues PASSED [ 61%]
+tests/api/test_jobs_validate_citations.py::test_validate_citations_job_uses_default_limit PASSED [ 61%]
+tests/api/test_rag_guardrails.py::test_cache_helpers_do_not_create_event_loop PASSED [ 62%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_accepts_valid_completion PASSED [ 63%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_rejects_mismatched_citations PASSED [ 64%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_requires_osis_reference PASSED [ 64%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_cache_hit_increments_metric PASSED [ 65%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_cache_stale_and_refresh_metrics PASSED [ 66%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_summary_uses_citation_documents PASSED [ 67%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_uses_echo_model PASSED [ 67%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_profile_mismatch_raises_guardrail_error PASSED [ 68%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_profile_match_includes_profile PASSED [ 69%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_reuses_cache PASSED [ 70%]
+tests/api/test_rag_guardrails.py::test_guarded_answer_invalidates_stale_cache PASSED [ 70%]
+tests/api/test_rag_guardrails.py::test_run_guarded_chat_reuses_cache PASSED [ 71%]
+tests/api/test_rag_guardrails.py::test_run_guarded_chat_guardrail_violation_propagates PASSED [ 72%]
+tests/api/test_rag_pdf_deliverables.py::test_build_sermon_deliverable_pdf_renders_binary PASSED [ 73%]
+tests/api/test_rag_pdf_deliverables.py::test_build_transcript_deliverable_pdf_renders_binary PASSED [ 73%]
+tests/api/test_research_dss_links.py::test_dss_links_endpoint_returns_matches PASSED [ 74%]
+tests/api/test_research_dss_links.py::test_dss_links_endpoint_handles_ranges PASSED [ 75%]
+tests/api/test_research_dss_links.py::test_dss_links_endpoint_handles_missing_osis PASSED [ 76%]
+tests/api/test_security.py::test_missing_credentials_return_unauthorized[post-/ingest/url-kwargs0] PASSED [ 76%]
+tests/api/test_security.py::test_missing_credentials_return_unauthorized[get-/ai/llm-kwargs1] PASSED [ 77%]
+tests/api/test_security.py::test_missing_credentials_return_unauthorized[post-/ai/digest-kwargs2] PASSED [ 78%]
+tests/api/test_security.py::test_missing_credentials_return_unauthorized[get-/documents-kwargs3] PASSED [ 79%]
+tests/api/test_security.py::test_missing_credentials_return_unauthorized[get-/jobs-kwargs4] PASSED [ 79%]
+tests/api/test_security.py::test_invalid_credentials_return_forbidden[post-/ingest/url-kwargs0] PASSED [ 80%]
+tests/api/test_security.py::test_invalid_credentials_return_forbidden[get-/ai/llm-kwargs1] PASSED [ 81%]
+tests/api/test_security.py::test_invalid_credentials_return_forbidden[post-/ai/digest-kwargs2] PASSED [ 82%]
+tests/api/test_security.py::test_invalid_credentials_return_forbidden[get-/documents-kwargs3] PASSED [ 82%]
+tests/api/test_security.py::test_invalid_credentials_return_forbidden[get-/jobs-kwargs4] PASSED [ 83%]
+tests/api/test_security.py::test_api_key_allows_access[post-/ingest/url-kwargs0] PASSED [ 84%]
+tests/api/test_security.py::test_api_key_allows_access[get-/ai/llm-kwargs1] PASSED [ 85%]
+tests/api/test_security.py::test_api_key_allows_access[post-/ai/digest-kwargs2] PASSED [ 85%]
+tests/api/test_security.py::test_api_key_allows_access[get-/documents-kwargs3] PASSED [ 86%]
+tests/api/test_security.py::test_api_key_allows_access[get-/jobs-kwargs4] PASSED [ 87%]
+tests/api/test_security.py::test_jwt_allows_access PASSED                [ 88%]
+tests/api/test_security.py::test_anonymous_access_allowed_when_auth_unconfigured PASSED [ 88%]
+tests/api/test_sql_migrations.py::test_sql_migrations_run_on_startup PASSED [ 89%]
+tests/api/test_sql_migrations.py::test_cli_entry_point_invokes_runner PASSED [ 90%]
+tests/api/test_telemetry.py::test_repro_workflow_context_dict_serialization[value0] PASSED [ 91%]
+tests/api/test_telemetry.py::test_repro_workflow_context_dict_serialization[value1] PASSED [ 91%]
+tests/api/test_verse_timeline.py::test_get_verse_timeline_groups_mentions_by_month PASSED [ 92%]
+tests/api/test_verse_timeline.py::test_get_verse_timeline_filters_by_source_type PASSED [ 93%]
+tests/api/test_verse_timeline.py::test_get_verse_timeline_respects_limit PASSED [ 94%]
+tests/api/test_verse_timeline.py::test_get_verse_timeline_rejects_invalid_window PASSED [ 94%]
+tests/api/test_verse_timeline.py::test_get_verse_timeline_filters_by_author_for_week_window PASSED [ 95%]
+tests/api/test_watchlist_performance.py::test_document_window_query_uses_created_at_index PASSED [ 96%]
+tests/api/test_watchlist_performance.py::test_watchlist_event_query_uses_run_started_index PASSED [ 97%]
+tests/api/test_workflow_spans.py::test_multimedia_digest_emits_span_and_records_steps PASSED [ 97%]
+tests/api/test_workflow_spans.py::test_devotional_flow_emits_span PASSED [ 98%]
+tests/api/test_workflow_spans.py::test_research_reconciliation_emits_span PASSED [ 99%]
+tests/api/test_workflow_spans.py::test_corpus_curation_emits_span PASSED [100%]
+
+=================================== ERRORS ====================================
+_________ ERROR at setup of test_export_citations_returns_csl_payload _________
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+______ ERROR at setup of test_export_citations_allows_missing_source_url ______
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+________ ERROR at setup of test_export_citations_rejects_empty_payload ________
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+______ ERROR at setup of test_export_citations_reports_missing_document _______
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+________ ERROR at setup of test_export_citations_requires_document_id _________
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+___ ERROR at setup of test_sermon_export_returns_serialised_asset[markdown] ___
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+____ ERROR at setup of test_sermon_export_returns_serialised_asset[ndjson] ____
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+_____ ERROR at setup of test_sermon_export_returns_serialised_asset[csv] ______
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+_____ ERROR at setup of test_sermon_export_returns_serialised_asset[pdf] ______
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+_ ERROR at setup of test_transcript_export_returns_serialised_asset[markdown] _
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+___ ERROR at setup of test_transcript_export_returns_serialised_asset[csv] ____
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+___ ERROR at setup of test_transcript_export_returns_serialised_asset[pdf] ____
+E   sqlite3.OperationalError: no such column: contradiction_seeds.perspective
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+    [SQL: SELECT contradiction_seeds.id AS contradiction_seeds_id, contradiction_seeds.osis_a AS contradiction_seeds_osis_a, contradiction_seeds.osis_b AS contradiction_seeds_osis_b, contradiction_seeds.summary AS contradiction_seeds_summary, contradiction_seeds.source AS contradiction_seeds_source, contradiction_seeds.tags AS contradiction_seeds_tags, contradiction_seeds.weight AS contradiction_seeds_weight, contradiction_seeds.perspective AS contradiction_seeds_perspective, contradiction_seeds.created_at AS contradiction_seeds_created_at 
+    FROM contradiction_seeds 
+    WHERE contradiction_seeds.id = ?]
+    [parameters: ('c6fcf110-0db4-5237-86f2-f010a1f69772',)]
+    (Background on this error at: https://sqlalche.me/e/20/e3q8)
+================================== FAILURES ===================================
+C:\Users\dmedl\Projects\TheoEngine\.venv\Lib\site-packages\sqlalchemy\engine\default.py:951: sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: contradiction_seeds.perspective
+c:\Users\dmedl\Projects\TheoEngine\tests\api\test_ingest.py:330: assert 500 == 400
+c:\Users\dmedl\Projects\TheoEngine\tests\api\test_ingest.py:374: assert 500 == 400
+c:\Users\dmedl\Projects\TheoEngine\tests\api\test_ingest.py:441: assert 500 == 400
+============================== warnings summary ===============================
+.venv\Lib\site-packages\schemathesis\generation\coverage.py:305
+  c:\Users\dmedl\Projects\TheoEngine\.venv\Lib\site-packages\schemathesis\generation\coverage.py:305: DeprecationWarning: jsonschema.exceptions.RefResolutionError is deprecated as of version 4.18.0. If you wish to catch potential reference resolution errors, directly catch referencing.exceptions.Unresolvable.
+    ref_error: type[Exception] = jsonschema.RefResolutionError,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/api/test_ai_features_endpoint.py::test_ai_features_exposes_guardrail_catalogues
+FAILED tests/api/test_ingest.py::test_ingest_url_times_out_on_slow_response
+FAILED tests/api/test_ingest.py::test_ingest_url_rejects_oversized_response
+FAILED tests/api/test_ingest.py::test_ingest_url_detects_redirect_loop - asse...
+ERROR tests/api/test_ai_citation_export.py::test_export_citations_returns_csl_payload
+ERROR tests/api/test_ai_citation_export.py::test_export_citations_allows_missing_source_url
+ERROR tests/api/test_ai_citation_export.py::test_export_citations_rejects_empty_payload
+ERROR tests/api/test_ai_citation_export.py::test_export_citations_reports_missing_document
+ERROR tests/api/test_ai_citation_export.py::test_export_citations_requires_document_id
+ERROR tests/api/test_ai_exports.py::test_sermon_export_returns_serialised_asset[markdown]
+ERROR tests/api/test_ai_exports.py::test_sermon_export_returns_serialised_asset[ndjson]
+ERROR tests/api/test_ai_exports.py::test_sermon_export_returns_serialised_asset[csv]
+ERROR tests/api/test_ai_exports.py::test_sermon_export_returns_serialised_asset[pdf]
+ERROR tests/api/test_ai_exports.py::test_transcript_export_returns_serialised_asset[markdown]
+ERROR tests/api/test_ai_exports.py::test_transcript_export_returns_serialised_asset[csv]
+ERROR tests/api/test_ai_exports.py::test_transcript_export_returns_serialised_asset[pdf]
+============ 4 failed, 118 passed, 1 warning, 12 errors in 24.88s =============

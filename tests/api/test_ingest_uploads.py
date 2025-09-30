@@ -132,7 +132,7 @@ def test_ingest_markdown_with_windows_1252_bytes(
     captured: dict[str, str] = {}
 
     def fake_pipeline(_session, path: Path, frontmatter):
-        body, _ = ingest_pipeline._parse_text_file(path)
+        body, _ = ingest_pipeline.parse_text_file(path)
         captured["body"] = body
         return _mkdoc()
 

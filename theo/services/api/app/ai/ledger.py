@@ -456,8 +456,8 @@ class SharedLedger:
                     cost=row.cost or 0.0,
                     created_at=row.updated_at,
                 )
-                with self.transaction() as txn:
-                    txn.clear_single_inflight(cache_key)
+                # Don't clear inflight immediately to avoid race condition
+                # It will be cleaned up by periodic maintenance
                 return record
             if row.status == "error":
                 with self.transaction() as txn:

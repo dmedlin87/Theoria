@@ -1,0 +1,73 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.6, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\dmedl\Projects\TheoEngine\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\dmedl\Projects\TheoEngine
+configfile: pyproject.toml
+plugins: anyio-4.11.0, hypothesis-6.140.2, cov-7.0.0, subtests-0.14.2, schemathesis-3.39.16
+collecting ... collected 1 item
+
+tests/api/test_ingest.py::test_ingest_url_times_out_on_slow_response FAILED
+
+================================== FAILURES ===================================
+_________________ test_ingest_url_times_out_on_slow_response __________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001710B9C3200>
+api_client = <starlette.testclient.TestClient object at 0x000001710B9C31A0>
+
+    def test_ingest_url_times_out_on_slow_response(
+        monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+    ) -> None:
+        settings = Settings()
+        settings.ingest_web_timeout_seconds = 0.5
+        settings.ingest_web_max_bytes = 1024
+        settings.ingest_web_max_redirects = 3
+    
+        class _TimeoutResponse:
+            headers = _FakeHeaders()
+    
+            def geturl(self) -> str:
+                return "https://slow.example.com"
+    
+            def read(self, size: int | None = None) -> bytes:  # noqa: ARG002
+                raise socket.timeout()
+    
+            def close(self) -> None:
+                pass
+    
+        class _TimeoutOpener:
+            def __init__(self, handler):  # noqa: ANN001
+                self.handler = handler
+                self.addheaders = []
+    
+            def open(self, request, timeout=None):  # noqa: ANN001, D401
+                return _TimeoutResponse()
+    
+        _install_url_pipeline_stub(
+            monkeypatch,
+            settings,
+            lambda *handlers: _TimeoutOpener(handlers[0]),
+            expected_failure_message="Fetching URL timed out after 0.5 seconds",
+        )
+    
+        response = api_client.post("/ingest/url", json={"url": "https://slow.example.com"})
+>       assert response.status_code == status.HTTP_400_BAD_REQUEST
+E       assert 500 == 400
+E        +  where 500 = <Response [500 Internal Server Error]>.status_code
+E        +  and   400 = status.HTTP_400_BAD_REQUEST
+
+tests\api\test_ingest.py:330: AssertionError
+----------------------------- Captured log setup ------------------------------
+WARNING  theo.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\TheoEngine\theo\data\providers\openbible-geo\data
+------------------------------ Captured log call ------------------------------
+ERROR    theo.api.errors:reporting.py:189 api.debug_report
+============================== warnings summary ===============================
+.venv\Lib\site-packages\schemathesis\generation\coverage.py:305
+  c:\Users\dmedl\Projects\TheoEngine\.venv\Lib\site-packages\schemathesis\generation\coverage.py:305: DeprecationWarning: jsonschema.exceptions.RefResolutionError is deprecated as of version 4.18.0. If you wish to catch potential reference resolution errors, directly catch referencing.exceptions.Unresolvable.
+    ref_error: type[Exception] = jsonschema.RefResolutionError,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/api/test_ingest.py::test_ingest_url_times_out_on_slow_response
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+======================== 1 failed, 1 warning in 0.62s =========================
