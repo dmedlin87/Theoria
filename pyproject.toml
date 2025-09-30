@@ -15,7 +15,7 @@ src = ["theo", "tests", "scripts"]
 exclude = ["docs"]
 
 [tool.ruff.lint]
-extend-select = ["I"]
+extend-select = ["I", "PD", "FA"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["theo"]
@@ -23,7 +23,12 @@ combine-as-imports = true
 
 [tool.mypy]
 python_version = "3.11"
-files = ["theo/services/api/app/export", "tests/export"]
+files = [
+    "theo/services/api/app/export",
+    "theo/services/api/app/ingest",
+    "theo/services/api/app/retriever",
+    "tests/export",
+]
 ignore_missing_imports = true
 warn_unused_configs = true
 follow_imports = "skip"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -24,6 +25,9 @@ _RERANKER: Reranker | None = None
 _RERANKER_PATH: str | None = None
 _RERANKER_FAILED: bool = False
 _RERANKER_TOP_K = 20
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _reset_reranker_cache() -> None:
@@ -54,6 +58,14 @@ def _resolve_reranker(model_path: str | Path | None) -> Reranker | None:
         try:
             _RERANKER = load_reranker(model_str)
         except Exception:
+            if not _RERANKER_FAILED:
+                LOGGER.exception(
+                    "search.reranker_load_failed",
+                    extra={
+                        "event": "search.reranker_load_failed",
+                        "model_path": model_str,
+                    },
+                )
             _RERANKER_FAILED = True
             return None
     return _RERANKER
