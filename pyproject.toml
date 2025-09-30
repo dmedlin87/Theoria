@@ -32,4 +32,5 @@ follow_imports = "skip"
 markers = [
     "redteam: OWASP LLM red-team regression suite",
     "no_auth_override: disable authentication override fixture for security assertions",
+    "slow: slower end-to-end smoke tests",
 ]

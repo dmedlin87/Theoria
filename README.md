@@ -36,6 +36,30 @@ pip install -r requirements.txt
 
 After the dependencies are installed you can run `pytest` from the repository root to execute the automated test suite.
 
+## Training and evaluating the reranker
+
+Synthetic fixtures for experimenting with the learning-to-rank pipeline live under `tests/ranking/data`. The helper scripts can
+train a small reranker on recent feedback and score it on a holdout split:
+
+```bash
+# Train a checkpoint using the last 30 days of feedback.
+python scripts/train_reranker.py \
+  --feedback-path tests/ranking/data/feedback_events.jsonl \
+  --model-output /tmp/reranker.joblib \
+  --lookback-days 30
+
+# Evaluate the checkpoint on a labelled holdout set at k=10.
+python scripts/eval_reranker.py \
+  --checkpoint /tmp/reranker.joblib \
+  --holdout-path tests/ranking/data/holdout.json \
+  --k 10 \
+  --report-path /tmp/reranker_metrics.json
+```
+
+Use `--reference-time` on the training script to anchor the lookback window when replaying historical fixtures. The evaluation
+script prints baseline and reranked nDCG@k, MRR, and Recall@k metrics and optionally writes them to JSON for CI-friendly
+reporting.
+
 ## Resetting and reseeding the API database
 
 Use the bundled helper to rebuild the schema, apply the raw SQL migrations, seed reference
