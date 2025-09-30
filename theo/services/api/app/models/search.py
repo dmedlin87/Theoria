@@ -36,6 +36,9 @@ class HybridSearchResult(Passage):
     highlights: list[str] | None = None
     document_score: float | None = None
     document_rank: int | None = None
+    lexical_score: float | None = None
+    vector_score: float | None = None
+    osis_distance: float | None = None
 
 
 class HybridSearchResponse(APIModel):
