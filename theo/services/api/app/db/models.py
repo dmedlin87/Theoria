@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Any
 from uuid import uuid4
 
@@ -20,6 +21,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -199,7 +201,65 @@ class IngestionJob(Base):
         nullable=False,
     )
 
-    document: Mapped[Document | None] = relationship("Document")
+    document: Mapped["Document | None"] = relationship("Document")
+
+
+class FeedbackEventAction(str, Enum):
+    """Permissible action types for user feedback events."""
+
+    VIEW = "view"
+    CLICK = "click"
+    COPY = "copy"
+    LIKE = "like"
+    DISLIKE = "dislike"
+
+
+class FeedbackEvent(Base):
+    """Captures explicit or implicit user feedback interactions."""
+
+    __tablename__ = "feedback_events"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    user_id: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
+    chat_session_id: Mapped[str | None] = mapped_column(
+        String, index=True, nullable=True
+    )
+    query: Mapped[str | None] = mapped_column(Text, nullable=True)
+    document_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
+    passage_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("passages.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
+    action: Mapped[FeedbackEventAction] = mapped_column(
+        SQLEnum(
+            FeedbackEventAction,
+            name="feedback_event_action",
+            native_enum=False,
+            validate_strings=True,
+        ),
+        nullable=False,
+    )
+    rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+        index=True,
+    )
+
+    document: Mapped["Document | None"] = relationship("Document")
+    passage: Mapped["Passage | None"] = relationship("Passage")
 
 
 class ResearchNote(Base):
