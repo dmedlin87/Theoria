@@ -369,7 +369,7 @@ def ingest_folder(
         )
         return
 
-    click.echo(f"Discovered {len(items)} supported source(s) from {source}.")
+    click.echo(f"Discovered {len(items)} supported file(s) from {source}.")
     log_workflow_event(
         "cli.ingest.started",
         workflow="cli.ingest_folder",

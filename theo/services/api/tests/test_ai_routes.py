@@ -3,24 +3,46 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from contextlib import contextmanager
 
 from click.testing import CliRunner
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core.database import get_engine
+from theo.services.api.app.core.database import configure_engine, get_engine, get_session
 from theo.services.api.app.db.models import AgentTrail, Document, Passage
 from theo.services.api.app.main import app
 from theo.services.api.app.workers import tasks as worker_tasks
 from theo.services.cli.batch_intel import main as batch_intel_main
 
+@contextmanager
+def _api_client():
+    configure_engine()
+    def _override_session():
+        with Session(get_engine()) as session:
+            yield session
+    app.dependency_overrides[get_session] = _override_session
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+
+
+
 
 def _seed_corpus() -> None:
+    configure_engine()
     engine = get_engine()
     with Session(engine) as session:
-        if session.get(Document, "doc-1"):
-            return
+        existing_doc = session.get(Document, "doc-1")
+        if existing_doc:
+            session.delete(existing_doc)
+        existing_transcript = session.get(Document, "doc-2")
+        if existing_transcript:
+            session.delete(existing_transcript)
+        session.commit()
         doc = Document(
             id="doc-1",
             title="Sample Sermon",
@@ -65,6 +87,10 @@ def _seed_corpus() -> None:
         transcript.passages.append(transcript_passage)
         session.add_all([doc, transcript])
         session.commit()
+        assert session.get(Passage, "passage-1") is not None
+        assert session.get(Passage, "passage-2") is not None
+        remaining = session.execute(select(Passage.id).where(Passage.osis_ref == "John.1.1")).all()
+        assert remaining, "Failed to seed passages for John.1.1"
 
 
 def _register_echo_model(client: TestClient, *, make_default: bool = True) -> dict:
@@ -89,7 +115,7 @@ def _register_echo_model(client: TestClient, *, make_default: bool = True) -> di
 
 def test_verse_copilot_returns_citations_and_followups() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         state = _register_echo_model(client)
         assert state["default_model"] == "echo"
         response = client.post(
@@ -131,7 +157,7 @@ def test_verse_copilot_returns_citations_and_followups() -> None:
 
 def test_verse_copilot_accepts_plain_language_passage() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post(
             "/ai/verse",
@@ -143,7 +169,7 @@ def test_verse_copilot_accepts_plain_language_passage() -> None:
 
 
 def test_llm_registry_crud_operations() -> None:
-    with TestClient(app) as client:
+    with _api_client() as client:
         state = _register_echo_model(client)
         assert state["default_model"] == "echo"
 
@@ -177,7 +203,7 @@ def test_llm_registry_crud_operations() -> None:
 
 def test_chat_session_returns_guarded_answer_and_trail() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post(
             "/ai/chat",
@@ -214,7 +240,7 @@ def test_chat_session_returns_guarded_answer_and_trail() -> None:
 
 def test_chat_turn_guardrail_failure_returns_422() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post(
             "/ai/chat",
@@ -243,7 +269,7 @@ def test_chat_turn_guardrail_failure_returns_422() -> None:
 
 
 def test_provider_settings_crud_flow() -> None:
-    with TestClient(app) as client:
+    with _api_client() as client:
         missing = client.get("/settings/ai/providers/openai")
         assert missing.status_code == 404
 
@@ -286,7 +312,7 @@ def test_provider_settings_crud_flow() -> None:
 
 def test_verse_copilot_guardrails_when_no_citations() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post(
             "/ai/verse",
@@ -313,7 +339,7 @@ def test_sermon_prep_export_markdown() -> None:
             "These highlights include a [Click](javascript:alert(1)) example."
         )
         session.commit()
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post(
             "/ai/sermon-prep/export",
@@ -351,7 +377,7 @@ def test_export_deliverable_sermon_bundle(monkeypatch) -> None:
         fake_apply_async,
     )
 
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post(
             "/export/deliverable",
@@ -385,7 +411,7 @@ def test_export_deliverable_sermon_bundle(monkeypatch) -> None:
 
 def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post(
             "/ai/sermon-prep",
@@ -418,7 +444,7 @@ def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
 
 def test_sermon_prep_guardrails_when_no_results() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post(
             "/ai/sermon-prep",
@@ -429,7 +455,7 @@ def test_sermon_prep_guardrails_when_no_results() -> None:
 
 def test_transcript_export_csv() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         response = client.post(
             "/ai/transcript/export",
             json={"document_id": "doc-2", "format": "csv"},
@@ -451,7 +477,7 @@ def test_transcript_export_markdown_sanitises_payload() -> None:
         )
         passage.meta = {"speaker": "Student<script>alert(1)</script>"}
         session.commit()
-    with TestClient(app) as client:
+    with _api_client() as client:
         response = client.post(
             "/ai/transcript/export",
             json={"document_id": "doc-2", "format": "markdown"},
@@ -484,7 +510,7 @@ def test_export_deliverable_transcript_bundle(monkeypatch) -> None:
         fake_apply_async,
     )
 
-    with TestClient(app) as client:
+    with _api_client() as client:
         response = client.post(
             "/export/deliverable",
             json={
@@ -511,7 +537,7 @@ def test_export_deliverable_transcript_bundle(monkeypatch) -> None:
 
 def test_comparative_analysis_returns_citations_and_comparisons() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
         response = client.post(
             "/ai/comparative",
@@ -535,7 +561,7 @@ def test_comparative_analysis_returns_citations_and_comparisons() -> None:
 
 def test_multimedia_digest_highlights_audio_sources() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
         response = client.post(
             "/ai/multimedia",
@@ -555,7 +581,7 @@ def test_multimedia_digest_highlights_audio_sources() -> None:
 
 def test_devotional_flow_returns_reflection_and_prayer() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
         response = client.post(
             "/ai/devotional",
@@ -574,7 +600,7 @@ def test_devotional_flow_returns_reflection_and_prayer() -> None:
 
 def test_collaboration_reconciliation_includes_synthesized_view() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         client.post("/ai/llm", json={"name": "echo", "provider": "echo", "model": "echo"})
         response = client.post(
             "/ai/collaboration",
@@ -598,7 +624,7 @@ def test_collaboration_reconciliation_includes_synthesized_view() -> None:
 def test_corpus_curation_report_persists_summaries() -> None:
     _seed_corpus()
     since = (datetime.now(UTC) - timedelta(days=1)).isoformat()
-    with TestClient(app) as client:
+    with _api_client() as client:
         response = client.post("/ai/curation", json={"since": since})
         assert response.status_code == 200
         payload = response.json()
@@ -609,7 +635,7 @@ def test_corpus_curation_report_persists_summaries() -> None:
 
 def test_topic_digest_generation() -> None:
     _seed_corpus()
-    with TestClient(app) as client:
+    with _api_client() as client:
         _register_echo_model(client)
         response = client.post("/ai/digest", params={"hours": 24})
         assert response.status_code == 200

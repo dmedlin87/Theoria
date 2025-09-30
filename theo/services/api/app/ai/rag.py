@@ -605,6 +605,24 @@ def _load_guardrail_reference(session: Session) -> HybridSearchResult | None:
 
 
 
+def _load_passages_for_osis(
+    session: Session, osis: str, *, limit: int = 3
+) -> list[HybridSearchResult]:
+    passages = (
+        session.execute(
+            select(Passage).where(Passage.osis_ref == osis).limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    results: list[HybridSearchResult] = []
+    for passage in passages:
+        document = session.get(Document, passage.document_id)
+        results.append(_build_guardrail_result(passage, document))
+    return results
+
+
+
 def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
     digest = hashlib.sha256()
     for result in results:
@@ -1223,17 +1241,30 @@ def _guarded_answer_or_refusal(
     recorder: "TrailRecorder | None" = None,
     filters: HybridSearchFilters | None = None,
     memory_context: Sequence[str] | None = None,
+    osis: str | None = None,
+    allow_fallback: bool | None = None,
 ) -> RAGAnswer:
+    original_results = list(results)
+    filtered_results = [result for result in original_results if result.osis_ref]
+    fallback_results: list[HybridSearchResult] = []
+    if not filtered_results and osis:
+        fallback_results = _load_passages_for_osis(session, osis)
+        if fallback_results:
+            filtered_results = fallback_results
+    candidate_results = filtered_results or original_results
+    enable_fallback = allow_fallback if allow_fallback is not None else False
+
     try:
         return _guarded_answer(
             session,
             question=question,
-            results=results,
+            results=candidate_results,
             registry=registry,
             model_hint=model_hint,
             recorder=recorder,
             filters=filters,
             memory_context=memory_context,
+            allow_fallback=enable_fallback,
         )
     except GuardrailError as exc:
         if not getattr(exc, "safe_refusal", False):
@@ -1256,7 +1287,17 @@ def _search(
     k: int = 8,
 ) -> list[HybridSearchResult]:
     request = HybridSearchRequest(query=query, osis=osis, filters=filters, k=k)
-    return hybrid_search(session, request)
+    results = list(hybrid_search(session, request))
+    if osis and not any(result.osis_ref for result in results):
+        fallback = _load_passages_for_osis(session, osis)
+        if fallback:
+            LOGGER.debug(
+                "Hybrid search yielded no OSIS matches; injecting %d fallback passages for %s",
+                len(fallback),
+                osis,
+            )
+            return fallback
+    return results
 
 
 def run_guarded_chat(
@@ -1319,6 +1360,7 @@ def run_guarded_chat(
             recorder=recorder,
             filters=filters,
             memory_context=memory_context,
+            osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -1392,6 +1434,7 @@ def generate_verse_brief(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -1479,6 +1522,7 @@ def generate_sermon_prep_outline(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -1553,6 +1597,7 @@ def generate_comparative_analysis(
             registry=registry,
             model_hint=model_name,
             filters=filters,
+            osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1631,6 +1676,7 @@ def generate_multimedia_digest(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            osis=None,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         highlights = [
@@ -1703,6 +1749,7 @@ def generate_devotional_flow(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1842,6 +1889,7 @@ def run_research_reconciliation(
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
+            osis=osis,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(

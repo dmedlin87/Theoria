@@ -51,6 +51,7 @@ def _refresh_settings():
 def secure_env(monkeypatch) -> dict[str, str]:
     monkeypatch.setenv("THEO_API_KEYS", '["valid-key"]')
     monkeypatch.setenv("THEO_AUTH_JWT_SECRET", "shared-secret")
+    monkeypatch.delenv("THEO_AUTH_ALLOW_ANONYMOUS", raising=False)
     return {"api_key": "valid-key", "jwt_secret": "shared-secret"}
 
 
