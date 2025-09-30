@@ -20,6 +20,7 @@ from theo.services.api.app.core.settings import Settings  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
 from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E402
+from theo.services.api.app.ingest import network as network_module  # noqa: E402
 
 
 @pytest.fixture()
@@ -464,5 +465,10 @@ def test_ingest_file_rejects_corrupt_pdf(api_client: TestClient) -> None:
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {"detail": _PDF_EXTRACTION_ERROR}
 
- 
+
+def test_extract_youtube_video_id_handles_embed_urls() -> None:
+    url = "https://www.youtube.com/embed/abc123XYZ?feature=share"
+    assert network_module.extract_youtube_video_id(url) == "abc123XYZ"
+
+
 

@@ -332,6 +332,10 @@ def extract_youtube_video_id(url: str) -> str:
                 return vid
         elif parsed.path.startswith("/shorts/"):
             return parsed.path.split("/shorts/")[1].split("/")[0]
+        elif parsed.path.startswith("/embed/"):
+            remainder = parsed.path.split("/embed/", 1)[1].strip("/")
+            if remainder:
+                return remainder.split("/")[0]
         elif parsed.path.startswith("/") and len(parsed.path.strip("/")) > 0:
             return parsed.path.strip("/")
     if "youtu.be" in host:
