@@ -520,7 +520,7 @@ export default function ChatWorkspace({
   }
   if (guardrail && guardrail.suggestions.length) {
     guardrailActions.actions = (
-      <div className="guardrail-actions" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+      <div className="guardrail-actions">
         {guardrail.suggestions.map((suggestion, index) => (
           <button
             key={`${suggestion.action}-${index}-${suggestion.label}`}
@@ -564,13 +564,83 @@ export default function ChatWorkspace({
 
   return (
     <div className="chat-workspace" aria-live="polite">
-      <div className="chat-intro">
-        <h2>Ask with {mode.label} stance</h2>
-        <p>
-          We’ll keep the conversation aligned to <strong>{mode.label.toLowerCase()}</strong> emphasis while grounding
-          every answer with citations you can inspect.
-        </p>
-      </div>
+      <section className="chat-hero" aria-label="Chat overview">
+        <div className="chat-hero__content">
+          <p className="chat-hero__eyebrow">Theo Engine Copilot</p>
+          <h2>Ask with {mode.label} stance</h2>
+          <p>
+            We’ll keep the conversation aligned to <strong>{mode.label.toLowerCase()}</strong> emphasis while grounding
+            every answer with citations you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
+          </p>
+          <div className="chat-hero__actions" aria-label="Quick navigation">
+            <Link href="/search" className="chat-hero__action">
+              <span className="chat-hero__action-icon" aria-hidden="true">
+                🔍
+              </span>
+              <span className="chat-hero__action-copy">
+                <strong>Search the library</strong>
+                <span>Jump into cross-references</span>
+              </span>
+              <span className="chat-hero__action-arrow" aria-hidden="true">
+                →
+              </span>
+            </Link>
+            <Link href="/verse" className="chat-hero__action">
+              <span className="chat-hero__action-icon" aria-hidden="true">
+                📖
+              </span>
+              <span className="chat-hero__action-copy">
+                <strong>Trace a passage</strong>
+                <span>Explore every verse connection</span>
+              </span>
+              <span className="chat-hero__action-arrow" aria-hidden="true">
+                →
+              </span>
+            </Link>
+            <Link href="/upload" className="chat-hero__action">
+              <span className="chat-hero__action-icon" aria-hidden="true">
+                📤
+              </span>
+              <span className="chat-hero__action-copy">
+                <strong>Enrich your corpus</strong>
+                <span>Upload documents for future chats</span>
+              </span>
+              <span className="chat-hero__action-arrow" aria-hidden="true">
+                →
+              </span>
+            </Link>
+          </div>
+        </div>
+        <ul className="chat-hero__highlights" aria-label="What this workspace offers">
+          <li className="chat-hero__highlight">
+            <span className="chat-hero__highlight-icon" aria-hidden="true">
+              ✅
+            </span>
+            <div>
+              <p className="chat-hero__highlight-title">Grounded answers</p>
+              <p className="chat-hero__highlight-text">Every response links back to trusted sources.</p>
+            </div>
+          </li>
+          <li className="chat-hero__highlight">
+            <span className="chat-hero__highlight-icon" aria-hidden="true">
+              🌐
+            </span>
+            <div>
+              <p className="chat-hero__highlight-title">Perspective aware</p>
+              <p className="chat-hero__highlight-text">Tune the stance to match your research context.</p>
+            </div>
+          </li>
+          <li className="chat-hero__highlight">
+            <span className="chat-hero__highlight-icon" aria-hidden="true">
+              📝
+            </span>
+            <div>
+              <p className="chat-hero__highlight-title">Export ready</p>
+              <p className="chat-hero__highlight-text">Capture threads and build shareable briefs effortlessly.</p>
+            </div>
+          </li>
+        </ul>
+      </section>
 
       <div className="chat-transcript" role="log" aria-label="Chat transcript">
         {hasTranscript ? (
@@ -610,27 +680,32 @@ export default function ChatWorkspace({
                   </aside>
                 )}
                 {entry.role === "assistant" && (
-                  <div
-                    className="chat-feedback-controls"
-                    style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}
-                  >
+                  <div className="chat-feedback-controls">
                     <button
                       type="button"
+                      className={`chat-feedback-button chat-feedback-button--positive${
+                        selection === "like" ? " chat-feedback-button--active" : ""
+                      }`}
                       onClick={() => handleAssistantFeedback(entry.id, "like")}
                       disabled={feedbackDisabled}
                       aria-pressed={selection === "like"}
                       aria-label="Mark response helpful"
                     >
-                      👍
+                      <span aria-hidden="true">👍</span>
+                      <span className="visually-hidden">Helpful response</span>
                     </button>
                     <button
                       type="button"
+                      className={`chat-feedback-button chat-feedback-button--negative${
+                        selection === "dislike" ? " chat-feedback-button--active" : ""
+                      }`}
                       onClick={() => handleAssistantFeedback(entry.id, "dislike")}
                       disabled={feedbackDisabled}
                       aria-pressed={selection === "dislike"}
                       aria-label="Mark response unhelpful"
                     >
-                      👎
+                      <span aria-hidden="true">👎</span>
+                      <span className="visually-hidden">Unhelpful response</span>
                     </button>
                   </div>
                 )}
@@ -641,11 +716,12 @@ export default function ChatWorkspace({
           <div className="chat-empty-state">
             <h3>Start the conversation</h3>
             <p>Ask about a passage, doctrine, or theme and we’ll respond with cited insights.</p>
-            <div className="chat-empty-state-actions">
+            <div className="chat-empty-state-actions" role="list">
               {sampleQuestions.map((question, index) => (
                 <button
                   key={question}
                   type="button"
+                  role="listitem"
                   className="chat-empty-state-chip"
                   onClick={() => handleSampleQuestionClick(question, index)}
                 >
