@@ -66,7 +66,7 @@ def test_seeders_remove_stale_records(tmp_path, monkeypatch) -> None:
 
     stale_contradiction_id = seeds.uuid5(
         seeds.CONTRADICTION_NAMESPACE,
-        "gen.1.3|gen.1.4|test",
+        "gen.1.3|gen.1.4|test|skeptical",
     )
 
     with Session(engine) as session:
@@ -86,7 +86,7 @@ def test_seeders_remove_stale_records(tmp_path, monkeypatch) -> None:
         assert session.get(ContradictionSeed, str(
             seeds.uuid5(
                 seeds.CONTRADICTION_NAMESPACE,
-                "gen.1.1|gen.1.2|test",
+                "gen.1.1|gen.1.2|test|skeptical",
             )
         )) is not None
         assert session.get(GeoPlace, "jerusalem") is not None

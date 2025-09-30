@@ -15,7 +15,7 @@ from tests.redteam.harness import (
 from tests.redteam.prompts import OWASP_REDTEAM_PROMPTS
 
 
-EXPECTED_REFUSAL = "I’m sorry, but I cannot help with that request."
+EXPECTED_REFUSAL = "I'm sorry, but I cannot help with that request."
 
 _OWASP_PROMPT_CASES = [
     pytest.param(category, prompt, id=f"{category}::{index}")
@@ -48,9 +48,31 @@ def redteam_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[RedTeamHarness]
         temperature: float = 0.0,
         max_output_tokens: int = 400,
     ) -> str:
-        return "I’m sorry, but I cannot help with that request."
+        return "I'm sorry, but I cannot help with that request.\n\nSources: [1] John.1.1 (page 1)"
+
+    def _mock_search(
+        session,
+        *,
+        query: str | None,
+        osis: str | None,
+        filters,
+        k: int = 8,
+    ) -> list[HybridSearchResult]:
+        return [
+            HybridSearchResult(
+                id="redteam-passage",
+                document_id="redteam-doc",
+                text="John 1:1 affirms the Word as divine and life-giving; our responses must remain grounded in that hope.",
+                snippet="John 1:1 affirms the Word as divine and life-giving",
+                osis_ref="John.1.1",
+                rank=0,
+                page_no=1,
+                document_title="Guardrail Reference Sermon",
+            )
+        ]
 
     monkeypatch.setattr(EchoClient, "generate", _safe_generate, raising=False)
+    monkeypatch.setattr("theo.services.api.app.ai.rag._search", _mock_search)
     seed_reference_corpus()
     with TestClient(app) as client:
         model_name = register_safe_model(client)
