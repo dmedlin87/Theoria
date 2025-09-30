@@ -28,7 +28,15 @@ CADENCE_WINDOWS: dict[str, timedelta] = {
 def _normalise_list(values: Iterable[str] | None) -> list[str]:
     if not values:
         return []
-    return [str(value).strip() for value in values if str(value).strip()]
+
+    normalised: list[str] = []
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            normalised.append(text)
+    return normalised
 
 
 def _load_filters(raw: dict | list | None) -> WatchlistFilters:
