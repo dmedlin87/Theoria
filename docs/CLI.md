@@ -81,6 +81,21 @@ python -m theo.services.cli.ingest_folder ./archive --mode worker
 
 Bulk exports are available via `theo.services.cli.export_data`.
 
+## Retrieval benchmarking
+
+Use the `rag_eval` command to benchmark reranker candidates or intent-aware prompt
+changes against the curated evaluation suites:
+
+```bash
+python -m theo.services.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
+  --trace-path data/eval/production_traces.jsonl \
+  --output data/eval/reranker_candidate.json
+```
+
+Pass `--update-baseline` after validating improvements to persist the new aggregate
+scores. Surface the before/after metrics in pull requests so reviewers can confirm the
+change meets the tolerances configured in `data/eval/baseline.json`.
+
 ### Search exports
 
 Run a hybrid search and save the results to an NDJSON file:
