@@ -212,6 +212,9 @@ export default function SearchPage(): JSX.Element {
   const [diffSelection, setDiffSelection] = useState<string[]>([]);
   const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(null);
   const [rerankerName, setRerankerName] = useState<string | null>(null);
+  const queryInputRef = useRef<HTMLInputElement | null>(null);
+  const osisInputRef = useRef<HTMLInputElement | null>(null);
+  const isBeginnerMode = uiMode === "simple";
 
   const presetIsCustom = presetSelection === CUSTOM_PRESET_VALUE || presetSelection === "";
 
@@ -945,6 +948,16 @@ export default function SearchPage(): JSX.Element {
     </div>
   );
 
+  const handleGuidedPassageChip = (): void => {
+    osisInputRef.current?.focus();
+    setOsis((current) => (current ? current : "John.1.1-5"));
+  };
+
+  const handleGuidedTopicChip = (): void => {
+    queryInputRef.current?.focus();
+    setQuery((current) => (current ? current : "atonement theology"));
+  };
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem(SAVED_SEARCH_STORAGE_KEY);
@@ -1040,9 +1053,75 @@ export default function SearchPage(): JSX.Element {
     );
   }, [groups]);
 
-    return (
-      <section>
-        <h2>Search</h2>
+  const savedSearchContent = (
+    <>
+      <form
+        onSubmit={handleSavedSearchSubmit}
+        style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}
+      >
+        <input
+          type="text"
+          value={savedSearchName}
+          onChange={(event) => setSavedSearchName(event.target.value)}
+          placeholder="Name this search"
+          style={{ flex: "1 1 220px", minWidth: "200px" }}
+        />
+        <button type="submit" disabled={!savedSearchName.trim()}>
+          Save current filters
+        </button>
+      </form>
+      {savedSearches.length === 0 ? (
+        <p style={{ marginTop: "0.75rem", fontSize: "0.9rem", color: "#555" }}>
+          No saved searches yet. Configure filters and click save to store a preset.
+        </p>
+      ) : (
+        <ul
+          style={{
+            listStyle: "none",
+            padding: 0,
+            margin: "0.75rem 0 0",
+            display: "grid",
+            gap: "0.5rem",
+          }}
+        >
+          {savedSearches.map((saved) => (
+            <li
+              key={saved.id}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+                alignItems: "center",
+                justifyContent: "space-between",
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.5rem",
+                padding: "0.5rem 0.75rem",
+              }}
+            >
+              <div>
+                <strong>{saved.name}</strong>
+                <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#555" }}>
+                  {serializeSearchParams(saved.filters)}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button type="button" onClick={() => void handleApplySavedSearch(saved)}>
+                  Run
+                </button>
+                <button type="button" onClick={() => handleDeleteSavedSearch(saved.id)}>
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+
+  return (
+    <section>
+      <h2>Search</h2>
       <p>Hybrid search with lexical, vector, and OSIS-aware filtering.</p>
       <div style={{ margin: "1.5rem 0" }}>
         <UiModeToggle mode={uiMode} onChange={setUiMode} />
@@ -1054,6 +1133,43 @@ export default function SearchPage(): JSX.Element {
         style={{ marginBottom: "1.5rem", display: "grid", gap: "1rem" }}
       >
         <div style={{ display: "grid", gap: "0.75rem" }}>
+          <div
+            aria-label="Guided search suggestions"
+            style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}
+          >
+            <button
+              type="button"
+              onClick={handleGuidedPassageChip}
+              style={{
+                border: "1px solid #cbd5f5",
+                background: "#eef2ff",
+                color: "#312e81",
+                borderRadius: "999px",
+                padding: "0.25rem 0.75rem",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Search by passage
+            </button>
+            <button
+              type="button"
+              onClick={handleGuidedTopicChip}
+              style={{
+                border: "1px solid #cbd5f5",
+                background: "#eef2ff",
+                color: "#312e81",
+                borderRadius: "999px",
+                padding: "0.25rem 0.75rem",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Search by topic
+            </button>
+          </div>
           <label style={{ display: "block" }}>
             Query
             <input
@@ -1063,6 +1179,7 @@ export default function SearchPage(): JSX.Element {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search corpus"
               style={{ width: "100%" }}
+              ref={queryInputRef}
             />
           </label>
           <label style={{ display: "block" }}>
@@ -1074,13 +1191,14 @@ export default function SearchPage(): JSX.Element {
               onChange={(event) => setOsis(event.target.value)}
               placeholder="John.1.1-5"
               style={{ width: "100%" }}
+              ref={osisInputRef}
             />
           </label>
         </div>
 
-        {!isAdvancedUi && (
+        {isBeginnerMode && (
           <p style={{ margin: 0, color: "#475569" }}>
-            Simple mode shows only the essentials. Open the advanced panel for presets, guardrail filters, and facets.
+            Simple mode shows only the essentials. Use the advanced panel when you need presets, saved searches, or guardrail filters.
           </p>
         )}
 
@@ -1095,11 +1213,9 @@ export default function SearchPage(): JSX.Element {
               background: "#f8fafc",
             }}
           >
-            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-              Advanced filters & presets
-            </summary>
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>Advanced</summary>
             <p style={{ margin: "0.75rem 0", fontSize: "0.9rem", color: "#475569" }}>
-              Expand when you need dataset facets, guardrail profiles, or saved presets.
+              Expand to tune presets, guardrail filters, and dataset facets. Saved search tools live here too.
             </p>
             {advancedFilterControls}
           </details>
@@ -1110,60 +1226,28 @@ export default function SearchPage(): JSX.Element {
         </button>
       </form>
 
-
-      <section aria-label="Saved searches" style={{ margin: "2rem 0" }}>
-        <h3 style={{ marginBottom: "0.75rem" }}>Saved searches</h3>
-        <form onSubmit={handleSavedSearchSubmit} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <input
-            type="text"
-            value={savedSearchName}
-            onChange={(event) => setSavedSearchName(event.target.value)}
-            placeholder="Name this search"
-            style={{ flex: "1 1 220px", minWidth: "200px" }}
-          />
-          <button type="submit" disabled={!savedSearchName.trim()}>
-            Save current filters
-          </button>
-        </form>
-        {savedSearches.length === 0 ? (
-          <p style={{ marginTop: "0.75rem", fontSize: "0.9rem", color: "#555" }}>
-            No saved searches yet. Configure filters and click save to store a preset.
+      {isAdvancedUi ? (
+        <section aria-label="Saved searches" style={{ margin: "2rem 0" }}>
+          <h3 style={{ marginBottom: "0.75rem" }}>Saved searches</h3>
+          {savedSearchContent}
+        </section>
+      ) : (
+        <details
+          style={{
+            border: "1px solid #cbd5f5",
+            borderRadius: "0.75rem",
+            padding: "0.75rem 1rem",
+            background: "#f8fafc",
+            margin: "2rem 0",
+          }}
+        >
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>Saved searches</summary>
+          <p style={{ margin: "0.75rem 0", fontSize: "0.9rem", color: "#475569" }}>
+            Expand to store or recall presets. Saved searches remember every active filter.
           </p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: "0.75rem 0 0", display: "grid", gap: "0.5rem" }}>
-            {savedSearches.map((saved) => (
-              <li
-                key={saved.id}
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "0.5rem",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "0.5rem",
-                  padding: "0.5rem 0.75rem",
-                }}
-              >
-                <div>
-                  <strong>{saved.name}</strong>
-                  <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#555" }}>
-                    {serializeSearchParams(saved.filters)}
-                  </p>
-                </div>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <button type="button" onClick={() => void handleApplySavedSearch(saved)}>
-                    Run
-                  </button>
-                  <button type="button" onClick={() => handleDeleteSavedSearch(saved.id)}>
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          {savedSearchContent}
+        </details>
+      )}
 
       <div style={{ margin: "1.5rem 0" }}>
         <SortControls value={sortKey} onChange={setSortKey} />
