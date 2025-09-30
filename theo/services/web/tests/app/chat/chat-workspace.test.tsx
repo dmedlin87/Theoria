@@ -9,7 +9,7 @@ import type {
   ChatWorkflowStreamEvent,
 } from "../../../app/lib/chat-client";
 import ChatWorkspace from "../../../app/chat/ChatWorkspace";
-import { submitFeedback } from "../../../app/lib/telemetry";
+import { emitTelemetry, submitFeedback } from "../../../app/lib/telemetry";
 
 jest.mock("../../../app/lib/telemetry", () => ({
   submitFeedback: jest.fn(),
@@ -56,6 +56,37 @@ jest.mock("../../../app/mode-context", () => {
 describe("ChatWorkspace", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it("prefills the textarea when a sample question chip is clicked", () => {
+    const client: ChatWorkflowClient = {
+      runChatWorkflow: jest.fn(),
+      fetchChatSession: jest.fn(async () => null),
+    };
+    const telemetryMock = emitTelemetry as jest.MockedFunction<typeof emitTelemetry>;
+    telemetryMock.mockResolvedValue(undefined);
+
+    render(<ChatWorkspace client={client} />);
+
+    const textarea = screen.getByLabelText("Ask Theo Engine") as HTMLTextAreaElement;
+    expect(textarea).toHaveValue("");
+
+    const sampleChip = screen.getByRole("button", {
+      name: "How does John 1:1 connect with Genesis 1?",
+    });
+
+    fireEvent.click(sampleChip);
+
+    expect(textarea).toHaveValue("How does John 1:1 connect with Genesis 1?");
+    expect(telemetryMock).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          event: "chat.sample_question_click",
+          metadata: expect.objectContaining({ index: 0 }),
+        }),
+      ],
+      { page: "chat" },
+    );
   });
 
   it("streams a chat response and renders citations", async () => {
@@ -127,7 +158,9 @@ describe("ChatWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Ask Theo Engine"), {
       target: { value: "Share restricted content" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    const sendButton = screen.getByRole("button", { name: "Send" });
+    await waitFor(() => expect(sendButton).not.toBeDisabled());
+    fireEvent.click(sendButton);
 
     expect(await screen.findByText("Blocked by safeguards")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rephrase question" })).toBeInTheDocument();

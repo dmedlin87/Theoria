@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import DeliverableExportAction from "../../components/DeliverableExportAction";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
@@ -14,6 +14,22 @@ import type {
 
 interface Props {
   initialDocument: DocumentDetail;
+}
+
+interface MetadataDraft {
+  title: string;
+  collection: string;
+  authors: string;
+  sourceType: string;
+  abstract: string;
+}
+
+interface MetadataSnapshot {
+  title: string;
+  collection: string;
+  authors: string[];
+  source_type: string | null;
+  abstract: string | null;
 }
 
 const SAFE_SOURCE_URL_PROTOCOLS = new Set(["http", "https"]);
@@ -51,10 +67,21 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const [metadataMessage, setMetadataMessage] = useState<string | null>(null);
   const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [lastMetadataSnapshot, setLastMetadataSnapshot] = useState<MetadataSnapshot | null>(null);
+
+  const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>(() => ({
+    title: initialDocument.title ?? "",
+    collection: initialDocument.collection ?? "",
+    authors: formatAuthors(initialDocument.authors),
+    sourceType: initialDocument.source_type ?? "",
+    abstract: initialDocument.abstract ?? "",
+  }));
 
   const [newAnnotation, setNewAnnotation] = useState("");
   const [isSavingAnnotation, setIsSavingAnnotation] = useState(false);
   const [annotationError, setAnnotationError] = useState<string | null>(null);
+
+  const annotationTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const passageLookup = useMemo(() => {
@@ -79,22 +106,46 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
     note: { background: "#94a3b8", color: "#111827" },
   };
 
+  useEffect(() => {
+    setMetadataDraft({
+      title: document.title ?? "",
+      collection: document.collection ?? "",
+      authors: formatAuthors(document.authors),
+      sourceType: document.source_type ?? "",
+      abstract: document.abstract ?? "",
+    });
+  }, [document]);
+
+  const handleMetadataInputChange = (field: keyof MetadataDraft) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setMetadataDraft((prev) => ({ ...prev, [field]: event.target.value }));
+      setMetadataMessage(null);
+      setMetadataError(null);
+    };
+
   const handleMetadataSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSavingMetadata(true);
     setMetadataError(null);
     setMetadataMessage(null);
 
-    const formData = new FormData(event.currentTarget);
-    const title = (formData.get("title") as string | null)?.trim() ?? "";
-    const collection = (formData.get("collection") as string | null)?.trim() ?? "";
-    const authorsRaw = (formData.get("authors") as string | null)?.trim() ?? "";
-    const sourceType = (formData.get("source_type") as string | null)?.trim() ?? "";
-    const abstract = (formData.get("abstract") as string | null)?.trim() ?? "";
+    const title = metadataDraft.title.trim();
+    const collection = metadataDraft.collection.trim();
+    const authorsRaw = metadataDraft.authors.trim();
+    const sourceType = metadataDraft.sourceType.trim();
+    const abstract = metadataDraft.abstract.trim();
 
     const authors = authorsRaw
       ? authorsRaw.split(",").map((value) => value.trim()).filter(Boolean)
       : [];
+
+    const previousMetadata: MetadataSnapshot = {
+      title: document.title ?? "",
+      collection: document.collection ?? "",
+      authors: document.authors ?? [],
+      source_type: document.source_type ?? null,
+      abstract: document.abstract ?? null,
+    };
 
     try {
       const response = await fetch(`${baseUrl}/documents/${document.id}`, {
@@ -114,8 +165,43 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
       const updated = (await response.json()) as DocumentDetail;
       setDocument(updated);
       setMetadataMessage("Metadata saved");
+      setLastMetadataSnapshot(previousMetadata);
     } catch (error) {
       setMetadataError((error as Error).message || "Unable to save metadata");
+    } finally {
+      setIsSavingMetadata(false);
+    }
+  };
+
+  const handleMetadataUndo = async () => {
+    if (!lastMetadataSnapshot) {
+      return;
+    }
+    setIsSavingMetadata(true);
+    setMetadataError(null);
+    setMetadataMessage(null);
+
+    try {
+      const response = await fetch(`${baseUrl}/documents/${document.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: lastMetadataSnapshot.title,
+          collection: lastMetadataSnapshot.collection,
+          authors: lastMetadataSnapshot.authors,
+          source_type: lastMetadataSnapshot.source_type,
+          abstract: lastMetadataSnapshot.abstract,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const updated = (await response.json()) as DocumentDetail;
+      setDocument(updated);
+      setMetadataMessage("Changes reverted");
+      setLastMetadataSnapshot(null);
+    } catch (error) {
+      setMetadataError((error as Error).message || "Unable to undo changes");
     } finally {
       setIsSavingMetadata(false);
     }
@@ -151,6 +237,14 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
     }
   };
 
+  const handleAddAnnotationShortcut = () => {
+    const element = annotationTextareaRef.current;
+    if (element) {
+      element.focus();
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
   const handleDeleteAnnotation = async (annotationId: string) => {
     setAnnotationError(null);
     try {
@@ -177,96 +271,52 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
       <h2>{document.title ?? "Document"}</h2>
       <p>Document ID: {document.id}</p>
 
-      <section style={{ margin: "1.5rem 0" }}>
-        <h3>Exports</h3>
-        <DeliverableExportAction
-          label="Export Q&A digest"
-          preparingText="Generating transcript digest…"
-          successText="Transcript export ready."
-          idleText="Download a digest for this transcript."
-          requestPayload={{
-            type: "transcript",
-            document_id: document.id,
-            formats: ["markdown", "csv"],
-          }}
-        />
-      </section>
-
-      <form onSubmit={handleMetadataSubmit} style={{ margin: "1.5rem 0", display: "grid", gap: "0.75rem", maxWidth: 560 }}>
-        <fieldset disabled={isSavingMetadata} style={{ display: "grid", gap: "0.75rem" }}>
-          <legend>Metadata</legend>
-          <label>
-            Title
-            <input type="text" name="title" defaultValue={document.title ?? ""} style={{ width: "100%" }} />
-          </label>
-          <label>
-            Collection
-            <input type="text" name="collection" defaultValue={document.collection ?? ""} style={{ width: "100%" }} />
-          </label>
-          <label>
-            Authors (comma separated)
-            <input type="text" name="authors" defaultValue={formatAuthors(document.authors)} style={{ width: "100%" }} />
-          </label>
-          <label>
-            Source type
-            <input type="text" name="source_type" defaultValue={document.source_type ?? ""} style={{ width: "100%" }} />
-          </label>
-          <label>
-            Abstract
-            <textarea name="abstract" defaultValue={document.abstract ?? ""} rows={4} style={{ width: "100%" }} />
-          </label>
-          <button type="submit">{isSavingMetadata ? "Saving." : "Save changes"}</button>
-        </fieldset>
-        {metadataMessage && <p role="status">{metadataMessage}</p>}
-        {metadataError && (
-          <p role="alert" style={{ color: "crimson" }}>
-            {metadataError}
-          </p>
-        )}
-      </form>
-
-      <div style={{ marginBottom: "1.5rem", display: "grid", gap: "0.35rem" }}>
-        {document.source_url &&
-          (isSafeSourceUrl(document.source_url) ? (
-            <a href={document.source_url} target="_blank" rel="noopener noreferrer">
-              Original source
-            </a>
-          ) : (
-            <span>Original source: {document.source_url}</span>
-          ))}
-        {document.collection && <p>Collection: {document.collection}</p>}
-        {document.source_type && <p>Source type: {document.source_type}</p>}
-        {document.authors && document.authors.length > 0 && <p>Authors: {formatAuthors(document.authors)}</p>}
-        {document.channel && <p>Channel: {document.channel}</p>}
-      </div>
-
-      <section style={{ marginBottom: "2rem" }}>
-        <h3>Annotations</h3>
-        <form onSubmit={handleAnnotationSubmit} style={{ display: "grid", gap: "0.5rem", maxWidth: 520 }}>
-          <textarea
-            name="annotation"
-            value={newAnnotation}
-            onChange={(event) => setNewAnnotation(event.target.value)}
-            rows={3}
-            placeholder="Add a researcher note"
-            style={{ width: "100%" }}
-          />
-          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-            <button type="submit" disabled={isSavingAnnotation}>
-              {isSavingAnnotation ? "Saving." : "Add annotation"}
-            </button>
-            {annotationError && (
-              <span role="alert" style={{ color: "crimson" }}>
-                {annotationError}
-              </span>
-            )}
+      <details open style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>
+        <summary style={{ fontSize: "1.125rem", fontWeight: 600, cursor: "pointer" }}>Read & annotate</summary>
+        <div style={{ marginTop: "1rem", display: "grid", gap: "1.5rem" }}>
+          <div style={{ display: "grid", gap: "0.35rem" }}>
+            {document.source_url &&
+              (isSafeSourceUrl(document.source_url) ? (
+                <a href={document.source_url} target="_blank" rel="noopener noreferrer">
+                  Original source
+                </a>
+              ) : (
+                <span>Original source: {document.source_url}</span>
+              ))}
+            {document.collection && <p>Collection: {document.collection}</p>}
+            {document.source_type && <p>Source type: {document.source_type}</p>}
+            {document.authors && document.authors.length > 0 && <p>Authors: {formatAuthors(document.authors)}</p>}
+            {document.channel && <p>Channel: {document.channel}</p>}
           </div>
-        </form>
-        {document.annotations.length === 0 ? (
-          <p style={{ marginTop: "1rem" }}>No annotations yet.</p>
-        ) : (
-          <ul style={{ listStyle: "none", margin: "1rem 0 0", padding: 0, display: "grid", gap: "0.75rem" }}>
-            {document.annotations.map((annotation) => {
+
+          <section>
+            <h3>Annotations</h3>
+            <form onSubmit={handleAnnotationSubmit} style={{ display: "grid", gap: "0.5rem", maxWidth: 520 }}>
+              <textarea
+                name="annotation"
+                ref={annotationTextareaRef}
+                value={newAnnotation}
+                onChange={(event) => setNewAnnotation(event.target.value)}
+                rows={3}
+                placeholder="Add a researcher note"
+                style={{ width: "100%" }}
+              />
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <button type="submit" disabled={isSavingAnnotation}>
+                  {isSavingAnnotation ? "Saving." : "Add annotation"}
+                </button>
+                {annotationError && (
+                  <span role="alert" style={{ color: "crimson" }}>
+                    {annotationError}
+                  </span>
+                )}
+              </div>
+            </form>
+            {document.annotations.length === 0 ? (
+              <p style={{ marginTop: "1rem" }}>No annotations yet.</p>
+            ) : (
+              <ul style={{ listStyle: "none", margin: "1rem 0 0", padding: 0, display: "grid", gap: "0.75rem" }}>
+                {document.annotations.map((annotation) => {
               const badgeStyle = typeBadgeStyles[annotation.type] ?? typeBadgeStyles.note;
               const badges = (
                 <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
@@ -308,7 +358,10 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
               );
 
               return (
-                <li key={annotation.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "0.5rem", padding: "0.75rem" }}>
+                <li
+                  key={annotation.id}
+                  style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "0.5rem", padding: "0.75rem" }}
+                >
                   {badges}
                   <p style={{ margin: "0 0 0.5rem", whiteSpace: "pre-wrap" }}>{annotation.body}</p>
                   {annotation.passage_ids.length > 0 ? (
@@ -341,31 +394,52 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
                       </ul>
                     </div>
                   ) : null}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem", color: "#555" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      fontSize: "0.85rem",
+                      color: "#555",
+                    }}
+                  >
                     <span>{formatTimestamp(annotation.updated_at)}</span>
-                    <button type="button" onClick={() => handleDeleteAnnotation(annotation.id)} style={{ color: "crimson", background: "none", border: "none", cursor: "pointer" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAnnotation(annotation.id)}
+                      style={{ color: "crimson", background: "none", border: "none", cursor: "pointer" }}
+                    >
                       Delete
                     </button>
                   </div>
                 </li>
               );
             })}
-          </ul>
-        )}
-      </section>
+              </ul>
+            )}
+          </section>
 
-      <section>
-        <h3>Passages</h3>
-        {document.passages.length === 0 ? (
-          <p>No passages available for this document.</p>
-        ) : (
-          <ol style={{ padding: 0, listStyle: "none", display: "grid", gap: "1rem" }}>
-            {document.passages.map((passage) => {
-              const anchor = formatAnchor({
-                page_no: passage.page_no ?? null,
-                t_start: passage.t_start ?? null,
-                t_end: passage.t_end ?? null,
-              });
+          <section>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+              <h3 style={{ margin: 0 }}>Passages</h3>
+              <button
+                type="button"
+                onClick={handleAddAnnotationShortcut}
+                style={{ padding: "0.5rem 0.85rem", borderRadius: "999px", border: "1px solid #2563eb", background: "#2563eb", color: "#fff" }}
+              >
+                Add annotation
+              </button>
+            </div>
+            {document.passages.length === 0 ? (
+              <p style={{ marginTop: "1rem" }}>No passages available for this document.</p>
+            ) : (
+              <ol style={{ padding: 0, listStyle: "none", display: "grid", gap: "1rem", marginTop: "1rem" }}>
+                {document.passages.map((passage) => {
+                  const anchor = formatAnchor({
+                    page_no: passage.page_no ?? null,
+                    t_start: passage.t_start ?? null,
+                    t_end: passage.t_end ?? null,
+                  });
               return (
                 <li
                   key={passage.id}
@@ -386,9 +460,107 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
                 </li>
               );
             })}
-          </ol>
-        )}
-      </section>
+              </ol>
+            )}
+          </section>
+        </div>
+      </details>
+
+      <details style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>
+        <summary style={{ fontSize: "1.125rem", fontWeight: 600, cursor: "pointer" }}>Exports</summary>
+        <div style={{ marginTop: "1rem" }}>
+          <DeliverableExportAction
+            label="Export Q&A digest"
+            preparingText="Generating transcript digest…"
+            successText="Transcript export ready."
+            idleText="Download a digest for this transcript."
+            requestPayload={{
+              type: "transcript",
+              document_id: document.id,
+              formats: ["markdown", "csv"],
+            }}
+          />
+        </div>
+      </details>
+
+      <details style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>
+        <summary style={{ fontSize: "1.125rem", fontWeight: 600, cursor: "pointer" }}>Edit metadata</summary>
+        <form
+          onSubmit={handleMetadataSubmit}
+          style={{ marginTop: "1rem", display: "grid", gap: "0.75rem", maxWidth: 560 }}
+        >
+          <fieldset disabled={isSavingMetadata} style={{ display: "grid", gap: "0.75rem" }}>
+            <label>
+              Title
+              <input
+                type="text"
+                name="title"
+                value={metadataDraft.title}
+                onChange={handleMetadataInputChange("title")}
+                style={{ width: "100%" }}
+              />
+            </label>
+            <label>
+              Collection
+              <input
+                type="text"
+                name="collection"
+                value={metadataDraft.collection}
+                onChange={handleMetadataInputChange("collection")}
+                style={{ width: "100%" }}
+              />
+            </label>
+            <label>
+              Authors (comma separated)
+              <input
+                type="text"
+                name="authors"
+                value={metadataDraft.authors}
+                onChange={handleMetadataInputChange("authors")}
+                style={{ width: "100%" }}
+              />
+            </label>
+            <label>
+              Source type
+              <input
+                type="text"
+                name="source_type"
+                value={metadataDraft.sourceType}
+                onChange={handleMetadataInputChange("sourceType")}
+                style={{ width: "100%" }}
+              />
+            </label>
+            <label>
+              Abstract
+              <textarea
+                name="abstract"
+                value={metadataDraft.abstract}
+                onChange={handleMetadataInputChange("abstract")}
+                rows={4}
+                style={{ width: "100%" }}
+              />
+            </label>
+            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+              <button type="submit">{isSavingMetadata ? "Saving." : "Save changes"}</button>
+              {lastMetadataSnapshot && !isSavingMetadata && (
+                <button type="button" onClick={handleMetadataUndo}>
+                  Undo last save
+                </button>
+              )}
+            </div>
+          </fieldset>
+          {metadataMessage && (
+            <p role="status" style={{ margin: 0 }}>
+              {metadataMessage}
+            </p>
+          )}
+          {metadataError && (
+            <p role="alert" style={{ color: "crimson", margin: 0 }}>
+              {metadataError}
+            </p>
+          )}
+        </form>
+      </details>
     </section>
   );
 }
