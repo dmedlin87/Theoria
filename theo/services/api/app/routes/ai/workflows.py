@@ -38,6 +38,7 @@ from ...ai.rag import (
 from ...ai.registry import LLMModel, LLMRegistry, save_llm_registry
 from ...ai.trails import TrailService
 from ...core.database import get_session
+from ...core.settings import get_settings
 from ...core.settings_store import load_setting, save_setting
 from ...db.models import ChatSession, Document, Passage
 from ...export.formatters import build_document_export
@@ -62,6 +63,7 @@ from ...models.ai import (
     GuardrailAdvisory,
     GuardrailFailureMetadata,
     GuardrailSuggestion,
+    IntentTagPayload,
     LLMDefaultRequest,
     LLMModelRequest,
     LLMModelUpdateRequest,
@@ -82,6 +84,7 @@ from ...models.export import (
     DocumentExportResponse,
 )
 from ...models.search import HybridSearchFilters
+from ...intent.tagger import get_intent_tagger
 
 _BAD_REQUEST_RESPONSE = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
@@ -913,6 +916,24 @@ def chat_turn(
     if not question:
         raise HTTPException(status_code=400, detail="user message cannot be blank")
 
+    settings = get_settings()
+    intent_tags: list[IntentTagPayload] | None = None
+    serialized_intent_tags: list[dict[str, object]] | None = None
+    if settings.intent_tagger_enabled:
+        try:
+            tagger = get_intent_tagger(settings)
+            if tagger is not None:
+                predicted = tagger.predict(question)
+                tag_payload = IntentTagPayload(**predicted.to_payload())
+                intent_tags = [tag_payload]
+                serialized_intent_tags = [
+                    tag_payload.model_dump(exclude_none=True)
+                ]
+        except Exception:  # noqa: BLE001 - tagging failures should not block chat flow
+            LOGGER.warning(
+                "Intent tagging failed for chat request", exc_info=True
+            )
+
     session_id = payload.session_id or str(uuid4())
     trail_service = TrailService(session)
 
@@ -983,13 +1004,16 @@ def chat_turn(
                 answer=answer,
                 preferences=preferences,
             )
+            trail_output = {
+                "session_id": session_id,
+                "answer": answer,
+                "message": message,
+            }
+            if serialized_intent_tags:
+                trail_output["intent_tags"] = serialized_intent_tags
             recorder.finalize(
                 final_md=answer.summary,
-                output_payload={
-                    "session_id": session_id,
-                    "answer": answer,
-                    "message": message,
-                },
+                output_payload=trail_output,
             )
     except GuardrailError as exc:
         return _guardrail_http_exception(
@@ -1003,7 +1027,12 @@ def chat_turn(
     if message is None or answer is None:
         raise HTTPException(status_code=500, detail="failed to compose chat response")
 
-    return ChatSessionResponse(session_id=session_id, message=message, answer=answer)
+    return ChatSessionResponse(
+        session_id=session_id,
+        message=message,
+        answer=answer,
+        intent_tags=intent_tags,
+    )
 
 
 @router.get(

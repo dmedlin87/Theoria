@@ -217,6 +217,16 @@ class Settings(BaseSettings):
         default=True,
         description="Toggle verse mention timeline aggregation endpoints",
     )
+    intent_tagger_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("INTENT_TAGGER_ENABLED", "intent_tagger_enabled"),
+        description="Toggle automatic tagging of chat intents",
+    )
+    intent_model_path: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("INTENT_MODEL_PATH", "intent_model_path"),
+        description="Path to the trained intent classification model",
+    )
     ingest_upload_max_bytes: int = Field(
         default=16 * 1024 * 1024,
         description="Maximum allowed size for synchronous ingest uploads in bytes",
