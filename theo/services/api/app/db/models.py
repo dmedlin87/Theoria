@@ -212,6 +212,7 @@ class FeedbackEventAction(str, Enum):
     COPY = "copy"
     LIKE = "like"
     DISLIKE = "dislike"
+    USED_IN_ANSWER = "used_in_answer"
 
 
 class FeedbackEvent(Base):

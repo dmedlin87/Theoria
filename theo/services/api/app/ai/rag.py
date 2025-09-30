@@ -22,6 +22,7 @@ from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..analytics.telemetry import record_feedback_event
 from ..core.settings import get_settings
 from ..core.version import get_git_sha
 from ..db.models import Document, Passage
@@ -302,6 +303,46 @@ class RAGAnswer(APIModel):
     model_name: str | None = None
     model_output: str | None = None
     guardrail_profile: dict[str, str] | None = None
+
+
+def _record_used_citation_feedback(
+    session: Session,
+    *,
+    citations: Sequence[RAGCitation],
+    results: Sequence[HybridSearchResult],
+    query: str | None,
+    recorder: "TrailRecorder | None" = None,
+) -> None:
+    """Persist feedback events indicating which passages were cited."""
+
+    if not citations:
+        return
+
+    result_by_passage: dict[str, HybridSearchResult] = {
+        str(result.id): result
+        for result in results
+        if getattr(result, "id", None)
+    }
+    user_id: str | None = None
+    if recorder is not None and getattr(recorder, "trail", None) is not None:
+        user_id = getattr(recorder.trail, "user_id", None)
+
+    for citation in citations:
+        passage_id = getattr(citation, "passage_id", None)
+        document_id = getattr(citation, "document_id", None)
+        if not passage_id and not document_id:
+            continue
+        context = result_by_passage.get(str(passage_id)) if passage_id else None
+        record_feedback_event(
+            session,
+            action="used_in_answer",
+            user_id=user_id,
+            query=query,
+            document_id=document_id,
+            passage_id=passage_id,
+            rank=getattr(context, "rank", getattr(citation, "index", None)),
+            score=getattr(context, "score", None),
+        )
 
 
 class VerseCopilotResponse(APIModel):
@@ -1362,6 +1403,13 @@ def run_guarded_chat(
             memory_context=memory_context,
             osis=osis,
         )
+        _record_used_citation_feedback(
+            session,
+            citations=answer.citations,
+            results=results,
+            query=question,
+            recorder=recorder,
+        )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
         log_workflow_event(
@@ -1435,6 +1483,13 @@ def generate_verse_brief(
             recorder=recorder,
             filters=filters,
             osis=osis,
+        )
+        _record_used_citation_feedback(
+            session,
+            citations=answer.citations,
+            results=results,
+            query=question or osis,
+            recorder=recorder,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
@@ -1524,6 +1579,13 @@ def generate_sermon_prep_outline(
             filters=filters,
             osis=osis,
         )
+        _record_used_citation_feedback(
+            session,
+            citations=answer.citations,
+            results=results,
+            query=query,
+            recorder=recorder,
+        )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
         log_workflow_event(
@@ -1589,15 +1651,22 @@ def generate_comparative_analysis(
             result_count=len(results),
         )
         registry = get_llm_registry(session)
+        question_text = f"How do {', '.join(participants)} interpret {osis}?"
         answer = _guarded_answer_or_refusal(
             session,
             context="comparative_analysis",
-            question=f"How do {', '.join(participants)} interpret {osis}?",
+            question=question_text,
             results=results,
             registry=registry,
             model_hint=model_name,
             filters=filters,
             osis=osis,
+        )
+        _record_used_citation_feedback(
+            session,
+            citations=answer.citations,
+            results=results,
+            query=question_text,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1678,6 +1747,13 @@ def generate_multimedia_digest(
             filters=filters,
             osis=None,
         )
+        _record_used_citation_feedback(
+            session,
+            citations=answer.citations,
+            results=results,
+            query="What are the key audio/video insights?",
+            recorder=recorder,
+        )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         highlights = [
             f"{citation.document_title or citation.document_id}: {citation.snippet}"
@@ -1740,16 +1816,24 @@ def generate_devotional_flow(
                 output_digest=f"{len(results)} passages",
             )
         registry = get_llm_registry(session)
+        question_text = f"Devotional focus: {focus}"
         answer = _guarded_answer_or_refusal(
             session,
             context="devotional",
-            question=f"Devotional focus: {focus}",
+            question=question_text,
             results=results,
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
             osis=osis,
+        )
+        _record_used_citation_feedback(
+            session,
+            citations=answer.citations,
+            results=results,
+            query=question_text,
+            recorder=recorder,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
@@ -1880,16 +1964,24 @@ def run_research_reconciliation(
                 output_digest=f"{len(results)} passages",
             )
         registry = get_llm_registry(session)
+        question_text = f"Reconcile viewpoints for {osis} in {thread}"
         answer = _guarded_answer_or_refusal(
             session,
             context="research_reconciliation",
-            question=f"Reconcile viewpoints for {osis} in {thread}",
+            question=question_text,
             results=results,
             registry=registry,
             model_hint=model_name,
             recorder=recorder,
             filters=filters,
             osis=osis,
+        )
+        _record_used_citation_feedback(
+            session,
+            citations=answer.citations,
+            results=results,
+            query=question_text,
+            recorder=recorder,
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         log_workflow_event(
