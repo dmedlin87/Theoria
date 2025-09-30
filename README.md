@@ -12,6 +12,32 @@ Theo Engine now layers grounded generative workflows on top of the deterministic
 
 For usage details run `python -m theo.services.cli.ingest_folder --help` or consult [the CLI guide](docs/CLI.md).
 
+## Reranker and intent tagger workflows
+
+Early reranker and intent tagger experiments live behind feature flags so they can be
+developed without impacting production retrieval quality. Start by reviewing the
+[reranker MVP plan](docs/reranker_mvp.md) for dataset expectations and export
+conventions. Two key commands support the experimentation loop:
+
+- Train candidate models with the scikit-learn pipelines described in
+  `configs/reranker.yaml` and `configs/intent.yaml`:
+
+  ```bash
+  python -m theo.experiments.reranker.train --config configs/reranker.yaml
+  python -m theo.experiments.intent.train --config configs/intent.yaml
+  ```
+
+- Capture before/after retrieval metrics using the bench script:
+
+  ```bash
+  python -m theo.services.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
+    --trace-path data/eval/production_traces.jsonl \
+    --output data/eval/reranker_candidate.json
+  ```
+
+Document the resulting metrics in pull requests and release notes before toggling the
+feature flags in staging or production.
+
 ## API authentication configuration
 
 The API refuses to start unless authentication credentials are configured. Set one or more
@@ -35,6 +61,30 @@ pip install -r requirements.txt
 ```
 
 After the dependencies are installed you can run `pytest` from the repository root to execute the automated test suite.
+
+## Training and evaluating the reranker
+
+Synthetic fixtures for experimenting with the learning-to-rank pipeline live under `tests/ranking/data`. The helper scripts can
+train a small reranker on recent feedback and score it on a holdout split:
+
+```bash
+# Train a checkpoint using the last 30 days of feedback.
+python scripts/train_reranker.py \
+  --feedback-path tests/ranking/data/feedback_events.jsonl \
+  --model-output /tmp/reranker.joblib \
+  --lookback-days 30
+
+# Evaluate the checkpoint on a labelled holdout set at k=10.
+python scripts/eval_reranker.py \
+  --checkpoint /tmp/reranker.joblib \
+  --holdout-path tests/ranking/data/holdout.json \
+  --k 10 \
+  --report-path /tmp/reranker_metrics.json
+```
+
+Use `--reference-time` on the training script to anchor the lookback window when replaying historical fixtures. The evaluation
+script prints baseline and reranked nDCG@k, MRR, and Recall@k metrics and optionally writes them to JSON for CI-friendly
+reporting.
 
 ## Resetting and reseeding the API database
 

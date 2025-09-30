@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     )
     embedding_model: str = Field(default="BAAI/bge-m3")
     embedding_dim: int = Field(default=1024)
+    reranker_enabled: bool = Field(default=False)
+    reranker_model_path: Path | None = Field(default=None)
     max_chunk_tokens: int = Field(default=900)
     doc_max_pages: int = Field(default=5000)
     transcript_max_window: float = Field(default=40.0)

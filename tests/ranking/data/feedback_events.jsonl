@@ -1,0 +1,4 @@
+{"created_at": "2025-02-20T00:00:00Z", "query_id": "q1", "document_id": "d1", "label": 1, "features": {"baseline_rank": 1, "baseline_score": 0.9, "token_overlap": 0.8}}
+{"created_at": "2025-02-20T00:00:00Z", "query_id": "q1", "document_id": "d2", "label": 0, "features": {"baseline_rank": 2, "baseline_score": 0.6, "token_overlap": 0.2}}
+{"created_at": "2025-02-19T00:00:00Z", "query_id": "q2", "document_id": "d3", "label": 0, "features": {"baseline_rank": 1, "baseline_score": 0.7, "token_overlap": 0.3}}
+{"created_at": "2025-02-19T00:00:00Z", "query_id": "q2", "document_id": "d4", "label": 1, "features": {"baseline_rank": 2, "baseline_score": 0.4, "token_overlap": 0.6}}
