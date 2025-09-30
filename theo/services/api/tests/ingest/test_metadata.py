@@ -22,3 +22,15 @@ def test_extract_guardrail_profile_from_tags_and_fields():
     assert tradition == "Reformed"
     assert topics == ["theology", "biblical"]
 
+
+def test_repro_merge_metadata_nested_dict_preserves_base_keys():
+    base = {"speakers": {"primary": "Alice", "secondary": "Bob"}}
+    overrides = {"speakers": {"secondary": "Carol"}}
+
+    merged = merge_metadata(base, overrides)
+
+    # Expect nested dictionaries to be merged rather than overwritten so the
+    # untouched "primary" speaker is preserved.
+    assert merged["speakers"]["primary"] == "Alice"
+    assert merged["speakers"]["secondary"] == "Carol"
+
