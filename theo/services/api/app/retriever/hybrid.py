@@ -15,7 +15,7 @@ from ..core.settings import get_settings
 from ..db.models import Document, Passage
 from ..db.types import VectorType
 from ..ingest.embeddings import get_embedding_service
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.search import HybridSearchRequest, HybridSearchResult
 from .annotations import index_annotations_by_passage, load_annotations_for_documents
 from .utils import compose_passage_meta
@@ -122,6 +122,28 @@ class _Candidate:
     vector_score: float = 0.0
     lexical_score: float = 0.0
     osis_match: bool = False
+    osis_distance: float | None = None
+
+
+def _osis_distance_value(candidate_ref: str | None, target_ref: str | None) -> float | None:
+    if not candidate_ref or not target_ref:
+        return None
+    candidate_ids = expand_osis_reference(candidate_ref)
+    target_ids = expand_osis_reference(target_ref)
+    if not candidate_ids or not target_ids:
+        return None
+    if not candidate_ids.isdisjoint(target_ids):
+        return 0.0
+    return float(min(abs(a - b) for a in candidate_ids for b in target_ids))
+
+
+def _mark_candidate_osis(candidate: _Candidate, target_ref: str) -> None:
+    candidate.osis_match = True
+    distance = _osis_distance_value(candidate.passage.osis_ref, target_ref)
+    if distance is None:
+        return
+    if candidate.osis_distance is None or distance < candidate.osis_distance:
+        candidate.osis_distance = distance
 
 
 def _passes_author_filter(document: Document, author: str | None) -> bool:
@@ -221,12 +243,10 @@ def _fallback_search(
             )
             lexical = _lexical_score(combined_text, query_tokens)
             tei_score = _tei_match_score(passage, query_tokens)
-            osis_match = False
-            if request.osis:
-                if passage.osis_ref and osis_intersects(passage.osis_ref, request.osis):
-                    osis_match = True
-                elif not lexical:
-                    continue
+            osis_distance = _osis_distance_value(passage.osis_ref, request.osis)
+            osis_match = bool(osis_distance == 0.0)
+            if request.osis and not osis_match and lexical == 0.0:
+                continue
 
             if request.query and lexical == 0.0 and tei_score == 0.0 and not osis_match:
                 continue
@@ -261,6 +281,9 @@ def _fallback_search(
                 snippet=_snippet(passage.text),
                 rank=0,
                 highlights=None,
+                lexical_score=lexical,
+                vector_score=None,
+                osis_distance=osis_distance,
             )
 
             heapq.heappush(heap, (score, counter, result))
@@ -348,7 +371,7 @@ def _postgres_hybrid_search(
                     candidate.vector_score, float(row[3] or 0.0)
                 )
                 if request.osis:
-                    candidate.osis_match = True
+                    _mark_candidate_osis(candidate, request.osis)
 
         if request.query:
             ts_query = func.plainto_tsquery("english", request.query)
@@ -380,7 +403,7 @@ def _postgres_hybrid_search(
                     candidate.lexical_score, float(row[2] or 0.0)
                 )
                 if request.osis:
-                    candidate.osis_match = True
+                    _mark_candidate_osis(candidate, request.osis)
 
             tei_blob = Passage.meta["tei_search_blob"].astext
             tei_facet_blob = Passage.meta["tei"].astext
@@ -409,7 +432,7 @@ def _postgres_hybrid_search(
                     candidate = _Candidate(passage=passage, document=document)
                     candidates[key] = candidate
                 if request.osis:
-                    candidate.osis_match = True
+                    _mark_candidate_osis(candidate, request.osis)
 
         if request.osis and (not request.query or not candidates):
             osis_stmt = base_stmt.where(Passage.osis_ref.isnot(None)).limit(limit)
@@ -425,7 +448,7 @@ def _postgres_hybrid_search(
                 if not candidate:
                     candidate = _Candidate(passage=passage, document=document)
                     candidates[key] = candidate
-                candidate.osis_match = True
+                _mark_candidate_osis(candidate, request.osis)
 
         results: list[HybridSearchResult] = []
         if not candidates and not request.query:
@@ -503,6 +526,9 @@ def _postgres_hybrid_search(
                 snippet=_snippet(passage.text),
                 rank=0,
                 highlights=None,
+                lexical_score=candidate.lexical_score or None,
+                vector_score=candidate.vector_score or None,
+                osis_distance=candidate.osis_distance,
             )
             scored.append((result, score))
 

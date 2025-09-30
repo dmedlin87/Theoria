@@ -2,22 +2,66 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
+from ..core.settings import get_settings
 from ..models.search import (
     HybridSearchFilters,
     HybridSearchRequest,
     HybridSearchResponse,
 )
 from ..retriever.hybrid import hybrid_search
+from ..ranking.re_ranker import Reranker, load_reranker
 
 router = APIRouter()
 
 
+_RERANKER: Reranker | None = None
+_RERANKER_PATH: str | None = None
+_RERANKER_FAILED: bool = False
+_RERANKER_TOP_K = 20
+
+
+def _reset_reranker_cache() -> None:
+    global _RERANKER, _RERANKER_PATH, _RERANKER_FAILED
+    _RERANKER = None
+    _RERANKER_PATH = None
+    _RERANKER_FAILED = False
+
+
+def reset_reranker_cache() -> None:
+    """Expose a reset hook for tests."""
+
+    _reset_reranker_cache()
+
+
+def _resolve_reranker(model_path: str | Path | None) -> Reranker | None:
+    global _RERANKER, _RERANKER_PATH, _RERANKER_FAILED
+
+    if model_path is None:
+        return None
+    model_str = str(model_path)
+    if _RERANKER_PATH != model_str:
+        _reset_reranker_cache()
+        _RERANKER_PATH = model_str
+    if _RERANKER_FAILED:
+        return None
+    if _RERANKER is None:
+        try:
+            _RERANKER = load_reranker(model_str)
+        except Exception:
+            _RERANKER_FAILED = True
+            return None
+    return _RERANKER
+
+
 @router.get("/", response_model=HybridSearchResponse)
 def search(
+    response: Response,
     q: str | None = Query(default=None, description="Keyword query"),
     osis: str | None = Query(default=None, description="Normalized OSIS reference"),
     collection: str | None = Query(
@@ -41,4 +85,24 @@ def search(
         k=k,
     )
     results = hybrid_search(session, request)
+
+    settings = get_settings()
+    if settings.reranker_enabled and settings.reranker_model_path:
+        reranker = _resolve_reranker(settings.reranker_model_path)
+        if reranker is not None:
+            try:
+                top_n = min(len(results), _RERANKER_TOP_K)
+                if top_n:
+                    reranked_head = reranker.rerank(results[:top_n])
+                    ordered = reranked_head + results[top_n:]
+                    for index, item in enumerate(ordered, start=1):
+                        item.rank = index
+                    response.headers["X-Reranker"] = (
+                        Path(settings.reranker_model_path).name
+                        or str(settings.reranker_model_path)
+                    )
+                    results = ordered
+            except Exception:
+                pass
+
     return HybridSearchResponse(query=q, osis=osis, results=results)
