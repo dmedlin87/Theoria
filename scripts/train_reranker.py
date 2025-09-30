@@ -22,7 +22,9 @@ fields:
   automatically when present.
 
 The resulting joblib checkpoint stores the fitted scikit-learn pipeline and
-the feature column order used for inference.
+the feature column order used for inference. When scikit-learn is not
+available, a lightweight fallback reranker is saved instead so evaluation and
+integration tests can still exercise the CLI.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,10 +45,21 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
 import joblib
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import HistGradientBoostingRegressor
+
+from ranking.minimal_reranker import MinimalReranker, train_minimal_reranker
+
+try:  # scikit-learn is optional in some environments (e.g. minimal CI images)
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    HAS_SKLEARN = True
+except ModuleNotFoundError:  # pragma: no cover - exercised via subprocess in tests
+    SimpleImputer = Pipeline = StandardScaler = HistGradientBoostingRegressor = None  # type: ignore[assignment]
+    HAS_SKLEARN = False
+
+
+FORCE_FALLBACK = os.getenv("THEO_FORCE_MINIMAL_RERANKER") == "1"
 
 
 Record = Dict[str, object]
@@ -222,27 +236,41 @@ def build_dataset(records: Iterable[Record]) -> Dataset:
     return Dataset(features=rows, labels=labels, feature_columns=feature_columns)
 
 
-def train_model(dataset: Dataset, random_state: int) -> Pipeline:
-    pipeline = Pipeline(
-        steps=[
-            ("imputer", SimpleImputer(strategy="constant", fill_value=0.0)),
-            ("scaler", StandardScaler()),
-            (
-                "model",
-                HistGradientBoostingRegressor(
-                    random_state=random_state,
-                    max_depth=6,
-                    learning_rate=0.1,
-                    max_bins=32,
+def _train_minimal_model(dataset: Dataset) -> MinimalReranker:
+    return train_minimal_reranker(dataset.features, dataset.labels)
+
+
+def train_model(dataset: Dataset, random_state: int) -> object:
+    if HAS_SKLEARN and not FORCE_FALLBACK:
+        pipeline = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="constant", fill_value=0.0)),
+                ("scaler", StandardScaler()),
+                (
+                    "model",
+                    HistGradientBoostingRegressor(
+                        random_state=random_state,
+                        max_depth=6,
+                        learning_rate=0.1,
+                        max_bins=32,
+                    ),
                 ),
-            ),
-        ]
-    )
-    pipeline.fit(dataset.features, dataset.labels)
-    return pipeline
+            ]
+        )
+        pipeline.fit(dataset.features, dataset.labels)
+        return pipeline
+
+    if not HAS_SKLEARN:
+        print("scikit-learn not available; using minimal reranker.", file=sys.stderr)
+    elif FORCE_FALLBACK:
+        print(
+            "THEO_FORCE_MINIMAL_RERANKER=1 set; using minimal reranker instead of scikit-learn.",
+            file=sys.stderr,
+        )
+    return _train_minimal_model(dataset)
 
 
-def save_checkpoint(model: Pipeline, feature_columns: List[str], output_path: Path) -> None:
+def save_checkpoint(model: object, feature_columns: List[str], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"model": model, "feature_columns": feature_columns}
     joblib.dump(payload, output_path)
