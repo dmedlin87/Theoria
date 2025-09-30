@@ -97,18 +97,9 @@ def ensure_url_allowed(settings, url: str) -> None:
 def _fetch_web_document(*args, **kwargs):  # noqa: ANN001, D401
     """Helper to allow monkeypatching in tests."""
 
-    original_build_opener = network_module.build_opener
-    original_ensure_allowed = network_module.ensure_url_allowed
-    original_resolve = network_module.resolve_host_addresses
-    network_module.build_opener = build_opener
-    network_module.ensure_url_allowed = ensure_url_allowed
-    network_module.resolve_host_addresses = resolve_host_addresses
-    try:
-        return fetch_web_document(*args, **kwargs)
-    finally:
-        network_module.build_opener = original_build_opener
-        network_module.ensure_url_allowed = original_ensure_allowed
-        network_module.resolve_host_addresses = original_resolve
+    kwargs.setdefault("build_opener_func", build_opener)
+    kwargs.setdefault("ensure_url_allowed_func", ensure_url_allowed)
+    return fetch_web_document(*args, **kwargs)
 
 
 def _parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:

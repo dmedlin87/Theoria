@@ -133,12 +133,18 @@ def ensure_url_allowed(settings, url: str) -> None:
 class LoopDetectingRedirectHandler(HTTPRedirectHandler):
     """HTTP redirect handler that guards against loops and deep chains."""
 
-    def __init__(self, max_redirects: int, settings) -> None:
+    def __init__(
+        self,
+        max_redirects: int,
+        settings,
+        ensure_url_allowed_func,
+    ) -> None:
         super().__init__()
         self.max_redirects = max_redirects
         self.redirect_count = 0
         self.visited: set[str] = set()
         self._settings = settings
+        self._ensure_url_allowed = ensure_url_allowed_func
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
         location = headers.get("Location") if headers else None
@@ -149,7 +155,7 @@ class LoopDetectingRedirectHandler(HTTPRedirectHandler):
         if resolved in self.visited:
             raise UnsupportedSourceError("URL redirect loop detected")
 
-        ensure_url_allowed(self._settings, resolved)
+        self._ensure_url_allowed(self._settings, resolved)
 
         self.redirect_count += 1
         if self.redirect_count > self.max_redirects:
@@ -166,17 +172,25 @@ class LoopDetectingRedirectHandler(HTTPRedirectHandler):
         return redirected
 
 
-def fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]:
-    ensure_url_allowed(settings, url)
+def fetch_web_document(
+    settings,
+    url: str,
+    *,
+    build_opener_func=build_opener,
+    ensure_url_allowed_func=ensure_url_allowed,
+) -> tuple[str, dict[str, str | None]]:
+    ensure_url_allowed_func(settings, url)
 
     timeout = getattr(settings, "ingest_web_timeout_seconds", 10.0)
     max_bytes = getattr(settings, "ingest_web_max_bytes", None)
     max_redirects = getattr(settings, "ingest_web_max_redirects", 5)
 
-    redirect_handler = LoopDetectingRedirectHandler(max_redirects, settings)
+    redirect_handler = LoopDetectingRedirectHandler(
+        max_redirects, settings, ensure_url_allowed_func
+    )
     redirect_handler.visited.add(url)
 
-    opener = build_opener(redirect_handler)
+    opener = build_opener_func(redirect_handler)
     opener.addheaders = [("User-Agent", settings.user_agent)]
 
     request = Request(url, headers={"User-Agent": settings.user_agent})
@@ -197,7 +211,7 @@ def fetch_web_document(settings, url: str) -> tuple[str, dict[str, str | None]]:
 
     try:
         final_url = response.geturl()
-        ensure_url_allowed(settings, final_url)
+        ensure_url_allowed_func(settings, final_url)
 
         while True:
             chunk = response.read(64 * 1024)
