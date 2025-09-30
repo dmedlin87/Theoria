@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...ai import (
+    build_guardrail_refusal,
     build_sermon_deliverable,
     build_transcript_deliverable,
     generate_comparative_analysis,
@@ -827,10 +829,11 @@ def _guardrail_advisory(
 def _guardrail_http_exception(
     exc: GuardrailError,
     *,
+    session: Session,
     question: str | None,
     osis: str | None,
     filters: HybridSearchFilters | None,
-) -> HTTPException:
+) -> JSONResponse:
     failure_metadata = _build_guardrail_metadata(exc, filters)
     advisory = _guardrail_advisory(
         str(exc),
@@ -839,9 +842,23 @@ def _guardrail_http_exception(
         filters=filters,
         metadata=failure_metadata,
     )
-    detail = advisory.model_dump(mode="json")
-    detail["type"] = "guardrail_refusal"
-    return HTTPException(status_code=422, detail=detail)
+    summary = str(exc).strip() or "Guardrail enforcement prevented a response."
+    detail = f"Guardrail refusal: {summary}"
+    advisory_payload = advisory.model_dump(mode="json")
+    advisory_payload.update({"type": "guardrail_refusal", "message": summary})
+    answer = build_guardrail_refusal(session, reason=summary)
+    headers = {
+        "X-Guardrail-Advisory": json.dumps(
+            advisory_payload, ensure_ascii=False, separators=(",", ":")
+        )
+    }
+    content = {
+        "detail": detail,
+        "message": {"role": "assistant", "content": _DEFAULT_REFUSAL_MESSAGE},
+        "answer": answer.model_dump(mode="json"),
+        "guardrail_advisory": advisory_payload,
+    }
+    return JSONResponse(status_code=422, content=content, headers=headers)
 
 
 def _extract_refusal_text(answer: RAGAnswer) -> str:
@@ -967,12 +984,13 @@ def chat_turn(
                 },
             )
     except GuardrailError as exc:
-        raise _guardrail_http_exception(
+        return _guardrail_http_exception(
             exc,
+            session=session,
             question=question,
             osis=payload.osis,
             filters=payload.filters,
-        ) from exc
+        )
 
     if message is None or answer is None:
         raise HTTPException(status_code=500, detail="failed to compose chat response")
@@ -1227,12 +1245,13 @@ def verse_copilot(
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise _guardrail_http_exception(
+        return _guardrail_http_exception(
             exc,
+            session=session,
             question=payload.question,
             osis=resolved_osis,
             filters=payload.filters,
-        ) from exc
+        )
 
 
 @router.post("/sermon-prep", response_model_exclude_none=True)
@@ -1264,12 +1283,13 @@ def sermon_prep(
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise _guardrail_http_exception(
+        return _guardrail_http_exception(
             exc,
+            session=session,
             question=None,
             osis=payload.osis,
             filters=payload.filters,
-        ) from exc
+        )
 
 
 # FastAPI coerces literal return types when a response model is provided, so we
@@ -1291,12 +1311,13 @@ def sermon_prep_export(
             model_name=payload.model,
         )
     except GuardrailError as exc:
-        raise _guardrail_http_exception(
+        return _guardrail_http_exception(
             exc,
+            session=session,
             question=None,
             osis=payload.osis,
             filters=payload.filters,
-        ) from exc
+        )
     normalized = format.lower()
     package = build_sermon_deliverable(
         response,
@@ -1365,12 +1386,13 @@ def comparative_analysis(
             model_name=payload.model,
         )
     except GuardrailError as exc:
-        raise _guardrail_http_exception(
+        return _guardrail_http_exception(
             exc,
+            session=session,
             question=None,
             osis=payload.osis,
             filters=None,
-        ) from exc
+        )
 
 
 @router.post("/multimedia", response_model_exclude_none=True)
@@ -1397,12 +1419,13 @@ def multimedia_digest(
             recorder.finalize(final_md=final_md, output_payload=response)
             return response
     except GuardrailError as exc:
-        raise _guardrail_http_exception(
+        return _guardrail_http_exception(
             exc,
+            session=session,
             question=payload.collection,
             osis=None,
             filters=None,
-        ) from exc
+        )
 
 
 @router.post("/devotional", response_model_exclude_none=True)
@@ -1432,12 +1455,13 @@ def devotional_flow(
             )
             return response
     except GuardrailError as exc:
-        raise _guardrail_http_exception(
+        return _guardrail_http_exception(
             exc,
+            session=session,
             question=payload.focus,
             osis=payload.osis,
             filters=None,
-        ) from exc
+        )
 
 
 @router.post(
@@ -1474,12 +1498,13 @@ def collaboration(
             )
             return response
     except GuardrailError as exc:
-        raise _guardrail_http_exception(
+        return _guardrail_http_exception(
             exc,
+            session=session,
             question="; ".join(payload.viewpoints) if payload.viewpoints else None,
             osis=payload.osis,
             filters=None,
-        ) from exc
+        )
 
 
 @router.post(

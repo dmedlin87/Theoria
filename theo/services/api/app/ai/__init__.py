@@ -1,6 +1,7 @@
 """AI and generative utilities for Theo Engine."""
 
 from .rag import (
+    build_guardrail_refusal,
     ComparativeAnalysisResponse,
     DevotionalResponse,
     MultimediaDigestResponse,
@@ -33,6 +34,7 @@ __all__ = [
     "RAGCitation",
     "SermonPrepResponse",
     "VerseCopilotResponse",
+    "build_guardrail_refusal",
     "build_sermon_deliverable",
     "build_sermon_prep_package",
     "build_transcript_deliverable",
