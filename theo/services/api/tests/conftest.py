@@ -12,6 +12,7 @@ import pytest
 from fastapi import Request as FastAPIRequest
 
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
+os.environ.setdefault("THEO_AUTH_ALLOW_ANONYMOUS", "1")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 if str(PROJECT_ROOT) not in sys.path:
