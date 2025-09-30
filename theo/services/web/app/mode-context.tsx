@@ -96,6 +96,26 @@ export function useMode(): ModeContextValue {
 
 export function ModeSwitcher(): JSX.Element {
   const { mode, modes, setMode } = useMode();
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  if (!showAdvanced) {
+    return (
+      <div className="mode-panel mode-panel--compact" aria-live="polite">
+        <p className="mode-panel__summary">{formatEmphasisSummary(mode)}</p>
+        <p className="mode-panel__help">
+          Switch modes when you need results to lean more scholarly or devotional—changing the
+          mode refreshes search and chat responses to match.
+        </p>
+        <button
+          type="button"
+          className="mode-panel__button"
+          onClick={() => setShowAdvanced(true)}
+        >
+          Change mode
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mode-panel" aria-live="polite">
@@ -119,17 +139,31 @@ export function ModeSwitcher(): JSX.Element {
         </div>
       </div>
       <p className="mode-panel__description">{mode.description}</p>
-      <dl className="mode-panel__meta">
-        <div className="mode-panel__row">
-          <dt className="mode-panel__label">Emphasises</dt>
-          <dd className="mode-panel__value">{mode.emphasis.join(", ")}</dd>
-        </div>
-        <div className="mode-panel__row">
-          <dt className="mode-panel__label">Softens</dt>
-          <dd className="mode-panel__value">{mode.suppressions.join(", ")}</dd>
-        </div>
-      </dl>
+      <p className="mode-panel__help">
+        Choose the mode that best fits your task. Investigative mode surfaces critical variants,
+        while Devotional centres pastoral insight; switching updates future answers accordingly.
+      </p>
+      <details className="mode-panel__details">
+        <summary className="mode-panel__details-summary">See emphasis and softening details</summary>
+        <dl className="mode-panel__meta">
+          <div className="mode-panel__row">
+            <dt className="mode-panel__label">Emphasises</dt>
+            <dd className="mode-panel__value">{mode.emphasis.join(", ")}</dd>
+          </div>
+          <div className="mode-panel__row">
+            <dt className="mode-panel__label">Softens</dt>
+            <dd className="mode-panel__value">{mode.suppressions.join(", ")}</dd>
+          </div>
+        </dl>
+      </details>
       <p className="mode-panel__summary">{formatEmphasisSummary(mode)}</p>
+      <button
+        type="button"
+        className="mode-panel__button mode-panel__button--secondary"
+        onClick={() => setShowAdvanced(false)}
+      >
+        Done
+      </button>
     </div>
   );
 }
