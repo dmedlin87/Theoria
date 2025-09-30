@@ -509,6 +509,7 @@ export default function SearchPage(): JSX.Element {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [savedSearchName, setSavedSearchName] = useState("");
   const [diffSelection, setDiffSelection] = useState<string[]>([]);
+  const [activeActionsGroupId, setActiveActionsGroupId] = useState<string | null>(null);
   const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(null);
   const [rerankerName, setRerankerName] = useState<string | null>(null);
 
@@ -1626,6 +1627,7 @@ export default function SearchPage(): JSX.Element {
             : diffSelection.length >= 2
             ? "Replace in diff"
             : "Add to diff";
+          const showGroupActions = isAdvancedUi || activeActionsGroupId === group.documentId;
           return (
             <article
               key={group.documentId}
@@ -1635,20 +1637,61 @@ export default function SearchPage(): JSX.Element {
                 padding: "1.25rem",
                 border: isSelectedForDiff ? "2px solid #3b82f6" : "1px solid #e2e8f0",
               }}
+              tabIndex={0}
+              onFocus={() => setActiveActionsGroupId(group.documentId)}
+              onBlur={() =>
+                setActiveActionsGroupId((current) =>
+                  current === group.documentId ? null : current,
+                )
+              }
+              onMouseEnter={() => setActiveActionsGroupId(group.documentId)}
+              onMouseLeave={() =>
+                setActiveActionsGroupId((current) =>
+                  current === group.documentId ? null : current,
+                )
+              }
             >
               <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
                 <div>
                   <h3 style={{ margin: "0 0 0.25rem" }}>{group.title}</h3>
                   {typeof group.rank === "number" && (
-                    <p style={{ margin: 0 }}>Document rank #{group.rank}</p>
+                    <p style={{ margin: 0 }}>
+                      Document rank #{group.rank}
+                      {isAdvancedUi && (
+                        <span
+                          style={{ marginLeft: "0.5rem", fontSize: "0.8rem", color: "#64748b" }}
+                          title="Lower rank numbers indicate higher retrieval relevance."
+                        >
+                          (lower is better)
+                        </span>
+                      )}
+                    </p>
                   )}
                   {typeof group.score === "number" && (
                     <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#555" }}>
                       Document score {group.score.toFixed(2)}
+                      {isAdvancedUi && (
+                        <span
+                          style={{ marginLeft: "0.5rem", fontSize: "0.8rem", color: "#64748b" }}
+                          title="Combined retriever confidence; higher scores indicate stronger matches."
+                        >
+                          (higher is better)
+                        </span>
+                      )}
                     </p>
                   )}
                 </div>
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "0.5rem",
+                    flexWrap: "wrap",
+                    opacity: showGroupActions ? 1 : 0,
+                    visibility: showGroupActions ? "visible" : "hidden",
+                    pointerEvents: showGroupActions ? "auto" : "none",
+                    transition: "opacity 0.15s ease",
+                  }}
+                >
                   <button type="button" onClick={() => handleExportGroup(group)}>
                     Export JSON
                   </button>
@@ -1667,23 +1710,32 @@ export default function SearchPage(): JSX.Element {
                   return (
                     <li key={result.id} style={{ border: "1px solid #e2e8f0", borderRadius: "0.5rem", padding: "0.75rem" }}>
                       <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
-                          <div>
-                            {anchorDescription && <p style={{ margin: "0 0 0.25rem" }}>{anchorDescription}</p>}
-                            {result.osis_ref && <p style={{ margin: 0 }}>OSIS: {result.osis_ref}</p>}
-                          </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            gap: "1rem",
+                          }}
+                        >
+                          <p style={{ margin: 0, flex: 1 }}>{result.snippet}</p>
                           <Link
                             href={buildPassageLink(result.document_id, result.id, {
                               pageNo: result.page_no ?? null,
                               tStart: result.t_start ?? null,
                             })}
                             onClick={() => handlePassageClick(result)}
-                            style={{ whiteSpace: "nowrap" }}
+                            style={{ whiteSpace: "nowrap", fontWeight: 500 }}
                           >
                             Open passage
                           </Link>
                         </div>
-                        <p style={{ marginTop: "0.5rem" }}>{result.snippet}</p>
+                        {(anchorDescription || result.osis_ref) && (
+                          <div style={{ marginTop: "0.5rem" }}>
+                            {anchorDescription && <p style={{ margin: "0 0 0.25rem" }}>{anchorDescription}</p>}
+                            {result.osis_ref && <p style={{ margin: 0 }}>OSIS: {result.osis_ref}</p>}
+                          </div>
+                        )}
                         {Array.isArray(result.highlights) && result.highlights.length > 0 && (
                           <div style={{ marginTop: "0.75rem", display: "grid", gap: "0.5rem" }}>
                             {result.highlights.map((highlight) => (
@@ -1705,6 +1757,14 @@ export default function SearchPage(): JSX.Element {
                         {typeof result.score === "number" && (
                           <p style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#555" }}>
                             Passage score {result.score.toFixed(2)}
+                            {isAdvancedUi && (
+                              <span
+                                style={{ marginLeft: "0.5rem", fontSize: "0.8rem", color: "#64748b" }}
+                                title="Reranker confidence for this passage; higher scores indicate stronger matches."
+                              >
+                                (higher is better)
+                              </span>
+                            )}
                           </p>
                         )}
                       </div>
