@@ -2274,6 +2274,14 @@ export interface components {
              * @description Optional retrieval score
              */
             score?: number | null;
+            /** Retriever Score */
+            retriever_score?: number | null;
+            /** Retriever Rank */
+            retriever_rank?: number | null;
+            /** Reranker Score */
+            reranker_score?: number | null;
+            /** Reranker Rank */
+            reranker_rank?: number | null;
             /** Meta */
             meta?: {
                 [key: string]: unknown;

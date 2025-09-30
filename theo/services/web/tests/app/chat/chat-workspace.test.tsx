@@ -9,6 +9,19 @@ import type {
   ChatWorkflowStreamEvent,
 } from "../../../app/lib/chat-client";
 import ChatWorkspace from "../../../app/chat/ChatWorkspace";
+import { submitFeedback } from "../../../app/lib/telemetry";
+
+jest.mock("../../../app/lib/telemetry", () => ({
+  submitFeedback: jest.fn(),
+  emitTelemetry: jest.fn(),
+}));
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+  }),
+}));
 
 const sampleAnswer = {
   summary: "The prologue echoes Genesis, presenting the Logos as divine and eternal.",
@@ -41,6 +54,10 @@ jest.mock("../../../app/mode-context", () => {
 });
 
 describe("ChatWorkspace", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("streams a chat response and renders citations", async () => {
     const events: ChatWorkflowStreamEvent[] = [
       { type: "answer_fragment", content: "In the beginning" },
@@ -114,5 +131,64 @@ describe("ChatWorkspace", () => {
 
     expect(await screen.findByText("Blocked by safeguards")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rephrase question" })).toBeInTheDocument();
+  });
+
+  it("sends feedback when reaction buttons are pressed", async () => {
+    const events: ChatWorkflowStreamEvent[] = [
+      { type: "answer_fragment", content: "In the beginning" },
+      { type: "complete", response: { sessionId: "session-1", answer: sampleAnswer } },
+    ];
+    const successResult: ChatWorkflowResult = {
+      kind: "success",
+      sessionId: "session-1",
+      answer: sampleAnswer,
+    };
+    const client: ChatWorkflowClient = {
+      runChatWorkflow: jest.fn(async (_payload, options) => {
+        events.forEach((event) => options?.onEvent?.(event));
+        return successResult;
+      }),
+      fetchChatSession: jest.fn(async () => null),
+    };
+
+    const submitMock = submitFeedback as jest.MockedFunction<typeof submitFeedback>;
+    submitMock.mockResolvedValue(undefined);
+
+    render(<ChatWorkspace client={client} />);
+
+    fireEvent.change(screen.getByLabelText("Ask Theo Engine"), {
+      target: { value: "Explain John 1:1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(sampleAnswer.summary)).toBeInTheDocument();
+    });
+
+    const helpfulButton = screen.getByRole("button", { name: "Mark response helpful" });
+    const unhelpfulButton = screen.getByRole("button", { name: "Mark response unhelpful" });
+
+    let resolveFeedback: (() => void) | undefined;
+    const pendingFeedback = new Promise<void>((resolve) => {
+      resolveFeedback = resolve;
+    });
+    submitMock.mockReturnValueOnce(pendingFeedback);
+
+    fireEvent.click(helpfulButton);
+
+    expect(helpfulButton).toBeDisabled();
+    expect(unhelpfulButton).toBeDisabled();
+    expect(submitMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "like",
+        chatSessionId: "session-1",
+        query: "Explain John 1:1",
+      }),
+    );
+
+    resolveFeedback?.();
+    await waitFor(() => expect(helpfulButton).not.toBeDisabled());
+    expect(helpfulButton).toHaveAttribute("aria-pressed", "true");
+    expect(unhelpfulButton).toHaveAttribute("aria-pressed", "false");
   });
 });

@@ -16,6 +16,7 @@ import {
 } from "../lib/guardrails";
 import type { RAGCitation } from "../copilot/components/types";
 import { useMode } from "../mode-context";
+import { submitFeedback, type FeedbackAction } from "../lib/telemetry";
 
 function createMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -26,9 +27,17 @@ function createMessageId(): string {
 
 type ConversationEntry =
   | { id: string; role: "user"; content: string }
-  | { id: string; role: "assistant"; content: string; citations: RAGCitation[] };
+  | {
+      id: string;
+      role: "assistant";
+      content: string;
+      citations: RAGCitation[];
+      prompt?: string;
+    };
 
 type AssistantConversationEntry = Extract<ConversationEntry, { role: "assistant" }>;
+
+type Reaction = Extract<FeedbackAction, "like" | "dislike">;
 
 type GuardrailState =
   | {
@@ -66,6 +75,10 @@ export default function ChatWorkspace({
   useEffect(() => {
     conversationRef.current = conversation;
   }, [conversation]);
+  const [feedbackSelections, setFeedbackSelections] = useState<
+    Partial<Record<string, Reaction>>
+  >({});
+  const [pendingFeedbackIds, setPendingFeedbackIds] = useState<Set<string>>(new Set());
 
   const [inputValue, setInputValue] = useState(initialPrompt ?? "");
   useEffect(() => {
@@ -138,6 +151,7 @@ export default function ChatWorkspace({
             role: "assistant",
             content: entry.answer,
             citations: entry.citations ?? [],
+            prompt: entry.question,
           });
         });
         if (restoredConversation.length > 0) {
@@ -147,6 +161,8 @@ export default function ChatWorkspace({
             .find((entry) => entry.role === "user");
           setLastQuestion(lastUser?.content ?? null);
         }
+        setFeedbackSelections({});
+        setPendingFeedbackIds(new Set());
         setConversation(restoredConversation);
       } catch (error) {
         console.warn("Failed to restore chat session", error);
@@ -192,6 +208,22 @@ export default function ChatWorkspace({
 
   const removeEntryById = useCallback((id: string) => {
     setConversation((previous) => previous.filter((entry) => entry.id !== id));
+    setFeedbackSelections((previous) => {
+      if (!(id in previous)) {
+        return previous;
+      }
+      const next = { ...previous };
+      delete next[id];
+      return next;
+    });
+    setPendingFeedbackIds((previous) => {
+      if (!previous.has(id)) {
+        return previous;
+      }
+      const next = new Set(previous);
+      next.delete(id);
+      return next;
+    });
   }, []);
 
   const buildFallbackSuggestions = useCallback(
@@ -273,6 +305,7 @@ export default function ChatWorkspace({
         role: "assistant",
         content: "",
         citations: [],
+        prompt: trimmed,
       };
 
       setConversation([...baseConversation, userEntry, assistantEntry]);
@@ -411,6 +444,45 @@ export default function ChatWorkspace({
     setGuardrail(null);
   }, [lastQuestion]);
 
+  const handleAssistantFeedback = useCallback(
+    async (entryId: string, action: Reaction) => {
+      if (pendingFeedbackIds.has(entryId)) {
+        return;
+      }
+      setPendingFeedbackIds((previous) => {
+        const next = new Set(previous);
+        next.add(entryId);
+        return next;
+      });
+      const entry = conversationRef.current.find(
+        (candidate): candidate is AssistantConversationEntry =>
+          candidate.id === entryId && candidate.role === "assistant",
+      );
+      try {
+        await submitFeedback({
+          action,
+          chatSessionId: sessionId ?? null,
+          query: entry?.prompt ?? entry?.content ?? lastQuestion ?? null,
+        });
+        setFeedbackSelections((previous) => ({ ...previous, [entryId]: action }));
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("Failed to submit chat feedback", error);
+        }
+      } finally {
+        setPendingFeedbackIds((previous) => {
+          if (!previous.has(entryId)) {
+            return previous;
+          }
+          const next = new Set(previous);
+          next.delete(entryId);
+          return next;
+        });
+      }
+    },
+    [lastQuestion, pendingFeedbackIds, sessionId],
+  );
+
   const guardrailActions: Partial<Pick<ErrorCalloutProps, "onRetry" | "actions">> = {};
   if (lastQuestion) {
     guardrailActions.onRetry = handleRetry;
@@ -438,6 +510,8 @@ export default function ChatWorkspace({
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setConversation([]);
+    setFeedbackSelections({});
+    setPendingFeedbackIds(new Set());
     setSessionId(null);
     setGuardrail(null);
     setErrorMessage(null);
@@ -469,15 +543,19 @@ export default function ChatWorkspace({
 
       <div className="chat-transcript" role="log" aria-label="Chat transcript">
         {hasTranscript ? (
-          transcript.map((entry) => (
-            <article key={entry.id} className={`chat-message chat-message--${entry.role}`}>
-              <header>{entry.role === "user" ? "You" : "Theo"}</header>
-              <p aria-live={entry.isActive ? "polite" : undefined}>{entry.displayContent || "Awaiting response."}</p>
-              {entry.role === "assistant" && entry.citations.length > 0 && (
-                <aside className="chat-citations" aria-label="Citations">
-                  <h4>Citations</h4>
-                  <ol>
-                    {entry.citations.map((citation) => {
+          transcript.map((entry) => {
+            const selection = feedbackSelections[entry.id] ?? null;
+            const feedbackPending = pendingFeedbackIds.has(entry.id);
+            const feedbackDisabled = feedbackPending || entry.isActive;
+            return (
+              <article key={entry.id} className={`chat-message chat-message--${entry.role}`}>
+                <header>{entry.role === "user" ? "You" : "Theo"}</header>
+                <p aria-live={entry.isActive ? "polite" : undefined}>{entry.displayContent || "Awaiting response."}</p>
+                {entry.role === "assistant" && entry.citations.length > 0 && (
+                  <aside className="chat-citations" aria-label="Citations">
+                    <h4>Citations</h4>
+                    <ol>
+                      {entry.citations.map((citation) => {
                       const verseHref = `/verse/${encodeURIComponent(citation.osis)}`;
                       const searchParams = new URLSearchParams({ osis: citation.osis });
                       const searchHref = `/search?${searchParams.toString()}`;
@@ -496,12 +574,38 @@ export default function ChatWorkspace({
                           </div>
                         </li>
                       );
-                    })}
-                  </ol>
-                </aside>
-              )}
-            </article>
-          ))
+                      })}
+                    </ol>
+                  </aside>
+                )}
+                {entry.role === "assistant" && (
+                  <div
+                    className="chat-feedback-controls"
+                    style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleAssistantFeedback(entry.id, "like")}
+                      disabled={feedbackDisabled}
+                      aria-pressed={selection === "like"}
+                      aria-label="Mark response helpful"
+                    >
+                      👍
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAssistantFeedback(entry.id, "dislike")}
+                      disabled={feedbackDisabled}
+                      aria-pressed={selection === "dislike"}
+                      aria-label="Mark response unhelpful"
+                    >
+                      👎
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })
         ) : (
           <div className="chat-empty-state">
             <h3>Start the conversation</h3>
