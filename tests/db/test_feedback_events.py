@@ -78,6 +78,19 @@ def test_record_feedback_event_accepts_enum(session: Session) -> None:
     assert stored.action is FeedbackEventAction.LIKE
 
 
+def test_record_feedback_event_accepts_used_in_answer(session: Session) -> None:
+    event = record_feedback_event(
+        session,
+        action="used_in_answer",
+        passage_id="passage-1",
+    )
+    session.commit()
+
+    stored = session.get(FeedbackEvent, event.id)
+    assert stored is not None
+    assert stored.action is FeedbackEventAction.USED_IN_ANSWER
+
+
 def test_record_feedback_event_rejects_invalid_action(session: Session) -> None:
     with pytest.raises(ValueError):
         record_feedback_event(session, action="invalid-action")

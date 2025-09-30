@@ -29,8 +29,19 @@ def _patch_instrumentation(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, d
     return spans
 
 
+def _patch_feedback_recorder(monkeypatch: pytest.MonkeyPatch) -> list[tuple[tuple, dict]]:
+    calls: list[tuple[tuple, dict]] = []
+
+    def _capture(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(rag, "_record_used_citation_feedback", _capture)
+    return calls
+
+
 def test_multimedia_digest_emits_span_and_records_steps(monkeypatch: pytest.MonkeyPatch) -> None:
     spans = _patch_instrumentation(monkeypatch)
+    feedback_calls = _patch_feedback_recorder(monkeypatch)
 
     fake_result = SimpleNamespace(
         id="multimedia-1",
@@ -74,10 +85,12 @@ def test_multimedia_digest_emits_span_and_records_steps(monkeypatch: pytest.Monk
     assert spans and spans[0][0] == "multimedia_digest"
     recorder.log_step.assert_called_once()
     recorder.record_citations.assert_called_once_with(fake_answer.citations)
+    assert len(feedback_calls) == 1
 
 
 def test_devotional_flow_emits_span(monkeypatch: pytest.MonkeyPatch) -> None:
     spans = _patch_instrumentation(monkeypatch)
+    feedback_calls = _patch_feedback_recorder(monkeypatch)
 
     fake_result = SimpleNamespace(
         id="devotional-1",
@@ -120,10 +133,12 @@ def test_devotional_flow_emits_span(monkeypatch: pytest.MonkeyPatch) -> None:
     assert spans and spans[0][0] == "devotional"
     recorder.log_step.assert_called_once()
     recorder.record_citations.assert_called_once_with(fake_answer.citations)
+    assert len(feedback_calls) == 1
 
 
 def test_research_reconciliation_emits_span(monkeypatch: pytest.MonkeyPatch) -> None:
     spans = _patch_instrumentation(monkeypatch)
+    feedback_calls = _patch_feedback_recorder(monkeypatch)
 
     fake_result = SimpleNamespace(
         id="collab-1",
@@ -167,6 +182,7 @@ def test_research_reconciliation_emits_span(monkeypatch: pytest.MonkeyPatch) -> 
     assert spans and spans[0][0] == "research_reconciliation"
     recorder.log_step.assert_called_once()
     recorder.record_citations.assert_called_once_with(fake_answer.citations)
+    assert len(feedback_calls) == 1
 
 
 def test_corpus_curation_emits_span(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -40,4 +40,45 @@ class TelemetryBatch(APIModel):
     )
 
 
-__all__ = ["TelemetryEvent", "TelemetryBatch"]
+class FeedbackEventPayload(APIModel):
+    """Request body describing a user feedback interaction."""
+
+    action: str = Field(
+        description="Categorical label describing the feedback interaction.",
+    )
+    user_id: str | None = Field(
+        default=None,
+        description="Identifier of the user submitting the feedback, if available.",
+    )
+    chat_session_id: str | None = Field(
+        default=None,
+        description="Associated conversational session identifier, when relevant.",
+    )
+    query: str | None = Field(
+        default=None,
+        description="Original user query or prompt that produced this feedback event.",
+    )
+    document_id: str | None = Field(
+        default=None,
+        description="Identifier of the cited document involved in the interaction.",
+    )
+    passage_id: str | None = Field(
+        default=None,
+        description="Identifier of the cited passage involved in the interaction.",
+    )
+    rank: int | None = Field(
+        default=None,
+        ge=0,
+        description="Zero-based rank of the cited item within the retrieval results.",
+    )
+    score: float | None = Field(
+        default=None,
+        description="Retrieval score for the cited item, if available.",
+    )
+    confidence: float | None = Field(
+        default=None,
+        description="System confidence assigned to the citation, when supplied.",
+    )
+
+
+__all__ = ["TelemetryEvent", "TelemetryBatch", "FeedbackEventPayload"]
