@@ -15,7 +15,9 @@ import ErrorCallout from "../components/ErrorCallout";
 import UiModeToggle from "../components/UiModeToggle";
 import { buildPassageLink, formatAnchor } from "../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../lib/errorUtils";
-import { emitTelemetry } from "../lib/telemetry";
+import type { components } from "../lib/generated/api";
+import { emitTelemetry, submitFeedback } from "../lib/telemetry";
+import type { FeedbackEventInput } from "../lib/telemetry";
 import { usePersistentSort } from "../lib/usePersistentSort";
 import { useUiModePreference } from "../lib/useUiModePreference";
 import { sortDocumentGroups, SortableDocumentGroup } from "./groupSorting";
@@ -147,25 +149,9 @@ type SavedSearch = {
   createdAt: number;
 };
 
-type SearchResult = {
-  id: string;
-  document_id: string;
-  text: string;
-  snippet: string;
-  document_title?: string | null;
-  osis_ref?: string | null;
-  page_no?: number | null;
-  t_start?: number | null;
-  t_end?: number | null;
-  score?: number | null;
-  highlights?: string[] | null;
-  document_score?: number | null;
-  document_rank?: number | null;
-};
+type SearchResult = components["schemas"]["HybridSearchResult"];
 
-type SearchResponse = {
-  results: SearchResult[];
-};
+type SearchResponse = components["schemas"]["HybridSearchResponse"];
 
 type DocumentGroup = SortableDocumentGroup & {
   documentId: string;
@@ -225,6 +211,7 @@ export default function SearchPage(): JSX.Element {
   const [savedSearchName, setSavedSearchName] = useState("");
   const [diffSelection, setDiffSelection] = useState<string[]>([]);
   const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(null);
+  const [rerankerName, setRerankerName] = useState<string | null>(null);
 
   const presetIsCustom = presetSelection === CUSTOM_PRESET_VALUE || presetSelection === "";
 
@@ -347,6 +334,7 @@ export default function SearchPage(): JSX.Element {
       setError(null);
       setHasSearched(true);
       setLastSearchFilters(filters);
+      setRerankerName(null);
 
       const perf = typeof performance !== "undefined" ? performance : null;
       const requestStart = perf ? perf.now() : null;
@@ -359,6 +347,10 @@ export default function SearchPage(): JSX.Element {
         const response = await fetch(`/api/search${searchQuery ? `?${searchQuery}` : ""}`, {
           cache: "no-store",
         });
+        const rerankerHeader = response.headers.get("x-reranker");
+        setRerankerName(
+          rerankerHeader && rerankerHeader.trim() ? rerankerHeader.trim() : null,
+        );
         retrievalEnd = perf ? perf.now() : null;
         if (!response.ok) {
           const errorDetails = await parseErrorResponse(
@@ -487,6 +479,35 @@ export default function SearchPage(): JSX.Element {
       void runSearch(lastSearchFilters);
     }
   }, [lastSearchFilters, runSearch]);
+
+  const handlePassageClick = useCallback(
+    (result: SearchResult) => {
+      const queryValue = (
+        lastSearchFilters?.query ?? currentFilters.query ?? ""
+      ).trim();
+      const rerankScore =
+        typeof result.reranker_score === "number" ? result.reranker_score : undefined;
+      const passageScore =
+        typeof result.score === "number" ? result.score : undefined;
+      const retrieverScore =
+        typeof result.retriever_score === "number" ? result.retriever_score : undefined;
+      const payload = {
+        action: "click",
+        documentId: result.document_id,
+        passageId: result.id,
+        ...(typeof result.rank === "number" ? { rank: result.rank } : {}),
+        ...(typeof rerankScore === "number"
+          ? { score: rerankScore }
+          : typeof passageScore === "number"
+          ? { score: passageScore }
+          : {}),
+        ...(typeof retrieverScore === "number" ? { confidence: retrieverScore } : {}),
+        ...(queryValue ? { query: queryValue } : {}),
+      } satisfies FeedbackEventInput;
+      void submitFeedback(payload);
+    },
+    [currentFilters.query, lastSearchFilters],
+  );
 
   const handlePresetChange = useCallback(
     (value: string) => {
@@ -1148,6 +1169,36 @@ export default function SearchPage(): JSX.Element {
         <SortControls value={sortKey} onChange={setSortKey} />
       </div>
 
+      {rerankerName && (
+        <div style={{ marginBottom: "1rem" }}>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              background: "#ecfdf5",
+              color: "#047857",
+              borderRadius: "999px",
+              padding: "0.25rem 0.75rem",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                display: "inline-block",
+                width: "0.5rem",
+                height: "0.5rem",
+                borderRadius: "999px",
+                background: "#10b981",
+              }}
+            />
+            Reranked by {rerankerName}
+          </span>
+        </div>
+      )}
+
       {filterChips.length > 0 && (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
           {filterChips.map((chip) => (
@@ -1289,6 +1340,7 @@ export default function SearchPage(): JSX.Element {
                               pageNo: result.page_no ?? null,
                               tStart: result.t_start ?? null,
                             })}
+                            onClick={() => handlePassageClick(result)}
                             style={{ whiteSpace: "nowrap" }}
                           >
                             Open passage

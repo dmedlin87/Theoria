@@ -32,6 +32,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const body = await response.text();
   const headers = new Headers();
   headers.set("content-type", response.headers.get("content-type") ?? "application/json");
+  const reranker = response.headers.get("x-reranker");
+  if (reranker) {
+    headers.set("x-reranker", reranker);
+  }
   forwardTraceHeaders(response.headers, headers);
   return new NextResponse(body, {
     status: response.status,
