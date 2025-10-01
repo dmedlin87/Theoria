@@ -14,8 +14,45 @@ from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from defusedxml import ElementTree as ET
-from defusedxml.common import DefusedXmlException
+try:  # pragma: no cover - exercised via dedicated regression test
+    from defusedxml import ElementTree as ET
+    from defusedxml.common import DefusedXmlException
+except ModuleNotFoundError:  # pragma: no cover - fallback used when optional dep missing
+    import types
+    import xml.etree.ElementTree as _ET
+
+    class DefusedXmlException(RuntimeError):
+        """Raised when XML input contains disallowed constructs."""
+
+    def _ensure_safe_xml(payload: Any) -> None:
+        """Reject XML strings that rely on DTD/ENTITY expansion.
+
+        ``defusedxml`` normally guards against these features.  When the
+        optional dependency is not installed we emulate the most important
+        protections locally by rejecting payloads that contain DOCTYPE or
+        ENTITY declarations before handing them to ``xml.etree``.
+        """
+
+        if isinstance(payload, (bytes, bytearray)):
+            haystack_bytes = bytes(payload).upper()
+            if b"<!DOCTYPE" in haystack_bytes or b"<!ENTITY" in haystack_bytes:
+                raise DefusedXmlException("Unsafe XML constructs are not supported")
+            return
+
+        haystack = str(payload).upper()
+        if "<!DOCTYPE" in haystack or "<!ENTITY" in haystack:
+            raise DefusedXmlException("Unsafe XML constructs are not supported")
+
+    def _secure_fromstring(text: Any, parser: Any | None = None):
+        _ensure_safe_xml(text)
+        if parser is None:
+            parser = _ET.XMLParser(resolve_entities=False)
+        return _ET.fromstring(text, parser=parser)
+
+    ET = types.SimpleNamespace(  # type: ignore[assignment]
+        ParseError=_ET.ParseError,
+        fromstring=_secure_fromstring,
+    )
 
 import webvtt
 from pdfminer.high_level import extract_text
