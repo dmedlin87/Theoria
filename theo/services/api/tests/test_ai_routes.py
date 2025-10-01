@@ -113,6 +113,15 @@ def _register_echo_model(client: TestClient, *, make_default: bool = True) -> di
     return get_response.json()
 
 
+def test_ai_features_returns_guardrail_catalogue() -> None:
+    with _api_client() as client:
+        response = client.get("/ai/features")
+        assert response.status_code == 200
+        payload = response.json()
+        assert "guardrails" in payload
+        assert payload["guardrails"], payload
+
+
 def test_verse_copilot_returns_citations_and_followups() -> None:
     _seed_corpus()
     with _api_client() as client:
@@ -327,6 +336,36 @@ def test_verse_copilot_guardrails_when_no_citations() -> None:
         assert isinstance(suggestions, list) and suggestions
         first = suggestions[0]
         assert first.get("action") == "search"
+
+
+def test_citation_export_returns_manifest() -> None:
+    _seed_corpus()
+    with _api_client() as client:
+        response = client.post(
+            "/ai/citations/export",
+            json={
+                "citations": [
+                    {
+                        "index": 0,
+                        "osis": "John.1.1",
+                        "anchor": "1",
+                        "passage_id": "passage-1",
+                        "document_id": "doc-1",
+                        "document_title": "Sample Sermon",
+                        "snippet": "In John 1:1 the Word is proclaimed as light",
+                        "source_url": "/doc/doc-1",
+                    }
+                ]
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        totals = payload["manifest"]["totals"]
+        assert totals["documents"] == 1
+        assert totals["passages"] == 1
+        assert payload["records"] and payload["records"][0]["document_id"] == "doc-1"
+        assert payload["manager_payload"]["mendeley"]["documents"]
+        assert payload["csl"] and payload["csl"][0]["id"] == "doc-1"
 
 
 def test_sermon_prep_export_markdown() -> None:

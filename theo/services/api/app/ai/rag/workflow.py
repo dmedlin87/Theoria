@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from ...analytics.telemetry import record_feedback_event
 from ...db.models import Document, Passage
+from ...core.version import get_git_sha
 from ...export.formatters import SCHEMA_VERSION, generate_export_id
 from ...models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
 from ...models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
@@ -53,6 +54,7 @@ from .models import (
 )
 from .prompts import (
     sanitise_json_structure as _prompts_sanitize_json_structure,
+    sanitise_markdown_field as _prompts_sanitize_markdown_field,
     scrub_adversarial_language as _prompts_scrub_adversarial_language,
 )
 from ..registry import LLMModel, LLMRegistry, get_llm_registry
@@ -500,6 +502,10 @@ def _scrub_adversarial_language(value: str | None) -> str | None:
 
 def _sanitize_json_structure(payload: Any) -> Any:
     return _prompts_sanitize_json_structure(payload)
+
+
+def _sanitize_markdown_field(value: object) -> str:
+    return _prompts_sanitize_markdown_field(value)
 
 
 def _extract_topic_domains(meta: Mapping[str, Any] | None) -> set[str]:
