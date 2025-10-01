@@ -46,3 +46,7 @@ name = "workflows"
   [[suites.endpoints]]
   method = "POST"
   path = "/ai/curation"
+
+  [[suites.endpoints]]
+  method = "POST"
+  path = "/ai/chat"

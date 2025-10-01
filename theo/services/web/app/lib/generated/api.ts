@@ -1510,6 +1510,8 @@ export interface components {
             question: string;
             /** Answer */
             answer: string;
+            /** Prompt */
+            prompt?: string | null;
             /** Answer Summary */
             answer_summary?: string | null;
             /** Citations */
@@ -1548,6 +1550,8 @@ export interface components {
             session_id?: string | null;
             /** Model */
             model?: string | null;
+            /** Prompt */
+            prompt?: string | null;
             /** Osis */
             osis?: string | null;
             filters?: components["schemas"]["HybridSearchFilters"];
