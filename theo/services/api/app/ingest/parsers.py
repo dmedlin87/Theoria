@@ -13,7 +13,9 @@ from html.parser import HTMLParser
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from xml.etree import ElementTree as ET
+
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 import webvtt
 from pdfminer.high_level import extract_text
@@ -285,7 +287,7 @@ def _extract_docx_metadata(docx: zipfile.ZipFile) -> dict[str, Any]:
 
     try:
         root = ET.fromstring(core)
-    except ET.ParseError:
+    except (ET.ParseError, DefusedXmlException):
         return metadata
 
     ns = {
@@ -313,7 +315,7 @@ def _fallback_docx_text(path: Path) -> tuple[str, dict[str, Any]]:
 
             try:
                 root = ET.fromstring(xml_bytes)
-            except ET.ParseError:
+            except (ET.ParseError, DefusedXmlException):
                 return read_text_file(path), {}
 
             ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
