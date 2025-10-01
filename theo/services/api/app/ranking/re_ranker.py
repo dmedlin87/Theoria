@@ -2,24 +2,37 @@
 
 from __future__ import annotations
 
-import pickle
+import hashlib
 from pathlib import Path
 from typing import Sequence
 
-try:  # pragma: no cover - optional dependency
-    import joblib  # type: ignore[import]
-except Exception:  # pragma: no cover - gracefully handle missing joblib
-    joblib = None  # type: ignore[assignment]
+import joblib  # type: ignore[import]
 
 from ..models.search import HybridSearchResult
 from .features import extract_features
 
 
-def _load_model(path: Path):
-    if joblib is not None:
-        return joblib.load(path)
+def _compute_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
     with path.open("rb") as handle:
-        return pickle.load(handle)
+        for chunk in iter(lambda: handle.read(8192), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+class RerankerValidationError(RuntimeError):
+    """Raised when the persisted reranker fails validation prior to loading."""
+
+
+def _load_model(path: Path, *, expected_sha256: str | None = None):
+    if expected_sha256 is not None:
+        actual_sha256 = _compute_sha256(path)
+        if actual_sha256.lower() != expected_sha256.lower():
+            raise RerankerValidationError(
+                "Hash mismatch for reranker model: expected %s but loaded %s"
+                % (expected_sha256, actual_sha256)
+            )
+    return joblib.load(path)
 
 
 def _coerce_scores(raw: object) -> list[float]:
@@ -83,9 +96,11 @@ class Reranker:
         return reranked
 
 
-def load_reranker(path: str | Path) -> Reranker:
+def load_reranker(
+    path: str | Path, *, expected_sha256: str | None = None
+) -> Reranker:
     """Load a reranker model from disk."""
 
-    resolved = Path(path)
-    estimator = _load_model(resolved)
+    resolved = Path(path).resolve()
+    estimator = _load_model(resolved, expected_sha256=expected_sha256)
     return Reranker(estimator)
