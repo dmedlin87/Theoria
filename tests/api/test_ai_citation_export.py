@@ -18,10 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.core.database import Base, get_session
 from theo.services.api.app.db.models import Document, Passage
 from theo.services.api.app.main import app
-from theo.services.api.app.routes.ai.workflows import (
-    _CSL_TYPE_MAP,
-    _build_csl_entry,
-)
+from theo.services.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _build_csl_entry
 
 
 @pytest.fixture()
