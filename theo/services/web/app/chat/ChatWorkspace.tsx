@@ -716,19 +716,19 @@ export default function ChatWorkspace({
           <div className="chat-empty-state">
             <h3>Start the conversation</h3>
             <p>Ask about a passage, doctrine, or theme and we’ll respond with cited insights.</p>
-            <div className="chat-empty-state-actions" role="list">
+            <ul className="chat-empty-state-actions">
               {sampleQuestions.map((question, index) => (
-                <button
-                  key={question}
-                  type="button"
-                  role="listitem"
-                  className="chat-empty-state-chip"
-                  onClick={() => handleSampleQuestionClick(question, index)}
-                >
-                  {question}
-                </button>
+                <li key={question}>
+                  <button
+                    type="button"
+                    className="chat-empty-state-chip"
+                    onClick={() => handleSampleQuestionClick(question, index)}
+                  >
+                    {question}
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
             <p className="chat-empty-state-links">
               Prefer browsing? Explore the <Link href="/search">Search</Link> and
               {" "}
