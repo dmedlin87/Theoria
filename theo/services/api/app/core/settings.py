@@ -173,7 +173,6 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return value
         raise ValueError("Invalid JWT algorithm configuration")
-    
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> list[str]:
