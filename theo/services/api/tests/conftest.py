@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.main import app
+from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 from theo.services.api.app.security import require_principal
 
 
@@ -53,6 +54,7 @@ def configure_test_environment(
     engine = configure_engine(settings.database_url)
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    run_sql_migrations(engine)
 
     try:
         yield
