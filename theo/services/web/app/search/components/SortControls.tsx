@@ -2,7 +2,7 @@
 
 import { ChangeEvent } from "react";
 
-import { GroupSortKey } from "./groupSorting";
+import { GroupSortKey } from "../groupSorting";
 
 export const SORT_OPTIONS: { key: GroupSortKey; label: string; description: string }[] = [
   {
