@@ -42,12 +42,14 @@ describe("admin digest components", () => {
         topics=""
         keywords=""
         authors=""
+        osis=""
         onNameChange={() => undefined}
         onCadenceChange={() => undefined}
         onDeliveryChannelsChange={() => undefined}
         onTopicsChange={() => undefined}
         onKeywordsChange={() => undefined}
         onAuthorsChange={() => undefined}
+        onOsisChange={() => undefined}
         onSubmit={onSubmit}
         isCreating={false}
         error={null}

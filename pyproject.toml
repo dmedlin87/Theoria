@@ -11,11 +11,44 @@ combine_as_imports = true
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-src = ["theo", "tests", "scripts"]
-exclude = ["docs"]
+src = ["theo/services/api/app"]
+exclude = [
+    "docs",
+    "tests",
+    "typings",
+    "scripts",
+    "theo/services/cli",
+    "theo/services/geo",
+    "theo/services/api/tests",
+]
 
 [tool.ruff.lint]
-extend-select = ["I", "PD", "FA"]
+extend-select = ["E", "F", "W", "B", "S", "PD", "FA"]
+ignore = [
+    "E501",
+    "E402",
+    "F401",
+    "F811",
+    "F821",
+    "F841",
+    "B008",
+    "B010",
+    "B904",
+    "B905",
+    "S101",
+    "S110",
+    "S112",
+    "S310",
+    "S311",
+    "S314",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S106", "E501"]
+"theo/services/api/tests/**" = ["S101", "S106", "E501"]
+"theo/services/cli/tests/**" = ["S101", "S106", "E501"]
+"typings/**" = ["I001"]
+"theo/services/geo/seed_openbible_geo.py" = ["S603", "S607", "E501", "I001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["theo"]
@@ -24,9 +57,8 @@ combine-as-imports = true
 [tool.mypy]
 python_version = "3.11"
 files = [
-    "theo/services/api/app/export",
-    "theo/services/api/app/ingest",
-    "theo/services/api/app/retriever",
+    "theo/services/api/app",
+    "theo/services/api/tests",
     "tests/export",
 ]
 ignore_missing_imports = true

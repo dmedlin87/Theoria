@@ -158,9 +158,9 @@ class ErrorReportingMiddleware(BaseHTTPMiddleware):
     ) -> DebugReport:
         context = {**self.base_context}
         if hasattr(request.state, "workflow"):
-            context.setdefault("workflow", getattr(request.state, "workflow"))
+            context.setdefault("workflow", request.state.workflow)  # type: ignore[attr-defined]
         if hasattr(request.state, "request_id"):
-            context.setdefault("request_id", getattr(request.state, "request_id"))
+            context.setdefault("request_id", request.state.request_id)  # type: ignore[attr-defined]
         return build_debug_report(
             request,
             exc=exc,
