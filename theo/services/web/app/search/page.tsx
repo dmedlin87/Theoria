@@ -788,23 +788,23 @@ export default function SearchPage(): JSX.Element {
       const queryValue = (
         lastSearchFilters?.query ?? currentFilters.query ?? ""
       ).trim();
-      const rerankScore =
-        typeof result.reranker_score === "number" ? result.reranker_score : undefined;
       const passageScore =
         typeof result.score === "number" ? result.score : undefined;
-      const retrieverScore =
-        typeof result.retriever_score === "number" ? result.retriever_score : undefined;
+      const vectorScore =
+        typeof result.vector_score === "number" ? result.vector_score : undefined;
+      const lexicalScore =
+        typeof result.lexical_score === "number" ? result.lexical_score : undefined;
+      const documentScore =
+        typeof result.document_score === "number" ? result.document_score : undefined;
+      const rankingScore =
+        passageScore ?? vectorScore ?? lexicalScore ?? undefined;
       const payload = {
         action: "click",
         documentId: result.document_id,
         passageId: result.id,
         ...(typeof result.rank === "number" ? { rank: result.rank } : {}),
-        ...(typeof rerankScore === "number"
-          ? { score: rerankScore }
-          : typeof passageScore === "number"
-          ? { score: passageScore }
-          : {}),
-        ...(typeof retrieverScore === "number" ? { confidence: retrieverScore } : {}),
+        ...(typeof rankingScore === "number" ? { score: rankingScore } : {}),
+        ...(typeof documentScore === "number" ? { confidence: documentScore } : {}),
         ...(queryValue ? { query: queryValue } : {}),
       } satisfies FeedbackEventInput;
       void submitFeedback(payload);

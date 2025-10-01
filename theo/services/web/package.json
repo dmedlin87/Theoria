@@ -6,17 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "jest",
+    "test": "THEO_AUTH_ALLOW_ANONYMOUS=1 jest",
     "lint": "tsc --noEmit",
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "next": "14.2.3",
+    "next": "14.2.33",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "14.2.3",
+    "@next/bundle-analyzer": "14.2.33",
     "@playwright/test": "1.44.1",
     "@testing-library/jest-dom": "6.6.3",
     "@testing-library/react": "14.3.1",

@@ -62,8 +62,6 @@ describe("SearchPage feedback", () => {
             score: 0.92,
             document_score: 0.88,
             document_rank: 0,
-            reranker_score: 0.92,
-            retriever_score: 0.81,
           },
         ],
       }),
@@ -91,7 +89,7 @@ describe("SearchPage feedback", () => {
           passageId: "passage-1",
           rank: 0,
           score: 0.92,
-          confidence: 0.81,
+          confidence: 0.88,
           query: "logos",
         }),
       );

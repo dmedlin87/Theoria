@@ -288,6 +288,7 @@ export default function CitationList({
             const notes = (annotationsByDocument[citation.document_id] ?? []).filter(
               (annotation) =>
                 Boolean(citation.passage_id) &&
+                Array.isArray(annotation.passage_ids) &&
                 annotation.passage_ids.includes(citation.passage_id),
             );
             const content = (
