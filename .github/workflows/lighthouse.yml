@@ -74,6 +74,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Capture production audit report
+        run: npm audit --omit=dev
+
       - name: Build production bundle
         if: ${{ github.event.inputs.target != 'staging' }}
         run: npm run build

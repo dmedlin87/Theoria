@@ -4,7 +4,7 @@ export type FeatureFlags = {
   ai_copilot?: boolean;
 };
 
-export type RAGCitation = components["schemas"]["RAGCitation"];
+export type RAGCitation = components["schemas"]["RAGCitation-Output"];
 
 export type RAGAnswer = components["schemas"]["RAGAnswer"];
 
