@@ -16,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.main import app
+from theo.services.api.app.db import run_sql_migrations as migrations_module
 from theo.services.api.app.security import require_principal
 
 @pytest.fixture(autouse=True)
@@ -36,4 +37,12 @@ def _bypass_authentication(request: pytest.FixtureRequest):
         yield
     finally:
         app.dependency_overrides.pop(require_principal, None)
+
+
+@pytest.fixture(autouse=True)
+def _disable_migrations(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Prevent database migrations from running in API tests."""
+
+    monkeypatch.setattr(migrations_module, "run_sql_migrations", lambda *_: None)
+    monkeypatch.setattr("theo.services.api.app.main.run_sql_migrations", lambda *_: None)
 

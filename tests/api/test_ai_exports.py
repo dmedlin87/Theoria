@@ -14,7 +14,7 @@ from theo.services.api.app.models.export import (
     DeliverableManifest,
     DeliverablePackage,
 )
-from theo.services.api.app.routes.ai import workflows as workflows_module
+from theo.services.api.app.routes.ai.workflows import exports as exports_module
 
 
 def _build_package(
@@ -69,12 +69,12 @@ def test_sermon_export_returns_serialised_asset(
     api_client: TestClient, monkeypatch: pytest.MonkeyPatch, export_format: str
 ) -> None:
     monkeypatch.setattr(
-        workflows_module,
+        exports_module,
         "generate_sermon_prep_outline",
         lambda *_, **__: object(),
     )
     monkeypatch.setattr(
-        workflows_module,
+        exports_module,
         "build_sermon_deliverable",
         lambda response, *, formats, filters=None: _build_package("sermon", formats),
     )
@@ -104,7 +104,7 @@ def test_transcript_export_returns_serialised_asset(
     api_client: TestClient, monkeypatch: pytest.MonkeyPatch, export_format: str
 ) -> None:
     monkeypatch.setattr(
-        workflows_module,
+        exports_module,
         "build_transcript_deliverable",
         lambda session, document_id, *, formats: _build_package("transcript", formats),
     )

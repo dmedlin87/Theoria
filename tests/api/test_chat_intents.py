@@ -11,7 +11,7 @@ from theo.services.api.app.ai.rag import RAGAnswer
 from theo.services.api.app.core.database import get_session
 from theo.services.api.app.intent.tagger import IntentTag
 from theo.services.api.app.main import app
-from theo.services.api.app.routes.ai import workflows as workflows_module
+from theo.services.api.app.routes.ai.workflows import chat as chat_module
 
 
 class DummySession:
@@ -78,17 +78,17 @@ def chat_client(
     app.dependency_overrides[get_session] = override_session
 
     StubTrailService.created.clear()
-    monkeypatch.setattr(workflows_module, "TrailService", StubTrailService)
+    monkeypatch.setattr(chat_module, "TrailService", StubTrailService)
     context = ChatTestContext()
 
     def _persist(*_, prompt: str | None = None, **kwargs: object) -> SimpleNamespace:
         context.persist_calls.append({"prompt": prompt, "kwargs": kwargs})
         return SimpleNamespace(id="session")
 
-    monkeypatch.setattr(workflows_module, "_persist_chat_session", _persist)
-    monkeypatch.setattr(workflows_module, "ensure_completion_safe", lambda *_: None)
+    monkeypatch.setattr(chat_module, "_persist_chat_session", _persist)
+    monkeypatch.setattr(chat_module, "ensure_completion_safe", lambda *_: None)
     monkeypatch.setattr(
-        workflows_module,
+        chat_module,
         "run_guarded_chat",
         lambda *_, **__: RAGAnswer(summary="response", citations=[]),
     )
@@ -127,7 +127,7 @@ def test_chat_turn_attaches_intent_tags(
     client, context = chat_client
 
     settings = SimpleNamespace(intent_tagger_enabled=True, intent_model_path=Path("dummy.joblib"))
-    monkeypatch.setattr(workflows_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(chat_module, "get_settings", lambda: settings)
 
     tag = IntentTag(intent="sermon_prep", stance="supportive", confidence=0.87)
 
@@ -136,7 +136,7 @@ def test_chat_turn_attaches_intent_tags(
             assert message == "Plan a sermon on hope"
             return tag
 
-    monkeypatch.setattr(workflows_module, "get_intent_tagger", lambda _settings: StubTagger())
+    monkeypatch.setattr(chat_module, "get_intent_tagger", lambda _settings: StubTagger())
 
     response = client.post("/ai/chat", json=_chat_payload("Plan a sermon on hope"))
     assert response.status_code == 200
@@ -160,12 +160,12 @@ def test_chat_turn_omits_tags_when_disabled(
     client, context = chat_client
 
     settings = SimpleNamespace(intent_tagger_enabled=False, intent_model_path=None)
-    monkeypatch.setattr(workflows_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(chat_module, "get_settings", lambda: settings)
 
     def _should_not_run(_settings: object) -> None:
         raise AssertionError("intent tagger should not be resolved when disabled")
 
-    monkeypatch.setattr(workflows_module, "get_intent_tagger", _should_not_run)
+    monkeypatch.setattr(chat_module, "get_intent_tagger", _should_not_run)
 
     response = client.post("/ai/chat", json=_chat_payload("Tell me about Romans 8"))
     assert response.status_code == 200
@@ -185,7 +185,7 @@ def test_chat_turn_records_prompt(
     client, context = chat_client
 
     settings = SimpleNamespace(intent_tagger_enabled=False, intent_model_path=None)
-    monkeypatch.setattr(workflows_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(chat_module, "get_settings", lambda: settings)
 
     response = client.post(
         "/ai/chat",
