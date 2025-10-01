@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+import zipfile
+
 import pytest
 
 from theo.services.api.app.ingest import parsers  # noqa: E402
@@ -66,3 +69,46 @@ def test_parse_html_document_ignores_script_content(tmp_path, disable_unstructur
     combined_chunks = " \n".join(chunk.text for chunk in result.chunks)
     assert "should never surface" not in combined_chunks
     assert "still hidden" not in combined_chunks
+
+
+def _write_malicious_docx(path: Path, *, core_xml: str | None = None, document_xml: str | None = None) -> Path:
+    docx_path = path / "malicious.docx"
+    with zipfile.ZipFile(docx_path, "w") as handle:
+        if core_xml is not None:
+            handle.writestr("docProps/core.xml", core_xml)
+        if document_xml is not None:
+            handle.writestr("word/document.xml", document_xml)
+    return docx_path
+
+
+def test_extract_docx_metadata_rejects_external_entities(tmp_path):
+    malicious_core = """<?xml version='1.0' encoding='UTF-8'?>
+    <!DOCTYPE foo [<!ELEMENT foo ANY ><!ENTITY xxe SYSTEM 'file:///etc/passwd'>]>
+    <cp:coreProperties xmlns:cp='http://schemas.openxmlformats.org/package/2006/metadata/core-properties'
+                      xmlns:dc='http://purl.org/dc/elements/1.1/'>
+      <dc:title>&xxe;</dc:title>
+    </cp:coreProperties>
+    """
+    docx_path = _write_malicious_docx(tmp_path, core_xml=malicious_core)
+
+    with zipfile.ZipFile(docx_path) as handle:
+        metadata = parsers._extract_docx_metadata(handle)
+
+    assert metadata == {}
+
+
+def test_fallback_docx_text_rejects_external_entities(tmp_path):
+    malicious_document = """<?xml version='1.0' encoding='UTF-8'?>
+    <!DOCTYPE foo [<!ELEMENT foo ANY ><!ENTITY xxe SYSTEM 'file:///etc/passwd'>]>
+    <w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>
+      <w:body>
+        <w:p><w:r><w:t>&xxe;</w:t></w:r></w:p>
+      </w:body>
+    </w:document>
+    """
+    docx_path = _write_malicious_docx(tmp_path, document_xml=malicious_document)
+
+    text, metadata = parsers._fallback_docx_text(docx_path)
+
+    assert metadata == {}
+    assert isinstance(text, str)
