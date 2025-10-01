@@ -83,6 +83,14 @@ def search(
     source_type: str | None = Query(
         default=None, description="Restrict to a source type"
     ),
+    theological_tradition: str | None = Query(
+        default=None,
+        description="Restrict to documents aligned with a theological tradition",
+    ),
+    topic_domain: str | None = Query(
+        default=None,
+        description="Restrict to documents tagged with a topic domain",
+    ),
     k: int = Query(default=10, ge=1, le=50),
     session: Session = Depends(get_session),
 ) -> HybridSearchResponse:
@@ -92,7 +100,11 @@ def search(
         query=q,
         osis=osis,
         filters=HybridSearchFilters(
-            collection=collection, author=author, source_type=source_type
+            collection=collection,
+            author=author,
+            source_type=source_type,
+            theological_tradition=theological_tradition,
+            topic_domain=topic_domain,
         ),
         k=k,
     )
