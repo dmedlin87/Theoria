@@ -84,6 +84,7 @@ class ChatSessionPreferences(APIModel):
 class ChatMemoryEntry(APIModel):
     question: str
     answer: str
+    prompt: str | None = None
     answer_summary: str | None = None
     citations: list[RAGCitation] = Field(default_factory=list)
     document_ids: list[str] = Field(default_factory=list)
@@ -94,6 +95,7 @@ class ChatSessionRequest(APIModel):
     messages: Sequence[ChatSessionMessage]
     session_id: str | None = None
     model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
+    prompt: str | None = None
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     recorder_metadata: RecorderMetadata | None = None

@@ -193,6 +193,7 @@ def _persist_chat_session(
     user_id: str | None,
     stance: str | None,
     question: str,
+    prompt: str | None,
     message: ChatSessionMessage,
     answer: RAGAnswer,
     preferences: ChatSessionPreferences,
@@ -202,6 +203,7 @@ def _persist_chat_session(
     new_entry = ChatMemoryEntry(
         question=_truncate_text(question, _MEMORY_TEXT_LIMIT),
         answer=_truncate_text(message.content, _MEMORY_TEXT_LIMIT),
+        prompt=_truncate_text(prompt, _MEMORY_TEXT_LIMIT) if prompt else None,
         answer_summary=(
             _truncate_text(answer.summary, _MEMORY_SUMMARY_LIMIT)
             if answer.summary
@@ -1000,6 +1002,7 @@ def chat_turn(
                 ),
                 stance=payload.stance or payload.mode_id,
                 question=question,
+                prompt=payload.prompt,
                 message=message,
                 answer=answer,
                 preferences=preferences,
