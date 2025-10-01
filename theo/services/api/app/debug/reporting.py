@@ -19,6 +19,7 @@ from ..tracing import get_current_trace_id
 
 SAFE_HEADER_PREFIXES = ("x-", "cf-", "forwarded")
 SAFE_ENV_PREFIXES = ("THEO_", "APP_", "FEATURE_")
+SENSITIVE_ENV_SUBSTRINGS = ("SECRET", "TOKEN", "KEY", "PASSWORD", "JWT")
 LOGGER = logging.getLogger("theo.api.errors")
 
 
@@ -126,8 +127,14 @@ def _collect_runtime_context() -> dict[str, Any]:
 def _collect_environment(prefixes: Iterable[str]) -> dict[str, str]:
     safe_env: dict[str, str] = {}
     for key, value in os.environ.items():
-        if any(key.startswith(prefix) for prefix in prefixes):
-            safe_env[key] = value
+        if not any(key.startswith(prefix) for prefix in prefixes):
+            continue
+
+        upper_key = key.upper()
+        if any(substring in upper_key for substring in SENSITIVE_ENV_SUBSTRINGS):
+            continue
+
+        safe_env[key] = value
     return safe_env
 
 
