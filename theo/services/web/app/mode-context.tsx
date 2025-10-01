@@ -45,13 +45,31 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof document === "undefined") {
       return;
     }
+
     const stored = localStorage.getItem(MODE_STORAGE_KEY);
+    let persisted: ResearchModeId | undefined;
+
     if (stored && isResearchModeId(stored)) {
-      setModeId((current) => (current === stored ? current : stored));
+      persisted = stored;
+    } else {
+      const cookiePrefix = `${MODE_COOKIE_KEY}=`;
+      const cookieValue = document.cookie
+        .split("; ")
+        .find((entry) => entry.startsWith(cookiePrefix))
+        ?.slice(cookiePrefix.length);
+
+      if (cookieValue && isResearchModeId(cookieValue)) {
+        persisted = cookieValue;
+      }
     }
+
+    if (persisted) {
+      setModeId((current) => (current === persisted ? current : persisted));
+    }
+
     setHasHydrated(true);
   }, []);
 
