@@ -6,7 +6,7 @@
       "dom.iterable",
       "es2022"
     ],
-    "allowJs": true,
+    "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -31,7 +31,11 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "useDefineForClassFields": true
   },
   "include": [
     "next-env.d.ts",

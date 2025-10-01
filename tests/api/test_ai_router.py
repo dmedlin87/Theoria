@@ -1,14 +1,13 @@
 import itertools
 import multiprocessing as mp
-
-from unittest.mock import Mock
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-
+from unittest.mock import Mock
 
 import pytest
 
+from theo.services.api.app.ai import router as router_module
 from theo.services.api.app.ai.clients import GenerationError
 from theo.services.api.app.ai.ledger import SharedLedger
 from theo.services.api.app.ai.registry import LLMModel, LLMRegistry
@@ -17,7 +16,6 @@ from theo.services.api.app.ai.router import (
     RoutedGeneration,
     reset_router_state,
 )
-from theo.services.api.app.ai import router as router_module
 
 
 @pytest.fixture(autouse=True)

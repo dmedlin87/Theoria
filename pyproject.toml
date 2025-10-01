@@ -15,7 +15,9 @@ src = ["theo", "tests", "scripts"]
 exclude = ["docs"]
 
 [tool.ruff.lint]
+select = ["E", "F", "W", "S"]
 extend-select = ["I", "PD", "FA"]
+ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["theo"]
@@ -24,9 +26,8 @@ combine-as-imports = true
 [tool.mypy]
 python_version = "3.11"
 files = [
-    "theo/services/api/app/export",
-    "theo/services/api/app/ingest",
-    "theo/services/api/app/retriever",
+    "theo/services/api/app",
+    "theo/services/api/tests",
     "tests/export",
 ]
 ignore_missing_imports = true
@@ -39,3 +40,8 @@ markers = [
     "no_auth_override: disable authentication override fixture for security assertions",
     "slow: slower end-to-end smoke tests",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]
+"theo/services/geo/seed_openbible_geo.py" = ["S603", "S607"]
+"typings/jwt/__init__.pyi" = ["I001"]

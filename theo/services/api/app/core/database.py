@@ -68,7 +68,8 @@ def get_session() -> Generator[Session, None, None]:
     global _SessionLocal
     if _SessionLocal is None:
         configure_engine(get_settings().database_url)
-    assert _SessionLocal is not None  # for type checkers
+    if _SessionLocal is None:  # pragma: no cover - configuration failed
+        raise RuntimeError("Database engine is not configured")
     session: Session = _SessionLocal()
     try:
         yield session

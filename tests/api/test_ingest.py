@@ -1,14 +1,15 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
+import json
 import logging
 import socket
-from pathlib import Path
 import sys
+import tempfile
+from pathlib import Path
 
 import pytest
 from fastapi import status
-import json
-
 from fastapi.testclient import TestClient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -17,10 +18,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.core.database import get_session  # noqa: E402
 from theo.services.api.app.core.settings import Settings  # noqa: E402
+from theo.services.api.app.ingest import (
+    network as network_module,  # noqa: E402
+    pipeline as pipeline_module,  # noqa: E402
+)
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
-from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E402
-from theo.services.api.app.ingest import network as network_module  # noqa: E402
 
 
 @pytest.fixture()
@@ -50,15 +53,15 @@ def _override_ingest_limit(monkeypatch: pytest.MonkeyPatch, limit: int) -> Setti
     return settings
 
 
- 
+
 class _FakeHeaders(dict):
     def get_content_charset(self, default: str | None = None) -> str | None:
         return self.get("charset", default)
- 
+
 _PDF_EXTRACTION_ERROR = (
     "Unable to extract text from PDF; the file may be password protected or corrupted."
 )
- 
+
 
 
 def test_ingest_file_streams_large_upload_without_buffering(
@@ -220,7 +223,10 @@ def test_simple_ingest_streams_progress(
     monkeypatch: pytest.MonkeyPatch, api_client: TestClient
 ) -> None:
     items = [
-        ingest_module.cli_ingest.IngestItem(path=Path("/tmp/file.md"), source_type="markdown"),
+        ingest_module.cli_ingest.IngestItem(
+            path=Path(tempfile.gettempdir()) / "file.md",
+            source_type="markdown",
+        ),
         ingest_module.cli_ingest.IngestItem(url="https://example.com", source_type="web_page"),
     ]
 
@@ -441,7 +447,7 @@ def test_ingest_url_detects_redirect_loop(
     response = api_client.post("/ingest/url", json={"url": "https://loop.example.com"})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["detail"] == "URL redirect loop detected"
- 
+
 def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:
     pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "password_protected.pdf"
     with pdf_path.open("rb") as handle:

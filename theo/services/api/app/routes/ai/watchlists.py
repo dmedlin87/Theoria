@@ -17,7 +17,6 @@ from ...models.watchlists import (
 )
 from ...security import Principal, require_principal
 
-
 _WATCHLIST_NOT_FOUND_RESPONSE = {
     status.HTTP_404_NOT_FOUND: {"description": "Watchlist not found"}
 }

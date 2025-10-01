@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 from typing import Iterator
-import sys
 
 import httpx
 import pytest
@@ -437,7 +438,7 @@ def test_retry_backoff_respects_retry_after() -> None:
                     project_id="proj",
                     location="us-central1",
                     model="text-model",
-                    access_token="token",
+                    access_token=os.environ.get("TEST_VERTEX_TOKEN", "token"),
                 ),
                 settings=settings,
             ),

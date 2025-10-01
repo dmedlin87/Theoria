@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -45,6 +46,8 @@ from .metadata import (
 )
 from .osis import detect_osis_references
 from .sanitizer import sanitize_passage_text
+
+LOGGER = logging.getLogger(__name__)
 
 
 class EmbeddingServiceProtocol(Protocol):
@@ -99,8 +102,10 @@ def refresh_creator_verse_rollups(
                 else:
                     task(sorted_refs)
                 return
-        except Exception:  # pragma: no cover - async fallbacks
-            pass
+        except Exception as exc:  # pragma: no cover - async fallbacks
+            LOGGER.exception(
+                "Failed to enqueue creator verse rollup refresh", exc_info=exc
+            )
 
     service = CreatorVersePerspectiveService(session)
     service.refresh_many(sorted_refs)

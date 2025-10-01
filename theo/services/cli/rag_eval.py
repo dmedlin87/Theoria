@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import click
+
 try:  # pragma: no cover - datasets is optional for unit tests
     from datasets import Dataset as HFDataset
 except ImportError:  # pragma: no cover - allows stubbing in tests

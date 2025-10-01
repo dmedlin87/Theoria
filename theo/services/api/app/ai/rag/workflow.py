@@ -15,20 +15,26 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...analytics.telemetry import record_feedback_event
+from ...core.version import get_git_sha
 from ...db.models import Document, Passage
 from ...export.formatters import SCHEMA_VERSION, generate_export_id
 from ...models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
-from ...models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
+from ...models.search import (
+    HybridSearchFilters,
+    HybridSearchRequest,
+    HybridSearchResult,
+)
 from ...retriever.hybrid import hybrid_search
-from ...retriever.utils import compose_passage_meta
 from ...telemetry import (
     RAG_CACHE_EVENTS,
     instrument_workflow,
     log_workflow_event,
     set_span_attribute,
 )
-from .cache import RAGCache
 from ..clients import GenerationError
+from ..registry import LLMRegistry, get_llm_registry
+from ..router import get_router
+from .cache import RAGCache
 from .guardrails import (
     GuardrailError,
     apply_guardrail_profile as _guardrails_apply_guardrail_profile,
@@ -55,8 +61,6 @@ from .prompts import (
     sanitise_json_structure as _prompts_sanitize_json_structure,
     scrub_adversarial_language as _prompts_scrub_adversarial_language,
 )
-from ..registry import LLMModel, LLMRegistry, get_llm_registry
-from ..router import get_router
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from ..trails import TrailRecorder
@@ -201,14 +205,12 @@ class GuardedAnswerPipeline:
 
         retrieval_digest = _build_retrieval_digest(ordered_results)
         last_error: GenerationError | None = None
-        selected_model: LLMModel | None = None
 
         cache_key = None
         cache_key_suffix = None
         cache_status = "skipped"
 
         for candidate in candidates:
-            selected_model = candidate
             cache_event_logged = False
             cache_key = _build_cache_key(
                 user_id=user_id,
@@ -641,6 +643,18 @@ def _derive_snippet(
     snippet = " ".join(selected_sentences).strip()
     return snippet or fallback_value
 
+
+def _format_anchor(result: HybridSearchResult) -> str:
+    """Return a human readable anchor for a search result."""
+
+    if result.osis_ref:
+        return result.osis_ref
+    if result.page_no is not None:
+        return f"Page {result.page_no}"
+    if result.t_start is not None:
+        minutes, seconds = divmod(int(result.t_start), 60)
+        return f"T+{minutes:02d}:{seconds:02d}"
+    return str(result.rank)
 
 
 def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
@@ -1541,6 +1555,15 @@ def _normalise_formats(formats: Sequence[str]) -> list[str]:
         if candidate not in normalised:
             normalised.append(candidate)
     return normalised
+
+
+def _sanitize_markdown_field(value: object | None) -> str:
+    """Escape markdown-unfriendly characters in export fields."""
+
+    if value is None:
+        return ""
+    text = str(value)
+    return text.replace("|", "\\|").replace("\n", " ").strip()
 
 
 def _build_deliverable_manifest(

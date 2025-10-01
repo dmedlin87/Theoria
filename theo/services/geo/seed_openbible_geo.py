@@ -22,7 +22,7 @@ from theo.services.api.app.db.models import (
     GeoModernLocation,
     GeoPlaceVerse,
 )
-from theo.services.api.app.ingest.osis import format_osis, _osis_to_readable
+from theo.services.api.app.ingest.osis import _osis_to_readable, format_osis
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,10 @@ def _parse_float(value: str | float | int | None) -> float | None:
         return None
 
 
-def _load_geometry_payload(entry: dict[str, Any], geometry_folder: Path) -> dict[str, Any] | None:
+def _load_geometry_payload(
+    entry: dict[str, Any],
+    geometry_folder: Path,
+) -> dict[str, Any] | None:
     geojson_payload: dict[str, Any] = {}
     for key, value in entry.items():
         if not isinstance(value, str):
@@ -180,7 +183,10 @@ def _detect_commit_sha(data_root: Path) -> str | None:
             capture_output=True,
             text=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError):  # pragma: no cover - git missing
+    except (
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+    ):  # pragma: no cover - git missing
         logger.warning("Unable to resolve OpenBible geo commit SHA")
         return None
     return result.stdout.strip() or None
@@ -397,7 +403,11 @@ def seed_openbible_geo(
                 owner_kind = "modern"
             else:
                 continue
-            thumb_details = thumbnails.get(owner_id) if isinstance(thumbnails, dict) else None
+            thumb_details = (
+                thumbnails.get(owner_id)
+                if isinstance(thumbnails, dict)
+                else None
+            )
             thumb_file = None
             if isinstance(thumb_details, dict):
                 thumb_file = thumb_details.get("file")
@@ -458,7 +468,10 @@ def seed_openbible_geo(
         "commit_sha": commit_sha,
     }
     save_setting(session, _METADATA_SETTING_KEY, metadata)
-    logger.info("Seeded OpenBible geo dataset%s", f" @ {commit_sha}" if commit_sha else "")
+    logger.info(
+        "Seeded OpenBible geo dataset%s",
+        f" @ {commit_sha}" if commit_sha else "",
+    )
 
 
 __all__ = ["seed_openbible_geo"]

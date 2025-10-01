@@ -12,6 +12,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Enum as SQLEnum,
     Float,
     ForeignKey,
     Index,
@@ -21,7 +22,6 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base

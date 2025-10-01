@@ -81,7 +81,7 @@ async function uploadUrl({
   if (frontmatter.trim()) {
     try {
       parsedFrontmatter = JSON.parse(frontmatter);
-    } catch (error) {
+    } catch (_error) {
       return {
         kind: "error",
         message: "Frontmatter must be valid JSON",
@@ -314,7 +314,7 @@ export default function UploadPage(): JSX.Element {
           setSimpleError("Additional metadata must be a JSON object.");
           return;
         }
-      } catch (error) {
+      } catch (_error) {
         setSimpleError("Additional metadata must be valid JSON.");
         return;
       }

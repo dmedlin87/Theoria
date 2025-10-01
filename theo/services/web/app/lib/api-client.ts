@@ -1,20 +1,10 @@
 import type { components } from "./generated/api";
-import type { HybridSearchFilters } from "./guardrails";
-import {
-  ChatSessionMemoryEntry,
-  ChatSessionPreferencesPayload,
-  ChatSessionState,
-  normaliseExportResponse,
-} from "./api-normalizers";
+import { ChatSessionState, normaliseExportResponse } from "./api-normalizers";
 import { ChatWorkflowOptions, ChatWorkflowRequest, ChatWorkflowResult, createChatClient } from "./chat-client";
 import { createHttpClient } from "./http";
 
 export type { HybridSearchFilters } from "./guardrails";
-export type {
-  ChatSessionMemoryEntry,
-  ChatSessionPreferencesPayload,
-  ChatSessionState,
-} from "./api-normalizers";
+export type { ChatSessionMemoryEntry, ChatSessionPreferencesPayload, ChatSessionState } from "./api-normalizers";
 export type {
   ChatWorkflowClient,
   ChatWorkflowGuardrail,

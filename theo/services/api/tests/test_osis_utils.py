@@ -4,9 +4,9 @@ from typing import Iterator, cast
 import pytest
 
 from theo.services.api.app.core.database import get_engine
+from theo.services.api.app.db.models import TranscriptSegment
 from theo.services.api.app.ingest.osis import _osis_to_readable, osis_intersects
 from theo.services.api.app.transcripts.service import _matches_osis
-from theo.services.api.app.db.models import TranscriptSegment
 
 
 @pytest.fixture(autouse=True)

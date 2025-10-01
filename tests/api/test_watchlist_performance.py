@@ -1,9 +1,10 @@
 """Performance regression checks for watchlist analytics queries."""
+# ruff: noqa: E402
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-import sys
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session

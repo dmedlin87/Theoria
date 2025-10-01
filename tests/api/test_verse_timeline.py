@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import sys
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from pathlib import Path
-import sys
 
 import pytest
 from sqlalchemy.orm import Session

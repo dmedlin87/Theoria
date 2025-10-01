@@ -1,17 +1,16 @@
 """Contract tests ensuring OpenAPI schema coverage via Schemathesis."""
 import os
 import sys
-from pathlib import Path
 import tomllib
+from pathlib import Path
 
 import pytest
 import schemathesis
-from schemathesis import experimental
-from schemathesis import openapi as schemathesis_openapi
 from fastapi import Request as FastAPIRequest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from schemathesis import experimental, openapi as schemathesis_openapi
 from schemathesis.schemas import BaseSchema
+from sqlalchemy.orm import Session
 
 os.environ.setdefault("THEO_DISABLE_AI_SETTINGS", "1")
 os.environ.setdefault("THEO_AUTH_ALLOW_ANONYMOUS", "1")

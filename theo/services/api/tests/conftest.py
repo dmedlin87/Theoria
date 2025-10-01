@@ -1,5 +1,6 @@
 """Pytest fixtures for the Theo Engine API."""
 
+# ruff: noqa: E402
 from __future__ import annotations
 
 import os

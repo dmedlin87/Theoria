@@ -5,9 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from httpx import Response as HTTPXResponse
-
 from fastapi.testclient import TestClient
+from httpx import Response as HTTPXResponse
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.core.database import get_engine

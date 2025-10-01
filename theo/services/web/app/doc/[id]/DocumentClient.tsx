@@ -45,7 +45,7 @@ function isSafeSourceUrl(url?: string | null): boolean {
     const parsed = new URL(url);
     const protocol = parsed.protocol.replace(/:$/, "").toLowerCase();
     return SAFE_SOURCE_URL_PROTOCOLS.has(protocol);
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }

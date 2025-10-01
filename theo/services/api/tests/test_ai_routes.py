@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 
 from click.testing import CliRunner
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core.database import configure_engine, get_engine, get_session
+from theo.services.api.app.core.database import (
+    configure_engine,
+    get_engine,
+    get_session,
+)
 from theo.services.api.app.db.models import AgentTrail, Document, Passage
 from theo.services.api.app.main import app
 from theo.services.api.app.workers import tasks as worker_tasks
 from theo.services.cli.batch_intel import main as batch_intel_main
+
 
 @contextmanager
 def _api_client():

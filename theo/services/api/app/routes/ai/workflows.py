@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
@@ -28,13 +27,7 @@ from ...ai import (
     run_research_reconciliation,
 )
 from ...ai.passage import PassageResolutionError, resolve_passage_reference
-from ...ai.rag import (
-    GuardrailError,
-    RAGAnswer,
-    RAGCitation,
-    REFUSAL_MODEL_NAME,
-    ensure_completion_safe,
-)
+from ...ai.rag import GuardrailError, RAGAnswer, RAGCitation, ensure_completion_safe
 from ...ai.registry import LLMModel, LLMRegistry, save_llm_registry
 from ...ai.trails import TrailService
 from ...core.database import get_session
@@ -42,7 +35,11 @@ from ...core.settings import get_settings
 from ...core.settings_store import load_setting, save_setting
 from ...db.models import ChatSession, Document, Passage
 from ...export.formatters import build_document_export
+from ...intent.tagger import get_intent_tagger
 from ...models.ai import (
+    CHAT_SESSION_MEMORY_CHAR_BUDGET,
+    CHAT_SESSION_TOTAL_CHAR_BUDGET,
+    DEFAULT_GUARDRAIL_SETTINGS,
     AIFeaturesResponse,
     ChatMemoryEntry,
     ChatSessionMessage,
@@ -50,8 +47,6 @@ from ...models.ai import (
     ChatSessionRequest,
     ChatSessionResponse,
     ChatSessionState,
-    CHAT_SESSION_MEMORY_CHAR_BUDGET,
-    CHAT_SESSION_TOTAL_CHAR_BUDGET,
     CitationExportRequest,
     CitationExportResponse,
     CollaborationRequest,
@@ -74,17 +69,15 @@ from ...models.ai import (
     SermonPrepRequest,
     TranscriptExportRequest,
     VerseCopilotRequest,
-    DEFAULT_GUARDRAIL_SETTINGS,
 )
 from ...models.base import Passage as PassageSchema
-from ...models.export import serialise_asset_content
 from ...models.documents import DocumentDetailResponse
 from ...models.export import (
     DocumentExportFilters,
     DocumentExportResponse,
+    serialise_asset_content,
 )
 from ...models.search import HybridSearchFilters
-from ...intent.tagger import get_intent_tagger
 
 _BAD_REQUEST_RESPONSE = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
@@ -1376,7 +1369,7 @@ def sermon_prep_export(
 
 # See comment above regarding the response model.
 @router.post("/transcript/export", response_model=ExportDeliverableResponse)
- 
+
 def transcript_export(
     payload: TranscriptExportRequest,
     session: Session = Depends(get_session),

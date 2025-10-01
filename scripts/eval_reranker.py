@@ -16,15 +16,15 @@ may specify features via a nested ``features`` mapping or numeric top-level
 fields, mirroring ``train_reranker.py``.
 """
 
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
-
-import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -33,7 +33,6 @@ if str(PROJECT_ROOT) not in sys.path:
 import joblib
 
 from ranking.metrics import batch_mrr, batch_ndcg_at_k, batch_recall_at_k
-
 
 Candidate = Dict[str, object]
 QueryRecord = Dict[str, object]

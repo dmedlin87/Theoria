@@ -10,7 +10,7 @@ from html import unescape
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode, urlsplit
+from urllib.parse import quote, urlencode, urlparse, urlsplit
 from urllib.request import Request, urlopen
 
 from sqlalchemy.orm import Session
@@ -315,14 +315,17 @@ class MetadataEnricher:
         return None
 
     def _http_get_json(self, url: str) -> Any:
-        request = Request(
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError(f"Unsupported URL scheme for enrichment: {url}")
+        request = Request(  # noqa: S310 - scheme validated
             url,
             headers={
                 "User-Agent": self.settings.user_agent,
                 "Accept": "application/json",
             },
         )
-        with urlopen(request, timeout=10) as response:
+        with urlopen(request, timeout=10) as response:  # noqa: S310 - scheme validated
             charset = response.headers.get_content_charset() or "utf-8"
             data = response.read().decode(charset)
         return json.loads(data)

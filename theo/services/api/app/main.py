@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-
 import importlib
 import inspect
 import logging
 import os
+from contextlib import asynccontextmanager
 from functools import wraps
 from typing import Callable, Optional, cast
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -43,6 +45,7 @@ from .routes import (
 from .security import require_principal
 from .telemetry import configure_console_tracer
 from .tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
+
 GenerateLatestFn = Callable[[], bytes]
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
 generate_latest: Optional[GenerateLatestFn] = None

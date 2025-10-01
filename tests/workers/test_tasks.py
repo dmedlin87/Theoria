@@ -6,14 +6,15 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
-from sqlalchemy.orm import Session
 
 from celery.app.task import Task
+from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from theo.services.api.app.ai.rag import RAGCitation  # noqa: E402
 from theo.services.api.app.core.database import (  # noqa: E402  (import after path tweak)
     Base,
     configure_engine,
@@ -26,15 +27,12 @@ from theo.services.api.app.db.models import (  # noqa: E402
     IngestionJob,
     Passage,
 )
-
+from theo.services.api.app.models.ai import ChatMemoryEntry  # noqa: E402
 from theo.services.api.app.models.export import (  # noqa: E402
     DeliverableAsset,
     DeliverableManifest,
     DeliverablePackage,
 )
-
-from theo.services.api.app.ai.rag import RAGCitation  # noqa: E402
-from theo.services.api.app.models.ai import ChatMemoryEntry  # noqa: E402
 from theo.services.api.app.models.search import HybridSearchResult  # noqa: E402
 from theo.services.api.app.workers import tasks  # noqa: E402
 
@@ -173,6 +171,7 @@ def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
         tasks._update_job_status = original_update
         setattr(process_url_task, "retry", original_retry)
         settings.storage_root = original_storage
+        tasks.settings.storage_root = original_task_storage
 
     with Session(engine) as session:
         job_record = session.get(IngestionJob, job_id)

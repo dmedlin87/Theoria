@@ -35,7 +35,7 @@ function isLikelyUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
     return Boolean(parsed.protocol && parsed.host);
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }

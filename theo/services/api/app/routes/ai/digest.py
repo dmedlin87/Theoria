@@ -12,7 +12,6 @@ from ...analytics.topics import TopicDigest
 from ...core.database import get_session
 from ...core.settings import get_settings
 
-
 router = APIRouter()
 
 

@@ -40,7 +40,10 @@ Speaker 1: We read the prologue from John 1:1-3 and ponder its light.
 These verses echo the creation of Genesis 1:1-2 and guide our prayers.
 """
 
-SAMPLE_VTT_VARIANT = SAMPLE_VTT + "\n00:08.000 --> 00:12.000\nWe continue reflecting on abiding hope.\n"
+SAMPLE_VTT_VARIANT = (
+    SAMPLE_VTT
+    + "\n00:08.000 --> 00:12.000\nWe continue reflecting on abiding hope.\n"
+)
 
 
 def test_transcript_search_filters_by_osis_ranges() -> None:

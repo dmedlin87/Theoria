@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+import re
+import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-import logging
-import random
-import re
-import time
+from random import SystemRandom
 from typing import Any, Protocol
-import uuid
 
 import httpx
 
@@ -61,6 +61,9 @@ class AIClientSettings:
 DEFAULT_AI_CLIENT_SETTINGS = AIClientSettings()
 
 
+_RNG = SystemRandom()
+
+
 class BaseAIClient:
     """Shared utilities for provider-specific clients."""
 
@@ -95,7 +98,7 @@ class BaseAIClient:
         delay = min(delay, self._settings.backoff_max)
         if self._settings.jitter:
             spread = self._settings.jitter
-            delay *= random.uniform(1 - spread, 1 + spread)
+            delay *= _RNG.uniform(1 - spread, 1 + spread)
         return max(delay, 0.0)
 
     @staticmethod

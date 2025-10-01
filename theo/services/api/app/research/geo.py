@@ -16,7 +16,7 @@ from ..db.models import (
     GeoModernLocation,
     GeoPlaceVerse,
 )
-from ..ingest.osis import format_osis, _osis_to_readable
+from ..ingest.osis import _osis_to_readable, format_osis
 from ..models.research import (
     GeoAttribution,
     GeoLocationItem,

@@ -27,18 +27,19 @@ available, a lightweight fallback reranker is saved instead so evaluation and
 integration tests can still exercise the CLI.
 """
 
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import csv
 import json
+import logging
 import os
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
-
-import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -48,11 +49,13 @@ import joblib
 
 from ranking.minimal_reranker import MinimalReranker, train_minimal_reranker
 
+LOGGER = logging.getLogger(__name__)
+
 try:  # scikit-learn is optional in some environments (e.g. minimal CI images)
+    from sklearn.ensemble import HistGradientBoostingRegressor
     from sklearn.impute import SimpleImputer
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
-    from sklearn.ensemble import HistGradientBoostingRegressor
     HAS_SKLEARN = True
 except ModuleNotFoundError:  # pragma: no cover - exercised via subprocess in tests
     SimpleImputer = Pipeline = StandardScaler = HistGradientBoostingRegressor = None  # type: ignore[assignment]
@@ -173,7 +176,8 @@ def filter_recent_events(records: Iterable[Record], cutoff: datetime) -> List[Re
             continue
         try:
             created_dt = _parse_datetime(created_at)
-        except Exception:  # pragma: no cover - defensive programming
+        except Exception as exc:  # pragma: no cover - defensive programming
+            LOGGER.exception("Failed to parse feedback timestamp %s", created_at, exc_info=exc)
             continue
         if created_dt >= cutoff:
             filtered.append(record)

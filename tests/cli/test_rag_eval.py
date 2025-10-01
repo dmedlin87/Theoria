@@ -1,12 +1,14 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 
 import pytest
 from click.testing import CliRunner
+
 try:
     from datasets import Dataset as HFDataset
 except ImportError:  # pragma: no cover - tests can supply a stub

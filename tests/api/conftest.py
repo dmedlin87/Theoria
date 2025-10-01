@@ -1,12 +1,14 @@
 """Shared test configuration for API-level tests."""
+# ruff: noqa: E402
 from __future__ import annotations
 
 import os
+
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("THEO_API_KEYS", '["pytest-default-key"]')
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 from fastapi import Request as FastAPIRequest
@@ -17,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.main import app
 from theo.services.api.app.security import require_principal
+
 
 @pytest.fixture(autouse=True)
 def _bypass_authentication(request: pytest.FixtureRequest):

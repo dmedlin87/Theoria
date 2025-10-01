@@ -1,11 +1,12 @@
+# ruff: noqa: E402
 import json
 import sys
 from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
 
-import pythonbible as pb
 import pytest
+import pythonbible as pb
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 

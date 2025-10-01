@@ -10,7 +10,6 @@ import {
   useCurationWorkflow,
   useDevotionalWorkflow,
   useExportWorkflow,
-  useMultimediaWorkflow,
   useSermonWorkflow,
   useVerseWorkflow,
 } from "../../app/copilot/components/workflow-hooks";

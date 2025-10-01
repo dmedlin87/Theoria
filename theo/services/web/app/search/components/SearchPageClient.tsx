@@ -2,15 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout from "../../components/ErrorCallout";
 import UiModeToggle from "../../components/UiModeToggle";
@@ -112,17 +104,6 @@ const FILTER_FIELD_KEYS: Array<keyof SearchFilters> = [
   "includeDisputed",
   "preset",
 ];
-const VISUALLY_HIDDEN_STYLES: CSSProperties = {
-  border: 0,
-  clip: "rect(0 0 0 0)",
-  height: "1px",
-  margin: "-1px",
-  overflow: "hidden",
-  padding: 0,
-  position: "absolute",
-  width: "1px",
-  whiteSpace: "nowrap",
-};
 const EMPTY_FILTERS: SearchFilters = {
   query: "",
   osis: "",

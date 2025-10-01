@@ -1,7 +1,8 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,9 +12,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.core.database import get_session  # noqa: E402
+from theo.services.api.app.ingest import (
+    parsers as ingest_parsers,  # noqa: E402
+    pipeline as ingest_pipeline,  # noqa: E402
+)
 from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.ingest import parsers as ingest_parsers  # noqa: E402
-from theo.services.api.app.ingest import pipeline as ingest_pipeline  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
 
 

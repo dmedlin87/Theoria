@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

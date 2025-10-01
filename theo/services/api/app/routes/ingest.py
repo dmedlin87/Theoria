@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from uuid import uuid4
 from typing import Any, AsyncIterator, Iterator
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+
+from theo.services.cli import ingest_folder as cli_ingest
 
 from ..core.database import get_session
 from ..core.settings import get_settings
@@ -26,7 +28,6 @@ from ..models.documents import (
     UrlIngestRequest,
 )
 from ..telemetry import log_workflow_event
-from theo.services.cli import ingest_folder as cli_ingest
 
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},

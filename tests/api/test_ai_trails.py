@@ -1,9 +1,10 @@
 """Regression tests for agent trail persistence."""
+# ruff: noqa: E402
 from __future__ import annotations
 
+import sys
 from collections.abc import Generator
 from pathlib import Path
-import sys
 
 import pytest
 from sqlalchemy import create_engine

@@ -8,10 +8,15 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from ...core.settings import get_settings
 from ...core.version import get_git_sha
+
+if TYPE_CHECKING:
+    from .workflow import RAGAnswer
+else:  # pragma: no cover - used only for type checking
+    RAGAnswer = Any  # type: ignore[assignment]
 
 try:  # pragma: no cover - optional dependency guard
     import redis

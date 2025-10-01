@@ -1,9 +1,10 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
+import sys
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from contextlib import contextmanager
-import sys
 from typing import Any
 
 import jwt
@@ -17,10 +18,11 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.core.database import get_session
 from theo.services.api.app.core.settings import get_settings
 from theo.services.api.app.main import app
-from theo.services.api.app.routes import ai as ai_module
-from theo.services.api.app.routes import documents as documents_module
-from theo.services.api.app.routes import ingest as ingest_module
-
+from theo.services.api.app.routes import (
+    ai as ai_module,
+    documents as documents_module,
+    ingest as ingest_module,
+)
 
 pytestmark = pytest.mark.no_auth_override
 

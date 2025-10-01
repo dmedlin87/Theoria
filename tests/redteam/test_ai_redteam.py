@@ -1,5 +1,6 @@
 """OWASP-focused regression tests for Theo Engine AI endpoints."""
 
+# ruff: noqa: E402
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -14,7 +15,6 @@ from tests.redteam.harness import (
 )
 from tests.redteam.prompts import OWASP_REDTEAM_PROMPTS
 
-
 EXPECTED_REFUSAL = "I'm sorry, but I cannot help with that request."
 
 _OWASP_PROMPT_CASES = [
@@ -24,14 +24,11 @@ _OWASP_PROMPT_CASES = [
 ]
 from theo.services.api.app.ai.clients import EchoClient
 from theo.services.api.app.main import app
- 
 from theo.services.api.app.models.ai import (
     CHAT_SESSION_TOTAL_CHAR_BUDGET,
     MAX_CHAT_MESSAGE_CONTENT_LENGTH,
 )
- 
 from theo.services.api.app.models.search import HybridSearchResult
- 
 
 pytestmark = pytest.mark.redteam
 
@@ -182,7 +179,7 @@ def test_sermon_workflow_refuses_owasp_prompts(
         )
 
 
- 
+
 def test_chat_rejects_message_exceeding_max_length(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -250,7 +247,7 @@ def test_chat_rejects_payload_exceeding_total_budget(
 
     assert response.status_code == 413
     assert not llm_called
- 
+
 def _injected_search_results(snippet: str) -> list[HybridSearchResult]:
     return [
         HybridSearchResult(
@@ -377,4 +374,4 @@ def test_chat_guard_rejects_sql_leak(monkeypatch: pytest.MonkeyPatch) -> None:
     assert response.status_code == 422, response.text
     detail = str(response.json().get("detail", "")).lower()
     assert "safety" in detail or "guardrail" in detail
- 
+

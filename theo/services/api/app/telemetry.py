@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import Mapping
 from contextlib import contextmanager
 from time import perf_counter
-from collections.abc import Mapping
 from typing import Any, ContextManager, Iterable, Iterator, Protocol, cast
 
 
@@ -262,10 +262,6 @@ def configure_console_tracer() -> None:
     ):
         LOGGER.warning("opentelemetry-sdk is installed but missing tracing exports")
         return
-
-    assert TracerProvider is not None
-    assert SimpleSpanProcessor is not None
-    assert ConsoleSpanExporter is not None
 
     tracer_provider = TracerProvider()
     tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))

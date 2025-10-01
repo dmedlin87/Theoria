@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import heapq
-from time import perf_counter
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Iterable
 
 from opentelemetry import trace
@@ -19,7 +19,6 @@ from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from .annotations import index_annotations_by_passage, load_annotations_for_documents
 from .utils import compose_passage_meta
-
 
 _TRACER = trace.get_tracer("theo.retriever")
 

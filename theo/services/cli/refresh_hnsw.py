@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-
-import click
-
 from typing import cast
 
+import click
 from celery.app.task import Task
 
 from theo.services.api.app.workers.tasks import refresh_hnsw

@@ -4,14 +4,13 @@ import json
 from types import SimpleNamespace
 from typing import cast
 
-from sqlalchemy.orm import Session
-
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
+from theo.services.api.app.core import settings as settings_module
 from theo.services.api.app.db.models import TranscriptSegment
 from theo.services.api.app.main import app
-from theo.services.api.app.core import settings as settings_module
 
 SAMPLE_VTT = """WEBVTT
 
@@ -168,8 +167,8 @@ def test_refresh_creator_rollups_helper_handles_async_failure(
     original_async = settings.creator_verse_rollups_async_refresh
     settings.creator_verse_rollups_async_refresh = True
     try:
-        from theo.services.api.app.workers import tasks as worker_tasks
         from theo.services.api.app.ingest.pipeline import _refresh_creator_verse_rollups
+        from theo.services.api.app.workers import tasks as worker_tasks
 
         recorded: list[list[str]] = []
 

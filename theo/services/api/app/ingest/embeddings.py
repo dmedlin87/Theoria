@@ -9,6 +9,8 @@ from typing import Protocol, Sequence
 
 from opentelemetry import trace
 
+from ..core.settings import get_settings
+
 try:  # pragma: no cover - heavy dependency may be unavailable in tests
     from FlagEmbedding import FlagModel as _RuntimeFlagModel  # type: ignore
 except Exception:  # pragma: no cover - optional dependency
@@ -20,9 +22,6 @@ class _EmbeddingBackend(Protocol):
 
     def encode(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
         ...
-
-from ..core.settings import get_settings
-
 
 _TRACER = trace.get_tracer("theo.embedding")
 
@@ -77,7 +76,8 @@ class EmbeddingService:
                     self._model = _RuntimeFlagModel(self.model_name, use_fp16=False)  # type: ignore[call-arg]
                 else:
                     self._model = _FallbackEmbedder(self.dimension)
-        assert self._model is not None
+        if self._model is None:  # pragma: no cover - enforced by initialization
+            raise RuntimeError("Embedding backend initialisation failed")
         return self._model
 
     def _encode(self, texts: Sequence[str]) -> list[list[float]]:

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 import hashlib
-
-import pytest
-from fastapi.testclient import TestClient
+from pathlib import Path
 
 import joblib  # type: ignore[import]
+import pytest
+from fastapi.testclient import TestClient
 
 from theo.services.api.app.core.settings import get_settings
 from theo.services.api.app.main import app

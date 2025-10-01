@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, cast
 
 from .datasets import report_templates_dataset
-from .fallacies import fallacy_detect, FallacyHit
-from .historicity import historicity_search, HistoricityEntry
+from .fallacies import FallacyHit, fallacy_detect
+from .historicity import HistoricityEntry, historicity_search
 from .variants import variants_apparatus
 
 

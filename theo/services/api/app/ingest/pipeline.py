@@ -12,8 +12,9 @@ from urllib.request import build_opener as _urllib_build_opener
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
-from ..telemetry import instrument_workflow, set_span_attribute
 from ..db.models import Document, TranscriptSegment
+from ..telemetry import instrument_workflow, set_span_attribute
+from . import network as ingest_network
 from .embeddings import get_embedding_service
 from .exceptions import UnsupportedSourceError
 from .metadata import (
@@ -26,7 +27,6 @@ from .metadata import (
     prepare_text_chunks,
     prepare_transcript_chunks,
 )
-from . import network as ingest_network
 from .network import (
     extract_youtube_video_id,
     fetch_web_document,
@@ -48,7 +48,6 @@ from .persistence import (
     persist_transcript_document,
     refresh_creator_verse_rollups,
 )
-
 
 _resolve_host_addresses = ingest_network.resolve_host_addresses
 

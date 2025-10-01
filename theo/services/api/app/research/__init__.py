@@ -3,8 +3,10 @@
 from .commentaries import search_commentaries
 from .contradictions import search_contradictions
 from .crossrefs import fetch_cross_references
+from .dss_links import fetch_dss_links
 from .fallacies import fallacy_detect
 from .geo import lookup_geo_places, places_for_osis
+from .historicity import historicity_search
 from .morphology import fetch_morphology
 from .notes import (
     create_research_note,
@@ -16,8 +18,6 @@ from .overview import build_reliability_overview
 from .reports import report_build
 from .scripture import fetch_passage
 from .variants import variants_apparatus
-from .historicity import historicity_search
-from .dss_links import fetch_dss_links
 
 __all__ = [
     "fetch_passage",

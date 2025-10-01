@@ -1,9 +1,10 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
+import sys
 from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
-import sys
 
 import pytest
 from fastapi.testclient import TestClient

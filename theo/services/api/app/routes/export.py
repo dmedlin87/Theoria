@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import gzip
-from datetime import UTC, datetime
-
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response

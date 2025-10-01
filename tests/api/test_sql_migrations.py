@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
-import importlib
-
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
