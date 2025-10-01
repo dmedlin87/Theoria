@@ -22,7 +22,7 @@ router = APIRouter()
 
 
 _RERANKER: Reranker | None = None
-_RERANKER_PATH: str | None = None
+_RERANKER_KEY: tuple[str, str | None] | None = None
 _RERANKER_FAILED: bool = False
 _RERANKER_TOP_K = 20
 
@@ -31,9 +31,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _reset_reranker_cache() -> None:
-    global _RERANKER, _RERANKER_PATH, _RERANKER_FAILED
+    global _RERANKER, _RERANKER_KEY, _RERANKER_FAILED
     _RERANKER = None
-    _RERANKER_PATH = None
+    _RERANKER_KEY = None
     _RERANKER_FAILED = False
 
 
@@ -43,27 +43,33 @@ def reset_reranker_cache() -> None:
     _reset_reranker_cache()
 
 
-def _resolve_reranker(model_path: str | Path | None) -> Reranker | None:
-    global _RERANKER, _RERANKER_PATH, _RERANKER_FAILED
+def _resolve_reranker(
+    model_path: str | Path | None, expected_sha256: str | None
+) -> Reranker | None:
+    global _RERANKER, _RERANKER_KEY, _RERANKER_FAILED
 
     if model_path is None:
         return None
     model_str = str(model_path)
-    if _RERANKER_PATH != model_str:
+    cache_key = (model_str, expected_sha256)
+    if _RERANKER_KEY != cache_key:
         _reset_reranker_cache()
-        _RERANKER_PATH = model_str
+        _RERANKER_KEY = cache_key
     if _RERANKER_FAILED:
         return None
     if _RERANKER is None:
         try:
-            _RERANKER = load_reranker(model_str)
-        except Exception:
+            _RERANKER = load_reranker(
+                model_str, expected_sha256=expected_sha256
+            )
+        except Exception as exc:
             if not _RERANKER_FAILED:
                 LOGGER.exception(
                     "search.reranker_load_failed",
                     extra={
                         "event": "search.reranker_load_failed",
                         "model_path": model_str,
+                        "error": str(exc),
                     },
                 )
             _RERANKER_FAILED = True
@@ -112,7 +118,9 @@ def search(
 
     settings = get_settings()
     if settings.reranker_enabled and settings.reranker_model_path:
-        reranker = _resolve_reranker(settings.reranker_model_path)
+        reranker = _resolve_reranker(
+            settings.reranker_model_path, settings.reranker_model_sha256
+        )
         if reranker is not None:
             try:
                 top_n = min(len(results), _RERANKER_TOP_K)

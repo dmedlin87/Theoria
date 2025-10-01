@@ -6,9 +6,10 @@ import base64
 import hashlib
 from functools import lru_cache
 from pathlib import Path
+import re
 
 from cryptography.fernet import Fernet
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +40,10 @@ class Settings(BaseSettings):
     embedding_dim: int = Field(default=1024)
     reranker_enabled: bool = Field(default=False)
     reranker_model_path: Path | None = Field(default=None)
+    reranker_model_sha256: str | None = Field(
+        default=None,
+        description="Expected SHA256 digest for the configured reranker model",
+    )
     max_chunk_tokens: int = Field(default=900)
     doc_max_pages: int = Field(default=5000)
     transcript_max_window: float = Field(default=40.0)
@@ -201,6 +206,43 @@ class Settings(BaseSettings):
     @classmethod
     def _parse_ingest_collections(cls, value: object) -> list[str]:
         return cls._parse_string_collection(value)
+
+    @model_validator(mode="after")
+    def _validate_reranker_configuration(self) -> "Settings":
+        if self.reranker_model_path is None:
+            if self.reranker_model_sha256:
+                raise ValueError(
+                    "reranker_model_sha256 requires reranker_model_path to be set"
+                )
+            return self
+
+        allowed_root = (self.storage_root / "rerankers").resolve()
+        resolved_path = self.reranker_model_path
+        if not resolved_path.is_absolute():
+            resolved_path = (allowed_root / resolved_path).resolve()
+        else:
+            resolved_path = resolved_path.resolve()
+
+        if not resolved_path.is_relative_to(allowed_root):
+            raise ValueError(
+                "reranker_model_path must reside within the rerankers directory"
+            )
+
+        digest = self.reranker_model_sha256
+        if not digest:
+            raise ValueError(
+                "reranker_model_sha256 is required when reranker_model_path is set"
+            )
+
+        normalized_digest = digest.lower()
+        if re.fullmatch(r"[0-9a-f]{64}", normalized_digest) is None:
+            raise ValueError(
+                "reranker_model_sha256 must be a 64 character hexadecimal digest"
+            )
+
+        self.reranker_model_path = resolved_path
+        self.reranker_model_sha256 = normalized_digest
+        return self
     contradictions_enabled: bool = Field(
         default=True, description="Toggle contradiction search endpoints"
     )
