@@ -16,7 +16,7 @@ from ..db.models import Document, Passage
 from ..db.types import VectorType
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import expand_osis_reference, osis_intersects
-from ..models.search import HybridSearchRequest, HybridSearchResult
+from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from .annotations import index_annotations_by_passage, load_annotations_for_documents
 from .utils import compose_passage_meta
 
@@ -154,6 +154,44 @@ def _passes_author_filter(document: Document, author: str | None) -> bool:
     return author in document.authors
 
 
+def _normalise_filter_value(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    return normalized.casefold()
+
+
+def _matches_tradition(document: Document, filter_value: str | None) -> bool:
+    target = _normalise_filter_value(filter_value)
+    if target is None:
+        return True
+    candidate = _normalise_filter_value(document.theological_tradition)
+    return candidate == target
+
+
+def _matches_topic_domain(document: Document, filter_value: str | None) -> bool:
+    target = _normalise_filter_value(filter_value)
+    if target is None:
+        return True
+    domains = document.topic_domains or []
+    for domain in domains:
+        if _normalise_filter_value(domain) == target:
+            return True
+    return False
+
+
+def _passes_guardrail_filters(
+    document: Document, filters: HybridSearchFilters
+) -> bool:
+    if not _matches_tradition(document, filters.theological_tradition):
+        return False
+    if not _matches_topic_domain(document, filters.topic_domain):
+        return False
+    return True
+
+
 def _tei_terms(passage: Passage) -> list[str]:
     meta = passage.meta or {}
     if not isinstance(meta, dict):
@@ -234,6 +272,8 @@ def _fallback_search(
         counter = 0
         for passage, document in rows:
             if not _passes_author_filter(document, request.filters.author):
+                continue
+            if not _passes_guardrail_filters(document, request.filters):
                 continue
 
             annotation_notes = annotations_by_passage.get(passage.id, [])
@@ -358,6 +398,8 @@ def _postgres_hybrid_search(
                 document: Document = row[1]
                 if not _passes_author_filter(document, request.filters.author):
                     continue
+                if not _passes_guardrail_filters(document, request.filters):
+                    continue
                 if request.osis and not (
                     passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)
                 ):
@@ -389,6 +431,8 @@ def _postgres_hybrid_search(
                 passage: Passage = row[0]
                 document: Document = row[1]
                 if not _passes_author_filter(document, request.filters.author):
+                    continue
+                if not _passes_guardrail_filters(document, request.filters):
                     continue
                 if request.osis and not (
                     passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)
@@ -422,6 +466,8 @@ def _postgres_hybrid_search(
             for passage, document in session.execute(tei_stmt):
                 if not _passes_author_filter(document, request.filters.author):
                     continue
+                if not _passes_guardrail_filters(document, request.filters):
+                    continue
                 if request.osis and not (
                     passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)
                 ):
@@ -438,6 +484,8 @@ def _postgres_hybrid_search(
             osis_stmt = base_stmt.where(Passage.osis_ref.isnot(None)).limit(limit)
             for passage, document in session.execute(osis_stmt):
                 if not _passes_author_filter(document, request.filters.author):
+                    continue
+                if not _passes_guardrail_filters(document, request.filters):
                     continue
                 if not (
                     passage.osis_ref and osis_intersects(passage.osis_ref, request.osis)
