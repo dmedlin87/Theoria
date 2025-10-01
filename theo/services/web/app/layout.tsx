@@ -1,12 +1,6 @@
-import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 
-import {
-  DEFAULT_MODE_ID,
-  MODE_COOKIE_KEY,
-  ResearchModeId,
-  isResearchModeId,
-} from "./mode-config";
+import { DEFAULT_MODE_ID } from "./mode-config";
 import { ModeProvider, ModeSwitcher } from "./mode-context";
 import "./theme.css";
 import "./globals.css";
@@ -34,11 +28,7 @@ const adminLinks: NavItem[] =
     : [];
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const cookieStore = cookies();
-  const initialModeCookie = cookieStore.get(MODE_COOKIE_KEY)?.value;
-  const initialMode: ResearchModeId = isResearchModeId(initialModeCookie)
-    ? initialModeCookie
-    : DEFAULT_MODE_ID;
+  const initialMode = DEFAULT_MODE_ID;
   const enableUiV2 = process.env.NEXT_PUBLIC_ENABLE_UI_V2 === "true";
   const navSections: AppShellNavSection[] = [
     {
