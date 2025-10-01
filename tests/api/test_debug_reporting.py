@@ -47,11 +47,13 @@ def _make_request(body: bytes) -> Request:
 
 def test_build_debug_report_filters_sensitive_data(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("THEO_VISIBLE", "1")
-    monkeypatch.setenv("SECRET_KEY", "hidden")
+    monkeypatch.setenv("THEO_PUBLIC_ENDPOINT", "https://example.invalid")
+    monkeypatch.setenv("THEO_SECRET_KEY", "hidden")
+    monkeypatch.setenv("THEO_ACCESS_TOKEN", "token")
 
     # Normalise the environment so we only assert on the keys we control.
     for key in list(os.environ):
-        if key.startswith("THEO_") and key not in {"THEO_VISIBLE"}:
+        if key.startswith("THEO_") and key not in {"THEO_VISIBLE", "THEO_PUBLIC_ENDPOINT"}:
             monkeypatch.delenv(key, raising=False)
     body = b"{\"password\": \"secret\"}"
     request = _make_request(body)
@@ -66,12 +68,19 @@ def test_build_debug_report_filters_sensitive_data(monkeypatch: pytest.MonkeyPat
 
     environment = payload["environment"]
     assert environment["THEO_VISIBLE"] == "1"
-    assert "SECRET_KEY" not in environment
+    assert environment["THEO_PUBLIC_ENDPOINT"] == "https://example.invalid"
+    assert "THEO_SECRET_KEY" not in environment
+    assert "THEO_ACCESS_TOKEN" not in environment
     assert payload["error"]["type"] == "ValueError"
     assert "ValueError: boom" in "".join(payload["error"]["stacktrace"])
 
 
-def test_error_reporting_middleware_emits_report(caplog: pytest.LogCaptureFixture) -> None:
+def test_error_reporting_middleware_emits_report(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv("THEO_VISIBLE", "1")
+    monkeypatch.setenv("THEO_SECRET_KEY", "hidden")
+
     app = FastAPI()
     app.add_middleware(
         ErrorReportingMiddleware,
@@ -98,6 +107,8 @@ def test_error_reporting_middleware_emits_report(caplog: pytest.LogCaptureFixtur
     logged_report = debug_records[0].__dict__["debug_report"]
     assert logged_report["context"]["feature"] == "test"
     assert logged_report["error"]["message"] == "kaboom"
+    assert logged_report["environment"]["THEO_VISIBLE"] == "1"
+    assert "THEO_SECRET_KEY" not in logged_report["environment"]
 
 
 def test_debug_report_includes_trace_id(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
