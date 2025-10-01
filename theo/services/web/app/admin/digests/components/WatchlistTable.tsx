@@ -134,6 +134,17 @@ export default function WatchlistTable({
                         }
                       />
                     </label>
+                    <label>
+                      OSIS references
+                      <input
+                        value={toCommaList(watchlist.filters?.osis)}
+                        onChange={(event) =>
+                          onEdit(watchlist.id, {
+                            filters: { ...watchlist.filters, osis: fromCommaList(event.target.value) },
+                          })
+                        }
+                      />
+                    </label>
                   </div>
                 </td>
                 <td>

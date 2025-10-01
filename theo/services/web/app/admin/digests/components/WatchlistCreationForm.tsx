@@ -5,12 +5,14 @@ type WatchlistCreationFormProps = {
   topics: string;
   keywords: string;
   authors: string;
+  osis: string;
   onNameChange: (value: string) => void;
   onCadenceChange: (value: string) => void;
   onDeliveryChannelsChange: (value: string) => void;
   onTopicsChange: (value: string) => void;
   onKeywordsChange: (value: string) => void;
   onAuthorsChange: (value: string) => void;
+  onOsisChange: (value: string) => void;
   onSubmit: () => void;
   isCreating: boolean;
   error: string | null;
@@ -23,12 +25,14 @@ export default function WatchlistCreationForm({
   topics,
   keywords,
   authors,
+  osis,
   onNameChange,
   onCadenceChange,
   onDeliveryChannelsChange,
   onTopicsChange,
   onKeywordsChange,
   onAuthorsChange,
+  onOsisChange,
   onSubmit,
   isCreating,
   error,
@@ -74,6 +78,10 @@ export default function WatchlistCreationForm({
       <label>
         Authors (comma separated)
         <input value={authors} onChange={(event) => onAuthorsChange(event.target.value)} />
+      </label>
+      <label>
+        OSIS references (comma separated)
+        <input value={osis} onChange={(event) => onOsisChange(event.target.value)} />
       </label>
       {error ? (
         <p role="alert" className="error">

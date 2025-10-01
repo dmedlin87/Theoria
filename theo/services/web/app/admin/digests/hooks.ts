@@ -169,6 +169,9 @@ export function useWatchlistCrud(client?: TheoApiClient): WatchlistCrudState {
       if (buildCommaList(currentFilters.authors ?? null) !== buildCommaList(originalFilters.authors ?? null)) {
         filters.authors = currentFilters.authors ?? [];
       }
+      if (buildCommaList(currentFilters.osis ?? null) !== buildCommaList(originalFilters.osis ?? null)) {
+        filters.osis = currentFilters.osis ?? [];
+      }
       if (Object.keys(filters).length > 0) {
         payload.filters = filters;
       }

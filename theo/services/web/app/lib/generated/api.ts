@@ -41,6 +41,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ingest/simple": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Simple Ingest */
+        post: operations["simple_ingest_ingest_simple_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ingest/transcript": {
         parameters: {
             query?: never;
@@ -189,6 +206,26 @@ export interface paths {
          * @description Queue a background job that generates the topical activity digest.
          */
         post: operations["enqueue_topic_digest_job_jobs_topic_digest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/validate_citations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue Citation Validation Job
+         * @description Queue a background job to validate cached citation integrity.
+         */
+        post: operations["enqueue_citation_validation_job_jobs_validate_citations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -703,6 +740,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/research/commentaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Commentaries */
+        get: operations["list_commentaries_research_commentaries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/research/geo/search": {
         parameters: {
             query?: never;
@@ -856,6 +910,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/analytics/telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest Client Telemetry
+         * @description Accept batched telemetry measurements emitted by the client.
+         */
+        post: operations["ingest_client_telemetry_analytics_telemetry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analytics/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest Feedback Event
+         * @description Persist structured user feedback events for downstream analysis.
+         */
+        post: operations["ingest_feedback_event_analytics_feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ai/features": {
         parameters: {
             query?: never;
@@ -960,6 +1054,23 @@ export interface paths {
         put?: never;
         /** Chat Turn */
         post: operations["chat_turn_ai_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/chat/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Chat Session */
+        get: operations["get_chat_session_ai_chat__session_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1393,6 +1504,24 @@ export interface components {
             /** Frontmatter */
             frontmatter?: string | null;
         };
+        /** ChatMemoryEntry */
+        ChatMemoryEntry: {
+            /** Question */
+            question: string;
+            /** Answer */
+            answer: string;
+            /** Answer Summary */
+            answer_summary?: string | null;
+            /** Citations */
+            citations?: components["schemas"]["RAGCitation-Output"][];
+            /** Document Ids */
+            document_ids?: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** ChatSessionMessage */
         ChatSessionMessage: {
             /**
@@ -1402,6 +1531,14 @@ export interface components {
             role: "user" | "assistant" | "system";
             /** Content */
             content: string;
+        };
+        /** ChatSessionPreferences */
+        ChatSessionPreferences: {
+            /** Mode */
+            mode?: string | null;
+            default_filters?: components["schemas"]["HybridSearchFilters"] | null;
+            /** Frequently Opened Panels */
+            frequently_opened_panels?: string[];
         };
         /** ChatSessionRequest */
         ChatSessionRequest: {
@@ -1415,6 +1552,11 @@ export interface components {
             osis?: string | null;
             filters?: components["schemas"]["HybridSearchFilters"];
             recorder_metadata?: components["schemas"]["RecorderMetadata"] | null;
+            /** Stance */
+            stance?: string | null;
+            /** Mode Id */
+            mode_id?: string | null;
+            preferences?: components["schemas"]["ChatSessionPreferences"] | null;
         };
         /** ChatSessionResponse */
         ChatSessionResponse: {
@@ -1422,6 +1564,37 @@ export interface components {
             session_id: string;
             message: components["schemas"]["ChatSessionMessage"];
             answer: components["schemas"]["RAGAnswer"];
+            /** Intent Tags */
+            intent_tags?: components["schemas"]["IntentTagPayload"][] | null;
+        };
+        /** ChatSessionState */
+        ChatSessionState: {
+            /** Session Id */
+            session_id: string;
+            /** Stance */
+            stance?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Document Ids */
+            document_ids?: string[];
+            preferences?: components["schemas"]["ChatSessionPreferences"] | null;
+            /** Memory */
+            memory?: components["schemas"]["ChatMemoryEntry"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Last Interaction At
+             * Format: date-time
+             */
+            last_interaction_at: string;
         };
         /**
          * CitationExportRequest
@@ -1429,7 +1602,7 @@ export interface components {
          */
         CitationExportRequest: {
             /** Citations */
-            citations: components["schemas"]["RAGCitation"][];
+            citations: components["schemas"]["RAGCitation-Input"][];
         };
         /**
          * CitationExportResponse
@@ -1450,6 +1623,14 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** CitationValidationJobRequest */
+        CitationValidationJobRequest: {
+            /**
+             * Limit
+             * @default 25
+             */
+            limit: number;
+        };
         /** CollaborationRequest */
         CollaborationRequest: {
             /** Thread */
@@ -1460,6 +1641,35 @@ export interface components {
             viewpoints: string[];
             /** Model */
             model?: string | null;
+        };
+        /** CommentaryExcerptItem */
+        CommentaryExcerptItem: {
+            /** Id */
+            id: string;
+            /** Osis */
+            osis: string;
+            /** Title */
+            title?: string | null;
+            /** Excerpt */
+            excerpt: string;
+            /** Source */
+            source?: string | null;
+            /** Perspective */
+            perspective?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+        };
+        /** CommentarySearchResponse */
+        CommentarySearchResponse: {
+            /** Osis */
+            osis: string;
+            /** Items */
+            items?: components["schemas"]["CommentaryExcerptItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
         };
         /** ComparativeAnalysisRequest */
         ComparativeAnalysisRequest: {
@@ -1489,6 +1699,8 @@ export interface components {
              * @default 1
              */
             weight: number;
+            /** Perspective */
+            perspective?: string | null;
         };
         /** ContradictionSearchResponse */
         ContradictionSearchResponse: {
@@ -1622,23 +1834,6 @@ export interface components {
             total: number;
         };
         /**
-         * DeliverableAsset
-         * @description Single file artifact returned by a deliverable export.
-         */
-        DeliverableAsset: {
-            /**
-             * Format
-             * @enum {string}
-             */
-            format: "markdown" | "ndjson" | "csv" | "pdf";
-            /** Filename */
-            filename: string;
-            /** Media Type */
-            media_type: string;
-            /** Content */
-            content: string;
-        };
-        /**
          * DeliverableDownload
          * @description Metadata describing a persisted deliverable artifact.
          */
@@ -1749,10 +1944,57 @@ export interface components {
         };
         /** DocumentAnnotationCreate */
         DocumentAnnotationCreate: {
-            /** Type */
-            type?: "claim" | "evidence" | "question" | "note" | null;
-            /** Text */
+            /**
+             * Type
+             * @description Structured annotation type
+             */
+            type?: ("claim" | "evidence" | "question" | "note") | null;
+            /**
+             * Text
+             * @description Primary text body for the annotation
+             */
             text?: string | null;
+            /**
+             * Stance
+             * @description Optional stance label for the annotation
+             */
+            stance?: string | null;
+            /**
+             * Passage Ids
+             * @description Passage identifiers referenced by this annotation
+             */
+            passage_ids?: string[];
+            /**
+             * Group Id
+             * @description Shared identifier to link related annotations
+             */
+            group_id?: string | null;
+            /**
+             * Metadata
+             * @description Arbitrary structured metadata for the annotation
+             */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Body
+             * @description Legacy free-form annotation text (alias for text)
+             */
+            body?: string | null;
+        };
+        /** DocumentAnnotationResponse */
+        DocumentAnnotationResponse: {
+            /** Id */
+            id: string;
+            /** Document Id */
+            document_id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "claim" | "evidence" | "question" | "note";
+            /** Body */
+            body: string;
             /** Stance */
             stance?: string | null;
             /** Passage Ids */
@@ -1763,34 +2005,14 @@ export interface components {
             metadata?: {
                 [key: string]: unknown;
             } | null;
-            /** Body */
-            body?: string | null;
-        };
-        /** DocumentAnnotationResponse */
-        DocumentAnnotationResponse: {
-            /** Id */
-            id: string;
-            /** Document Id */
-            document_id: string;
-            /** Type */
-            type: "claim" | "evidence" | "question" | "note";
-            /** Body */
-            body: string;
-            /** Stance */
-            stance?: string | null;
-            /** Passage Ids */
-            passage_ids: string[];
-            /** Group Id */
-            group_id?: string | null;
-            /** Metadata */
-            metadata?: {
-                [key: string]: unknown;
-            } | null;
             /** Raw */
             raw?: {
                 [key: string]: unknown;
             } | null;
-            /** Legacy */
+            /**
+             * Legacy
+             * @default false
+             */
             legacy: boolean;
             /**
              * Created At
@@ -2063,6 +2285,57 @@ export interface components {
             /** Matches */
             matches?: string[];
         };
+        /**
+         * FeedbackEventPayload
+         * @description Request body describing a user feedback interaction.
+         */
+        FeedbackEventPayload: {
+            /**
+             * Action
+             * @description Categorical label describing the feedback interaction.
+             */
+            action: string;
+            /**
+             * User Id
+             * @description Identifier of the user submitting the feedback, if available.
+             */
+            user_id?: string | null;
+            /**
+             * Chat Session Id
+             * @description Associated conversational session identifier, when relevant.
+             */
+            chat_session_id?: string | null;
+            /**
+             * Query
+             * @description Original user query or prompt that produced this feedback event.
+             */
+            query?: string | null;
+            /**
+             * Document Id
+             * @description Identifier of the cited document involved in the interaction.
+             */
+            document_id?: string | null;
+            /**
+             * Passage Id
+             * @description Identifier of the cited passage involved in the interaction.
+             */
+            passage_id?: string | null;
+            /**
+             * Rank
+             * @description Zero-based rank of the cited item within the retrieval results.
+             */
+            rank?: number | null;
+            /**
+             * Score
+             * @description Retrieval score for the cited item, if available.
+             */
+            score?: number | null;
+            /**
+             * Confidence
+             * @description System confidence assigned to the citation, when supplied.
+             */
+            confidence?: number | null;
+        };
         /** GeoAttribution */
         GeoAttribution: {
             /** Source */
@@ -2274,14 +2547,6 @@ export interface components {
              * @description Optional retrieval score
              */
             score?: number | null;
-            /** Retriever Score */
-            retriever_score?: number | null;
-            /** Retriever Rank */
-            retriever_rank?: number | null;
-            /** Reranker Score */
-            reranker_score?: number | null;
-            /** Reranker Rank */
-            reranker_rank?: number | null;
             /** Meta */
             meta?: {
                 [key: string]: unknown;
@@ -2298,6 +2563,21 @@ export interface components {
             document_score?: number | null;
             /** Document Rank */
             document_rank?: number | null;
+            /** Lexical Score */
+            lexical_score?: number | null;
+            /** Vector Score */
+            vector_score?: number | null;
+            /** Osis Distance */
+            osis_distance?: number | null;
+        };
+        /** IntentTagPayload */
+        IntentTagPayload: {
+            /** Intent */
+            intent: string;
+            /** Stance */
+            stance?: string | null;
+            /** Confidence */
+            confidence?: number | null;
         };
         /** JobEnqueueRequest */
         JobEnqueueRequest: {
@@ -2579,7 +2859,7 @@ export interface components {
             /** Summary */
             summary: string;
             /** Citations */
-            citations: components["schemas"]["RAGCitation"][];
+            citations: components["schemas"]["RAGCitation-Output"][];
             /** Model Name */
             model_name?: string | null;
             /** Model Output */
@@ -2590,7 +2870,28 @@ export interface components {
             } | null;
         };
         /** RAGCitation */
-        RAGCitation: {
+        "RAGCitation-Input": {
+            /** Index */
+            index: number;
+            /** Osis */
+            osis: string;
+            /** Anchor */
+            anchor: string;
+            /** Passage Id */
+            passage_id: string;
+            /** Document Id */
+            document_id: string;
+            /** Document Title */
+            document_title?: string | null;
+            /** Snippet */
+            snippet: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Raw Snippet */
+            raw_snippet?: string | null;
+        };
+        /** RAGCitation */
+        "RAGCitation-Output": {
             /** Index */
             index: number;
             /** Osis */
@@ -2821,10 +3122,81 @@ export interface components {
             model?: string | null;
             recorder_metadata?: components["schemas"]["RecorderMetadata"] | null;
         };
+        /** SimpleIngestRequest */
+        SimpleIngestRequest: {
+            /** Sources */
+            sources: string[];
+            /**
+             * Mode
+             * @default api
+             * @enum {string}
+             */
+            mode: "api" | "worker";
+            /**
+             * Batch Size
+             * @default 10
+             */
+            batch_size: number;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
+            /** Post Batch */
+            post_batch?: string[] | null;
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+        };
         /** SummaryJobRequest */
         SummaryJobRequest: {
             /** Document Id */
             document_id: string;
+        };
+        /**
+         * TelemetryBatch
+         * @description Envelope for batching client telemetry events.
+         */
+        TelemetryBatch: {
+            /**
+             * Events
+             * @description Ordered list of telemetry events captured on the client side.
+             */
+            events?: components["schemas"]["TelemetryEvent"][];
+            /**
+             * Page
+             * @description Logical page or surface that generated this telemetry batch.
+             */
+            page?: string | null;
+        };
+        /**
+         * TelemetryEvent
+         * @description Client-side performance measurement emitted from the web app.
+         */
+        TelemetryEvent: {
+            /**
+             * Event
+             * @description Event identifier, e.g. copilot.retrieval.
+             */
+            event: string;
+            /**
+             * Duration Ms
+             * @description Measured duration of the event in milliseconds.
+             */
+            duration_ms: number;
+            /**
+             * Workflow
+             * @description Optional workflow or feature identifier associated with the metric.
+             */
+            workflow?: string | null;
+            /**
+             * Metadata
+             * @description Additional context key-value pairs supplied by the client.
+             */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TopicCluster */
         TopicCluster: {
@@ -3120,8 +3492,6 @@ export interface components {
          * @description Payload required to create a new watchlist.
          */
         WatchlistCreateRequest: {
-            /** User Id */
-            user_id: string;
             /** Name */
             name: string;
             filters?: components["schemas"]["WatchlistFilters"] | null;
@@ -3335,6 +3705,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentIngestResponse"];
+                };
+            };
+            /** @description Invalid ingest request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simple_ingest_ingest_simple_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimpleIngestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Invalid ingest request */
@@ -3660,6 +4080,42 @@ export interface operations {
             };
         };
     };
+    enqueue_citation_validation_job_jobs_validate_citations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CitationValidationJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     enqueue_job_jobs_enqueue_post: {
         parameters: {
             query?: never;
@@ -3709,6 +4165,10 @@ export interface operations {
                 author?: string | null;
                 /** @description Restrict to a source type */
                 source_type?: string | null;
+                /** @description Restrict to documents aligned with a theological tradition */
+                theological_tradition?: string | null;
+                /** @description Restrict to documents tagged with a topic domain */
+                topic_domain?: string | null;
                 k?: number;
             };
             header?: {
@@ -4885,6 +5345,8 @@ export interface operations {
                 osis: string[];
                 /** @description Optional topic tag filter */
                 topic?: string | null;
+                /** @description Filter by interpretive perspective (apologetic, skeptical, neutral) */
+                perspective?: string[] | null;
                 limit?: number;
             };
             header?: {
@@ -4903,6 +5365,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContradictionSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_commentaries_research_commentaries_get: {
+        parameters: {
+            query: {
+                /** @description OSIS reference or list of references */
+                osis: string[];
+                /** @description Filter by interpretive perspective (apologetic, skeptical, neutral) */
+                perspective?: string[] | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentarySearchResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5246,6 +5746,82 @@ export interface operations {
             };
         };
     };
+    ingest_client_telemetry_analytics_telemetry_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelemetryBatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingest_feedback_event_analytics_feedback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackEventPayload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_ai_features_ai_features_get: {
         parameters: {
             query?: never;
@@ -5568,6 +6144,47 @@ export interface operations {
             };
         };
     };
+    get_chat_session_ai_chat__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionState"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     verse_copilot_ai_verse_post: {
         parameters: {
             query?: never;
@@ -5703,20 +6320,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ExportDeliverableResponse"];
                 };
-            };
-            /** @description Invalid request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Resource not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -5999,10 +6602,7 @@ export interface operations {
     };
     list_user_watchlists_ai_digest_watchlists_get: {
         parameters: {
-            query: {
-                /** @description Owning user identifier */
-                user_id: string;
-            };
+            query?: never;
             header?: {
                 authorization?: string | null;
                 "X-API-Key"?: string | null;

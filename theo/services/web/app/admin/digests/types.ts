@@ -1,6 +1,5 @@
 export type TopicCluster = {
   topic: string;
-  summary: string | null;
   new_documents: number;
   total_documents: number;
   document_ids: string[];
@@ -13,6 +12,7 @@ export type TopicDigest = {
 };
 
 export type WatchlistFilters = {
+  osis?: string[] | null;
   keywords?: string[] | null;
   authors?: string[] | null;
   topics?: string[] | null;
