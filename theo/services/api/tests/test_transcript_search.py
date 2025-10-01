@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from theo.services.api.app.core.database import Base, get_engine
 from theo.services.api.app.db.seeds import seed_reference_data
+from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 from theo.services.api.app.routes import ingest, transcripts
 
 
@@ -16,6 +17,7 @@ from theo.services.api.app.routes import ingest, transcripts
 async def _lifespan(_: FastAPI):
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
+    run_sql_migrations(engine)
     with Session(engine) as session:
         seed_reference_data(session)
     yield

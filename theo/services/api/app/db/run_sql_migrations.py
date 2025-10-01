@@ -62,7 +62,8 @@ def run_sql_migrations(
         migrations_path = MIGRATIONS_PATH
 
     dialect_name = getattr(engine.dialect, "name", None)
-    if not force and dialect_name != "postgresql":
+    supported_dialects = {"postgresql", "sqlite"}
+    if not force and dialect_name not in supported_dialects:
         logger.debug(
             "Skipping SQL migrations for unsupported dialect: %s", dialect_name
         )
@@ -96,7 +97,7 @@ def run_sql_migrations(
                 continue
 
             logger.info("Applying SQL migration: %s", migration_name)
-            if _requires_autocommit(sql):
+            if dialect_name == "postgresql" and _requires_autocommit(sql):
                 session.flush()
                 session.commit()
                 _execute_autocommit(engine, sql)
