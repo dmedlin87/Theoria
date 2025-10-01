@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -15,8 +16,8 @@ from ..models.search import (
     HybridSearchRequest,
     HybridSearchResponse,
 )
-from ..retriever.hybrid import hybrid_search
 from ..ranking.re_ranker import Reranker, load_reranker
+from ..retriever.hybrid import hybrid_search
 
 router = APIRouter()
 
@@ -134,7 +135,7 @@ def search(
                         or str(settings.reranker_model_path)
                     )
                     results = ordered
-            except Exception:
-                pass
+            except Exception as exc:
+                LOGGER.warning("Reranker failed; returning base search order", exc_info=exc)
 
     return HybridSearchResponse(query=q, osis=osis, results=results)

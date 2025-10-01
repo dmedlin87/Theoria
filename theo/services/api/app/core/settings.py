@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import re
 from functools import lru_cache
 from pathlib import Path
-import re
 
 from cryptography.fernet import Fernet
 from pydantic import AliasChoices, Field, field_validator, model_validator
@@ -173,7 +173,7 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return value
         raise ValueError("Invalid JWT algorithm configuration")
-    
+
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> list[str]:

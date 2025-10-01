@@ -15,22 +15,29 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...analytics.telemetry import record_feedback_event
+from ...core.version import get_git_sha
 from ...db.models import Document, Passage
 from ...export.formatters import SCHEMA_VERSION, generate_export_id
 from ...models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
-from ...models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
+from ...models.search import (
+    HybridSearchFilters,
+    HybridSearchRequest,
+    HybridSearchResult,
+)
 from ...retriever.hybrid import hybrid_search
-from ...retriever.utils import compose_passage_meta
 from ...telemetry import (
     RAG_CACHE_EVENTS,
     instrument_workflow,
     log_workflow_event,
     set_span_attribute,
 )
-from .cache import RAGCache
 from ..clients import GenerationError
+from ..registry import LLMRegistry, get_llm_registry
+from ..router import get_router
+from .cache import RAGCache
 from .guardrails import (
     GuardrailError,
+    _format_anchor,
     apply_guardrail_profile as _guardrails_apply_guardrail_profile,
     build_citations as _guardrails_build_citations,
     build_guardrail_result as _guardrails_build_guardrail_result,
@@ -55,8 +62,6 @@ from .prompts import (
     sanitise_json_structure as _prompts_sanitize_json_structure,
     scrub_adversarial_language as _prompts_scrub_adversarial_language,
 )
-from ..registry import LLMModel, LLMRegistry, get_llm_registry
-from ..router import get_router
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from ..trails import TrailRecorder
@@ -201,14 +206,11 @@ class GuardedAnswerPipeline:
 
         retrieval_digest = _build_retrieval_digest(ordered_results)
         last_error: GenerationError | None = None
-        selected_model: LLMModel | None = None
-
         cache_key = None
         cache_key_suffix = None
         cache_status = "skipped"
 
         for candidate in candidates:
-            selected_model = candidate
             cache_event_logged = False
             cache_key = _build_cache_key(
                 user_id=user_id,
@@ -500,6 +502,13 @@ def _scrub_adversarial_language(value: str | None) -> str | None:
 
 def _sanitize_json_structure(payload: Any) -> Any:
     return _prompts_sanitize_json_structure(payload)
+
+
+def _sanitize_markdown_field(value: object | None) -> str:
+    if value is None:
+        return ""
+    text = str(value).replace("\r", " ").replace("\n", " ")
+    return text.strip()
 
 
 def _extract_topic_domains(meta: Mapping[str, Any] | None) -> set[str]:

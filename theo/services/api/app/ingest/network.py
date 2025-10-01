@@ -9,7 +9,7 @@ from ipaddress import ip_address, ip_network
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
+from urllib.parse import parse_qs, urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .exceptions import UnsupportedSourceError
@@ -184,7 +184,9 @@ def fetch_web_document(
     opener = opener_factory(redirect_handler)
     opener.addheaders = [("User-Agent", settings.user_agent)]
 
-    request = Request(url, headers={"User-Agent": settings.user_agent})
+    request = Request(  # noqa: S310 - outbound fetch constrained by allowlist
+        url, headers={"User-Agent": settings.user_agent}
+    )
 
     try:
         response = opener.open(request, timeout=timeout)

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..db.models import TranscriptSegment, Video
 from ..ingest.osis import expand_osis_reference
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _matches_osis(segment: TranscriptSegment, osis: str) -> bool:
@@ -20,7 +24,8 @@ def _matches_osis(segment: TranscriptSegment, osis: str) -> bool:
 
     try:
         target_ids = expand_osis_reference(osis)
-    except Exception:  # pragma: no cover - defensive against malformed input
+    except Exception as exc:  # pragma: no cover - defensive against malformed input
+        LOGGER.warning("Failed to expand OSIS reference", exc_info=exc)
         return False
     if not target_ids:
         return False
@@ -29,7 +34,8 @@ def _matches_osis(segment: TranscriptSegment, osis: str) -> bool:
         try:
             if expand_osis_reference(reference) & target_ids:
                 return True
-        except Exception:  # pragma: no cover - defensive against malformed data
+        except Exception as exc:  # pragma: no cover - defensive against malformed data
+            LOGGER.debug("Skipping malformed OSIS reference", exc_info=exc)
             continue
     return False
 

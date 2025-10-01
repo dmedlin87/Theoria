@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-
-import threading
-import time
 from typing import Any, Callable, Iterator
-
 from uuid import uuid4
 
 import pytest
@@ -19,11 +17,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.core.database import Base, get_engine
-from theo.services.api.app.db.seeds import seed_reference_data
+from theo.services.api.app.db.models import IngestionJob
 from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
-from theo.services.api.app.db.models import IngestionJob
+from theo.services.api.app.db.seeds import seed_reference_data
 from theo.services.api.app.routes import ingest, jobs as jobs_module
-from theo.services.api.app.db.models import IngestionJob
 
 
 @asynccontextmanager
@@ -212,8 +209,6 @@ def test_enqueue_collapses_concurrent_retries(
 
     first = client.post("/jobs/enqueue", json=payload)
     assert first.status_code == 202, first.text
-    first_payload = first.json()
-
     instrumented_send_task.set_delay(0.05)
     instrumented_send_task.fail_after(1, lambda: RuntimeError("should not re-dispatch"))
 

@@ -315,14 +315,14 @@ class MetadataEnricher:
         return None
 
     def _http_get_json(self, url: str) -> Any:
-        request = Request(
+        request = Request(  # noqa: S310 - external HTTP request with validated provider URL
             url,
             headers={
                 "User-Agent": self.settings.user_agent,
                 "Accept": "application/json",
             },
         )
-        with urlopen(request, timeout=10) as response:
+        with urlopen(request, timeout=10) as response:  # noqa: S310 - controlled outbound fetch
             charset = response.headers.get_content_charset() or "utf-8"
             data = response.read().decode(charset)
         return json.loads(data)

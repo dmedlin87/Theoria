@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from functools import lru_cache
 
@@ -10,9 +11,13 @@ from functools import lru_cache
 def get_git_sha() -> str | None:
     """Return the current Git SHA if available."""
 
+    git_executable = shutil.which("git")
+    if not git_executable:
+        return None
+
     try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+        result = subprocess.run(  # noqa: S603 - bounded git invocation for version metadata
+            [git_executable, "rev-parse", "HEAD"],
             check=True,
             capture_output=True,
             text=True,

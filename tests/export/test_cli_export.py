@@ -1,3 +1,5 @@
+# ruff: noqa: E402,I001
+
 import csv
 import json
 import sys

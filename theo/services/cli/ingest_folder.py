@@ -8,19 +8,19 @@ from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Sequence, cast
+from urllib.parse import urlparse
 from uuid import uuid4
 
 import click
 import httpx
 from sqlalchemy.orm import Session
-from urllib.parse import urlparse
 
 from ..api.app.core.database import get_engine
 from ..api.app.db.models import Document
 from ..api.app.enrich import MetadataEnricher
 from ..api.app.ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
-from ..api.app.workers import tasks as worker_tasks
 from ..api.app.telemetry import log_workflow_event
+from ..api.app.workers import tasks as worker_tasks
 
 SUPPORTED_TRANSCRIPT_EXTENSIONS = {".vtt", ".webvtt", ".srt"}
 SUPPORTED_TEXT_EXTENSIONS = {".md", ".markdown", ".txt", ".html", ".htm"}
@@ -405,7 +405,7 @@ def ingest_folder(
             document_ids = _ingest_batch_via_api(
                 batch, overrides, normalized_post_batch
             )
-            for item, doc_id in zip(batch, document_ids):
+            for item, doc_id in zip(batch, document_ids, strict=False):
                 click.echo(f"   Processed {item.label} → document {doc_id}")
                 log_workflow_event(
                     "cli.ingest.processed",
@@ -419,7 +419,7 @@ def ingest_folder(
             if normalized_post_batch:
                 click.echo("   Post-batch steps require API mode; skipping.")
             task_ids = _queue_batch_via_worker(batch, overrides)
-            for item, task_id in zip(batch, task_ids):
+            for item, task_id in zip(batch, task_ids, strict=False):
                 click.echo(f"   Queued {item.label} → task {task_id}")
                 log_workflow_event(
                     "cli.ingest.queued",

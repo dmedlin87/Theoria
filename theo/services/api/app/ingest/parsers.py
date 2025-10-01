@@ -46,8 +46,8 @@ except ModuleNotFoundError:  # pragma: no cover - fallback used when optional de
     def _secure_fromstring(text: Any, parser: Any | None = None):
         _ensure_safe_xml(text)
         if parser is None:
-            parser = _ET.XMLParser(resolve_entities=False)
-        return _ET.fromstring(text, parser=parser)
+            parser = _ET.XMLParser(resolve_entities=False)  # noqa: S314 - parser configured to block entity expansion
+        return _ET.fromstring(text, parser=parser)  # noqa: S314 - guarded by _ensure_safe_xml
 
     ET = types.SimpleNamespace(  # type: ignore[assignment]
         ParseError=_ET.ParseError,
@@ -302,7 +302,8 @@ def _docling_extract_text(path: Path) -> tuple[str, dict[str, Any]] | None:
         if callable(exporter):
             try:
                 exported = exporter()
-            except Exception:  # pragma: no cover - safety guard
+            except Exception as exc:  # pragma: no cover - safety guard
+                LOGGER.debug("Docling exporter %s failed", attr, exc_info=exc)
                 continue
             if exported:
                 text = str(exported)

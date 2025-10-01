@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r theo/services/api/requirements.txt
+          pip install mypy ruff
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: theo/services/web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: theo/services/web
+        run: npm ci
+
+      - name: Run Ruff
+        run: >-
+          ruff check
+          theo/services/api/app/ai/clients.py
+          theo/services/api/app/ai/rag/cache.py
+          theo/services/api/app/ai/rag/workflow.py
+          theo/services/api/app/core/database.py
+          theo/services/api/app/core/version.py
+          theo/services/api/app/enrich/metadata.py
+          theo/services/api/app/ingest/embeddings.py
+          theo/services/api/app/ingest/metadata.py
+          theo/services/api/app/ingest/network.py
+          theo/services/api/app/ingest/parsers.py
+          theo/services/api/app/ingest/persistence.py
+          theo/services/api/app/routes/search.py
+          theo/services/api/app/telemetry.py
+          theo/services/api/app/transcripts/service.py
+          theo/services/cli/ingest_folder.py
+          theo/services/geo/seed_openbible_geo.py
+          tests/cli/test_rag_eval.py
+          tests/contracts/test_schemathesis.py
+          tests/db/test_feedback_events.py
+          tests/db/test_seeds.py
+          tests/export/test_cli_export.py
+          theo/services/api/tests/conftest.py
+          theo/services/api/tests/test_jobs.py
+
+      - name: Run mypy
+        run: mypy --config-file mypy.ini
+
+      - name: Run ESLint
+        working-directory: theo/services/web
+        run: npm run lint
+
+      - name: Run Jest unit tests
+        working-directory: theo/services/web
+        run: npm test -- --runInBand
+
+      - name: Run pytest
+        env:
+          THEO_AUTH_ALLOW_ANONYMOUS: '1'
+        run: pytest --ignore=tests/contracts
+
+      - name: Run contract tests
+        env:
+          THEO_AUTH_ALLOW_ANONYMOUS: '1'
+        run: pytest tests/contracts

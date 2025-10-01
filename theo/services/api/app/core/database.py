@@ -66,10 +66,13 @@ def get_session() -> Generator[Session, None, None]:
     """Yield a database session for request handling."""
 
     global _SessionLocal
-    if _SessionLocal is None:
+    session_factory = _SessionLocal
+    if session_factory is None:
         configure_engine(get_settings().database_url)
-    assert _SessionLocal is not None  # for type checkers
-    session: Session = _SessionLocal()
+        session_factory = _SessionLocal
+    if session_factory is None:  # pragma: no cover - defensive guard
+        raise RuntimeError("Database session factory is not configured")
+    session: Session = session_factory()
     try:
         yield session
     finally:

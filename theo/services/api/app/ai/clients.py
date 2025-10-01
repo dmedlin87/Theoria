@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 import logging
 import random
 import re
 import time
-from typing import Any, Protocol
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from typing import Any, Protocol
 
 import httpx
 
@@ -95,7 +95,7 @@ class BaseAIClient:
         delay = min(delay, self._settings.backoff_max)
         if self._settings.jitter:
             spread = self._settings.jitter
-            delay *= random.uniform(1 - spread, 1 + spread)
+            delay *= random.uniform(1 - spread, 1 + spread)  # noqa: S311 - jitter uses non-crypto PRNG
         return max(delay, 0.0)
 
     @staticmethod
