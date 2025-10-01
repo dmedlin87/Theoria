@@ -1,0 +1,90 @@
+"""Pydantic models for guardrailed RAG workflows."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import Field
+
+from ...models.base import APIModel
+
+
+class RAGCitation(APIModel):
+    index: int
+    osis: str
+    anchor: str
+    passage_id: str
+    document_id: str
+    document_title: str | None = None
+    snippet: str
+    source_url: str | None = None
+    raw_snippet: str | None = Field(default=None, exclude=True)
+
+
+class RAGAnswer(APIModel):
+    summary: str
+    citations: list[RAGCitation]
+    model_name: str | None = None
+    model_output: str | None = None
+    guardrail_profile: dict[str, str] | None = None
+
+
+class VerseCopilotResponse(APIModel):
+    osis: str
+    question: str | None = None
+    answer: RAGAnswer
+    follow_ups: list[str]
+
+
+class SermonPrepResponse(APIModel):
+    topic: str
+    osis: str | None = None
+    outline: list[str]
+    key_points: list[str]
+    answer: RAGAnswer
+
+
+class ComparativeAnalysisResponse(APIModel):
+    osis: str
+    participants: list[str]
+    comparisons: list[str]
+    answer: RAGAnswer
+
+
+class MultimediaDigestResponse(APIModel):
+    collection: str | None
+    highlights: list[str]
+    answer: RAGAnswer
+
+
+class DevotionalResponse(APIModel):
+    osis: str
+    focus: str
+    reflection: str
+    prayer: str
+    answer: RAGAnswer
+
+
+class CorpusCurationReport(APIModel):
+    since: datetime
+    documents_processed: int
+    summaries: list[str]
+
+
+class CollaborationResponse(APIModel):
+    thread: str
+    synthesized_view: str
+    answer: RAGAnswer
+
+
+__all__ = [
+    "CollaborationResponse",
+    "ComparativeAnalysisResponse",
+    "CorpusCurationReport",
+    "DevotionalResponse",
+    "MultimediaDigestResponse",
+    "RAGAnswer",
+    "RAGCitation",
+    "SermonPrepResponse",
+    "VerseCopilotResponse",
+]
