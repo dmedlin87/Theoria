@@ -70,7 +70,6 @@ export default function DigestOverview({
             <thead>
               <tr>
                 <th scope="col">Topic</th>
-                <th scope="col">Summary</th>
                 <th scope="col">New docs</th>
                 <th scope="col">Total docs</th>
               </tr>
@@ -80,14 +79,13 @@ export default function DigestOverview({
                 topics.map((topic) => (
                   <tr key={topic.topic}>
                     <th scope="row">{topic.topic}</th>
-                    <td>{topic.summary || "—"}</td>
                     <td>{topic.new_documents}</td>
                     <td>{topic.total_documents}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4}>No clusters were generated for this window.</td>
+                  <td colSpan={3}>No clusters were generated for this window.</td>
                 </tr>
               )}
             </tbody>

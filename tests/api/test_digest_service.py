@@ -22,6 +22,25 @@ def _build_digest(*, generated_at: datetime) -> TopicDigest:
     )
 
 
+def test_topic_cluster_serialization():
+    cluster = TopicCluster(
+        topic="Example",
+        new_documents=3,
+        total_documents=10,
+        document_ids=["doc-a", "doc-b", "doc-c"],
+    )
+
+    payload = cluster.model_dump()
+
+    assert payload == {
+        "topic": "Example",
+        "new_documents": 3,
+        "total_documents": 10,
+        "document_ids": ["doc-a", "doc-b", "doc-c"],
+    }
+    assert "summary" not in payload
+
+
 def test_ensure_latest_returns_cached_when_within_ttl(monkeypatch):
     ttl = timedelta(hours=2)
     service = DigestService(session=object(), ttl=ttl)

@@ -44,6 +44,7 @@ export default function DigestDashboard(): JSX.Element {
   const [creationTopics, setCreationTopics] = useState("");
   const [creationKeywords, setCreationKeywords] = useState("");
   const [creationAuthors, setCreationAuthors] = useState("");
+  const [creationOsis, setCreationOsis] = useState("");
   const [creationError, setCreationError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -91,12 +92,14 @@ export default function DigestDashboard(): JSX.Element {
           topics: toOptional(creationTopics),
           keywords: toOptional(creationKeywords),
           authors: toOptional(creationAuthors),
+          osis: toOptional(creationOsis),
         },
       });
       setCreationName("");
       setCreationTopics("");
       setCreationKeywords("");
       setCreationAuthors("");
+      setCreationOsis("");
     } catch (error) {
       setCreationError((error as Error).message);
     } finally {
@@ -188,12 +191,14 @@ export default function DigestDashboard(): JSX.Element {
             topics={creationTopics}
             keywords={creationKeywords}
             authors={creationAuthors}
+            osis={creationOsis}
             onNameChange={setCreationName}
             onCadenceChange={setCreationCadence}
             onDeliveryChannelsChange={setCreationDeliveryChannels}
             onTopicsChange={setCreationTopics}
             onKeywordsChange={setCreationKeywords}
             onAuthorsChange={setCreationAuthors}
+            onOsisChange={setCreationOsis}
             onSubmit={handleCreateWatchlist}
             isCreating={isCreating}
             error={creationError}
