@@ -3,12 +3,13 @@
 import "@testing-library/jest-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-import SearchPage from "../../../app/search/page";
+import SearchPageClient from "../../../app/search/components/SearchPageClient";
+import type { SearchFilters } from "../../../app/search/searchParams";
 import { submitFeedback } from "../../../app/lib/telemetry";
 
 jest.mock("next/navigation", () => {
-  const params = new URLSearchParams("q=logos");
-  const searchParams = {
+  let params = new URLSearchParams("q=logos");
+  const createSearchParams = () => ({
     get: (key: string) => params.get(key),
     toString: () => params.toString(),
     has: (key: string) => params.has(key),
@@ -17,10 +18,13 @@ jest.mock("next/navigation", () => {
     values: () => params.values(),
     forEach: (callback: (value: string, key: string) => void) => params.forEach(callback),
     [Symbol.iterator]: () => params[Symbol.iterator](),
-  };
+  });
   return {
     useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
-    useSearchParams: () => searchParams,
+    useSearchParams: () => createSearchParams(),
+    __setSearchParams: (value: string) => {
+      params = new URLSearchParams(value);
+    },
   };
 });
 
@@ -29,7 +33,13 @@ jest.mock("../../../app/lib/telemetry", () => ({
   submitFeedback: jest.fn(),
 }));
 
-describe("SearchPage feedback", () => {
+const { __setSearchParams } = require("next/navigation") as {
+  __setSearchParams: (value: string) => void;
+};
+
+const setSearchParams = __setSearchParams;
+
+describe("SearchPageClient feedback", () => {
   const originalFetch = global.fetch;
   const fetchMock = jest.fn();
   const submitMock = submitFeedback as jest.MockedFunction<typeof submitFeedback>;
@@ -38,6 +48,7 @@ describe("SearchPage feedback", () => {
     jest.clearAllMocks();
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
+    setSearchParams("");
   });
 
   afterEach(() => {
@@ -47,30 +58,49 @@ describe("SearchPage feedback", () => {
   it("dispatches click feedback with scoring context", async () => {
     submitMock.mockResolvedValue(undefined);
 
-    const searchResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        results: [
-          {
-            id: "passage-1",
-            document_id: "doc-1",
-            text: "In the beginning",
-            snippet: "In the beginning was the Word",
-            document_title: "Sample Treatise",
-            rank: 0,
-            score: 0.92,
-            document_score: 0.88,
-            document_rank: 0,
-          },
-        ],
-      }),
-      headers: new Headers({ "x-reranker": "cross-encoder" }),
-    } as const;
+    setSearchParams("q=logos");
 
-    fetchMock.mockResolvedValueOnce(searchResponse as unknown as Response);
+    const initialFilters: SearchFilters = {
+      query: "logos",
+      osis: "",
+      collection: "",
+      author: "",
+      sourceType: "",
+      theologicalTradition: "",
+      topicDomain: "",
+      collectionFacets: [],
+      datasetFacets: [],
+      variantFacets: [],
+      dateStart: "",
+      dateEnd: "",
+      includeVariants: false,
+      includeDisputed: false,
+      preset: "",
+    };
 
-    render(<SearchPage />);
+    render(
+      <SearchPageClient
+        initialFilters={initialFilters}
+        initialResults={{
+          results: [
+            {
+              id: "passage-1",
+              document_id: "doc-1",
+              text: "In the beginning",
+              snippet: "In the beginning was the Word",
+              document_title: "Sample Treatise",
+              rank: 0,
+              score: 0.92,
+              document_score: 0.88,
+              document_rank: 0,
+            },
+          ],
+        }}
+        initialError={null}
+        initialRerankerName="cross-encoder"
+        initialHasSearched
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Open passage")).toBeInTheDocument();
@@ -93,6 +123,65 @@ describe("SearchPage feedback", () => {
           query: "logos",
         }),
       );
+    });
+  });
+
+  it("shows a loading indicator while fetching new results", async () => {
+    const initialFilters: SearchFilters = {
+      query: "",
+      osis: "",
+      collection: "",
+      author: "",
+      sourceType: "",
+      theologicalTradition: "",
+      topicDomain: "",
+      collectionFacets: [],
+      datasetFacets: [],
+      variantFacets: [],
+      dateStart: "",
+      dateEnd: "",
+      includeVariants: false,
+      includeDisputed: false,
+      preset: "",
+    };
+
+    let resolveFetch: ((value: Response) => void) | undefined;
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+
+    render(
+      <SearchPageClient
+        initialFilters={initialFilters}
+        initialResults={null}
+        initialError={null}
+        initialRerankerName={null}
+        initialHasSearched={false}
+      />,
+    );
+
+    const queryInput = screen.getByLabelText("Query");
+    fireEvent.change(queryInput, { target: { value: "logos" } });
+
+    const submitButton = screen.getByRole("button", { name: /^Search(?:ing\.)?$/ });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("Searching.");
+    });
+
+    resolveFetch?.(
+      new Response(JSON.stringify({ results: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
   });
 });
