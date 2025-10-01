@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getApiBaseUrl } from "../../lib/api";
 import { forwardTraceHeaders } from "../trace";
+import { createProxyErrorResponse } from "../utils/proxyError";
 
 function buildTargetUrl(request: NextRequest): URL {
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
@@ -25,20 +26,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       requestHeaders["X-API-Key"] = apiKey;
     }
   }
-  const response = await fetch(target, {
-    headers: requestHeaders,
-    cache: "no-store",
-  });
-  const body = await response.text();
-  const headers = new Headers();
-  headers.set("content-type", response.headers.get("content-type") ?? "application/json");
-  const reranker = response.headers.get("x-reranker");
-  if (reranker) {
-    headers.set("x-reranker", reranker);
+  try {
+    const response = await fetch(target, {
+      headers: requestHeaders,
+      cache: "no-store",
+    });
+    const body = await response.text();
+    const headers = new Headers();
+    headers.set("content-type", response.headers.get("content-type") ?? "application/json");
+    const reranker = response.headers.get("x-reranker");
+    if (reranker) {
+      headers.set("x-reranker", reranker);
+    }
+    forwardTraceHeaders(response.headers, headers);
+    return new NextResponse(body, {
+      status: response.status,
+      headers,
+    });
+  } catch (error) {
+    return createProxyErrorResponse({
+      error,
+      logContext: "Failed to proxy search request",
+      message: "Search service is currently unavailable. Please try again later.",
+    });
   }
-  forwardTraceHeaders(response.headers, headers);
-  return new NextResponse(body, {
-    status: response.status,
-    headers,
-  });
 }

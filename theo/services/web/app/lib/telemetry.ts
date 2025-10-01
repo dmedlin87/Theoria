@@ -1,5 +1,7 @@
 "use client";
 
+import { parseErrorResponse } from "./errorUtils";
+
 type TelemetryEventInput = {
   event: string;
   durationMs: number;
@@ -36,11 +38,21 @@ export async function emitTelemetry(
     payload.page = context.page ?? null;
   }
   try {
-    await fetch("/api/analytics/telemetry", {
+    const response = await fetch("/api/analytics/telemetry", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    if (!response.ok && process.env.NODE_ENV !== "production") {
+      const details = await parseErrorResponse(
+        response,
+        `Telemetry submission failed with status ${response.status}`,
+      );
+      console.debug(
+        `Telemetry endpoint responded with ${response.status}: ${details.message}`,
+        details.traceId ? { traceId: details.traceId } : undefined,
+      );
+    }
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.debug("Failed to emit telemetry", error);
@@ -81,11 +93,21 @@ export async function submitFeedback(payload: FeedbackEventInput): Promise<void>
   if (typeof payload.confidence === "number") body.confidence = payload.confidence;
 
   try {
-    await fetch("/api/analytics/feedback", {
+    const response = await fetch("/api/analytics/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (!response.ok && process.env.NODE_ENV !== "production") {
+      const details = await parseErrorResponse(
+        response,
+        `Feedback submission failed with status ${response.status}`,
+      );
+      console.debug(
+        `Feedback endpoint responded with ${response.status}: ${details.message}`,
+        details.traceId ? { traceId: details.traceId } : undefined,
+      );
+    }
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.debug("Failed to submit feedback", error);
