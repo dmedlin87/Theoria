@@ -115,6 +115,100 @@ def _apply_document_ranks(
     return results
 
 
+def _score_candidates(
+    candidates: dict[str, _Candidate],
+    annotations_by_passage: dict[str, list],
+    request: HybridSearchRequest,
+    query_tokens: list[str],
+) -> list[tuple[HybridSearchResult, float]]:
+    vector_weight = 0.65
+    lexical_weight = 0.35
+    osis_bonus = 0.2 if request.osis else 0.0
+    scored: list[tuple[HybridSearchResult, float]] = []
+    for candidate in candidates.values():
+        passage = candidate.passage
+        document = candidate.document
+        tei_score = _tei_match_score(passage, query_tokens)
+        score = 0.0
+        if candidate.vector_score:
+            score += vector_weight * candidate.vector_score
+        if candidate.lexical_score:
+            score += lexical_weight * candidate.lexical_score
+        annotation_notes = annotations_by_passage.get(passage.id, [])
+        if request.query and annotation_notes:
+            note_text = " \n".join(note.body for note in annotation_notes if note.body)
+            if note_text:
+                score += lexical_weight * _lexical_score(note_text, query_tokens)
+        if (
+            request.query
+            and candidate.lexical_score == 0.0
+            and candidate.vector_score == 0.0
+            and tei_score == 0.0
+            and not candidate.osis_match
+        ):
+            continue
+        if (
+            request.query is None
+            and candidate.lexical_score == 0.0
+            and candidate.vector_score == 0.0
+            and tei_score == 0.0
+        ):
+            score = max(score, 0.1)
+        if tei_score:
+            score += 0.35 * tei_score
+        if candidate.osis_match:
+            score += osis_bonus
+        meta = compose_passage_meta(passage, document)
+        if annotation_notes:
+            meta = {**(meta or {})}
+            meta["annotations"] = [note.model_dump(mode="json") for note in annotation_notes]
+        result = HybridSearchResult(
+            id=passage.id,
+            document_id=passage.document_id,
+            text=passage.text,
+            raw_text=passage.raw_text,
+            osis_ref=passage.osis_ref,
+            start_char=passage.start_char,
+            end_char=passage.end_char,
+            page_no=passage.page_no,
+            t_start=passage.t_start,
+            t_end=passage.t_end,
+            score=score,
+            meta=meta,
+            document_title=document.title,
+            snippet=_snippet(passage.text),
+            rank=0,
+            highlights=None,
+            lexical_score=candidate.lexical_score or None,
+            vector_score=candidate.vector_score or None,
+            osis_distance=candidate.osis_distance,
+        )
+        scored.append((result, score))
+    return scored
+
+
+def _merge_scored_candidates(
+    scored: list[tuple[HybridSearchResult, float]],
+    request: HybridSearchRequest,
+    query_tokens: list[str],
+) -> list[HybridSearchResult]:
+    scored.sort(key=lambda item: item[1], reverse=True)
+    limited = scored[: request.k]
+    results: list[HybridSearchResult] = []
+    for idx, (result, score) in enumerate(limited, start=1):
+        result.rank = idx
+        result.score = score
+        results.append(result)
+
+    doc_scores: dict[str, float] = {}
+    for result in results:
+        doc_scores[result.document_id] = max(
+            doc_scores.get(result.document_id, float("-inf")), result.score or 0.0
+        )
+
+    return _apply_document_ranks(results, doc_scores, query_tokens)
+
+
 @dataclass
 class _Candidate:
     passage: Passage
@@ -228,6 +322,51 @@ def _apply_common_filters(stmt, request: HybridSearchRequest):
     return stmt
 
 
+def _build_base_query(request: HybridSearchRequest):
+    stmt = select(Passage, Document).join(Document)
+    return _apply_common_filters(stmt, request)
+
+
+def _build_vector_statement(
+    base_stmt, query_embedding: list[float], limit: int, *, embedding_dim: int
+):
+    vector_param = literal(query_embedding, type_=VectorType(embedding_dim))
+    distance = func.cosine_distance(Passage.embedding, vector_param).label("distance")
+    vector_score_expr = (1.0 - func.coalesce(distance, 1.0)).label("vector_score")
+    return (
+        base_stmt.add_columns(distance, vector_score_expr)
+        .where(Passage.embedding.isnot(None))
+        .order_by(distance.asc())
+        .limit(limit)
+    )
+
+
+def _build_lexical_statement(base_stmt, request: HybridSearchRequest, limit: int):
+    ts_query = func.plainto_tsquery("english", request.query)
+    lexical_rank = func.ts_rank_cd(Passage.lexeme, ts_query).label("lexical_score")
+    return (
+        base_stmt.add_columns(lexical_rank)
+        .where(Passage.lexeme.isnot(None))
+        .where(Passage.lexeme.op("@@")(ts_query))
+        .order_by(lexical_rank.desc())
+        .limit(limit)
+    )
+
+
+def _build_tei_statement(base_stmt, query_tokens: list[str], limit: int):
+    tei_blob = Passage.meta["tei_search_blob"].astext
+    tei_facet_blob = Passage.meta["tei"].astext
+    tei_like_clauses = []
+    for token in query_tokens:
+        like_value = f"%{token}%"
+        tei_like_clauses.append(tei_blob.ilike(like_value))
+        tei_like_clauses.append(tei_facet_blob.ilike(like_value))
+    tei_present = or_(tei_blob.isnot(None), tei_facet_blob.isnot(None))
+    if tei_like_clauses:
+        return base_stmt.where(tei_present).where(or_(*tei_like_clauses)).limit(limit)
+    return base_stmt.where(tei_present).limit(limit)
+
+
 def _fallback_search(
     session: Session, request: HybridSearchRequest
 ) -> list[HybridSearchResult]:
@@ -240,8 +379,7 @@ def _fallback_search(
 
         query_tokens = _tokenise(request.query or "")
 
-        stmt = select(Passage, Document).join(Document)
-        stmt = _apply_common_filters(stmt, request)
+        stmt = _build_base_query(request)
         if request.query and not request.osis:
             token_clauses = []
             tei_blob = func.json_extract(Passage.meta, "$.tei_search_blob")
@@ -372,26 +510,13 @@ def _postgres_hybrid_search(
         limit = max(request.k * 4, 20)
         query_tokens = _tokenise(request.query or "")
 
-        base_stmt = select(Passage, Document).join(Document)
-        base_stmt = _apply_common_filters(base_stmt, request)
+        base_stmt = _build_base_query(request)
 
         query_embedding: list[float] | None = None
         if request.query:
             query_embedding = embedding_service.embed([request.query])[0]
-            vector_param = literal(
-                query_embedding, type_=VectorType(settings.embedding_dim)
-            )
-            distance = func.cosine_distance(Passage.embedding, vector_param).label(
-                "distance"
-            )
-            vector_score_expr = (1.0 - func.coalesce(distance, 1.0)).label(
-                "vector_score"
-            )
-            vector_stmt = (
-                base_stmt.add_columns(distance, vector_score_expr)
-                .where(Passage.embedding.isnot(None))
-                .order_by(distance.asc())
-                .limit(limit)
+            vector_stmt = _build_vector_statement(
+                base_stmt, query_embedding, limit, embedding_dim=settings.embedding_dim
             )
             for row in session.execute(vector_stmt):
                 passage: Passage = row[0]
@@ -416,17 +541,7 @@ def _postgres_hybrid_search(
                     _mark_candidate_osis(candidate, request.osis)
 
         if request.query:
-            ts_query = func.plainto_tsquery("english", request.query)
-            lexical_rank = func.ts_rank_cd(Passage.lexeme, ts_query).label(
-                "lexical_score"
-            )
-            lexical_stmt = (
-                base_stmt.add_columns(lexical_rank)
-                .where(Passage.lexeme.isnot(None))
-                .where(Passage.lexeme.op("@@")(ts_query))
-                .order_by(lexical_rank.desc())
-                .limit(limit)
-            )
+            lexical_stmt = _build_lexical_statement(base_stmt, request, limit)
             for row in session.execute(lexical_stmt):
                 passage: Passage = row[0]
                 document: Document = row[1]
@@ -449,20 +564,7 @@ def _postgres_hybrid_search(
                 if request.osis:
                     _mark_candidate_osis(candidate, request.osis)
 
-            tei_blob = Passage.meta["tei_search_blob"].astext
-            tei_facet_blob = Passage.meta["tei"].astext
-            tei_like_clauses = []
-            for token in query_tokens:
-                like_value = f"%{token}%"
-                tei_like_clauses.append(tei_blob.ilike(like_value))
-                tei_like_clauses.append(tei_facet_blob.ilike(like_value))
-            tei_present = or_(tei_blob.isnot(None), tei_facet_blob.isnot(None))
-            if tei_like_clauses:
-                tei_stmt = base_stmt.where(tei_present).where(or_(*tei_like_clauses)).limit(
-                    limit
-                )
-            else:
-                tei_stmt = base_stmt.where(tei_present).limit(limit)
+            tei_stmt = _build_tei_statement(base_stmt, query_tokens, limit)
             for passage, document in session.execute(tei_stmt):
                 if not _passes_author_filter(document, request.filters.author):
                     continue
@@ -498,12 +600,11 @@ def _postgres_hybrid_search(
                     candidates[key] = candidate
                 _mark_candidate_osis(candidate, request.osis)
 
-        results: list[HybridSearchResult] = []
         if not candidates and not request.query:
             latency_ms = (perf_counter() - start) * 1000.0
-            span.set_attribute("retrieval.hit_count", len(results))
+            span.set_attribute("retrieval.hit_count", 0)
             span.set_attribute("retrieval.latency_ms", round(latency_ms, 2))
-            return results
+            return []
 
         doc_ids = [candidate.document.id for candidate in candidates.values()]
         annotations_by_document = load_annotations_for_documents(session, doc_ids)
@@ -511,93 +612,12 @@ def _postgres_hybrid_search(
             annotations_by_document
         )
 
-        VECTOR_WEIGHT = 0.65
-        LEXICAL_WEIGHT = 0.35
-        OSIS_BONUS = 0.2 if request.osis else 0.0
-
-        scored: list[tuple[HybridSearchResult, float]] = []
-        for candidate in candidates.values():
-            passage = candidate.passage
-            document = candidate.document
-            tei_score = _tei_match_score(passage, query_tokens)
-            score = 0.0
-            if candidate.vector_score:
-                score += VECTOR_WEIGHT * candidate.vector_score
-            if candidate.lexical_score:
-                score += LEXICAL_WEIGHT * candidate.lexical_score
-            annotation_notes = annotations_by_passage.get(passage.id, [])
-            if request.query and annotation_notes:
-                note_text = " \n".join(
-                    note.body for note in annotation_notes if note.body
-                )
-                if note_text:
-                    score += LEXICAL_WEIGHT * _lexical_score(note_text, query_tokens)
-            if (
-                request.query
-                and candidate.lexical_score == 0.0
-                and candidate.vector_score == 0.0
-                and tei_score == 0.0
-                and not candidate.osis_match
-            ):
-                continue
-            if (
-                request.query is None
-                and candidate.lexical_score == 0.0
-                and candidate.vector_score == 0.0
-                and tei_score == 0.0
-            ):
-                score = max(score, 0.1)
-            if tei_score:
-                score += 0.35 * tei_score
-            if candidate.osis_match:
-                score += OSIS_BONUS
-            meta = compose_passage_meta(passage, document)
-            if annotation_notes:
-                meta = {**(meta or {})}
-                meta["annotations"] = [
-                    note.model_dump(mode="json") for note in annotation_notes
-                ]
-            result = HybridSearchResult(
-                id=passage.id,
-                document_id=passage.document_id,
-                text=passage.text,
-                raw_text=passage.raw_text,
-                osis_ref=passage.osis_ref,
-                start_char=passage.start_char,
-                end_char=passage.end_char,
-                page_no=passage.page_no,
-                t_start=passage.t_start,
-                t_end=passage.t_end,
-                score=score,
-                meta=meta,
-                document_title=document.title,
-                snippet=_snippet(passage.text),
-                rank=0,
-                highlights=None,
-                lexical_score=candidate.lexical_score or None,
-                vector_score=candidate.vector_score or None,
-                osis_distance=candidate.osis_distance,
-            )
-            scored.append((result, score))
-
-        scored.sort(key=lambda item: item[1], reverse=True)
-        limited = scored[: request.k]
-        for idx, (result, score) in enumerate(limited, start=1):
-            result.rank = idx
-            result.score = score
-            results.append(result)
-
-        doc_scores: dict[str, float] = {}
-        for result in results:
-            doc_scores[result.document_id] = max(
-                doc_scores.get(result.document_id, float("-inf")), result.score or 0.0
-            )
-
-        ranked = _apply_document_ranks(results, doc_scores, query_tokens)
+        scored = _score_candidates(candidates, annotations_by_passage, request, query_tokens)
+        results = _merge_scored_candidates(scored, request, query_tokens)
         latency_ms = (perf_counter() - start) * 1000.0
-        span.set_attribute("retrieval.hit_count", len(ranked))
+        span.set_attribute("retrieval.hit_count", len(results))
         span.set_attribute("retrieval.latency_ms", round(latency_ms, 2))
-        return ranked
+        return results
 
 
 def hybrid_search(

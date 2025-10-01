@@ -2,177 +2,504 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
-import math
 import re
 import textwrap
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Callable, Literal, Mapping, Pattern, Sequence, TypeVar
-from urllib.parse import urlencode
-
-try:  # pragma: no cover - optional dependency guard
-    import redis
-except ImportError:  # pragma: no cover - redis is optional at runtime
-    redis = None  # type: ignore[assignment]
+from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence
 
 from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..analytics.telemetry import record_feedback_event
-from ..core.settings import get_settings
-from ..core.version import get_git_sha
-from ..db.models import Document, Passage
-from ..export.formatters import SCHEMA_VERSION, generate_export_id
-from pydantic import Field
-
-from ..models.base import APIModel
-from ..models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
-from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
-from ..retriever.hybrid import hybrid_search
-from ..retriever.utils import compose_passage_meta
-from ..telemetry import (
+from ...analytics.telemetry import record_feedback_event
+from ...db.models import Document, Passage
+from ...export.formatters import SCHEMA_VERSION, generate_export_id
+from ...models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
+from ...models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
+from ...retriever.hybrid import hybrid_search
+from ...retriever.utils import compose_passage_meta
+from ...telemetry import (
     RAG_CACHE_EVENTS,
     instrument_workflow,
     log_workflow_event,
     set_span_attribute,
 )
-from .clients import GenerationError
-from .registry import LLMModel, LLMRegistry, get_llm_registry
-from .router import get_router
+from .cache import RAGCache
+from ..clients import GenerationError
+from .guardrails import (
+    GuardrailError,
+    apply_guardrail_profile as _guardrails_apply_guardrail_profile,
+    build_citations as _guardrails_build_citations,
+    build_guardrail_result as _guardrails_build_guardrail_result,
+    build_retrieval_digest as _guardrails_build_retrieval_digest,
+    ensure_completion_safe as _guardrails_ensure_completion_safe,
+    load_guardrail_reference as _guardrails_load_guardrail_reference,
+    load_passages_for_osis as _guardrails_load_passages_for_osis,
+    validate_model_completion as _guardrails_validate_model_completion,
+)
+from .models import (
+    CollaborationResponse,
+    ComparativeAnalysisResponse,
+    CorpusCurationReport,
+    DevotionalResponse,
+    MultimediaDigestResponse,
+    RAGAnswer,
+    RAGCitation,
+    SermonPrepResponse,
+    VerseCopilotResponse,
+)
+from .prompts import (
+    sanitise_json_structure as _prompts_sanitize_json_structure,
+    scrub_adversarial_language as _prompts_scrub_adversarial_language,
+)
+from ..registry import LLMModel, LLMRegistry, get_llm_registry
+from ..router import get_router
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
-    from .trails import TrailRecorder
+    from ..trails import TrailRecorder
 
 
 LOGGER = logging.getLogger(__name__)
 
 _RAG_TRACER = trace.get_tracer("theo.rag")
 
-_CACHE_TTL_SECONDS = 30 * 60
-_CITATION_ENTRY_PATTERN = re.compile(r"^\[(?P<index>\d+)]\s*(?P<osis>[^()]+?)\s*\((?P<anchor>[^()]+)\)$")
+_CACHE = RAGCache()
 _SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
-_MARKDOWN_ESCAPE_PATTERN = re.compile(r"([\\`*_{}\[\]()#+.!|\-])")
-
-_ADVERSARIAL_REPLACEMENTS: tuple[tuple[Pattern[str], str], ...] = (
-    (
-        re.compile(
-            r"\b(?:ignore|disregard|forget)\b[^\n]{0,40}?\b(?:previous|prior|all)\s+instructions?\b",
-            re.IGNORECASE,
-        ),
-        "[filtered-instruction]",
-    ),
-    (
-        re.compile(
-            r"\b(?:override|reset|disable)\b[^\n]{0,40}?\b(?:guardrails?|safety|system)\b",
-            re.IGNORECASE,
-        ),
-        "[filtered-override]",
-    ),
-    (
-        re.compile(r"drop\s+table\b", re.IGNORECASE),
-        "[filtered-sql]",
-    ),
-    (
-        re.compile(r"<\s*/?script\b[^>]*>", re.IGNORECASE),
-        "[filtered-html]",
-    ),
-    (
-        re.compile(r"<\s*/?style\b[^>]*>", re.IGNORECASE),
-        "[filtered-html]",
-    ),
-    (
-        re.compile(r"<!--.*?-->", re.DOTALL),
-        "[filtered-comment]",
-    ),
-    (
-        re.compile(r"```(?:html|javascript|sql)[\s\S]*?```", re.IGNORECASE),
-        "[filtered-code-block]",
-    ),
-)
-
-_DISALLOWED_COMPLETION_PATTERNS: tuple[tuple[Pattern[str], str], ...] = (
-    (
-        re.compile(r"\bselect\b[^\n]+\bfrom\b", re.IGNORECASE),
-        "SQL SELECT pattern",
-    ),
-    (
-        re.compile(
-            r"\b(insert|update|delete|drop|alter|create)\b[^\n]+\btable\b",
-            re.IGNORECASE,
-        ),
-        "SQL modification pattern",
-    ),
-    (
-        re.compile(r"<\s*/?script\b", re.IGNORECASE),
-        "script markup",
-    ),
-    (
-        re.compile(r"password\s*[:=]", re.IGNORECASE),
-        "credential disclosure",
-    ),
-    (
-        re.compile(r"api[-_\s]*key", re.IGNORECASE),
-        "credential disclosure",
-    ),
-    (
-        re.compile(r"access\s*token", re.IGNORECASE),
-        "credential disclosure",
-    ),
-    (
-        re.compile(r"secret\s*(?:key|token)", re.IGNORECASE),
-        "credential disclosure",
-    ),
-)
-
-_redis_client: Any = None
 
 
-def _normalise_profile_value(value: str | None) -> str | None:
-    if not value:
-        return None
-    text = value.strip().lower()
-    return text or None
+
+class PassageRetriever:
+    """Encapsulates passage lookup logic for reuse across workflows."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def search(
+        self,
+        *,
+        query: str | None,
+        osis: str | None,
+        filters: HybridSearchFilters,
+        k: int = 8,
+    ) -> list[HybridSearchResult]:
+        request = HybridSearchRequest(query=query, osis=osis, filters=filters, k=k)
+        results = list(hybrid_search(self._session, request))
+        if osis and not any(result.osis_ref for result in results):
+            fallback = _guardrails_load_passages_for_osis(self._session, osis)
+            if fallback:
+                LOGGER.debug(
+                    "Hybrid search yielded no OSIS matches; injecting %d fallback passages for %s",
+                    len(fallback),
+                    osis,
+                )
+                return fallback
+        return results
 
 
-def _escape_markdown_html(value: str) -> str:
-    if not value:
-        return ""
-    escaped = (
-        value.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
-    return _MARKDOWN_ESCAPE_PATTERN.sub(r"\\\1", escaped)
+class GuardedAnswerPipeline:
+    """Compose grounded answers while handling guardrails and caching."""
 
+    def __init__(
+        self,
+        session: Session,
+        registry: LLMRegistry,
+        *,
+        cache: RAGCache = _CACHE,
+        recorder: "TrailRecorder | None" = None,
+    ) -> None:
+        self.session = session
+        self.registry = registry
+        self.cache = cache
+        self.recorder = recorder
 
-def _sanitize_markdown_field(value: Any) -> str:
-    if value is None:
-        return ""
-    text = str(value).replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
-    return _escape_markdown_html(text)
+    def compose(
+        self,
+        *,
+        question: str | None,
+        results: Sequence[HybridSearchResult],
+        model_hint: str | None = None,
+        filters: HybridSearchFilters | None = None,
+        memory_context: Sequence[str] | None = None,
+        allow_fallback: bool = False,
+    ) -> RAGAnswer:
+        ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
+        citations = _build_citations(ordered_results)
+        if not citations and allow_fallback:
+            fallback_result = _load_guardrail_reference(self.session)
+            if fallback_result:
+                ordered_results = [fallback_result]
+                citations = _build_citations(ordered_results)
+        if not citations:
+            raise GuardrailError(
+                "Retrieved passages lacked OSIS references; aborting generation",
+                metadata={
+                    "code": "retrieval_missing_osis",
+                    "guardrail": "retrieval",
+                    "suggested_action": "upload",
+                },
+            )
+
+        cited_results = [result for result in ordered_results if result.osis_ref]
+        summary_lines = []
+        for idx, citation in enumerate(citations):
+            result = cited_results[idx] if idx < len(cited_results) else None
+            document_title = (
+                citation.document_title
+                or (result.document_title if result else None)
+                or citation.document_id
+            )
+            summary_lines.append(
+                f"[{citation.index}] {citation.snippet} — {document_title}"
+                f" ({citation.osis}, {citation.anchor})"
+            )
+        summary_text = "\n".join(summary_lines)
+
+        model_output = None
+        model_name = None
+        validation_result: dict[str, Any] | None = None
+        cache_status = "skipped"
+        cache_key: str | None = None
+        cache_key_suffix: str | None = None
+
+        user_id = None
+        if self.recorder and getattr(self.recorder, "trail", None) is not None:
+            user_id = getattr(self.recorder.trail, "user_id", None)
+
+        router = get_router(self.session, registry=self.registry)
+        candidates = list(router.iter_candidates("rag", model_hint))
+        if not candidates:
+            raise GenerationError("No language models are available for workflow 'rag'")
+
+        context_lines = []
+        for citation in citations:
+            prompt_snippet = _scrub_adversarial_language(citation.snippet) or ""
+            context_lines.append(
+                f"[{citation.index}] {prompt_snippet.strip()} (OSIS {citation.osis}, {citation.anchor})"
+            )
+        prompt_parts = [
+            "You are Theo Engine's grounded assistant.",
+            "Answer the question strictly from the provided passages.",
+            "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
+            "If the passages do not answer the question, state that explicitly.",
+        ]
+        if memory_context:
+            prompt_parts.append("Prior conversation highlights:")
+            for idx, snippet in enumerate(memory_context, start=1):
+                sanitized = _scrub_adversarial_language(snippet) or ""
+                if sanitized:
+                    prompt_parts.append(f"{idx}. {sanitized}")
+        sanitized_question = _scrub_adversarial_language(question)
+        if sanitized_question:
+            prompt_parts.append(f"Question: {sanitized_question}")
+        prompt_parts.append("Passages:")
+        prompt_parts.extend(context_lines)
+        prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
+        prompt = "\n".join(prompt_parts)
+
+        retrieval_digest = _build_retrieval_digest(ordered_results)
+        last_error: GenerationError | None = None
+        selected_model: LLMModel | None = None
+
+        cache_key = None
+        cache_key_suffix = None
+        cache_status = "skipped"
+
+        for candidate in candidates:
+            selected_model = candidate
+            cache_event_logged = False
+            cache_key = _build_cache_key(
+                user_id=user_id,
+                model_label=candidate.name,
+                prompt=prompt,
+                retrieval_digest=retrieval_digest,
+            )
+            cache_key_suffix = cache_key[-12:]
+            cache_status = "miss"
+            cache_hit_payload: RAGAnswer | None = None
+            validation_result = None
+            model_output = None
+
+            cached_payload = _load_cached_answer(cache_key)
+            if cached_payload:
+                cache_status = "hit"
+                try:
+                    cache_hit_payload = RAGAnswer.model_validate(cached_payload.get("answer"))
+                except Exception:
+                    LOGGER.debug(
+                        "invalid cached answer payload for key %s", cache_key, exc_info=True
+                    )
+                    cache_hit_payload = None
+
+                if cache_hit_payload and cache_hit_payload.model_output:
+                    try:
+                        validation_result = _validate_model_completion(
+                            cache_hit_payload.model_output, citations
+                        )
+                        ensure_completion_safe(cache_hit_payload.model_output)
+                    except GuardrailError as exc:
+                        cache_status = "stale"
+                        self.cache.delete(cache_key)
+                        RAG_CACHE_EVENTS.labels(status="stale").inc()
+                        log_workflow_event(
+                            "workflow.guardrails_cache",
+                            workflow="rag",
+                            status="stale",
+                            cache_key_suffix=cache_key_suffix,
+                        )
+                        cache_event_logged = True
+                        if self.recorder:
+                            self.recorder.log_step(
+                                tool="rag.cache",
+                                action="invalidate",
+                                input_payload={"cache_key_suffix": cache_key_suffix},
+                                status="failed",
+                                error_message=str(exc),
+                            )
+                        cache_hit_payload = None
+                        validation_result = None
+                    else:
+                        model_output = cache_hit_payload.model_output
+                        model_name = cached_payload.get("model_name", candidate.name)
+                else:
+                    cache_status = "stale"
+
+            if cache_status == "hit" and model_output:
+                RAG_CACHE_EVENTS.labels(status="hit").inc()
+                log_workflow_event(
+                    "workflow.guardrails_cache",
+                    workflow="rag",
+                    status="hit",
+                    cache_key_suffix=cache_key_suffix,
+                )
+            elif not cache_event_logged:
+                if cache_status == "hit":
+                    cache_status = "stale"
+                if cache_status == "stale":
+                    RAG_CACHE_EVENTS.labels(status="stale").inc()
+                    log_workflow_event(
+                        "workflow.guardrails_cache",
+                        workflow="rag",
+                        status="stale",
+                        cache_key_suffix=cache_key_suffix,
+                    )
+                else:
+                    RAG_CACHE_EVENTS.labels(status="miss").inc()
+                    log_workflow_event(
+                        "workflow.guardrails_cache",
+                        workflow="rag",
+                        status="miss",
+                        cache_key_suffix=cache_key_suffix,
+                    )
+
+            if self.recorder and cache_key:
+                self.recorder.log_step(
+                    tool="rag.cache",
+                    action="lookup",
+                    input_payload={"cache_key_suffix": cache_key_suffix},
+                    output_payload={"status": cache_status},
+                    output_digest=cache_status,
+                )
+
+            if model_output:
+                break
+
+            llm_payload = {
+                "prompt": prompt,
+                "model": candidate.model,
+                "registry_name": candidate.name,
+            }
+            try:
+                with _RAG_TRACER.start_as_current_span("rag.execute_generation") as span:
+                    span.set_attribute("rag.candidate", candidate.name)
+                    span.set_attribute("rag.model_label", candidate.model)
+                    span.set_attribute("rag.cache_status", cache_status)
+                    if cache_key_suffix:
+                        span.set_attribute("rag.cache_key_suffix", cache_key_suffix)
+                    span.set_attribute("rag.prompt_tokens", max(len(prompt) // 4, 0))
+                    try:
+                        routed_generation = router.execute_generation(
+                            workflow="rag",
+                            model=candidate,
+                            prompt=prompt,
+                        )
+                    except GenerationError as inner_exc:
+                        span.record_exception(inner_exc)
+                        span.set_attribute("rag.guardrails_cache_final", cache_status)
+                        raise
+                    span.set_attribute("rag.latency_ms", routed_generation.latency_ms)
+                    span.set_attribute(
+                        "rag.completion_tokens",
+                        max(len(routed_generation.output) // 4, 0)
+                        if routed_generation.output
+                        else 0,
+                    )
+
+                    completion = routed_generation.output
+                    if self.recorder:
+                        self.recorder.log_step(
+                            tool="llm.generate",
+                            action="generate_grounded_answer",
+                            input_payload=llm_payload,
+                            output_payload={
+                                "completion": completion,
+                                "latency_ms": routed_generation.latency_ms,
+                                "cost": routed_generation.cost,
+                            },
+                            output_digest=f"{len(completion)} characters",
+                        )
+                    sources_line = "; ".join(
+                        f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
+                    )
+                    has_citations_line = bool(re.search(r"Sources:\s*\[\d+]", completion))
+                    if not has_citations_line:
+                        completion = completion.strip() + f"\n\nSources: {sources_line}"
+                    try:
+                        validation_result = _validate_model_completion(completion, citations)
+                        ensure_completion_safe(completion)
+                    except GuardrailError as exc:
+                        span.record_exception(exc)
+                        log_workflow_event(
+                            "workflow.guardrails_validation",
+                            workflow="rag",
+                            status="failed",
+                            cache_status=cache_status,
+                            cache_key_suffix=cache_key_suffix,
+                        )
+                        if self.recorder:
+                            self.recorder.log_step(
+                                tool="guardrails.validate",
+                                action="check_citations",
+                                status="failed",
+                                input_payload={
+                                    "cache_status": cache_status,
+                                    "cache_key_suffix": cache_key_suffix,
+                                },
+                                output_payload={"completion": completion},
+                                error_message=str(exc),
+                            )
+                        span.set_attribute("rag.guardrails_cache_final", cache_status)
+                        raise
+                    model_output = completion
+                    model_name = candidate.name
+                    if cache_status == "stale":
+                        cache_status = "refresh"
+                    span.set_attribute("rag.guardrails_cache_final", cache_status)
+                    break
+            except GenerationError as exc:
+                last_error = exc
+                if self.recorder:
+                    self.recorder.log_step(
+                        tool="llm.generate",
+                        action="generate_grounded_answer",
+                        status="failed",
+                        input_payload=llm_payload,
+                        output_digest=str(exc),
+                        error_message=str(exc),
+                    )
+                continue
+
+        if not model_output:
+            if last_error is not None:
+                raise last_error
+            raise GenerationError("Language model routing failed to produce a completion")
+        if validation_result:
+            log_workflow_event(
+                "workflow.guardrails_validation",
+                workflow="rag",
+                status=validation_result.get("status", "passed"),
+                cache_status=cache_status,
+                cache_key_suffix=cache_key_suffix,
+                citation_count=validation_result.get("citation_count"),
+                cited_indices=validation_result.get("cited_indices"),
+            )
+            if self.recorder:
+                self.recorder.log_step(
+                    tool="guardrails.validate",
+                    action="check_citations",
+                    input_payload={
+                        "cache_status": cache_status,
+                        "cache_key_suffix": cache_key_suffix,
+                    },
+                    output_payload=validation_result,
+                    output_digest=f"status={validation_result.get('status', 'passed')}",
+                )
+
+        answer = RAGAnswer(
+            summary=summary_text,
+            citations=citations,
+            model_name=model_name,
+            model_output=model_output,
+            guardrail_profile=guardrail_profile,
+        )
+
+        if cache_key and model_output and validation_result and cache_status in {
+            "miss",
+            "refresh",
+        }:
+            _store_cached_answer(cache_key, answer=answer, validation=validation_result)
+            if cache_status == "refresh":
+                RAG_CACHE_EVENTS.labels(status="refresh").inc()
+                log_workflow_event(
+                    "workflow.guardrails_cache",
+                    workflow="rag",
+                    status="refresh",
+                    cache_key_suffix=cache_key_suffix,
+                )
+
+        if self.recorder:
+            compose_step = self.recorder.log_step(
+                tool="rag.compose",
+                action="compose_answer",
+                input_payload={
+                    "question": question,
+                    "citations": [
+                        {
+                            "index": citation.index,
+                            "osis": citation.osis,
+                            "anchor": citation.anchor,
+                            "snippet": citation.snippet,
+                            "passage_id": citation.passage_id,
+                        }
+                        for citation in citations
+                    ],
+                },
+                output_payload={
+                    "summary": summary_text,
+                    "model_name": model_name,
+                    "model_output": model_output,
+                    "cache_status": cache_status,
+                    "validation": validation_result,
+                },
+                output_digest=f"{len(summary_lines)} summary lines",
+            )
+
+            passage_ids = [
+                citation.passage_id
+                for citation in citations
+                if getattr(citation, "passage_id", None)
+            ]
+            osis_refs = [
+                citation.osis for citation in citations if getattr(citation, "osis", None)
+            ]
+            self.recorder.record_retrieval_snapshot(
+                retrieval_hash=retrieval_digest,
+                passage_ids=passage_ids,
+                osis_refs=osis_refs,
+                step=compose_step,
+            )
+
+        return answer
 
 
 def _scrub_adversarial_language(value: str | None) -> str | None:
-    if not value:
-        return value
-    text = value
-    for pattern, replacement in _ADVERSARIAL_REPLACEMENTS:
-        text = pattern.sub(replacement, text)
-    return text
+    return _prompts_scrub_adversarial_language(value)
 
 
 def _sanitize_json_structure(payload: Any) -> Any:
-    if isinstance(payload, dict):
-        return {key: _sanitize_json_structure(value) for key, value in payload.items()}
-    if isinstance(payload, (list, tuple, set)):
-        return [_sanitize_json_structure(item) for item in payload]
-    if isinstance(payload, str):
-        return _sanitize_markdown_field(payload)
-    return payload
+    return _prompts_sanitize_json_structure(payload)
 
 
 def _extract_topic_domains(meta: Mapping[str, Any] | None) -> set[str]:
@@ -199,111 +526,7 @@ def _apply_guardrail_profile(
     results: Sequence[HybridSearchResult],
     filters: HybridSearchFilters | None,
 ) -> tuple[list[HybridSearchResult], dict[str, str] | None]:
-    ordered = list(results)
-    if not filters:
-        return ordered, None
-
-    tradition_filter = _normalise_profile_value(filters.theological_tradition)
-    domain_filter = _normalise_profile_value(filters.topic_domain)
-    if not tradition_filter and not domain_filter:
-        payload = {
-            key: value
-            for key, value in {
-                "theological_tradition": filters.theological_tradition,
-                "topic_domain": filters.topic_domain,
-            }.items()
-            if value
-        }
-        return ordered, payload or None
-
-    matched: list[HybridSearchResult] = []
-    remainder: list[HybridSearchResult] = []
-    for result in ordered:
-        meta = getattr(result, "meta", None)
-        meta_mapping: Mapping[str, Any] | None = meta if isinstance(meta, Mapping) else None
-        meta_tradition = (
-            _normalise_profile_value(str(meta_mapping.get("theological_tradition")))
-            if meta_mapping and meta_mapping.get("theological_tradition") is not None
-            else None
-        )
-        domains = _extract_topic_domains(meta_mapping)
-
-        matches_tradition = True
-        if tradition_filter:
-            matches_tradition = meta_tradition == tradition_filter
-
-        matches_domain = True
-        if domain_filter:
-            matches_domain = domain_filter in domains
-
-        if matches_tradition and matches_domain:
-            matched.append(result)
-        else:
-            remainder.append(result)
-
-    if not matched:
-        LOGGER.warning(
-            "guardrail profile rejected retrieved passages",
-            extra={
-                "theological_tradition": filters.theological_tradition,
-                "topic_domain": filters.topic_domain,
-            },
-        )
-        raise GuardrailError(
-            "No passages matched the requested guardrail profile",
-            safe_refusal=True,
-            metadata={
-                "code": "guardrail_profile_no_match",
-                "guardrail": "retrieval",
-                "suggested_action": "search",
-            },
-        )
-
-    payload = {
-        key: value
-        for key, value in {
-            "theological_tradition": filters.theological_tradition,
-            "topic_domain": filters.topic_domain,
-        }.items()
-        if value
-    }
-    return matched + remainder, payload or None
-
-
-class GuardrailError(GenerationError):
-    """Raised when an answer violates grounding requirements."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        safe_refusal: bool = False,
-        metadata: dict[str, Any] | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.safe_refusal = safe_refusal
-        self.metadata = metadata or {}
-
-
-class RAGCitation(APIModel):
-    index: int
-    osis: str
-    anchor: str
-    passage_id: str
-    document_id: str
-    document_title: str | None = None
-    snippet: str
-    source_url: str | None = None
-    raw_snippet: str | None = Field(default=None, exclude=True)
-
-
-class RAGAnswer(APIModel):
-    summary: str
-    citations: list[RAGCitation]
-    model_name: str | None = None
-    model_output: str | None = None
-    guardrail_profile: dict[str, str] | None = None
-
+    return _guardrails_apply_guardrail_profile(results, filters)
 
 def _record_used_citation_feedback(
     session: Session,
@@ -345,98 +568,6 @@ def _record_used_citation_feedback(
         )
 
 
-class VerseCopilotResponse(APIModel):
-    osis: str
-    question: str | None = None
-    answer: RAGAnswer
-    follow_ups: list[str]
-
-
-class SermonPrepResponse(APIModel):
-    topic: str
-    osis: str | None = None
-    outline: list[str]
-    key_points: list[str]
-    answer: RAGAnswer
-
-
-class ComparativeAnalysisResponse(APIModel):
-    osis: str
-    participants: list[str]
-    comparisons: list[str]
-    answer: RAGAnswer
-
-
-class MultimediaDigestResponse(APIModel):
-    collection: str | None
-    highlights: list[str]
-    answer: RAGAnswer
-
-
-class DevotionalResponse(APIModel):
-    osis: str
-    focus: str
-    reflection: str
-    prayer: str
-    answer: RAGAnswer
-
-
-class CorpusCurationReport(APIModel):
-    since: datetime
-    documents_processed: int
-    summaries: list[str]
-
-
-class CollaborationResponse(APIModel):
-    thread: str
-    synthesized_view: str
-    answer: RAGAnswer
-
-
-T = TypeVar("T")
-
-
-def _get_cache_client() -> Any:
-    """Return a memoized Redis client or ``None`` if unavailable."""
-
-    global _redis_client
-
-    if redis is None:
-        return None
-    if _redis_client is not None:
-        return _redis_client
-
-    try:
-        settings = get_settings()
-        _redis_client = redis.Redis.from_url(  # type: ignore[assignment]
-            settings.redis_url,
-            encoding="utf-8",
-            decode_responses=True,
-        )
-    except Exception:  # pragma: no cover - network/config errors
-        LOGGER.debug("failed to initialise redis client", exc_info=True)
-        _redis_client = None
-    return _redis_client
-
-
-def _run_redis_command(operation: Callable[[Any], T]) -> T | None:
-    """Execute a redis command using the memoized client."""
-
-    client = _get_cache_client()
-    if client is None:
-        return None
-    try:
-        return operation(client)
-    except Exception:  # pragma: no cover - redis failures logged at debug
-        LOGGER.debug("redis command failed", exc_info=True)
-        return None
-
-
-def _normalise_cache_segment(value: str | None, default: str) -> str:
-    segment = value or default
-    return re.sub(r"[^a-zA-Z0-9._-]", "_", segment)
-
-
 def _build_cache_key(
     *,
     user_id: str | None,
@@ -444,25 +575,16 @@ def _build_cache_key(
     prompt: str,
     retrieval_digest: str,
 ) -> str:
-    prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
-    version = _normalise_cache_segment(get_git_sha() or "dev", "dev")
-    user_segment = _normalise_cache_segment(user_id, "anon")
-    model_segment = _normalise_cache_segment(model_label, "default")
-    return f"rag:{version}:{user_segment}:{model_segment}:{retrieval_digest}:{prompt_hash}"
+    return _CACHE.build_key(
+        user_id=user_id,
+        model_label=model_label,
+        prompt=prompt,
+        retrieval_digest=retrieval_digest,
+    )
 
 
 def _load_cached_answer(key: str) -> dict[str, Any] | None:
-    raw = _run_redis_command(lambda client: client.get(key))
-    if not raw:
-        return None
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        LOGGER.debug("invalid JSON payload in cache for key %s", key, exc_info=True)
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return payload
+    return _CACHE.load(key)
 
 
 def _store_cached_answer(
@@ -471,42 +593,7 @@ def _store_cached_answer(
     answer: RAGAnswer,
     validation: dict[str, Any] | None,
 ) -> None:
-    payload = {
-        "answer": answer.model_dump(mode="json"),
-        "validation": validation,
-        "model_name": answer.model_name,
-        "cached_at": datetime.now(UTC).isoformat(),
-    }
-    try:
-        serialised = json.dumps(payload)
-    except TypeError:
-        LOGGER.debug("failed to serialise cache payload", exc_info=True)
-        return
-    _run_redis_command(lambda client: client.set(key, serialised, ex=_CACHE_TTL_SECONDS))
-
-
-def _format_anchor(passage: HybridSearchResult | Passage) -> str:
-    if getattr(passage, "page_no", None) is not None:
-        return f"page {passage.page_no}"
-    if getattr(passage, "t_start", None) is not None:
-        t_end = getattr(passage, "t_end", None)
-        if t_end is None:
-            return f"t={passage.t_start:.0f}s"
-        return f"t={passage.t_start:.0f}-{t_end:.0f}s"
-    return "context"
-
-
-def _build_source_url(result: HybridSearchResult) -> str:
-    params: dict[str, str] = {}
-    if getattr(result, "page_no", None) is not None:
-        params["page"] = str(result.page_no)
-    t_start = getattr(result, "t_start", None)
-    if t_start is not None:
-        params["t"] = str(math.floor(t_start))
-    query = urlencode(params)
-    base = f"/doc/{result.document_id}"
-    anchor = f"#passage-{result.id}"
-    return f"{base}?{query}{anchor}" if query else f"{base}{anchor}"
+    _CACHE.store(key, answer=answer, validation=validation)
 
 
 def _iter_sentence_spans(text: str) -> list[tuple[int, int, str]]:
@@ -557,32 +644,7 @@ def _derive_snippet(
 
 
 def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
-    citations: list[RAGCitation] = []
-    for index, result in enumerate(results, start=1):
-        if not result.osis_ref:
-            continue
-        anchor = _format_anchor(result)
-        snippet = _derive_snippet(result)
-        raw_snippet = None
-        raw_text = getattr(result, "raw_text", None)
-        if raw_text:
-            raw_snippet = _derive_snippet(
-                result, text=raw_text, fallback=raw_text
-            )
-        citations.append(
-            RAGCitation(
-                index=index,
-                osis=result.osis_ref,
-                anchor=anchor,
-                passage_id=result.id,
-                document_id=result.document_id,
-                document_title=result.document_title,
-                snippet=snippet,
-                source_url=_build_source_url(result),
-                raw_snippet=raw_snippet,
-            )
-        )
-    return citations
+    return _guardrails_build_citations(results)
 
 def _normalise_snippet(text: str) -> str:
     collapsed = " ".join(text.split())
@@ -594,210 +656,35 @@ def _normalise_snippet(text: str) -> str:
 def _build_guardrail_result(
     passage: Passage, document: Document | None
 ) -> HybridSearchResult:
-    snippet_source = passage.text or document.title or "Guardrail passage"
-    snippet = _normalise_snippet(snippet_source)
-    title = document.title if document else None
-
-    return HybridSearchResult(
-        id=passage.id,
-        document_id=passage.document_id,
-        text=passage.text,
-        raw_text=passage.raw_text,
-        osis_ref=passage.osis_ref,
-        start_char=passage.start_char,
-        end_char=passage.end_char,
-        page_no=passage.page_no,
-        t_start=passage.t_start,
-        t_end=passage.t_end,
-        score=1.0,
-        meta={},
-        document_title=title,
-        snippet=snippet,
-        rank=0,
-
-        highlights=None,
-    )
+    return _guardrails_build_guardrail_result(passage, document)
 
 
 
 def _load_guardrail_reference(session: Session) -> HybridSearchResult | None:
-    preferred_ids = ("redteam-passage", "guardrail-reference")
-    for passage_id in preferred_ids:
-        passage = session.get(Passage, passage_id)
-        if passage and passage.osis_ref:
-            document = session.get(Document, passage.document_id)
-            return _build_guardrail_result(passage, document)
-
-    row = (
-        session.execute(
-            select(Passage, Document)
-            .join(Document)
-            .where(Passage.osis_ref.isnot(None))
-            .limit(1)
-        )
-        .first()
-    )
-    if not row:
-        return None
-    passage, document = row
-    if not passage.osis_ref:
-        return None
-    return _build_guardrail_result(passage, document)
+    return _guardrails_load_guardrail_reference(session)
 
 
 
 def _load_passages_for_osis(
     session: Session, osis: str, *, limit: int = 3
 ) -> list[HybridSearchResult]:
-    passages = (
-        session.execute(
-            select(Passage).where(Passage.osis_ref == osis).limit(limit)
-        )
-        .scalars()
-        .all()
-    )
-    results: list[HybridSearchResult] = []
-    for passage in passages:
-        document = session.get(Document, passage.document_id)
-        results.append(_build_guardrail_result(passage, document))
-    return results
+    return _guardrails_load_passages_for_osis(session, osis, limit=limit)
 
 
 
 def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
-    digest = hashlib.sha256()
-    for result in results:
-        digest.update(str(result.id).encode("utf-8"))
-        digest.update(str(result.document_id).encode("utf-8"))
-        digest.update(str(result.osis_ref or "").encode("utf-8"))
-        digest.update(str(result.rank).encode("utf-8"))
-        digest.update(str(result.snippet or result.text or "").encode("utf-8"))
-        digest.update(_format_anchor(result).encode("utf-8"))
-    return digest.hexdigest()
+    return _guardrails_build_retrieval_digest(results)
 
 
 def _validate_model_completion(
     completion: str,
     citations: Sequence[RAGCitation],
 ) -> dict[str, Any]:
-    if not completion or not completion.strip():
-        raise GuardrailError(
-            "Model completion was empty",
-            metadata={
-                "code": "generation_empty_completion",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
-
-    marker_index = completion.lower().rfind("sources:")
-    if marker_index == -1:
-        raise GuardrailError(
-            "Model completion missing 'Sources:' line",
-            metadata={
-                "code": "generation_missing_sources_line",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
-
-    sources_text = completion[marker_index + len("Sources:") :].strip()
-    if not sources_text:
-        raise GuardrailError(
-            "Model completion missing citations after 'Sources:'",
-            metadata={
-                "code": "generation_missing_citations",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
-
-    entries = [entry.strip() for entry in re.split(r";|\n", sources_text) if entry.strip()]
-    if not entries:
-        raise GuardrailError(
-            "Model completion missing citations after 'Sources:'",
-            metadata={
-                "code": "generation_missing_citations",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
-
-    expected = {citation.index: citation for citation in citations}
-    mismatches: list[str] = []
-    parsed_entries: list[dict[str, Any]] = []
-    cited_indices: list[int] = []
-
-    for entry in entries:
-        entry_match = _CITATION_ENTRY_PATTERN.match(entry)
-        if not entry_match:
-            mismatches.append(f"unparseable citation '{entry}'")
-            continue
-
-        index = int(entry_match.group("index"))
-        osis = entry_match.group("osis").strip()
-        anchor = entry_match.group("anchor").strip()
-        parsed_entries.append({"index": index, "osis": osis, "anchor": anchor})
-        cited_indices.append(index)
-
-        citation = expected.get(index)
-        if citation is None:
-            mismatches.append(
-                f"citation index {index} not present in retrieved passages"
-            )
-            continue
-        if osis != citation.osis:
-            mismatches.append(
-                f"citation [{index}] OSIS mismatch (expected {citation.osis}, got {osis})"
-            )
-        if anchor != citation.anchor:
-            mismatches.append(
-                f"citation [{index}] anchor mismatch (expected {citation.anchor}, got {anchor})"
-            )
-
-    if not cited_indices:
-        raise GuardrailError(
-            "Model completion did not include any recognised citations",
-            metadata={
-                "code": "generation_unrecognised_citations",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
-
-    if mismatches:
-        raise GuardrailError(
-            "Model citations failed guardrails: " + "; ".join(mismatches),
-            metadata={
-                "code": "generation_citation_mismatch",
-                "guardrail": "generation",
-                "suggested_action": "search",
-                "reason": "; ".join(mismatches),
-            },
-        )
-
-    return {
-        "status": "passed",
-        "cited_indices": sorted(set(cited_indices)),
-        "citation_count": len(parsed_entries),
-        "sources": parsed_entries,
-    }
+    return _guardrails_validate_model_completion(completion, citations)
 
 
 def ensure_completion_safe(completion: str | None) -> None:
-    if not completion:
-        return
-    for pattern, reason in _DISALLOWED_COMPLETION_PATTERNS:
-        if pattern.search(completion):
-            raise GuardrailError(
-                f"Model completion failed safety check: {reason}",
-                metadata={
-                    "code": "safety_pattern_detected",
-                    "guardrail": "safety",
-                    "suggested_action": "search",
-                    "reason": reason,
-                },
-            )
+    _guardrails_ensure_completion_safe(completion)
 
 
 def _guarded_answer(
@@ -812,370 +699,20 @@ def _guarded_answer(
     memory_context: Sequence[str] | None = None,
     allow_fallback: bool = False,
 ) -> RAGAnswer:
-    ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
-    citations = _build_citations(ordered_results)
-    if not citations and allow_fallback:
-        fallback_result = _load_guardrail_reference(session)
-        if fallback_result:
-            ordered_results = [fallback_result]
-            citations = _build_citations(ordered_results)
-    if not citations:
-        raise GuardrailError(
-            "Retrieved passages lacked OSIS references; aborting generation",
-            metadata={
-                "code": "retrieval_missing_osis",
-                "guardrail": "retrieval",
-                "suggested_action": "upload",
-            },
-        )
-
-    cited_results = [result for result in ordered_results if result.osis_ref]
-    summary_lines = []
-    for idx, citation in enumerate(citations):
-        result = cited_results[idx] if idx < len(cited_results) else None
-        document_title = (
-            citation.document_title
-            or (result.document_title if result else None)
-            or citation.document_id
-        )
-        summary_lines.append(
-            f"[{citation.index}] {citation.snippet} — {document_title}"
-            f" ({citation.osis}, {citation.anchor})"
-        )
-    summary_text = "\n".join(summary_lines)
-
-    model_output = None
-    model_name = None
-    validation_result: dict[str, Any] | None = None
-    cache_status = "skipped"
-    cache_key: str | None = None
-    cache_key_suffix: str | None = None
-
-
-    user_id = None
-    if recorder and getattr(recorder, "trail", None) is not None:
-        user_id = getattr(recorder.trail, "user_id", None)
-
-    router = get_router(session, registry=registry)
-    candidates = list(router.iter_candidates("rag", model_hint))
-    if not candidates:
-        raise GenerationError("No language models are available for workflow 'rag'")
-
-    context_lines = []
-    for citation in citations:
-        prompt_snippet = _scrub_adversarial_language(citation.snippet) or ""
-        context_lines.append(
-            f"[{citation.index}] {prompt_snippet.strip()} (OSIS {citation.osis}, {citation.anchor})"
-        )
-    prompt_parts = [
-        "You are Theo Engine's grounded assistant.",
-        "Answer the question strictly from the provided passages.",
-        "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
-        "If the passages do not answer the question, state that explicitly.",
-    ]
-    if memory_context:
-        prompt_parts.append("Prior conversation highlights:")
-        for idx, snippet in enumerate(memory_context, start=1):
-            sanitized = _scrub_adversarial_language(snippet) or ""
-            if sanitized:
-                prompt_parts.append(f"{idx}. {sanitized}")
-    sanitized_question = _scrub_adversarial_language(question)
-    if sanitized_question:
-        prompt_parts.append(f"Question: {sanitized_question}")
-    prompt_parts.append("Passages:")
-    prompt_parts.extend(context_lines)
-    prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
-    prompt = "\\n".join(prompt_parts)
-
-    retrieval_digest = _build_retrieval_digest(ordered_results)
-    last_error: GenerationError | None = None
-    selected_model: LLMModel | None = None
-
-    cache_key = None
-    cache_key_suffix = None
-    cache_status = "skipped"
-
-    for candidate in candidates:
-        selected_model = candidate
-        cache_event_logged = False
-        cache_key = _build_cache_key(
-            user_id=user_id,
-            model_label=candidate.name,
-            prompt=prompt,
-            retrieval_digest=retrieval_digest,
-        )
-        cache_key_suffix = cache_key[-12:]
-        cache_status = "miss"
-        cache_hit_payload: RAGAnswer | None = None
-        validation_result = None
-        model_output = None
-
-        cached_payload = _load_cached_answer(cache_key)
-        if cached_payload:
-            cache_status = "hit"
-            try:
-                cache_hit_payload = RAGAnswer.model_validate(cached_payload.get("answer"))
-            except Exception:
-                LOGGER.debug(
-                    "invalid cached answer payload for key %s", cache_key, exc_info=True
-                )
-                cache_hit_payload = None
-
-            if cache_hit_payload and cache_hit_payload.model_output:
-                try:
-                    validation_result = _validate_model_completion(
-                        cache_hit_payload.model_output, citations
-                    )
-                    ensure_completion_safe(cache_hit_payload.model_output)
-                except GuardrailError as exc:
-                    cache_status = "stale"
-                    _run_redis_command(lambda client: client.delete(cache_key))
-                    RAG_CACHE_EVENTS.labels(status="stale").inc()
-                    log_workflow_event(
-                        "workflow.guardrails_cache",
-                        workflow="rag",
-                        status="stale",
-                        cache_key_suffix=cache_key_suffix,
-                    )
-                    cache_event_logged = True
-                    if recorder:
-                        recorder.log_step(
-                            tool="rag.cache",
-                            action="invalidate",
-                            input_payload={"cache_key_suffix": cache_key_suffix},
-                            status="failed",
-                            error_message=str(exc),
-                        )
-                    cache_hit_payload = None
-                    validation_result = None
-                else:
-                    model_output = cache_hit_payload.model_output
-                    model_name = cached_payload.get("model_name", candidate.name)
-            else:
-                cache_status = "stale"
-
-        if cache_status == "hit" and model_output:
-            RAG_CACHE_EVENTS.labels(status="hit").inc()
-            log_workflow_event(
-                "workflow.guardrails_cache",
-                workflow="rag",
-                status="hit",
-                cache_key_suffix=cache_key_suffix,
-            )
-        elif not cache_event_logged:
-            if cache_status == "hit":
-                cache_status = "stale"
-            if cache_status == "stale":
-                RAG_CACHE_EVENTS.labels(status="stale").inc()
-                log_workflow_event(
-                    "workflow.guardrails_cache",
-                    workflow="rag",
-                    status="stale",
-                    cache_key_suffix=cache_key_suffix,
-                )
-            else:
-                RAG_CACHE_EVENTS.labels(status="miss").inc()
-                log_workflow_event(
-                    "workflow.guardrails_cache",
-                    workflow="rag",
-                    status="miss",
-                    cache_key_suffix=cache_key_suffix,
-                )
-
-        if recorder and cache_key:
-            recorder.log_step(
-                tool="rag.cache",
-                action="lookup",
-                input_payload={"cache_key_suffix": cache_key_suffix},
-                output_payload={"status": cache_status},
-                output_digest=cache_status,
-            )
-
-        if model_output:
-            break
-
-        llm_payload = {
-            "prompt": prompt,
-            "model": candidate.model,
-            "registry_name": candidate.name,
-        }
-        try:
-            with _RAG_TRACER.start_as_current_span("rag.execute_generation") as span:
-                span.set_attribute("rag.candidate", candidate.name)
-                span.set_attribute("rag.model_label", candidate.model)
-                span.set_attribute("rag.cache_status", cache_status)
-                if cache_key_suffix:
-                    span.set_attribute("rag.cache_key_suffix", cache_key_suffix)
-                span.set_attribute("rag.prompt_tokens", max(len(prompt) // 4, 0))
-                try:
-                    routed_generation = router.execute_generation(
-                        workflow="rag",
-                        model=candidate,
-                        prompt=prompt,
-                    )
-                except GenerationError as inner_exc:
-                    span.record_exception(inner_exc)
-                    span.set_attribute("rag.guardrails_cache_final", cache_status)
-                    raise
-                span.set_attribute("rag.latency_ms", routed_generation.latency_ms)
-                span.set_attribute("rag.completion_tokens", max(len(routed_generation.output) // 4, 0) if routed_generation.output else 0)
-
-                completion = routed_generation.output
-                if recorder:
-                    recorder.log_step(
-                        tool="llm.generate",
-                        action="generate_grounded_answer",
-                        input_payload=llm_payload,
-                        output_payload={
-                            "completion": completion,
-                            "latency_ms": routed_generation.latency_ms,
-                            "cost": routed_generation.cost,
-                        },
-                        output_digest=f"{len(completion)} characters",
-                    )
-                sources_line = "; ".join(
-                    f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
-                )
-                has_citations_line = bool(re.search(r"Sources:\s*\[\d+]", completion))
-                if not has_citations_line:
-                    completion = completion.strip() + f"\n\nSources: {sources_line}"
-                try:
-                    validation_result = _validate_model_completion(completion, citations)
-                    ensure_completion_safe(completion)
-                except GuardrailError as exc:
-                    span.record_exception(exc)
-                    log_workflow_event(
-                        "workflow.guardrails_validation",
-                        workflow="rag",
-                        status="failed",
-                        cache_status=cache_status,
-                        cache_key_suffix=cache_key_suffix,
-                    )
-                    if recorder:
-                        recorder.log_step(
-                            tool="guardrails.validate",
-                            action="check_citations",
-                            status="failed",
-                            input_payload={
-                                "cache_status": cache_status,
-                                "cache_key_suffix": cache_key_suffix,
-                            },
-                            output_payload={"completion": completion},
-                            error_message=str(exc),
-                        )
-                    span.set_attribute("rag.guardrails_cache_final", cache_status)
-                    raise
-                model_output = completion
-                model_name = candidate.name
-                if cache_status == "stale":
-                    cache_status = "refresh"
-                span.set_attribute("rag.guardrails_cache_final", cache_status)
-                break
-        except GenerationError as exc:
-            last_error = exc
-            if recorder:
-                recorder.log_step(
-                    tool="llm.generate",
-                    action="generate_grounded_answer",
-                    status="failed",
-                    input_payload=llm_payload,
-                    output_digest=str(exc),
-                    error_message=str(exc),
-                )
-            continue
-
-    if not model_output:
-        if last_error is not None:
-            raise last_error
-        raise GenerationError("Language model routing failed to produce a completion")
-    if validation_result:
-        log_workflow_event(
-            "workflow.guardrails_validation",
-            workflow="rag",
-            status=validation_result.get("status", "passed"),
-            cache_status=cache_status,
-            cache_key_suffix=cache_key_suffix,
-            citation_count=validation_result.get("citation_count"),
-            cited_indices=validation_result.get("cited_indices"),
-        )
-        if recorder:
-            recorder.log_step(
-                tool="guardrails.validate",
-                action="check_citations",
-                input_payload={
-                    "cache_status": cache_status,
-                    "cache_key_suffix": cache_key_suffix,
-                },
-                output_payload=validation_result,
-                output_digest=f"status={validation_result.get('status', 'passed')}",
-            )
-
-    answer = RAGAnswer(
-        summary=summary_text,
-        citations=citations,
-        model_name=model_name,
-        model_output=model_output,
-        guardrail_profile=guardrail_profile,
+    pipeline = GuardedAnswerPipeline(
+        session,
+        registry,
+        cache=_CACHE,
+        recorder=recorder,
     )
-
-    if cache_key and model_output and validation_result and cache_status in {
-        "miss",
-        "refresh",
-    }:
-        _store_cached_answer(cache_key, answer=answer, validation=validation_result)
-        if cache_status == "refresh":
-            RAG_CACHE_EVENTS.labels(status="refresh").inc()
-            log_workflow_event(
-                "workflow.guardrails_cache",
-                workflow="rag",
-                status="refresh",
-                cache_key_suffix=cache_key_suffix,
-            )
-
-    if recorder:
-        compose_step = recorder.log_step(
-            tool="rag.compose",
-            action="compose_answer",
-            input_payload={
-                "question": question,
-                "citations": [
-                    {
-                        "index": citation.index,
-                        "osis": citation.osis,
-                        "anchor": citation.anchor,
-                        "snippet": citation.snippet,
-                        "passage_id": citation.passage_id,
-                    }
-                    for citation in citations
-                ],
-            },
-            output_payload={
-                "summary": summary_text,
-                "model_name": model_name,
-                "model_output": model_output,
-                "cache_status": cache_status,
-                "validation": validation_result,
-            },
-            output_digest=f"{len(summary_lines)} summary lines",
-        )
-
-        passage_ids = [
-            citation.passage_id
-            for citation in citations
-            if getattr(citation, "passage_id", None)
-        ]
-        osis_refs = [
-            citation.osis for citation in citations if getattr(citation, "osis", None)
-        ]
-        recorder.record_retrieval_snapshot(
-            retrieval_hash=retrieval_digest,
-            passage_ids=passage_ids,
-            osis_refs=osis_refs,
-            step=compose_step,
-        )
-
-    return answer
-
+    return pipeline.compose(
+        question=question,
+        results=results,
+        model_hint=model_hint,
+        filters=filters,
+        memory_context=memory_context,
+        allow_fallback=allow_fallback,
+    )
 
 _REFUSAL_OSIS = "John.1.1"
 _REFUSAL_FALLBACK_ANCHOR = "John 1:1"
@@ -1327,18 +864,8 @@ def _search(
     filters: HybridSearchFilters,
     k: int = 8,
 ) -> list[HybridSearchResult]:
-    request = HybridSearchRequest(query=query, osis=osis, filters=filters, k=k)
-    results = list(hybrid_search(session, request))
-    if osis and not any(result.osis_ref for result in results):
-        fallback = _load_passages_for_osis(session, osis)
-        if fallback:
-            LOGGER.debug(
-                "Hybrid search yielded no OSIS matches; injecting %d fallback passages for %s",
-                len(fallback),
-                osis,
-            )
-            return fallback
-    return results
+    retriever = PassageRetriever(session)
+    return retriever.search(query=query, osis=osis, filters=filters, k=k)
 
 
 def run_guarded_chat(
