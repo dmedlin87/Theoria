@@ -9,6 +9,7 @@ from .morphology import fetch_morphology
 from .notes import (
     create_research_note,
     delete_research_note,
+    generate_research_note_preview,
     get_notes_for_osis,
     update_research_note,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "fetch_cross_references",
     "fetch_morphology",
     "create_research_note",
+    "generate_research_note_preview",
     "get_notes_for_osis",
     "update_research_note",
     "delete_research_note",
