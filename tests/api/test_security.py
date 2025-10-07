@@ -9,6 +9,8 @@ from typing import Any
 import jwt
 import pytest
 from fastapi.testclient import TestClient
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -39,6 +41,9 @@ class _DummySession:
     def execute(self, _stmt):
         return _DummyResult()
 
+    def get(self, _model, _pk):
+        return None
+
 
 @pytest.fixture(autouse=True)
 def _refresh_settings():
@@ -51,6 +56,9 @@ def _refresh_settings():
 def secure_env(monkeypatch) -> dict[str, str]:
     monkeypatch.setenv("THEO_API_KEYS", '["valid-key"]')
     monkeypatch.setenv("THEO_AUTH_JWT_SECRET", "shared-secret")
+    monkeypatch.delenv("THEO_AUTH_JWT_ALGORITHMS", raising=False)
+    monkeypatch.delenv("THEO_AUTH_JWT_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("THEO_AUTH_JWT_PUBLIC_KEY_PATH", raising=False)
     monkeypatch.delenv("THEO_AUTH_ALLOW_ANONYMOUS", raising=False)
     return {"api_key": "valid-key", "jwt_secret": "shared-secret"}
 
@@ -65,9 +73,40 @@ def api_client(monkeypatch, secure_env):
 def anonymous_client(monkeypatch):
     monkeypatch.delenv("THEO_API_KEYS", raising=False)
     monkeypatch.delenv("THEO_AUTH_JWT_SECRET", raising=False)
+    monkeypatch.delenv("THEO_AUTH_JWT_ALGORITHMS", raising=False)
+    monkeypatch.delenv("THEO_AUTH_JWT_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("THEO_AUTH_JWT_PUBLIC_KEY_PATH", raising=False)
     monkeypatch.setenv("THEO_AUTH_ALLOW_ANONYMOUS", "1")
     with _client_context(monkeypatch) as client:
         yield client
+
+
+@pytest.fixture
+def rsa_keys() -> tuple[str, str]:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("utf-8")
+    return private_pem, public_pem
+
+
+@pytest.fixture
+def rsa_client(monkeypatch, rsa_keys):
+    private_pem, public_pem = rsa_keys
+    monkeypatch.setenv("THEO_API_KEYS", '["valid-key"]')
+    monkeypatch.delenv("THEO_AUTH_JWT_SECRET", raising=False)
+    monkeypatch.setenv("THEO_AUTH_JWT_ALGORITHMS", '["RS256"]')
+    monkeypatch.setenv("THEO_AUTH_JWT_PUBLIC_KEY", public_pem)
+    monkeypatch.delenv("THEO_AUTH_JWT_PUBLIC_KEY_PATH", raising=False)
+    monkeypatch.delenv("THEO_AUTH_ALLOW_ANONYMOUS", raising=False)
+    with _client_context(monkeypatch) as client:
+        yield client, private_pem
 
 
 @contextmanager
@@ -164,7 +203,7 @@ def test_api_key_allows_access(api_client, method: str, path: str, kwargs: dict[
     assert response.status_code == 200
 
 
-def test_jwt_allows_access(api_client):
+def test_hs256_jwt_allows_access(api_client):
     token = jwt.encode({"sub": "test-user"}, "shared-secret", algorithm="HS256")
     response = api_client.get("/documents", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
@@ -172,4 +211,11 @@ def test_jwt_allows_access(api_client):
 
 def test_anonymous_access_allowed_when_auth_unconfigured(anonymous_client):
     response = anonymous_client.get("/documents")
+    assert response.status_code == 200
+
+
+def test_rs256_jwt_allows_access(rsa_client):
+    client, private_key = rsa_client
+    token = jwt.encode({"sub": "rs-user"}, private_key, algorithm="RS256")
+    response = client.get("/documents", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200

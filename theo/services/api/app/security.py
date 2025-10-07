@@ -45,14 +45,31 @@ def _authenticate_api_key(key: str) -> Principal:
 
 def _decode_jwt(token: str) -> Principal:
     settings = get_settings()
-    if not settings.auth_jwt_secret:
+    if not settings.has_auth_jwt_credentials():
         _reject_forbidden("JWT authentication is not configured")
 
+    algorithms = settings.auth_jwt_algorithms or ["HS256"]
+
     try:
+        header = jwt.get_unverified_header(token)
+        algorithm = header.get("alg")
+        if not algorithm:
+            raise jwt.InvalidTokenError("Missing signing algorithm")
+        if algorithm not in algorithms:
+            raise jwt.InvalidTokenError("Unsupported signing algorithm")
+        verification_key: str | None
+        if algorithm.startswith("HS"):
+            verification_key = settings.auth_jwt_secret
+        elif algorithm.startswith("RS"):
+            verification_key = settings.load_auth_jwt_public_key()
+        else:
+            verification_key = settings.auth_jwt_secret or settings.load_auth_jwt_public_key()
+        if not verification_key:
+            _reject_forbidden("JWT authentication is not configured")
         payload = jwt.decode(
             token,
-            settings.auth_jwt_secret,
-            algorithms=settings.auth_jwt_algorithms or ["HS256"],
+            verification_key,
+            algorithms=[algorithm],
             audience=settings.auth_jwt_audience,
             issuer=settings.auth_jwt_issuer,
         )
@@ -93,7 +110,7 @@ def _anonymous_principal() -> Principal:
 
 
 def _auth_configured(settings: Settings) -> bool:
-    return bool(settings.api_keys or settings.auth_jwt_secret)
+    return bool(settings.api_keys or settings.has_auth_jwt_credentials())
 
 
 def require_principal(
@@ -106,7 +123,7 @@ def require_principal(
     settings = get_settings()
     principal: Principal | None = None
 
-    credentials_configured = bool(settings.api_keys) or bool(settings.auth_jwt_secret)
+    credentials_configured = bool(settings.api_keys) or settings.has_auth_jwt_credentials()
     allow_anonymous = settings.auth_allow_anonymous
 
     if not credentials_configured:
