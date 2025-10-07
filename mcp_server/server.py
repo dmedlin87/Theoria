@@ -9,6 +9,8 @@ from typing import Any, Awaitable, Callable, Dict, Iterable, Literal, Mapping, T
 from uuid import uuid4
 
 from fastapi import FastAPI, Header
+from pydantic import BaseModel
+from pydantic_core import PydanticUndefined
 from . import schemas
 
 LOGGER = logging.getLogger(__name__)
@@ -35,6 +37,17 @@ def _placeholder_value(field: Any) -> Any:
     annotation = getattr(field, "annotation", Any)
     origin = get_origin(annotation)
     args = get_args(annotation)
+
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        nested_kwargs: Dict[str, Any] = {}
+        for nested_name, nested_field in annotation.model_fields.items():
+            if nested_field.is_required():
+                nested_kwargs[nested_name] = _placeholder_value(nested_field)
+            else:
+                default_value = nested_field.get_default(call_default_factory=True)
+                if default_value is not PydanticUndefined:
+                    nested_kwargs[nested_name] = default_value
+        return nested_kwargs
 
     if origin in (list, tuple, set, frozenset, ABCSequence):
         return []
