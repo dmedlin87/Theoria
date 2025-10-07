@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Header
 from . import schemas
-from .tools import read
+from .tools import read, write
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def _build_stub_handler(
         )
         return response_model(
             request_id=request.request_id,
-            dry_run=request.dry_run,
+            commit=request.commit,
             run_id=run_id,
         )
 
@@ -89,14 +89,14 @@ def _build_tools() -> tuple[ToolDefinition, ...]:
             description="Create or update a research note anchored to an OSIS reference.",
             request_model=schemas.NoteWriteRequest,
             response_model=schemas.NoteWriteResponse,
-            handler=_build_stub_handler("note_write", schemas.NoteWriteResponse),
+            handler=write.note_write,
         ),
         ToolDefinition(
             name="index_refresh",
             description="Request a refresh of Theo's background indexes.",
             request_model=schemas.IndexRefreshRequest,
             response_model=schemas.IndexRefreshResponse,
-            handler=_build_stub_handler("index_refresh", schemas.IndexRefreshResponse),
+            handler=write.index_refresh,
         ),
         ToolDefinition(
             name="source_registry_list",
@@ -110,7 +110,7 @@ def _build_tools() -> tuple[ToolDefinition, ...]:
             description="Create an evidence card that can be attached to research workflows.",
             request_model=schemas.EvidenceCardCreateRequest,
             response_model=schemas.EvidenceCardCreateResponse,
-            handler=_build_stub_handler("evidence_card_create", schemas.EvidenceCardCreateResponse),
+            handler=write.evidence_card_create,
         ),
     )
 

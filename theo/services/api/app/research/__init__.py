@@ -13,6 +13,7 @@ from .notes import (
     get_notes_for_osis,
     update_research_note,
 )
+from .evidence_cards import create_evidence_card, preview_evidence_card
 from .overview import build_reliability_overview
 from .reports import report_build
 from .scripture import fetch_passage
@@ -29,6 +30,8 @@ __all__ = [
     "get_notes_for_osis",
     "update_research_note",
     "delete_research_note",
+    "create_evidence_card",
+    "preview_evidence_card",
     "search_contradictions",
     "search_commentaries",
     "lookup_geo_places",

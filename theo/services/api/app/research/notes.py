@@ -24,6 +24,9 @@ def create_research_note(
     tags: list[str] | None = None,
     evidences: Iterable[dict] | None = None,
     commit: bool = True,
+    request_id: str | None = None,
+    end_user_id: str | None = None,
+    tenant_id: str | None = None,
 ) -> ResearchNote:
     """Persist a research note and optional evidence records."""
 
@@ -35,6 +38,9 @@ def create_research_note(
         claim_type=claim_type,
         confidence=confidence,
         tags=list(tags) if tags else None,
+        request_id=request_id,
+        created_by=end_user_id,
+        tenant_id=tenant_id,
     )
     session.add(note)
     session.flush()
