@@ -278,6 +278,9 @@ class ResearchNote(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    created_by: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
@@ -322,6 +325,32 @@ class NoteEvidence(Base):
 
     note: Mapped[ResearchNote] = relationship(
         "ResearchNote", back_populates="evidences"
+    )
+
+
+class EvidenceCard(Base):
+    """Evidence card records authored via MCP."""
+
+    __tablename__ = "evidence_cards"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    osis: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    claim_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[dict] = mapped_column(JSON, nullable=False)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    created_by: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
     )
 
 

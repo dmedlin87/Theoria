@@ -58,7 +58,7 @@ def _tool_instrumentation(
         span.set_attribute("tool.name", tool)
         span.set_attribute("tool.request_id", request.request_id)
         span.set_attribute("tool.end_user_id", end_user_id)
-        span.set_attribute("tool.dry_run", request.dry_run)
+        span.set_attribute("tool.commit", request.commit)
         LOGGER.info(
             "mcp.tool.invoked",
             extra={
@@ -66,7 +66,7 @@ def _tool_instrumentation(
                 "tool": tool,
                 "request_id": request.request_id,
                 "end_user_id": end_user_id,
-                "dry_run": request.dry_run,
+                "commit": request.commit,
                 "run_id": run_id,
             },
         )
@@ -154,7 +154,7 @@ async def search_library(
         return schemas.SearchLibraryResponse(
             request_id=request.request_id,
             run_id=run_id,
-            dry_run=request.dry_run,
+            commit=request.commit,
             results=contract_results,
             debug={"query": request.query, "filters": request.filters},
         )
@@ -200,7 +200,7 @@ async def aggregate_verses(
         return schemas.AggregateVersesResponse(
             request_id=request.request_id,
             run_id=run_id,
-            dry_run=request.dry_run,
+            commit=request.commit,
             osis=request.osis,
             strategy=request.strategy,
             combined_text=combined_text,
@@ -274,7 +274,7 @@ async def get_timeline(
         return schemas.GetTimelineResponse(
             request_id=request.request_id,
             run_id=run_id,
-            dry_run=request.dry_run,
+            commit=request.commit,
             osis=request.osis,
             window=request.window,
             buckets=buckets,
@@ -344,7 +344,7 @@ async def quote_lookup(
         return schemas.QuoteLookupResponse(
             request_id=request.request_id,
             run_id=run_id,
-            dry_run=request.dry_run,
+            commit=request.commit,
             quotes=quotes,
             total=len(quotes),
         )
