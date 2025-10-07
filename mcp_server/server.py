@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Dict, Iterable, Mapping, Type, TypeVar
+from collections.abc import Mapping as ABCMapping, Sequence as ABCSequence
+from typing import Any, Awaitable, Callable, Dict, Iterable, Literal, Mapping, Type, TypeVar, get_args, get_origin
 from uuid import uuid4
 
 from fastapi import FastAPI, Header
@@ -28,6 +29,32 @@ class ToolDefinition:
     handler: Callable[[RequestModel, str], Awaitable[ResponseModel]]
 
 
+def _placeholder_value(field: Any) -> Any:
+    """Return a synthetic value for required response fields without defaults."""
+
+    annotation = getattr(field, "annotation", Any)
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+
+    if origin in (list, tuple, set, frozenset, ABCSequence):
+        return []
+    if origin in (dict, ABCMapping):
+        return {}
+    if origin is Literal:
+        return args[0] if args else None
+
+    if annotation is str or annotation is Any:
+        return ""
+    if annotation is int:
+        return 0
+    if annotation is float:
+        return 0.0
+    if annotation is bool:
+        return False
+
+    return ""
+
+
 def _build_stub_handler(
     tool_name: str,
     response_model: Type[ResponseModel],
@@ -42,11 +69,22 @@ def _build_stub_handler(
         LOGGER.info(
             "Invoked MCP tool", extra={"tool": tool_name, "request_id": request.request_id, "run_id": run_id, "end_user_id": end_user_id}
         )
-        return response_model(
-            request_id=request.request_id,
-            dry_run=request.dry_run,
-            run_id=run_id,
-        )
+        response_kwargs: Dict[str, Any] = {
+            "request_id": request.request_id,
+            "dry_run": request.dry_run,
+            "run_id": run_id,
+        }
+
+        for field_name, field in response_model.model_fields.items():
+            if field_name in response_kwargs:
+                continue
+            if field.is_required():
+                if hasattr(request, field_name):
+                    response_kwargs[field_name] = getattr(request, field_name)
+                else:
+                    response_kwargs[field_name] = _placeholder_value(field)
+
+        return response_model(**response_kwargs)
 
     return _handler
 
