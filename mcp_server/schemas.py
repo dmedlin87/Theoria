@@ -11,9 +11,12 @@ class ToolRequestBase(BaseModel):
     """Base fields shared by all tool requests."""
 
     request_id: str = Field(..., description="Unique identifier supplied by the MCP client.")
-    dry_run: bool = Field(
+    commit: bool = Field(
         default=False,
-        description="When true, the server performs validation without mutating persistent state.",
+        description=(
+            "When true, the server is allowed to persist mutations. Requests default to preview"
+            " mode and must explicitly opt-in to writes."
+        ),
     )
 
 
@@ -22,9 +25,9 @@ class ToolResponseBase(BaseModel):
 
     request_id: str = Field(..., description="Echo of the originating request identifier.")
     run_id: str = Field(..., description="Server generated identifier for the tool execution.")
-    dry_run: bool = Field(
+    commit: bool = Field(
         default=False,
-        description="Indicates whether the tool was executed in dry-run mode.",
+        description="Echo of the commit flag used for the request.",
     )
 
 
@@ -251,13 +254,27 @@ class NoteWriteResponse(ToolResponseBase):
 
     note_id: str | None = Field(default=None, description="Identifier of the persisted note.")
     status: str = Field(default="accepted", description="Execution status for the request.")
+    preview: Dict[str, Any] | None = Field(
+        default=None,
+        description="Preview metadata describing the note that would be created when commit=false.",
+    )
 
 
 class IndexRefreshRequest(ToolRequestBase):
     """Request the background refresh of an index."""
 
-    index_name: str = Field(..., description="Identifier for the index to refresh.")
-    priority: str | None = Field(default=None, description="Optional priority hint for the refresh job.")
+    sample_queries: int = Field(
+        default=25,
+        ge=1,
+        le=500,
+        description="Number of sample queries used to evaluate the refresh.",
+    )
+    top_k: int = Field(
+        default=10,
+        ge=1,
+        le=200,
+        description="Top-K parameter forwarded to the refresh evaluation routine.",
+    )
 
 
 class IndexRefreshResponse(ToolResponseBase):
@@ -265,6 +282,14 @@ class IndexRefreshResponse(ToolResponseBase):
 
     accepted: bool = Field(default=True, description="Indicates whether the refresh request was accepted.")
     message: str | None = Field(default=None, description="Optional human readable status message.")
+    job: Dict[str, Any] | None = Field(
+        default=None,
+        description="Serialized job record returned when the refresh is committed.",
+    )
+    preview: Dict[str, Any] | None = Field(
+        default=None,
+        description="Parameters that would be enqueued when commit is false.",
+    )
 
 
 class SourceRegistryListRequest(ToolRequestBase):
@@ -315,3 +340,7 @@ class EvidenceCardCreateResponse(ToolResponseBase):
         description="Identifier of the created evidence card when persistence succeeds.",
     )
     status: str = Field(default="accepted", description="Execution status for the request.")
+    preview: Dict[str, Any] | None = Field(
+        default=None,
+        description="Preview payload describing the evidence card when commit=false.",
+    )
