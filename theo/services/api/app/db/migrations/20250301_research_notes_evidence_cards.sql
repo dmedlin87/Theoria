@@ -5,8 +5,7 @@ ALTER TABLE research_notes
     ADD COLUMN IF NOT EXISTS tags JSONB NULL,
     ADD COLUMN IF NOT EXISTS request_id TEXT NULL,
     ADD COLUMN IF NOT EXISTS created_by TEXT NULL,
-    ADD COLUMN IF NOT EXISTS tenant_id TEXT NULL,
-    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    ADD COLUMN IF NOT EXISTS tenant_id TEXT NULL;
 
 CREATE INDEX IF NOT EXISTS ix_research_notes_request_id
     ON research_notes (request_id);
@@ -16,9 +15,6 @@ CREATE INDEX IF NOT EXISTS ix_research_notes_created_by
 
 CREATE INDEX IF NOT EXISTS ix_research_notes_tenant_id
     ON research_notes (tenant_id);
-
-ALTER TABLE note_evidence
-    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS evidence_cards (
     id TEXT PRIMARY KEY,
