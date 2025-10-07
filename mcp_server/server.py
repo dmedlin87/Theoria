@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Header
 from . import schemas
+from .tools import read
 
 LOGGER = logging.getLogger(__name__)
 
@@ -60,28 +61,28 @@ def _build_tools() -> tuple[ToolDefinition, ...]:
             description="Search Theo's library for passages, documents, and cross references.",
             request_model=schemas.SearchLibraryRequest,
             response_model=schemas.SearchLibraryResponse,
-            handler=_build_stub_handler("search_library", schemas.SearchLibraryResponse),
+            handler=read.search_library,
         ),
         ToolDefinition(
             name="aggregate_verses",
             description="Aggregate verse mentions across the Theo corpus.",
             request_model=schemas.AggregateVersesRequest,
             response_model=schemas.AggregateVersesResponse,
-            handler=_build_stub_handler("aggregate_verses", schemas.AggregateVersesResponse),
+            handler=read.aggregate_verses,
         ),
         ToolDefinition(
             name="get_timeline",
             description="Return aggregated timeline information for a verse.",
             request_model=schemas.GetTimelineRequest,
             response_model=schemas.GetTimelineResponse,
-            handler=_build_stub_handler("get_timeline", schemas.GetTimelineResponse),
+            handler=read.get_timeline,
         ),
         ToolDefinition(
             name="quote_lookup",
             description="Retrieve transcript quotes linked to passages or identifiers.",
             request_model=schemas.QuoteLookupRequest,
             response_model=schemas.QuoteLookupResponse,
-            handler=_build_stub_handler("quote_lookup", schemas.QuoteLookupResponse),
+            handler=read.quote_lookup,
         ),
         ToolDefinition(
             name="note_write",
