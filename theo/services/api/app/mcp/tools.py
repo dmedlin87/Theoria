@@ -9,9 +9,13 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..db.models import Passage, ResearchNote
-from ..models.research import NoteEvidenceCreate, ResearchNoteCreate
-from ..research.notes import create_research_note
+from ..db.models import Passage
+from ..models.research import (
+    NoteEvidenceCreate,
+    ResearchNote as ResearchNoteSchema,
+    ResearchNoteCreate,
+)
+from ..research.notes import create_research_note, generate_research_note_preview
 
 
 class MCPToolError(ValueError):
@@ -57,8 +61,10 @@ def _serialize_evidences(
     return [evidence.model_dump() for evidence in evidences]
 
 
-def handle_note_write(session: Session, payload: Mapping[str, Any]) -> ResearchNote:
-    """Persist a research note for the MCP `note_write` tool."""
+def handle_note_write(
+    session: Session, payload: Mapping[str, Any]
+) -> ResearchNoteSchema:
+    """Persist or preview a research note for the MCP `note_write` tool."""
 
     try:
         note_payload = ResearchNoteCreate.model_validate(payload)
@@ -76,7 +82,25 @@ def handle_note_write(session: Session, payload: Mapping[str, Any]) -> ResearchN
     if not osis:
         raise MCPToolError("note_write payload must include an OSIS reference")
 
-    note = create_research_note(
+    commit_flag = payload.get("commit")
+    commit = True if commit_flag is None else bool(commit_flag)
+
+    if commit:
+        note = create_research_note(
+            session,
+            osis=osis,
+            body=note_payload.body,
+            title=note_payload.title,
+            stance=note_payload.stance,
+            claim_type=note_payload.claim_type,
+            confidence=note_payload.confidence,
+            tags=note_payload.tags,
+            evidences=_serialize_evidences(note_payload.evidences),
+            commit=True,
+        )
+        return ResearchNoteSchema.model_validate(note)
+
+    preview = generate_research_note_preview(
         session,
         osis=osis,
         body=note_payload.body,
@@ -87,7 +111,7 @@ def handle_note_write(session: Session, payload: Mapping[str, Any]) -> ResearchN
         tags=note_payload.tags,
         evidences=_serialize_evidences(note_payload.evidences),
     )
-    return note
+    return preview
 
 
 __all__ = ["handle_note_write", "MCPToolError"]

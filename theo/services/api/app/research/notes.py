@@ -9,6 +9,7 @@ from sqlalchemy import Text, cast, func
 from sqlalchemy.orm import Session
 
 from ..db.models import NoteEvidence, ResearchNote
+from ..models.research import ResearchNote as ResearchNoteSchema
 
 
 def create_research_note(
@@ -22,6 +23,7 @@ def create_research_note(
     confidence: float | None = None,
     tags: list[str] | None = None,
     evidences: Iterable[dict] | None = None,
+    commit: bool = True,
 ) -> ResearchNote:
     """Persist a research note and optional evidence records."""
 
@@ -49,9 +51,49 @@ def create_research_note(
             )
         )
 
-    session.commit()
-    session.refresh(note)
+    session.flush()
+
+    if commit:
+        session.commit()
+        session.refresh(note)
     return note
+
+
+def generate_research_note_preview(
+    session: Session,
+    *,
+    osis: str,
+    body: str,
+    title: str | None = None,
+    stance: str | None = None,
+    claim_type: str | None = None,
+    confidence: float | None = None,
+    tags: list[str] | None = None,
+    evidences: Iterable[dict] | None = None,
+) -> ResearchNoteSchema:
+    """Render a research note preview without committing it to the database."""
+
+    transaction = session.begin_nested()
+    try:
+        note = create_research_note(
+            session,
+            osis=osis,
+            body=body,
+            title=title,
+            stance=stance,
+            claim_type=claim_type,
+            confidence=confidence,
+            tags=tags,
+            evidences=evidences,
+            commit=False,
+        )
+        session.flush()
+        preview = ResearchNoteSchema.model_validate(note)
+    finally:
+        if transaction.is_active:
+            transaction.rollback()
+
+    return preview
 
 
 def get_notes_for_osis(
