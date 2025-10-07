@@ -45,6 +45,10 @@ class SearchLibraryResult(BaseModel):
     document_id: str = Field(..., description="Identifier of the document containing the hit.")
     title: str | None = Field(default=None, description="Title of the source document.")
     snippet: str = Field(..., description="Relevant excerpt for the match.")
+    snippet_html: str | None = Field(
+        default=None,
+        description="HTML-rendered snippet with inline highlights for UI display.",
+    )
     osis: str | None = Field(default=None, description="Primary OSIS reference for the hit.")
     score: float | None = Field(default=None, description="Relevance score assigned by the retriever.")
 
@@ -66,6 +70,15 @@ class AggregateVersesRequest(ToolRequestBase):
     """Aggregate verse mentions across the Theo corpus."""
 
     osis: str = Field(..., description="OSIS passage to aggregate mentions for.")
+    translation: str | None = Field(
+        default=None,
+        description="Optional translation code to use when retrieving scripture text.",
+    )
+    strategy: str = Field(
+        default="concat",
+        description="Aggregation strategy applied to the verse text (concat or harmonize).",
+        pattern="^(concat|harmonize)$",
+    )
     filters: Dict[str, Any] | None = Field(
         default=None,
         description="Optional filters limiting the aggregation scope.",
@@ -87,6 +100,14 @@ class AggregateVersesResponse(ToolResponseBase):
     """Response payload for the verse aggregation tool."""
 
     osis: str = Field(..., description="Echo of the requested OSIS passage.")
+    strategy: str = Field(..., description="Aggregation strategy applied to the verse text.")
+    combined_text: str = Field(
+        ..., description="Combined verse text generated according to the aggregation strategy."
+    )
+    citations: List[str] = Field(
+        default_factory=list,
+        description="Ordered OSIS citations represented in the aggregated text.",
+    )
     buckets: List[VerseAggregateBucket] = Field(
         default_factory=list,
         description="Aggregated buckets (empty for the stub implementation).",
@@ -146,6 +167,10 @@ class GetTimelineResponse(ToolResponseBase):
         ge=0,
         description="Total mentions captured across the returned timeline buckets.",
     )
+    timeline_html: str | None = Field(
+        default=None,
+        description="Simple HTML markup representing the rendered timeline.",
+    )
 
 
 class QuoteLookupRequest(ToolRequestBase):
@@ -163,6 +188,12 @@ class QuoteLookupRequest(ToolRequestBase):
         default=None,
         description="Optional external source reference to look up.",
     )
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=25,
+        description="Maximum number of quotes to retrieve from the fuzzy search.",
+    )
 
 
 class QuoteRecord(BaseModel):
@@ -171,8 +202,23 @@ class QuoteRecord(BaseModel):
     id: str = Field(..., description="Unique identifier of the quote.")
     osis_refs: List[str] = Field(default_factory=list, description="Associated OSIS references.")
     snippet: str = Field(..., description="Quote text or summary snippet.")
+    snippet_html: str | None = Field(
+        default=None,
+        description="HTML formatted snippet with inline highlights.",
+    )
     source_ref: str | None = Field(default=None, description="External reference identifier.")
     document_id: str | None = Field(default=None, description="Identifier of the originating document.")
+    score: float | None = Field(
+        default=None, description="Similarity score associated with the quote retrieval."
+    )
+    span_start: int | None = Field(
+        default=None,
+        description="Inclusive character offset for the highlighted span within the source text.",
+    )
+    span_end: int | None = Field(
+        default=None,
+        description="Exclusive character offset for the highlighted span within the source text.",
+    )
 
 
 class QuoteLookupResponse(ToolResponseBase):
