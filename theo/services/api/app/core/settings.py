@@ -113,6 +113,22 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("THEO_AUTH_JWT_SECRET", "AUTH_JWT_SECRET"),
         description="Shared secret used to validate bearer JWTs",
     )
+    auth_jwt_public_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_AUTH_JWT_PUBLIC_KEY", "AUTH_JWT_PUBLIC_KEY"
+        ),
+        description=(
+            "PEM-encoded RSA public key or filesystem path used to validate asymmetric JWTs"
+        ),
+    )
+    auth_jwt_public_key_path: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_AUTH_JWT_PUBLIC_KEY_PATH", "AUTH_JWT_PUBLIC_KEY_PATH"
+        ),
+        description="Filesystem path to a PEM-encoded RSA public key for JWT validation",
+    )
     auth_jwt_audience: str | None = Field(
         default=None,
         validation_alias=AliasChoices("THEO_AUTH_JWT_AUDIENCE", "AUTH_JWT_AUDIENCE"),
@@ -168,10 +184,13 @@ class Settings(BaseSettings):
         if value in (None, ""):
             return ["HS256"]
         if isinstance(value, str):
-            parsed = [segment.strip() for segment in value.split(",") if segment.strip()]
+            parsed = [
+                segment.strip().upper() for segment in value.split(",") if segment.strip()
+            ]
             return parsed or ["HS256"]
         if isinstance(value, list):
-            return value
+            normalized = [str(item).strip().upper() for item in value if str(item).strip()]
+            return normalized or ["HS256"]
         raise ValueError("Invalid JWT algorithm configuration")
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
@@ -183,6 +202,31 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return value
         raise ValueError("Invalid CORS origin configuration")
+
+    def has_auth_jwt_credentials(self) -> bool:
+        return bool(
+            self.auth_jwt_secret
+            or (self.auth_jwt_public_key and self.auth_jwt_public_key.strip())
+            or self.auth_jwt_public_key_path
+        )
+
+    def load_auth_jwt_public_key(self) -> str | None:
+        key_candidate = (self.auth_jwt_public_key or "").strip()
+        if key_candidate:
+            if "-----BEGIN" in key_candidate:
+                return key_candidate
+            possible_path = Path(key_candidate).expanduser()
+            if possible_path.exists():
+                try:
+                    return possible_path.read_text(encoding="utf-8")
+                except OSError:
+                    return None
+        if self.auth_jwt_public_key_path:
+            try:
+                return self.auth_jwt_public_key_path.read_text(encoding="utf-8")
+            except OSError:
+                return None
+        return None
 
     @staticmethod
     def _parse_string_collection(value: object) -> list[str]:

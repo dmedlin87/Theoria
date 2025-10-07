@@ -264,7 +264,7 @@ def _enforce_authentication_requirements() -> None:
     settings = get_settings()
     if settings.auth_allow_anonymous:
         return
-    if settings.api_keys or settings.auth_jwt_secret:
+    if settings.api_keys or settings.has_auth_jwt_credentials():
         return
     message = (
         "API authentication is not configured. Set THEO_API_KEYS or JWT settings before "
