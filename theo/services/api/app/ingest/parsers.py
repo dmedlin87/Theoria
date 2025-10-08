@@ -143,25 +143,40 @@ def parse_pdf(path: Path, *, max_pages: int | None = None) -> list[ParsedPage] |
     except (FileNotDecryptedError, PdfReadError):
         return PDF_EXTRACTION_UNSUPPORTED
 
+    total_pages: int | None = None
+
     if getattr(reader, "is_encrypted", False):
         try:
             # Attempt to open PDFs that use an empty password, which is a common
             # pattern for lightly protected documents.
-            reader.decrypt("")
+            decrypt_status = reader.decrypt("")
         except Exception:
             return PDF_EXTRACTION_UNSUPPORTED
-        if getattr(reader, "is_encrypted", False):
+
+        if not decrypt_status:
+            # ``decrypt`` returning ``0`` indicates that the password was not
+            # accepted.  Some lightly protected PDFs still allow reading even
+            # when the empty password is rejected, so defer failure until we
+            # actually try to access pages.
+            try:
+                total_pages = len(reader.pages)
+            except (FileNotDecryptedError, PdfReadError):
+                return PDF_EXTRACTION_UNSUPPORTED
+
+    if total_pages is None:
+        try:
+            total_pages = len(reader.pages)
+        except (FileNotDecryptedError, PdfReadError):
             return PDF_EXTRACTION_UNSUPPORTED
 
     pages: list[ParsedPage] = []
-    total_pages = len(reader.pages)
     for page_index in range(total_pages):
         if max_pages is not None and page_index >= max_pages:
             break
 
         try:
             page = reader.pages[page_index]
-        except PdfReadError:
+        except (PdfReadError, FileNotDecryptedError):
             return PDF_EXTRACTION_UNSUPPORTED
 
         try:
