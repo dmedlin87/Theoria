@@ -47,6 +47,21 @@ def _execute_autocommit(engine: Engine, sql: str) -> None:
             connection.exec_driver_sql(statement)
 
 
+_SQLITE_PERSPECTIVE_MIGRATION = "20250129_add_perspective_to_contradiction_seeds.sql"
+
+
+def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
+    """Return True when the provided SQLite table already defines the column."""
+
+    with engine.connect() as connection:
+        result = connection.exec_driver_sql(f"PRAGMA table_info('{table}')")
+        for row in result:
+            # SQLite pragma rows expose column name at index 1
+            if len(row) > 1 and row[1] == column:
+                return True
+    return False
+
+
 def run_sql_migrations(
     engine: Engine | None = None,
     migrations_path: Path | None = None,
@@ -96,14 +111,27 @@ def run_sql_migrations(
                 applied.append(migration_name)
                 continue
 
-            logger.info("Applying SQL migration: %s", migration_name)
-            if dialect_name == "postgresql" and _requires_autocommit(sql):
-                session.flush()
-                session.commit()
-                _execute_autocommit(engine, sql)
-            else:
-                connection = session.connection()
-                connection.exec_driver_sql(sql)
+            should_execute = True
+            if (
+                dialect_name == "sqlite"
+                and migration_name == _SQLITE_PERSPECTIVE_MIGRATION
+                and _sqlite_has_column(engine, "contradiction_seeds", "perspective")
+            ):
+                logger.debug(
+                    "Skipping migration %s; contradiction_seeds.perspective already exists",
+                    migration_name,
+                )
+                should_execute = False
+
+            if should_execute:
+                logger.info("Applying SQL migration: %s", migration_name)
+                if dialect_name == "postgresql" and _requires_autocommit(sql):
+                    session.flush()
+                    session.commit()
+                    _execute_autocommit(engine, sql)
+                else:
+                    connection = session.connection()
+                    connection.exec_driver_sql(sql)
 
             session.add(
                 AppSetting(
