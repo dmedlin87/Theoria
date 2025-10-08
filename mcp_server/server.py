@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, Iterable, Mapping, Type, TypeVar
 from uuid import uuid4
@@ -56,6 +57,20 @@ def _build_stub_handler(
         )
 
     return _handler
+
+
+def _schema_base_url() -> str:
+    """Return the base URL used when emitting JSON Schema identifiers."""
+
+    base = os.getenv("MCP_SCHEMA_BASE_URL", "https://theoengine.dev/mcp/schemas")
+    return base.rstrip("/")
+
+
+def _schema_ref(tool_name: str, direction: str) -> str:
+    """Build a stable schema URL for the given tool and direction."""
+
+    base = _schema_base_url()
+    return f"{base}/{tool_name}.{direction}.json"
 
 
 def _build_tools() -> tuple[ToolDefinition, ...]:
@@ -145,8 +160,8 @@ def _collect_schemas(tools: Iterable[ToolDefinition]) -> Mapping[str, Dict[str, 
 
     schema_map: dict[str, Dict[str, Any]] = {}
     for tool in tools:
-        request_schema_id = f"https://theoengine.dev/mcp/schemas/{tool.name}.request.json"
-        response_schema_id = f"https://theoengine.dev/mcp/schemas/{tool.name}.response.json"
+        request_schema_id = _schema_ref(tool.name, "request")
+        response_schema_id = _schema_ref(tool.name, "response")
 
         request_schema = tool.request_model.model_json_schema()
         response_schema = tool.response_model.model_json_schema()
@@ -168,8 +183,8 @@ def metadata() -> Dict[str, Any]:
     schemas_payload = _collect_schemas(TOOLS)
 
     for tool in TOOLS:
-        request_schema_id = f"https://theoengine.dev/mcp/schemas/{tool.name}.request.json"
-        response_schema_id = f"https://theoengine.dev/mcp/schemas/{tool.name}.response.json"
+        request_schema_id = _schema_ref(tool.name, "request")
+        response_schema_id = _schema_ref(tool.name, "response")
         tools_payload.append(
             {
                 "name": tool.name,
