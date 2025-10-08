@@ -41,7 +41,13 @@ def _build_stub_handler(
     ) -> ResponseModel:
         run_id = str(uuid4())
         LOGGER.info(
-            "Invoked MCP tool", extra={"tool": tool_name, "request_id": request.request_id, "run_id": run_id, "end_user_id": end_user_id}
+            "Invoked MCP tool",
+            extra={
+                "tool": tool_name,
+                "request_id": request.request_id,
+                "run_id": run_id,
+                "end_user_id": end_user_id,
+            },
         )
         return response_model(
             request_id=request.request_id,
