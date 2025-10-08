@@ -40,9 +40,17 @@ def _bypass_authentication(request: pytest.FixtureRequest):
 
 
 @pytest.fixture(autouse=True)
-def _disable_migrations(monkeypatch: pytest.MonkeyPatch) -> None:
+def _disable_migrations(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Prevent database migrations from running in API tests."""
+
+    if request.node.get_closest_marker("enable_migrations"):
+        yield
+        return
 
     monkeypatch.setattr(migrations_module, "run_sql_migrations", lambda *_: None)
     monkeypatch.setattr("theo.services.api.app.main.run_sql_migrations", lambda *_: None)
+
+    yield
 

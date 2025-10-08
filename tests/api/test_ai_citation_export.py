@@ -7,7 +7,7 @@ import sys
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -210,3 +210,72 @@ def test_build_csl_entry_uses_expected_type(source_type: str, expected: str) -> 
     entry = _build_csl_entry(record, citations=[])
 
     assert entry["type"] == expected
+
+
+@pytest.mark.enable_migrations
+def test_sqlite_migration_backfills_contradiction_perspective(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'pre-migration.db'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+
+    from theo.services.api.app.core import database as database_module
+    from theo.services.api.app.core import settings as settings_module
+    from theo.services.api.app.db import run_sql_migrations as migrations_module
+
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    migration_source = (
+        PROJECT_ROOT
+        / "theo"
+        / "services"
+        / "api"
+        / "app"
+        / "db"
+        / "migrations"
+        / "20250129_add_perspective_to_contradiction_seeds.sql"
+    )
+    migrations_dir.joinpath(migration_source.name).write_text(
+        migration_source.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(migrations_module, "MIGRATIONS_PATH", migrations_dir)
+
+    settings_module.get_settings.cache_clear()
+    engine = database_module.configure_engine()
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE contradiction_seeds (
+                id TEXT PRIMARY KEY,
+                osis_a TEXT NOT NULL,
+                osis_b TEXT NOT NULL,
+                summary TEXT,
+                source TEXT,
+                tags JSON,
+                weight FLOAT NOT NULL DEFAULT 1.0,
+                created_at TIMESTAMP NOT NULL
+            )
+            """
+        )
+
+    try:
+        with TestClient(app) as seeded_client:
+            response = seeded_client.get(
+                "/research/contradictions",
+                params=[("osis", "Luke.2.1-7")],
+            )
+
+            assert response.status_code == 200
+            payload = response.json()
+            assert payload["items"], "expected contradiction seeds to load"
+
+        inspector = inspect(engine)
+        columns = {column["name"] for column in inspector.get_columns("contradiction_seeds")}
+        assert "perspective" in columns
+    finally:
+        engine.dispose()
+        settings_module.get_settings.cache_clear()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
