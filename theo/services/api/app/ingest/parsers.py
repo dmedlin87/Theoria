@@ -55,14 +55,8 @@ except ModuleNotFoundError:  # pragma: no cover - fallback used when optional de
     )
 
 import webvtt
-from pdfminer.high_level import extract_text
-from pdfminer.pdfdocument import (
-    PDFNoValidXRef,
-    PDFPasswordIncorrect,
-    PDFTextExtractionNotAllowed,
-)
-from pdfminer.pdfparser import PDFSyntaxError
-from pdfminer.psparser import PSEOF
+from pypdf import PdfReader
+from pypdf.errors import FileNotDecryptedError, PdfReadError
 
 if TYPE_CHECKING:  # pragma: no cover - import-cycle guard
     from .chunking import Chunk
@@ -133,7 +127,7 @@ def read_text_file(path: Path) -> str:
 
 
 class _PdfExtractionErrorSentinel:
-    """Sentinel returned when pdfminer cannot extract text."""
+    """Sentinel returned when pypdf cannot extract text."""
 
     __slots__ = ()
 
@@ -142,28 +136,45 @@ PDF_EXTRACTION_UNSUPPORTED = _PdfExtractionErrorSentinel()
 
 
 def parse_pdf(path: Path, *, max_pages: int | None = None) -> list[ParsedPage] | _PdfExtractionErrorSentinel:
-    """Extract text from a PDF file page-by-page using pdfminer."""
+    """Extract text from a PDF file page-by-page using :mod:`pypdf`."""
+
+    try:
+        reader = PdfReader(str(path))
+    except (FileNotDecryptedError, PdfReadError):
+        return PDF_EXTRACTION_UNSUPPORTED
+
+    if getattr(reader, "is_encrypted", False):
+        try:
+            # Attempt to open PDFs that use an empty password, which is a common
+            # pattern for lightly protected documents.
+            reader.decrypt("")
+        except Exception:
+            return PDF_EXTRACTION_UNSUPPORTED
+        if getattr(reader, "is_encrypted", False):
+            return PDF_EXTRACTION_UNSUPPORTED
 
     pages: list[ParsedPage] = []
-    page_index = 0
-    while True:
+    total_pages = len(reader.pages)
+    for page_index in range(total_pages):
         if max_pages is not None and page_index >= max_pages:
             break
+
         try:
-            text = extract_text(str(path), page_numbers=[page_index])
-        except (
-            PDFPasswordIncorrect,
-            PDFTextExtractionNotAllowed,
-            PDFSyntaxError,
-            PDFNoValidXRef,
-            PSEOF,
-        ):
+            page = reader.pages[page_index]
+        except PdfReadError:
             return PDF_EXTRACTION_UNSUPPORTED
+
+        try:
+            text = page.extract_text() or ""
+        except (PdfReadError, ValueError, KeyError, TypeError):
+            return PDF_EXTRACTION_UNSUPPORTED
+
         if not text:
             break
+
         cleaned = "\n".join(line.rstrip() for line in text.splitlines()).strip()
         pages.append(ParsedPage(text=cleaned, page_no=page_index + 1))
-        page_index += 1
+
     return pages
 
 
@@ -634,7 +645,10 @@ def parse_pdf_document(
         return PDF_EXTRACTION_UNSUPPORTED
     if not pages:
         return ParserResult(
-            text="", chunks=[], parser="pdfminer", parser_version="0.2.0"
+            text="",
+            chunks=[],
+            parser="pypdf",
+            parser_version=_package_version("pypdf", "5.x"),
         )
 
     chunks: list["Chunk"] = []
@@ -655,7 +669,10 @@ def parse_pdf_document(
 
     full_text = "\n".join(text_parts)
     return ParserResult(
-        text=full_text, chunks=chunks, parser="pdfminer", parser_version="0.2.0"
+        text=full_text,
+        chunks=chunks,
+        parser="pypdf",
+        parser_version=_package_version("pypdf", "5.x"),
     )
 
 
