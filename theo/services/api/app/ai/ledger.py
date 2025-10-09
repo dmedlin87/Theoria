@@ -44,6 +44,7 @@ class InflightRow:
     cost: float | None
     error: str | None
     updated_at: float
+    completed_at: float | None
 
 
 class LedgerTransaction:
@@ -191,7 +192,7 @@ class LedgerTransaction:
     def get_inflight(self, cache_key: str) -> InflightRow | None:
         row = self._connection.execute(
             """
-            SELECT cache_key, status, model_name, workflow, output, latency_ms, cost, error, updated_at
+            SELECT cache_key, status, model_name, workflow, output, latency_ms, cost, error, updated_at, completed_at
             FROM inflight_entries
             WHERE cache_key = ?
             """,
@@ -209,20 +210,18 @@ class LedgerTransaction:
             cost=float(row[6]) if row[6] is not None else None,
             error=row[7],
             updated_at=float(row[8]),
+            completed_at=float(row[9]) if row[9] is not None else None,
         )
 
     def create_inflight(self, cache_key: str, *, model_name: str, workflow: str) -> None:
         self._connection.execute(
             """
-            INSERT INTO inflight_entries(cache_key, status, model_name, workflow, updated_at)
-            VALUES(?, 'waiting', ?, ?, ?)
+            INSERT INTO inflight_entries(cache_key, status, model_name, workflow, updated_at, completed_at)
+            VALUES(?, 'waiting', ?, ?, ?, NULL)
             ON CONFLICT(cache_key) DO UPDATE SET
                 status='waiting',
                 model_name=excluded.model_name,
                 workflow=excluded.workflow,
-                output=NULL,
-                latency_ms=NULL,
-                cost=NULL,
                 error=NULL,
                 updated_at=excluded.updated_at
             """,
@@ -239,11 +238,12 @@ class LedgerTransaction:
         latency_ms: float,
         cost: float,
     ) -> None:
+        timestamp = time.time()
         self._connection.execute(
             """
             UPDATE inflight_entries
             SET status='success', model_name=?, workflow=?, output=?,
-                latency_ms=?, cost=?, error=NULL, updated_at=?
+                latency_ms=?, cost=?, error=NULL, updated_at=?, completed_at=?
             WHERE cache_key=?
             """,
             (
@@ -252,7 +252,8 @@ class LedgerTransaction:
                 output,
                 float(latency_ms),
                 float(cost),
-                time.time(),
+                timestamp,
+                timestamp,
                 cache_key,
             ),
         )
@@ -345,12 +346,21 @@ class SharedLedger:
                     latency_ms REAL,
                     cost REAL,
                     error TEXT,
-                    updated_at REAL NOT NULL
+                    updated_at REAL NOT NULL,
+                    completed_at REAL
                 );
                 """
             )
+            self._ensure_inflight_schema(connection)
         finally:
             connection.close()
+
+    def _ensure_inflight_schema(self, connection: sqlite3.Connection) -> None:
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info('inflight_entries')")
+        }
+        if "completed_at" not in columns:
+            connection.execute("ALTER TABLE inflight_entries ADD COLUMN completed_at REAL")
 
     # ------------------------------------------------------------------
     # Transaction handling
@@ -395,7 +405,7 @@ class SharedLedger:
         try:
             row = connection.execute(
                 """
-                SELECT cache_key, status, model_name, workflow, output, latency_ms, cost, error, updated_at
+                SELECT cache_key, status, model_name, workflow, output, latency_ms, cost, error, updated_at, completed_at
                 FROM inflight_entries
                 WHERE cache_key = ?
                 """,
@@ -413,6 +423,7 @@ class SharedLedger:
                 cost=float(row[6]) if row[6] is not None else None,
                 error=row[7],
                 updated_at=float(row[8]),
+                completed_at=float(row[9]) if row[9] is not None else None,
             )
         finally:
             connection.close()
@@ -427,6 +438,22 @@ class SharedLedger:
         """Block until the inflight entry completes or raises."""
 
         start = time.time()
+
+        def _row_to_record(row: InflightRow) -> CacheRecord:
+            created_at = row.completed_at or row.updated_at
+            return CacheRecord(
+                cache_key=row.cache_key,
+                model_name=row.model_name or "",
+                workflow=row.workflow or "",
+                prompt="",
+                temperature=0.0,
+                max_output_tokens=0,
+                output=row.output or "",
+                latency_ms=row.latency_ms or 0.0,
+                cost=row.cost or 0.0,
+                created_at=created_at,
+            )
+
         while True:
             row = self._read_inflight(cache_key)
             if row is None:
@@ -441,28 +468,26 @@ class SharedLedger:
                     )
                 time.sleep(poll_interval)
                 continue
+            if (
+                row.output is not None
+                and row.completed_at is not None
+                and row.completed_at >= start
+            ):
+                return _row_to_record(row)
             if row.status == "waiting":
                 if timeout is not None and time.time() - start > timeout:
                     raise GenerationError("Timed out waiting for inflight generation")
                 time.sleep(poll_interval)
                 continue
             if row.status == "success":
-                record = CacheRecord(
-                    cache_key=row.cache_key,
-                    model_name=row.model_name or "",
-                    workflow=row.workflow or "",
-                    prompt="",
-                    temperature=0.0,
-                    max_output_tokens=0,
-                    output=row.output or "",
-                    latency_ms=row.latency_ms or 0.0,
-                    cost=row.cost or 0.0,
-                    created_at=row.updated_at,
-                )
-                # Don't clear inflight immediately to avoid race condition
-                # It will be cleaned up by periodic maintenance
-                return record
+                return _row_to_record(row)
             if row.status == "error":
+                if (
+                    row.output is not None
+                    and row.completed_at is not None
+                    and row.completed_at >= start
+                ):
+                    return _row_to_record(row)
                 with self.transaction() as txn:
                     txn.clear_single_inflight(cache_key)
                 raise GenerationError(row.error or "Deduplicated generation failed")
