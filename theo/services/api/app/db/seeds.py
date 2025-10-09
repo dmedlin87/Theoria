@@ -173,11 +173,14 @@ def seed_contradiction_claims(session: Session) -> None:
                     record.perspective = perspective
     except OperationalError as exc:
         session.rollback()
-        logger.warning(
-            "Skipping contradiction seeds because 'perspective' column is unavailable: %s",
-            exc,
-        )
-        return
+        message = str(exc).lower()
+        if "no such column" in message and "perspective" in message:
+            logger.warning(
+                "Skipping contradiction seeds because 'perspective' column is unavailable: %s",
+                exc,
+            )
+            return
+        raise
 
     if seen_ids:
         session.execute(
