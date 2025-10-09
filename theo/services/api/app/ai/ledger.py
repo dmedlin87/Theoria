@@ -488,8 +488,9 @@ class SharedLedger:
                     and row.completed_at >= start
                 ):
                     return _row_to_record(row)
-                with self.transaction() as txn:
-                    txn.clear_single_inflight(cache_key)
+                if row.completed_at is None:
+                    with self.transaction() as txn:
+                        txn.clear_single_inflight(cache_key)
                 raise GenerationError(row.error or "Deduplicated generation failed")
             raise GenerationError(f"Unknown inflight status: {row.status}")
 
