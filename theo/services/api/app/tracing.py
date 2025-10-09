@@ -2,22 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Callable
 
 try:  # pragma: no cover - optional dependency
-    from opentelemetry.trace import get_current_span
+    from opentelemetry.trace import get_current_span as _imported_get_current_span
 except ImportError:  # pragma: no cover - graceful degradation
-    get_current_span = None  # type: ignore[assignment]
+    _GET_CURRENT_SPAN: Callable[[], Any] | None = None
+else:  # pragma: no cover - imported for type checking only
+    _GET_CURRENT_SPAN = _imported_get_current_span
 
 TRACEPARENT_HEADER_NAME = "traceparent"
 TRACE_ID_HEADER_NAME = "x-trace-id"
 
 
 def _get_span_context() -> Any | None:
-    if get_current_span is None:  # pragma: no cover - optional dependency
+    if _GET_CURRENT_SPAN is None:  # pragma: no cover - optional dependency
         return None
     try:
-        span = get_current_span()
+        span = _GET_CURRENT_SPAN()
     except Exception:  # pragma: no cover - defensive
         return None
     if span is None:
@@ -66,10 +68,10 @@ def get_current_traceparent() -> str | None:
     return f"00-{trace_id_hex}-{span_id_hex}-{trace_flags_hex}"
 
 
-def get_current_trace_headers() -> Dict[str, str]:
+def get_current_trace_headers() -> dict[str, str]:
     """Return trace headers suitable for attaching to an HTTP response."""
 
-    headers: Dict[str, str] = {}
+    headers: dict[str, str] = {}
     traceparent = get_current_traceparent()
     if traceparent:
         headers[TRACEPARENT_HEADER_NAME] = traceparent

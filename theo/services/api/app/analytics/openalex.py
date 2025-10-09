@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 import httpx
 
@@ -52,7 +52,7 @@ class OpenAlexClient:
         return []
 
     # ------------------------------------------------------------------
-    def _fetch(self, query_type: str, value: str) -> dict | None:
+    def _fetch(self, query_type: str, value: str) -> Mapping[str, Any] | None:
         if not value:
             return None
 
@@ -63,22 +63,22 @@ class OpenAlexClient:
             response = self._client.get(f"{self.BASE_URL}/{identifier}")
             response.raise_for_status()
             payload = response.json()
-            return payload if isinstance(payload, dict) else None
+            return payload if isinstance(payload, Mapping) else None
 
         params = {"search": value, "per-page": 1}
         response = self._client.get(self.BASE_URL, params=params)
         response.raise_for_status()
         payload = response.json()
-        if isinstance(payload, dict):
+        if isinstance(payload, Mapping):
             results = payload.get("results")
             if isinstance(results, Sequence) and results:
                 first = results[0]
-                if isinstance(first, dict):
+                if isinstance(first, Mapping):
                     return first
         return None
 
-    def _parse_topics(self, payload: dict | None) -> list[str]:
-        if not isinstance(payload, dict):
+    def _parse_topics(self, payload: Mapping[str, Any] | None) -> list[str]:
+        if not isinstance(payload, Mapping):
             return []
 
         concepts = payload.get("concepts")
@@ -87,7 +87,7 @@ class OpenAlexClient:
 
         names: list[str] = []
         for concept in concepts:
-            if isinstance(concept, dict):
+            if isinstance(concept, Mapping):
                 name = concept.get("display_name")
                 if isinstance(name, str):
                     names.append(name)
