@@ -57,6 +57,11 @@ except ModuleNotFoundError:  # pragma: no cover - fallback used when optional de
 
 import webvtt
 from pypdf import PdfReader
+
+try:  # pragma: no cover - exercised via dedicated regression test
+    from pypdf import PasswordType as _PasswordType
+except ImportError:  # pragma: no cover - pypdf<5.2 lacks the enum
+    _PasswordType = None
 from pypdf.errors import FileNotDecryptedError, PdfReadError
 
 if TYPE_CHECKING:  # pragma: no cover - import-cycle guard
@@ -143,6 +148,8 @@ def _decrypt_status_allows_access(status: Any) -> bool:
         return status
     if isinstance(status, int):
         return status != 0
+    if _PasswordType is not None and isinstance(status, _PasswordType):
+        return status is not _PasswordType.NOT_DECRYPTED
     if isinstance(status, Enum):
         try:
             not_decrypted = status.__class__.NOT_DECRYPTED
