@@ -12,12 +12,12 @@ from uuid import uuid4
 
 from fastapi import Header
 from opentelemetry import trace
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import schemas
 from theo.services.api.app.core.database import get_session
-from theo.services.api.app.db.models import TranscriptQuote
+from theo.services.api.app.db.models import Document, TranscriptQuote
 from theo.services.api.app.models.search import (
     HybridSearchFilters,
     HybridSearchRequest,
@@ -347,4 +347,96 @@ async def quote_lookup(
             commit=request.commit,
             quotes=quotes,
             total=len(quotes),
+        )
+
+
+def _summarise_source_entry(
+    *,
+    document_id: str,
+    title: str | None,
+    collection: str | None,
+    source_type: str | None,
+    abstract: str | None,
+    source_url: str | None,
+) -> tuple[str, str | None, str | None]:
+    """Return the display name and description for a source registry entry."""
+
+    name = title or collection or document_id
+    description_parts: list[str] = []
+    if abstract:
+        cleaned = abstract.strip()
+        if cleaned:
+            description_parts.append(cleaned)
+    if collection:
+        description_parts.append(f"Collection: {collection}")
+    if source_type:
+        description_parts.append(f"Source type: {source_type}")
+
+    description: str | None = None
+    if description_parts:
+        combined = " ".join(description_parts).strip()
+        if combined:
+            description = combined if len(combined) <= 280 else combined[:277].rstrip() + "..."
+    return name, description, source_url
+
+
+async def source_registry_list(
+    request: schemas.SourceRegistryListRequest,
+    end_user_id: str = Header(..., alias="X-End-User-Id"),
+) -> schemas.SourceRegistryListResponse:
+    """Return source registry entries backed by Theo documents."""
+
+    with _tool_instrumentation("source_registry_list", request, end_user_id) as (
+        run_id,
+        span,
+    ):
+        with _session_scope() as session:
+            stmt = select(
+                Document.id,
+                Document.title,
+                Document.collection,
+                Document.source_type,
+                Document.abstract,
+                Document.source_url,
+            ).order_by(Document.created_at.desc())
+            count_stmt = select(func.count()).select_from(Document)
+            if request.collection:
+                stmt = stmt.where(Document.collection == request.collection)
+                count_stmt = count_stmt.where(Document.collection == request.collection)
+            rows = session.execute(stmt.limit(100)).all()
+            total = session.execute(count_stmt).scalar() or 0
+
+        entries: list[schemas.SourceRegistryEntry] = []
+        for (
+            document_id,
+            title,
+            collection,
+            source_type,
+            abstract,
+            source_url,
+        ) in rows:
+            name, description, url = _summarise_source_entry(
+                document_id=document_id,
+                title=title,
+                collection=collection,
+                source_type=source_type,
+                abstract=abstract,
+                source_url=source_url,
+            )
+            entries.append(
+                schemas.SourceRegistryEntry(
+                    id=document_id,
+                    name=name,
+                    description=description,
+                    url=url,
+                )
+            )
+        span.set_attribute("tool.result_count", len(entries))
+        span.set_attribute("tool.total_sources", total)
+        return schemas.SourceRegistryListResponse(
+            request_id=request.request_id,
+            run_id=run_id,
+            commit=request.commit,
+            sources=entries,
+            total=int(total),
         )

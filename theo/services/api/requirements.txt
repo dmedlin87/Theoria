@@ -1,6 +1,6 @@
 fastapi[all]==0.115.6
 uvicorn[standard]==0.34.0
-psycopg[binary]==3.2.0
+psycopg-binary==3.2.8
 SQLAlchemy==2.0.36
 pgvector==0.3.3
 pydantic==2.7.4
@@ -11,7 +11,7 @@ pythonbible==0.13.1
 PyYAML==6.0.2
 click==8.1.7
 pypdf==5.1.0
-webvtt-py==0.5.2
+webvtt-py==0.5.1
 youtube-transcript-api==0.6.2
 docling==2.28.4
 unstructured==0.16.1
@@ -19,5 +19,4 @@ opentelemetry-api==1.26.0
 opentelemetry-sdk==1.26.0
 opentelemetry-exporter-otlp==1.26.0
 PyJWT==2.10.1
-
 

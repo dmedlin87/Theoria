@@ -134,3 +134,67 @@ async def test_quote_lookup_schema(monkeypatch):
     validate(payload, schemas.QuoteLookupResponse.model_json_schema())
     assert payload["quotes"][0]["span_end"] == 10
     assert payload["quotes"][0]["snippet_html"].startswith("<p>")
+
+
+@pytest.mark.anyio("asyncio")
+async def test_source_registry_list_returns_sources(monkeypatch):
+    rows = [
+        (
+            "doc-1",
+            "Theo Digest",
+            "Theo Collection",
+            "digest",
+            "Weekly digest of topics.",
+            "https://theoengine.dev/digest",
+        ),
+        (
+            "doc-2",
+            None,
+            "Theo Collection",
+            "pdf",
+            None,
+            "https://theoengine.dev/pdf",
+        ),
+    ]
+
+    class _FakeListResult:
+        def __init__(self, data):
+            self._data = data
+
+        def all(self):
+            return self._data
+
+    class _FakeScalarResult:
+        def __init__(self, value):
+            self._value = value
+
+        def scalar(self):
+            return self._value
+
+    class _FakeSession:
+        def __init__(self):
+            self._results = [
+                _FakeListResult(rows),
+                _FakeScalarResult(len(rows)),
+            ]
+
+        def execute(self, _stmt):
+            return self._results.pop(0)
+
+    @contextmanager
+    def _session_with_sources():
+        yield _FakeSession()
+
+    monkeypatch.setattr(read, "_session_scope", _session_with_sources)
+
+    request = schemas.SourceRegistryListRequest(
+        request_id="registry-1",
+        collection="Theo Collection",
+    )
+
+    response = await read.source_registry_list(request, end_user_id="user-22")
+    payload = response.model_dump()
+    validate(payload, schemas.SourceRegistryListResponse.model_json_schema())
+    assert payload["total"] == 2
+    assert payload["sources"][0]["name"] == "Theo Digest"
+    assert payload["sources"][1]["name"] == "Theo Collection"

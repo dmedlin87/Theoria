@@ -124,7 +124,7 @@ def _build_tools() -> tuple[ToolDefinition, ...]:
             description="List the registered MCP content sources.",
             request_model=schemas.SourceRegistryListRequest,
             response_model=schemas.SourceRegistryListResponse,
-            handler=_build_stub_handler("source_registry_list", schemas.SourceRegistryListResponse),
+            handler=read.source_registry_list,
         ),
         ToolDefinition(
             name="evidence_card_create",
@@ -136,7 +136,16 @@ def _build_tools() -> tuple[ToolDefinition, ...]:
     )
 
 
-TOOLS: tuple[ToolDefinition, ...] = _build_tools()
+def _tools_enabled() -> bool:
+    """Return True when MCP tool endpoints should be exposed."""
+
+    raw = os.getenv("MCP_TOOLS_ENABLED")
+    if raw is None:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+TOOLS: tuple[ToolDefinition, ...] = _build_tools() if _tools_enabled() else tuple()
 
 app = FastAPI(title="Theo Engine MCP Server", version="0.1.0")
 

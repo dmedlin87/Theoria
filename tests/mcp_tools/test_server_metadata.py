@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Iterable
+import importlib
 
 import pytest
 from fastapi.testclient import TestClient
@@ -60,4 +61,21 @@ def test_metadata_schema_base_url_can_be_overridden(
     # Ensure the schemas map uses the overridden base URL as well.
     for schema_id in payload["schemas"].keys():
         assert schema_id.startswith("https://staging.theo.local/mcp/")
+
+
+def test_tools_disabled_without_feature_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    import mcp_server.server as server
+
+    monkeypatch.delenv("MCP_TOOLS_ENABLED", raising=False)
+    importlib.reload(server)
+
+    with TestClient(server.app) as test_client:
+        response = test_client.get("/metadata")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["tools"] == []
+        assert payload["schemas"] == {}
+
+    monkeypatch.setenv("MCP_TOOLS_ENABLED", "1")
+    importlib.reload(server)
 

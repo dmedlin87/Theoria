@@ -108,20 +108,30 @@ def run_sql_migrations(
                         },
                     )
                 )
+                session.commit()
                 applied.append(migration_name)
                 continue
 
             should_execute = True
-            if (
-                dialect_name == "sqlite"
-                and migration_name == _SQLITE_PERSPECTIVE_MIGRATION
-                and _sqlite_has_column(engine, "contradiction_seeds", "perspective")
-            ):
-                logger.debug(
-                    "Skipping migration %s; contradiction_seeds.perspective already exists",
-                    migration_name,
+            # Skip Postgres-only operations when using SQLite. These include
+            # pgvector/tsvector types and index methods not supported by SQLite.
+            if dialect_name == "sqlite":
+                sql_upper = sql.upper()
+                postgres_only_markers = (
+                    "VECTOR(",        # pgvector type
+                    "TSVECTOR",       # full text search type
+                    "TO_TSVECTOR(",   # FTS function
+                    "USING HNSW",     # pgvector index method
+                    "VECTOR_L2_OPS",  # pgvector operator class
+                    "USING GIN",      # Postgres index method
+                    "USING GIST",     # Postgres index method
                 )
-                should_execute = False
+                if any(marker in sql_upper for marker in postgres_only_markers):
+                    logger.debug(
+                        "Skipping migration %s for SQLite (Postgres-only constructs detected)",
+                        migration_name,
+                    )
+                    should_execute = False
 
             if should_execute:
                 logger.info("Applying SQL migration: %s", migration_name)
