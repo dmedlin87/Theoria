@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Iterable
@@ -104,6 +105,16 @@ def _ensure_perspective_column(
     return False
 
 
+def _is_missing_perspective_column_error(exc: OperationalError) -> bool:
+    """Return ``True`` when ``exc`` indicates SQLite lacks the perspective column."""
+
+    original = getattr(exc, "orig", None)
+    message = str(original if original is not None else exc).lower()
+    if original is not None and not isinstance(original, sqlite3.OperationalError):
+        return False
+    return "no such column" in message and "perspective" in message
+
+
 def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
 
@@ -173,8 +184,7 @@ def seed_contradiction_claims(session: Session) -> None:
                     record.perspective = perspective
     except OperationalError as exc:
         session.rollback()
-        message = str(exc).lower()
-        if "no such column" in message and "perspective" in message:
+        if _is_missing_perspective_column_error(exc):
             logger.warning(
                 "Skipping contradiction seeds because 'perspective' column is unavailable: %s",
                 exc,
