@@ -113,6 +113,15 @@ def run_sql_migrations(
                 continue
 
             should_execute = True
+            if (
+                dialect_name == "sqlite"
+                and migration_name == _SQLITE_PERSPECTIVE_MIGRATION
+                and _sqlite_has_column(engine, "contradiction_seeds", "perspective")
+            ):
+                logger.debug(
+                    "Skipping SQLite perspective migration; column already exists",
+                )
+                should_execute = False
             # Skip Postgres-only operations when using SQLite. These include
             # pgvector/tsvector types and index methods not supported by SQLite.
             if dialect_name == "sqlite":

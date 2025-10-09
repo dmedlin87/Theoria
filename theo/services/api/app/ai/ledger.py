@@ -435,9 +435,12 @@ class SharedLedger:
                     cached = txn.get_cache_entry(cache_key)
                 if cached is not None:
                     return cached
-                raise GenerationError(
-                    "Deduplicated generation completed without a result"
-                )
+                if timeout is not None and time.time() - start > timeout:
+                    raise GenerationError(
+                        "Timed out waiting for inflight generation"
+                    )
+                time.sleep(poll_interval)
+                continue
             if row.status == "waiting":
                 if timeout is not None and time.time() - start > timeout:
                     raise GenerationError("Timed out waiting for inflight generation")

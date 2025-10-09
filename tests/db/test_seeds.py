@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import logging
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -90,4 +91,60 @@ def test_seeders_remove_stale_records(tmp_path, monkeypatch) -> None:
             )
         )) is not None
         assert session.get(GeoPlace, "jerusalem") is not None
+
+
+def test_seeders_skip_when_perspective_missing(caplog) -> None:
+    engine = create_engine("sqlite:///:memory:", future=True)
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE contradiction_seeds (
+                id VARCHAR PRIMARY KEY,
+                osis_a VARCHAR NOT NULL,
+                osis_b VARCHAR NOT NULL,
+                summary TEXT,
+                source VARCHAR,
+                tags TEXT,
+                weight FLOAT NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE harmony_seeds (
+                id VARCHAR PRIMARY KEY,
+                osis_a VARCHAR NOT NULL,
+                osis_b VARCHAR NOT NULL,
+                summary TEXT,
+                source VARCHAR,
+                tags TEXT,
+                weight FLOAT NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE commentary_excerpt_seeds (
+                id VARCHAR PRIMARY KEY,
+                osis VARCHAR NOT NULL,
+                title VARCHAR,
+                excerpt TEXT NOT NULL,
+                source VARCHAR,
+                tags TEXT
+            )
+            """
+        )
+
+    caplog.clear()
+    with Session(engine) as session, caplog.at_level(logging.WARNING):
+        seeds.seed_contradiction_claims(session)
+        seeds.seed_harmony_claims(session)
+        seeds.seed_commentary_excerpts(session)
+        assert not session.in_transaction()
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert "Skipping contradiction seeds because 'perspective' column is missing" in messages
+    assert "Skipping harmony seeds because 'perspective' column is missing" in messages
+    assert "Skipping commentary excerpt seeds because 'perspective' column is missing" in messages
 

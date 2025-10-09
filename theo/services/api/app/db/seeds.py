@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Iterable
 from uuid import NAMESPACE_URL, uuid5
 
 import yaml
-from sqlalchemy import delete
+from sqlalchemy import Table, delete, inspect
 from sqlalchemy.orm import Session
 
 from theo.services.geo import seed_openbible_geo
@@ -26,6 +27,8 @@ SEED_ROOT = PROJECT_ROOT / "data" / "seeds"
 CONTRADICTION_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/contradictions")
 HARMONY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/harmonies")
 COMMENTARY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/commentaries")
+
+logger = logging.getLogger(__name__)
 
 
 def _load_structured(path: Path) -> list[dict]:
@@ -69,8 +72,43 @@ def _iter_seed_entries(*paths: Path) -> list[dict]:
     return entries
 
 
+def _table_has_column(session: Session, table_name: str, column_name: str, *, schema: str | None = None) -> bool:
+    """Check whether the bound database exposes ``column_name`` on ``table_name``."""
+
+    bind = session.get_bind()
+    if bind is None:
+        return False
+
+    inspector = inspect(bind)
+    try:
+        columns = inspector.get_columns(table_name, schema=schema)
+    except Exception:  # pragma: no cover - defensive: DB might be mid-migration
+        return False
+
+    return any(column.get("name") == column_name for column in columns)
+
+
+def _ensure_perspective_column(
+    session: Session, table: Table, dataset_label: str
+) -> bool:
+    """Verify the ``perspective`` column exists before reading from ``table``."""
+
+    if _table_has_column(session, table.name, "perspective", schema=table.schema):
+        return True
+
+    session.rollback()
+    logger.warning(
+        "Skipping %s seeds because 'perspective' column is missing", dataset_label
+    )
+    return False
+
+
 def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
+
+    table = ContradictionSeed.__table__
+    if not _ensure_perspective_column(session, table, "contradiction"):
+        return
 
     payload = _iter_seed_entries(
         SEED_ROOT / "contradictions.json",
@@ -141,6 +179,10 @@ def seed_contradiction_claims(session: Session) -> None:
 
 def seed_harmony_claims(session: Session) -> None:
     """Load harmony seeds from bundled YAML/JSON files."""
+
+    table = HarmonySeed.__table__
+    if not _ensure_perspective_column(session, table, "harmony"):
+        return
 
     payload = _iter_seed_entries(
         SEED_ROOT / "harmonies.yaml",
@@ -222,6 +264,10 @@ def seed_harmony_claims(session: Session) -> None:
 
 def seed_commentary_excerpts(session: Session) -> None:
     """Seed curated commentary excerpts into the catalogue."""
+
+    table = CommentaryExcerptSeed.__table__
+    if not _ensure_perspective_column(session, table, "commentary excerpt"):
+        return
 
     payload = _iter_seed_entries(
         SEED_ROOT / "commentaries.yaml",

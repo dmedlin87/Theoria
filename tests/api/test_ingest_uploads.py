@@ -106,8 +106,8 @@ def test_ingest_transcript_sanitizes_uploaded_files(
     response = api_client.post(
         "/ingest/transcript",
         files={
-            "transcript": ("../../evil.vtt", b"captions", "text/vtt"),
-            "audio": ("../../evil.mp3", b"audio-bytes", "audio/mpeg"),
+            "transcript": ("..\\..\\evil.vtt", b"captions", "text/vtt"),
+            "audio": ("C:/temp/uploads/evil.mp3", b"audio-bytes", "audio/mpeg"),
         },
     )
 
@@ -124,6 +124,9 @@ def test_ingest_transcript_sanitizes_uploaded_files(
     assert audio_path.parent == tmp_dir
     assert audio_path.name.endswith("evil.mp3")
     assert audio_path.resolve().is_relative_to(tmp_dir.resolve())
+
+    assert captured_filenames["transcript"] == "evil.vtt"
+    assert captured_filenames["audio"] == "evil.mp3"
 
 
 def test_ingest_markdown_with_windows_1252_bytes(
