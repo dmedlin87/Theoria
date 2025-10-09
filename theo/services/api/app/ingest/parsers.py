@@ -8,6 +8,7 @@ import logging
 import re
 import wave
 import zipfile
+from enum import Enum
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from importlib import metadata as importlib_metadata
@@ -56,11 +57,6 @@ except ModuleNotFoundError:  # pragma: no cover - fallback used when optional de
 
 import webvtt
 from pypdf import PdfReader
-
-try:  # pragma: no cover - ``PasswordType`` added in newer pypdf releases
-    from pypdf.constants import PasswordType
-except ImportError:  # pragma: no cover - fallback for pinned version without enum
-    PasswordType = None  # type: ignore[assignment]
 from pypdf.errors import FileNotDecryptedError, PdfReadError
 
 if TYPE_CHECKING:  # pragma: no cover - import-cycle guard
@@ -147,9 +143,12 @@ def _decrypt_status_allows_access(status: Any) -> bool:
         return status
     if isinstance(status, int):
         return status != 0
-    password_type = PasswordType
-    if password_type is not None and isinstance(status, password_type):
-        return status is not password_type.NOT_DECRYPTED
+    if isinstance(status, Enum):
+        try:
+            not_decrypted = status.__class__.NOT_DECRYPTED
+        except AttributeError:
+            return status.value != 0
+        return status is not not_decrypted
     return bool(status)
 
 
