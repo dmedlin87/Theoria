@@ -15,6 +15,8 @@ from .models import (
 from .workflow import (
     REFUSAL_MESSAGE,
     REFUSAL_MODEL_NAME,
+    _build_citations,
+    _validate_model_completion,
     build_guardrail_refusal,
     build_sermon_deliverable,
     build_sermon_prep_package,
@@ -41,6 +43,8 @@ __all__ = [
     "RAGCitation",
     "REFUSAL_MESSAGE",
     "REFUSAL_MODEL_NAME",
+    "_build_citations",
+    "_validate_model_completion",
     "ensure_completion_safe",
     "SermonPrepResponse",
     "VerseCopilotResponse",
