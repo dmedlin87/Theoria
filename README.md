@@ -10,7 +10,7 @@ Theo Engine now layers grounded generative workflows on top of the deterministic
 - Monitor new theological topics via OpenAlex-enhanced clustering and receive weekly digests summarizing under-represented themes.
 - Track background ingestion jobs in real time, edit document metadata inline, and surface historian notes alongside the grounded copilot workflows in the web UI.
 
-For usage details run `python -m theo.services.cli.ingest_folder --help` or consult [the CLI guide](docs/CLI.md).
+For usage details run `python -m theo.services.cli.ingest_folder --help` or consult [the CLI guide](docs/CLI.md). Operators preparing the ChatGPT connector can follow the [MCP integration execution guide](docs/mcp_integration_guide.md) for an end-to-end runbook.
 
 ## Reranker and intent tagger workflows
 
