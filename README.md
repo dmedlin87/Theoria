@@ -1,80 +1,171 @@
 # Theo Engine
 
-This repository powers Theo's document ingestion and retrieval pipeline. See [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) for the full system overview. The repository also exposes a bulk ingestion CLI that can walk a folder of source files and hand them to the API or worker pipeline.
+**A research engine for theology** that indexes your library (papers, notes, YouTube transcripts, audio), normalizes Scripture references (OSIS), and provides deterministic, verse-anchored search with a Verse Aggregator across your entire corpus.
 
-Theo Engine now layers grounded generative workflows on top of the deterministic retrieval core:
+See [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) for the complete system architecture.
 
-- Securely store multiple AI provider credentials (OpenAI, Anthropic, Azure, local adapters) and register custom model presets in the admin settings API.
-- Run verse-linked research, sermon prep, comparative analysis, multimedia insight extraction, devotional guides, corpus curation, and collaboration flows directly in the Verse Aggregator and search interfaces with strict OSIS-anchored citations.
-- Generate export-ready deliverables (Markdown, NDJSON, CSV) for sermons, lessons, and Q&A transcripts with reproducibility manifests, and trigger post-ingest batch enrichments from the CLI.
-- Monitor new theological topics via OpenAlex-enhanced clustering and receive weekly digests summarizing under-represented themes.
-- Track background ingestion jobs in real time, edit document metadata inline, and surface historian notes alongside the grounded copilot workflows in the web UI.
+## Features
 
-For usage details run `python -m theo.services.cli.ingest_folder --help` or consult [the CLI guide](docs/CLI.md). Operators preparing the ChatGPT connector can follow the [MCP integration execution guide](docs/mcp_integration_guide.md) for an end-to-end runbook.
+### Core Capabilities
 
-## Reranker and intent tagger workflows
+- **Document Ingestion** – Ingest local files, URLs, and YouTube content with automatic parsing, chunking, and citation preservation
+- **Scripture Normalization** – Detect and normalize Bible references to OSIS format (e.g., `John.1.1`)
+- **Hybrid Search** – Combine pgvector embeddings with lexical search for optimal retrieval
+- **Verse Aggregator** – View every snippet across your corpus for any OSIS reference, with jump links to original sources
+- **Bulk CLI** – Walk folders of source files and submit them to the API or worker pipeline
 
-Early reranker and intent tagger experiments live behind feature flags so they can be
-developed without impacting production retrieval quality. Start by reviewing the
-[reranker MVP plan](docs/reranker_mvp.md) for dataset expectations and export
-conventions. Two key commands support the experimentation loop:
+### Generative AI Workflows
 
-- Train candidate models with the scikit-learn pipelines described in
-  `configs/reranker.yaml` and `configs/intent.yaml`:
+Theo Engine layers grounded generative capabilities on top of the deterministic retrieval core:
 
-  ```bash
-  python -m theo.experiments.reranker.train --config configs/reranker.yaml
-  python -m theo.experiments.intent.train --config configs/intent.yaml
-  ```
+- **Multi-Provider Support** – Securely store credentials for OpenAI, Anthropic, Azure, and local adapters; register custom model presets via the admin API
+- **Verse-Linked Research** – Run sermon prep, comparative analysis, multimedia insight extraction, devotional guides, and collaboration flows with strict OSIS-anchored citations
+- **Export Deliverables** – Generate Markdown, NDJSON, and CSV exports for sermons, lessons, and Q&A transcripts with reproducibility manifests
+- **Topic Monitoring** – Track emerging theological topics via OpenAlex-enhanced clustering with weekly digest notifications
+- **Real-Time Tracking** – Monitor background ingestion jobs, edit document metadata inline, and surface historian notes in the web UI
 
-- Capture before/after retrieval metrics using the bench script:
+### Getting Started
 
-  ```bash
-  python -m theo.services.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
-    --trace-path data/eval/production_traces.jsonl \
-    --output data/eval/reranker_candidate.json
-  ```
+- **CLI Usage**: Run `python -m theo.services.cli.ingest_folder --help` or see the [CLI guide](docs/CLI.md)
+- **MCP Integration**: Follow the [MCP integration execution guide](docs/mcp_integration_guide.md) for ChatGPT connector setup
 
-Document the resulting metrics in pull requests and release notes before toggling the
-feature flags in staging or production.
+## Quick Start
 
-## API authentication configuration
-
-The API refuses to start unless authentication credentials are configured. Set one or more
-API keys via `THEO_API_KEYS` or provide JWT settings (`THEO_AUTH_JWT_SECRET` and optional
-issuer/audience) **before** booting the FastAPI service. For automated tests or local
-exploration you can opt into anonymous access by exporting `THEO_AUTH_ALLOW_ANONYMOUS=1`.
-When anonymous access is disabled and no credentials are supplied, requests now fail with
-HTTP 403.
-
-## Performance monitoring
-
-Continuous integration runs Lighthouse to guard against client-side regressions. Review [the performance monitoring policy](docs/performance.md) for guidance on interpreting lab scores, comparing them with Core Web Vitals, and understanding the thresholds that require follow-up.
-
-## Running the test suite
-
-The application relies on several third-party libraries for its API, ORM, and ingestion pipeline.
-Install the runtime and test dependencies before executing the tests:
+### Prerequisites
 
 ```bash
 pip install -r requirements.txt
 ```
 
-After the dependencies are installed you can run `pytest` from the repository root to execute the automated test suite.
+### Running Tests
 
-## Training and evaluating the reranker
-
-Synthetic fixtures for experimenting with the learning-to-rank pipeline live under `tests/ranking/data`. The helper scripts can
-train a small reranker on recent feedback and score it on a holdout split:
+Execute the automated test suite from the repository root:
 
 ```bash
-# Train a checkpoint using the last 30 days of feedback.
+pytest
+```
+
+### Running the API
+
+Start the FastAPI service (SQLite default):
+
+```bash
+uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+API documentation available at <http://localhost:8000/docs>
+
+### Running the Web UI
+
+The Next.js application lives under `theo/services/web`:
+
+```powershell
+cd theo\services\web
+$Env:NEXT_PUBLIC_API_BASE_URL = "http://127.0.0.1:8000"
+$Env:THEO_SEARCH_API_KEY = "Bearer <search-api-token>"  # omit "Bearer" to send via X-API-Key
+npm install   # first time only
+npm run dev
+```
+
+Open <http://localhost:3000> in your browser.
+
+**Note**: The web proxy that backs `/api/search` reads `THEO_SEARCH_API_KEY` on every request. If the value starts with `Bearer`, it's forwarded as an `Authorization` header; otherwise it's sent via `X-API-Key`.
+
+### One-Command Local Dev
+
+Launch both API and Web services with a single command:
+
+```powershell
+./scripts/dev.ps1
+```
+
+**Options**:
+
+```powershell
+./scripts/dev.ps1 -ApiPort 8010 -WebPort 3100 -BindHost 0.0.0.0
+```
+
+Stop with Ctrl+C (automatically cleans up background jobs).
+
+### Docker Compose
+
+Run the full stack (Postgres + Redis + API + Web):
+
+```powershell
+cd infra
+docker compose up --build -d
+```
+
+- Web UI: <http://localhost:3000>
+- API docs: <http://localhost:8000/docs>
+- View logs: `make logs`
+- Stop: `docker compose down`
+
+---
+
+## Configuration
+
+### API Authentication
+
+The API requires authentication credentials before starting. Configure one or more of the following:
+
+- **API Keys**: Set `THEO_API_KEYS` environment variable
+- **JWT Settings**: Set `THEO_AUTH_JWT_SECRET` (and optional issuer/audience)
+- **Anonymous Access** (dev only): Set `THEO_AUTH_ALLOW_ANONYMOUS=1`
+
+When anonymous access is disabled and no credentials are supplied, requests fail with HTTP 403.
+
+### Topic Digest Notifications
+
+Background workers can send webhooks when topic digests are generated. Configure via environment variables:
+
+- `NOTIFICATION_WEBHOOK_URL` – Required to enable delivery (logs and skips if unset)
+- `NOTIFICATION_WEBHOOK_HEADERS` – Optional JSON object of extra HTTP headers (e.g., `{ "Authorization": "Bearer …" }`)
+- `NOTIFICATION_TIMEOUT_SECONDS` – Optional timeout override (default: 10 seconds)
+
+Each notification POST includes the digest document identifier, recipient list, and context for downstream formatting.
+
+---
+
+## Advanced Topics
+
+### Reranker and Intent Tagger Workflows
+
+Early reranker and intent tagger experiments live behind feature flags to avoid impacting production retrieval quality. Review the [reranker MVP plan](docs/reranker_mvp.md) for dataset expectations and export conventions.
+
+**Training candidate models**:
+
+```bash
+python -m theo.experiments.reranker.train --config configs/reranker.yaml
+python -m theo.experiments.intent.train --config configs/intent.yaml
+```
+
+**Capturing before/after retrieval metrics**:
+
+```bash
+python -m theo.services.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
+  --trace-path data/eval/production_traces.jsonl \
+  --output data/eval/reranker_candidate.json
+```
+
+Document the resulting metrics in pull requests and release notes before toggling feature flags in staging or production.
+
+### Training and Evaluating the Reranker
+
+Synthetic fixtures for the learning-to-rank pipeline live under `tests/ranking/data`. Train a reranker on recent feedback and evaluate it on a holdout split:
+
+**Training a checkpoint** (using the last 30 days of feedback):
+
+```bash
 python scripts/train_reranker.py \
   --feedback-path tests/ranking/data/feedback_events.jsonl \
   --model-output /tmp/reranker.joblib \
   --lookback-days 30
+```
 
-# Evaluate the checkpoint on a labelled holdout set at k=10.
+**Evaluating the checkpoint** (on a labeled holdout set at k=10):
+
+```bash
 python scripts/eval_reranker.py \
   --checkpoint /tmp/reranker.joblib \
   --holdout-path tests/ranking/data/holdout.json \
@@ -82,124 +173,91 @@ python scripts/eval_reranker.py \
   --report-path /tmp/reranker_metrics.json
 ```
 
-Use `--reference-time` on the training script to anchor the lookback window when replaying historical fixtures. The evaluation
-script prints baseline and reranked nDCG@k, MRR, and Recall@k metrics and optionally writes them to JSON for CI-friendly
-reporting.
+Use `--reference-time` on the training script to anchor the lookback window when replaying historical fixtures. The evaluation script prints baseline and reranked nDCG@k, MRR, and Recall@k metrics and optionally writes them to JSON for CI-friendly reporting.
 
-## Resetting and reseeding the API database
+### Database Reset and Reseeding
 
-Use the bundled helper to rebuild the schema, apply the raw SQL migrations, seed reference
-datasets, and verify the API is able to return the seeded contradiction data. The script accepts
-optional overrides for the database URL, migration directory, log level, and smoke test OSIS
-reference.
+Rebuild the schema, apply SQL migrations, seed reference datasets, and verify the API returns seeded data:
+
+**Unix/Linux/macOS**:
 
 ```bash
-# Unix-like environments
 ./scripts/reset_reseed_smoke.py --log-level DEBUG
+```
 
-# Windows PowerShell
+**Windows PowerShell**:
+
+```powershell
 ./scripts/reset-reseed-smoke.ps1 -LogLevel DEBUG
 ```
 
-Both variants default to a local SQLite database. Provide `--database-url`/`-DatabaseUrl` when
-testing against Postgres or other backends. The helper performs an authenticated GET request using
-an API key supplied via `--api-key`/`-ApiKey` (defaults to `local-reset-key`) to confirm the
-`/research/contradictions` endpoint returns data after seeding.
+Both variants default to a local SQLite database. Provide `--database-url`/`-DatabaseUrl` for Postgres or other backends. The helper performs an authenticated GET request using an API key (`--api-key`/`-ApiKey`, defaults to `local-reset-key`) to confirm the `/research/contradictions` endpoint returns data after seeding.
 
-## Configuring topic digest notifications
+### Performance Monitoring
 
-Background workers can send a webhook each time a topic digest is generated. Configure the delivery endpoint via environment variables (they map directly to fields in `Settings`).
+Continuous integration runs Lighthouse to guard against client-side regressions. Review the [performance monitoring policy](docs/performance.md) for guidance on interpreting lab scores, comparing them with Core Web Vitals, and understanding thresholds that require follow-up.
 
-- `NOTIFICATION_WEBHOOK_URL` – required to enable delivery. When unset the worker logs the attempt and skips dispatching.
-- `NOTIFICATION_WEBHOOK_HEADERS` – optional JSON object of extra HTTP headers (for example `{ "Authorization": "Bearer …" }`).
-- `NOTIFICATION_TIMEOUT_SECONDS` – optional float override for the HTTP timeout (defaults to 10 seconds).
+---
 
-Each notification POST includes the digest document identifier, the recipient list supplied to the task, and any extra context so downstream systems can format the alert.
+## MCP Server Integration
 
-## Running the Web UI (Next.js frontend)
+The Model Context Protocol (MCP) server ships with the API and can be deployed in multiple ways:
 
-The Next.js application lives under `theo/services/web` (there is **no** `package.json` at the repository root). If you run `npm run dev` from the root you will see an error similar to:
+### Option 1: Embedded in the API
 
-```text
-npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '.../TheoEngine/package.json'
-```
+Set `MCP_TOOLS_ENABLED=1` in your environment (see `.env.example`). When the main API boots, it mounts the MCP app at `http://127.0.0.1:8000/mcp`, exposing `/metadata` and `/tools/*` endpoints behind the existing authentication layer.
 
-Follow these steps instead:
+### Option 2: Standalone Process
 
-1. Open a terminal at the repo root (optional if you are already there):
+Run the MCP server independently for tooling or contract tests:
 
 ```powershell
-cd c:\Users\dmedl\Projects\TheoEngine
+$Env:MCP_TOOLS_ENABLED = "1"
+$Env:MCP_RELOAD = "1"
+python -m mcp_server
 ```
 
-1. Start (or keep running) the API in another terminal (SQLite default):
+Override `MCP_PORT` or `MCP_HOST` to change the bind address (defaults: `8050`/`127.0.0.1`).
+
+### Option 3: Dev Script with MCP
+
+Launch all three services (API + Web + MCP) locally:
 
 ```powershell
-uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+./scripts/dev.ps1 -IncludeMcp -ApiPort 8000 -McpPort 8050
 ```
 
-1. In a new terminal start the web UI (point it at the API):
+### Option 4: Docker Compose
+
+Expose the MCP server via Docker:
 
 ```powershell
-cd .\theo\services\web
-$Env:NEXT_PUBLIC_API_BASE_URL = "http://127.0.0.1:8000"
-$Env:THEO_SEARCH_API_KEY = "Bearer <search-api-token>"  # omit "Bearer" to send the key via X-API-Key
-npm install   # first time only
-npm run dev
+docker compose up mcp  # MCP only
+docker compose up      # Full stack
 ```
 
-The web proxy that backs `/api/search` reads `THEO_SEARCH_API_KEY` on every request. If the value starts with `Bearer` the proxy
-forwards it as an `Authorization` header; otherwise it is sent via `X-API-Key`. Missing the environment variable will cause the
-proxy to surface `401 Unauthorized` responses from the upstream API.
+The service listens on `http://localhost:8050` by default and shares the same database and storage volumes as the API.
 
-1. Open <http://localhost:3000> in your browser.
+### Architecture
 
-### Docker alternative (Postgres + Redis + API + Web)
+Review [`docs/adr/0001-expose-theoengine-via-mcp.md`](docs/adr/0001-expose-theoengine-via-mcp.md) for architectural decisions that guide the tool contracts and feature flags.
 
-```powershell
-cd infra
-docker compose up --build -d
-```
+---
 
-Then visit <http://localhost:3000> (API docs at <http://localhost:8000/docs>). Use `make logs` for streaming logs and `docker compose down` to stop.
+## Documentation
 
-### One-command local dev (API + Web without Docker)
+- **[BLUEPRINT.md](docs/BLUEPRINT.md)** – Complete system architecture and design
+- **[CLI.md](docs/CLI.md)** – Command-line interface guide
+- **[API.md](docs/API.md)** – API reference and endpoints
+- **[MCP Integration Guide](docs/mcp_integration_guide.md)** – ChatGPT connector setup
+- **[Performance Monitoring](docs/performance.md)** – Lighthouse CI and Core Web Vitals
+- **[Reranker MVP Plan](docs/reranker_mvp.md)** – Dataset expectations and export conventions
+- **[Test Map](docs/testing/TEST_MAP.md)** – Testing strategy and coverage
 
-You can use the helper script to launch both services (FastAPI + Next.js) with one command:
+## Contributing
 
-```powershell
-./scripts/dev.ps1
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on submitting issues and pull requests.
 
-Options:
+## License
 
-```powershell
-./scripts/dev.ps1 -ApiPort 8010 -WebPort 3100 -BindHost 0.0.0.0
-```
-
-Stops with Ctrl+C (web) and automatically cleans up the API background job.
-
-## MCP server integration
-
-The Model Context Protocol (MCP) server ships with the API and can be mounted in two ways:
-
-- Set `MCP_TOOLS_ENABLED=1` in your environment (see `.env.example`). When the main API boots it mounts the MCP app at `http://127.0.0.1:8000/mcp`, exposing `/metadata` and `/tools/*` endpoints behind the existing authentication layer.
-- Run the MCP server as a standalone process for tooling or contract tests:
-
-  ```powershell
-  $Env:MCP_TOOLS_ENABLED = "1"
-  $Env:MCP_RELOAD = "1"
-  python -m mcp_server
-  ```
-
-  Override `MCP_PORT` or `MCP_HOST` to change the bind address (defaults: 8050/127.0.0.1).
-
-- Launch all three services locally with the dev script:
-
-  ```powershell
-  ./scripts/dev.ps1 -IncludeMcp -ApiPort 8000 -McpPort 8050
-  ```
-
-- Docker Compose now exposes the server via `docker compose up mcp` (or `up` to start the full stack). The service listens on `http://localhost:8050` by default and shares the same database and storage volumes as the API.
-
-Review `docs/adr/0001-expose-theoengine-via-mcp.md` for the architectural decisions that guide the tool contracts and feature flags.
+See the repository for license information.
