@@ -11,6 +11,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 import yaml
 from sqlalchemy import Table, delete, inspect
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from theo.services.geo import seed_openbible_geo
@@ -116,59 +117,70 @@ def seed_contradiction_claims(session: Session) -> None:
         SEED_ROOT / "contradictions_catalog.yaml",
     )
     seen_ids: set[str] = set()
-    for entry in payload:
-        osis_a = entry.get("osis_a")
-        osis_b = entry.get("osis_b")
-        if not osis_a or not osis_b:
-            continue
-        source = entry.get("source") or "community"
-        perspective = (entry.get("perspective") or "skeptical").strip().lower()
-        identifier = str(
-            uuid5(
-                CONTRADICTION_NAMESPACE,
-                "|".join(
-                    [
-                        str(osis_a).lower(),
-                        str(osis_b).lower(),
-                        source.lower(),
-                        perspective,
-                    ]
-                ),
+    try:
+        for entry in payload:
+            osis_a = entry.get("osis_a")
+            osis_b = entry.get("osis_b")
+            if not osis_a or not osis_b:
+                continue
+            source = entry.get("source") or "community"
+            perspective = (entry.get("perspective") or "skeptical").strip().lower()
+            identifier = str(
+                uuid5(
+                    CONTRADICTION_NAMESPACE,
+                    "|".join(
+                        [
+                            str(osis_a).lower(),
+                            str(osis_b).lower(),
+                            source.lower(),
+                            perspective,
+                        ]
+                    ),
+                )
             )
-        )
-        seen_ids.add(identifier)
-        record = session.get(ContradictionSeed, identifier)
-        tags = _coerce_list(entry.get("tags"))
-        weight = float(entry.get("weight", 1.0))
-        summary = entry.get("summary")
+            seen_ids.add(identifier)
+            record = session.get(ContradictionSeed, identifier)
+            tags = _coerce_list(entry.get("tags"))
+            weight = float(entry.get("weight", 1.0))
+            summary = entry.get("summary")
 
-        if record is None:
-            record = ContradictionSeed(
-                id=identifier,
-                osis_a=str(osis_a),
-                osis_b=str(osis_b),
-                summary=summary,
-                source=source,
-                tags=tags,
-                weight=weight,
-                perspective=perspective,
+            if record is None:
+                record = ContradictionSeed(
+                    id=identifier,
+                    osis_a=str(osis_a),
+                    osis_b=str(osis_b),
+                    summary=summary,
+                    source=source,
+                    tags=tags,
+                    weight=weight,
+                    perspective=perspective,
+                )
+                session.add(record)
+            else:
+                if record.osis_a != osis_a:
+                    record.osis_a = str(osis_a)
+                if record.osis_b != osis_b:
+                    record.osis_b = str(osis_b)
+                if record.summary != summary:
+                    record.summary = summary
+                if record.source != source:
+                    record.source = source
+                if record.tags != tags:
+                    record.tags = tags
+                if record.weight != weight:
+                    record.weight = weight
+                if record.perspective != perspective:
+                    record.perspective = perspective
+    except OperationalError as exc:
+        session.rollback()
+        message = str(exc).lower()
+        if "no such column" in message and "perspective" in message:
+            logger.warning(
+                "Skipping contradiction seeds because 'perspective' column is unavailable: %s",
+                exc,
             )
-            session.add(record)
-        else:
-            if record.osis_a != osis_a:
-                record.osis_a = str(osis_a)
-            if record.osis_b != osis_b:
-                record.osis_b = str(osis_b)
-            if record.summary != summary:
-                record.summary = summary
-            if record.source != source:
-                record.source = source
-            if record.tags != tags:
-                record.tags = tags
-            if record.weight != weight:
-                record.weight = weight
-            if record.perspective != perspective:
-                record.perspective = perspective
+            return
+        raise
 
     if seen_ids:
         session.execute(
