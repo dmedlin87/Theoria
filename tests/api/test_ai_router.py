@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from theo.services.api.app.ai.clients import GenerationError
-from theo.services.api.app.ai.ledger import SharedLedger
+from theo.services.api.app.ai.ledger import CacheRecord, SharedLedger
 from theo.services.api.app.ai.registry import LLMModel, LLMRegistry
 from theo.services.api.app.ai.router import (
     LLMRouterService,
@@ -472,6 +472,76 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
     assert call_count == 1
     assert {result.output for result in results} == {"shared-output"}
     assert router.get_spend("primary") == pytest.approx(results[0].cost)
+
+
+def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch):
+    registry = LLMRegistry()
+    registry.add_model(
+        LLMModel(
+            name="primary",
+            provider="echo",
+            model="echo",
+            config={},
+            pricing={"per_call": 0.3},
+            routing={"weight": 1.0},
+        ),
+        make_default=True,
+    )
+
+    router = LLMRouterService(registry)
+    model = registry.get()
+
+    call_count = 0
+    call_lock = threading.Lock()
+    first_call_done = threading.Event()
+
+    class _FlakyClient:
+        def generate(self, **_: object) -> str:
+            nonlocal call_count
+            with call_lock:
+                call_count += 1
+                current = call_count
+            time.sleep(0.05)
+            if current == 1:
+                first_call_done.set()
+                return "shared-output"
+            raise GenerationError("boom")
+
+    monkeypatch.setattr(model, "build_client", lambda: _FlakyClient())
+
+    original_wait = router._ledger.wait_for_inflight
+
+    def _slow_wait(
+        cache_key: str, *, poll_interval: float = 0.05, timeout: float | None = None
+    ) -> CacheRecord:
+        return original_wait(cache_key, poll_interval=0.2, timeout=timeout)
+
+    monkeypatch.setattr(router._ledger, "wait_for_inflight", _slow_wait)
+
+    barrier = threading.Barrier(3)
+
+    def _invoke() -> RoutedGeneration:
+        barrier.wait()
+        return router.execute_generation(
+            workflow="chat", model=model, prompt="simultaneous"
+        )
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(_invoke) for _ in range(3)]
+        assert first_call_done.wait(timeout=2.0)
+        time.sleep(0.15)
+
+        def _expect_error() -> None:
+            router.execute_generation(workflow="chat", model=model, prompt="simultaneous")
+
+        error_future = executor.submit(_expect_error)
+        with pytest.raises(GenerationError):
+            error_future.result()
+
+        results = [future.result() for future in futures]
+
+    assert call_count == 2
+    assert {result.output for result in results} == {"shared-output"}
 
 
 def test_wait_for_inflight_handles_transient_absence(tmp_path):
