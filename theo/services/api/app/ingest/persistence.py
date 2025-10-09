@@ -1023,9 +1023,10 @@ def persist_transcript_document(
 def _safe_storage_name(name: str, *, fallback: str) -> str:
     """Return a safe filename for persisted artifacts."""
 
-    candidate = Path(name).name
+    candidate = name.replace("\\", "/")
+    candidate = Path(candidate).name
     if candidate in {"", ".", ".."}:
-        candidate = Path(fallback).name
+        candidate = Path(fallback.replace("\\", "/")).name
 
     if candidate in {"", ".", ".."}:
         raise ValueError("artifact filename resolves outside storage directory")
