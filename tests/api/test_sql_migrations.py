@@ -14,6 +14,7 @@ from theo.services.api.app.db.models import AppSetting
 from theo.services.api.app.main import app
 
 
+@pytest.mark.enable_migrations
 @pytest.mark.usefixtures("_bypass_authentication")
 def test_sql_migrations_run_on_startup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     db_path = tmp_path / "app.db"
