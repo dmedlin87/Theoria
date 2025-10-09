@@ -51,12 +51,33 @@ def _parse_frontmatter(raw: str | None) -> dict[str, Any] | None:
         ) from exc
 
 
+def _normalise_upload_name(filename: str | None, *, default: str) -> str:
+    """Return a sanitised base filename for temporary upload storage."""
+
+    candidate = (filename or "").strip()
+    if candidate:
+        # Some clients (notably Windows browsers) include backslashes in the
+        # filename. Treat any slash variant as a directory separator so we do
+        # not persist user supplied paths.
+        candidate = candidate.replace("\\", "/")
+        candidate = Path(candidate).name
+
+    if not candidate:
+        candidate = Path(default).name
+
+    if not candidate:
+        return "upload.bin"
+
+    if candidate in {".", ".."}:
+        return "upload.bin"
+
+    return candidate
+
+
 def _unique_safe_path(tmp_dir: Path, filename: str | None, default: str) -> Path:
     """Return a unique, sanitized path anchored within ``tmp_dir``."""
 
-    safe_name = Path(filename or "").name
-    if not safe_name:
-        safe_name = Path(default).name or "upload.bin"
+    safe_name = _normalise_upload_name(filename, default=default)
     unique_name = f"{uuid4().hex}-{safe_name}"
     return tmp_dir / unique_name
 
@@ -342,8 +363,14 @@ async def ingest_transcript(
             transcript_path,
             frontmatter=parsed_frontmatter,
             audio_path=audio_path,
-            transcript_filename=Path(transcript.filename or "transcript.vtt").name,
-            audio_filename=(Path(audio.filename).name if audio and audio.filename else None),
+            transcript_filename=_normalise_upload_name(
+                transcript.filename, default="transcript.vtt"
+            ),
+            audio_filename=(
+                _normalise_upload_name(audio.filename, default="audio.bin")
+                if audio and audio.filename
+                else None
+            ),
         )
     except UnsupportedSourceError as exc:
         raise HTTPException(
