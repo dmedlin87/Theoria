@@ -47,6 +47,28 @@ services:
     volumes:
       - storage:/data/storage
 
+  mcp:
+    build:
+      context: ..
+      dockerfile: mcp_server/Dockerfile
+    env_file: ../.env
+    environment:
+      storage_root: /data/storage
+      database_url: postgresql+psycopg://postgres:postgres@db:5432/theo
+      redis_url: redis://redis:6379/0
+      MCP_TOOLS_ENABLED: "1"
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8050
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8050:8050"
+    volumes:
+      - storage:/data/storage
+
   web:
     build:
       context: ..

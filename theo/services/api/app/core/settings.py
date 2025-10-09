@@ -356,6 +356,26 @@ class Settings(BaseSettings):
             "Block URLs that resolve to private, loopback, or link-local addresses."
         ),
     )
+    mcp_tools_enabled: bool = Field(
+        default=False,
+        description="Expose Model Context Protocol tooling under the /mcp sub-application.",
+    )
+    mcp_schema_base_url: str = Field(
+        default="https://theoengine.dev/mcp/schemas",
+        description="Base URL used when emitting MCP JSON Schema identifiers.",
+    )
+    mcp_write_allowlist: str | None = Field(
+        default=None,
+        description=(
+            "Optional comma-separated allowlist entries (tool=value) gating MCP write tools."
+        ),
+    )
+    mcp_write_rate_limits: str | None = Field(
+        default=None,
+        description=(
+            "Optional comma-separated rate limits per MCP tool (e.g. note_write=5/min)."
+        ),
+    )
 
 
 @lru_cache

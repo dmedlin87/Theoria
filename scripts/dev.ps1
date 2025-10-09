@@ -3,13 +3,18 @@
   Launch Theo Engine API (FastAPI) and Web (Next.js) in development mode.
 .DESCRIPTION
   Starts the FastAPI server with live reload (SQLite backend by default) and the Next.js dev server
-  with the correct NEXT_PUBLIC_API_BASE_URL. Automatically installs Node dependencies if missing.
+  with the correct NEXT_PUBLIC_API_BASE_URL. Optionally boots the MCP server for tool development.
+  Automatically installs Node dependencies if missing.
 .PARAMETER ApiPort
   Port for the FastAPI server (default 8000)
 .PARAMETER WebPort
   Port for the Next.js dev server (default 3000)
 .PARAMETER BindHost
   Host interface to bind (default 127.0.0.1)
+.PARAMETER IncludeMcp
+  Start the MCP server alongside the API (default disabled)
+.PARAMETER McpPort
+  Port for the MCP server when IncludeMcp is set (default 8050)
 .EXAMPLE
   ./scripts/dev.ps1
 .EXAMPLE
@@ -18,7 +23,9 @@
 param(
   [int]$ApiPort = 8000,
   [int]$WebPort = 3000,
-  [string]$BindHost = '127.0.0.1'
+  [string]$BindHost = '127.0.0.1',
+  [switch]$IncludeMcp = $false,
+  [int]$McpPort = 8050
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,6 +85,13 @@ function Stop-ApiJob {
 
   if (-not $Job) { return }
 
+  if ($Job -is [System.Array]) {
+    foreach ($entry in $Job) {
+      Stop-ApiJob $entry
+    }
+    return
+  }
+
   Stop-Job $Job -ErrorAction SilentlyContinue | Out-Null
   $output = Receive-Job $Job -ErrorAction SilentlyContinue
   if ($output) { Write-Host $output }
@@ -134,6 +148,7 @@ $ApiArgs = @(
 Write-Host ("{0} {1}" -f $ApiExe, ($ApiArgs -join ' ')) -ForegroundColor Green
 
 # Start API in background job
+$McpJob = $null
 $ApiJob = Start-Job -ScriptBlock {
   param($exe, $exeArgs, $wd)
   Set-Location $wd
@@ -169,9 +184,57 @@ if (-not $ApiReady) {
 
 Write-Host "API is listening on ${BindHost}:${ApiPort}" -ForegroundColor Green
 
+if ($IncludeMcp) {
+  Write-Section 'Starting MCP Server'
+  $McpArgs = @('-m','mcp_server')
+  $McpEnv = @{
+    MCP_HOST = $BindHost
+    MCP_PORT = $McpPort
+    MCP_RELOAD = '1'
+    MCP_TOOLS_ENABLED = '1'
+  }
+  Write-Host ("{0} {1}" -f $PythonExe, ($McpArgs -join ' ')) -ForegroundColor Green
+
+  $McpJob = Start-Job -ScriptBlock {
+    param($exe, $exeArgs, $wd, $envVars)
+    Set-Location $wd
+    foreach ($key in $envVars.Keys) {
+      Set-Item -Path ("Env:{0}" -f $key) -Value $envVars[$key]
+    }
+    & $exe @exeArgs
+  } -ArgumentList $PythonExe, $McpArgs, $RepoRoot, $McpEnv
+
+  $McpReady = $false
+  $McpStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+  while ($McpStopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+    if ($McpJob.State -eq 'Failed' -or $McpJob.State -eq 'Stopped') {
+      Write-Host 'MCP server failed to start.' -ForegroundColor Red
+      $mcpOutput = Receive-Job $McpJob -ErrorAction SilentlyContinue
+      if ($mcpOutput) { Write-Host $mcpOutput }
+      Stop-ApiJob @($ApiJob, $McpJob)
+      exit 1
+    }
+
+    if (Test-PortOpen -TargetHost $ReadinessHost -Port $McpPort) {
+      $McpReady = $true
+      break
+    }
+
+    Start-Sleep -Milliseconds 500
+  }
+
+  if (-not $McpReady) {
+    Write-Host "MCP server did not become ready within $TimeoutSeconds seconds." -ForegroundColor Red
+    Stop-ApiJob @($ApiJob, $McpJob)
+    exit 1
+  }
+
+  Write-Host "MCP server is listening on ${BindHost}:${McpPort}" -ForegroundColor Green
+}
+
 if (-not (Test-Path $WebDir)) {
   Write-Host "Web directory not found: $WebDir" -ForegroundColor Red
-  Stop-ApiJob $ApiJob
+  Stop-ApiJob @($ApiJob, $McpJob)
   exit 1
 }
 
@@ -180,14 +243,14 @@ Set-Location $WebDir
 
 if (-not (Test-Path (Join-Path $WebDir 'package.json'))) {
   Write-Host 'package.json missing in web directory.' -ForegroundColor Red
-  Stop-ApiJob $ApiJob
+  Stop-ApiJob @($ApiJob, $McpJob)
   exit 1
 }
 
 # Ensure Node is installed
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
   Write-Host 'Node.js (node) not found on PATH. Please install Node 18+.' -ForegroundColor Red
-  Stop-ApiJob $ApiJob
+  Stop-ApiJob @($ApiJob, $McpJob)
   exit 1
 }
 
@@ -221,6 +284,6 @@ Write-Host ("{0} {1}" -f $NextExe, ($NextArgs -join ' ')) -ForegroundColor Green
 # Start web in foreground so user can stop with Ctrl+C
 & $NextExe @NextArgs
 
-Write-Host 'Shutting down API job...' -ForegroundColor Yellow
-Stop-ApiJob $ApiJob
+Write-Host 'Shutting down background jobs...' -ForegroundColor Yellow
+Stop-ApiJob @($ApiJob, $McpJob)
 

@@ -257,6 +257,17 @@ def create_app() -> FastAPI:
             payload = metrics_generator()
             return PlainTextResponse(payload, media_type=CONTENT_TYPE_LATEST)
 
+    if settings.mcp_tools_enabled:
+        try:
+            from mcp_server.server import app as mcp_app
+        except ImportError as exc:  # pragma: no cover - defensive guard
+            logger.warning(
+                "MCP tools enabled but server package import failed: %s", exc
+            )
+        else:
+            app.mount("/mcp", mcp_app)
+            logger.info("Mounted MCP server at /mcp")
+
     return app
 
 

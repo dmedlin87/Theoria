@@ -178,3 +178,28 @@ Options:
 ```
 
 Stops with Ctrl+C (web) and automatically cleans up the API background job.
+
+## MCP server integration
+
+The Model Context Protocol (MCP) server ships with the API and can be mounted in two ways:
+
+- Set `MCP_TOOLS_ENABLED=1` in your environment (see `.env.example`). When the main API boots it mounts the MCP app at `http://127.0.0.1:8000/mcp`, exposing `/metadata` and `/tools/*` endpoints behind the existing authentication layer.
+- Run the MCP server as a standalone process for tooling or contract tests:
+
+  ```powershell
+  $Env:MCP_TOOLS_ENABLED = "1"
+  $Env:MCP_RELOAD = "1"
+  python -m mcp_server
+  ```
+
+  Override `MCP_PORT` or `MCP_HOST` to change the bind address (defaults: 8050/127.0.0.1).
+
+- Launch all three services locally with the dev script:
+
+  ```powershell
+  ./scripts/dev.ps1 -IncludeMcp -ApiPort 8000 -McpPort 8050
+  ```
+
+- Docker Compose now exposes the server via `docker compose up mcp` (or `up` to start the full stack). The service listens on `http://localhost:8050` by default and shares the same database and storage volumes as the API.
+
+Review `docs/adr/0001-expose-theoengine-via-mcp.md` for the architectural decisions that guide the tool contracts and feature flags.
