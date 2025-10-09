@@ -1,6 +1,15 @@
 """Public API for guardrailed RAG workflows."""
 
+from __future__ import annotations
+
+import sys
+import types
+
+from . import guardrails as _guardrails_module
+from . import workflow as _workflow_module
 from .guardrails import GuardrailError, ensure_completion_safe
+from ...telemetry import instrument_workflow
+from ..registry import get_llm_registry
 from .models import (
     CollaborationResponse,
     ComparativeAnalysisResponse,
@@ -30,6 +39,9 @@ from .workflow import (
     run_corpus_curation,
     run_guarded_chat,
     run_research_reconciliation,
+    _record_used_citation_feedback,
+    _guarded_answer,
+    _search,
 )
 
 __all__ = [
@@ -58,7 +70,26 @@ __all__ = [
     "generate_multimedia_digest",
     "generate_sermon_prep_outline",
     "generate_verse_brief",
+    "get_llm_registry",
+    "instrument_workflow",
     "run_corpus_curation",
     "run_guarded_chat",
     "run_research_reconciliation",
+    "_record_used_citation_feedback",
+    "_guarded_answer",
+    "_search",
 ]
+
+
+class _RAGModule(types.ModuleType):
+    """Module proxy that keeps workflow exports patchable for tests."""
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if hasattr(_workflow_module, name):
+            setattr(_workflow_module, name, value)
+        if hasattr(_guardrails_module, name):
+            setattr(_guardrails_module, name, value)
+        super().__setattr__(name, value)
+
+
+sys.modules[__name__].__class__ = _RAGModule
