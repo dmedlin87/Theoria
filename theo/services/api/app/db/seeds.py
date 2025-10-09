@@ -10,7 +10,7 @@ from typing import Iterable
 from uuid import NAMESPACE_URL, uuid5
 
 import yaml
-from sqlalchemy import delete, inspect
+from sqlalchemy import Table, delete, inspect
 from sqlalchemy.orm import Session
 
 from theo.services.geo import seed_openbible_geo
@@ -88,14 +88,26 @@ def _table_has_column(session: Session, table_name: str, column_name: str, *, sc
     return any(column.get("name") == column_name for column in columns)
 
 
+def _ensure_perspective_column(
+    session: Session, table: Table, dataset_label: str
+) -> bool:
+    """Verify the ``perspective`` column exists before reading from ``table``."""
+
+    if _table_has_column(session, table.name, "perspective", schema=table.schema):
+        return True
+
+    session.rollback()
+    logger.warning(
+        "Skipping %s seeds because 'perspective' column is missing", dataset_label
+    )
+    return False
+
+
 def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
 
     table = ContradictionSeed.__table__
-    if not _table_has_column(session, table.name, "perspective", schema=table.schema):
-        logger.warning(
-            "Skipping contradiction seeds because 'perspective' column is missing"
-        )
+    if not _ensure_perspective_column(session, table, "contradiction"):
         return
 
     payload = _iter_seed_entries(
@@ -169,8 +181,7 @@ def seed_harmony_claims(session: Session) -> None:
     """Load harmony seeds from bundled YAML/JSON files."""
 
     table = HarmonySeed.__table__
-    if not _table_has_column(session, table.name, "perspective", schema=table.schema):
-        logger.warning("Skipping harmony seeds because 'perspective' column is missing")
+    if not _ensure_perspective_column(session, table, "harmony"):
         return
 
     payload = _iter_seed_entries(
@@ -253,6 +264,10 @@ def seed_harmony_claims(session: Session) -> None:
 
 def seed_commentary_excerpts(session: Session) -> None:
     """Seed curated commentary excerpts into the catalogue."""
+
+    table = CommentaryExcerptSeed.__table__
+    if not _ensure_perspective_column(session, table, "commentary excerpt"):
+        return
 
     payload = _iter_seed_entries(
         SEED_ROOT / "commentaries.yaml",
