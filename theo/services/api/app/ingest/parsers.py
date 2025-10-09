@@ -56,6 +56,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback used when optional de
 
 import webvtt
 from pypdf import PdfReader
+from pypdf.constants import PasswordType
 from pypdf.errors import FileNotDecryptedError, PdfReadError
 
 if TYPE_CHECKING:  # pragma: no cover - import-cycle guard
@@ -135,6 +136,18 @@ class _PdfExtractionErrorSentinel:
 PDF_EXTRACTION_UNSUPPORTED = _PdfExtractionErrorSentinel()
 
 
+def _decrypt_status_allows_access(status: Any) -> bool:
+    """Return ``True`` when :meth:`PdfReader.decrypt` unlocked the document."""
+
+    if isinstance(status, bool):
+        return status
+    if isinstance(status, int):
+        return status != 0
+    if isinstance(status, PasswordType):
+        return status is not PasswordType.NOT_DECRYPTED
+    return bool(status)
+
+
 def parse_pdf(path: Path, *, max_pages: int | None = None) -> list[ParsedPage] | _PdfExtractionErrorSentinel:
     """Extract text from a PDF file page-by-page using :mod:`pypdf`."""
 
@@ -153,11 +166,12 @@ def parse_pdf(path: Path, *, max_pages: int | None = None) -> list[ParsedPage] |
         except Exception:
             return PDF_EXTRACTION_UNSUPPORTED
 
-        if not decrypt_status:
-            # ``decrypt`` returning ``0`` indicates that the password was not
-            # accepted.  Some lightly protected PDFs still allow reading even
-            # when the empty password is rejected, so defer failure until we
-            # actually try to access pages.
+        if not _decrypt_status_allows_access(decrypt_status):
+            # ``decrypt`` returning ``0`` or ``PasswordType.NOT_DECRYPTED``
+            # indicates that the password was not accepted.  Some lightly
+            # protected PDFs still allow reading even when the empty password
+            # is rejected, so defer failure until we actually try to access
+            # pages.
             try:
                 total_pages = len(reader.pages)
             except (FileNotDecryptedError, PdfReadError):
