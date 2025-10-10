@@ -18,7 +18,12 @@ from theo.services.api.app.core.database import (  # noqa: E402  (import after p
     get_engine,
     get_settings,
 )
-from theo.services.api.app.db.models import Document, Passage  # noqa: E402
+from theo.services.api.app.db.models import (  # noqa: E402
+    CaseObject,
+    CaseSource,
+    Document,
+    Passage,
+)
 from theo.services.api.app.ingest import pipeline  # noqa: E402
 
 
@@ -71,6 +76,55 @@ def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
         assert stored_frontmatter["authors"] == ["Jane Doe"]
     finally:
         settings.storage_root = original_storage
+
+
+def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
+    """Case Builder objects mirror ingested passages when enabled."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    original_flag = settings.case_builder_enabled
+    settings.storage_root = tmp_path / "storage"
+    settings.case_builder_enabled = True
+
+    try:
+        markdown = "---\ntitle: Case Doc\n---\n\nVerse driven content." \
+            "\n\nAnother passage with OSIS John.1.1"
+        doc_path = tmp_path / "case_doc.md"
+        doc_path.write_text(markdown, encoding="utf-8")
+
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document_id = document.id
+
+        with Session(engine) as session:
+            source = (
+                session.query(CaseSource)
+                .filter(CaseSource.document_id == document_id)
+                .one_or_none()
+            )
+            objects = (
+                session.query(CaseObject)
+                .filter(CaseObject.document_id == document_id)
+                .order_by(CaseObject.id.asc())
+                .all()
+            )
+            passage_ids = {
+                passage.id
+                for passage in session.query(Passage).filter_by(document_id=document_id)
+            }
+
+        assert source is not None
+        assert objects, "Expected case objects to be persisted"
+        assert {obj.passage_id for obj in objects} == passage_ids
+        assert all(obj.object_type == "passage" for obj in objects)
+        assert any(obj.embedding for obj in objects)
+    finally:
+        settings.storage_root = original_storage
+        settings.case_builder_enabled = original_flag
 
 
 def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:

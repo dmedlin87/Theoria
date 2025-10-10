@@ -94,6 +94,18 @@ class Settings(BaseSettings):
         default=5,
         description="Maximum redirect hops allowed when fetching web documents",
     )
+    case_builder_enabled: bool = Field(
+        default=False,
+        description="Enable ingestion and APIs for the Case Builder feature",
+    )
+    case_builder_web_enabled: bool = Field(
+        default=False,
+        description="Expose Case Builder UI affordances in the web client",
+    )
+    case_builder_notify_channel: str = Field(
+        default="case_object_upsert",
+        description="Postgres NOTIFY channel used for case object upsert events",
+    )
     topic_digest_ttl_seconds: int = Field(
         default=3600,
         description="Time-to-live in seconds before regenerating cached topic digests",
