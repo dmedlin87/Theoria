@@ -14,6 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..case_builder import sync_passages_case_objects
 from ..core.settings import get_settings
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import (
@@ -462,6 +463,13 @@ def persist_text_document(
 
     session.flush()
 
+    sync_passages_case_objects(
+        session,
+        document=document,
+        passages=passages,
+        frontmatter=frontmatter,
+    )
+
     topics = collect_topics(document, frontmatter)
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
@@ -831,6 +839,13 @@ def persist_transcript_document(
         segments.append(segment)
 
     session.flush()
+
+    sync_passages_case_objects(
+        session,
+        document=document,
+        passages=passages,
+        frontmatter=frontmatter,
+    )
 
     topics = collect_topics(document, frontmatter)
     stance_overrides_raw = frontmatter.get("creator_stances") or {}

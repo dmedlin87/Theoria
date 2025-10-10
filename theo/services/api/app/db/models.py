@@ -84,6 +84,11 @@ class Document(Base):
         uselist=False,
         single_parent=True,
     )
+    case_objects: Mapped[list["CaseObject"]] = relationship(
+        "CaseObject",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
 
 
 class Passage(Base):
@@ -114,6 +119,12 @@ class Passage(Base):
     tei_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="passages")
+    case_object: Mapped["CaseObject | None"] = relationship(
+        "CaseObject",
+        back_populates="passage",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class AppSetting(Base):
@@ -159,6 +170,12 @@ class DocumentAnnotation(Base):
     )
 
     document: Mapped[Document] = relationship("Document", back_populates="annotations")
+    case_object: Mapped["CaseObject | None"] = relationship(
+        "CaseObject",
+        back_populates="annotation",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class IngestionJob(Base):
@@ -1043,6 +1060,178 @@ class GeoPlace(Base):
     )
 
 
+class CaseSource(Base):
+    """Source metadata powering case-builder evidence objects."""
+
+    __tablename__ = "case_sources"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    document_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="SET NULL"), unique=True, nullable=True
+    )
+    origin: Mapped[str | None] = mapped_column(String, nullable=True)
+    author: Mapped[str | None] = mapped_column(String, nullable=True)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
+    modality: Mapped[str | None] = mapped_column(String, nullable=True)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    objects: Mapped[list["CaseObject"]] = relationship(
+        "CaseObject", back_populates="source", cascade="all, delete-orphan"
+    )
+
+
+class CaseObject(Base):
+    """Normalized evidence item available to the case builder."""
+
+    __tablename__ = "case_objects"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    source_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("case_sources.id", ondelete="SET NULL"), nullable=True
+    )
+    document_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
+    passage_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("passages.id", ondelete="SET NULL"), unique=True, nullable=True
+    )
+    annotation_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("document_annotations.id", ondelete="SET NULL"),
+        unique=True,
+        nullable=True,
+    )
+    object_type: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    osis_ranges: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    modality: Mapped[str | None] = mapped_column(String, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    stability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        VectorType(get_settings().embedding_dim), nullable=True
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    source: Mapped[CaseSource | None] = relationship("CaseSource", back_populates="objects")
+    document: Mapped[Document | None] = relationship("Document", back_populates="case_objects")
+    passage: Mapped[Passage | None] = relationship("Passage", back_populates="case_object")
+    annotation: Mapped[DocumentAnnotation | None] = relationship(
+        "DocumentAnnotation", back_populates="case_object"
+    )
+    outgoing_edges: Mapped[list["CaseEdge"]] = relationship(
+        "CaseEdge",
+        back_populates="src_object",
+        cascade="all, delete-orphan",
+        foreign_keys="CaseEdge.src_object_id",
+    )
+    incoming_edges: Mapped[list["CaseEdge"]] = relationship(
+        "CaseEdge",
+        back_populates="dst_object",
+        cascade="all, delete-orphan",
+        foreign_keys="CaseEdge.dst_object_id",
+    )
+    insights: Mapped[list["CaseInsight"]] = relationship(
+        "CaseInsight", back_populates="primary_object"
+    )
+
+
+class CaseEdge(Base):
+    """Graph edge linking case objects with derived features."""
+
+    __tablename__ = "case_edges"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    src_object_id: Mapped[str] = mapped_column(
+        String, ForeignKey("case_objects.id", ondelete="CASCADE"), nullable=False
+    )
+    dst_object_id: Mapped[str] = mapped_column(
+        String, ForeignKey("case_objects.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    features: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    src_object: Mapped[CaseObject] = relationship(
+        "CaseObject", foreign_keys=[src_object_id], back_populates="outgoing_edges"
+    )
+    dst_object: Mapped[CaseObject] = relationship(
+        "CaseObject", foreign_keys=[dst_object_id], back_populates="incoming_edges"
+    )
+
+
+class CaseInsight(Base):
+    """Scored insight produced by the case builder workers."""
+
+    __tablename__ = "case_insights"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    insight_type: Mapped[str] = mapped_column(String, nullable=False)
+    primary_object_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("case_objects.id", ondelete="SET NULL"), nullable=True
+    )
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    primary_object: Mapped[CaseObject | None] = relationship(
+        "CaseObject", back_populates="insights"
+    )
+    actions: Mapped[list["CaseUserAction"]] = relationship(
+        "CaseUserAction", back_populates="insight", cascade="all, delete-orphan"
+    )
+
+
+class CaseUserAction(Base):
+    """User feedback captured for surfaced insights."""
+
+    __tablename__ = "case_user_actions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    insight_id: Mapped[str] = mapped_column(
+        String, ForeignKey("case_insights.id", ondelete="CASCADE"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    insight: Mapped[CaseInsight] = relationship("CaseInsight", back_populates="actions")
+
+
 __all__ = [
     "Document",
     "Passage",
@@ -1064,4 +1253,9 @@ __all__ = [
     "GeoGeometry",
     "GeoImage",
     "GeoPlace",
+    "CaseSource",
+    "CaseObject",
+    "CaseEdge",
+    "CaseInsight",
+    "CaseUserAction",
 ]

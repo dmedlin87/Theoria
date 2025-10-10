@@ -124,6 +124,19 @@ def _compose_cached_completion(
     return f"{base_text}\n\nSources: {sources}"
 
 
+@celery.task(name="tasks.on_case_object_upsert")
+def on_case_object_upsert(case_object_id: str) -> None:
+    """Placeholder worker triggered when new case objects land."""
+
+    if not case_object_id:
+        logger.debug("Received empty case object notification")
+        return
+
+    logger.info(
+        "Enqueued case object upsert", extra={"case_object_id": case_object_id}
+    )
+
+
 @celery.task(name="tasks.validate_citations")
 def validate_citations(
     job_id: str | None = None,

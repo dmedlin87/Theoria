@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..case_builder import sync_annotation_case_object
 from ..db.models import Document, DocumentAnnotation, Passage
 from ..models.base import Passage as PassageSchema
 from ..models.documents import (
@@ -214,6 +215,8 @@ def create_annotation(
     body = prepare_annotation_body(payload)
     annotation = DocumentAnnotation(document_id=document_id, body=body)
     session.add(annotation)
+    session.flush()
+    sync_annotation_case_object(session, document=document, annotation=annotation)
     session.commit()
     session.refresh(annotation)
     return annotation_to_schema(annotation)
