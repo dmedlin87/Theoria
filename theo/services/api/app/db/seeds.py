@@ -164,43 +164,38 @@ def seed_contradiction_claims(session: Session) -> None:
             )
         )
         seen_ids.add(identifier)
+        record = session.get(ContradictionSeed, identifier)
         tags = _coerce_list(entry.get("tags"))
         weight = float(entry.get("weight", 1.0))
         summary = entry.get("summary")
 
-        try:
-            record = session.get(ContradictionSeed, identifier)
-            if record is None:
-                record = ContradictionSeed(
-                    id=identifier,
-                    osis_a=str(osis_a),
-                    osis_b=str(osis_b),
-                    summary=summary,
-                    source=source,
-                    tags=tags,
-                    weight=weight,
-                    perspective=perspective,
-                )
-                session.add(record)
-            else:
-                if record.osis_a != osis_a:
-                    record.osis_a = str(osis_a)
-                if record.osis_b != osis_b:
-                    record.osis_b = str(osis_b)
-                if record.summary != summary:
-                    record.summary = summary
-                if record.source != source:
-                    record.source = source
-                if record.tags != tags:
-                    record.tags = tags
-                if record.weight != weight:
-                    record.weight = weight
-                if record.perspective != perspective:
-                    record.perspective = perspective
-        except OperationalError as exc:
-            if _handle_missing_perspective_error(session, "contradiction", exc):
-                return
-            raise
+        if record is None:
+            record = ContradictionSeed(
+                id=identifier,
+                osis_a=str(osis_a),
+                osis_b=str(osis_b),
+                summary=summary,
+                source=source,
+                tags=tags,
+                weight=weight,
+                perspective=perspective,
+            )
+            session.add(record)
+        else:
+            if record.osis_a != osis_a:
+                record.osis_a = str(osis_a)
+            if record.osis_b != osis_b:
+                record.osis_b = str(osis_b)
+            if record.summary != summary:
+                record.summary = summary
+            if record.source != source:
+                record.source = source
+            if record.tags != tags:
+                record.tags = tags
+            if record.weight != weight:
+                record.weight = weight
+            if record.perspective != perspective:
+                record.perspective = perspective
 
     if seen_ids:
         try:
@@ -257,52 +252,47 @@ def seed_harmony_claims(session: Session) -> None:
             )
         )
         seen_ids.add(identifier)
+        record = session.get(HarmonySeed, identifier)
         tags = _coerce_list(entry.get("tags"))
         weight = float(entry.get("weight", 1.0))
 
-        try:
-            record = session.get(HarmonySeed, identifier)
-            if record is None:
-                record = HarmonySeed(
-                    id=identifier,
-                    osis_a=str(osis_a),
-                    osis_b=str(osis_b),
-                    summary=summary,
-                    source=source,
-                    tags=tags,
-                    weight=weight,
-                    perspective=perspective,
-                )
-                session.add(record)
-            else:
-                updated = False
-                if record.osis_a != osis_a:
-                    record.osis_a = str(osis_a)
-                    updated = True
-                if record.osis_b != osis_b:
-                    record.osis_b = str(osis_b)
-                    updated = True
-                if record.summary != summary:
-                    record.summary = summary
-                    updated = True
-                if record.source != source:
-                    record.source = source
-                    updated = True
-                if record.tags != tags:
-                    record.tags = tags
-                    updated = True
-                if record.weight != weight:
-                    record.weight = weight
-                    updated = True
-                if record.perspective != perspective:
-                    record.perspective = perspective
-                    updated = True
-                if updated:
-                    record.updated_at = datetime.now(UTC)
-        except OperationalError as exc:
-            if _handle_missing_perspective_error(session, "harmony", exc):
-                return
-            raise
+        if record is None:
+            record = HarmonySeed(
+                id=identifier,
+                osis_a=str(osis_a),
+                osis_b=str(osis_b),
+                summary=summary,
+                source=source,
+                tags=tags,
+                weight=weight,
+                perspective=perspective,
+            )
+            session.add(record)
+        else:
+            updated = False
+            if record.osis_a != osis_a:
+                record.osis_a = str(osis_a)
+                updated = True
+            if record.osis_b != osis_b:
+                record.osis_b = str(osis_b)
+                updated = True
+            if record.summary != summary:
+                record.summary = summary
+                updated = True
+            if record.source != source:
+                record.source = source
+                updated = True
+            if record.tags != tags:
+                record.tags = tags
+                updated = True
+            if record.weight != weight:
+                record.weight = weight
+                updated = True
+            if record.perspective != perspective:
+                record.perspective = perspective
+                updated = True
+            if updated:
+                record.updated_at = datetime.now(UTC)
 
     if seen_ids:
         try:
