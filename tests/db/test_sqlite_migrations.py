@@ -7,11 +7,17 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.db.models import AppSetting
+from theo.services.api.app.db.models import (
+    AppSetting,
+    CommentaryExcerptSeed,
+    GeoPlace,
+    HarmonySeed,
+)
 from theo.services.api.app.db.run_sql_migrations import (
     _SQLITE_PERSPECTIVE_MIGRATION,
     run_sql_migrations,
 )
+from theo.services.api.app.db.seeds import seed_reference_data
 
 
 def test_run_sql_migrations_applies_sqlite_columns(tmp_path) -> None:
@@ -111,3 +117,38 @@ def test_run_sql_migrations_skips_existing_sqlite_column(tmp_path) -> None:
             f"db:migration:{_SQLITE_PERSPECTIVE_MIGRATION}",
         )
         assert setting is not None
+
+
+def test_seed_reference_data_tolerates_missing_perspective_column(
+    tmp_path, monkeypatch
+) -> None:
+    """Seeding should not crash when the SQLite table is missing perspective."""
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'drift.db'}", future=True)
+
+    HarmonySeed.__table__.create(bind=engine)
+    CommentaryExcerptSeed.__table__.create(bind=engine)
+    GeoPlace.__table__.create(bind=engine)
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE contradiction_seeds (
+                id TEXT PRIMARY KEY,
+                osis_a TEXT NOT NULL,
+                osis_b TEXT NOT NULL,
+                summary TEXT,
+                source TEXT,
+                tags JSON,
+                weight FLOAT NOT NULL DEFAULT 1.0,
+                created_at TIMESTAMP NOT NULL
+            )
+            """
+        )
+
+    from theo.services.api.app.db import seeds as seeds_module
+
+    monkeypatch.setattr(seeds_module, "seed_openbible_geo", lambda session: None)
+
+    with Session(engine) as session:
+        seed_reference_data(session)

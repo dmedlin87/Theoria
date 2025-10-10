@@ -11,7 +11,7 @@ import os
 from functools import wraps
 from typing import Callable, Optional, cast
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +25,7 @@ from .core.settings import get_settings
 from .db.run_sql_migrations import run_sql_migrations
 from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware
+from .ingest.exceptions import UnsupportedSourceError
 from .routes import (
     ai,
     analytics,
@@ -163,6 +164,14 @@ def create_app() -> FastAPI:
     @app.exception_handler(HTTPException)
     async def http_exception_with_trace(request: Request, exc: HTTPException) -> Response:  # type: ignore[override]
         response = await http_exception_handler(request, exc)
+        return _attach_trace_headers(response)
+
+    @app.exception_handler(UnsupportedSourceError)
+    async def unsupported_source_error_with_trace(
+        request: Request, exc: UnsupportedSourceError
+    ) -> Response:
+        del request
+        response = JSONResponse({"detail": str(exc)}, status_code=status.HTTP_400_BAD_REQUEST)
         return _attach_trace_headers(response)
 
     @app.exception_handler(RequestValidationError)

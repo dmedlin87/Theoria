@@ -11,6 +11,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 import yaml
 from sqlalchemy import Table, delete, inspect
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from theo.services.geo import seed_openbible_geo
@@ -103,6 +104,32 @@ def _ensure_perspective_column(
     return False
 
 
+def _handle_missing_perspective_error(
+    session: Session, dataset_label: str, exc: OperationalError
+) -> bool:
+    """Log and rollback when ``perspective`` column errors are encountered."""
+
+    message = str(getattr(exc, "orig", exc)).lower()
+    if "perspective" not in message:
+        return False
+
+    missing_indicators = (
+        "no such column",
+        "unknown column",
+        "has no column named",
+        "missing column",
+        "column not found",
+    )
+    if not any(indicator in message for indicator in missing_indicators):
+        return False
+
+    session.rollback()
+    logger.warning(
+        "Skipping %s seeds because 'perspective' column is missing", dataset_label
+    )
+    return True
+
+
 def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
 
@@ -116,65 +143,86 @@ def seed_contradiction_claims(session: Session) -> None:
         SEED_ROOT / "contradictions_catalog.yaml",
     )
     seen_ids: set[str] = set()
-    for entry in payload:
-        osis_a = entry.get("osis_a")
-        osis_b = entry.get("osis_b")
-        if not osis_a or not osis_b:
-            continue
-        source = entry.get("source") or "community"
-        perspective = (entry.get("perspective") or "skeptical").strip().lower()
-        identifier = str(
-            uuid5(
-                CONTRADICTION_NAMESPACE,
-                "|".join(
-                    [
-                        str(osis_a).lower(),
-                        str(osis_b).lower(),
-                        source.lower(),
-                        perspective,
-                    ]
-                ),
+    try:
+        for entry in payload:
+            osis_a = entry.get("osis_a")
+            osis_b = entry.get("osis_b")
+            if not osis_a or not osis_b:
+                continue
+            source = entry.get("source") or "community"
+            perspective = (entry.get("perspective") or "skeptical").strip().lower()
+            identifier = str(
+                uuid5(
+                    CONTRADICTION_NAMESPACE,
+                    "|".join(
+                        [
+                            str(osis_a).lower(),
+                            str(osis_b).lower(),
+                            source.lower(),
+                            perspective,
+                        ]
+                    ),
+                )
             )
-        )
-        seen_ids.add(identifier)
-        record = session.get(ContradictionSeed, identifier)
-        tags = _coerce_list(entry.get("tags"))
-        weight = float(entry.get("weight", 1.0))
-        summary = entry.get("summary")
+            seen_ids.add(identifier)
+            record = session.get(ContradictionSeed, identifier)
+            tags = _coerce_list(entry.get("tags"))
+            weight = float(entry.get("weight", 1.0))
+            summary = entry.get("summary")
 
-        if record is None:
-            record = ContradictionSeed(
-                id=identifier,
-                osis_a=str(osis_a),
-                osis_b=str(osis_b),
-                summary=summary,
-                source=source,
-                tags=tags,
-                weight=weight,
-                perspective=perspective,
+            if record is None:
+                record = ContradictionSeed(
+                    id=identifier,
+                    osis_a=str(osis_a),
+                    osis_b=str(osis_b),
+                    summary=summary,
+                    source=source,
+                    tags=tags,
+                    weight=weight,
+                    perspective=perspective,
+                )
+                session.add(record)
+            else:
+                if record.osis_a != osis_a:
+                    record.osis_a = str(osis_a)
+                if record.osis_b != osis_b:
+                    record.osis_b = str(osis_b)
+                if record.summary != summary:
+                    record.summary = summary
+                if record.source != source:
+                    record.source = source
+                if record.tags != tags:
+                    record.tags = tags
+                if record.weight != weight:
+                    record.weight = weight
+                if record.perspective != perspective:
+                    record.perspective = perspective
+    except OperationalError as exc:
+        session.rollback()
+        message = str(exc).lower()
+        if "no such column" in message and "perspective" in message:
+            logger.warning(
+                "Skipping contradiction seeds because 'perspective' column is unavailable: %s",
+                exc,
             )
-            session.add(record)
-        else:
-            if record.osis_a != osis_a:
-                record.osis_a = str(osis_a)
-            if record.osis_b != osis_b:
-                record.osis_b = str(osis_b)
-            if record.summary != summary:
-                record.summary = summary
-            if record.source != source:
-                record.source = source
-            if record.tags != tags:
-                record.tags = tags
-            if record.weight != weight:
-                record.weight = weight
-            if record.perspective != perspective:
-                record.perspective = perspective
+            return
+        raise
 
     if seen_ids:
-        session.execute(
-            delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
-        )
-    session.commit()
+        try:
+            session.execute(
+                delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
+            )
+        except OperationalError as exc:
+            if _handle_missing_perspective_error(session, "contradiction", exc):
+                return
+            raise
+    try:
+        session.commit()
+    except OperationalError as exc:
+        if _handle_missing_perspective_error(session, "contradiction", exc):
+            return
+        raise
 
 
 def seed_harmony_claims(session: Session) -> None:
@@ -258,8 +306,18 @@ def seed_harmony_claims(session: Session) -> None:
                 record.updated_at = datetime.now(UTC)
 
     if seen_ids:
-        session.execute(delete(HarmonySeed).where(~HarmonySeed.id.in_(seen_ids)))
-    session.commit()
+        try:
+            session.execute(delete(HarmonySeed).where(~HarmonySeed.id.in_(seen_ids)))
+        except OperationalError as exc:
+            if _handle_missing_perspective_error(session, "harmony", exc):
+                return
+            raise
+    try:
+        session.commit()
+    except OperationalError as exc:
+        if _handle_missing_perspective_error(session, "harmony", exc):
+            return
+        raise
 
 
 def seed_commentary_excerpts(session: Session) -> None:
