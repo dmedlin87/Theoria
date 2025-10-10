@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS case_objects (
     source_id TEXT NULL,
     document_id TEXT NULL,
     passage_id TEXT NULL,
+    annotation_id TEXT NULL,
     object_type case_object_type NOT NULL DEFAULT 'passage',
     title TEXT NULL,
     body TEXT NULL,
@@ -83,7 +84,12 @@ CREATE TABLE IF NOT EXISTS case_objects (
         FOREIGN KEY (passage_id)
         REFERENCES passages (id)
         ON DELETE CASCADE,
-    CONSTRAINT uq_case_objects_passage_id UNIQUE (passage_id)
+    CONSTRAINT fk_case_objects_annotation
+        FOREIGN KEY (annotation_id)
+        REFERENCES document_annotations (id)
+        ON DELETE SET NULL,
+    CONSTRAINT uq_case_objects_passage_id UNIQUE (passage_id),
+    CONSTRAINT uq_case_objects_annotation_id UNIQUE (annotation_id)
 );
 
 CREATE INDEX IF NOT EXISTS ix_case_objects_source_id
