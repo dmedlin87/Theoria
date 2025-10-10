@@ -280,8 +280,23 @@ def run_sql_migrations(
         for path in migration_files:
             migration_name = path.name
             key = _migration_key(migration_name)
-            if session.get(AppSetting, key):
-                continue
+
+            existing_entry = session.get(AppSetting, key)
+            if existing_entry:
+                if (
+                    dialect_name == "sqlite"
+                    and migration_name == _SQLITE_PERSPECTIVE_MIGRATION
+                    and not _sqlite_has_column(
+                        engine, "contradiction_seeds", "perspective"
+                    )
+                ):
+                    logger.info(
+                        "Reapplying SQLite perspective migration due to missing column"
+                    )
+                    session.delete(existing_entry)
+                    session.commit()
+                else:
+                    continue
 
             sql = path.read_text(encoding="utf-8")
             if not sql.strip():

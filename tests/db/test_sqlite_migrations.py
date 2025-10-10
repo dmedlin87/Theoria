@@ -2,22 +2,100 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.orm import Session
+import pytest
+from sqlalchemy import JSON, DateTime, Float, String, Text, create_engine, inspect
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from theo.services.api.app.db.models import (
-    AppSetting,
-    CommentaryExcerptSeed,
-    GeoPlace,
-    HarmonySeed,
-)
 from theo.services.api.app.db.run_sql_migrations import (
     _SQLITE_PERSPECTIVE_MIGRATION,
     run_sql_migrations,
 )
 from theo.services.api.app.db.seeds import seed_reference_data
+
+
+class _Base(DeclarativeBase):
+    """Declarative base for lightweight test-specific models."""
+
+
+class AppSetting(_Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
+class HarmonySeed(_Base):
+    __tablename__ = "harmony_seeds"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    osis_a: Mapped[str] = mapped_column(String, nullable=False)
+    osis_b: Mapped[str] = mapped_column(String, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    perspective: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
+class CommentaryExcerptSeed(_Base):
+    __tablename__ = "commentary_excerpt_seeds"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class GeoPlace(_Base):
+    __tablename__ = "geo_places"
+
+    slug: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    aliases: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    sources: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _patch_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure migrations and seeds use lightweight test models."""
+
+    from theo.services.api.app.db import run_sql_migrations as migrations_module
+    from theo.services.api.app.db import seeds as seeds_module
+
+    monkeypatch.setattr(migrations_module, "AppSetting", AppSetting)
+    monkeypatch.setattr(seeds_module, "HarmonySeed", HarmonySeed)
+    monkeypatch.setattr(seeds_module, "CommentaryExcerptSeed", CommentaryExcerptSeed)
+    monkeypatch.setattr(seeds_module, "GeoPlace", GeoPlace)
 
 
 def test_run_sql_migrations_applies_sqlite_columns(tmp_path) -> None:
@@ -110,6 +188,73 @@ def test_run_sql_migrations_skips_existing_sqlite_column(tmp_path) -> None:
     applied = run_sql_migrations(engine, migrations_path=sqlite_migrations)
 
     assert _SQLITE_PERSPECTIVE_MIGRATION in applied
+
+    with Session(engine) as session:
+        setting = session.get(
+            AppSetting,
+            f"db:migration:{_SQLITE_PERSPECTIVE_MIGRATION}",
+        )
+        assert setting is not None
+
+
+def test_run_sql_migrations_reapplies_when_ledger_stale(tmp_path) -> None:
+    """Ensure the perspective migration reruns when the ledger entry is stale."""
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'stale.db'}", future=True)
+
+    AppSetting.__table__.create(bind=engine)
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE contradiction_seeds (
+                id TEXT PRIMARY KEY,
+                osis_a TEXT NOT NULL,
+                osis_b TEXT NOT NULL,
+                summary TEXT,
+                source TEXT,
+                tags JSON,
+                weight FLOAT NOT NULL DEFAULT 1.0,
+                created_at TIMESTAMP NOT NULL
+            )
+            """
+        )
+
+    # Simulate a stale ledger entry indicating the migration has already run.
+    with Session(engine) as session:
+        session.add(
+            AppSetting(
+                key=f"db:migration:{_SQLITE_PERSPECTIVE_MIGRATION}",
+                value={"applied_at": "2025-01-30T00:00:00+00:00"},
+            )
+        )
+        session.commit()
+
+    sqlite_migrations = tmp_path / "migrations"
+    sqlite_migrations.mkdir()
+
+    migration_path = (
+        Path(__file__).resolve().parents[2]
+        / "theo"
+        / "services"
+        / "api"
+        / "app"
+        / "db"
+        / "migrations"
+        / _SQLITE_PERSPECTIVE_MIGRATION
+    )
+    sqlite_migrations.joinpath(_SQLITE_PERSPECTIVE_MIGRATION).write_text(
+        migration_path.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    applied = run_sql_migrations(engine, migrations_path=sqlite_migrations)
+
+    assert _SQLITE_PERSPECTIVE_MIGRATION in applied
+
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("contradiction_seeds")}
+    assert "perspective" in columns
 
     with Session(engine) as session:
         setting = session.get(
