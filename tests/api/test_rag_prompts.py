@@ -78,5 +78,5 @@ def test_prompt_context_build_summary_matches_golden(golden_dir: Path) -> None:
 
     golden_path = golden_dir / "prompt_summary_basic.txt"
     assert golden_path.exists(), "Golden prompt summary file is missing"
-    assert summary == golden_path.read_text().rstrip("\n")
+    assert summary == golden_path.read_text(encoding="utf-8").rstrip("\n")
     assert lines == summary.splitlines()
