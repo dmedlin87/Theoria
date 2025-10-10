@@ -158,6 +158,9 @@ class DocumentAnnotation(Base):
     document_id: Mapped[str] = mapped_column(
         String, ForeignKey("documents.id", ondelete="CASCADE")
     )
+    case_object_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("case_objects.id", ondelete="SET NULL"), nullable=True
+    )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
@@ -173,7 +176,6 @@ class DocumentAnnotation(Base):
     case_object: Mapped["CaseObject | None"] = relationship(
         "CaseObject",
         back_populates="annotation",
-        cascade="all, delete-orphan",
         uselist=False,
     )
 
@@ -1099,22 +1101,6 @@ class CaseUserActionType(str, Enum):
 
 
 class CaseSource(Base):
-    """Normalized source metadata backing Case Builder objects."""
-
-    __tablename__ = "case_sources"
-    __table_args__ = (
-        Index("ix_case_sources_document_id", "document_id"),
-    )
-
-    id: Mapped[str] = mapped_column(
-        String, primary_key=True, default=lambda: str(uuid4())
-    )
-    document_id: Mapped[str | None] = mapped_column(
-        String,
-        ForeignKey("documents.id", ondelete="SET NULL"),
-        unique=True,
-        nullable=True,
-class CaseSource(Base):
     """Source metadata powering case-builder evidence objects."""
 
     __tablename__ = "case_sources"
@@ -1208,7 +1194,9 @@ class CaseObject(Base):
     document: Mapped[Document | None] = relationship("Document", back_populates="case_objects")
     passage: Mapped[Passage | None] = relationship("Passage", back_populates="case_object")
     annotation: Mapped[DocumentAnnotation | None] = relationship(
-        "DocumentAnnotation", back_populates="case_object"
+        "DocumentAnnotation",
+        back_populates="case_object",
+        uselist=False,
     )
     outgoing_edges: Mapped[list["CaseEdge"]] = relationship(
         "CaseEdge",
@@ -1318,8 +1306,6 @@ class CaseInsight(Base):
         "CaseUserAction",
         back_populates="insight",
         cascade="all, delete-orphan",
-    actions: Mapped[list["CaseUserAction"]] = relationship(
-        "CaseUserAction", back_populates="insight", cascade="all, delete-orphan"
     )
 
 
