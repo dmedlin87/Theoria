@@ -184,6 +184,7 @@ def sync_case_objects_for_document(
         topic_tags.extend(str(tag) for tag in document.topics if tag)
 
     created_objects: list[CaseObject] = []
+    updated_objects: list[CaseObject] = []
     for passage in passages:
         existing = (
             session.query(CaseObject)
@@ -214,22 +215,64 @@ def sync_case_objects_for_document(
             session.add(case_object)
             created_objects.append(case_object)
         else:
-            existing.source_id = source.id if source else existing.source_id
-            existing.title = document.title
-            existing.body = passage.text
-            existing.osis_ranges = osis_ranges or None
-            existing.modality = document.source_type
-            existing.tags = topic_tags or None
-            existing.embedding = passage.embedding
-            existing.stability = stability
-            existing.meta = meta
-            existing.published_at = document.pub_date
-            existing.updated_at = datetime.now(UTC)
+            updated = False
+
+            new_source_id = source.id if source else existing.source_id
+            if existing.source_id != new_source_id:
+                existing.source_id = new_source_id
+                updated = True
+
+            if existing.title != document.title:
+                existing.title = document.title
+                updated = True
+
+            if existing.body != passage.text:
+                existing.body = passage.text
+                updated = True
+
+            new_osis_ranges = osis_ranges or None
+            if existing.osis_ranges != new_osis_ranges:
+                existing.osis_ranges = new_osis_ranges
+                updated = True
+
+            if existing.modality != document.source_type:
+                existing.modality = document.source_type
+                updated = True
+
+            new_tags = topic_tags or None
+            if existing.tags != new_tags:
+                existing.tags = new_tags
+                updated = True
+
+            if existing.embedding != passage.embedding:
+                existing.embedding = passage.embedding
+                updated = True
+
+            if existing.stability != stability:
+                existing.stability = stability
+                updated = True
+
+            if existing.meta != meta:
+                existing.meta = meta
+                updated = True
+
+            if existing.published_at != document.pub_date:
+                existing.published_at = document.pub_date
+                updated = True
+
+            if updated:
+                existing.updated_at = datetime.now(UTC)
+                updated_objects.append(existing)
             session.add(existing)
 
     session.flush()
+    notified_ids: list[str] = []
     if created_objects:
-        _notify_new_objects(session, [obj.id for obj in created_objects], settings)
+        notified_ids.extend(obj.id for obj in created_objects)
+    if updated_objects:
+        notified_ids.extend(obj.id for obj in updated_objects)
+    if notified_ids:
+        _notify_new_objects(session, notified_ids, settings)
     return created_objects
 
 
