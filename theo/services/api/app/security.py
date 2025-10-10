@@ -124,6 +124,16 @@ def require_principal(
     principal: Principal | None = None
 
     credentials_configured = bool(settings.api_keys) or settings.has_auth_jwt_credentials()
+    if not credentials_configured:
+        # Tests (and some local tooling) mutate environment variables at runtime to
+        # toggle authentication strategies. When this happens between requests we may
+        # still be holding on to a cached ``Settings`` instance without the refreshed
+        # credentials. Attempt a single cache refresh before treating the
+        # configuration as missing so we honour the latest environment changes.
+        get_settings.cache_clear()
+        settings = get_settings()
+        credentials_configured = bool(settings.api_keys) or settings.has_auth_jwt_credentials()
+
     allow_anonymous = settings.auth_allow_anonymous
 
     if not credentials_configured:
