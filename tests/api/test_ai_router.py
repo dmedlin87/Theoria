@@ -448,14 +448,22 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
 
     call_count = 0
     call_lock = threading.Lock()
+    first_started = threading.Event()
+    allow_first_to_finish = threading.Event()
 
     class _SlowClient:
         def generate(self, **_: object) -> str:
             nonlocal call_count
             with call_lock:
                 call_count += 1
-            time.sleep(0.05)
-            return "shared-output"
+                current = call_count
+            if current == 1:
+                first_started.set()
+                if not allow_first_to_finish.wait(timeout=5.0):  # pragma: no cover - safeguard
+                    raise TimeoutError("test did not release first generation")
+                time.sleep(0.05)
+                return "shared-output"
+            pytest.fail("Unexpected follower generation invocation")
 
     monkeypatch.setattr(model, "build_client", lambda: _SlowClient())
 
@@ -467,6 +475,16 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(_invoke) for _ in range(3)]
+        assert first_started.wait(timeout=2.0)
+
+        cache_key = router._ledger.encode_cache_key(
+            (model.name, "chat", "simultaneous", 0.2, 800)
+        )
+        with router._ledger.transaction() as txn:
+            txn.mark_inflight_error(cache_key, "transient failure")
+
+        time.sleep(0.05)
+        allow_first_to_finish.set()
         results = [future.result() for future in futures]
 
     assert call_count == 1
