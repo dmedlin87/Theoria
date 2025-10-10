@@ -91,6 +91,19 @@ def _is_supported(path: Path) -> bool:
     )
 
 
+def _is_within_allowlist(
+    path: Path, allowlist: tuple[Path, ...] | None
+) -> bool:
+    """Return True if *path* resolves under one of the allowed roots."""
+
+    if allowlist is None:
+        return True
+    resolved = path.resolve(strict=False)
+    return any(
+        resolved == root or resolved.is_relative_to(root) for root in allowlist
+    )
+
+
 def _discover_items(
     sources: Sequence[str], allowlist: Sequence[Path] | None = None
 ) -> list[IngestItem]:
@@ -117,27 +130,27 @@ def _discover_items(
         if not path.exists():
             raise ValueError(f"Path '{source}' does not exist")
         if normalized_allowlist is not None:
-            resolved_path = path.resolve()
-            if not any(
-                resolved_path == root or resolved_path.is_relative_to(root)
-                for root in normalized_allowlist
-            ):
+            if not _is_within_allowlist(path, normalized_allowlist):
                 raise ValueError(
                     f"Path '{source}' is not within an allowed ingest root"
                 )
         if not path.is_dir() and not _is_supported(path):
             continue
-        items.extend(_walk_folder(path))
+        items.extend(_walk_folder(path, normalized_allowlist))
     return items
 
 
-def _walk_folder(path: Path) -> Iterator[IngestItem]:
+def _walk_folder(
+    path: Path, allowlist: tuple[Path, ...] | None = None
+) -> Iterator[IngestItem]:
     candidates: Iterable[Path]
     if path.is_file():
         candidates = [path]
     else:
         candidates = sorted(p for p in path.rglob("*") if _is_supported(p))
     for candidate in candidates:
+        if not _is_within_allowlist(candidate, allowlist):
+            continue
         if not candidate.is_file() or not _is_supported(candidate):
             continue
         yield IngestItem(path=candidate, source_type=_detect_source_type(candidate))
