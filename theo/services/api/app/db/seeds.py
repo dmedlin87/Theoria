@@ -164,12 +164,7 @@ def seed_contradiction_claims(session: Session) -> None:
             )
         )
         seen_ids.add(identifier)
-        try:
-            record = session.get(ContradictionSeed, identifier)
-        except OperationalError as exc:
-            if _handle_missing_perspective_error(session, "contradiction", exc):
-                return
-            raise
+        record = session.get(ContradictionSeed, identifier)
         tags = _coerce_list(entry.get("tags"))
         weight = float(entry.get("weight", 1.0))
         summary = entry.get("summary")
@@ -257,12 +252,7 @@ def seed_harmony_claims(session: Session) -> None:
             )
         )
         seen_ids.add(identifier)
-        try:
-            record = session.get(HarmonySeed, identifier)
-        except OperationalError as exc:
-            if _handle_missing_perspective_error(session, "harmony", exc):
-                return
-            raise
+        record = session.get(HarmonySeed, identifier)
         tags = _coerce_list(entry.get("tags"))
         weight = float(entry.get("weight", 1.0))
 
