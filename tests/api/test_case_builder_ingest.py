@@ -78,6 +78,61 @@ def test_sync_case_objects_creates_records_when_enabled(
     assert pytest.approx(case_object.stability or 0.0, rel=1e-6) == pytest.approx(0.75)
 
 
+def test_sync_case_objects_notifies_updates(
+    sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="true")
+    settings = settings_module.get_settings()
+
+    document = Document(title="Doc", source_type="txt")
+    sqlite_session.add(document)
+    sqlite_session.flush()
+
+    passage = Passage(
+        document_id=document.id,
+        text="In the beginning",
+        raw_text="In the beginning",
+        tokens=3,
+        osis_ref="Gen.1.1",
+        meta={"osis_refs_all": ["Gen.1.1"], "stability": 0.75},
+    )
+    sqlite_session.add(passage)
+    sqlite_session.flush()
+
+    notified_payloads: list[list[str]] = []
+
+    def _fake_notify(session, object_ids, notify_settings):  # type: ignore[no-untyped-def]
+        assert session is sqlite_session
+        assert notify_settings is settings
+        notified_payloads.append(list(object_ids))
+
+    monkeypatch.setattr(
+        "theo.services.api.app.case_builder.ingest._notify_new_objects",
+        _fake_notify,
+    )
+
+    created = sync_case_objects_for_document(
+        sqlite_session, document=document, passages=[passage], settings=settings
+    )
+
+    assert len(created) == 1
+    assert notified_payloads == [[created[0].id]]
+
+    # Mutate passage content so the CaseObject is updated on re-ingest.
+    passage.text = "Updated beginning"
+    passage.meta = {"osis_refs_all": ["Gen.1.1"], "stability": 0.9}
+    sqlite_session.flush()
+
+    notified_payloads.clear()
+
+    second_created = sync_case_objects_for_document(
+        sqlite_session, document=document, passages=[passage], settings=settings
+    )
+
+    assert second_created == []
+    assert notified_payloads == [[created[0].id]]
+
+
 def test_sync_case_objects_noop_when_disabled(
     sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
