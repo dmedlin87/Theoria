@@ -134,7 +134,7 @@ def require_principal(
         settings = get_settings()
         credentials_configured = bool(settings.api_keys) or settings.has_auth_jwt_credentials()
 
-    allow_anonymous = settings.auth_allow_anonymous
+    allow_anonymous = settings.auth_allow_anonymous and not credentials_configured
 
     if not credentials_configured:
         if not allow_anonymous:
