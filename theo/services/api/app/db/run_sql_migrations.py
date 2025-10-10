@@ -160,6 +160,90 @@ def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
     return False
 
 
+def _split_sql_statements(sql: str) -> list[str]:
+    """Split SQL into individual statements while respecting string literals."""
+
+    statements: list[str] = []
+    buffer: list[str] = []
+    in_single_quote = False
+    in_double_quote = False
+    dollar_quote: str | None = None
+    index = 0
+    length = len(sql)
+
+    while index < length:
+        char = sql[index]
+
+        if dollar_quote is not None:
+            if sql.startswith(dollar_quote, index):
+                buffer.append(dollar_quote)
+                index += len(dollar_quote)
+                dollar_quote = None
+                continue
+            buffer.append(char)
+            index += 1
+            continue
+
+        if in_single_quote:
+            buffer.append(char)
+            index += 1
+            if char == "'":
+                next_char = sql[index] if index < length else ""
+                if next_char == "'":
+                    buffer.append("'")
+                    index += 1
+                else:
+                    in_single_quote = False
+            continue
+
+        if in_double_quote:
+            buffer.append(char)
+            index += 1
+            if char == '"':
+                in_double_quote = False
+            continue
+
+        if char == "'":
+            in_single_quote = True
+            buffer.append(char)
+            index += 1
+            continue
+
+        if char == '"':
+            in_double_quote = True
+            buffer.append(char)
+            index += 1
+            continue
+
+        if char == "$":
+            end = index + 1
+            while end < length and (sql[end].isalnum() or sql[end] == "_"):
+                end += 1
+            if end < length and sql[end] == "$":
+                tag = sql[index : end + 1]
+                dollar_quote = tag
+                buffer.append(tag)
+                index = end + 1
+                continue
+
+        if char == ";":
+            statement = "".join(buffer).strip()
+            if statement:
+                statements.append(statement)
+            buffer.clear()
+            index += 1
+            continue
+
+        buffer.append(char)
+        index += 1
+
+    tail = "".join(buffer).strip()
+    if tail:
+        statements.append(tail)
+
+    return statements
+
+
 def run_sql_migrations(
     engine: Engine | None = None,
     migrations_path: Path | None = None,
