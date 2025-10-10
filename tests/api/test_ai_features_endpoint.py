@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.main import app  # noqa: E402
 
 
-def test_ai_features_exposes_guardrail_catalogues() -> None:
+def test_ai_features_exposes_guardrail_catalogues(api_database) -> None:
     with TestClient(app) as client:
         response = client.get("/ai/features")
         assert response.status_code == 200

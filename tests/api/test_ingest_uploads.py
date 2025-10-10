@@ -18,7 +18,7 @@ from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
 
 
 @pytest.fixture()
-def api_client():
+def api_client(api_database):
     def _override_session():
         yield object()
 
