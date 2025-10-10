@@ -126,6 +126,7 @@ class LLMRouterService:
             now = time.monotonic()
 
             stale_status: str | None = None
+            wait_observed_updated_at: float | None = None
             with self._ledger.transaction() as txn:
                 spent = txn.get_spend(model.name)
                 span.set_attribute("llm.spent_before_call", spent)
@@ -188,13 +189,17 @@ class LLMRouterService:
                 elif inflight.status == "waiting":
                     cache_status = "wait"
                     owns_inflight = False
+                    wait_observed_updated_at = inflight.updated_at
                 else:
                     stale_status = inflight.status
                     owns_inflight = False
+                    wait_observed_updated_at = inflight.updated_at
 
             if stale_status is not None:
                 try:
-                    self._ledger.wait_for_inflight(cache_key)
+                    self._ledger.wait_for_inflight(
+                        cache_key, observed_updated_at=wait_observed_updated_at
+                    )
                 except GenerationError:
                     pass
                 with self._ledger.transaction() as txn:
@@ -206,7 +211,9 @@ class LLMRouterService:
 
             if not owns_inflight:
                 span.set_attribute("llm.cache_status", cache_status)
-                record = self._ledger.wait_for_inflight(cache_key)
+                record = self._ledger.wait_for_inflight(
+                    cache_key, observed_updated_at=wait_observed_updated_at
+                )
                 return self._record_to_generation(record)
 
             span.set_attribute("llm.cache_status", cache_status)

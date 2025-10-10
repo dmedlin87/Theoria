@@ -158,6 +158,9 @@ class DocumentAnnotation(Base):
     document_id: Mapped[str] = mapped_column(
         String, ForeignKey("documents.id", ondelete="CASCADE")
     )
+    case_object_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("case_objects.id", ondelete="SET NULL"), nullable=True
+    )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
@@ -171,7 +174,9 @@ class DocumentAnnotation(Base):
 
     document: Mapped[Document] = relationship("Document", back_populates="annotations")
     case_object: Mapped["CaseObject | None"] = relationship(
-        "CaseObject", back_populates="annotation", uselist=False
+        "CaseObject",
+        back_populates="annotation",
+        uselist=False,
     )
 
 
@@ -1195,7 +1200,9 @@ class CaseObject(Base):
     document: Mapped[Document | None] = relationship("Document", back_populates="case_objects")
     passage: Mapped[Passage | None] = relationship("Passage", back_populates="case_object")
     annotation: Mapped[DocumentAnnotation | None] = relationship(
-        "DocumentAnnotation", back_populates="case_object"
+        "DocumentAnnotation",
+        back_populates="case_object",
+        uselist=False,
     )
     outgoing_edges: Mapped[list["CaseEdge"]] = relationship(
         "CaseEdge",
@@ -1302,7 +1309,9 @@ class CaseInsight(Base):
         "CaseObject", back_populates="insights"
     )
     user_actions: Mapped[list["CaseUserAction"]] = relationship(
-        "CaseUserAction", back_populates="insight", cascade="all, delete-orphan"
+        "CaseUserAction",
+        back_populates="insight",
+        cascade="all, delete-orphan",
     )
 
 

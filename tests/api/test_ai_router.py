@@ -512,9 +512,18 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
     original_wait = router._ledger.wait_for_inflight
 
     def _slow_wait(
-        cache_key: str, *, poll_interval: float = 0.05, timeout: float | None = None
+        cache_key: str,
+        *,
+        poll_interval: float = 0.05,
+        timeout: float | None = None,
+        observed_updated_at: float | None = None,
     ) -> CacheRecord:
-        return original_wait(cache_key, poll_interval=0.2, timeout=timeout)
+        return original_wait(
+            cache_key,
+            poll_interval=0.2,
+            timeout=timeout,
+            observed_updated_at=observed_updated_at,
+        )
 
     monkeypatch.setattr(router._ledger, "wait_for_inflight", _slow_wait)
 

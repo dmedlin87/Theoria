@@ -259,13 +259,17 @@ class LedgerTransaction:
         )
 
     def mark_inflight_error(self, cache_key: str, message: str) -> None:
+        timestamp = time.time()
         self._connection.execute(
             """
             UPDATE inflight_entries
-            SET status='error', error=?, updated_at=?
+            SET
+                status=CASE WHEN status='success' THEN status ELSE 'error' END,
+                error=CASE WHEN status='success' THEN error ELSE ? END,
+                updated_at=CASE WHEN status='success' THEN updated_at ELSE ? END
             WHERE cache_key=?
             """,
-            (message, time.time(), cache_key),
+            (message, timestamp, cache_key),
         )
 
     def clear_inflight(self) -> None:
@@ -434,10 +438,12 @@ class SharedLedger:
         *,
         poll_interval: float = 0.05,
         timeout: float | None = None,
+        observed_updated_at: float | None = None,
     ) -> CacheRecord:
         """Block until the inflight entry completes or raises."""
 
         start = time.time()
+        comparison_floor = observed_updated_at if observed_updated_at is not None else start
 
         def _row_to_record(row: InflightRow) -> CacheRecord:
             created_at = row.completed_at or row.updated_at
@@ -471,10 +477,20 @@ class SharedLedger:
             if (
                 row.output is not None
                 and row.completed_at is not None
-                and row.completed_at >= start
+                and row.completed_at >= comparison_floor
             ):
                 return _row_to_record(row)
             if row.status == "waiting":
+                if (
+                    observed_updated_at is not None
+                    and row.updated_at > observed_updated_at
+                ):
+                    with self.transaction() as txn:
+                        cached = txn.get_cache_entry(cache_key)
+                    if cached is not None:
+                        return cached
+                    comparison_floor = row.updated_at
+                    observed_updated_at = row.updated_at
                 if timeout is not None and time.time() - start > timeout:
                     raise GenerationError("Timed out waiting for inflight generation")
                 time.sleep(poll_interval)
@@ -485,9 +501,19 @@ class SharedLedger:
                 if (
                     row.output is not None
                     and row.completed_at is not None
-                    and row.completed_at >= start
+                    and row.completed_at >= comparison_floor
                 ):
                     return _row_to_record(row)
+                if (
+                    observed_updated_at is not None
+                    and row.updated_at > observed_updated_at
+                ):
+                    with self.transaction() as txn:
+                        cached = txn.get_cache_entry(cache_key)
+                    if cached is not None:
+                        return cached
+                    comparison_floor = row.updated_at
+                    observed_updated_at = row.updated_at
                 if row.completed_at is None:
                     with self.transaction() as txn:
                         txn.clear_single_inflight(cache_key)

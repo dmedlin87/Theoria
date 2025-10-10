@@ -266,6 +266,11 @@ def run_sql_migrations(
         )
         return []
 
+    # Ensure the migration ledger table exists even on a brand new database.
+    # Without this, attempts to check for applied migrations would fail when the
+    # SQLite database has not yet been initialised by SQLAlchemy metadata.
+    AppSetting.__table__.create(bind=engine, checkfirst=True)
+
     applied: list[str] = []
     migration_files = list(_iter_migration_files(migrations_path))
     if not migration_files:
