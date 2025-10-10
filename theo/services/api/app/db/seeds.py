@@ -104,6 +104,32 @@ def _ensure_perspective_column(
     return False
 
 
+def _handle_missing_perspective_error(
+    session: Session, dataset_label: str, exc: OperationalError
+) -> bool:
+    """Log and rollback when ``perspective`` column errors are encountered."""
+
+    message = str(getattr(exc, "orig", exc)).lower()
+    if "perspective" not in message:
+        return False
+
+    missing_indicators = (
+        "no such column",
+        "unknown column",
+        "has no column named",
+        "missing column",
+        "column not found",
+    )
+    if not any(indicator in message for indicator in missing_indicators):
+        return False
+
+    session.rollback()
+    logger.warning(
+        "Skipping %s seeds because 'perspective' column is missing", dataset_label
+    )
+    return True
+
+
 def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
 
@@ -183,10 +209,20 @@ def seed_contradiction_claims(session: Session) -> None:
         raise
 
     if seen_ids:
-        session.execute(
-            delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
-        )
-    session.commit()
+        try:
+            session.execute(
+                delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
+            )
+        except OperationalError as exc:
+            if _handle_missing_perspective_error(session, "contradiction", exc):
+                return
+            raise
+    try:
+        session.commit()
+    except OperationalError as exc:
+        if _handle_missing_perspective_error(session, "contradiction", exc):
+            return
+        raise
 
 
 def seed_harmony_claims(session: Session) -> None:
@@ -270,8 +306,18 @@ def seed_harmony_claims(session: Session) -> None:
                 record.updated_at = datetime.now(UTC)
 
     if seen_ids:
-        session.execute(delete(HarmonySeed).where(~HarmonySeed.id.in_(seen_ids)))
-    session.commit()
+        try:
+            session.execute(delete(HarmonySeed).where(~HarmonySeed.id.in_(seen_ids)))
+        except OperationalError as exc:
+            if _handle_missing_perspective_error(session, "harmony", exc):
+                return
+            raise
+    try:
+        session.commit()
+    except OperationalError as exc:
+        if _handle_missing_perspective_error(session, "harmony", exc):
+            return
+        raise
 
 
 def seed_commentary_excerpts(session: Session) -> None:
