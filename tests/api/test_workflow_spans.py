@@ -35,7 +35,7 @@ def _patch_feedback_recorder(monkeypatch: pytest.MonkeyPatch) -> list[tuple[tupl
     def _capture(*args, **kwargs):
         calls.append((args, kwargs))
 
-    monkeypatch.setattr(rag, "_record_used_citation_feedback", _capture)
+    monkeypatch.setattr(rag, "record_used_citation_feedback", _capture)
     return calls
 
 
@@ -67,7 +67,7 @@ def test_multimedia_digest_emits_span_and_records_steps(monkeypatch: pytest.Monk
         model_output="output",
     )
 
-    monkeypatch.setattr(rag, "_search", lambda *_, **__: [fake_result])
+    monkeypatch.setattr(rag, "search_passages", lambda *_, **__: [fake_result])
     monkeypatch.setattr(rag, "get_llm_registry", lambda session: MagicMock())
     monkeypatch.setattr(rag, "_guarded_answer", lambda *_, **__: fake_answer)
 
@@ -114,7 +114,7 @@ def test_devotional_flow_emits_span(monkeypatch: pytest.MonkeyPatch) -> None:
         ],
     )
 
-    monkeypatch.setattr(rag, "_search", lambda *_, **__: [fake_result])
+    monkeypatch.setattr(rag, "search_passages", lambda *_, **__: [fake_result])
     monkeypatch.setattr(rag, "get_llm_registry", lambda session: MagicMock())
     monkeypatch.setattr(rag, "_guarded_answer", lambda *_, **__: fake_answer)
 
@@ -162,7 +162,7 @@ def test_research_reconciliation_emits_span(monkeypatch: pytest.MonkeyPatch) -> 
         ],
     )
 
-    monkeypatch.setattr(rag, "_search", lambda *_, **__: [fake_result])
+    monkeypatch.setattr(rag, "search_passages", lambda *_, **__: [fake_result])
     monkeypatch.setattr(rag, "get_llm_registry", lambda session: MagicMock())
     monkeypatch.setattr(rag, "_guarded_answer", lambda *_, **__: fake_answer)
 

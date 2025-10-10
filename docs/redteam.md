@@ -41,7 +41,7 @@ When a red-team probe fails:
    `pytest -k "<prompt snippet>" -vv` to print the failing response, or use the
    `RedTeamHarness` manually in a REPL to replay the request.
 3. **Check for regressions in guardrail logic** – confirm that
-   `_validate_model_completion` and related routines still enforce Sources lines
+   `validate_model_completion` and related routines still enforce Sources lines
    and citation matching.
 4. **Review recent LLM/provider changes** – ensure the registry still points to
    the refusal-capable model and that no unsafe completions leaked past the

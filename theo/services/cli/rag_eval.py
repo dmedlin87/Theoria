@@ -124,7 +124,7 @@ def _refresh_contexts(record: EvaluationRecord, session: Session) -> None:
         k=5,
     )
     results = hybrid_search(session, request)
-    citations = rag_service._build_citations(results)
+    citations = rag_service.build_citations(results)
     record.contexts = [citation.snippet for citation in citations]
     record.citations = [citation.model_dump(mode="json") for citation in citations]
 

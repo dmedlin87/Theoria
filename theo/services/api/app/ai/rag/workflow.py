@@ -2,45 +2,51 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
-import textwrap
-from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Literal, Sequence
 
 from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...analytics.telemetry import record_feedback_event
-from ...core.version import get_git_sha
 from ...db.models import Document, Passage
-from ...export.formatters import SCHEMA_VERSION, generate_export_id
-from ...models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
-from ...models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
-from ...retriever.hybrid import hybrid_search
-from ...retriever.utils import compose_passage_meta
+from ...models.search import HybridSearchFilters, HybridSearchResult
 from ...telemetry import (
     RAG_CACHE_EVENTS,
     instrument_workflow,
     log_workflow_event,
     set_span_attribute,
 )
-from .cache import RAGCache
 from ..clients import GenerationError
-from .guardrails import (
+from ..registry import LLMModel, LLMRegistry, get_llm_registry
+from ..router import get_router
+from .cache_ops import (
+    DEFAULT_CACHE,
+    RAGCache,
+    build_cache_key,
+    load_cached_answer,
+    store_cached_answer,
+)
+from .exports import (
+    build_sermon_deliverable,
+    build_sermon_prep_package,
+    build_transcript_deliverable,
+    build_transcript_package,
+)
+from .guardrail_helpers import (
     GuardrailError,
-    apply_guardrail_profile as _guardrails_apply_guardrail_profile,
-    build_citations as _guardrails_build_citations,
-    build_guardrail_result as _guardrails_build_guardrail_result,
-    build_retrieval_digest as _guardrails_build_retrieval_digest,
-    ensure_completion_safe as _guardrails_ensure_completion_safe,
-    _format_anchor as _guardrails_format_anchor,
-    load_guardrail_reference as _guardrails_load_guardrail_reference,
-    load_passages_for_osis as _guardrails_load_passages_for_osis,
-    validate_model_completion as _guardrails_validate_model_completion,
+    apply_guardrail_profile,
+    build_citations,
+    build_retrieval_digest,
+    derive_snippet,
+    ensure_completion_safe,
+    format_anchor,
+    load_guardrail_reference,
+    load_passages_for_osis,
+    scrub_adversarial_language,
+    validate_model_completion,
 )
 from .models import (
     CollaborationResponse,
@@ -53,13 +59,7 @@ from .models import (
     SermonPrepResponse,
     VerseCopilotResponse,
 )
-from .prompts import (
-    sanitise_json_structure as _prompts_sanitize_json_structure,
-    sanitise_markdown_field as _prompts_sanitize_markdown_field,
-    scrub_adversarial_language as _prompts_scrub_adversarial_language,
-)
-from ..registry import LLMModel, LLMRegistry, get_llm_registry
-from ..router import get_router
+from .retrieval import record_used_citation_feedback, search_passages
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from ..trails import TrailRecorder
@@ -69,37 +69,6 @@ LOGGER = logging.getLogger(__name__)
 
 _RAG_TRACER = trace.get_tracer("theo.rag")
 
-_CACHE = RAGCache()
-_SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
-
-
-
-class PassageRetriever:
-    """Encapsulates passage lookup logic for reuse across workflows."""
-
-    def __init__(self, session: Session) -> None:
-        self._session = session
-
-    def search(
-        self,
-        *,
-        query: str | None,
-        osis: str | None,
-        filters: HybridSearchFilters,
-        k: int = 8,
-    ) -> list[HybridSearchResult]:
-        request = HybridSearchRequest(query=query, osis=osis, filters=filters, k=k)
-        results = list(hybrid_search(self._session, request))
-        if osis and not any(result.osis_ref for result in results):
-            fallback = _guardrails_load_passages_for_osis(self._session, osis)
-            if fallback:
-                LOGGER.debug(
-                    "Hybrid search yielded no OSIS matches; injecting %d fallback passages for %s",
-                    len(fallback),
-                    osis,
-                )
-                return fallback
-        return results
 
 
 class GuardedAnswerPipeline:
@@ -110,7 +79,7 @@ class GuardedAnswerPipeline:
         session: Session,
         registry: LLMRegistry,
         *,
-        cache: RAGCache = _CACHE,
+        cache: RAGCache = DEFAULT_CACHE,
         recorder: "TrailRecorder | None" = None,
     ) -> None:
         self.session = session
@@ -128,13 +97,13 @@ class GuardedAnswerPipeline:
         memory_context: Sequence[str] | None = None,
         allow_fallback: bool = False,
     ) -> RAGAnswer:
-        ordered_results, guardrail_profile = _apply_guardrail_profile(results, filters)
-        citations = _build_citations(ordered_results)
+        ordered_results, guardrail_profile = apply_guardrail_profile(results, filters)
+        citations = build_citations(ordered_results)
         if not citations and allow_fallback:
-            fallback_result = _load_guardrail_reference(self.session)
+            fallback_result = load_guardrail_reference(self.session)
             if fallback_result:
                 ordered_results = [fallback_result]
-                citations = _build_citations(ordered_results)
+                citations = build_citations(ordered_results)
         if not citations:
             raise GuardrailError(
                 "Retrieved passages lacked OSIS references; aborting generation",
@@ -178,7 +147,7 @@ class GuardedAnswerPipeline:
 
         context_lines = []
         for citation in citations:
-            prompt_snippet = _scrub_adversarial_language(citation.snippet) or ""
+            prompt_snippet = scrub_adversarial_language(citation.snippet) or ""
             context_lines.append(
                 f"[{citation.index}] {prompt_snippet.strip()} (OSIS {citation.osis}, {citation.anchor})"
             )
@@ -191,10 +160,10 @@ class GuardedAnswerPipeline:
         if memory_context:
             prompt_parts.append("Prior conversation highlights:")
             for idx, snippet in enumerate(memory_context, start=1):
-                sanitized = _scrub_adversarial_language(snippet) or ""
+                sanitized = scrub_adversarial_language(snippet) or ""
                 if sanitized:
                     prompt_parts.append(f"{idx}. {sanitized}")
-        sanitized_question = _scrub_adversarial_language(question)
+        sanitized_question = scrub_adversarial_language(question)
         if sanitized_question:
             prompt_parts.append(f"Question: {sanitized_question}")
         prompt_parts.append("Passages:")
@@ -202,7 +171,7 @@ class GuardedAnswerPipeline:
         prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
         prompt = "\n".join(prompt_parts)
 
-        retrieval_digest = _build_retrieval_digest(ordered_results)
+        retrieval_digest = build_retrieval_digest(ordered_results)
         last_error: GenerationError | None = None
         selected_model: LLMModel | None = None
 
@@ -213,11 +182,12 @@ class GuardedAnswerPipeline:
         for candidate in candidates:
             selected_model = candidate
             cache_event_logged = False
-            cache_key = _build_cache_key(
+            cache_key = build_cache_key(
                 user_id=user_id,
                 model_label=candidate.name,
                 prompt=prompt,
                 retrieval_digest=retrieval_digest,
+                cache=self.cache,
             )
             cache_key_suffix = cache_key[-12:]
             cache_status = "miss"
@@ -225,7 +195,7 @@ class GuardedAnswerPipeline:
             validation_result = None
             model_output = None
 
-            cached_payload = _load_cached_answer(cache_key)
+            cached_payload = load_cached_answer(cache_key, cache=self.cache)
             if cached_payload:
                 cache_status = "hit"
                 try:
@@ -238,7 +208,7 @@ class GuardedAnswerPipeline:
 
                 if cache_hit_payload and cache_hit_payload.model_output:
                     try:
-                        validation_result = _validate_model_completion(
+                        validation_result = validate_model_completion(
                             cache_hit_payload.model_output, citations
                         )
                         ensure_completion_safe(cache_hit_payload.model_output)
@@ -360,7 +330,7 @@ class GuardedAnswerPipeline:
                     if not has_citations_line:
                         completion = completion.strip() + f"\n\nSources: {sources_line}"
                     try:
-                        validation_result = _validate_model_completion(completion, citations)
+                        validation_result = validate_model_completion(completion, citations)
                         ensure_completion_safe(completion)
                     except GuardrailError as exc:
                         span.record_exception(exc)
@@ -442,7 +412,12 @@ class GuardedAnswerPipeline:
             "miss",
             "refresh",
         }:
-            _store_cached_answer(cache_key, answer=answer, validation=validation_result)
+            store_cached_answer(
+                cache_key,
+                answer=answer,
+                validation=validation_result,
+                cache=self.cache,
+            )
             if cache_status == "refresh":
                 RAG_CACHE_EVENTS.labels(status="refresh").inc()
                 log_workflow_event(
@@ -497,203 +472,6 @@ class GuardedAnswerPipeline:
         return answer
 
 
-def _scrub_adversarial_language(value: str | None) -> str | None:
-    return _prompts_scrub_adversarial_language(value)
-
-
-def _sanitize_json_structure(payload: Any) -> Any:
-    return _prompts_sanitize_json_structure(payload)
-
-
-def _sanitize_markdown_field(value: object) -> str:
-    return _prompts_sanitize_markdown_field(value)
-
-
-def _extract_topic_domains(meta: Mapping[str, Any] | None) -> set[str]:
-    domains: set[str] = set()
-    if not meta:
-        return domains
-    raw = meta.get("topic_domains") or meta.get("topic_domain")
-    if raw is None:
-        return domains
-    if isinstance(raw, str):
-        candidates = re.split(r"[,;]", raw)
-    elif isinstance(raw, Iterable):
-        candidates = raw
-    else:
-        return domains
-    for item in candidates:
-        text = str(item).strip().lower()
-        if text:
-            domains.add(text)
-    return domains
-
-
-def _apply_guardrail_profile(
-    results: Sequence[HybridSearchResult],
-    filters: HybridSearchFilters | None,
-) -> tuple[list[HybridSearchResult], dict[str, str] | None]:
-    return _guardrails_apply_guardrail_profile(results, filters)
-
-def _record_used_citation_feedback(
-    session: Session,
-    *,
-    citations: Sequence[RAGCitation],
-    results: Sequence[HybridSearchResult],
-    query: str | None,
-    recorder: "TrailRecorder | None" = None,
-) -> None:
-    """Persist feedback events indicating which passages were cited."""
-
-    if not citations:
-        return
-
-    result_by_passage: dict[str, HybridSearchResult] = {
-        str(result.id): result
-        for result in results
-        if getattr(result, "id", None)
-    }
-    user_id: str | None = None
-    if recorder is not None and getattr(recorder, "trail", None) is not None:
-        user_id = getattr(recorder.trail, "user_id", None)
-
-    for citation in citations:
-        passage_id = getattr(citation, "passage_id", None)
-        document_id = getattr(citation, "document_id", None)
-        if not passage_id and not document_id:
-            continue
-        context = result_by_passage.get(str(passage_id)) if passage_id else None
-        record_feedback_event(
-            session,
-            action="used_in_answer",
-            user_id=user_id,
-            query=query,
-            document_id=document_id,
-            passage_id=passage_id,
-            rank=getattr(context, "rank", getattr(citation, "index", None)),
-            score=getattr(context, "score", None),
-        )
-
-
-def _build_cache_key(
-    *,
-    user_id: str | None,
-    model_label: str | None,
-    prompt: str,
-    retrieval_digest: str,
-) -> str:
-    return _CACHE.build_key(
-        user_id=user_id,
-        model_label=model_label,
-        prompt=prompt,
-        retrieval_digest=retrieval_digest,
-    )
-
-
-def _load_cached_answer(key: str) -> dict[str, Any] | None:
-    return _CACHE.load(key)
-
-
-def _store_cached_answer(
-    key: str,
-    *,
-    answer: RAGAnswer,
-    validation: dict[str, Any] | None,
-) -> None:
-    _CACHE.store(key, answer=answer, validation=validation)
-
-
-def _iter_sentence_spans(text: str) -> list[tuple[int, int, str]]:
-    spans: list[tuple[int, int, str]] = []
-    for match in _SENTENCE_PATTERN.finditer(text):
-        start, end = match.span()
-        sentence = text[start:end].strip()
-        if sentence:
-            spans.append((start, end, sentence))
-    return spans
-
-
-def _derive_snippet(
-    result: HybridSearchResult,
-    *,
-    text: str | None = None,
-    fallback: str | None = None,
-) -> str:
-    base_text = text if text is not None else result.text or ""
-    fallback_value = (fallback if fallback is not None else result.snippet or base_text).strip()
-    if not base_text.strip():
-        return fallback_value
-
-    start_char = getattr(result, "start_char", None)
-    end_char = getattr(result, "end_char", None)
-    if start_char is None or end_char is None:
-        return fallback_value
-
-    start = max(0, min(len(base_text), start_char))
-    end = max(start, min(len(base_text), end_char))
-    spans = _iter_sentence_spans(base_text)
-    if not spans:
-        snippet = base_text[start:end].strip()
-        return snippet or fallback_value
-
-    selected_sentences = [
-        sentence
-        for span_start, span_end, sentence in spans
-        if span_end > start and span_start < end
-    ]
-    if not selected_sentences:
-        snippet = base_text[start:end].strip()
-        return snippet or fallback_value
-
-    snippet = " ".join(selected_sentences).strip()
-    return snippet or fallback_value
-
-
-
-def _build_citations(results: Sequence[HybridSearchResult]) -> list[RAGCitation]:
-    return _guardrails_build_citations(results)
-
-def _normalise_snippet(text: str) -> str:
-    collapsed = " ".join(text.split())
-    if len(collapsed) <= 240:
-        return collapsed
-    return collapsed[:237].rstrip() + "…"
-
-
-def _build_guardrail_result(
-    passage: Passage, document: Document | None
-) -> HybridSearchResult:
-    return _guardrails_build_guardrail_result(passage, document)
-
-
-
-def _load_guardrail_reference(session: Session) -> HybridSearchResult | None:
-    return _guardrails_load_guardrail_reference(session)
-
-
-
-def _load_passages_for_osis(
-    session: Session, osis: str, *, limit: int = 3
-) -> list[HybridSearchResult]:
-    return _guardrails_load_passages_for_osis(session, osis, limit=limit)
-
-
-
-def _build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
-    return _guardrails_build_retrieval_digest(results)
-
-
-def _validate_model_completion(
-    completion: str,
-    citations: Sequence[RAGCitation],
-) -> dict[str, Any]:
-    return _guardrails_validate_model_completion(completion, citations)
-
-
-def ensure_completion_safe(completion: str | None) -> None:
-    _guardrails_ensure_completion_safe(completion)
-
-
 def _guarded_answer(
     session: Session,
     *,
@@ -709,7 +487,7 @@ def _guarded_answer(
     pipeline = GuardedAnswerPipeline(
         session,
         registry,
-        cache=_CACHE,
+        cache=DEFAULT_CACHE,
         recorder=recorder,
     )
     return pipeline.compose(
@@ -782,8 +560,8 @@ def _build_refusal_citation(session: Session) -> RAGCitation:
             rank=1,
             highlights=None,
         )
-        snippet = _derive_snippet(result, fallback=_REFUSAL_FALLBACK_SNIPPET)
-        anchor = _guardrails_format_anchor(result)
+        snippet = derive_snippet(result, fallback=_REFUSAL_FALLBACK_SNIPPET)
+        anchor = format_anchor(result)
 
     return RAGCitation(
         index=1,
@@ -833,7 +611,7 @@ def _guarded_answer_or_refusal(
     filtered_results = [result for result in original_results if result.osis_ref]
     fallback_results: list[HybridSearchResult] = []
     if not filtered_results and osis:
-        fallback_results = _load_passages_for_osis(session, osis)
+        fallback_results = load_passages_for_osis(session, osis)
         if fallback_results:
             filtered_results = fallback_results
     candidate_results = filtered_results or original_results
@@ -863,18 +641,6 @@ def _guarded_answer_or_refusal(
         return build_guardrail_refusal(session, reason=str(exc))
 
 
-def _search(
-    session: Session,
-    *,
-    query: str | None,
-    osis: str | None,
-    filters: HybridSearchFilters,
-    k: int = 8,
-) -> list[HybridSearchResult]:
-    retriever = PassageRetriever(session)
-    return retriever.search(query=query, osis=osis, filters=filters, k=k)
-
-
 def run_guarded_chat(
     session: Session,
     *,
@@ -896,7 +662,7 @@ def run_guarded_chat(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
-        results = _search(session, query=question, osis=osis, filters=filters)
+        results = search_passages(session, query=question, osis=osis, filters=filters)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
             "workflow.passages_retrieved",
@@ -937,7 +703,7 @@ def run_guarded_chat(
             memory_context=memory_context,
             osis=osis,
         )
-        _record_used_citation_feedback(
+        record_used_citation_feedback(
             session,
             citations=answer.citations,
             results=results,
@@ -977,7 +743,7 @@ def generate_verse_brief(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
-        results = _search(session, query=question or osis, osis=osis, filters=filters)
+        results = search_passages(session, query=question or osis, osis=osis, filters=filters)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
             "workflow.passages_retrieved",
@@ -1018,7 +784,7 @@ def generate_verse_brief(
             filters=filters,
             osis=osis,
         )
-        _record_used_citation_feedback(
+        record_used_citation_feedback(
             session,
             citations=answer.citations,
             results=results,
@@ -1072,7 +838,7 @@ def generate_sermon_prep_outline(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
-        results = _search(session, query=query, osis=osis, filters=filters, k=10)
+        results = search_passages(session, query=query, osis=osis, filters=filters, k=10)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
             "workflow.passages_retrieved",
@@ -1113,7 +879,7 @@ def generate_sermon_prep_outline(
             filters=filters,
             osis=osis,
         )
-        _record_used_citation_feedback(
+        record_used_citation_feedback(
             session,
             citations=answer.citations,
             results=results,
@@ -1174,7 +940,7 @@ def generate_comparative_analysis(
             "workflow.participants",
             list(participants),
         )
-        results = _search(
+        results = search_passages(
             session, query="; ".join(participants), osis=osis, filters=filters, k=12
         )
         set_span_attribute(span, "workflow.result_count", len(results))
@@ -1196,7 +962,7 @@ def generate_comparative_analysis(
             filters=filters,
             osis=osis,
         )
-        _record_used_citation_feedback(
+        record_used_citation_feedback(
             session,
             citations=answer.citations,
             results=results,
@@ -1241,7 +1007,7 @@ def generate_multimedia_digest(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
-        results = _search(session, query="highlights", osis=None, filters=filters, k=8)
+        results = search_passages(session, query="highlights", osis=None, filters=filters, k=8)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
             "workflow.passages_retrieved",
@@ -1281,7 +1047,7 @@ def generate_multimedia_digest(
             filters=filters,
             osis=None,
         )
-        _record_used_citation_feedback(
+        record_used_citation_feedback(
             session,
             citations=answer.citations,
             results=results,
@@ -1320,7 +1086,7 @@ def generate_devotional_flow(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
-        results = _search(session, query=focus, osis=osis, filters=filters, k=6)
+        results = search_passages(session, query=focus, osis=osis, filters=filters, k=6)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
             "workflow.passages_retrieved",
@@ -1362,7 +1128,7 @@ def generate_devotional_flow(
             filters=filters,
             osis=osis,
         )
-        _record_used_citation_feedback(
+        record_used_citation_feedback(
             session,
             citations=answer.citations,
             results=results,
@@ -1466,7 +1232,7 @@ def run_research_reconciliation(
             "workflow.viewpoints",
             list(viewpoints),
         )
-        results = _search(
+        results = search_passages(
             session, query="; ".join(viewpoints), osis=osis, filters=filters, k=10
         )
         set_span_attribute(span, "workflow.result_count", len(results))
@@ -1510,7 +1276,7 @@ def run_research_reconciliation(
             filters=filters,
             osis=osis,
         )
-        _record_used_citation_feedback(
+        record_used_citation_feedback(
             session,
             citations=answer.citations,
             results=results,
@@ -1534,473 +1300,6 @@ def run_research_reconciliation(
         )
 
 
-_SUPPORTED_DELIVERABLE_FORMATS = {"markdown", "ndjson", "csv", "pdf"}
-
-
-def _normalise_formats(formats: Sequence[str]) -> list[str]:
-    """Return a deduplicated list of valid deliverable formats."""
-
-    normalised: list[str] = []
-    for fmt in formats:
-        candidate = fmt.lower()
-        if candidate not in _SUPPORTED_DELIVERABLE_FORMATS:
-            raise ValueError(f"Unsupported format: {fmt}")
-        if candidate not in normalised:
-            normalised.append(candidate)
-    return normalised
-
-
-def _build_deliverable_manifest(
-    deliverable_type: Literal["sermon", "transcript"],
-    *,
-    export_id: str | None = None,
-    filters: Mapping[str, Any] | None = None,
-    model_preset: str | None = None,
-    sources: Sequence[str] | None = None,
-) -> DeliverableManifest:
-    """Create a manifest describing the generated deliverable."""
-
-    manifest_sources = list(dict.fromkeys(list(sources or [])))
-    return DeliverableManifest(
-        export_id=export_id or generate_export_id(),
-        schema_version=SCHEMA_VERSION,
-        generated_at=datetime.now(UTC),
-        type=deliverable_type,  # type: ignore[arg-type]
-        filters=dict(filters or {}),
-        git_sha=get_git_sha(),
-        model_preset=model_preset,
-        sources=manifest_sources,
-    )
-
-
-def _manifest_front_matter(manifest: DeliverableManifest) -> list[str]:
-    lines = [
-        "---",
-        f"export_id: {_sanitize_markdown_field(manifest.export_id)}",
-        f"schema_version: {_sanitize_markdown_field(manifest.schema_version)}",
-        f"generated_at: {_sanitize_markdown_field(manifest.generated_at.isoformat())}",
-        f"type: {_sanitize_markdown_field(manifest.type)}",
-    ]
-    if manifest.model_preset:
-        lines.append(f"model_preset: {_sanitize_markdown_field(manifest.model_preset)}")
-    if manifest.git_sha:
-        lines.append(f"git_sha: {_sanitize_markdown_field(manifest.git_sha)}")
-    if manifest.sources:
-        sources = _sanitize_json_structure(list(manifest.sources))
-        lines.append(
-            f"sources: {json.dumps(sources, ensure_ascii=False)}"
-        )
-    if manifest.filters:
-        filters = _sanitize_json_structure(dict(manifest.filters))
-        lines.append(
-            f"filters: {json.dumps(filters, sort_keys=True, ensure_ascii=False)}"
-        )
-    lines.append("---\n")
-    return lines
-
-
-def _csv_manifest_prefix(manifest: DeliverableManifest) -> str:
-    parts = [
-        f"export_id={manifest.export_id}",
-        f"schema_version={manifest.schema_version}",
-        f"type={manifest.type}",
-        f"generated_at={manifest.generated_at.isoformat()}",
-    ]
-    if manifest.git_sha:
-        parts.append(f"git_sha={manifest.git_sha}")
-    if manifest.model_preset:
-        parts.append(f"model_preset={manifest.model_preset}")
-    if manifest.sources:
-        parts.append(f"sources={json.dumps(manifest.sources)}")
-    if manifest.filters:
-        parts.append(f"filters={json.dumps(manifest.filters, sort_keys=True)}")
-    return ",".join(parts) + "\n"
-
-
-def _escape_pdf_text(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-
-
-def _markdown_to_pdf_lines(markdown: str) -> list[str]:
-    lines: list[str] = []
-    for raw_line in markdown.splitlines():
-        stripped = raw_line.strip()
-        if not stripped:
-            lines.append("")
-            continue
-        if stripped.startswith("#"):
-            heading = stripped.lstrip("#").strip()
-            lines.append(heading.upper() if heading else "")
-            lines.append("")
-            continue
-        prefix = ""
-        content = stripped
-        if stripped.startswith(("- ", "* ")):
-            prefix = "• "
-            content = stripped[2:].strip()
-        wrapped = textwrap.wrap(content, width=90) or [""]
-        for idx, item in enumerate(wrapped):
-            if prefix and idx == 0:
-                lines.append(f"{prefix}{item}")
-            elif prefix:
-                lines.append(f"{' ' * len(prefix)}{item}")
-            else:
-                lines.append(item)
-    return lines or [""]
-
-
-def _render_markdown_pdf(markdown: str, *, title: str | None = None) -> bytes:
-    text_lines = _markdown_to_pdf_lines(markdown)
-    heading_lines: list[str] = []
-    if title:
-        clean_title = title.strip()
-        if clean_title:
-            heading_lines = [clean_title, ""]
-    combined = heading_lines + text_lines
-    if not combined:
-        combined = [""]
-
-    commands = [
-        "BT",
-        "/F1 12 Tf",
-        "16 TL",
-        "72 756 Td",
-    ]
-    for idx, line in enumerate(combined):
-        commands.append(f"({_escape_pdf_text(line)}) Tj")
-        if idx != len(combined) - 1:
-            commands.append("T*")
-    commands.append("ET")
-    stream = "\n".join(commands).encode("utf-8")
-
-    objects = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
-        b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    ]
-
-    pdf = bytearray()
-    pdf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-    offsets = [0]
-    for index, obj in enumerate(objects, start=1):
-        offsets.append(len(pdf))
-        pdf.extend(f"{index} 0 obj\n".encode("ascii"))
-        pdf.extend(obj)
-        if not obj.endswith(b"\n"):
-            pdf.extend(b"\n")
-        pdf.extend(b"endobj\n")
-    xref_offset = len(pdf)
-    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
-    pdf.extend(b"0000000000 65535 f \n")
-    for offset in offsets[1:]:
-        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
-    pdf.extend(b"trailer\n")
-    pdf.extend(f"<< /Size {len(objects) + 1} /Root 1 0 R >>\n".encode("ascii"))
-    pdf.extend(b"startxref\n")
-    pdf.extend(f"{xref_offset}\n".encode("ascii"))
-    pdf.extend(b"%%EOF\n")
-    return bytes(pdf)
-
-
-def _render_sermon_markdown(
-    manifest: DeliverableManifest, response: SermonPrepResponse
-) -> str:
-    lines = _manifest_front_matter(manifest)
-    lines.append(
-        f"# Sermon Prep — {_sanitize_markdown_field(response.topic)}"
-    )
-    if response.osis:
-        lines.append(
-            f"Focus Passage: {_sanitize_markdown_field(response.osis)}\n"
-        )
-    if response.outline:
-        lines.append("## Outline")
-        for item in response.outline:
-            lines.append(f"- {_sanitize_markdown_field(item)}")
-        lines.append("")
-    if response.key_points:
-        lines.append("## Key Points")
-        for point in response.key_points:
-            lines.append(f"- {_sanitize_markdown_field(point)}")
-        lines.append("")
-    if response.answer.citations:
-        lines.append("## Citations")
-        for citation in response.answer.citations:
-            osis = _sanitize_markdown_field(citation.osis)
-            anchor = _sanitize_markdown_field(citation.anchor)
-            snippet = _sanitize_markdown_field(citation.snippet)
-            lines.append(f"- {osis} ({anchor}) — {snippet}")
-    return "\n".join(lines).strip() + "\n"
-
-
-def _render_sermon_ndjson(
-    manifest: DeliverableManifest, response: SermonPrepResponse
-) -> str:
-    payload = manifest.model_dump(mode="json")
-    lines = [json.dumps(payload, ensure_ascii=False)]
-    for idx, item in enumerate(response.outline, start=1):
-        lines.append(
-            json.dumps(
-                {"kind": "outline", "order": idx, "value": item},
-                ensure_ascii=False,
-            )
-        )
-    for idx, point in enumerate(response.key_points, start=1):
-        lines.append(
-            json.dumps(
-                {"kind": "key_point", "order": idx, "value": point},
-                ensure_ascii=False,
-            )
-        )
-    for citation in response.answer.citations:
-        lines.append(
-            json.dumps(
-                {
-                    "kind": "citation",
-                    "osis": citation.osis,
-                    "anchor": citation.anchor,
-                    "snippet": citation.snippet,
-                    "document_id": citation.document_id,
-                },
-                ensure_ascii=False,
-            )
-        )
-    return "\n".join(lines) + "\n"
-
-
-def _render_sermon_csv(
-    manifest: DeliverableManifest, response: SermonPrepResponse
-) -> str:
-    import csv
-    import io
-
-    buffer = io.StringIO()
-    writer = csv.DictWriter(
-        buffer, fieldnames=["osis", "anchor", "snippet", "document_id"]
-    )
-    writer.writeheader()
-    for citation in response.answer.citations:
-        writer.writerow(
-            {
-                "osis": citation.osis,
-                "anchor": citation.anchor,
-                "snippet": citation.snippet,
-                "document_id": citation.document_id,
-            }
-        )
-    return _csv_manifest_prefix(manifest) + buffer.getvalue()
-
-
-def _render_sermon_pdf(
-    manifest: DeliverableManifest, response: SermonPrepResponse
-) -> bytes:
-    markdown = _render_sermon_markdown(manifest, response)
-    title = f"Sermon Prep — {response.topic}" if response.topic else None
-    return _render_markdown_pdf(markdown, title=title)
-
-
-def build_sermon_deliverable(
-    response: SermonPrepResponse,
-    *,
-    formats: Sequence[str],
-    filters: Mapping[str, Any] | None = None,
-) -> DeliverablePackage:
-    """Render sermon prep content as a multi-format deliverable."""
-
-    normalised = _normalise_formats(formats)
-    citations = response.answer.citations
-    export_id = (
-        f"sermon-{citations[0].document_id}"
-        if citations
-        else generate_export_id()
-    )
-    manifest_filters: dict[str, Any] = {"topic": response.topic}
-    if response.osis:
-        manifest_filters["osis"] = response.osis
-    if filters:
-        manifest_filters["search_filters"] = dict(filters)
-    manifest = _build_deliverable_manifest(
-        "sermon",
-        export_id=export_id,
-        filters=manifest_filters,
-        model_preset=response.answer.model_name,
-        sources=[citation.document_id for citation in citations],
-    )
-    assets: list[DeliverableAsset] = []
-    for fmt in normalised:
-        if fmt == "markdown":
-            body = _render_sermon_markdown(manifest, response)
-            media_type = "text/markdown"
-            filename = "sermon.md"
-        elif fmt == "ndjson":
-            body = _render_sermon_ndjson(manifest, response)
-            media_type = "application/x-ndjson"
-            filename = "sermon.ndjson"
-        elif fmt == "csv":
-            body = _render_sermon_csv(manifest, response)
-            media_type = "text/csv"
-            filename = "sermon.csv"
-        elif fmt == "pdf":
-            body = _render_sermon_pdf(manifest, response)
-            media_type = "application/pdf"
-            filename = "sermon.pdf"
-        else:  # pragma: no cover - guarded earlier
-            raise ValueError(f"Unsupported format: {fmt}")
-        assets.append(
-            DeliverableAsset(
-                format=fmt,
-                filename=filename,
-                media_type=media_type,
-                content=body,
-            )
-        )
-    return DeliverablePackage(manifest=manifest, assets=assets)
-
-
-def _build_transcript_rows(passages: Sequence[Passage]) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    for passage in passages:
-        speaker = None
-        if passage.meta and isinstance(passage.meta, dict):
-            speaker = passage.meta.get("speaker")
-        rows.append(
-            {
-                "speaker": speaker or "Narrator",
-                "text": passage.text,
-                "osis": passage.osis_ref,
-                "t_start": passage.t_start,
-                "t_end": passage.t_end,
-                "page_no": passage.page_no,
-                "passage_id": passage.id,
-            }
-        )
-    return rows
-
-
-def _render_transcript_markdown(
-    manifest: DeliverableManifest,
-    title: str | None,
-    rows: Sequence[dict[str, Any]],
-) -> str:
-    lines = _manifest_front_matter(manifest)
-    heading_subject = title or manifest.filters.get("document_id") or ""
-    lines.append(
-        f"# Q&A Transcript — {_sanitize_markdown_field(heading_subject)}"
-    )
-    for row in rows:
-        anchor = row.get("osis") or row.get("page_no") or row.get("t_start")
-        speaker = _sanitize_markdown_field(row.get("speaker"))
-        anchor_text = _sanitize_markdown_field(anchor)
-        text = _sanitize_markdown_field(row.get("text"))
-        lines.append(f"- **{speaker}** ({anchor_text}): {text}")
-    return "\n".join(lines).strip() + "\n"
-
-
-def _render_transcript_ndjson(
-    manifest: DeliverableManifest, rows: Sequence[dict[str, Any]]
-) -> str:
-    payload = manifest.model_dump(mode="json")
-    lines = [json.dumps(payload, ensure_ascii=False)]
-    for row in rows:
-        lines.append(json.dumps(row, ensure_ascii=False))
-    return "\n".join(lines) + "\n"
-
-
-def _render_transcript_csv(
-    manifest: DeliverableManifest, rows: Sequence[dict[str, Any]]
-) -> str:
-    import csv
-    import io
-
-    buffer = io.StringIO()
-    fieldnames = list(rows[0].keys()) if rows else ["speaker", "text"]
-    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
-    writer.writeheader()
-    for row in rows:
-        writer.writerow(row)
-    return _csv_manifest_prefix(manifest) + buffer.getvalue()
-
-
-def _render_transcript_pdf(
-    manifest: DeliverableManifest,
-    title: str | None,
-    rows: Sequence[dict[str, Any]],
-) -> bytes:
-    markdown = _render_transcript_markdown(manifest, title, rows)
-    heading = f"Transcript — {title}" if title else "Transcript"
-    return _render_markdown_pdf(markdown, title=heading)
-
-
-def build_transcript_deliverable(
-    session: Session,
-    document_id: str,
-    *,
-    formats: Sequence[str],
-) -> DeliverablePackage:
-    """Generate transcript exports for the requested document."""
-
-    document = session.get(Document, document_id)
-    if document is None:
-        raise GuardrailError(
-            f"Document {document_id} not found",
-            metadata={
-                "code": "ingest_document_missing",
-                "guardrail": "ingest",
-                "suggested_action": "upload",
-                "reason": document_id,
-            },
-        )
-    passages = (
-        session.query(Passage)
-        .filter(Passage.document_id == document_id)
-        .order_by(
-            Passage.page_no.asc(),
-            Passage.t_start.asc(),
-            Passage.start_char.asc(),
-        )
-        .all()
-    )
-    rows = _build_transcript_rows(passages)
-    manifest = _build_deliverable_manifest(
-        "transcript",
-        export_id=f"transcript-{document_id}",
-        filters={"document_id": document_id},
-        sources=[document_id],
-    )
-    normalised = _normalise_formats(formats)
-    assets: list[DeliverableAsset] = []
-    for fmt in normalised:
-        if fmt == "markdown":
-            body = _render_transcript_markdown(manifest, document.title, rows)
-            media_type = "text/markdown"
-            filename = "transcript.md"
-        elif fmt == "ndjson":
-            body = _render_transcript_ndjson(manifest, rows)
-            media_type = "application/x-ndjson"
-            filename = "transcript.ndjson"
-        elif fmt == "csv":
-            body = _render_transcript_csv(manifest, rows)
-            media_type = "text/csv"
-            filename = "transcript.csv"
-        elif fmt == "pdf":
-            body = _render_transcript_pdf(manifest, document.title, rows)
-            media_type = "application/pdf"
-            filename = "transcript.pdf"
-        else:  # pragma: no cover - guarded earlier
-            raise ValueError(f"Unsupported format: {fmt}")
-        assets.append(
-            DeliverableAsset(
-                format=fmt,
-                filename=filename,
-                media_type=media_type,
-                content=body,
-            )
-        )
-    return DeliverablePackage(manifest=manifest, assets=assets)
-
-
 def build_sermon_prep_package(
     response: SermonPrepResponse, *, format: str
 ) -> tuple[str | bytes, str]:
@@ -2009,17 +1308,6 @@ def build_sermon_prep_package(
     asset = package.get_asset(normalised)
     return asset.content, asset.media_type
 
-
-def build_transcript_package(
-    session: Session,
-    document_id: str,
-    *,
-    format: str,
-) -> tuple[str | bytes, str]:
-    normalised = format.lower()
-    package = build_transcript_deliverable(session, document_id, formats=[normalised])
-    asset = package.get_asset(normalised)
-    return asset.content, asset.media_type
 
 
 __all__ = [
