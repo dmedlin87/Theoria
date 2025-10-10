@@ -444,6 +444,13 @@ class SharedLedger:
 
         start = time.time()
         comparison_floor = observed_updated_at if observed_updated_at is not None else start
+        max_error_wait = (
+            timeout if timeout is not None else max(poll_interval * 5.0, 0.5)
+        )
+        stale_error_message: str | None = None
+        stale_error_cleared_at: float | None = None
+        transient_error_seen_at: float | None = None
+        transient_error_updated_at: float | None = None
 
         def _row_to_record(row: InflightRow) -> CacheRecord:
             created_at = row.completed_at or row.updated_at
@@ -467,13 +474,27 @@ class SharedLedger:
                 with self.transaction() as txn:
                     cached = txn.get_cache_entry(cache_key)
                 if cached is not None:
+                    stale_error_message = None
+                    stale_error_cleared_at = None
+                    transient_error_seen_at = None
+                    transient_error_updated_at = None
                     return cached
+                if (
+                    stale_error_message is not None
+                    and stale_error_cleared_at is not None
+                    and time.time() - stale_error_cleared_at >= poll_interval
+                ):
+                    raise GenerationError(stale_error_message)
                 if timeout is not None and time.time() - start > timeout:
                     raise GenerationError(
                         "Timed out waiting for inflight generation"
                     )
                 time.sleep(poll_interval)
                 continue
+            else:
+                # Reset stale error tracking when we observe a fresh inflight row.
+                stale_error_message = None
+                stale_error_cleared_at = None
             if (
                 row.output is not None
                 and row.completed_at is not None
@@ -481,6 +502,8 @@ class SharedLedger:
             ):
                 return _row_to_record(row)
             if row.status == "waiting":
+                transient_error_seen_at = None
+                transient_error_updated_at = None
                 if (
                     observed_updated_at is not None
                     and row.updated_at > observed_updated_at
@@ -496,6 +519,8 @@ class SharedLedger:
                 time.sleep(poll_interval)
                 continue
             if row.status == "success":
+                transient_error_seen_at = None
+                transient_error_updated_at = None
                 return _row_to_record(row)
             if row.status == "error":
                 if (
@@ -503,6 +528,8 @@ class SharedLedger:
                     and row.completed_at is not None
                     and row.completed_at >= comparison_floor
                 ):
+                    transient_error_seen_at = None
+                    transient_error_updated_at = None
                     return _row_to_record(row)
                 if (
                     observed_updated_at is not None
@@ -511,12 +538,40 @@ class SharedLedger:
                     with self.transaction() as txn:
                         cached = txn.get_cache_entry(cache_key)
                     if cached is not None:
+                        transient_error_seen_at = None
+                        transient_error_updated_at = None
                         return cached
                     comparison_floor = row.updated_at
                     observed_updated_at = row.updated_at
-                if row.completed_at is None:
+                stale_completion = (
+                    row.completed_at is None or row.completed_at < comparison_floor
+                )
+                if (
+                    row.completed_at is None
+                    and row.updated_at < comparison_floor
+                ):
                     with self.transaction() as txn:
                         txn.clear_single_inflight(cache_key)
+                    stale_error_message = row.error or "Deduplicated generation failed"
+                    stale_error_cleared_at = time.time()
+                    transient_error_seen_at = None
+                    transient_error_updated_at = None
+                    time.sleep(poll_interval)
+                    continue
+                if stale_completion:
+                    if transient_error_updated_at != row.updated_at:
+                        transient_error_updated_at = row.updated_at
+                        transient_error_seen_at = time.time()
+                        time.sleep(poll_interval)
+                        continue
+                    if (
+                        transient_error_seen_at is not None
+                        and time.time() - transient_error_seen_at < max_error_wait
+                    ):
+                        time.sleep(poll_interval)
+                        continue
+                    if timeout is not None and time.time() - start > timeout:
+                        raise GenerationError("Timed out waiting for inflight generation")
                 # Preserve the inflight row so earlier waiters that began
                 # before a restart can still observe the preserved success
                 # payload. Clearing the entry here would race with those

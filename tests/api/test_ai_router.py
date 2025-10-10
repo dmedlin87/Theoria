@@ -604,6 +604,56 @@ def test_wait_for_inflight_handles_transient_absence(tmp_path):
     assert outputs == ["shared-output"] * waiter_count
 
 
+def test_wait_for_inflight_recovers_from_transient_error(tmp_path):
+    ledger_path = tmp_path / "transient-error.db"
+    ledger = SharedLedger(str(ledger_path))
+    ledger.reset()
+    cache_key = "cache-key"
+
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+
+    ready = threading.Event()
+    outputs: list[str] = []
+    errors: list[Exception] = []
+
+    def _waiter() -> None:
+        ready.set()
+        try:
+            record = ledger.wait_for_inflight(
+                cache_key, poll_interval=0.01, timeout=2.0
+            )
+            outputs.append(record.output)
+        except Exception as exc:  # pragma: no cover - unexpected
+            errors.append(exc)
+
+    thread = threading.Thread(target=_waiter)
+    thread.start()
+
+    assert ready.wait(timeout=1.0)
+    time.sleep(0.05)
+
+    with ledger.transaction() as txn:
+        txn.mark_inflight_error(cache_key, "transient failure")
+
+    time.sleep(0.05)
+
+    with ledger.transaction() as txn:
+        txn.mark_inflight_success(
+            cache_key,
+            model_name="model",
+            workflow="workflow",
+            output="recovered",
+            latency_ms=12.0,
+            cost=0.2,
+        )
+
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert not errors
+    assert outputs == ["recovered"]
+
+
 def test_router_shared_spend_across_processes(tmp_path):
     ledger_path = tmp_path / "shared-ledger.db"
     SharedLedger(str(ledger_path)).reset()
