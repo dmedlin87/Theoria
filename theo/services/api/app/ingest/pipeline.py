@@ -52,6 +52,9 @@ from .persistence import (
 
 _resolve_host_addresses = ingest_network.resolve_host_addresses
 
+# Legacy alias retained for older tests/hooks that patch the private helper.
+_parse_text_file = parse_text_file
+
 
 def ensure_url_allowed(settings, url: str) -> None:
     """Validate URL targets using the current resolve-host strategy."""
