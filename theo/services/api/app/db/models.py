@@ -175,8 +175,9 @@ class DocumentAnnotation(Base):
     document: Mapped[Document] = relationship("Document", back_populates="annotations")
     case_object: Mapped["CaseObject | None"] = relationship(
         "CaseObject",
-        back_populates="annotation",
         uselist=False,
+        primaryjoin="DocumentAnnotation.case_object_id == CaseObject.id",
+        foreign_keys="DocumentAnnotation.case_object_id",
     )
 
 
@@ -1201,8 +1202,9 @@ class CaseObject(Base):
     passage: Mapped[Passage | None] = relationship("Passage", back_populates="case_object")
     annotation: Mapped[DocumentAnnotation | None] = relationship(
         "DocumentAnnotation",
-        back_populates="case_object",
         uselist=False,
+        primaryjoin="CaseObject.annotation_id == DocumentAnnotation.id",
+        foreign_keys="CaseObject.annotation_id",
     )
     outgoing_edges: Mapped[list["CaseEdge"]] = relationship(
         "CaseEdge",
