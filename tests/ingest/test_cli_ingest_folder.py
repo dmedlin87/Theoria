@@ -79,6 +79,26 @@ def test_walk_folder_discovers_supported_files(tmp_path: Path) -> None:
     assert all(item.source_type for item in discovered)
 
 
+def test_walk_folder_enforces_allowlist(tmp_path: Path) -> None:
+    allowed_root = tmp_path / "allowed"
+    allowed_root.mkdir()
+    outside_root = tmp_path / "outside"
+    outside_root.mkdir()
+
+    safe_file = allowed_root / "safe.txt"
+    safe_file.write_text("safe", encoding="utf-8")
+    secret_file = outside_root / "secret.txt"
+    secret_file.write_text("secret", encoding="utf-8")
+
+    # Symlink into the allowed directory that points outside of the allowlist.
+    symlink_path = allowed_root / "leak.txt"
+    symlink_path.symlink_to(secret_file)
+
+    discovered = list(cli._walk_folder(allowed_root, (allowed_root.resolve(),)))
+
+    assert [item.path for item in discovered] == [safe_file]
+
+
 def test_discover_items_supports_urls(tmp_path: Path) -> None:
     local_file = tmp_path / "local.txt"
     local_file.write_text("content", encoding="utf-8")
