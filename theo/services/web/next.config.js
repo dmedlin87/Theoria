@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  env: {
+    NEXT_PUBLIC_CASE_BUILDER_ENABLED:
+      process.env.NEXT_PUBLIC_CASE_BUILDER_ENABLED ?? "false",
+  },
+};
 
 let withBundleAnalyzer = (config) => config;
 

@@ -75,6 +75,15 @@ celery.conf.beat_schedule.setdefault(
 )
 
 
+@celery.task(name="tasks.on_case_object_upsert")
+def on_case_object_upsert(case_object_id: str) -> None:
+    """Entry point for Case Builder object scoring."""
+
+    logger.debug(
+        "Received Case Builder object upsert", extra={"case_object_id": case_object_id}
+    )
+
+
 _CITATION_VALIDATION_TOP_K = 8
 _DEFAULT_CITATION_SESSION_LIMIT = 25
 

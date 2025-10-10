@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, Sequence
@@ -46,6 +47,9 @@ from .metadata import (
 )
 from .osis import detect_osis_references
 from .sanitizer import sanitize_passage_text
+
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingServiceProtocol(Protocol):
@@ -463,6 +467,21 @@ def persist_text_document(
 
     session.flush()
 
+    if getattr(settings, "case_builder_enabled", False):
+        try:
+            from ..case_builder import ingest as case_builder_ingest
+
+            case_builder_ingest.sync_case_objects_for_document(
+                session,
+                document=document,
+                passages=passages,
+                settings=settings,
+            )
+        except Exception:  # pragma: no cover - defensive logging
+            logger.exception(
+                "Case Builder sync failed during text ingestion",
+                extra={"document_id": document.id},
+            )
     sync_passages_case_objects(
         session,
         document=document,
@@ -840,6 +859,21 @@ def persist_transcript_document(
 
     session.flush()
 
+    if getattr(settings, "case_builder_enabled", False):
+        try:
+            from ..case_builder import ingest as case_builder_ingest
+
+            case_builder_ingest.sync_case_objects_for_document(
+                session,
+                document=document,
+                passages=passages,
+                settings=settings,
+            )
+        except Exception:  # pragma: no cover - defensive logging
+            logger.exception(
+                "Case Builder sync failed during transcript ingestion",
+                extra={"document_id": document.id},
+            )
     sync_passages_case_objects(
         session,
         document=document,
