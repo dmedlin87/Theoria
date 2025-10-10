@@ -62,6 +62,90 @@ def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
     return False
 
 
+def _split_sql_statements(sql: str) -> list[str]:
+    """Split SQL into individual statements while respecting string literals."""
+
+    statements: list[str] = []
+    buffer: list[str] = []
+    in_single_quote = False
+    in_double_quote = False
+    dollar_quote: str | None = None
+    index = 0
+    length = len(sql)
+
+    while index < length:
+        char = sql[index]
+
+        if dollar_quote is not None:
+            if sql.startswith(dollar_quote, index):
+                buffer.append(dollar_quote)
+                index += len(dollar_quote)
+                dollar_quote = None
+                continue
+            buffer.append(char)
+            index += 1
+            continue
+
+        if in_single_quote:
+            buffer.append(char)
+            index += 1
+            if char == "'":
+                next_char = sql[index] if index < length else ""
+                if next_char == "'":
+                    buffer.append("'")
+                    index += 1
+                else:
+                    in_single_quote = False
+            continue
+
+        if in_double_quote:
+            buffer.append(char)
+            index += 1
+            if char == '"':
+                in_double_quote = False
+            continue
+
+        if char == "'":
+            in_single_quote = True
+            buffer.append(char)
+            index += 1
+            continue
+
+        if char == '"':
+            in_double_quote = True
+            buffer.append(char)
+            index += 1
+            continue
+
+        if char == "$":
+            end = index + 1
+            while end < length and (sql[end].isalnum() or sql[end] == "_"):
+                end += 1
+            if end < length and sql[end] == "$":
+                tag = sql[index : end + 1]
+                dollar_quote = tag
+                buffer.append(tag)
+                index = end + 1
+                continue
+
+        if char == ";":
+            statement = "".join(buffer).strip()
+            if statement:
+                statements.append(statement)
+            buffer.clear()
+            index += 1
+            continue
+
+        buffer.append(char)
+        index += 1
+
+    tail = "".join(buffer).strip()
+    if tail:
+        statements.append(tail)
+
+    return statements
+
+
 def run_sql_migrations(
     engine: Engine | None = None,
     migrations_path: Path | None = None,
@@ -134,6 +218,11 @@ def run_sql_migrations(
                     "VECTOR_L2_OPS",  # pgvector operator class
                     "USING GIN",      # Postgres index method
                     "USING GIST",     # Postgres index method
+                    "JSONB",          # Postgres JSON type
+                    "TIMESTAMPTZ",    # Postgres timestamp type
+                    " UUID",          # UUID type (space ensures we're detecting identifiers)
+                    "UUID ",
+                    "CONCURRENTLY",   # Postgres concurrent index creation
                 )
                 if any(marker in sql_upper for marker in postgres_only_markers):
                     logger.debug(
@@ -150,7 +239,11 @@ def run_sql_migrations(
                     _execute_autocommit(engine, sql)
                 else:
                     connection = session.connection()
-                    connection.exec_driver_sql(sql)
+                    if dialect_name == "sqlite":
+                        for statement in _split_sql_statements(sql):
+                            connection.exec_driver_sql(statement)
+                    else:
+                        connection.exec_driver_sql(sql)
 
             session.add(
                 AppSetting(
