@@ -133,7 +133,9 @@ def test_ingest_folder_dry_run_lists_batches(monkeypatch, tmp_path: Path) -> Non
         cli.IngestItem(path=tmp_path / "second.txt", source_type="txt"),
     ]
 
-    monkeypatch.setattr(cli, "_discover_items", lambda sources: items)
+    monkeypatch.setattr(
+        cli, "_discover_items", lambda sources, allowlist=None: items
+    )
     monkeypatch.setattr(cli, "_batched", lambda iterable, size: iter([items]))
 
     runner = CliRunner()
@@ -153,7 +155,9 @@ def test_ingest_folder_uses_selected_backend(monkeypatch, tmp_path: Path) -> Non
         cli.IngestItem(path=tmp_path / "second.txt", source_type="txt"),
     ]
 
-    monkeypatch.setattr(cli, "_discover_items", lambda sources: items)
+    monkeypatch.setattr(
+        cli, "_discover_items", lambda sources, allowlist=None: items
+    )
     monkeypatch.setattr(cli, "_batched", lambda iterable, size: iter([items]))
 
     ingested_batches: list[list[cli.IngestItem]] = []

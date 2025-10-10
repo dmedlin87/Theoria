@@ -91,8 +91,16 @@ def _is_supported(path: Path) -> bool:
     )
 
 
-def _discover_items(sources: Sequence[str]) -> list[IngestItem]:
+def _discover_items(
+    sources: Sequence[str], allowlist: Sequence[Path] | None = None
+) -> list[IngestItem]:
     """Expand a list of user-supplied sources into ingestable items."""
+
+    normalized_allowlist: tuple[Path, ...] | None = None
+    if allowlist is not None:
+        normalized_allowlist = tuple(
+            Path(root).expanduser().resolve(strict=False) for root in allowlist
+        )
 
     items: list[IngestItem] = []
     for raw_source in sources:
@@ -108,6 +116,15 @@ def _discover_items(sources: Sequence[str]) -> list[IngestItem]:
         path = Path(source).expanduser()
         if not path.exists():
             raise ValueError(f"Path '{source}' does not exist")
+        if normalized_allowlist is not None:
+            resolved_path = path.resolve()
+            if not any(
+                resolved_path == root or resolved_path.is_relative_to(root)
+                for root in normalized_allowlist
+            ):
+                raise ValueError(
+                    f"Path '{source}' is not within an allowed ingest root"
+                )
         if not path.is_dir() and not _is_supported(path):
             continue
         items.extend(_walk_folder(path))

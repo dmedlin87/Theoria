@@ -224,7 +224,11 @@ def test_simple_ingest_streams_progress(
         ingest_module.cli_ingest.IngestItem(url="https://example.com", source_type="web_page"),
     ]
 
-    monkeypatch.setattr(ingest_module.cli_ingest, "_discover_items", lambda sources: items)
+    monkeypatch.setattr(
+        ingest_module.cli_ingest,
+        "_discover_items",
+        lambda sources, allowlist=None: items,
+    )
     monkeypatch.setattr(ingest_module.cli_ingest, "_batched", lambda iterable, size: iter([list(iterable)]))
 
     captured_overrides: list[dict[str, object]] = []
@@ -260,7 +264,7 @@ def test_simple_ingest_streams_progress(
 def test_simple_ingest_rejects_bad_source(
     monkeypatch: pytest.MonkeyPatch, api_client: TestClient
 ) -> None:
-    def fail_discovery(_sources):  # noqa: ANN001 - simple failure helper
+    def fail_discovery(_sources, allowlist=None):  # noqa: ANN001 - simple failure helper
         raise ValueError("Path 'missing' does not exist")
 
     monkeypatch.setattr(ingest_module.cli_ingest, "_discover_items", fail_discovery)
@@ -269,6 +273,59 @@ def test_simple_ingest_rejects_bad_source(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "does not exist" in response.json()["detail"]
+
+
+def test_simple_ingest_allows_sources_under_configured_roots(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient, tmp_path: Path
+) -> None:
+    allowed_root = tmp_path / "allowed"
+    allowed_root.mkdir()
+    allowed_file = allowed_root / "note.txt"
+    allowed_file.write_text("content", encoding="utf-8")
+
+    settings = Settings()
+    settings.simple_ingest_allowed_roots = [allowed_root]
+    monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
+
+    def fake_ingest(batch, overrides, post_batch_steps):  # noqa: ANN001 - test helper
+        assert len(batch) == 1
+        return ["doc-1"]
+
+    monkeypatch.setattr(ingest_module.cli_ingest, "_ingest_batch_via_api", fake_ingest)
+
+    with api_client.stream(
+        "POST",
+        "/ingest/simple",
+        json={"sources": [str(allowed_file)]},
+    ) as response:
+        assert response.status_code == status.HTTP_200_OK
+        payload = [line for line in response.iter_lines() if line]
+
+    events = [json.loads(line) for line in payload]
+    assert any(event.get("event") == "processed" for event in events)
+
+
+def test_simple_ingest_rejects_sources_outside_allowlist(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient, tmp_path: Path
+) -> None:
+    allowed_root = tmp_path / "allowed"
+    allowed_root.mkdir()
+    forbidden_root = tmp_path / "forbidden"
+    forbidden_root.mkdir()
+    forbidden_file = forbidden_root / "note.txt"
+    forbidden_file.write_text("secret", encoding="utf-8")
+
+    settings = Settings()
+    settings.simple_ingest_allowed_roots = [allowed_root]
+    monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
+
+    response = api_client.post(
+        "/ingest/simple",
+        json={"sources": [str(forbidden_file)]},
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "not within an allowed ingest root" in response.json()["detail"]
 
 
 
