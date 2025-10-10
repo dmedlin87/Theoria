@@ -56,6 +56,18 @@ _resolve_host_addresses = ingest_network.resolve_host_addresses
 _parse_text_file = parse_text_file
 
 
+__all__ = [
+    "PipelineDependencies",
+    "_parse_text_file",
+    "_refresh_creator_verse_rollups",
+    "build_opener",
+    "ensure_url_allowed",
+    "run_pipeline_for_file",
+    "run_pipeline_for_transcript",
+    "run_pipeline_for_url",
+]
+
+
 def ensure_url_allowed(settings, url: str) -> None:
     """Validate URL targets using the current resolve-host strategy."""
 
