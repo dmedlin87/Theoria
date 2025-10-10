@@ -15,6 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..case_builder import sync_passages_case_objects
 from ..core.settings import get_settings
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import (
@@ -481,6 +482,12 @@ def persist_text_document(
                 "Case Builder sync failed during text ingestion",
                 extra={"document_id": document.id},
             )
+    sync_passages_case_objects(
+        session,
+        document=document,
+        passages=passages,
+        frontmatter=frontmatter,
+    )
 
     topics = collect_topics(document, frontmatter)
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
@@ -867,6 +874,12 @@ def persist_transcript_document(
                 "Case Builder sync failed during transcript ingestion",
                 extra={"document_id": document.id},
             )
+    sync_passages_case_objects(
+        session,
+        document=document,
+        passages=passages,
+        frontmatter=frontmatter,
+    )
 
     topics = collect_topics(document, frontmatter)
     stance_overrides_raw = frontmatter.get("creator_stances") or {}

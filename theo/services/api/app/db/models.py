@@ -84,6 +84,11 @@ class Document(Base):
         uselist=False,
         single_parent=True,
     )
+    case_objects: Mapped[list["CaseObject"]] = relationship(
+        "CaseObject",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
 
 
 class Passage(Base):
@@ -114,6 +119,12 @@ class Passage(Base):
     tei_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="passages")
+    case_object: Mapped["CaseObject | None"] = relationship(
+        "CaseObject",
+        back_populates="passage",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class AppSetting(Base):
@@ -159,6 +170,12 @@ class DocumentAnnotation(Base):
     )
 
     document: Mapped[Document] = relationship("Document", back_populates="annotations")
+    case_object: Mapped["CaseObject | None"] = relationship(
+        "CaseObject",
+        back_populates="annotation",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class IngestionJob(Base):
@@ -1097,6 +1114,14 @@ class CaseSource(Base):
         ForeignKey("documents.id", ondelete="SET NULL"),
         unique=True,
         nullable=True,
+class CaseSource(Base):
+    """Source metadata powering case-builder evidence objects."""
+
+    __tablename__ = "case_sources"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    document_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="SET NULL"), unique=True, nullable=True
     )
     origin: Mapped[str | None] = mapped_column(String, nullable=True)
     author: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -1177,12 +1202,14 @@ class CaseObject(Base):
         onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-    source: Mapped[CaseSource | None] = relationship(
-        "CaseSource", back_populates="objects"
+    source: Mapped[CaseSource | None] = relationship("CaseSource", back_populates="objects")
+    document: Mapped[Document | None] = relationship("Document", back_populates="case_objects")
+    passage: Mapped[Passage | None] = relationship("Passage", back_populates="case_object")
+    annotation: Mapped[DocumentAnnotation | None] = relationship(
+        "DocumentAnnotation", back_populates="case_object"
     )
-    document: Mapped[Document | None] = relationship("Document")
-    passage: Mapped[Passage | None] = relationship("Passage")
     outgoing_edges: Mapped[list["CaseEdge"]] = relationship(
         "CaseEdge",
         back_populates="src_object",
@@ -1291,6 +1318,8 @@ class CaseInsight(Base):
         "CaseUserAction",
         back_populates="insight",
         cascade="all, delete-orphan",
+    actions: Mapped[list["CaseUserAction"]] = relationship(
+        "CaseUserAction", back_populates="insight", cascade="all, delete-orphan"
     )
 
 

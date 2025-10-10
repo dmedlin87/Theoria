@@ -96,11 +96,15 @@ class Settings(BaseSettings):
     )
     case_builder_enabled: bool = Field(
         default=False,
-        description="Enable Case Builder ingestion pipeline and related APIs.",
+        description="Enable ingestion and APIs for the Case Builder feature",
+    )
+    case_builder_web_enabled: bool = Field(
+        default=False,
+        description="Expose Case Builder UI affordances in the web client",
     )
     case_builder_notify_channel: str = Field(
-        default="case_objects_changed",
-        description="Postgres NOTIFY channel used for Case Builder object upserts.",
+        default="case_object_upsert",
+        description="Postgres NOTIFY channel used for case object upsert events",
     )
     topic_digest_ttl_seconds: int = Field(
         default=3600,
