@@ -1070,6 +1070,7 @@ class CaseObjectType(str, Enum):
     NOTE = "note"
     CLAIM = "claim"
     EVIDENCE = "evidence"
+    ANNOTATION = "annotation"
 
 
 class CaseEdgeKind(str, Enum):
