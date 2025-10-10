@@ -1104,6 +1104,7 @@ class CaseSource(Base):
     """Source metadata powering case-builder evidence objects."""
 
     __tablename__ = "case_sources"
+    __table_args__ = (Index("ix_case_sources_document_id", "document_id"),)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
     document_id: Mapped[str | None] = mapped_column(
@@ -1141,6 +1142,7 @@ class CaseObject(Base):
         Index("ix_case_objects_document_id", "document_id"),
         Index("ix_case_objects_created_at", "created_at"),
         UniqueConstraint("passage_id", name="uq_case_objects_passage_id"),
+        UniqueConstraint("annotation_id", name="uq_case_objects_annotation_id"),
     )
 
     id: Mapped[str] = mapped_column(
@@ -1159,6 +1161,11 @@ class CaseObject(Base):
     passage_id: Mapped[str | None] = mapped_column(
         String,
         ForeignKey("passages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    annotation_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("document_annotations.id", ondelete="SET NULL"),
         nullable=True,
     )
     object_type: Mapped[CaseObjectType] = mapped_column(
@@ -1188,7 +1195,6 @@ class CaseObject(Base):
         onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
-    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     source: Mapped[CaseSource | None] = relationship("CaseSource", back_populates="objects")
     document: Mapped[Document | None] = relationship("Document", back_populates="case_objects")
