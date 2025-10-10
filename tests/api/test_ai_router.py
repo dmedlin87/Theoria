@@ -11,6 +11,7 @@ import pytest
 
 from theo.services.api.app.ai.clients import GenerationError
 from theo.services.api.app.ai.ledger import CacheRecord, SharedLedger
+from theo.services.api.app.ai import ledger as ledger_module
 from theo.services.api.app.ai.registry import LLMModel, LLMRegistry
 from theo.services.api.app.ai.router import (
     LLMRouterService,
@@ -593,6 +594,67 @@ def test_wait_for_inflight_handles_transient_absence(tmp_path):
 
     assert not errors
     assert outputs == ["shared-output"] * waiter_count
+
+
+def test_wait_for_inflight_preserves_success_until_prior_waiters_finish(
+    tmp_path, monkeypatch
+):
+    ledger_path = tmp_path / "preserved-success.db"
+    ledger = SharedLedger(str(ledger_path))
+    ledger.reset()
+    cache_key = "cache-key"
+
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+        txn.mark_inflight_success(
+            cache_key,
+            model_name="model",
+            workflow="workflow",
+            output="original-output",
+            latency_ms=10.0,
+            cost=0.1,
+        )
+
+    preserved = ledger._read_inflight(cache_key)
+    assert preserved is not None
+    assert preserved.completed_at is not None
+    preserved_completed_at = preserved.completed_at
+
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+        txn.mark_inflight_error(cache_key, "boom")
+
+    def _time_factory(start: float):
+        current = start
+
+        def _fake_time() -> float:
+            nonlocal current
+            value = current
+            current += 0.01
+            return value
+
+        return _fake_time
+
+    monkeypatch.setattr(
+        ledger_module.time,
+        "time",
+        _time_factory(preserved_completed_at + 1.0),
+    )
+    with pytest.raises(GenerationError):
+        ledger.wait_for_inflight(cache_key, poll_interval=0.0, timeout=0.1)
+
+    row_after_error = ledger._read_inflight(cache_key)
+    assert row_after_error is not None
+    assert row_after_error.output == "original-output"
+    assert row_after_error.completed_at == preserved_completed_at
+
+    monkeypatch.setattr(
+        ledger_module.time,
+        "time",
+        _time_factory(max(preserved_completed_at - 1.0, 0.0)),
+    )
+    record = ledger.wait_for_inflight(cache_key, poll_interval=0.0, timeout=0.1)
+    assert record.output == "original-output"
 
 
 def test_router_shared_spend_across_processes(tmp_path):
