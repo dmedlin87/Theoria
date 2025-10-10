@@ -24,7 +24,7 @@ from theo.services.api.app.ingest import network as network_module  # noqa: E402
 
 
 @pytest.fixture()
-def api_client(api_database):
+def api_client(api_engine):
     def _override_session():
         yield object()
 

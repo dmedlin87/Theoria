@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from theo.services.api.app.core import database as database_module  # noqa: E402
 from theo.services.api.app.core.database import (  # noqa: E402
     Base,
     configure_engine,
@@ -25,19 +26,19 @@ from theo.services.api.app.models.documents import (  # noqa: E402
 from theo.services.api.app.retriever import documents as documents_api  # noqa: E402
 
 
-def _prepare_database(tmp_path: Path) -> None:
+def _prepare_database(tmp_path: Path):
     db_path = tmp_path / "annotations.db"
     configure_engine(f"sqlite:///{db_path}")
     engine = get_engine()
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    return engine
 
 
 def test_create_annotation_persists_case_object(tmp_path) -> None:
     """Annotations are mirrored into CaseObject rows when enabled."""
 
-    _prepare_database(tmp_path)
-    engine = get_engine()
+    engine = _prepare_database(tmp_path)
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -73,3 +74,6 @@ def test_create_annotation_persists_case_object(tmp_path) -> None:
     finally:
         settings.storage_root = original_storage
         settings.case_builder_enabled = original_flag
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]

@@ -6,26 +6,28 @@ from pathlib import Path
 import sys
 
 from sqlalchemy import text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from theo.services.api.app.core import database as database_module
 from theo.services.api.app.core.database import Base, configure_engine, get_engine
 from theo.services.api.app.db.models import Document, WatchlistEvent
 
 
-def _initialise_database(db_path: Path) -> Session:
+def _initialise_database(db_path: Path) -> tuple[Session, Engine]:
     configure_engine(f"sqlite:///{db_path}")
     engine = get_engine()
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    return Session(engine)
+    return Session(engine), engine
 
 
 def test_document_window_query_uses_created_at_index(tmp_path: Path) -> None:
-    session = _initialise_database(tmp_path / "watchlist_perf.db")
+    session, engine = _initialise_database(tmp_path / "watchlist_perf.db")
     try:
         now = datetime.now(UTC)
         documents = [
@@ -51,11 +53,13 @@ def test_document_window_query_uses_created_at_index(tmp_path: Path) -> None:
         assert "SCAN documents" not in detail
     finally:
         session.close()
-        configure_engine("sqlite://")
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_watchlist_event_query_uses_run_started_index(tmp_path: Path) -> None:
-    session = _initialise_database(tmp_path / "watchlist_events_perf.db")
+    session, engine = _initialise_database(tmp_path / "watchlist_events_perf.db")
     try:
         base_time = datetime.now(UTC)
         events = [
@@ -95,4 +99,6 @@ def test_watchlist_event_query_uses_run_started_index(tmp_path: Path) -> None:
         assert "SCAN watchlist_events" not in detail
     finally:
         session.close()
-        configure_engine("sqlite://")
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]

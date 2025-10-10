@@ -52,7 +52,7 @@ def _build_package(
 
 
 @pytest.fixture
-def api_client(api_database, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def api_client(api_engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     def override_session():
         yield object()
 

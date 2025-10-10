@@ -21,8 +21,8 @@ from theo.services.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _bu
 
 
 @pytest.fixture()
-def client(api_database) -> Generator[TestClient, None, None]:
-    engine = api_database
+def client(api_engine) -> Generator[TestClient, None, None]:
+    engine = api_engine
     session_factory = sessionmaker(
         bind=engine,
         autoflush=False,

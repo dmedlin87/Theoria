@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
+from theo.services.api.app.core import database as database_module
 from theo.services.api.app.core.database import Base, configure_engine, get_engine
 from theo.services.api.app.db.models import AppSetting
 from theo.services.api.app.main import app
@@ -22,49 +23,52 @@ def test_sql_migrations_run_on_startup(tmp_path: Path, monkeypatch: pytest.Monke
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
 
-    migrations_dir = tmp_path / "migrations"
-    migrations_dir.mkdir()
-    (migrations_dir / "001_create_table.sql").write_text(
-        "CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY, value TEXT);",
-        encoding="utf-8",
-    )
-    (migrations_dir / "002_insert.sql").write_text(
-        "INSERT INTO test_table (value) VALUES ('alpha');",
-        encoding="utf-8",
-    )
+    try:
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        (migrations_dir / "001_create_table.sql").write_text(
+            "CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY, value TEXT);",
+            encoding="utf-8",
+        )
+        (migrations_dir / "002_insert.sql").write_text(
+            "INSERT INTO test_table (value) VALUES ('alpha');",
+            encoding="utf-8",
+        )
 
-    migrations_module = importlib.import_module(
-        "theo.services.api.app.db.run_sql_migrations"
-    )
+        migrations_module = importlib.import_module(
+            "theo.services.api.app.db.run_sql_migrations"
+        )
 
-    monkeypatch.setattr(migrations_module, "MIGRATIONS_PATH", migrations_dir)
-    monkeypatch.setattr(engine.dialect, "name", "postgresql", raising=False)
+        monkeypatch.setattr(migrations_module, "MIGRATIONS_PATH", migrations_dir)
+        monkeypatch.setattr(engine.dialect, "name", "postgresql", raising=False)
 
-    executed_statements: list[str] = []
+        executed_statements: list[str] = []
 
-    @event.listens_for(engine, "before_cursor_execute")
-    def _capture_sql(_, __, statement, *___) -> None:
-        if "test_table" in statement:
-            executed_statements.append(statement.strip())
+        @event.listens_for(engine, "before_cursor_execute")
+        def _capture_sql(_, __, statement, *___) -> None:
+            if "test_table" in statement:
+                executed_statements.append(statement.strip())
 
-    with TestClient(app):
-        pass
+        with TestClient(app):
+            pass
 
-    assert any("CREATE TABLE IF NOT EXISTS test_table" in stmt for stmt in executed_statements)
-    assert any("INSERT INTO test_table" in stmt for stmt in executed_statements)
+        assert any("CREATE TABLE IF NOT EXISTS test_table" in stmt for stmt in executed_statements)
+        assert any("INSERT INTO test_table" in stmt for stmt in executed_statements)
 
-    with Session(engine) as session:
-        assert session.get(AppSetting, "db:migration:001_create_table.sql") is not None
-        assert session.get(AppSetting, "db:migration:002_insert.sql") is not None
+        with Session(engine) as session:
+            assert session.get(AppSetting, "db:migration:001_create_table.sql") is not None
+            assert session.get(AppSetting, "db:migration:002_insert.sql") is not None
 
-    executed_statements.clear()
+        executed_statements.clear()
 
-    with TestClient(app):
-        pass
+        with TestClient(app):
+            pass
 
-    assert not any("INSERT INTO test_table" in stmt for stmt in executed_statements)
-
-    configure_engine("sqlite://")
+        assert not any("INSERT INTO test_table" in stmt for stmt in executed_statements)
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_cli_entry_point_invokes_runner(
