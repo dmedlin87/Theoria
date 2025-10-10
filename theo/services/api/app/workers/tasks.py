@@ -206,7 +206,7 @@ def validate_citations(
                         CITATION_DRIFT_EVENTS.labels(status="failed").inc()
                         continue
 
-                    expected_citations = rag._build_citations(results)
+                    expected_citations = rag.build_citations(results)
                     if not expected_citations:
                         logger.warning(
                             "Citation validation missing retrieval citations",
@@ -227,7 +227,7 @@ def validate_citations(
                     completion = _compose_cached_completion(entry, cached_citations)
 
                     try:
-                        rag._validate_model_completion(completion, expected_citations)
+                        rag.validate_model_completion(completion, expected_citations)
                     except GuardrailError as exc:
                         error_message = str(exc)
                         logger.warning(

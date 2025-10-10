@@ -6,8 +6,15 @@ import sys
 import types
 
 from . import guardrails as _guardrails_module
+from . import guardrail_helpers as _guardrail_helpers_module
+from . import retrieval as _retrieval_module
 from . import workflow as _workflow_module
-from .guardrails import GuardrailError, ensure_completion_safe
+from .guardrail_helpers import (
+    GuardrailError,
+    build_citations,
+    ensure_completion_safe,
+    validate_model_completion,
+)
 from ...telemetry import instrument_workflow
 from ..registry import get_llm_registry
 from .models import (
@@ -21,11 +28,11 @@ from .models import (
     SermonPrepResponse,
     VerseCopilotResponse,
 )
+from .retrieval import record_used_citation_feedback, search_passages
 from .workflow import (
     REFUSAL_MESSAGE,
     REFUSAL_MODEL_NAME,
-    _build_citations,
-    _validate_model_completion,
+    _guarded_answer,
     build_guardrail_refusal,
     build_sermon_deliverable,
     build_sermon_prep_package,
@@ -39,9 +46,6 @@ from .workflow import (
     run_corpus_curation,
     run_guarded_chat,
     run_research_reconciliation,
-    _record_used_citation_feedback,
-    _guarded_answer,
-    _search,
 )
 
 __all__ = [
@@ -55,8 +59,9 @@ __all__ = [
     "RAGCitation",
     "REFUSAL_MESSAGE",
     "REFUSAL_MODEL_NAME",
-    "_build_citations",
-    "_validate_model_completion",
+    "_guarded_answer",
+    "build_citations",
+    "validate_model_completion",
     "ensure_completion_safe",
     "SermonPrepResponse",
     "VerseCopilotResponse",
@@ -75,9 +80,8 @@ __all__ = [
     "run_corpus_curation",
     "run_guarded_chat",
     "run_research_reconciliation",
-    "_record_used_citation_feedback",
-    "_guarded_answer",
-    "_search",
+    "record_used_citation_feedback",
+    "search_passages",
 ]
 
 
@@ -89,6 +93,10 @@ class _RAGModule(types.ModuleType):
             setattr(_workflow_module, name, value)
         if hasattr(_guardrails_module, name):
             setattr(_guardrails_module, name, value)
+        if hasattr(_guardrail_helpers_module, name):
+            setattr(_guardrail_helpers_module, name, value)
+        if hasattr(_retrieval_module, name):
+            setattr(_retrieval_module, name, value)
         super().__setattr__(name, value)
 
 
