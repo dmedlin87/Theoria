@@ -143,11 +143,17 @@ def _discover_items(
 def _walk_folder(
     path: Path, allowlist: tuple[Path, ...] | None = None
 ) -> Iterator[IngestItem]:
-    candidates: Iterable[Path]
     if path.is_file():
-        candidates = [path]
+        candidates: Iterable[Path] = [path]
     else:
-        candidates = sorted(p for p in path.rglob("*") if _is_supported(p))
+        def _iter_files() -> Iterator[Path]:
+            for root, _dirnames, filenames in os.walk(path, followlinks=False):
+                root_path = Path(root)
+                for filename in filenames:
+                    yield root_path / filename
+
+        candidates = _iter_files()
+
     for candidate in candidates:
         if not _is_within_allowlist(candidate, allowlist):
             continue
