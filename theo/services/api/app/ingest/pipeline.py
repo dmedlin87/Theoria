@@ -53,12 +53,15 @@ from .persistence import (
 _resolve_host_addresses = ingest_network.resolve_host_addresses
 
 # Legacy alias retained for older tests/hooks that patch the private helper.
+# Keep this close to the imports so reloads and import * behaviour keep the
+# attribute available for existing integrations.
 _parse_text_file = parse_text_file
 
 
 __all__ = [
     "PipelineDependencies",
     "_parse_text_file",
+    "parse_text_file",
     "_refresh_creator_verse_rollups",
     "build_opener",
     "ensure_url_allowed",
