@@ -482,12 +482,10 @@ class SharedLedger:
             if row.status == "success":
                 return _row_to_record(row)
             if row.status == "error":
-                has_preserved_completion = (
-                    row.output is not None and row.completed_at is not None
-                )
-                if has_preserved_completion and row.completed_at >= start:
+                preserved_completion = row.completed_at
+                if preserved_completion is not None and preserved_completion >= start:
                     return _row_to_record(row)
-                if not has_preserved_completion:
+                if preserved_completion is None:
                     with self.transaction() as txn:
                         txn.clear_single_inflight(cache_key)
                 # Preserve the inflight row so earlier waiters that began
