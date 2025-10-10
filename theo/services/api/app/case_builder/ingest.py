@@ -1,0 +1,236 @@
+"""Utilities for mirroring ingested artifacts into the Case Builder store."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Sequence
+
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from ..core.settings import Settings, get_settings
+from ..db.models import (
+    CaseObject,
+    CaseObjectType,
+    CaseSource,
+    Document,
+    Passage,
+)
+
+
+def _feature_enabled(settings: Settings | None = None) -> bool:
+    """Return ``True`` when Case Builder ingestion should run."""
+
+    settings = settings or get_settings()
+    return bool(getattr(settings, "case_builder_enabled", False))
+
+
+def _extract_osis_ranges(passage: Passage) -> list[str]:
+    osis_refs: list[str] = []
+    if passage.osis_ref:
+        osis_refs.append(passage.osis_ref)
+    meta = getattr(passage, "meta", None)
+    if isinstance(meta, dict):
+        raw_refs = meta.get("osis_refs_all")
+        if isinstance(raw_refs, (list, tuple)):
+            osis_refs.extend(str(item) for item in raw_refs if item)
+    return sorted({ref for ref in osis_refs if ref})
+
+
+def _extract_stability(passage: Passage) -> float | None:
+    meta = getattr(passage, "meta", None)
+    if isinstance(meta, dict):
+        stability = meta.get("stability")
+        if stability is None:
+            stability = meta.get("stability_score")
+        if stability is not None:
+            try:
+                return float(stability)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _build_passage_metadata(passage: Passage) -> dict | None:
+    meta = getattr(passage, "meta", None)
+    if isinstance(meta, dict):
+        # ``meta`` may be a custom mapping type – coerce to plain ``dict``.
+        try:
+            return dict(meta)
+        except TypeError:
+            return {key: meta[key] for key in meta.keys()}  # type: ignore[index]
+    return None
+
+
+def _source_meta(document: Document) -> dict | None:
+    payload: dict[str, object] = {}
+    if document.authors:
+        payload["authors"] = list(document.authors)
+    if document.collection:
+        payload["collection"] = document.collection
+    if document.topics:
+        payload["topics"] = document.topics
+    if document.topic_domains:
+        payload["topic_domains"] = document.topic_domains
+    if document.channel:
+        payload["channel"] = document.channel
+    if document.video_id:
+        payload["video_id"] = document.video_id
+    if document.duration_seconds is not None:
+        payload["duration_seconds"] = document.duration_seconds
+    if not payload:
+        return None
+    return payload
+
+
+def _get_or_create_source(session: Session, document: Document) -> CaseSource | None:
+    existing = (
+        session.query(CaseSource)
+        .filter(CaseSource.document_id == document.id)
+        .one_or_none()
+    )
+    if existing is not None:
+        updated = False
+        author = None
+        if document.authors:
+            author = document.authors[0]
+        if author and existing.author != author:
+            existing.author = author
+            updated = True
+        if document.year and existing.year != document.year:
+            existing.year = document.year
+            updated = True
+        if document.source_url and existing.url != document.source_url:
+            existing.url = document.source_url
+            updated = True
+        if document.source_type and existing.modality != document.source_type:
+            existing.modality = document.source_type
+            updated = True
+        meta = _source_meta(document)
+        if meta != existing.meta:
+            existing.meta = meta
+            updated = True
+        if updated:
+            existing.updated_at = datetime.now(UTC)
+        return existing
+
+    author = None
+    if document.authors:
+        author = document.authors[0]
+    source = CaseSource(
+        document_id=document.id,
+        origin=document.collection,
+        author=author,
+        year=document.year,
+        url=document.source_url,
+        modality=document.source_type,
+        meta=_source_meta(document),
+    )
+    session.add(source)
+    session.flush()
+    return source
+
+
+def _sanitise_channel(name: str) -> str:
+    if not name:
+        return "case_objects_changed"
+    cleaned = name.strip()
+    if not cleaned:
+        return "case_objects_changed"
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+    if not set(cleaned) <= allowed:
+        return "case_objects_changed"
+    return cleaned
+
+
+def _notify_new_objects(
+    session: Session,
+    object_ids: Sequence[str],
+    settings: Settings,
+) -> None:
+    if not object_ids:
+        return
+    bind = session.get_bind()
+    if bind is None or bind.dialect.name != "postgresql":
+        return
+    channel = _sanitise_channel(getattr(settings, "case_builder_notify_channel", "case_objects_changed"))
+    statement = text(f"NOTIFY {channel}, :payload")
+    for object_id in object_ids:
+        session.execute(statement, {"payload": object_id})
+
+
+def sync_case_objects_for_document(
+    session: Session,
+    *,
+    document: Document,
+    passages: Sequence[Passage],
+    settings: Settings | None = None,
+) -> list[CaseObject]:
+    """Ensure Case Builder records exist for *document* and its *passages*."""
+
+    settings = settings or get_settings()
+    if not _feature_enabled(settings):
+        return []
+
+    if not passages:
+        return []
+
+    source = _get_or_create_source(session, document)
+
+    topic_tags: list[str] = []
+    if document.topic_domains:
+        topic_tags.extend(str(tag) for tag in document.topic_domains if tag)
+    if document.topics:
+        topic_tags.extend(str(tag) for tag in document.topics if tag)
+
+    created_objects: list[CaseObject] = []
+    for passage in passages:
+        existing = (
+            session.query(CaseObject)
+            .filter(CaseObject.passage_id == passage.id)
+            .one_or_none()
+        )
+
+        osis_ranges = _extract_osis_ranges(passage)
+        meta = _build_passage_metadata(passage)
+        stability = _extract_stability(passage)
+
+        if existing is None:
+            case_object = CaseObject(
+                source_id=source.id if source else None,
+                document_id=document.id,
+                passage_id=passage.id,
+                object_type=CaseObjectType.PASSAGE,
+                title=document.title,
+                body=passage.text,
+                osis_ranges=osis_ranges or None,
+                modality=document.source_type,
+                tags=topic_tags or None,
+                embedding=passage.embedding,
+                stability=stability,
+                meta=meta,
+                published_at=document.pub_date,
+            )
+            session.add(case_object)
+            created_objects.append(case_object)
+        else:
+            existing.source_id = source.id if source else existing.source_id
+            existing.title = document.title
+            existing.body = passage.text
+            existing.osis_ranges = osis_ranges or None
+            existing.modality = document.source_type
+            existing.tags = topic_tags or None
+            existing.embedding = passage.embedding
+            existing.stability = stability
+            existing.meta = meta
+            existing.published_at = document.pub_date
+            existing.updated_at = datetime.now(UTC)
+            session.add(existing)
+
+    session.flush()
+    if created_objects:
+        _notify_new_objects(session, [obj.id for obj in created_objects], settings)
+    return created_objects
+
+
+__all__ = ["sync_case_objects_for_document"]

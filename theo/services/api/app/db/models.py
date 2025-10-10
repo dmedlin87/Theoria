@@ -1043,6 +1043,293 @@ class GeoPlace(Base):
     )
 
 
+class CaseObjectType(str, Enum):
+    """Enumeration of object kinds mirrored into the Case Builder."""
+
+    PASSAGE = "passage"
+    NOTE = "note"
+    CLAIM = "claim"
+    EVIDENCE = "evidence"
+
+
+class CaseEdgeKind(str, Enum):
+    """Types of relationships between Case Builder objects."""
+
+    SEMANTIC_SIM = "semantic_sim"
+    CO_CITATION = "co_citation"
+    VERSE_OVERLAP = "verse_overlap"
+    TOPIC_OVERLAP = "topic_overlap"
+    CONTRADICTION = "contradiction"
+
+
+class CaseInsightType(str, Enum):
+    """Insight categories emitted by the Case Builder."""
+
+    CONVERGENCE = "convergence"
+    COLLISION = "collision"
+    LEAD = "lead"
+    BUNDLE = "bundle"
+
+
+class CaseUserActionType(str, Enum):
+    """Actions an analyst can take on a Case Builder insight."""
+
+    ACCEPT = "accept"
+    SNOOZE = "snooze"
+    DISCARD = "discard"
+    PIN = "pin"
+    MUTE = "mute"
+
+
+class CaseSource(Base):
+    """Normalized source metadata backing Case Builder objects."""
+
+    __tablename__ = "case_sources"
+    __table_args__ = (
+        Index("ix_case_sources_document_id", "document_id"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    document_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        unique=True,
+        nullable=True,
+    )
+    origin: Mapped[str | None] = mapped_column(String, nullable=True)
+    author: Mapped[str | None] = mapped_column(String, nullable=True)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
+    modality: Mapped[str | None] = mapped_column(String, nullable=True)
+    meta: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    document: Mapped[Document | None] = relationship("Document")
+    objects: Mapped[list["CaseObject"]] = relationship(
+        "CaseObject",
+        back_populates="source",
+    )
+
+
+class CaseObject(Base):
+    """Evidence object evaluated by the Case Builder pipeline."""
+
+    __tablename__ = "case_objects"
+    __table_args__ = (
+        Index("ix_case_objects_source_id", "source_id"),
+        Index("ix_case_objects_document_id", "document_id"),
+        Index("ix_case_objects_created_at", "created_at"),
+        UniqueConstraint("passage_id", name="uq_case_objects_passage_id"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    source_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("case_sources.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    document_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    passage_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("passages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    object_type: Mapped[CaseObjectType] = mapped_column(
+        SQLEnum(CaseObjectType, name="case_object_type"),
+        nullable=False,
+        default=CaseObjectType.PASSAGE,
+    )
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    osis_ranges: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    modality: Mapped[str | None] = mapped_column(String, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        VectorType(get_settings().embedding_dim), nullable=True
+    )
+    stability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    source: Mapped[CaseSource | None] = relationship(
+        "CaseSource", back_populates="objects"
+    )
+    document: Mapped[Document | None] = relationship("Document")
+    passage: Mapped[Passage | None] = relationship("Passage")
+    outgoing_edges: Mapped[list["CaseEdge"]] = relationship(
+        "CaseEdge",
+        back_populates="src_object",
+        cascade="all, delete-orphan",
+        foreign_keys="CaseEdge.src_object_id",
+    )
+    incoming_edges: Mapped[list["CaseEdge"]] = relationship(
+        "CaseEdge",
+        back_populates="dst_object",
+        cascade="all, delete-orphan",
+        foreign_keys="CaseEdge.dst_object_id",
+    )
+    insights: Mapped[list["CaseInsight"]] = relationship(
+        "CaseInsight",
+        back_populates="primary_object",
+    )
+
+
+class CaseEdge(Base):
+    """Property-graph edge captured between Case Builder objects."""
+
+    __tablename__ = "case_edges"
+    __table_args__ = (
+        Index("ix_case_edges_src", "src_object_id"),
+        Index("ix_case_edges_dst", "dst_object_id"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    src_object_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("case_objects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    dst_object_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("case_objects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[CaseEdgeKind] = mapped_column(
+        SQLEnum(CaseEdgeKind, name="case_edge_kind"), nullable=False
+    )
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    features: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    src_object: Mapped[CaseObject] = relationship(
+        "CaseObject",
+        foreign_keys=[src_object_id],
+        back_populates="outgoing_edges",
+    )
+    dst_object: Mapped[CaseObject] = relationship(
+        "CaseObject",
+        foreign_keys=[dst_object_id],
+        back_populates="incoming_edges",
+    )
+
+
+class CaseInsight(Base):
+    """Insight record emitted by the Case Builder pipeline."""
+
+    __tablename__ = "case_insights"
+    __table_args__ = (
+        Index("ix_case_insights_type", "insight_type"),
+        Index("ix_case_insights_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    primary_object_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("case_objects.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    insight_type: Mapped[CaseInsightType] = mapped_column(
+        SQLEnum(CaseInsightType, name="case_insight_type"),
+        nullable=False,
+    )
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cluster_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    primary_object: Mapped[CaseObject | None] = relationship(
+        "CaseObject", back_populates="insights"
+    )
+    user_actions: Mapped[list["CaseUserAction"]] = relationship(
+        "CaseUserAction",
+        back_populates="insight",
+        cascade="all, delete-orphan",
+    )
+
+
+class CaseUserAction(Base):
+    """Analyst feedback captured for Case Builder insights."""
+
+    __tablename__ = "case_user_actions"
+    __table_args__ = (
+        Index("ix_case_user_actions_insight", "insight_id"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    insight_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("case_insights.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    action: Mapped[CaseUserActionType] = mapped_column(
+        SQLEnum(CaseUserActionType, name="case_user_action_type"), nullable=False
+    )
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    insight: Mapped[CaseInsight] = relationship(
+        "CaseInsight", back_populates="user_actions"
+    )
+
+
 __all__ = [
     "Document",
     "Passage",
@@ -1064,4 +1351,13 @@ __all__ = [
     "GeoGeometry",
     "GeoImage",
     "GeoPlace",
+    "CaseSource",
+    "CaseObject",
+    "CaseEdge",
+    "CaseInsight",
+    "CaseUserAction",
+    "CaseObjectType",
+    "CaseEdgeKind",
+    "CaseInsightType",
+    "CaseUserActionType",
 ]
