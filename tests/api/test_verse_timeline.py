@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from theo.services.api.app.core import database as database_module  # noqa: E402
 from theo.services.api.app.core.database import (  # noqa: E402  # import after path tweak
     Base,
     configure_engine,
@@ -77,9 +78,14 @@ def _seed_documents(session: Session) -> None:
 @contextmanager
 def _seeded_session(tmp_path: Path):
     engine = _prepare_engine(tmp_path)
-    with Session(engine) as session:
-        _seed_documents(session)
-        yield session
+    try:
+        with Session(engine) as session:
+            _seed_documents(session)
+            yield session
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_get_verse_timeline_groups_mentions_by_month(tmp_path) -> None:
@@ -141,57 +147,67 @@ def test_get_verse_timeline_respects_limit(tmp_path) -> None:
 
 def test_get_verse_timeline_rejects_invalid_window(tmp_path) -> None:
     engine = _prepare_engine(tmp_path)
-    with Session(engine) as session:
-        _seed_documents(session)
+    try:
+        with Session(engine) as session:
+            _seed_documents(session)
 
-        with pytest.raises(ValueError):
-            get_verse_timeline(session=session, osis="John.3.16", window="invalid")  # type: ignore[arg-type]
+            with pytest.raises(ValueError):
+                get_verse_timeline(session=session, osis="John.3.16", window="invalid")  # type: ignore[arg-type]
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_get_verse_timeline_filters_by_author_for_week_window(tmp_path) -> None:
     engine = _prepare_engine(tmp_path)
-    with Session(engine) as session:
-        documents = [
-            Document(
-                id="multi-1",
-                title="Week One",
-                source_type="pdf",
-                authors=["Alice", "Bob"],
-                pub_date=date(2023, 1, 2),
-            ),
-            Document(
-                id="multi-2",
-                title="Week Two",
-                source_type="pdf",
-                authors=["Bob"],
-                pub_date=date(2023, 1, 9),
-            ),
-            Document(
-                id="multi-3",
-                title="Week Three",
-                source_type="pdf",
-                authors=["Alice"],
-                pub_date=date(2023, 1, 16),
-            ),
-        ]
+    try:
+        with Session(engine) as session:
+            documents = [
+                Document(
+                    id="multi-1",
+                    title="Week One",
+                    source_type="pdf",
+                    authors=["Alice", "Bob"],
+                    pub_date=date(2023, 1, 2),
+                ),
+                Document(
+                    id="multi-2",
+                    title="Week Two",
+                    source_type="pdf",
+                    authors=["Bob"],
+                    pub_date=date(2023, 1, 9),
+                ),
+                Document(
+                    id="multi-3",
+                    title="Week Three",
+                    source_type="pdf",
+                    authors=["Alice"],
+                    pub_date=date(2023, 1, 16),
+                ),
+            ]
 
-        session.add_all(documents)
-        session.flush()
+            session.add_all(documents)
+            session.flush()
 
-        passages = [
-            Passage(id="multi-p1", document_id="multi-1", text="Ref", osis_ref="John.3.16"),
-            Passage(id="multi-p2", document_id="multi-2", text="Ref", osis_ref="John.3.16"),
-            Passage(id="multi-p3", document_id="multi-3", text="Ref", osis_ref="John.3.16"),
-        ]
-        session.add_all(passages)
-        session.commit()
+            passages = [
+                Passage(id="multi-p1", document_id="multi-1", text="Ref", osis_ref="John.3.16"),
+                Passage(id="multi-p2", document_id="multi-2", text="Ref", osis_ref="John.3.16"),
+                Passage(id="multi-p3", document_id="multi-3", text="Ref", osis_ref="John.3.16"),
+            ]
+            session.add_all(passages)
+            session.commit()
 
-        timeline = get_verse_timeline(
-            session=session,
-            osis="John.3.16",
-            window="week",
-            filters=VerseMentionsFilters(author="Alice"),
-        )
+            timeline = get_verse_timeline(
+                session=session,
+                osis="John.3.16",
+                window="week",
+                filters=VerseMentionsFilters(author="Alice"),
+            )
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
     assert timeline.window == "week"
     assert timeline.total_mentions == 2

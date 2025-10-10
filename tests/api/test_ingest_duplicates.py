@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from theo.services.api.app.core import database as database_module  # noqa: E402
 from theo.services.api.app.core.database import (  # noqa: E402
     Base,
     configure_engine,
@@ -48,6 +49,9 @@ def ingest_client(tmp_path: Path):
     finally:
         app.dependency_overrides.pop(get_session, None)
         settings.storage_root = original_storage
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_duplicate_file_ingest_returns_400(ingest_client):

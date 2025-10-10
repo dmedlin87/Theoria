@@ -94,17 +94,20 @@ def _disable_migrations(
 
 
 @pytest.fixture()
-def api_database(tmp_path_factory: pytest.TempPathFactory):
-    """Configure an isolated SQLite database for API tests."""
+def api_engine(tmp_path_factory: pytest.TempPathFactory):
+    """Configure and tear down an isolated SQLite engine for API tests."""
 
     database_path = tmp_path_factory.mktemp("db") / "api.sqlite"
-    engine = configure_engine(f"sqlite:///{database_path}")
+    configure_engine(f"sqlite:///{database_path}")
     Base.metadata.create_all(bind=get_engine())
+
+    engine = get_engine()
 
     try:
         yield engine
     finally:
-        engine.dispose()
+        if engine is not None:
+            engine.dispose()
         database_module._engine = None  # type: ignore[attr-defined]
         database_module._SessionLocal = None  # type: ignore[attr-defined]
 

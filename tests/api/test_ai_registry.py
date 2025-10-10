@@ -32,6 +32,9 @@ from theo.services.api.app.ai.registry import (  # noqa: E402
     get_llm_registry,
     save_llm_registry,
 )
+from sqlalchemy.engine import Engine
+
+from theo.services.api.app.core import database as database_module  # noqa: E402
 from theo.services.api.app.core.database import (  # noqa: E402
     Base,
     configure_engine,
@@ -63,7 +66,7 @@ def _reset_settings(monkeypatch):
     get_settings_cipher.cache_clear()
 
 
-def _prepare_engine(tmp_path: Path):
+def _prepare_engine(tmp_path: Path) -> Engine:
     configure_engine(f"sqlite:///{tmp_path / 'llm.db'}")
     engine = get_engine()
     Base.metadata.drop_all(engine)
@@ -115,17 +118,25 @@ def api_client(tmp_path: Path) -> Iterator[TestClient]:
             yield test_client
     finally:
         app.dependency_overrides.pop(get_session, None)
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_settings_store_encrypts_and_decrypts(tmp_path: Path) -> None:
     engine = _prepare_engine(tmp_path)
-    with Session(engine) as session:
-        save_setting(session, "secrets", {"token": "value"})
-        record = session.get(AppSetting, "app:secrets")
-        assert record is not None
-        assert isinstance(record.value, dict)
-        assert "__encrypted__" in record.value
-        assert load_setting(session, "secrets") == {"token": "value"}
+    try:
+        with Session(engine) as session:
+            save_setting(session, "secrets", {"token": "value"})
+            record = session.get(AppSetting, "app:secrets")
+            assert record is not None
+            assert isinstance(record.value, dict)
+            assert "__encrypted__" in record.value
+            assert load_setting(session, "secrets") == {"token": "value"}
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_registry_encrypts_api_keys_and_migrates_plaintext(tmp_path: Path) -> None:
@@ -141,23 +152,28 @@ def test_registry_encrypts_api_keys_and_migrates_plaintext(tmp_path: Path) -> No
             }
         ],
     }
-    with Session(engine) as session:
-        session.add(AppSetting(key="app:llm", value=payload))
-        session.commit()
+    try:
+        with Session(engine) as session:
+            session.add(AppSetting(key="app:llm", value=payload))
+            session.commit()
 
-        registry = get_llm_registry(session)
-        model = registry.get("anthropic")
-        assert model.config["api_key"] == "plain-key"
+            registry = get_llm_registry(session)
+            model = registry.get("anthropic")
+            assert model.config["api_key"] == "plain-key"
 
-        record = session.get(AppSetting, "app:llm")
-        assert record is not None
-        assert isinstance(record.value, dict)
-        assert "__encrypted__" in record.value
+            record = session.get(AppSetting, "app:llm")
+            assert record is not None
+            assert isinstance(record.value, dict)
+            assert "__encrypted__" in record.value
 
-        serialized = registry.serialize()
-        stored_config = serialized["models"][0]["config"]["api_key"]
-        assert isinstance(stored_config, dict)
-        assert "__encrypted__" in stored_config
+            serialized = registry.serialize()
+            stored_config = serialized["models"][0]["config"]["api_key"]
+            assert isinstance(stored_config, dict)
+            assert "__encrypted__" in stored_config
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_migrate_plaintext_settings_reencrypts(tmp_path: Path) -> None:
@@ -180,72 +196,77 @@ def test_migrate_plaintext_settings_reencrypts(tmp_path: Path) -> None:
         }
     }
 
-    with Session(engine) as session:
-        session.add(AppSetting(key="app:llm", value=llm_payload))
-        session.add(AppSetting(key="app:ai_providers", value=provider_payload))
-        session.commit()
+    try:
+        with Session(engine) as session:
+            session.add(AppSetting(key="app:llm", value=llm_payload))
+            session.add(AppSetting(key="app:ai_providers", value=provider_payload))
+            session.commit()
 
-        migrated = migrate_secret_settings(session)
-        assert set(migrated) == {"llm", "ai_providers"}
+            migrated = migrate_secret_settings(session)
+            assert set(migrated) == {"llm", "ai_providers"}
 
-        llm_record = session.get(AppSetting, "app:llm")
-        assert llm_record is not None
-        assert isinstance(llm_record.value, dict)
-        assert "__encrypted__" in llm_record.value
+            llm_record = session.get(AppSetting, "app:llm")
+            assert llm_record is not None
+            assert isinstance(llm_record.value, dict)
+            assert "__encrypted__" in llm_record.value
 
-        provider_record = session.get(AppSetting, "app:ai_providers")
-        assert provider_record is not None
-        assert isinstance(provider_record.value, dict)
-        assert "__encrypted__" in provider_record.value
+            provider_record = session.get(AppSetting, "app:ai_providers")
+            assert provider_record is not None
+            assert isinstance(provider_record.value, dict)
+            assert "__encrypted__" in provider_record.value
 
-        registry = get_llm_registry(session)
-        model = registry.get("anthropic")
-        assert model.config["api_key"] == "plain-key"
+            registry = get_llm_registry(session)
+            model = registry.get("anthropic")
+            assert model.config["api_key"] == "plain-key"
 
-        providers = load_setting(session, "ai_providers")
-        assert providers is not None
-        assert providers["openai"]["api_key"] == "provider-secret"
+            providers = load_setting(session, "ai_providers")
+            assert providers is not None
+            assert providers["openai"]["api_key"] == "provider-secret"
 
-        registry.add_model(
-            LLMModel(
-                name="azure",
-                provider="azure",
-                model="gpt-4o",
-                config={
-                    "api_key": "new-secret",
-                    "endpoint": "https://example.azure.com",
-                    "deployment": "prod",
+            registry.add_model(
+                LLMModel(
+                    name="azure",
+                    provider="azure",
+                    model="gpt-4o",
+                    config={
+                        "api_key": "new-secret",
+                        "endpoint": "https://example.azure.com",
+                        "deployment": "prod",
+                    },
+                )
+            )
+            save_llm_registry(session, registry)
+
+            save_setting(
+                session,
+                "ai_providers",
+                {
+                    "openai": {
+                        "api_key": "rotated",
+                        "base_url": "https://api.openai.example",
+                    }
                 },
             )
-        )
-        save_llm_registry(session, registry)
 
-        save_setting(
-            session,
-            "ai_providers",
-            {
-                "openai": {
-                    "api_key": "rotated",
-                    "base_url": "https://api.openai.example",
-                }
-            },
-        )
+            session.expire_all()
 
-        session.expire_all()
+            llm_record = session.get(AppSetting, "app:llm")
+            assert llm_record is not None
+            assert isinstance(llm_record.value, dict)
+            assert "__encrypted__" in llm_record.value
 
-        llm_record = session.get(AppSetting, "app:llm")
-        assert llm_record is not None
-        assert isinstance(llm_record.value, dict)
-        assert "__encrypted__" in llm_record.value
+            provider_record = session.get(AppSetting, "app:ai_providers")
+            assert provider_record is not None
+            assert isinstance(provider_record.value, dict)
+            assert "__encrypted__" in provider_record.value
 
-        provider_record = session.get(AppSetting, "app:ai_providers")
-        assert provider_record is not None
-        assert isinstance(provider_record.value, dict)
-        assert "__encrypted__" in provider_record.value
-
-        providers = load_setting(session, "ai_providers")
-        assert providers is not None
-        assert providers["openai"]["api_key"] == "rotated"
+            providers = load_setting(session, "ai_providers")
+            assert providers is not None
+            assert providers["openai"]["api_key"] == "rotated"
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize(
@@ -288,26 +309,31 @@ def test_build_client_dispatch(provider, config, expected) -> None:
 
 def test_registry_persists_model_metadata(tmp_path: Path) -> None:
     engine = _prepare_engine(tmp_path)
-    with Session(engine) as session:
-        registry = get_llm_registry(session)
-        model = LLMModel(
-            name="primary",
-            provider="echo",
-            model="echo",
-            config={"suffix": "[ok]"},
-            pricing={"per_call": 0.5},
-            latency={"p95": 1200},
-            routing={"spend_ceiling": 5.0, "weight": 2.5},
-        )
-        registry.add_model(model, make_default=True)
-        save_llm_registry(session, registry)
-        session.expire_all()
+    try:
+        with Session(engine) as session:
+            registry = get_llm_registry(session)
+            model = LLMModel(
+                name="primary",
+                provider="echo",
+                model="echo",
+                config={"suffix": "[ok]"},
+                pricing={"per_call": 0.5},
+                latency={"p95": 1200},
+                routing={"spend_ceiling": 5.0, "weight": 2.5},
+            )
+            registry.add_model(model, make_default=True)
+            save_llm_registry(session, registry)
+            session.expire_all()
 
-        reloaded = get_llm_registry(session)
-        loaded = reloaded.get("primary")
-        assert loaded.pricing["per_call"] == 0.5
-        assert loaded.latency["p95"] == 1200
-        assert loaded.routing["spend_ceiling"] == 5.0
+            reloaded = get_llm_registry(session)
+            loaded = reloaded.get("primary")
+            assert loaded.pricing["per_call"] == 0.5
+            assert loaded.latency["p95"] == 1200
+            assert loaded.routing["spend_ceiling"] == 5.0
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def test_llm_routes_persist_metadata(api_client: TestClient) -> None:

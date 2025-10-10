@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from theo.services.api.app.core import database as database_module
 from theo.services.api.app.core.database import (  # noqa: E402  (import after path tweak)
     Base,
     configure_engine,
@@ -28,18 +29,23 @@ def test_repro_enqueue_job_runtime_error(monkeypatch, tmp_path) -> None:
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
 
-    class DummyResult:
-        id = "dummy-task-id"
+    try:
+        class DummyResult:
+            id = "dummy-task-id"
 
-    def fake_send_task(task_name: str, kwargs: dict | None = None, eta=None):
-        return DummyResult()
+        def fake_send_task(task_name: str, kwargs: dict | None = None, eta=None):
+            return DummyResult()
 
-    monkeypatch.setattr(jobs_module.celery, "send_task", fake_send_task)
+        monkeypatch.setattr(jobs_module.celery, "send_task", fake_send_task)
 
-    with TestClient(app, raise_server_exceptions=False) as client:
-        response = client.post(
-            "/jobs/enqueue",
-            json={"task": "tests.example", "args": {"foo": "bar"}},
-        )
+        with TestClient(app, raise_server_exceptions=False) as client:
+            response = client.post(
+                "/jobs/enqueue",
+                json={"task": "tests.example", "args": {"foo": "bar"}},
+            )
 
-    assert response.status_code == 202, response.text
+        assert response.status_code == 202, response.text
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
