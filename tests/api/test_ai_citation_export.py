@@ -7,29 +7,28 @@ import sys
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.core.database import Base, get_session
+from theo.services.api.app.core.database import get_session
 from theo.services.api.app.db.models import Document, Passage
 from theo.services.api.app.main import app
 from theo.services.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _build_csl_entry
 
 
 @pytest.fixture()
-def client() -> Generator[TestClient, None, None]:
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+def client(api_database) -> Generator[TestClient, None, None]:
+    engine = api_database
+    session_factory = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
     )
-    TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-    Base.metadata.create_all(bind=engine)
 
     with Session(engine) as session:
         document = Document(
@@ -59,7 +58,7 @@ def client() -> Generator[TestClient, None, None]:
         session.commit()
 
     def _override_session() -> Generator[Session, None, None]:
-        db_session = TestingSession()
+        db_session = session_factory()
         try:
             yield db_session
         finally:
@@ -71,8 +70,6 @@ def client() -> Generator[TestClient, None, None]:
             yield test_client
     finally:
         app.dependency_overrides.pop(get_session, None)
-        Base.metadata.drop_all(bind=engine)
-        engine.dispose()
 
 
 def test_export_citations_returns_csl_payload(client: TestClient) -> None:

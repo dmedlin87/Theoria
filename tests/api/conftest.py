@@ -19,7 +19,8 @@ from sqlalchemy import inspect as sa_inspect
 
 from theo.services.api.app.main import app
 from theo.services.api.app.db import run_sql_migrations as migrations_module
-from theo.services.api.app.core.database import get_engine
+from theo.services.api.app.core import database as database_module
+from theo.services.api.app.core.database import Base, configure_engine, get_engine
 from theo.services.api.app.security import require_principal
 
 @pytest.fixture(autouse=True)
@@ -90,4 +91,20 @@ def _disable_migrations(
     )
 
     yield
+
+
+@pytest.fixture()
+def api_database(tmp_path_factory: pytest.TempPathFactory):
+    """Configure an isolated SQLite database for API tests."""
+
+    database_path = tmp_path_factory.mktemp("db") / "api.sqlite"
+    engine = configure_engine(f"sqlite:///{database_path}")
+    Base.metadata.create_all(bind=get_engine())
+
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
