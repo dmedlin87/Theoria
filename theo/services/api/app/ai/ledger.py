@@ -488,6 +488,9 @@ class SharedLedger:
                     and row.completed_at >= start
                 ):
                     return _row_to_record(row)
+                if row.completed_at is None:
+                    with self.transaction() as txn:
+                        txn.clear_single_inflight(cache_key)
                 # Preserve the inflight row so earlier waiters that began
                 # before a restart can still observe the preserved success
                 # payload. Clearing the entry here would race with those
