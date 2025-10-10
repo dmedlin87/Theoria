@@ -37,6 +37,7 @@ from .guardrails import (
     build_guardrail_result as _guardrails_build_guardrail_result,
     build_retrieval_digest as _guardrails_build_retrieval_digest,
     ensure_completion_safe as _guardrails_ensure_completion_safe,
+    _format_anchor as _guardrails_format_anchor,
     load_guardrail_reference as _guardrails_load_guardrail_reference,
     load_passages_for_osis as _guardrails_load_passages_for_osis,
     validate_model_completion as _guardrails_validate_model_completion,
@@ -782,7 +783,7 @@ def _build_refusal_citation(session: Session) -> RAGCitation:
             highlights=None,
         )
         snippet = _derive_snippet(result, fallback=_REFUSAL_FALLBACK_SNIPPET)
-        anchor = _format_anchor(result)
+        anchor = _guardrails_format_anchor(result)
 
     return RAGCitation(
         index=1,

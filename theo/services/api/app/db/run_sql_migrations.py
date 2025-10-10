@@ -47,6 +47,104 @@ def _execute_autocommit(engine: Engine, sql: str) -> None:
             connection.exec_driver_sql(statement)
 
 
+def _split_sql_statements(sql: str) -> list[str]:
+    """Split a raw SQL script into individual statements.
+
+    SQLite's DB-API driver does not allow executing multiple statements at
+    once. When running migrations against SQLite we therefore need to split
+    the script manually. The implementation below keeps track of quoted
+    strings and SQL comments so that semicolons inside them do not terminate
+    the statement.
+    """
+
+    statements: list[str] = []
+    buffer: list[str] = []
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = False
+    length = len(sql)
+    i = 0
+
+    while i < length:
+        char = sql[i]
+        next_char = sql[i + 1] if i + 1 < length else ""
+
+        if in_line_comment:
+            buffer.append(char)
+            if char == "\n":
+                in_line_comment = False
+            i += 1
+            continue
+
+        if in_block_comment:
+            buffer.append(char)
+            if char == "*" and next_char == "/":
+                buffer.append(next_char)
+                in_block_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+
+        if not in_single_quote and not in_double_quote:
+            if char == "-" and next_char == "-":
+                buffer.append(char)
+                buffer.append(next_char)
+                in_line_comment = True
+                i += 2
+                continue
+            if char == "/" and next_char == "*":
+                buffer.append(char)
+                buffer.append(next_char)
+                in_block_comment = True
+                i += 2
+                continue
+
+        if char == "'" and not in_double_quote:
+            buffer.append(char)
+            if in_single_quote and next_char == "'":
+                buffer.append(next_char)
+                i += 2
+                continue
+            in_single_quote = not in_single_quote
+            i += 1
+            continue
+
+        if char == '"' and not in_single_quote:
+            buffer.append(char)
+            if in_double_quote and next_char == '"':
+                buffer.append(next_char)
+                i += 2
+                continue
+            in_double_quote = not in_double_quote
+            i += 1
+            continue
+
+        if (
+            char == ";"
+            and not in_single_quote
+            and not in_double_quote
+            and not in_line_comment
+            and not in_block_comment
+        ):
+            statement = "".join(buffer).strip()
+            if statement:
+                statements.append(statement)
+            buffer.clear()
+            i += 1
+            continue
+
+        buffer.append(char)
+        i += 1
+
+    statement = "".join(buffer).strip()
+    if statement:
+        statements.append(statement)
+
+    return statements
+
+
 _SQLITE_PERSPECTIVE_MIGRATION = "20250129_add_perspective_to_contradiction_seeds.sql"
 
 
@@ -134,6 +232,13 @@ def run_sql_migrations(
                     "VECTOR_L2_OPS",  # pgvector operator class
                     "USING GIN",      # Postgres index method
                     "USING GIST",     # Postgres index method
+                    "JSONB",          # Postgres JSON storage
+                    "TIMESTAMPTZ",    # Postgres timestamp with TZ
+                    "::JSON",         # Postgres casting syntax
+                    "::JSONB",        # Postgres casting syntax
+                    "NOW()",          # Postgres-specific default
+                    "DOUBLE PRECISION",  # Postgres float alias
+                    "CONCURRENTLY",   # Concurrent index creation
                 )
                 if any(marker in sql_upper for marker in postgres_only_markers):
                     logger.debug(
@@ -150,7 +255,11 @@ def run_sql_migrations(
                     _execute_autocommit(engine, sql)
                 else:
                     connection = session.connection()
-                    connection.exec_driver_sql(sql)
+                    if dialect_name == "sqlite":
+                        for statement in _split_sql_statements(sql):
+                            connection.exec_driver_sql(statement)
+                    else:
+                        connection.exec_driver_sql(sql)
 
             session.add(
                 AppSetting(
