@@ -29,6 +29,7 @@ from .types import IntArrayType, TSVectorType, VectorType
 
 
 if TYPE_CHECKING:
+
     class DeclarativeBase:
         """Typed façade for SQLAlchemy's declarative base."""
 
@@ -215,7 +216,9 @@ class EntryMention(Base):
         nullable=False,
     )
 
-    entry: Mapped[NotebookEntry] = relationship("NotebookEntry", back_populates="mentions")
+    entry: Mapped[NotebookEntry] = relationship(
+        "NotebookEntry", back_populates="mentions"
+    )
     document: Mapped[Document | None] = relationship("Document")
 
 
@@ -249,7 +252,9 @@ class NotebookCollaborator(Base):
         nullable=False,
     )
 
-    notebook: Mapped[Notebook] = relationship("Notebook", back_populates="collaborators")
+    notebook: Mapped[Notebook] = relationship(
+        "Notebook", back_populates="collaborators"
+    )
 
 
 class Passage(Base):
@@ -315,9 +320,7 @@ class PassageVerse(Base):
     """Association table connecting passages to verse identifiers."""
 
     __tablename__ = "passage_verses"
-    __table_args__ = (
-        Index("ix_passage_verses_verse_id", "verse_id"),
-    )
+    __table_args__ = (Index("ix_passage_verses_verse_id", "verse_id"),)
 
     passage_id: Mapped[str] = mapped_column(
         String,
@@ -917,7 +920,7 @@ class ContradictionSeed(Base):
         Index("ix_contradiction_seeds_start_verse_id_b", "start_verse_id_b"),
         Index("ix_contradiction_seeds_end_verse_id_b", "end_verse_id_b"),
         Index(
-            "ix_contradiction_seeds_range_a",
+            "ix_contradiction_seeds_range_primary",
             "start_verse_id",
             "end_verse_id",
         ),
@@ -955,17 +958,12 @@ class HarmonySeed(Base):
         Index("ix_harmony_seeds_osis_a", "osis_a"),
         Index("ix_harmony_seeds_osis_b", "osis_b"),
         Index("ix_harmony_seeds_range_a", "start_verse_id_a", "end_verse_id_a"),
-        Index("ix_harmony_seeds_range_b", "start_verse_id_b", "end_verse_id_b"),
         Index("ix_harmony_seeds_start_verse_id", "start_verse_id"),
         Index("ix_harmony_seeds_end_verse_id", "end_verse_id"),
         Index("ix_harmony_seeds_start_verse_id_b", "start_verse_id_b"),
         Index("ix_harmony_seeds_end_verse_id_b", "end_verse_id_b"),
-        Index("ix_harmony_seeds_range_a", "start_verse_id", "end_verse_id"),
-        Index(
-            "ix_harmony_seeds_range_b",
-            "start_verse_id_b",
-            "end_verse_id_b",
-        ),
+        Index("ix_harmony_seeds_range_primary", "start_verse_id", "end_verse_id"),
+        Index("ix_harmony_seeds_range_b", "start_verse_id_b", "end_verse_id_b"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -1093,9 +1091,7 @@ class ChatSession(Base):
     memory_snippets: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON, nullable=False, default=list
     )
-    document_ids: Mapped[list[str]] = mapped_column(
-        JSON, nullable=False, default=list
-    )
+    document_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     preferences: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
@@ -1344,7 +1340,9 @@ class GeoPlaceVerse(Base):
     )
     osis_ref: Mapped[str] = mapped_column(String, primary_key=True)
 
-    place: Mapped[GeoAncientPlace] = relationship("GeoAncientPlace", back_populates="verses")
+    place: Mapped[GeoAncientPlace] = relationship(
+        "GeoAncientPlace", back_populates="verses"
+    )
 
 
 class GeoGeometry(Base):
@@ -1436,9 +1434,14 @@ class CaseSource(Base):
     __tablename__ = "case_sources"
     __table_args__ = (Index("ix_case_sources_document_id", "document_id"),)
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
     document_id: Mapped[str | None] = mapped_column(
-        String, ForeignKey("documents.id", ondelete="SET NULL"), unique=True, nullable=True
+        String,
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        unique=True,
+        nullable=True,
     )
     origin: Mapped[str | None] = mapped_column(String, nullable=True)
     author: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -1526,9 +1529,15 @@ class CaseObject(Base):
         nullable=False,
     )
 
-    source: Mapped[CaseSource | None] = relationship("CaseSource", back_populates="objects")
-    document: Mapped[Document | None] = relationship("Document", back_populates="case_objects")
-    passage: Mapped[Passage | None] = relationship("Passage", back_populates="case_object")
+    source: Mapped[CaseSource | None] = relationship(
+        "CaseSource", back_populates="objects"
+    )
+    document: Mapped[Document | None] = relationship(
+        "Document", back_populates="case_objects"
+    )
+    passage: Mapped[Passage | None] = relationship(
+        "Passage", back_populates="case_object"
+    )
     annotation: Mapped[DocumentAnnotation | None] = relationship(
         "DocumentAnnotation",
         uselist=False,
@@ -1650,9 +1659,7 @@ class CaseUserAction(Base):
     """Analyst feedback captured for Case Builder insights."""
 
     __tablename__ = "case_user_actions"
-    __table_args__ = (
-        Index("ix_case_user_actions_insight", "insight_id"),
-    )
+    __table_args__ = (Index("ix_case_user_actions_insight", "insight_id"),)
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
