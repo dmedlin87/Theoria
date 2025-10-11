@@ -356,6 +356,7 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
     ],
 )
 def test_run_pipeline_for_url_blocks_private_targets(monkeypatch, blocked_url) -> None:
+    """Private network targets should be rejected before fetching."""
 
     def unexpected_fetch(*args, **kwargs):  # noqa: ANN001
         raise AssertionError("Blocked URLs should not be fetched")
@@ -363,7 +364,6 @@ def test_run_pipeline_for_url_blocks_private_targets(monkeypatch, blocked_url) -
     monkeypatch.setattr(pipeline, "_fetch_web_document", unexpected_fetch)
 
     with pytest.raises(pipeline.UnsupportedSourceError):
-
         pipeline.run_pipeline_for_url(object(), blocked_url)
 
 
