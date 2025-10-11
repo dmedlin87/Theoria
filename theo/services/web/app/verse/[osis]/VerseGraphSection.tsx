@@ -6,8 +6,8 @@ import {
   forceLink,
   forceManyBody,
   forceSimulation,
-} from "d3-force";
-import type { SimulationLinkDatum, SimulationNodeDatum } from "d3-force";
+} from "d3";
+import type { SimulationLinkDatum, SimulationNodeDatum } from "d3";
 import { useEffect, useMemo, useState } from "react";
 
 import { buildPassageLink, formatAnchor } from "../../lib/api";
@@ -100,8 +100,10 @@ function upperLabel(value: string): string {
   return value.toUpperCase();
 }
 
-function getNodeId(ref: string | LayoutNode): string {
-  return typeof ref === "string" ? ref : ref.id;
+function getNodeId(ref: string | number | LayoutNode): string {
+  if (typeof ref === "string") return ref;
+  if (typeof ref === "number") return String(ref);
+  return ref.id;
 }
 
 interface VerseGraphSectionProps {
@@ -385,17 +387,17 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
                 const mentionHref =
                   node.raw.kind === "mention" && documentId && passageId
                     ? buildPassageLink(documentId, passageId, {
-                        pageNo: pageNo ?? undefined,
-                        tStart: tStart ?? undefined,
+                        pageNo: pageNo ?? null,
+                        tStart: tStart ?? null,
                       })
                     : null;
 
                 const anchor =
                   node.raw.kind === "mention"
                     ? formatAnchor({
-                        page_no: pageNo ?? undefined,
-                        t_start: tStart ?? undefined,
-                        t_end: tEnd ?? undefined,
+                        page_no: pageNo ?? null,
+                        t_start: tStart ?? null,
+                        t_end: tEnd ?? null,
                       })
                     : null;
 
