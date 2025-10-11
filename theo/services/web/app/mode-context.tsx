@@ -55,27 +55,34 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
 
     let persisted: ResearchModeId | undefined;
 
-    try {
-      const stored =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem(MODE_STORAGE_KEY)
-          : null;
+    let stored: string | null = null;
+    if (typeof window !== "undefined") {
+      try {
+        stored = window.localStorage.getItem(MODE_STORAGE_KEY);
+      } catch {
+        stored = null;
+      }
+    }
 
-      if (stored && isResearchModeId(stored)) {
-        persisted = stored;
-      } else {
-        const cookiePrefix = `${MODE_COOKIE_KEY}=`;
-        const cookieValue = document.cookie
+    if (stored && isResearchModeId(stored)) {
+      persisted = stored;
+    }
+
+    if (!persisted) {
+      const cookiePrefix = `${MODE_COOKIE_KEY}=`;
+      let cookieValue: string | undefined;
+      try {
+        cookieValue = document.cookie
           .split("; ")
           .find((entry) => entry.startsWith(cookiePrefix))
           ?.slice(cookiePrefix.length);
-
-        if (cookieValue && isResearchModeId(cookieValue)) {
-          persisted = cookieValue;
-        }
+      } catch {
+        cookieValue = undefined;
       }
-    } catch {
-      persisted = undefined;
+
+      if (cookieValue && isResearchModeId(cookieValue)) {
+        persisted = cookieValue;
+      }
     }
 
     if (persisted) {
