@@ -473,7 +473,7 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
         start_barrier.wait()
         return router.execute_generation(workflow="chat", model=model, prompt="simultaneous")
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(_invoke) for _ in range(3)]
         assert first_started.wait(timeout=2.0)
 
@@ -484,11 +484,19 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
             txn.mark_inflight_error(cache_key, "transient failure")
 
         time.sleep(0.05)
+        ledger_wait_future = executor.submit(
+            lambda: router._ledger.wait_for_inflight(
+                cache_key, poll_interval=0.01, timeout=2.0
+            )
+        )
         allow_first_to_finish.set()
         results = [future.result() for future in futures]
+        ledger_wait_record = ledger_wait_future.result()
 
     assert call_count == 1
-    assert {result.output for result in results} == {"shared-output"}
+    outputs = {result.output for result in results}
+    outputs.add(ledger_wait_record.output)
+    assert outputs == {"shared-output"}
     assert router.get_spend("primary") == pytest.approx(results[0].cost)
 
 

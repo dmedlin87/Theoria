@@ -497,6 +497,10 @@ class SharedLedger:
                 # Reset stale error tracking when we observe a fresh inflight row.
                 stale_error_message = None
                 stale_error_cleared_at = None
+                if observed_updated_at is None:
+                    observed_updated_at = row.updated_at
+                if row.updated_at < comparison_floor:
+                    comparison_floor = row.updated_at
             if (
                 row.output is not None
                 and row.completed_at is not None
@@ -554,6 +558,13 @@ class SharedLedger:
                 ):
                     with self.transaction() as txn:
                         txn.clear_single_inflight(cache_key)
+                        cached = txn.get_cache_entry(cache_key)
+                    if cached is not None:
+                        stale_error_message = None
+                        stale_error_cleared_at = None
+                        transient_error_seen_at = None
+                        transient_error_updated_at = None
+                        return cached
                     stale_error_message = row.error or "Deduplicated generation failed"
                     stale_error_cleared_at = time.time()
                     transient_error_seen_at = None
@@ -586,6 +597,13 @@ class SharedLedger:
                         raise GenerationError("Timed out waiting for inflight generation")
                     with self.transaction() as txn:
                         txn.clear_single_inflight(cache_key)
+                        cached = txn.get_cache_entry(cache_key)
+                    if cached is not None:
+                        stale_error_message = None
+                        stale_error_cleared_at = None
+                        transient_error_seen_at = None
+                        transient_error_updated_at = None
+                        return cached
                     stale_error_message = row.error or "Deduplicated generation failed"
                     stale_error_cleared_at = time.time()
                     transient_error_seen_at = None
@@ -596,6 +614,14 @@ class SharedLedger:
                 # before a restart can still observe the preserved success
                 # payload. Clearing the entry here would race with those
                 # callers and drop the cached result before they can reuse it.
+                with self.transaction() as txn:
+                    cached = txn.get_cache_entry(cache_key)
+                if cached is not None:
+                    stale_error_message = None
+                    stale_error_cleared_at = None
+                    transient_error_seen_at = None
+                    transient_error_updated_at = None
+                    return cached
                 raise GenerationError(row.error or "Deduplicated generation failed")
             raise GenerationError(f"Unknown inflight status: {row.status}")
 
