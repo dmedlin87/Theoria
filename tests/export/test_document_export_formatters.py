@@ -80,3 +80,51 @@ def test_repro_document_export_passage_text_field() -> None:
     assert records == [
         {"passages": [{"text": "Example passage"}]}
     ]
+
+
+def test_document_export_metadata_field_subset() -> None:
+    """Selecting a specific metadata field should retain only that entry."""
+
+    now = datetime.now(timezone.utc)
+    document = DocumentDetailResponse(
+        id="doc-meta",
+        title="Metadata Example",
+        source_type="markdown",
+        collection="sermons",
+        authors=["Jane"],
+        doi=None,
+        venue=None,
+        year=None,
+        created_at=now,
+        updated_at=now,
+        provenance_score=None,
+        source_url=None,
+        channel=None,
+        video_id=None,
+        duration_seconds=None,
+        storage_path=None,
+        abstract=None,
+        topics=None,
+        enrichment_version=None,
+        primary_topic=None,
+        metadata={
+            "title": "Document Metadata Title",
+            "details": {
+                "subtitle": "Nested subtitle",
+                "keywords": ["alpha", "beta"],
+            },
+        },
+        passages=[],
+    )
+    response = _build_document_export(document)
+
+    _, records = build_document_export(
+        response,
+        include_passages=False,
+        include_text=False,
+        fields={"metadata.title"},
+    )
+
+    assert records == [
+        {"metadata": {"title": "Document Metadata Title"}}
+    ]
