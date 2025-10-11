@@ -62,6 +62,26 @@ describe("createHttpClient", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  it("does not set Content-Type header for GET requests", async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(
+      createMockResponse({
+        status: 200,
+        body: JSON.stringify({ features: {} }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: fetchMock,
+    });
+    const client = createHttpClient("https://api.test");
+    await client.request<Record<string, unknown>>("/features/");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(options.headers).toEqual({});
+  });
+
   it("propagates API error payloads for 400 responses", async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(
       createMockResponse({
