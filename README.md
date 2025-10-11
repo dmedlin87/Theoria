@@ -134,13 +134,18 @@ docker compose up --build -d
 
 ### API Authentication
 
-The API requires authentication credentials before starting. Configure one or more of the following:
+The API validates its authentication configuration at startup. If anonymous
+access is disabled and no API keys or JWT credentials are provided, the service
+aborts launch with a configuration error. Configure one or more of the
+following to satisfy the startup checks:
 
 - **API Keys**: Set `THEO_API_KEYS` environment variable
 - **JWT Settings**: Set `THEO_AUTH_JWT_SECRET` (and optional issuer/audience)
 - **Anonymous Access** (dev only): Set `THEO_AUTH_ALLOW_ANONYMOUS=1`
 
-When anonymous access is disabled and no credentials are supplied, requests fail with HTTP 403.
+Supplying credentials or enabling `THEO_AUTH_ALLOW_ANONYMOUS` allows the API to
+start normally. When anonymous access remains disabled without credentials,
+requests fail with HTTP 403.
 
 ### Topic Digest Notifications
 
