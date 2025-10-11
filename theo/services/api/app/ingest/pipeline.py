@@ -123,48 +123,6 @@ def _hash_parser_result(parser_result: ParserResult) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _persist_parser_result(
-    persist_fn,
-    *,
-    session: Session,
-    parser_result: ParserResult,
-    persistence_dependencies: PersistenceDependencies,
-    settings,
-    span,
-    cache_status: str | None = "n/a",
-    **persist_kwargs,
-):
-    """Persist parsed content while recording common telemetry."""
-
-    chunk_count = len(parser_result.chunks)
-    set_span_attribute(span, "ingest.chunk_count", chunk_count)
-    set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
-    if cache_status is not None:
-        set_span_attribute(span, "ingest.cache_status", cache_status)
-
-    document = persist_fn(
-        session,
-        dependencies=persistence_dependencies,
-        chunks=parser_result.chunks,
-        parser=parser_result.parser,
-        parser_version=parser_result.parser_version,
-        frontmatter=persist_kwargs.pop("frontmatter"),
-        settings=settings,
-        **persist_kwargs,
-    )
-    return document
-
-
-def _resolve_dependencies(
-    dependencies: PipelineDependencies | None,
-) -> PersistenceDependencies:
-    """Normalise optional dependency overrides for persistence helpers."""
-
-    if dependencies is None:
-        dependencies = PipelineDependencies()
-    return dependencies.for_persistence()
-
-
 def _set_chunk_span_metrics(span, parser_result: ParserResult) -> None:
     chunk_count = len(parser_result.chunks)
     set_span_attribute(span, "ingest.chunk_count", chunk_count)
@@ -302,9 +260,7 @@ def run_pipeline_for_file(
 ) -> Document:
     """Execute the file ingestion pipeline synchronously."""
 
-    persistence_dependencies = _resolve_dependencies(dependencies)
-
-    settings = get_settings()
+    settings, persistence_dependencies = _resolve_context(dependencies)
     with instrument_workflow(
         "ingest.file", source_path=str(path), source_name=path.name
     ) as span:
@@ -325,15 +281,14 @@ def run_pipeline_for_file(
         )
 
         if source_type == "transcript":
-            document = _persist_parser_result(
-                persist_transcript_document,
-                session=session,
+            document = _ingest_transcript_document(
+                session,
+                span,
+                dependencies=persistence_dependencies,
                 parser_result=parser_result,
-                persistence_dependencies=persistence_dependencies,
-                settings=settings,
-                span=span,
-                sha256=sha256,
                 frontmatter=merged_frontmatter,
+                settings=settings,
+                sha256=sha256,
                 source_type="transcript",
                 title=merged_frontmatter.get("title") or path.stem,
                 cache_status="n/a",
@@ -343,15 +298,14 @@ def run_pipeline_for_file(
             )
             return document
 
-        document = _persist_parser_result(
-            persist_text_document,
-            session=session,
+        document = _ingest_text_document(
+            session,
+            span,
+            dependencies=persistence_dependencies,
             parser_result=parser_result,
-            persistence_dependencies=persistence_dependencies,
-            settings=settings,
-            span=span,
-            sha256=sha256,
             frontmatter=merged_frontmatter,
+            settings=settings,
+            sha256=sha256,
             source_type=source_type,
             title=merged_frontmatter.get("title") or path.stem,
             cache_status="n/a",
@@ -398,20 +352,19 @@ def run_pipeline_for_url(
             if transcript_path:
                 set_span_attribute(span, "ingest.transcript_fixture", transcript_path.name)
 
-            document = _persist_parser_result(
-                persist_transcript_document,
-                session=session,
+            document = _ingest_transcript_document(
+                session,
+                span,
+                dependencies=persistence_dependencies,
                 parser_result=parser_result,
-                persistence_dependencies=persistence_dependencies,
-                settings=settings,
-                span=span,
-                cache_status=cache_status,
-                sha256=sha256,
                 frontmatter=merged_frontmatter,
+                settings=settings,
+                sha256=sha256,
                 source_type="youtube",
                 title=merged_frontmatter.get("title")
                 or metadata.get("title")
                 or f"YouTube Video {video_id}",
+                cache_status=cache_status,
                 source_url=merged_frontmatter.get("source_url") or url,
                 channel=merged_frontmatter.get("channel") or metadata.get("channel"),
                 video_id=video_id,
@@ -440,15 +393,14 @@ def run_pipeline_for_url(
         parser_result = prepare_text_chunks(text_content, settings=settings)
         sha256 = _hash_parser_result(parser_result)
 
-        document = _persist_parser_result(
-            persist_text_document,
-            session=session,
+        document = _ingest_text_document(
+            session,
+            span,
+            dependencies=persistence_dependencies,
             parser_result=parser_result,
-            persistence_dependencies=persistence_dependencies,
-            settings=settings,
-            span=span,
-            sha256=sha256,
             frontmatter=merged_frontmatter,
+            settings=settings,
+            sha256=sha256,
             source_type="web_page",
             title=merged_frontmatter.get("title") or metadata.get("title") or url,
             cache_status="n/a",
@@ -491,15 +443,14 @@ def run_pipeline_for_transcript(
         title = merged_frontmatter.get("title") or transcript_path.stem
 
         set_span_attribute(span, "ingest.source_type", source_type)
-        document = _persist_parser_result(
-            persist_transcript_document,
-            session=session,
+        document = _ingest_transcript_document(
+            session,
+            span,
+            dependencies=persistence_dependencies,
             parser_result=parser_result,
-            persistence_dependencies=persistence_dependencies,
-            settings=settings,
-            span=span,
-            sha256=sha256,
             frontmatter=merged_frontmatter,
+            settings=settings,
+            sha256=sha256,
             source_type=source_type,
             title=title,
             cache_status="n/a",
