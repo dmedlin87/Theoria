@@ -84,12 +84,17 @@ def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
     settings.storage_root = storage_root
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         markdown = """---\ntitle: Sample Doc\nauthors:\n  - Jane Doe\n---\n\nThis is a sample document."""
         doc_path = tmp_path / "sample.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document = pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -128,12 +133,17 @@ def test_run_pipeline_for_file_records_span_metrics(tmp_path, monkeypatch) -> No
     recorded = _capture_span_attributes(monkeypatch)
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         markdown = "---\ntitle: Telemetry Doc\n---\n\nShort body."
         doc_path = tmp_path / "telemetry.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document = pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -160,6 +170,7 @@ def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
     settings.case_builder_enabled = True
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         markdown = (
             "---\ntitle: Case Doc\n---\n\nVerse driven content."
             "\n\nAnother passage with OSIS John.1.1"
@@ -168,7 +179,11 @@ def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
         doc_path.write_text(markdown, encoding="utf-8")
 
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document = pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -217,8 +232,13 @@ def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(pipeline, "_fetch_web_document", _fake_fetch)
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_url(session, "https://example.com/foo")
+            document = pipeline.run_pipeline_for_url(
+                session,
+                "https://example.com/foo",
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -265,8 +285,13 @@ def test_run_pipeline_for_url_records_span_metrics(tmp_path, monkeypatch) -> Non
     monkeypatch.setattr(pipeline, "_fetch_web_document", _fake_fetch)
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_url(session, "https://example.com/foo")
+            document = pipeline.run_pipeline_for_url(
+                session,
+                "https://example.com/foo",
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -295,12 +320,17 @@ def test_run_pipeline_for_file_inlines_snapshot_when_small(tmp_path) -> None:
     settings.ingest_normalized_snapshot_max_bytes = 10_000_000
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         markdown = """---\ntitle: Inline Doc\n---\n\nShort content."""
         doc_path = tmp_path / "inline.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document = pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -338,13 +368,18 @@ def test_run_pipeline_for_large_file_uses_snapshot_manifest(tmp_path) -> None:
     settings.ingest_normalized_snapshot_max_bytes = 512
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         large_text = "Lorem ipsum dolor sit amet. " * 200
         markdown = "---\ntitle: Large Doc\n---\n\n" + large_text
         doc_path = tmp_path / "large.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document = pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -381,8 +416,13 @@ def test_run_pipeline_for_url_rejects_disallowed_scheme(monkeypatch) -> None:
     monkeypatch.setattr(pipeline, "_fetch_web_document", unexpected_fetch)
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         with pytest.raises(pipeline.UnsupportedSourceError):
-            pipeline.run_pipeline_for_url(object(), "http://example.com/data")
+            pipeline.run_pipeline_for_url(
+                object(),
+                "http://example.com/data",
+                dependencies=dependencies,
+            )
     finally:
         settings.ingest_url_allowed_schemes = original_schemes
 
@@ -399,6 +439,7 @@ def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
     settings.storage_root = storage_root
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         markdown = (
             "---\n"
             "title: Unsafe Doc\n"
@@ -410,7 +451,11 @@ def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
         doc_path.write_text(markdown, encoding="utf-8")
 
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document = pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -434,6 +479,7 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
     settings.storage_root = storage_root
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         transcript_path = tmp_path / "segments.json"
         transcript_payload = [{"text": "Hello world", "start": 0.0, "end": 2.5}]
         transcript_path.write_text(json.dumps(transcript_payload), encoding="utf-8")
@@ -448,6 +494,7 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
                 session,
                 transcript_path,
                 frontmatter=frontmatter,
+                dependencies=dependencies,
             )
             document_id = document.id
 
@@ -475,6 +522,7 @@ def test_run_pipeline_for_transcript_records_span_metrics(
     recorded = _capture_span_attributes(monkeypatch)
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         transcript_path = tmp_path / "segments.json"
         segments = [{"text": "Hello world", "start": 0.0, "end": 2.5}]
         transcript_path.write_text(json.dumps(segments), encoding="utf-8")
@@ -489,6 +537,7 @@ def test_run_pipeline_for_transcript_records_span_metrics(
                 session,
                 transcript_path,
                 frontmatter=frontmatter,
+                dependencies=dependencies,
             )
             document_id = document.id
 
@@ -545,11 +594,14 @@ def test_transcript_pipeline_retries_parser_failure(tmp_path, monkeypatch) -> No
     policy = RecordingPolicy()
 
     try:
+        dependencies = pipeline.PipelineDependencies(
+            settings=settings, error_policy=policy
+        )
         with Session(engine) as session:
             document = pipeline.run_pipeline_for_transcript(
                 session,
                 transcript_path,
-                dependencies=pipeline.PipelineDependencies(error_policy=policy),
+                dependencies=dependencies,
             )
             assert document is not None
     finally:
@@ -616,11 +668,14 @@ def test_youtube_fetch_retries_with_error_policy(tmp_path, monkeypatch) -> None:
     policy = RetryPolicy()
 
     try:
+        dependencies = pipeline.PipelineDependencies(
+            settings=settings, error_policy=policy
+        )
         with Session(engine) as session:
             document = pipeline.run_pipeline_for_url(
                 session,
                 "https://youtu.be/example",
-                dependencies=pipeline.PipelineDependencies(error_policy=policy),
+                dependencies=dependencies,
             )
             assert document.source_type == "youtube"
     finally:
@@ -644,8 +699,13 @@ def test_duplicate_file_ingest_triggers_error_policy(tmp_path) -> None:
     doc_path.write_text("Simple duplicate test", encoding="utf-8")
 
     try:
+        base_dependencies = pipeline.PipelineDependencies(settings=settings)
         with Session(engine) as session:
-            pipeline.run_pipeline_for_file(session, doc_path)
+            pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=base_dependencies,
+            )
 
         class RecordingPolicy:
             def __init__(self) -> None:
@@ -662,7 +722,9 @@ def test_duplicate_file_ingest_triggers_error_policy(tmp_path) -> None:
                 pipeline.run_pipeline_for_file(
                     session,
                     doc_path,
-                    dependencies=pipeline.PipelineDependencies(error_policy=policy),
+                    dependencies=pipeline.PipelineDependencies(
+                        settings=settings, error_policy=policy
+                    ),
                 )
     finally:
         settings.storage_root = original_storage
@@ -684,7 +746,11 @@ def test_run_pipeline_for_url_blocks_private_targets(monkeypatch, blocked_url) -
     monkeypatch.setattr(pipeline, "_fetch_web_document", unexpected_fetch)
 
     with pytest.raises(pipeline.UnsupportedSourceError):
-        pipeline.run_pipeline_for_url(object(), blocked_url)
+        pipeline.run_pipeline_for_url(
+            object(),
+            blocked_url,
+            dependencies=pipeline.PipelineDependencies(settings=get_settings()),
+        )
 
 
 def test_pipeline_sanitises_adversarial_markdown(tmp_path) -> None:
@@ -696,6 +762,7 @@ def test_pipeline_sanitises_adversarial_markdown(tmp_path) -> None:
     settings.storage_root = tmp_path / "storage"
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         malicious = (
             "---\ntitle: Bad Doc\n---\n\n"
             "This introduction is benign.\n\n"
@@ -706,7 +773,11 @@ def test_pipeline_sanitises_adversarial_markdown(tmp_path) -> None:
         doc_path.write_text(malicious, encoding="utf-8")
 
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document = pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -751,9 +822,12 @@ def test_pipeline_sanitises_adversarial_html(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(pipeline, "_fetch_web_document", _fake_fetch)
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         with Session(engine) as session:
             document = pipeline.run_pipeline_for_url(
-                session, "https://example.com/injected"
+                session,
+                "https://example.com/injected",
+                dependencies=dependencies,
             )
             document_id = document.id
 
@@ -819,6 +893,10 @@ def test_run_pipeline_for_url_rejects_oversized_responses(monkeypatch) -> None:
 
     try:
         with pytest.raises(pipeline.UnsupportedSourceError):
-            pipeline.run_pipeline_for_url(object(), "https://example.com/large")
+            pipeline.run_pipeline_for_url(
+                object(),
+                "https://example.com/large",
+                dependencies=pipeline.PipelineDependencies(settings=settings),
+            )
     finally:
         settings.ingest_web_max_bytes = original_max_bytes

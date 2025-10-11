@@ -38,7 +38,11 @@ from ..db.types import VectorType
 from ..models.export import DeliverableDownload
 from ..models.search import HybridSearchFilters
 from ..enrich import MetadataEnricher
-from ..ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
+from ..ingest.pipeline import (
+    PipelineDependencies,
+    run_pipeline_for_file,
+    run_pipeline_for_url,
+)
 from ..models.ai import ChatMemoryEntry
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.hybrid import hybrid_search
@@ -417,7 +421,12 @@ def process_file(
             _update_job_status(session, job_id, status="processing")
             session.commit()
         try:
-            document = run_pipeline_for_file(session, Path(path), frontmatter)
+            document = run_pipeline_for_file(
+                session,
+                Path(path),
+                frontmatter,
+                dependencies=PipelineDependencies(settings=settings),
+            )
             session.commit()
             if job_id:
                 _update_job_status(
@@ -454,6 +463,7 @@ def process_url(
                 url,
                 source_type=source_type,
                 frontmatter=frontmatter,
+                dependencies=PipelineDependencies(settings=settings),
             )
             session.commit()
             if job_id:

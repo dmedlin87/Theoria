@@ -78,7 +78,9 @@ def test_ingest_file_streams_large_upload_without_buffering(
     stored: dict[str, Path] = {}
     recorded_size: dict[str, int] = {}
 
-    def fake_pipeline(_session, path: Path, frontmatter):
+    def fake_pipeline(
+        _session, path: Path, frontmatter, *, dependencies=None
+    ) -> object:
         stored["path"] = path
         recorded_size["bytes"] = path.stat().st_size
         return _mkdoc()
@@ -104,7 +106,9 @@ def test_ingest_file_logs_large_body_as_truncated(
 ) -> None:
     _override_ingest_limit(monkeypatch, 12 * 1024 * 1024)
 
-    def failing_pipeline(_session, path: Path, frontmatter):
+    def failing_pipeline(
+        _session, path: Path, frontmatter, *, dependencies=None
+    ) -> object:
         raise RuntimeError("boom")
 
     monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_file", failing_pipeline)
@@ -135,7 +139,9 @@ def test_ingest_file_rejects_upload_exceeding_limit(
 
     called = False
 
-    def fake_pipeline(_session, path: Path, frontmatter):
+    def fake_pipeline(
+        _session, path: Path, frontmatter, *, dependencies=None
+    ) -> object:
         nonlocal called
         called = True
         return _mkdoc()
@@ -239,7 +245,9 @@ def test_simple_ingest_streams_progress(
 
     captured_overrides: list[dict[str, object]] = []
 
-    def fake_ingest(batch, overrides, post_batch_steps):  # noqa: ANN001 - test helper
+    def fake_ingest(
+        batch, overrides, post_batch_steps, *, dependencies=None
+    ):  # noqa: ANN001 - test helper
         captured_overrides.append(dict(overrides))
         assert len(batch) == len(items)
         assert post_batch_steps == set()
@@ -318,7 +326,9 @@ def test_simple_ingest_allows_sources_under_configured_roots(
         ingestion_service_module.get_ingestion_service
     ] = lambda: custom_service
 
-    def fake_ingest(batch, overrides, post_batch_steps):  # noqa: ANN001 - test helper
+    def fake_ingest(
+        batch, overrides, post_batch_steps, *, dependencies=None
+    ):  # noqa: ANN001 - test helper
         assert len(batch) == 1
         return ["doc-1"]
 
@@ -400,7 +410,14 @@ def _install_url_pipeline_stub(
 
     call_counter = {"count": 0}
 
-    def _fake_run(session, url: str, source_type=None, frontmatter=None):  # noqa: ANN001
+    def _fake_run(
+        session,
+        url: str,
+        source_type=None,
+        frontmatter=None,
+        *,
+        dependencies=None,
+    ):  # noqa: ANN001
         # Directly raise the expected exception without calling _fetch_web_document
         # since the monkeypatched build_opener should make it work correctly anyway
         call_counter["count"] += 1
