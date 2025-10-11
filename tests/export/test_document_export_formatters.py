@@ -133,6 +133,54 @@ def test_document_export_metadata_field_subset() -> None:
     ]
 
 
+def test_document_export_metadata_field_subset_with_additional_fields() -> None:
+    """Metadata subsets should preserve other requested top-level fields."""
+
+    now = datetime.now(timezone.utc)
+    document = DocumentDetailResponse(
+        id="doc-meta-2",
+        title="Metadata Example",
+        source_type="markdown",
+        collection="sermons",
+        authors=["Jane"],
+        doi=None,
+        venue=None,
+        year=None,
+        created_at=now,
+        updated_at=now,
+        provenance_score=None,
+        source_url=None,
+        channel=None,
+        video_id=None,
+        duration_seconds=None,
+        storage_path=None,
+        abstract=None,
+        topics=None,
+        enrichment_version=None,
+        primary_topic=None,
+        metadata={
+            "title": "Second Metadata Title",
+            "details": {"subtitle": "Nested subtitle"},
+        },
+        passages=[],
+    )
+    response = _build_document_export(document)
+
+    _, records = build_document_export(
+        response,
+        include_passages=False,
+        include_text=False,
+        fields={"document_id", "metadata.title"},
+    )
+
+    assert records == [
+        {
+            "document_id": "doc-meta-2",
+            "metadata": {"title": "Second Metadata Title"},
+        }
+    ]
+
+
 def test_document_export_passage_meta_subset() -> None:
     """Selecting nested passage meta fields should drop unrelated data."""
 
