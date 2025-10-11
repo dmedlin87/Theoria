@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Sequence, TYPE_CHECKING
 
 from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
@@ -97,3 +98,54 @@ class TSVectorType(_TypeDecorator[str | None]):
         if value is None:
             return None
         return str(value)
+
+
+class IntArrayType(_TypeDecorator[list[int] | None]):
+    """Cross-database representation for integer array columns."""
+
+    cache_ok = True
+    impl = SQLiteJSON
+
+    def load_dialect_impl(self, dialect: Any) -> sqltypes.TypeEngine[Any]:
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import ARRAY
+
+            return dialect.type_descriptor(ARRAY(sqltypes.INTEGER()))
+        if dialect.name == "sqlite":
+            return dialect.type_descriptor(SQLiteJSON())
+        return dialect.type_descriptor(sqltypes.JSON())
+
+    def process_bind_param(self, value: Sequence[int] | None, dialect: Any) -> Any:
+        if value is None:
+            return None
+        integers: list[int] = []
+        for component in value:
+            try:
+                integers.append(int(component))
+            except (TypeError, ValueError):
+                continue
+        return integers
+
+    def process_result_value(self, value: Any, dialect: Any) -> list[int] | None:
+        if value is None:
+            return None
+        if isinstance(value, (list, tuple)):
+            return [int(component) for component in value]
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                return None
+            if isinstance(parsed, list):
+                integers: list[int] = []
+                for component in parsed:
+                    try:
+                        integers.append(int(component))
+                    except (TypeError, ValueError):
+                        continue
+                return integers
+            return None
+        try:
+            return [int(component) for component in list(value)]
+        except (TypeError, ValueError):
+            return None
