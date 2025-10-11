@@ -5,10 +5,13 @@ Theo Engine exposes a FastAPI application located at
 multipart uploads for binary content.
 
 - **Base URL:** `/` (all paths below are relative to the FastAPI root)
+
 - **Content type:** `application/json` unless noted otherwise
+
 - **Authentication:** not required (the MVP runs in trusted environments)
+
 - **Error format:** errors follow FastAPI's default structure:
-  
+
   ```json
   {
     "detail": "Human readable message"
@@ -38,10 +41,10 @@ unsupported or when frontmatter cannot be parsed.
 
 Accepts binary uploads via `multipart/form-data`.
 
-| Field        | Type            | Required | Notes                                   |
+| Field | Type | Required | Notes |
 | ------------ | --------------- | -------- | --------------------------------------- |
-| `file`       | File            | ✅       | Any supported document (PDF, DOCX, etc) |
-| `frontmatter`| Text (JSON str) | ❌       | Optional metadata overrides              |
+| `file` | File | ✅ | Any supported document (PDF, DOCX, etc) |
+| `frontmatter`| Text (JSON str) | ❌ | Optional metadata overrides |
 
 The uploaded file is stored temporarily, parsed synchronously, and indexed.
 
@@ -80,11 +83,11 @@ the scheme is rejected by request validation).
 Uploads pre-generated transcripts, optionally paired with the original audio.
 The request uses `multipart/form-data` with the following fields:
 
-| Field         | Type            | Required | Notes                                           |
+| Field | Type | Required | Notes |
 | ------------- | --------------- | -------- | ----------------------------------------------- |
-| `transcript`  | File            | ✅       | Transcript file (WebVTT, plain text, etc.)      |
-| `audio`       | File            | ❌       | Optional audio/video binary for reference       |
-| `frontmatter` | Text (JSON str) | ❌       | Optional metadata overrides                     |
+| `transcript` | File | ✅ | Transcript file (WebVTT, plain text, etc.) |
+| `audio` | File | ❌ | Optional audio/video binary for reference |
+| `frontmatter` | Text (JSON str) | ❌ | Optional metadata overrides |
 
 The pipeline parses the transcript and indexes generated passages. Audio, when
 provided, is stored long enough to support downstream enrichments.
@@ -160,14 +163,14 @@ for clients without additional coordination logic.
 Runs hybrid retrieval (vector + lexical) over the indexed passages. Query
 parameters:
 
-| Parameter     | Type   | Description                                   |
+| Parameter | Type | Description |
 | ------------- | ------ | --------------------------------------------- |
-| `q`           | str    | Keyword query                                  |
-| `osis`        | str    | Normalized OSIS Bible reference                |
-| `collection`  | str    | Restrict results to a specific collection      |
-| `author`      | str    | Filter by canonical author                     |
-| `source_type` | str    | Filter by document source type                 |
-| `k`           | int    | Number of results to return (1 – 50, default 10)|
+| `q` | str | Keyword query |
+| `osis` | str | Normalized OSIS Bible reference |
+| `collection` | str | Restrict results to a specific collection |
+| `author` | str | Filter by canonical author |
+| `source_type` | str | Filter by document source type |
+| `k` | int | Number of results to return (1 – 50, default 10)|
 
 Example response:
 
@@ -227,13 +230,13 @@ the `verse_timeline` feature flag returned from `/features/discovery`.
 
 Query parameters:
 
-| Parameter     | Type   | Description                                      |
+| Parameter | Type | Description |
 | ------------- | ------ | ------------------------------------------------ |
-| `window`      | str    | Bucket size: `week`, `month`, `quarter`, `year`. |
-| `limit`       | int    | Max number of windows to return (default 36).    |
-| `source_type` | str    | Optional filter mirroring `/mentions`.           |
-| `collection`  | str    | Optional filter mirroring `/mentions`.           |
-| `author`      | str    | Optional filter mirroring `/mentions`.           |
+| `window` | str | Bucket size: `week`, `month`, `quarter`, `year`. |
+| `limit` | int | Max number of windows to return (default 36). |
+| `source_type` | str | Optional filter mirroring `/mentions`. |
+| `collection` | str | Optional filter mirroring `/mentions`. |
+| `author` | str | Optional filter mirroring `/mentions`. |
 
 Example response:
 
@@ -265,11 +268,11 @@ who mention a given verse or short range. The feature is guarded by the
 
 Aggregate creators and their quotes for an OSIS reference. Query parameters:
 
-| Parameter        | Type | Description                                                    |
+| Parameter | Type | Description |
 | ---------------- | ---- | -------------------------------------------------------------- |
-| `osis`           | str  | Required OSIS reference or short range (e.g., `John.1.1-John.1.3`). |
-| `limit_creators` | int  | Optional maximum creators to return (default 10, max 50).      |
-| `limit_quotes`   | int  | Optional maximum quotes per creator (default 3, max 10).       |
+| `osis` | str | Required OSIS reference or short range (e.g., `John.1.1-John.1.3`). |
+| `limit_creators` | int | Optional maximum creators to return (default 10, max 50). |
+| `limit_quotes` | int | Optional maximum quotes per creator (default 3, max 10). |
 
 Response:
 
@@ -327,13 +330,13 @@ or a minimum confidence threshold.
 
 Query parameters:
 
-| Parameter         | Type   | Description                                                      |
+| Parameter | Type | Description |
 | ----------------- | ------ | ---------------------------------------------------------------- |
-| `osis`            | str    | Required OSIS anchor (e.g., `John.1.1`).                          |
-| `stance`          | str    | Optional stance label filter (case-insensitive).                 |
-| `claim_type`      | str    | Optional claim type filter (case-insensitive).                   |
-| `tag`             | str    | Restrict to notes where `tags` contains the provided label.      |
-| `min_confidence`  | float  | Minimum inclusive confidence score (`0.0` – `1.0`).              |
+| `osis` | str | Required OSIS anchor (e.g., `John.1.1`). |
+| `stance` | str | Optional stance label filter (case-insensitive). |
+| `claim_type` | str | Optional claim type filter (case-insensitive). |
+| `tag` | str | Restrict to notes where `tags` contains the provided label. |
+| `min_confidence` | float | Minimum inclusive confidence score (`0.0` – `1.0`). |
 
 Example filtered response:
 
@@ -372,13 +375,15 @@ Returns seeded contradiction or harmony claims anchored to OSIS references.
 
 Query parameters:
 
-| Parameter | Type   | Description                                      |
+| Parameter | Type | Description |
 | --------- | ------ | ------------------------------------------------ |
-| `osis`    | list   | One or more OSIS ranges (`osis=Luke.2.1-7`).     |
-| `topic`   | str    | Optional tag filter (e.g., `chronology`).        |
-| `perspective` | list   | Perspective (apologetic/skeptical/neutral).     |
-|               |        | Multiple values allowed.                        |
-| `limit`   | int    | Max number of items to return (default 25).      |
+| `osis` | list | One or more OSIS ranges (`osis=Luke.2.1-7`). |
+| `topic` | str | Optional tag filter (e.g., `chronology`). |
+| `perspective` | list | Optional perspective filter. Accepts any of the |
+| | | values in [`PERSPECTIVE_CHOICES`](../theo/services/api/app/research/contradictions.py): |
+| | | `apologetic`, `skeptical`, or `neutral`. Multiple |
+| | | values allowed. |
+| `limit` | int | Max number of items to return (default 25). |
 
 Response (truncated):
 
@@ -407,10 +412,10 @@ Performs fuzzy lookup of seeded biblical places.
 
 Query parameters:
 
-| Parameter | Type | Description                                  |
+| Parameter | Type | Description |
 | --------- | ---- | -------------------------------------------- |
-| `query`   | str  | Partial place name (e.g., `Bethlehem`).      |
-| `limit`   | int  | Max number of results (default 10).          |
+| `query` | str | Partial place name (e.g., `Bethlehem`). |
+| `limit` | int | Max number of results (default 10). |
 
 Response:
 
@@ -460,10 +465,10 @@ Document endpoints expose indexed content and metadata.
 
 Lists documents with pagination.
 
-| Parameter | Type | Description                        |
+| Parameter | Type | Description |
 | --------- | ---- | ---------------------------------- |
-| `limit`   | int  | Page size (1 – 100, default 20)    |
-| `offset`  | int  | Zero-based result offset (default 0)|
+| `limit` | int | Page size (1 – 100, default 20) |
+| `offset` | int | Zero-based result offset (default 0)|
 
 Response:
 

@@ -11,6 +11,8 @@ from ..db.models import ContradictionSeed, HarmonySeed
 from ..ingest.osis import osis_intersects
 from ..models.research import ContradictionItem
 
+PERSPECTIVE_CHOICES: tuple[str, ...] = ("apologetic", "skeptical", "neutral")
+
 
 @dataclass(slots=True)
 class _ScoredSeed:
@@ -30,7 +32,7 @@ def _normalize_osis(values: Iterable[str]) -> list[str]:
 
 def _normalize_perspective(raw: str | None, *, default: str) -> str:
     value = (raw or default).strip().lower()
-    if value not in {"apologetic", "skeptical", "neutral"}:
+    if value not in PERSPECTIVE_CHOICES:
         return default
     return value
 
@@ -52,7 +54,7 @@ def search_contradictions(
     allowed_perspectives = {
         p.strip().lower()
         for p in (perspectives or [])
-        if p and p.strip().lower() in {"apologetic", "skeptical", "neutral"}
+        if p and p.strip().lower() in PERSPECTIVE_CHOICES
     }
     if not allowed_perspectives and perspectives:
         # If filters were provided but none are valid, return empty set.
