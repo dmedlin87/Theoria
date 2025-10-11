@@ -68,4 +68,6 @@ DROP INDEX IF EXISTS idx_geo_location_search_terms_trgm;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_geo_location_friendly_id_trgm
     ON geo_location USING gin (friendly_id gin_trgm_ops);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_geo_location_search_terms_trgm
-    ON geo_location USING gin (search_terms gin_trgm_ops);
+    ON geo_location USING gin (
+        (array_to_string(COALESCE(search_terms, ARRAY[]::TEXT[]), ' ')) gin_trgm_ops
+    );
