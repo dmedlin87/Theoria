@@ -142,7 +142,7 @@ class CreatorVersePerspectiveService:
 
         claims = list(self._session.scalars(stmt).unique())
         if not claims:
-            return {}
+            return self._collect_claims_fallback(osis)
 
         segment_ids = {
             claim.segment_id for claim in claims if getattr(claim, "segment_id", None)
