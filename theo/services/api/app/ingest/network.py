@@ -6,7 +6,14 @@ import json
 import socket
 from functools import lru_cache
 from http.client import HTTPException, IncompleteRead
-from ipaddress import ip_address, ip_network
+from ipaddress import (
+    IPv4Address,
+    IPv4Network,
+    IPv6Address,
+    IPv6Network,
+    ip_address,
+    ip_network,
+)
 from pathlib import Path
 from typing import Any
 from urllib.error import ContentTooShortError, HTTPError, URLError
@@ -23,8 +30,12 @@ def normalise_host(host: str) -> str:
     return host.strip().lower().rstrip(".")
 
 
-def _parse_blocked_networks(networks: list[str]) -> list[ip_network]:
-    parsed: list[ip_network] = []
+IPAddress = IPv4Address | IPv6Address
+IPNetwork = IPv4Network | IPv6Network
+
+
+def _parse_blocked_networks(networks: list[str]) -> list[IPNetwork]:
+    parsed: list[IPNetwork] = []
     for cidr in networks:
         try:
             parsed.append(ip_network(cidr, strict=False))
@@ -34,12 +45,12 @@ def _parse_blocked_networks(networks: list[str]) -> list[ip_network]:
 
 
 @lru_cache(maxsize=32)
-def cached_blocked_networks(networks: tuple[str, ...]) -> tuple[ip_network, ...]:
+def cached_blocked_networks(networks: tuple[str, ...]) -> tuple[IPNetwork, ...]:
     return tuple(_parse_blocked_networks(list(networks)))
 
 
 @lru_cache(maxsize=128)
-def resolve_host_addresses(host: str) -> tuple[ip_address, ...]:
+def resolve_host_addresses(host: str) -> tuple[IPAddress, ...]:
     normalised = normalise_host(host)
 
     try:
@@ -52,7 +63,7 @@ def resolve_host_addresses(host: str) -> tuple[ip_address, ...]:
     except socket.gaierror as exc:
         raise UnsupportedSourceError("URL target is not allowed for ingestion") from exc
 
-    addresses: list[ip_address] = []
+    addresses: list[IPAddress] = []
     for info in addr_info:
         sockaddr = info[4]
         if not sockaddr:
@@ -73,7 +84,7 @@ def resolve_host_addresses(host: str) -> tuple[ip_address, ...]:
     return unique
 
 
-def ensure_resolved_addresses_allowed(settings, addresses: tuple[ip_address, ...]) -> None:
+def ensure_resolved_addresses_allowed(settings, addresses: tuple[IPAddress, ...]) -> None:
     if not addresses:
         raise UnsupportedSourceError("URL target is not allowed for ingestion")
 
