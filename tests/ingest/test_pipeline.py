@@ -50,7 +50,9 @@ def _capture_span_attributes(monkeypatch):
     return recorded
 
 
-def _assert_ingest_metrics(recorded, document_id: str, expected_cache_status: str) -> None:
+def _assert_ingest_metrics(
+    recorded, document_id: str, expected_cache_status: str
+) -> None:
     ingest_attributes = {}
     for key, value in recorded:
         if key.startswith("ingest."):
@@ -158,8 +160,10 @@ def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
     settings.case_builder_enabled = True
 
     try:
-        markdown = "---\ntitle: Case Doc\n---\n\nVerse driven content." \
+        markdown = (
+            "---\ntitle: Case Doc\n---\n\nVerse driven content."
             "\n\nAnother passage with OSIS John.1.1"
+        )
         doc_path = tmp_path / "case_doc.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
@@ -309,7 +313,9 @@ def test_run_pipeline_for_file_inlines_snapshot_when_small(tmp_path) -> None:
         assert normalized_path.exists()
 
         normalized_payload = json.loads(normalized_path.read_text("utf-8"))
-        assert normalized_payload["document"]["text"].strip().startswith("Short content")
+        assert (
+            normalized_payload["document"]["text"].strip().startswith("Short content")
+        )
         assert "chunks" in normalized_payload
         assert normalized_payload["chunks"]
         assert "snapshot_manifest" not in normalized_payload
@@ -396,7 +402,7 @@ def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
         markdown = (
             "---\n"
             "title: Unsafe Doc\n"
-            "source_url: \"javascript:alert(1)\"\n"
+            'source_url: "javascript:alert(1)"\n'
             "---\n\n"
             "This document links to a javascript URI."
         )
@@ -432,7 +438,10 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
         transcript_payload = [{"text": "Hello world", "start": 0.0, "end": 2.5}]
         transcript_path.write_text(json.dumps(transcript_payload), encoding="utf-8")
 
-        frontmatter = {"title": "Unsafe Transcript", "source_url": "javascript:alert(1)"}
+        frontmatter = {
+            "title": "Unsafe Transcript",
+            "source_url": "javascript:alert(1)",
+        }
 
         with Session(engine) as session:
             document = pipeline.run_pipeline_for_transcript(
@@ -451,7 +460,9 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
         settings.storage_root = original_storage
 
 
-def test_run_pipeline_for_transcript_records_span_metrics(tmp_path, monkeypatch) -> None:
+def test_run_pipeline_for_transcript_records_span_metrics(
+    tmp_path, monkeypatch
+) -> None:
     """Transcript ingestion records span metrics alongside persistence."""
 
     _prepare_database(tmp_path)
@@ -468,7 +479,10 @@ def test_run_pipeline_for_transcript_records_span_metrics(tmp_path, monkeypatch)
         segments = [{"text": "Hello world", "start": 0.0, "end": 2.5}]
         transcript_path.write_text(json.dumps(segments), encoding="utf-8")
 
-        frontmatter = {"title": "Transcript Doc", "source_url": "https://example.com/video"}
+        frontmatter = {
+            "title": "Transcript Doc",
+            "source_url": "https://example.com/video",
+        }
 
         with Session(engine) as session:
             document = pipeline.run_pipeline_for_transcript(
@@ -738,7 +752,9 @@ def test_pipeline_sanitises_adversarial_html(tmp_path, monkeypatch) -> None:
 
     try:
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_url(session, "https://example.com/injected")
+            document = pipeline.run_pipeline_for_url(
+                session, "https://example.com/injected"
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -755,7 +771,6 @@ def test_pipeline_sanitises_adversarial_html(tmp_path, monkeypatch) -> None:
         assert "USER:" in raw_blob
     finally:
         settings.storage_root = original_storage
-
 
 
 def test_run_pipeline_for_url_rejects_oversized_responses(monkeypatch) -> None:
