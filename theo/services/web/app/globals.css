@@ -9,6 +9,13 @@
   --accent-soft: var(--color-accent-soft);
   --shadow: var(--shadow-md);
   --header-height: 4.25rem;
+  --motion-hover-translate-y-sm: translateY(-1px);
+  --motion-hover-translate-y-md: translateY(-2px);
+  --motion-hover-translate-y-lg: translateY(-4px);
+  --motion-hover-translate-x-sm: translateX(2px);
+  --motion-hover-translate-x-lg: translateX(4px);
+  --motion-hover-scale-indicator: scale(1.2);
+  --motion-hover-lift-scale: translateY(-2px) scale(1.02);
   scroll-padding-top: calc(var(--header-height) + var(--space-1));
 }
 
@@ -101,7 +108,7 @@ textarea {
 .app-shell-v2__brand:hover,
 .app-shell-v2__brand:focus-visible {
   color: var(--accent);
-  transform: translateY(-1px);
+  transform: var(--motion-hover-translate-y-sm);
   transition: all var(--transition-base);
 }
 
@@ -166,7 +173,7 @@ textarea {
   background: var(--accent-soft);
   color: var(--accent);
   text-decoration: none;
-  transform: translateX(2px);
+  transform: var(--motion-hover-translate-x-sm);
   box-shadow: var(--shadow-sm);
 }
 
@@ -189,7 +196,7 @@ textarea {
 
 .app-shell-v2__nav-link.is-active::before {
   opacity: 1;
-  transform: scale(1.2);
+  transform: var(--motion-hover-scale-indicator);
 }
 
 .app-shell-v2__mode {
@@ -253,7 +260,7 @@ textarea {
   color: var(--color-text-primary);
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-glow), var(--shadow-md);
-  transform: translateY(-1px);
+  transform: var(--motion-hover-translate-y-sm);
 }
 
 .app-shell-v2__command-search:disabled {
@@ -299,7 +306,7 @@ textarea {
 
 .app-shell-v2__action:hover,
 .app-shell-v2__action:focus-visible {
-  transform: translateY(-2px);
+  transform: var(--motion-hover-translate-y-md);
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
   box-shadow: var(--shadow-lg), var(--shadow-glow);
@@ -435,7 +442,7 @@ textarea {
 }
 
 .brand:hover {
-  transform: translateY(-1px);
+  transform: var(--motion-hover-translate-y-sm);
 }
 
 .site-nav {
@@ -459,7 +466,7 @@ textarea {
   background: var(--accent-soft);
   color: var(--accent);
   text-decoration: none;
-  transform: translateY(-1px);
+  transform: var(--motion-hover-translate-y-sm);
   box-shadow: var(--shadow-sm);
 }
 
@@ -623,7 +630,7 @@ textarea {
   outline: none;
   background: var(--color-accent);
   color: var(--color-text-inverse);
-  transform: translateY(-1px);
+  transform: var(--motion-hover-translate-y-sm);
   box-shadow: var(--shadow-md);
 }
 
@@ -752,7 +759,7 @@ textarea {
 
 .button:hover,
 .button:focus-visible {
-  transform: translateY(-2px) scale(1.02);
+  transform: var(--motion-hover-lift-scale);
   background: var(--color-accent-hover);
   box-shadow: var(--shadow-xl), var(--shadow-glow);
   text-decoration: none;
@@ -792,7 +799,7 @@ textarea {
 }
 
 .feature-card:hover {
-  transform: translateY(-4px);
+  transform: var(--motion-hover-translate-y-lg);
   box-shadow: var(--shadow-lg);
   border-color: var(--color-accent);
 }
@@ -844,7 +851,7 @@ section + section {
 .nav-link--primary:focus-visible {
   background: var(--color-accent-hover);
   color: var(--color-text-inverse);
-  transform: translateY(-2px);
+  transform: var(--motion-hover-translate-y-md);
   box-shadow: var(--shadow-lg), var(--shadow-glow);
 }
 
@@ -930,7 +937,7 @@ section + section {
 
 .chat-hero__action:hover,
 .chat-hero__action:focus-visible {
-  transform: translateY(-2px);
+  transform: var(--motion-hover-translate-y-md);
   border-color: var(--color-accent);
   background: var(--color-surface-hover);
   box-shadow: var(--shadow-lg);
@@ -968,7 +975,7 @@ section + section {
 }
 
 .chat-hero__action:hover .chat-hero__action-arrow {
-  transform: translateX(4px);
+  transform: var(--motion-hover-translate-x-lg);
 }
 
 .chat-hero__highlights {
@@ -993,7 +1000,7 @@ section + section {
 }
 
 .chat-hero__highlight:hover {
-  transform: translateY(-2px);
+  transform: var(--motion-hover-translate-y-md);
   box-shadow: var(--shadow-lg);
   border-color: var(--color-accent);
 }
@@ -1080,7 +1087,7 @@ section + section {
 .chat-session-controls button:focus-visible {
   background: var(--color-accent);
   color: var(--color-text-inverse);
-  transform: translateY(-2px);
+  transform: var(--motion-hover-translate-y-md);
   box-shadow: var(--shadow-md), var(--shadow-glow);
 }
 
@@ -1220,7 +1227,7 @@ section + section {
   background: var(--color-accent-soft);
   color: var(--color-accent);
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px) scale(1.02);
+  transform: var(--motion-hover-lift-scale);
   outline: none;
 }
 
@@ -1262,7 +1269,7 @@ section + section {
 .chat-feedback-button:focus-visible {
   border-color: var(--color-accent);
   background: var(--color-surface-hover);
-  transform: translateY(-1px);
+  transform: var(--motion-hover-translate-y-sm);
   box-shadow: var(--shadow-md);
   outline: none;
 }
@@ -1315,7 +1322,7 @@ section + section {
 .guardrail-actions button:focus-visible {
   background: var(--color-accent);
   color: var(--color-text-inverse);
-  transform: translateY(-1px);
+  transform: var(--motion-hover-translate-y-sm);
   box-shadow: var(--shadow-md);
   outline: none;
 }
@@ -1371,7 +1378,7 @@ section + section {
 .chat-form button:hover,
 .chat-form button:focus-visible {
   background: var(--color-accent-hover);
-  transform: translateY(-2px);
+  transform: var(--motion-hover-translate-y-md);
   box-shadow: var(--shadow-lg), var(--shadow-glow);
 }
 
@@ -1387,6 +1394,36 @@ section + section {
   margin: 0;
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-base: 0s;
+    --transition-fast: 0s;
+    --transition-slow: 0s;
+    --transition-spring: 0s;
+    --motion-hover-translate-y-sm: none;
+    --motion-hover-translate-y-md: none;
+    --motion-hover-translate-y-lg: none;
+    --motion-hover-translate-x-sm: none;
+    --motion-hover-translate-x-lg: none;
+    --motion-hover-scale-indicator: none;
+    --motion-hover-lift-scale: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+
+  html:focus-within {
+    scroll-behavior: auto;
+  }
 }
 
 @media (max-width: 720px) {
