@@ -164,15 +164,15 @@ def _compute_tool_metrics(
         for step in trail.steps:
             tool_counts[step.tool] += 1
             tool_trails[step.tool].add(trail.id)
-            if step.tokens_in:
+            if step.tokens_in is not None:
                 tool_tokens_in[step.tool] += step.tokens_in
-            if step.tokens_out:
+            if step.tokens_out is not None:
                 tool_tokens_out[step.tool] += step.tokens_out
             if step.tool.startswith("llm"):
                 llm_step_count += 1
-                if step.tokens_in:
+                if step.tokens_in is not None:
                     llm_token_in_total += step.tokens_in
-                if step.tokens_out:
+                if step.tokens_out is not None:
                     llm_token_out_total += step.tokens_out
 
     average_llm_tokens_in = (
