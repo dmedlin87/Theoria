@@ -28,6 +28,7 @@ Theo Engine layers grounded generative capabilities on top of the deterministic 
 
 - **CLI Usage**: Run `python -m theo.services.cli.ingest_folder --help` or see the [CLI guide](docs/CLI.md)
 - **MCP Integration**: Follow the [MCP integration execution guide](docs/mcp_integration_guide.md) for ChatGPT connector setup
+- **Search API Authentication**: Review the [authentication guide](docs/authentication.md) for header requirements and environment configuration
 
 ## Quick Start
 

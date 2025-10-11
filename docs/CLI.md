@@ -3,7 +3,9 @@
 The `theo.services.cli.ingest_folder` command walks a folder (or a single file) and
 submits every supported asset to the Theo ingestion pipeline. It is intended for
 local bulk imports and supports synchronous API execution or background worker
-queuing.
+queuing. Configure API credentials before invoking the CLI; see the
+[Search API authentication guide](authentication.md) for accepted headers and
+environment variables.
 
 ## Supported sources
 
