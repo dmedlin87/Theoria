@@ -200,11 +200,35 @@ def _coerce_int(value: Any) -> int | None:
 
 
 def _normalise_doi(value: Any) -> str | None:
+    """Normalise DOI strings to a canonical ``https://doi.org/...`` form."""
+
     if not isinstance(value, str):
         return None
+
     cleaned = value.strip()
     if not cleaned:
         return None
+
+    lowered = cleaned.lower()
+    if lowered.startswith("http"):
+        # Assume fully qualified URLs are already canonical enough.
+        return cleaned
+
+    if lowered.startswith("doi:"):
+        cleaned = cleaned[len("doi:") :].strip()
+        lowered = cleaned.lower()
+
+    # Accept bare domains such as ``doi.org/10.123`` or ``dx.doi.org/10.123``.
+    for prefix in ("doi.org/", "dx.doi.org/"):
+        if lowered.startswith(prefix):
+            cleaned = cleaned[len(prefix) :].lstrip("/")
+            lowered = cleaned.lower()
+            break
+
+    if not cleaned:
+        return None
+
+    return f"https://doi.org/{cleaned}"
     lowered = cleaned.lower()
     prefixes = (
         "https://doi.org/",
