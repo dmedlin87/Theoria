@@ -8,6 +8,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SETTINGS_SECRET_KEY: geo-ci-secret
+      FIXTURES_ROOT: ${{ github.workspace }}/fixtures
 
     steps:
       - name: Checkout repository
@@ -52,6 +56,9 @@ jobs:
 
       - name: Run pytest suite
         run: pytest
+
+      - name: Run Geo pytest suite
+        run: pytest tests/geo -q
 
       - name: Run contract tests
         run: pytest tests/contracts/test_schemathesis.py
