@@ -31,6 +31,25 @@ Theo Engine layers grounded generative capabilities on top of the deterministic 
 
 ## Quick Start
 
+### Repository layout
+
+The codebase is split into a handful of top-level packages to keep the
+retrieval pipeline, web application, and developer tooling isolated:
+
+- `theo/services/api` &mdash; FastAPI service, background workers, and
+  ingestion pipeline primitives
+- `theo/services/web` &mdash; Next.js frontend that consumes the search and
+  ingestion APIs
+- `docs/` &mdash; Product plans, runbooks, architecture notes, and task
+  backlogs referenced throughout the project
+- `scripts/` &mdash; Helper utilities for training, reseeding fixtures, and
+  coordinating local development workflows
+- `tests/` &mdash; Unit and integration suites covering ingestion, ranking,
+  and MCP connectors
+
+Refer to these directories while reading the quick start steps below so you
+can map each command to the relevant subsystem.
+
 ### Prerequisites
 
 ```bash
