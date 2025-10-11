@@ -60,7 +60,7 @@ _SAMPLE_MODERN_LOCATIONS = [
             {"name": "Bethlehem"},
             {"name": "Bethlehem Ephrathah"},
         ],
-        "search_terms": "bethlehem bethlehem ephrathah",
+        "search_terms": ["bethlehem", "bethlehem ephrathah"],
         "longitude": 35.2003,
         "latitude": 31.7054,
         "raw": {
@@ -161,7 +161,7 @@ def _parse_float(value: str | float | int | None) -> float | None:
         return None
 
 
-def _compose_search_terms(friendly_id: str, names: Any) -> str | None:
+def _compose_search_terms(friendly_id: str, names: Any) -> list[str] | None:
     terms: list[str] = []
     seen: set[str] = set()
 
@@ -189,7 +189,7 @@ def _compose_search_terms(friendly_id: str, names: Any) -> str | None:
 
     if not terms:
         return None
-    return " ".join(terms)
+    return terms
 
 
 def _load_geometry_payload(entry: dict[str, Any], geometry_folder: Path) -> dict[str, Any] | None:

@@ -183,7 +183,7 @@ def test_compose_search_terms_normalizes_deduplicates():
         ],
     )
 
-    assert result == "bethlehem bethlehem ephrathah"
+    assert result == ["bethlehem", "bethlehem ephrathah"]
 
 
 def test_load_geometry_payload(tmp_path):
