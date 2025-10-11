@@ -168,11 +168,38 @@ def _normalise_doi(value: Any) -> str | None:
     cleaned = value.strip()
     if not cleaned:
         return None
-    if cleaned.lower().startswith("http"):
-        return cleaned
-    cleaned = cleaned.removeprefix("doi:").strip()
+    lowered = cleaned.lower()
+    if lowered.startswith("doi:"):
+        cleaned = cleaned[4:].strip()
+        lowered = cleaned.lower()
+    prefixes = (
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+        "doi.org/",
+    )
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            cleaned = cleaned[len(prefix) :]
+            lowered = cleaned.lower()
+            break
+    cleaned = cleaned.strip()
     if not cleaned:
         return None
+    if cleaned.lower().startswith("doi:"):
+        cleaned = cleaned[4:].strip()
+    http_lower = cleaned.lower()
+    doi_http_prefixes = (
+        "http://doi.org/",
+        "https://doi.org/",
+        "http://dx.doi.org/",
+        "https://dx.doi.org/",
+    )
+    if http_lower.startswith("http") and not any(
+        http_lower.startswith(prefix) for prefix in doi_http_prefixes
+    ):
+        return cleaned
     return f"https://doi.org/{cleaned}"
 
 
