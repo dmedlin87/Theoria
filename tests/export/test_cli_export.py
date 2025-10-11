@@ -4,6 +4,7 @@ import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
@@ -394,3 +395,58 @@ def test_search_manifest_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
     manifest = json.loads(state_file.read_text("utf-8"))
     assert manifest["totals"]["returned"] == 0
     assert manifest["next_cursor"] is None
+
+
+def test_citation_export_cli_preview(monkeypatch: pytest.MonkeyPatch) -> None:
+    document = SimpleNamespace(
+        id="doc-1",
+        title="Example Citation",
+        authors=["Jane Doe", "John Smith"],
+        year=2021,
+        venue="Theo Quarterly",
+        doi="10.5555/test",
+        source_url="https://example.test/citation",
+        collection="sermons",
+        source_type="article",
+        metadata={"publisher": "Grace Press"},
+    )
+
+    class _Session:
+        def __init__(self, docs: list[SimpleNamespace]):
+            self._docs = docs
+
+        def execute(self, _query):  # noqa: ANN001
+            class _Result:
+                def __init__(self, rows: list[SimpleNamespace]):
+                    self._rows = rows
+
+                def scalars(self):
+                    return iter(self._rows)
+
+            return _Result(self._docs)
+
+    @contextmanager
+    def _session_override():
+        yield _Session([document])
+
+    monkeypatch.setattr(cli, "_session_scope", _session_override)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.export,
+        [
+            "citations",
+            "--style",
+            "apa",
+            "--format",
+            "json",
+            "--document-id",
+            "doc-1",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["manifest"]["type"] == "citations"
+    assert payload["records"][0]["document_id"] == "doc-1"
+    assert payload["records"][0]["citation"].startswith("Doe, J.")
