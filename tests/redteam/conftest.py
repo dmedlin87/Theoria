@@ -65,7 +65,7 @@ def configure_redteam_environment(
         if db_path.exists():
             db_path.unlink()
 
-        for key, value in env_overrides.items():
+        for key, _value in env_overrides.items():
             previous = original_env.get(key)
             if previous is None:
                 os.environ.pop(key, None)

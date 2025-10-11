@@ -49,16 +49,13 @@ def _override_ingest_limit(monkeypatch: pytest.MonkeyPatch, limit: int) -> Setti
     monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
     return settings
 
-
- 
 class _FakeHeaders(dict):
     def get_content_charset(self, default: str | None = None) -> str | None:
         return self.get("charset", default)
- 
+
 _PDF_EXTRACTION_ERROR = (
     "Unable to extract text from PDF; the file may be password protected or corrupted."
 )
- 
 
 
 def test_ingest_file_streams_large_upload_without_buffering(
@@ -100,7 +97,6 @@ def test_ingest_file_streams_large_upload_without_buffering(
     assert sum(captured_sizes) == len(payload)
     assert max(captured_sizes) <= ingest_module._UPLOAD_CHUNK_SIZE
     assert len(captured_sizes) >= 2
-
 
 def test_ingest_file_logs_large_body_as_truncated(
     monkeypatch: pytest.MonkeyPatch, api_client: TestClient, caplog: pytest.LogCaptureFixture
@@ -154,7 +150,6 @@ def test_ingest_file_rejects_upload_exceeding_limit(
 
     assert response.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
     assert called is False
-
 
 
 def test_ingest_url_allows_http(monkeypatch: pytest.MonkeyPatch, api_client: TestClient) -> None:
@@ -217,10 +212,13 @@ def test_ingest_url_blocks_private_targets(
 
 
 def test_simple_ingest_streams_progress(
-    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient, tmp_path: Path
 ) -> None:
+    local_markdown = tmp_path / "file.md"
+    local_markdown.write_text("# Notes\n")
+
     items = [
-        ingest_module.cli_ingest.IngestItem(path=Path("/tmp/file.md"), source_type="markdown"),
+        ingest_module.cli_ingest.IngestItem(path=local_markdown, source_type="markdown"),
         ingest_module.cli_ingest.IngestItem(url="https://example.com", source_type="web_page"),
     ]
 
@@ -498,7 +496,7 @@ def test_ingest_url_detects_redirect_loop(
     response = api_client.post("/ingest/url", json={"url": "https://loop.example.com"})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["detail"] == "URL redirect loop detected"
- 
+
 def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:
     pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "password_protected.pdf"
     with pdf_path.open("rb") as handle:
