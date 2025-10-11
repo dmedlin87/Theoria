@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
+from ..ingest.embeddings import clear_embedding_cache
 from ..models.search import (
     HybridSearchFilters,
     HybridSearchRequest,
@@ -21,9 +22,13 @@ router = APIRouter()
 
 
 def reset_reranker_cache() -> None:
-    """Expose a reset hook for tests."""
+    """Expose a reset hook for tests.
+
+    Clears both reranker and embedding caches to minimise cross-test state.
+    """
 
     _reset_reranker_cache()
+    clear_embedding_cache()
 
 
 @router.get("/", response_model=HybridSearchResponse)

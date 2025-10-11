@@ -10,7 +10,7 @@ The following code quality checks were executed against the contents of the `scr
 
 ## Command Output
 
-```
+```powershell
 $ ruff check scripts
 All checks passed!
 ```

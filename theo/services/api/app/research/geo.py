@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 from typing import Any, Iterable
 
 import pythonbible as pb
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..core.settings_store import load_setting
@@ -82,32 +83,58 @@ def lookup_geo_places(
     if not normalized_query:
         return []
 
-    locations = session.query(GeoModernLocation).all()
-    scored: list[_ScoredLocation] = []
+    bind = session.get_bind()
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+    locations: list[GeoModernLocation]
 
-    for location in locations:
-        best_score = 0.0
-        for candidate in _candidate_strings(location):
-            candidate_norm = candidate.casefold()
-            if normalized_query in candidate_norm:
-                best_score = max(best_score, 1.0)
-                break
-            best_score = max(best_score, _fuzzy_score(normalized_query, candidate_norm))
-        if best_score <= 0.0:
-            continue
-        scored.append(_ScoredLocation(location=location, score=best_score))
-
-    scored.sort(
-        key=lambda entry: (
-            -entry.score,
-            -(entry.location.confidence or 0.0),
-            entry.location.friendly_id,
+    if dialect_name == "postgresql":
+        search_terms = GeoModernLocation.search_terms
+        score_expr = func.greatest(
+            func.similarity(search_terms, normalized_query),
+            func.word_similarity(search_terms, normalized_query),
+        ).label("score")
+        stmt = (
+            select(GeoModernLocation, score_expr)
+            .where(
+                GeoModernLocation.search_terms.is_not(None),
+                score_expr > 0.0,
+            )
+            .order_by(
+                score_expr.desc(),
+                GeoModernLocation.confidence.desc().nullslast(),
+                GeoModernLocation.friendly_id,
+            )
+            .limit(limit)
         )
-    )
+        results = session.execute(stmt).all()
+        locations = [row[0] for row in results]
+    else:
+        rows = session.query(GeoModernLocation).all()
+        scored: list[_ScoredLocation] = []
+
+        for location in rows:
+            best_score = 0.0
+            for candidate in _candidate_strings(location):
+                candidate_norm = candidate.casefold()
+                if normalized_query in candidate_norm:
+                    best_score = max(best_score, 1.0)
+                    break
+                best_score = max(best_score, _fuzzy_score(normalized_query, candidate_norm))
+            if best_score <= 0.0:
+                continue
+            scored.append(_ScoredLocation(location=location, score=best_score))
+
+        scored.sort(
+            key=lambda entry: (
+                -entry.score,
+                -(entry.location.confidence or 0.0),
+                entry.location.friendly_id,
+            )
+        )
+        locations = [entry.location for entry in scored[:limit]]
 
     items: list[GeoPlaceItem] = []
-    for entry in scored[:limit]:
-        location = entry.location
+    for location in locations:
         aliases = _location_aliases(location)
         items.append(
             GeoPlaceItem(

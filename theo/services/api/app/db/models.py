@@ -25,7 +25,7 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects import postgresql
 from ..core.settings import get_settings
-from .types import TSVectorType, VectorType
+from .types import IntArrayType, TSVectorType, VectorType
 
 
 if TYPE_CHECKING:
@@ -627,6 +627,13 @@ class TranscriptSegment(Base):
     """Time-coded transcript span enriched with metadata."""
 
     __tablename__ = "transcript_segments"
+    __table_args__ = (
+        Index(
+            "ix_transcript_segments_osis_verse_ids",
+            "osis_verse_ids",
+            postgresql_using="gin",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
@@ -646,6 +653,9 @@ class TranscriptSegment(Base):
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     primary_osis: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
     osis_refs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    osis_verse_ids: Mapped[list[int] | None] = mapped_column(
+        IntArrayType(), nullable=True
+    )
     topics: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     entities: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -1171,6 +1181,7 @@ class GeoModernLocation(Base):
     geom_kind: Mapped[str | None] = mapped_column(String, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     names: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    search_terms: Mapped[str | None] = mapped_column(Text, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     raw: Mapped[dict] = mapped_column(JSON, nullable=False)

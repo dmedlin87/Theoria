@@ -60,6 +60,7 @@ _SAMPLE_MODERN_LOCATIONS = [
             {"name": "Bethlehem"},
             {"name": "Bethlehem Ephrathah"},
         ],
+        "search_terms": "bethlehem bethlehem ephrathah",
         "longitude": 35.2003,
         "latitude": 31.7054,
         "raw": {
@@ -158,6 +159,37 @@ def _parse_float(value: str | float | int | None) -> float | None:
         return float(str(value))
     except (TypeError, ValueError):  # pragma: no cover - defensive guard
         return None
+
+
+def _compose_search_terms(friendly_id: str, names: Any) -> str | None:
+    terms: list[str] = []
+    seen: set[str] = set()
+
+    def _add(term: Any) -> None:
+        if not term:
+            return
+        normalized = str(term).casefold().strip()
+        if not normalized or normalized in seen:
+            return
+        seen.add(normalized)
+        terms.append(normalized)
+
+    _add(friendly_id)
+
+    if isinstance(names, list):
+        for entry in names:
+            label: str | None = None
+            if isinstance(entry, dict):
+                raw_label = entry.get("name")
+                if isinstance(raw_label, str):
+                    label = raw_label
+            elif isinstance(entry, str):
+                label = entry
+            _add(label)
+
+    if not terms:
+        return None
+    return " ".join(terms)
 
 
 def _load_geometry_payload(entry: dict[str, Any], geometry_folder: Path) -> dict[str, Any] | None:
@@ -329,6 +361,9 @@ def seed_openbible_geo(
                 "geom_kind": entry.get("geometry"),
                 "confidence": _parse_float(entry.get("confidence")),
                 "names": entry.get("names"),
+                "search_terms": _compose_search_terms(
+                    friendly_id, entry.get("names")
+                ),
                 "longitude": lon,
                 "latitude": lat,
                 "raw": entry,
