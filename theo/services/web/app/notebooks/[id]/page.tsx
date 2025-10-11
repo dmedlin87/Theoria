@@ -165,9 +165,18 @@ function renderEntry(entry: NotebookEntry) {
 export default async function NotebookPage({ params }: NotebookPageProps) {
   const notebook = await fetchNotebook(params.id);
   const osisRefs = collectOsis(notebook);
-  const features: ResearchFeatureFlags | null = osisRefs.length
-    ? await fetchResearchFeatures()
-    : null;
+
+  let features: ResearchFeatureFlags | null = null;
+  let featureDiscoveryFailed = false;
+  if (osisRefs.length) {
+    try {
+      features = await fetchResearchFeatures();
+    } catch (error) {
+      featureDiscoveryFailed = true;
+      console.error("Failed to fetch research features", error);
+      features = null;
+    }
+  }
   const version = await fetchRealtimeVersion(notebook.id);
 
   const exportPayload: DeliverableRequestPayload | null = notebook.primary_osis
@@ -217,6 +226,20 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
           </div>
         )}
       </section>
+
+      {featureDiscoveryFailed ? (
+        <p
+          role="alert"
+          style={{
+            background: "var(--muted, #fef2f2)",
+            color: "var(--muted-foreground, #b91c1c)",
+            borderRadius: "0.5rem",
+            padding: "0.75rem 1rem",
+          }}
+        >
+          Research features are temporarily unavailable. Notebook entries remain accessible.
+        </p>
+      ) : null}
 
       {osisRefs.length > 0 && features ? (
         <section style={{ display: "grid", gap: "1.5rem" }}>
