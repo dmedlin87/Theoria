@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -126,10 +126,9 @@ class GetTimelineRequest(ToolRequestBase):
     """Retrieve a timeline of mentions for a verse."""
 
     osis: str = Field(..., description="Passage identifier to build a timeline for.")
-    window: str = Field(
+    window: Literal["week", "month", "quarter", "year"] = Field(
         default="month",
         description="Aggregation window (e.g. week, month, quarter, year).",
-        pattern="^(week|month|quarter|year)$",
     )
     limit: int = Field(
         default=36,
