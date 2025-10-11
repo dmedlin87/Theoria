@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
 import "@testing-library/jest-dom";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 
 import ReliabilityOverviewCard from "../app/verse/[osis]/ReliabilityOverviewCard";
 
@@ -81,6 +81,30 @@ describe("ReliabilityOverviewCard", () => {
     render(element ?? <></>);
 
     expect(screen.getByRole("alert")).toHaveTextContent("Unable to load the overview. Boom");
+  });
+
+  it("falls back to empty sections when API omits a list", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        osis: "John.1.1",
+        mode: "apologetic",
+        consensus: [
+          { summary: "A core agreement remains strong.", citations: ["Doc 1"] },
+        ],
+        disputed: [],
+      }),
+      text: async () => "",
+    });
+
+    const element = await ReliabilityOverviewCard({ osis: "John.1.1", mode: "apologetic" });
+    render(element ?? <></>);
+
+    expect(screen.getByText("Consensus threads")).toBeInTheDocument();
+    expect(screen.getByText("A core agreement remains strong.")).toBeInTheDocument();
+
+    const manuscriptsSection = screen.getByLabelText("Key manuscripts");
+    expect(within(manuscriptsSection).getByText("Nothing to report yet.")).toBeInTheDocument();
   });
 });
 
