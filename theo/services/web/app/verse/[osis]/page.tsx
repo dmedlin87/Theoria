@@ -285,14 +285,16 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   let timelineError: string | null = null;
   let graph: VerseGraphResponse | null = null;
   let graphError: string | null = null;
+  let featuresError: string | null = null;
 
   try {
-    const [mentionsResponse, featureFlags] = await Promise.all([
+    const [mentionsResponse, featureResult] = await Promise.all([
       fetchMentions(resolvedParams.osis, normalizedSearchParams),
       fetchResearchFeatures(),
     ]);
     data = mentionsResponse;
-    features = featureFlags;
+    features = featureResult.features ?? {};
+    featuresError = featureResult.error;
   } catch (err) {
     console.error("Failed to load verse mentions", err);
     error = err instanceof Error ? err.message : "Unknown error";
@@ -429,6 +431,12 @@ export default async function VersePage({ params, searchParams }: VersePageProps
           <p>
             Showing {mentions.length} of {total} mentions
           </p>
+
+          {featuresError ? (
+            <p role="alert" style={{ margin: "0 0 1rem", color: "#b91c1c" }}>
+              Unable to load research capabilities. {featuresError}
+            </p>
+          ) : null}
 
           {features.verse_timeline ? (
             <TimelineSection timeline={timeline} window={windowParam} error={timelineError} />
