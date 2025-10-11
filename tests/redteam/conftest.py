@@ -18,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="package", autouse=True)
 def configure_redteam_environment(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Generator[None, None, None]:
@@ -41,9 +41,10 @@ def configure_redteam_environment(
 
     # Guardrail suites expect anonymous access regardless of broader test
     # configuration. Other suites may have populated ``THEO_API_KEYS`` which
-    # forces authentication even when ``THEO_AUTH_ALLOW_ANONYMOUS`` is set.  Drop
+    # forces authentication even when ``THEO_AUTH_ALLOW_ANONYMOUS`` is set. Drop
     # API key configuration within this fixture so guardrail requests proceed
-    # without credentials.
+    # without credentials. The fixture is package-scoped so the override only
+    # applies to tests within ``tests/redteam``.
     os.environ.pop("THEO_API_KEYS", None)
 
     from theo.services.api.app.core import settings as settings_module
