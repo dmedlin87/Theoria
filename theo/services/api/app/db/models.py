@@ -104,6 +104,7 @@ class Notebook(Base):
     """Team notebooks used for collaborative research."""
 
     __tablename__ = "notebooks"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
