@@ -5,13 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from ..db.models import ContradictionSeed, HarmonySeed
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.research import ContradictionItem
 
 PERSPECTIVE_CHOICES: tuple[str, ...] = ("apologetic", "skeptical", "neutral")
+
+_CONTRADICTION_PERSPECTIVES = {"skeptical", "neutral"}
+_HARMONY_PERSPECTIVES = {"apologetic", "neutral"}
 
 
 @dataclass(slots=True)
@@ -60,8 +64,15 @@ def search_contradictions(
         # If filters were provided but none are valid, return empty set.
         return []
 
-    contradiction_seeds = session.query(ContradictionSeed).all()
-    harmony_seeds = session.query(HarmonySeed).all()
+    candidate_ranges: list[tuple[str, int, int]] = []
+    for requested in candidates:
+        verse_ids = expand_osis_reference(requested)
+        if not verse_ids:
+            continue
+        candidate_ranges.append((requested, min(verse_ids), max(verse_ids)))
+    if not candidate_ranges:
+        return []
+
     topic_lower = topic.lower() if topic else None
     scored: list[_ScoredSeed] = []
 
@@ -75,6 +86,53 @@ def search_contradictions(
         if not allowed_perspectives:
             return True
         return value in allowed_perspectives
+
+    def _range_predicate(model: type[ContradictionSeed] | type[HarmonySeed]):
+        clauses = []
+        for _, start, end in candidate_ranges:
+            clauses.append(
+                and_(model.start_verse_id_a <= end, model.end_verse_id_a >= start)
+            )
+            clauses.append(
+                and_(model.start_verse_id_b <= end, model.end_verse_id_b >= start)
+            )
+        return or_(*clauses) if clauses else None
+
+    contradiction_query = session.query(ContradictionSeed)
+    harmony_query = session.query(HarmonySeed)
+
+    if allowed_perspectives:
+        contradiction_values = list(allowed_perspectives & _CONTRADICTION_PERSPECTIVES)
+        if contradiction_values:
+            contradiction_query = contradiction_query.filter(
+                ContradictionSeed.perspective.in_(contradiction_values)
+            )
+        else:
+            contradiction_query = None
+
+        harmony_values = list(allowed_perspectives & _HARMONY_PERSPECTIVES)
+        if harmony_values:
+            harmony_query = harmony_query.filter(
+                HarmonySeed.perspective.in_(harmony_values)
+            )
+        else:
+            harmony_query = None
+
+    if contradiction_query is not None:
+        predicate = _range_predicate(ContradictionSeed)
+        if predicate is not None:
+            contradiction_query = contradiction_query.filter(predicate)
+        contradiction_seeds = contradiction_query.all()
+    else:
+        contradiction_seeds = []
+
+    if harmony_query is not None:
+        predicate = _range_predicate(HarmonySeed)
+        if predicate is not None:
+            harmony_query = harmony_query.filter(predicate)
+        harmony_seeds = harmony_query.all()
+    else:
+        harmony_seeds = []
 
     for seed in contradiction_seeds:
         perspective = _normalize_perspective(seed.perspective, default="skeptical")
