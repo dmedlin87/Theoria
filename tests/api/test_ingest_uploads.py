@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.core.database import get_session  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.ingest import parsers as ingest_parsers  # noqa: E402
-from theo.services.api.app.ingest import pipeline as ingest_pipeline  # noqa: E402
+from theo.services.api.app.ingest.pipeline import parse_text_file  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
 
 
@@ -135,7 +135,7 @@ def test_ingest_markdown_with_windows_1252_bytes(
     captured: dict[str, str] = {}
 
     def fake_pipeline(_session, path: Path, frontmatter):
-        body, _ = ingest_pipeline.parse_text_file(path)
+        body, _ = parse_text_file(path)
         captured["body"] = body
         return _mkdoc()
 
