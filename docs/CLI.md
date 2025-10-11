@@ -77,6 +77,19 @@ Queue files for background processing instead of running the API synchronously:
 python -m theo.services.cli.ingest_folder ./archive --mode worker
 ```
 
+## Code quality checks
+
+Run Theo's linting and test bundle from the command line using the aggregated helper:
+
+```bash
+python -m theo.services.cli.code_quality
+```
+
+By default the command lints the `mcp_server` package with `ruff` and runs the MCP-focused pytest suite. Add `--include-mypy` to
+execute optional type checking (fails the run only when combined with `--strict`). Use the `--ruff-path`, `--pytest-path`, and
+`--mypy-path` options to target different packages or tests, and pass tool-specific arguments via the `--ruff-arg`, `--pytest-arg`,
+and `--mypy-arg` flags.
+
 ## Export utilities
 
 Bulk exports are available via `theo.services.cli.export_data`.
