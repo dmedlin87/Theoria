@@ -85,10 +85,13 @@ export function createHttpClient(baseUrl?: string): HttpClient {
   ): Promise<T>;
   async function request<T>(path: string, init?: RequestOptions): Promise<T | void> {
     const { parseJson = true, headers, ...rest } = init ?? {};
+    const defaultHeaders: HeadersInit =
+      rest.body === undefined ? {} : { "Content-Type": "application/json" };
+
     const response = await fetch(`${resolved}${path}`, {
       cache: "no-store",
       headers: {
-        "Content-Type": "application/json",
+        ...defaultHeaders,
         ...(headers ?? {}),
       },
       ...rest,

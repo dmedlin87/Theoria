@@ -165,9 +165,22 @@ function renderEntry(entry: NotebookEntry) {
 export default async function NotebookPage({ params }: NotebookPageProps) {
   const notebook = await fetchNotebook(params.id);
   const osisRefs = collectOsis(notebook);
-  const features: ResearchFeatureFlags | null = osisRefs.length
+  const { features: fetchedFeatures, error: researchFeaturesError } = osisRefs.length
     ? await fetchResearchFeatures()
-    : null;
+    : { features: null, error: null };
+  const features: ResearchFeatureFlags | null = fetchedFeatures;
+
+  let features: ResearchFeatureFlags | null = null;
+  let featureDiscoveryFailed = false;
+  if (osisRefs.length) {
+    try {
+      features = await fetchResearchFeatures();
+    } catch (error) {
+      featureDiscoveryFailed = true;
+      console.error("Failed to fetch research features", error);
+      features = null;
+    }
+  }
   const version = await fetchRealtimeVersion(notebook.id);
 
   const exportPayload: DeliverableRequestPayload | null = notebook.primary_osis
@@ -218,6 +231,21 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
         )}
       </section>
 
+      {osisRefs.length > 0 ? (
+      {featureDiscoveryFailed ? (
+        <p
+          role="alert"
+          style={{
+            background: "var(--muted, #fef2f2)",
+            color: "var(--muted-foreground, #b91c1c)",
+            borderRadius: "0.5rem",
+            padding: "0.75rem 1rem",
+          }}
+        >
+          Research features are temporarily unavailable. Notebook entries remain accessible.
+        </p>
+      ) : null}
+
       {osisRefs.length > 0 && features ? (
         <section style={{ display: "grid", gap: "1.5rem" }}>
           <header>
@@ -226,14 +254,28 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
               Collating insights for {osisRefs.join(", ")}
             </p>
           </header>
-          {osisRefs.map((osis) => (
-            <div key={osis} style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: "1rem" }}>
-              <h3 style={{ marginTop: 0 }}>{osis}</h3>
-              <Suspense fallback={<p>Loading research panels…</p>}>
-                <ResearchPanels osis={osis} features={features} />
-              </Suspense>
-            </div>
-          ))}
+          {researchFeaturesError ? (
+            <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+              Unable to load research capabilities. {researchFeaturesError}
+            </p>
+          ) : null}
+          {features
+            ? osisRefs.map((osis) => (
+                <div
+                  key={osis}
+                  style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: "1rem" }}
+                >
+                  <h3 style={{ marginTop: 0 }}>{osis}</h3>
+                  <Suspense fallback={<p>Loading research panels…</p>}>
+                    <ResearchPanels osis={osis} features={features} />
+                  </Suspense>
+                </div>
+              ))
+            : !researchFeaturesError ? (
+                <p style={{ margin: 0, color: "var(--muted-foreground, #4b5563)" }}>
+                  Research capabilities are unavailable for this notebook.
+                </p>
+              ) : null}
         </section>
       ) : null}
 

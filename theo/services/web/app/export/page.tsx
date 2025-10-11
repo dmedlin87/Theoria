@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const FORMAT_LABELS: Record<string, string> = {
   markdown: 'Markdown (.md)',
@@ -27,6 +27,16 @@ function normaliseDocumentIds(input: string): string[] {
     .filter((value) => value.length > 0);
 }
 
+function isAbortError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return error.name === 'AbortError';
+  }
+  if (error instanceof Error) {
+    return error.name === 'AbortError';
+  }
+  return false;
+}
+
 export default function CitationExportPage(): JSX.Element {
   const [style, setStyle] = useState<string>('apa');
   const [downloadFormat, setDownloadFormat] = useState<string>('markdown');
@@ -41,6 +51,16 @@ export default function CitationExportPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const requestController = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (requestController.current) {
+        requestController.current.abort();
+        requestController.current = null;
+      }
+    };
+  }, []);
 
   const formatExtension = useMemo(() => {
     switch (downloadFormat) {
@@ -90,12 +110,19 @@ export default function CitationExportPage(): JSX.Element {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    let controller: AbortController | null = null;
     try {
       const payload = buildPayload('json');
+      if (requestController.current) {
+        requestController.current.abort();
+      }
+      controller = new AbortController();
+      requestController.current = controller;
       const response = await fetch('/export/citations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
       if (!response.ok) {
         const detail = await response.text();
@@ -113,12 +140,22 @@ export default function CitationExportPage(): JSX.Element {
       );
       setManifest(data.manifest ?? null);
     } catch (previewError: unknown) {
+      if (isAbortError(previewError)) {
+        return;
+      }
       const message = previewError instanceof Error ? previewError.message : 'Unable to preview citations.';
       setError(message);
       setPreview([]);
       setManifest(null);
     } finally {
-      setLoading(false);
+      if (!controller) {
+        setLoading(false);
+        return;
+      }
+      if (requestController.current === controller) {
+        requestController.current = null;
+        setLoading(false);
+      }
     }
   }, [buildPayload]);
 
@@ -126,12 +163,19 @@ export default function CitationExportPage(): JSX.Element {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    let controller: AbortController | null = null;
     try {
       const payload = buildPayload(downloadFormat);
+      if (requestController.current) {
+        requestController.current.abort();
+      }
+      controller = new AbortController();
+      requestController.current = controller;
       const response = await fetch('/export/citations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
       if (!response.ok) {
         const detail = await response.text();
@@ -150,10 +194,20 @@ export default function CitationExportPage(): JSX.Element {
       URL.revokeObjectURL(url);
       setSuccess(`Downloaded ${filename}`);
     } catch (downloadError: unknown) {
+      if (isAbortError(downloadError)) {
+        return;
+      }
       const message = downloadError instanceof Error ? downloadError.message : 'Unable to download citation bundle.';
       setError(message);
     } finally {
-      setLoading(false);
+      if (!controller) {
+        setLoading(false);
+        return;
+      }
+      if (requestController.current === controller) {
+        requestController.current = null;
+        setLoading(false);
+      }
     }
   }, [buildPayload, downloadFormat, formatExtension]);
 

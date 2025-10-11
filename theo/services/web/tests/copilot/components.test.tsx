@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import CitationList from "../../app/copilot/components/CitationList";
 import QuickStartPresets from "../../app/copilot/components/QuickStartPresets";
@@ -151,6 +151,51 @@ describe("copilot components", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /export/i }));
     expect(onExport).toHaveBeenCalled();
+  });
+
+  it("does not refetch annotations when citation identities are unchanged", async () => {
+    const citations = [
+      {
+        index: 1,
+        osis: "John",
+        anchor: "1",
+        snippet: "Snippet",
+        document_id: "doc",
+        passage_id: "John.1.1",
+        document_title: "Document",
+        source_url: "https://example.com",
+      },
+    ] satisfies Parameters<typeof CitationList>[0]["citations"];
+
+    const { rerender } = render(
+      <CitationList
+        citations={citations}
+        summaryText="Summary"
+        workflowId="verse"
+        onExport={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    (globalThis.fetch as jest.Mock).mockClear();
+
+    rerender(
+      <CitationList
+        citations={citations.map((citation) => ({ ...citation }))}
+        summaryText="Summary"
+        workflowId="verse"
+        onExport={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("renders RAG answer with follow ups", () => {

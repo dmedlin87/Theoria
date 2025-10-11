@@ -224,4 +224,41 @@ describe("ChatWorkspace", () => {
     expect(helpfulButton).toHaveAttribute("aria-pressed", "true");
     expect(unhelpfulButton).toHaveAttribute("aria-pressed", "false");
   });
+
+  it("auto-submits new prompts when initialPrompt changes", async () => {
+    const client: ChatWorkflowClient = {
+      runChatWorkflow: jest.fn(async () => ({
+        kind: "success",
+        sessionId: "session-1",
+        answer: sampleAnswer,
+      })),
+      fetchChatSession: jest.fn(async () => null),
+    };
+
+    const { rerender } = render(
+      <ChatWorkspace client={client} initialPrompt="Explain John 1" autoSubmit />,
+    );
+
+    await waitFor(() => {
+      expect(client.runChatWorkflow).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ prompt: "Explain John 1" }),
+        expect.objectContaining({ onEvent: expect.any(Function) }),
+      );
+    });
+
+    rerender(
+      <ChatWorkspace client={client} initialPrompt="Summarize Romans 8" autoSubmit />,
+    );
+
+    await waitFor(() => {
+      expect(client.runChatWorkflow).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ prompt: "Summarize Romans 8" }),
+        expect.objectContaining({ onEvent: expect.any(Function) }),
+      );
+    });
+
+    expect(client.runChatWorkflow).toHaveBeenCalledTimes(2);
+  });
 });

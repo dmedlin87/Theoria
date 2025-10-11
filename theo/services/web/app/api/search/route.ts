@@ -18,14 +18,15 @@ function buildTargetUrl(request: NextRequest): URL {
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const target = buildTargetUrl(request);
   const apiKey = process.env.THEO_SEARCH_API_KEY?.trim();
-  const requestHeaders: Record<string, string> = { Accept: "application/json" };
+  const requestHeaders = new Headers({ Accept: "application/json" });
   if (apiKey) {
     if (/^Bearer\s+/i.test(apiKey)) {
-      requestHeaders.Authorization = apiKey;
+      requestHeaders.set("Authorization", apiKey);
     } else {
-      requestHeaders["X-API-Key"] = apiKey;
+      requestHeaders.set("X-API-Key", apiKey);
     }
   }
+  forwardTraceHeaders(request.headers, requestHeaders);
   try {
     const response = await fetch(target, {
       headers: requestHeaders,

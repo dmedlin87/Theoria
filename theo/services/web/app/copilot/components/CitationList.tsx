@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getApiBaseUrl } from "../../lib/api";
 import type { components } from "../../lib/generated/api";
@@ -74,6 +74,11 @@ export default function CitationList({
     return documentChoiceIds.slice().sort().join("|");
   }, [documentChoiceIds]);
 
+  const documentChoiceIdsRef = useRef(documentChoiceIds);
+  useEffect(() => {
+    documentChoiceIdsRef.current = documentChoiceIds;
+  }, [documentChoiceIds]);
+
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>(
     documentChoices[0]?.id ?? "",
   );
@@ -98,7 +103,7 @@ export default function CitationList({
   const [isLoadingAnnotations, setIsLoadingAnnotations] = useState(false);
 
   useEffect(() => {
-    const docIds = documentChoiceIds;
+    const docIds = documentChoiceIdsRef.current;
     if (!docIds.length) {
       setAnnotationsByDocument({});
       setAnnotationsError(null);
@@ -147,7 +152,7 @@ export default function CitationList({
       cancelled = true;
       controller.abort();
     };
-  }, [baseUrl, documentChoiceIds, documentChoiceKey]);
+  }, [baseUrl, documentChoiceKey]);
 
   const [isSavingBundle, setIsSavingBundle] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);

@@ -224,17 +224,20 @@ export default function CopilotPage(): JSX.Element {
       let active = true;
       const loadResearchFeatures = async () => {
         try {
-          const flags = await fetchResearchFeatures();
-          if (active) {
-            setResearchFeatures(flags);
-            setResearchFeaturesError(null);
+          const { features, error } = await fetchResearchFeatures();
+          if (!active) {
+            return;
           }
+          setResearchFeatures(features ?? {});
+          setResearchFeaturesError(error);
         } catch (fetchError) {
           console.error("Failed to load research features", fetchError);
           if (active) {
             setResearchFeatures({});
             setResearchFeaturesError(
-              (fetchError as Error).message || "Unable to load research capabilities",
+              fetchError instanceof Error && fetchError.message
+                ? fetchError.message
+                : "Unable to load research capabilities",
             );
           }
         }

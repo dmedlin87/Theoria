@@ -1,10 +1,20 @@
 import type { NextRequest } from "next/server";
 
+import { TRACE_HEADER_NAMES } from "../../../../app/api/trace";
 import { GET } from "../../../../app/api/search/route";
 
-function createRequest(query: string): NextRequest {
+function createRequest(query: string, init?: { headers?: Record<string, string> }): NextRequest {
   const url = new URL(`https://example.com/api/search?${query}`);
-  return { nextUrl: url } as unknown as NextRequest;
+  const headers = new Headers(init?.headers);
+  return { nextUrl: url, headers } as unknown as NextRequest;
+}
+
+function getFetchHeaders(fetchMock: jest.MockedFunction<typeof fetch>): Headers | undefined {
+  const fetchOptions = fetchMock.mock.calls[0]?.[1] as { headers?: HeadersInit } | undefined;
+  if (!fetchOptions?.headers) {
+    return undefined;
+  }
+  return new Headers(fetchOptions.headers);
 }
 
 describe("/api/search proxy", () => {
@@ -33,15 +43,9 @@ describe("/api/search proxy", () => {
     const request = createRequest("q=faith");
     await GET(request);
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.any(URL),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Accept: "application/json",
-          Authorization: "Bearer secret",
-        }),
-      }),
-    );
+    const headers = getFetchHeaders(fetchSpy);
+    expect(headers?.get("Accept")).toBe("application/json");
+    expect(headers?.get("Authorization")).toBe("Bearer secret");
   });
 
   it("sends a plain key via the X-API-Key header", async () => {
@@ -56,15 +60,9 @@ describe("/api/search proxy", () => {
     const request = createRequest("q=hope");
     await GET(request);
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.any(URL),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Accept: "application/json",
-          "X-API-Key": "plain-key",
-        }),
-      }),
-    );
+    const headers = getFetchHeaders(fetchSpy);
+    expect(headers?.get("Accept")).toBe("application/json");
+    expect(headers?.get("X-API-Key")).toBe("plain-key");
   });
 
   it("bubbles a 401 response when the API key is not configured", async () => {
@@ -80,19 +78,10 @@ describe("/api/search proxy", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(401);
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.any(URL),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Accept: "application/json",
-        }),
-      }),
-    );
-    const fetchOptions = fetchMock.mock.calls[0]?.[1] as { headers?: Record<string, string> } | undefined;
-    expect(fetchOptions?.headers).toBeDefined();
-    const calledHeaders = fetchOptions?.headers ?? {};
-    expect(calledHeaders).not.toHaveProperty("Authorization");
-    expect(calledHeaders).not.toHaveProperty("X-API-Key");
+    const headers = getFetchHeaders(fetchMock);
+    expect(headers?.get("Accept")).toBe("application/json");
+    expect(headers?.has("Authorization")).toBe(false);
+    expect(headers?.has("X-API-Key")).toBe(false);
   });
 
   it("forwards trace headers from the upstream search service", async () => {
@@ -115,5 +104,28 @@ describe("/api/search proxy", () => {
 
     expect(response.headers.get("traceparent")).toBe(traceparent);
     expect(response.headers.get("x-trace-id")).toBe(traceId);
+  });
+
+  it("forwards trace headers from the client request to the upstream search service", async () => {
+    process.env.THEO_SEARCH_API_KEY = "plain-key";
+    const traceHeaders: Record<string, string> = {};
+    for (const header of TRACE_HEADER_NAMES) {
+      traceHeaders[header] = `${header}-value`;
+    }
+    const mockResponse = new Response("{}", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    const fetchMock = jest.fn().mockResolvedValue(mockResponse) as jest.MockedFunction<typeof fetch>;
+    global.fetch = fetchMock;
+
+    const request = createRequest("q=grace", { headers: traceHeaders });
+    await GET(request);
+
+    const headers = getFetchHeaders(fetchMock);
+    expect(headers).toBeDefined();
+    for (const header of TRACE_HEADER_NAMES) {
+      expect(headers?.get(header)).toBe(traceHeaders[header]);
+    }
   });
 });

@@ -8,13 +8,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
   const target = new URL("/analytics/feedback", baseUrl);
   const body = await request.text();
+  const outboundHeaders = new Headers({
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  });
+  forwardTraceHeaders(request.headers, outboundHeaders);
   try {
     const response = await fetch(target, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      headers: outboundHeaders,
       body,
       cache: "no-store",
     });

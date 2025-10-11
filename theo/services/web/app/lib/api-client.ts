@@ -86,42 +86,49 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
     runVerseWorkflow(payload) {
       return request<VerseResponse>("/ai/verse", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     runSermonWorkflow(payload) {
       return request<SermonResponse>("/ai/sermon-prep", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     runComparativeWorkflow(payload) {
       return request<ComparativeResponse>("/ai/comparative", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     runMultimediaWorkflow(payload) {
       return request<MultimediaDigestResponse>("/ai/multimedia", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     runDevotionalWorkflow(payload) {
       return request<DevotionalResponse>("/ai/devotional", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     runCollaborationWorkflow(payload) {
       return request<CollaborationResponse>("/ai/collaboration", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     runCurationWorkflow(payload) {
       return request<CorpusCurationReport>("/ai/curation", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
@@ -130,6 +137,7 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
         `/ai/sermon-prep/export?format=${encodeURIComponent(payload.format)}`,
         {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             model: payload.model,
             topic: payload.topic,
@@ -141,6 +149,7 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
     runTranscriptExport(payload) {
       return request<ExportDeliverableResponse>("/ai/transcript/export", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           document_id: payload.documentId,
           format: payload.format,
@@ -150,6 +159,7 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
     exportCitations(payload) {
       return request<CitationExportResponse>("/ai/citations/export", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
@@ -169,12 +179,14 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
     createWatchlist(payload) {
       return request<WatchlistResponse>("/ai/digest/watchlists", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     updateWatchlist(watchlistId, payload) {
       return request<WatchlistResponse>(`/ai/digest/watchlists/${watchlistId}`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
