@@ -53,8 +53,8 @@ def _split_sql_statements(sql: str) -> list[str]:
     SQLite's DB-API driver does not allow executing multiple statements at
     once. When running migrations against SQLite we therefore need to split
     the script manually. The implementation below keeps track of quoted
-    strings and SQL comments so that semicolons inside them do not terminate
-    the statement.
+    strings, dollar-quoted blocks, and SQL comments so that semicolons inside
+    them do not terminate the statement.
     """
 
     statements: list[str] = []
@@ -63,12 +63,23 @@ def _split_sql_statements(sql: str) -> list[str]:
     in_double_quote = False
     in_line_comment = False
     in_block_comment = False
+    dollar_quote: str | None = None
     length = len(sql)
     i = 0
 
     while i < length:
         char = sql[i]
         next_char = sql[i + 1] if i + 1 < length else ""
+
+        if dollar_quote is not None:
+            if sql.startswith(dollar_quote, i):
+                buffer.append(dollar_quote)
+                i += len(dollar_quote)
+                dollar_quote = None
+                continue
+            buffer.append(char)
+            i += 1
+            continue
 
         if in_line_comment:
             buffer.append(char)
@@ -121,6 +132,17 @@ def _split_sql_statements(sql: str) -> list[str]:
             i += 1
             continue
 
+        if not in_single_quote and not in_double_quote and char == "$":
+            end = i + 1
+            while end < length and (sql[end].isalnum() or sql[end] == "_"):
+                end += 1
+            if end < length and sql[end] == "$":
+                tag = sql[i : end + 1]
+                buffer.append(tag)
+                dollar_quote = tag
+                i = end + 1
+                continue
+
         if (
             char == ";"
             and not in_single_quote
@@ -158,90 +180,6 @@ def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
             if len(row) > 1 and row[1] == column:
                 return True
     return False
-
-
-def _split_sql_statements(sql: str) -> list[str]:
-    """Split SQL into individual statements while respecting string literals."""
-
-    statements: list[str] = []
-    buffer: list[str] = []
-    in_single_quote = False
-    in_double_quote = False
-    dollar_quote: str | None = None
-    index = 0
-    length = len(sql)
-
-    while index < length:
-        char = sql[index]
-
-        if dollar_quote is not None:
-            if sql.startswith(dollar_quote, index):
-                buffer.append(dollar_quote)
-                index += len(dollar_quote)
-                dollar_quote = None
-                continue
-            buffer.append(char)
-            index += 1
-            continue
-
-        if in_single_quote:
-            buffer.append(char)
-            index += 1
-            if char == "'":
-                next_char = sql[index] if index < length else ""
-                if next_char == "'":
-                    buffer.append("'")
-                    index += 1
-                else:
-                    in_single_quote = False
-            continue
-
-        if in_double_quote:
-            buffer.append(char)
-            index += 1
-            if char == '"':
-                in_double_quote = False
-            continue
-
-        if char == "'":
-            in_single_quote = True
-            buffer.append(char)
-            index += 1
-            continue
-
-        if char == '"':
-            in_double_quote = True
-            buffer.append(char)
-            index += 1
-            continue
-
-        if char == "$":
-            end = index + 1
-            while end < length and (sql[end].isalnum() or sql[end] == "_"):
-                end += 1
-            if end < length and sql[end] == "$":
-                tag = sql[index : end + 1]
-                dollar_quote = tag
-                buffer.append(tag)
-                index = end + 1
-                continue
-
-        if char == ";":
-            statement = "".join(buffer).strip()
-            if statement:
-                statements.append(statement)
-            buffer.clear()
-            index += 1
-            continue
-
-        buffer.append(char)
-        index += 1
-
-    tail = "".join(buffer).strip()
-    if tail:
-        statements.append(tail)
-
-    return statements
 
 
 def run_sql_migrations(
