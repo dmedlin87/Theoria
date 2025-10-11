@@ -260,6 +260,30 @@ def expand_osis_reference(reference: str) -> frozenset[int]:
     return frozenset(verse_ids)
 
 
+def canonical_verse_range(
+    references: Sequence[str] | None,
+) -> tuple[list[int] | None, int | None, int | None]:
+    """Return canonical verse identifiers and range bounds for *references*."""
+
+    if not references:
+        return None, None, None
+
+    verse_ids: set[int] = set()
+    for reference in references:
+        if not reference:
+            continue
+        try:
+            verse_ids.update(expand_osis_reference(reference))
+        except Exception:  # pragma: no cover - defensive guard for malformed refs
+            continue
+
+    if not verse_ids:
+        return None, None, None
+
+    sorted_ids = sorted(verse_ids)
+    return sorted_ids, sorted_ids[0], sorted_ids[-1]
+
+
 def osis_intersects(a: str, b: str) -> bool:
     """Determine if two OSIS ranges intersect (basic overlap check)."""
 
