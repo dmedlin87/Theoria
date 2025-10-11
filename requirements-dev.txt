@@ -1,0 +1,2 @@
+# Development-only dependencies for static analysis.
+types-PyYAML>=6.0.12.20240917
