@@ -11,6 +11,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from theo.services.api.app.db.run_sql_migrations import (
     _SQLITE_PERSPECTIVE_MIGRATION,
+    _split_sql_statements,
     run_sql_migrations,
 )
 from theo.services.api.app.db.seeds import seed_reference_data
@@ -297,3 +298,25 @@ def test_seed_reference_data_tolerates_missing_perspective_column(
 
     with Session(engine) as session:
         seed_reference_data(session)
+
+
+def test_split_sql_statements_handles_comments_and_dollar_quotes() -> None:
+    """Ensure SQL splitting respects comments and PostgreSQL dollar quotes."""
+
+    sql = """
+    INSERT INTO demo VALUES ('value; still string');
+    /* block comment with ; inside */
+    DO $$BEGIN
+        PERFORM 1;
+        -- inline comment with ; inside;
+        PERFORM 2;
+    END$$;
+    """
+
+    statements = _split_sql_statements(sql)
+
+    assert len(statements) == 2
+    assert "INSERT INTO demo VALUES" in statements[0]
+    assert statements[1].lstrip().startswith("/* block comment")
+    assert "inline comment" in statements[1]
+    assert statements[1].strip().endswith("END$$")
