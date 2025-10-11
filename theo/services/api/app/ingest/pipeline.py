@@ -150,6 +150,11 @@ def _persist_parser_result(
         parser_version=parser_result.parser_version,
         frontmatter=persist_kwargs.pop("frontmatter"),
         settings=settings,
+        **persist_kwargs,
+    )
+    return document
+
+
 def _resolve_dependencies(
     dependencies: PipelineDependencies | None,
 ) -> PersistenceDependencies:
@@ -325,12 +330,6 @@ def run_pipeline_for_file(
                 session=session,
                 parser_result=parser_result,
                 persistence_dependencies=persistence_dependencies,
-            return _ingest_transcript_document(
-                session,
-                span,
-                dependencies=persistence_dependencies,
-                parser_result=parser_result,
-                frontmatter=merged_frontmatter,
                 settings=settings,
                 span=span,
                 sha256=sha256,
@@ -349,13 +348,6 @@ def run_pipeline_for_file(
             session=session,
             parser_result=parser_result,
             persistence_dependencies=persistence_dependencies,
-
-        return _ingest_text_document(
-            session,
-            span,
-            dependencies=persistence_dependencies,
-            parser_result=parser_result,
-            frontmatter=merged_frontmatter,
             settings=settings,
             span=span,
             sha256=sha256,
@@ -420,7 +412,6 @@ def run_pipeline_for_url(
                 title=merged_frontmatter.get("title")
                 or metadata.get("title")
                 or f"YouTube Video {video_id}",
-                cache_status=cache_status,
                 source_url=merged_frontmatter.get("source_url") or url,
                 channel=merged_frontmatter.get("channel") or metadata.get("channel"),
                 video_id=video_id,
