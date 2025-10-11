@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine
@@ -32,6 +33,31 @@ class DummySession:
 
     def query(self, *_args, **_kwargs):  # pragma: no cover - guard fallback
         pytest.fail("lookup_geo_places should not use ORM query in Postgres mode")
+
+
+class DummyFallbackQuery:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+
+class DummyFallbackSession:
+    def __init__(self, rows):
+        self._rows = rows
+        self.statements: list[Any] = []
+        self.query_calls = 0
+
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+
+    def execute(self, statement, *_args, **_kwargs):  # pragma: no cover - guard fallback
+        pytest.fail("fallback session should not execute statements")
+
+    def query(self, *_args, **_kwargs):
+        self.query_calls += 1
+        return DummyFallbackQuery(self._rows)
 
 
 @pytest.fixture()
@@ -121,3 +147,20 @@ def test_lookup_geo_places_sqlite_fallback_preserves_ordering(sqlite_session: Se
     assert [item.modern_id for item in items] == ["bethlehem", "bethany"]
     assert items[0].aliases == ["Bethlehem Ephrathah"]
     assert len(items) == 2
+
+
+def test_lookup_geo_places_postgres_short_query_uses_python_fallback():
+    bethlehem = GeoModernLocation(
+        modern_id="bethlehem",
+        friendly_id="Bethlehem",
+        search_terms="bethlehem bethlehem ephrathah",
+        confidence=0.95,
+        names=[{"name": "Bethlehem"}],
+    )
+
+    session = DummyFallbackSession([bethlehem])
+
+    items = lookup_geo_places(session, query="be", limit=5)
+
+    assert session.query_calls == 1
+    assert [item.modern_id for item in items] == ["bethlehem"]

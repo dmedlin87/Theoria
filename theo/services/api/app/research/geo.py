@@ -87,7 +87,9 @@ def lookup_geo_places(
     dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
     locations: list[GeoModernLocation]
 
-    if dialect_name == "postgresql":
+    use_trigram_search = dialect_name == "postgresql" and len(normalized_query) >= 3
+
+    if use_trigram_search:
         search_terms = GeoModernLocation.search_terms
         score_expr = func.greatest(
             func.similarity(search_terms, normalized_query),
