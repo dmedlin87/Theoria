@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Callable, Sequence
@@ -28,12 +30,19 @@ class _RerankerCache:
     reranker: Reranker | None = field(default=None, init=False)
     key: tuple[str, str | None] | None = field(default=None, init=False)
     failed: bool = field(default=False, init=False)
+    cooldown_seconds: float = 60.0
+    _last_failure_at: float | None = field(default=None, init=False)
+    _artifact_signature: tuple[int, int] | None = field(default=None, init=False)
+    _cooldown_logged: bool = field(default=False, init=False)
 
     def reset(self) -> None:
         with self.lock:
             self.reranker = None
             self.key = None
             self.failed = False
+            self._last_failure_at = None
+            self._artifact_signature = None
+            self._cooldown_logged = False
 
     def resolve(
         self, model_path: str | Path | None, expected_sha256: str | None
@@ -49,19 +58,58 @@ class _RerankerCache:
                 self.reranker = None
                 self.failed = False
                 self.key = cache_key
+                self._last_failure_at = None
+                self._artifact_signature = None
+                self._cooldown_logged = False
+
+            signature = self._snapshot_artifact(model_str)
 
             if self.failed:
-                return None
+                if signature != self._artifact_signature:
+                    self.failed = False
+                    self.reranker = None
+                    self._last_failure_at = None
+                    self._cooldown_logged = False
+                else:
+                    if self._last_failure_at is not None:
+                        elapsed = time.monotonic() - self._last_failure_at
+                        if elapsed < self.cooldown_seconds:
+                            remaining = self.cooldown_seconds - elapsed
+                            if not self._cooldown_logged:
+                                retry_at = datetime.now(timezone.utc) + timedelta(
+                                    seconds=remaining
+                                )
+                                LOGGER.info(
+                                    "search.reranker_retry_pending",
+                                    extra={
+                                        "event": "search.reranker_retry_pending",
+                                        "model_path": model_str,
+                                        "retry_in_seconds": round(remaining, 3),
+                                        "retry_at": retry_at.isoformat(),
+                                    },
+                                )
+                                self._cooldown_logged = True
+                            return None
+                    self.failed = False
+                    self.reranker = None
+                    self._last_failure_at = None
+                    self._cooldown_logged = False
 
             if self.reranker is None:
                 try:
                     self.reranker = self.loader(
                         model_str, expected_sha256=expected_sha256
                     )
+                    self._artifact_signature = signature
+                    self._last_failure_at = None
+                    self._cooldown_logged = False
                 except Exception as exc:  # pragma: no cover - defensive logging handled upstream
-                    should_log = not self.failed
+                    previously_failed = self.failed
                     self.failed = True
-                    if should_log:
+                    self._last_failure_at = time.monotonic()
+                    self._artifact_signature = signature
+                    self._cooldown_logged = False
+                    if not previously_failed:
                         LOGGER.exception(
                             "search.reranker_load_failed",
                             extra={
@@ -70,9 +118,30 @@ class _RerankerCache:
                                 "error": str(exc),
                             },
                         )
+                    retry_in = self.cooldown_seconds
+                    retry_at = datetime.now(timezone.utc) + timedelta(
+                        seconds=retry_in
+                    )
+                    LOGGER.info(
+                        "search.reranker_retry_scheduled",
+                        extra={
+                            "event": "search.reranker_retry_scheduled",
+                            "model_path": model_str,
+                            "retry_in_seconds": retry_in,
+                            "retry_at": retry_at.isoformat(),
+                        },
+                    )
                     return None
 
             return self.reranker
+
+    @staticmethod
+    def _snapshot_artifact(path: str) -> tuple[int, int] | None:
+        try:
+            stat = Path(path).stat()
+        except OSError:
+            return None
+        return int(stat.st_mtime_ns), stat.st_size
 
 
 _DEFAULT_RERANKER_CACHE = _RerankerCache(load_reranker)
