@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 
-from sqlalchemy import Integer, cast, exists, false, func, select
+from sqlalchemy import Integer, and_, cast, exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from ..db.models import Document, Passage
@@ -27,33 +27,80 @@ def _snippet(text: str, max_length: int = 280) -> str:
     return text[: max_length - 3].rstrip() + "..."
 
 
-def _resolve_query_ids(osis: str) -> list[int]:
-    """Expand *osis* into stable verse identifiers."""
+@dataclass(frozen=True)
+class _VerseQuery:
+    verse_ids: list[int]
+    start_id: int
+    end_id: int
+
+
+def _resolve_query_range(osis: str) -> _VerseQuery | None:
+    """Expand *osis* into a canonical verse-id range."""
 
     try:
-        return list(sorted(expand_osis_reference(osis)))
+        ids = list(sorted(expand_osis_reference(osis)))
     except Exception:  # pragma: no cover - defensive guard for malformed input
-        return []
-
-
-def _verse_overlap_clause(column, verse_ids: list[int], dialect_name: str):
-    """Return a SQL expression testing overlap with *verse_ids*."""
-
-    if not verse_ids:
         return None
 
+    if not ids:
+        return None
+
+    return _VerseQuery(verse_ids=ids, start_id=ids[0], end_id=ids[-1])
+
+
+def _array_overlap_clause(column, query: _VerseQuery, dialect_name: str):
+    """Return a SQL expression testing overlap with *verse_ids*."""
+
     if dialect_name == "postgresql":
-        return column.op("&&")(verse_ids)
+        return column.op("&&")(query.verse_ids)
 
     if dialect_name == "sqlite":
         json_each = func.json_each(column).table_valued("key", "value")
         return exists(
             select(1)
             .select_from(json_each)
-            .where(cast(json_each.c.value, Integer).in_(verse_ids))
+            .where(cast(json_each.c.value, Integer).in_(query.verse_ids))
         )
 
     return column.isnot(None)
+
+
+def _range_overlap_clause(query: _VerseQuery):
+    """Return a SQL expression for overlapping verse-id ranges."""
+
+    return and_(
+        Passage.osis_start_verse_id.isnot(None),
+        Passage.osis_end_verse_id.isnot(None),
+        Passage.osis_start_verse_id <= query.end_id,
+        Passage.osis_end_verse_id >= query.start_id,
+    )
+
+
+def _matches_query(passage: Passage, query: _VerseQuery) -> bool:
+    """Return ``True`` when *passage* overlaps the requested verse range."""
+
+    start = passage.osis_start_verse_id
+    end = passage.osis_end_verse_id
+    if start is not None and end is not None:
+        return start <= query.end_id and end >= query.start_id
+
+    verse_candidates: set[int] = set()
+    if passage.osis_verse_ids:
+        try:
+            verse_candidates.update(int(value) for value in passage.osis_verse_ids if value is not None)
+        except TypeError:  # pragma: no cover - defensive for unexpected payloads
+            pass
+
+    if not verse_candidates and passage.osis_ref:
+        try:
+            verse_candidates.update(expand_osis_reference(passage.osis_ref))
+        except Exception:  # pragma: no cover - malformed legacy metadata
+            return False
+
+    if not verse_candidates:
+        return False
+
+    return any(query.start_id <= verse_id <= query.end_id for verse_id in verse_candidates)
 
 
 def get_mentions_for_osis(
@@ -63,23 +110,37 @@ def get_mentions_for_osis(
 ) -> list[VerseMention]:
     """Return passages whose OSIS reference intersects the requested range."""
 
-    verse_ids = _resolve_query_ids(osis)
-    if not verse_ids:
+    verse_query = _resolve_query_range(osis)
+    if not verse_query:
         return []
 
     bind = session.get_bind()
     dialect_name = bind.dialect.name if bind is not None else ""
-    overlap_clause = _verse_overlap_clause(Passage.osis_verse_ids, verse_ids, dialect_name)
-    if overlap_clause is None:
-        return []
+    range_clause = _range_overlap_clause(verse_query)
+    array_overlap_clause = _array_overlap_clause(
+        Passage.osis_verse_ids, verse_query, dialect_name
+    )
+    fallback_clause = None
+    if array_overlap_clause is not None:
+        fallback_clause = and_(
+            or_(
+                Passage.osis_start_verse_id.is_(None),
+                Passage.osis_end_verse_id.is_(None),
+            ),
+            Passage.osis_verse_ids.isnot(None),
+            array_overlap_clause,
+        )
 
     stmt = (
         select(Passage)
         .join(Document, Passage.document)
         .options(joinedload(Passage.document))
-        .where(Passage.osis_verse_ids.isnot(None))
-        .where(overlap_clause)
     )
+    if fallback_clause is not None:
+        stmt = stmt.where(or_(range_clause, fallback_clause))
+    else:
+        stmt = stmt.where(range_clause)
+
     if filters:
         if filters.source_type:
             stmt = stmt.where(Document.source_type == filters.source_type)
@@ -99,6 +160,9 @@ def get_mentions_for_osis(
             authors = document.authors or []
             if filters.author not in authors:
                 continue
+
+        if not _matches_query(passage, verse_query):
+            continue
 
         passage_schema = PassageSchema(
             id=passage.id,
@@ -186,8 +250,8 @@ def get_verse_timeline(
     if window not in _WINDOW_TYPES:
         raise ValueError(f"Unsupported timeline window: {window}")
 
-    verse_ids = _resolve_query_ids(osis)
-    if not verse_ids:
+    verse_query = _resolve_query_range(osis)
+    if not verse_query:
         return VerseTimelineResponse(
             osis=osis,
             window=window,
@@ -197,19 +261,31 @@ def get_verse_timeline(
 
     bind = session.get_bind()
     dialect_name = bind.dialect.name if bind is not None else ""
-    overlap_clause = _verse_overlap_clause(Passage.osis_verse_ids, verse_ids, dialect_name)
+    range_clause = _range_overlap_clause(verse_query)
+    array_overlap_clause = _array_overlap_clause(
+        Passage.osis_verse_ids, verse_query, dialect_name
+    )
+    fallback_clause = None
+    if array_overlap_clause is not None:
+        fallback_clause = and_(
+            or_(
+                Passage.osis_start_verse_id.is_(None),
+                Passage.osis_end_verse_id.is_(None),
+            ),
+            Passage.osis_verse_ids.isnot(None),
+            array_overlap_clause,
+        )
 
     stmt = (
         select(Passage)
         .join(Document, Passage.document)
         .options(joinedload(Passage.document))
-        .where(Passage.osis_verse_ids.isnot(None))
     )
 
-    if overlap_clause is not None:
-        stmt = stmt.where(overlap_clause)
+    if fallback_clause is not None:
+        stmt = stmt.where(or_(range_clause, fallback_clause))
     else:
-        stmt = stmt.where(false())
+        stmt = stmt.where(range_clause)
 
     if filters:
         if filters.source_type:
@@ -231,6 +307,9 @@ def get_verse_timeline(
             authors = document.authors or []
             if filters.author not in authors:
                 continue
+
+        if not _matches_query(passage, verse_query):
+            continue
 
         reference_date = document.pub_date or (
             document.created_at.date() if document.created_at else None

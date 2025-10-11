@@ -46,6 +46,11 @@ def _session(tmp_path: Path):
         database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
+def _ids_and_bounds(osis: str) -> tuple[list[int], int, int]:
+    ids = list(sorted(expand_osis_reference(osis)))
+    return ids, ids[0], ids[-1]
+
+
 def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
     with _session(tmp_path) as session:
         doc_hit = Document(
@@ -66,9 +71,11 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
         session.add_all([doc_hit, doc_range, doc_miss])
         session.flush()
 
-        john_316_ids = list(sorted(expand_osis_reference("John.3.16")))
-        john_317_ids = list(sorted(expand_osis_reference("John.3.17")))
-        john_range_ids = list(sorted(expand_osis_reference("John.3.16-John.3.17")))
+        john_316_ids, john_316_start, john_316_end = _ids_and_bounds("John.3.16")
+        john_317_ids, john_317_start, john_317_end = _ids_and_bounds("John.3.17")
+        john_range_ids, john_range_start, john_range_end = _ids_and_bounds(
+            "John.3.16-John.3.17"
+        )
 
         passages = [
             Passage(
@@ -77,6 +84,8 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
                 text="Primary hit",
                 osis_ref=None,
                 osis_verse_ids=john_316_ids,
+                osis_start_verse_id=john_316_start,
+                osis_end_verse_id=john_316_end,
             ),
             Passage(
                 id="passage-range",
@@ -84,6 +93,8 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
                 text="Range hit",
                 osis_ref="John.3.16-John.3.17",
                 osis_verse_ids=john_range_ids,
+                osis_start_verse_id=john_range_start,
+                osis_end_verse_id=john_range_end,
             ),
             Passage(
                 id="passage-miss",
@@ -91,6 +102,8 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
                 text="Mismatched ids",
                 osis_ref="John.3.16",  # legacy metadata but wrong ids
                 osis_verse_ids=john_317_ids,
+                osis_start_verse_id=john_317_start,
+                osis_end_verse_id=john_317_end,
             ),
         ]
         session.add_all(passages)
@@ -110,6 +123,76 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
     } == {"Target", "Range"}
 
 
+def test_get_mentions_for_osis_respects_filters(tmp_path: Path) -> None:
+    with _session(tmp_path) as session:
+        doc_primary = Document(
+            id="doc-primary",
+            title="Primary Collection",
+            source_type="pdf",
+            collection="Sermons",
+            authors=["Alice", "Bob"],
+        )
+        doc_secondary = Document(
+            id="doc-secondary",
+            title="Secondary",
+            source_type="pdf",
+            collection="Sermons",
+            authors=["Carol"],
+        )
+        doc_other_collection = Document(
+            id="doc-other",
+            title="Different Collection",
+            source_type="pdf",
+            collection="Notes",
+            authors=["Alice"],
+        )
+        session.add_all([doc_primary, doc_secondary, doc_other_collection])
+        session.flush()
+
+        john_316_ids, john_316_start, john_316_end = _ids_and_bounds("John.3.16")
+
+        session.add_all(
+            [
+                Passage(
+                    id="primary-pass",
+                    document_id=doc_primary.id,
+                    text="Primary",
+                    osis_ref="John.3.16",
+                    osis_verse_ids=john_316_ids,
+                    osis_start_verse_id=john_316_start,
+                    osis_end_verse_id=john_316_end,
+                ),
+                Passage(
+                    id="secondary-pass",
+                    document_id=doc_secondary.id,
+                    text="Secondary",
+                    osis_ref="John.3.16",
+                    osis_verse_ids=john_316_ids,
+                    osis_start_verse_id=john_316_start,
+                    osis_end_verse_id=john_316_end,
+                ),
+                Passage(
+                    id="other-pass",
+                    document_id=doc_other_collection.id,
+                    text="Other",
+                    osis_ref="John.3.16",
+                    osis_verse_ids=john_316_ids,
+                    osis_start_verse_id=john_316_start,
+                    osis_end_verse_id=john_316_end,
+                ),
+            ]
+        )
+        session.commit()
+
+        mentions = get_mentions_for_osis(
+            session=session,
+            osis="John.3.16",
+            filters=VerseMentionsFilters(author="Alice", collection="Sermons"),
+        )
+
+    assert [mention.passage.id for mention in mentions] == ["primary-pass"]
+
+
 def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
     with _session(tmp_path) as session:
         hit_doc = Document(
@@ -127,8 +210,8 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
         session.add_all([hit_doc, miss_doc])
         session.flush()
 
-        john_316_ids = list(sorted(expand_osis_reference("John.3.16")))
-        john_317_ids = list(sorted(expand_osis_reference("John.3.17")))
+        john_316_ids, john_316_start, john_316_end = _ids_and_bounds("John.3.16")
+        john_317_ids, john_317_start, john_317_end = _ids_and_bounds("John.3.17")
 
         session.add_all(
             [
@@ -138,6 +221,8 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
                     text="Timeline target",
                     osis_ref="John.3.16",
                     osis_verse_ids=john_316_ids,
+                    osis_start_verse_id=john_316_start,
+                    osis_end_verse_id=john_316_end,
                 ),
                 Passage(
                     id="timeline-miss-passage",
@@ -145,6 +230,8 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
                     text="Timeline miss",
                     osis_ref="John.3.16",
                     osis_verse_ids=john_317_ids,
+                    osis_start_verse_id=john_317_start,
+                    osis_end_verse_id=john_317_end,
                 ),
             ]
         )

@@ -262,6 +262,11 @@ class Passage(Base):
             "osis_verse_ids",
             postgresql_using="gin",
         ),
+        Index(
+            "ix_passages_osis_verse_range",
+            "osis_start_verse_id",
+            "osis_end_verse_id",
+        ),
         {"extend_existing": True},
     )
 
@@ -281,6 +286,8 @@ class Passage(Base):
         postgresql.ARRAY(Integer).with_variant(JSON, "sqlite"),
         nullable=True,
     )
+    osis_start_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    osis_end_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -55,8 +55,13 @@ logger = logging.getLogger(__name__)
 from .stages import IngestContext
 
 
-def _collect_osis_verse_ids(references: Sequence[str]) -> list[int]:
-    """Return sorted verse identifiers for the supplied OSIS references."""
+def _collect_verse_metadata(
+    references: Sequence[str] | None,
+) -> tuple[list[int] | None, int | None, int | None]:
+    """Return verse identifiers alongside canonical range bounds."""
+
+    if not references:
+        return None, None, None
 
     verse_ids: set[int] = set()
     for reference in references:
@@ -66,7 +71,19 @@ def _collect_osis_verse_ids(references: Sequence[str]) -> list[int]:
             verse_ids.update(expand_osis_reference(reference))
         except Exception:  # pragma: no cover - defensive in case of malformed refs
             continue
-    return sorted(verse_ids)
+
+    if not verse_ids:
+        return None, None, None
+
+    sorted_ids = sorted(int(verse_id) for verse_id in verse_ids)
+    return sorted_ids, sorted_ids[0], sorted_ids[-1]
+
+
+def _collect_osis_verse_ids(references: Sequence[str]) -> list[int]:
+    """Return sorted verse identifiers for the supplied OSIS references."""
+
+    verse_ids, _, _ = _collect_verse_metadata(references)
+    return verse_ids or []
 
 
 def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
@@ -87,18 +104,8 @@ def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
 def _collect_verse_ids(references: Sequence[str] | None) -> list[int] | None:
     """Return sorted verse identifiers for *references* or ``None`` when empty."""
 
-    if not references:
-        return None
-
-    verse_ids: set[int] = set()
-    for reference in references:
-        if reference:
-            verse_ids.update(expand_osis_reference(reference))
-
-    if not verse_ids:
-        return None
-
-    return sorted(verse_ids)
+    verse_ids, _, _ = _collect_verse_metadata(references)
+    return verse_ids
 
 
 def refresh_creator_verse_rollups(
@@ -461,7 +468,7 @@ def persist_text_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
-        verse_ids = _collect_verse_ids(normalized_refs)
+        verse_ids, start_verse_id, end_verse_id = _collect_verse_metadata(normalized_refs)
 
         passage = Passage(
             document_id=document.id,
@@ -475,6 +482,8 @@ def persist_text_document(
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
             osis_verse_ids=verse_ids,
+            osis_start_verse_id=start_verse_id,
+            osis_end_verse_id=end_verse_id,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -887,7 +896,7 @@ def persist_transcript_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
-        verse_ids = _collect_verse_ids(normalized_refs)
+        verse_ids, start_verse_id, end_verse_id = _collect_verse_metadata(normalized_refs)
 
         passage = Passage(
             document_id=document.id,
@@ -901,6 +910,8 @@ def persist_transcript_document(
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
             osis_verse_ids=verse_ids,
+            osis_start_verse_id=start_verse_id,
+            osis_end_verse_id=end_verse_id,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,

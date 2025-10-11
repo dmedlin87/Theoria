@@ -42,12 +42,18 @@ def _seed_graph_data(engine) -> None:
         session.add_all([doc_pdf, doc_markdown])
         session.flush()
 
+        john_ids = list(sorted(expand_osis_reference("John.3.16")))
+        start_id = john_ids[0]
+        end_id = john_ids[-1]
+
         passage_pdf = Passage(
             id="passage-pdf",
             document_id=doc_pdf.id,
             text="For God so loved the world",
             osis_ref="John.3.16",
-            osis_verse_ids=list(sorted(expand_osis_reference("John.3.16"))),
+            osis_verse_ids=john_ids,
+            osis_start_verse_id=start_id,
+            osis_end_verse_id=end_id,
             page_no=3,
             t_start=12.5,
             t_end=18.0,
@@ -57,7 +63,9 @@ def _seed_graph_data(engine) -> None:
             document_id=doc_markdown.id,
             text="Study notes on John 3:16",
             osis_ref="John.3.16",
-            osis_verse_ids=list(sorted(expand_osis_reference("John.3.16"))),
+            osis_verse_ids=john_ids,
+            osis_start_verse_id=start_id,
+            osis_end_verse_id=end_id,
         )
         session.add_all([passage_pdf, passage_markdown])
 

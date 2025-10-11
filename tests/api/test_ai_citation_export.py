@@ -45,12 +45,15 @@ def client(api_engine) -> Generator[TestClient, None, None]:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
+        john_ids = list(sorted(expand_osis_reference("John.1.1")))
         passage = Passage(
             id="passage-1",
             document_id="doc-1",
             text="In the beginning was the Word.",
             osis_ref="John.1.1",
-            osis_verse_ids=list(sorted(expand_osis_reference("John.1.1"))),
+            osis_verse_ids=john_ids,
+            osis_start_verse_id=john_ids[0],
+            osis_end_verse_id=john_ids[-1],
             page_no=1,
             t_start=0.0,
             t_end=5.0,

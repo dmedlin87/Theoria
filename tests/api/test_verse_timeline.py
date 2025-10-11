@@ -26,6 +26,11 @@ from theo.services.api.app.retriever.verses import (  # noqa: E402
 )
 
 
+def _ids_and_bounds(osis: str) -> tuple[list[int], int, int]:
+    ids = list(sorted(expand_osis_reference(osis)))
+    return ids, ids[0], ids[-1]
+
+
 def _prepare_engine(tmp_path: Path):
     configure_engine(f"sqlite:///{tmp_path / 'timeline.db'}")
     engine = get_engine()
@@ -68,7 +73,7 @@ def _seed_documents(session: Session) -> None:
     session.add_all([doc1, doc2, doc3, doc4])
     session.flush()
 
-    john_ids = list(sorted(expand_osis_reference("John.3.16")))
+    john_ids, john_start, john_end = _ids_and_bounds("John.3.16")
 
     passages = [
         Passage(
@@ -77,6 +82,8 @@ def _seed_documents(session: Session) -> None:
             text="Ref",
             osis_ref="John.3.16",
             osis_verse_ids=john_ids,
+            osis_start_verse_id=john_start,
+            osis_end_verse_id=john_end,
         ),
         Passage(
             id="p-2",
@@ -84,6 +91,8 @@ def _seed_documents(session: Session) -> None:
             text="Ref",
             osis_ref="John.3.16",
             osis_verse_ids=john_ids,
+            osis_start_verse_id=john_start,
+            osis_end_verse_id=john_end,
         ),
         Passage(
             id="p-3",
@@ -91,6 +100,8 @@ def _seed_documents(session: Session) -> None:
             text="Ref",
             osis_ref="John.3.16",
             osis_verse_ids=john_ids,
+            osis_start_verse_id=john_start,
+            osis_end_verse_id=john_end,
         ),
         Passage(
             id="p-4",
@@ -98,6 +109,8 @@ def _seed_documents(session: Session) -> None:
             text="Ref",
             osis_ref="John.3.16",
             osis_verse_ids=john_ids,
+            osis_start_verse_id=john_start,
+            osis_end_verse_id=john_end,
         ),
     ]
     session.add_all(passages)
@@ -217,7 +230,7 @@ def test_get_verse_timeline_filters_by_author_for_week_window(tmp_path) -> None:
             session.add_all(documents)
             session.flush()
 
-            john_ids = list(sorted(expand_osis_reference("John.3.16")))
+            john_ids, john_start, john_end = _ids_and_bounds("John.3.16")
 
             passages = [
                 Passage(
@@ -226,6 +239,8 @@ def test_get_verse_timeline_filters_by_author_for_week_window(tmp_path) -> None:
                     text="Ref",
                     osis_ref="John.3.16",
                     osis_verse_ids=john_ids,
+                    osis_start_verse_id=john_start,
+                    osis_end_verse_id=john_end,
                 ),
                 Passage(
                     id="multi-p2",
@@ -233,6 +248,8 @@ def test_get_verse_timeline_filters_by_author_for_week_window(tmp_path) -> None:
                     text="Ref",
                     osis_ref="John.3.16",
                     osis_verse_ids=john_ids,
+                    osis_start_verse_id=john_start,
+                    osis_end_verse_id=john_end,
                 ),
                 Passage(
                     id="multi-p3",
@@ -240,6 +257,8 @@ def test_get_verse_timeline_filters_by_author_for_week_window(tmp_path) -> None:
                     text="Ref",
                     osis_ref="John.3.16",
                     osis_verse_ids=john_ids,
+                    osis_start_verse_id=john_start,
+                    osis_end_verse_id=john_end,
                 ),
             ]
             session.add_all(passages)
