@@ -22,6 +22,7 @@ class _EmbeddingBackend(Protocol):
         ...
 
 from ..core.settings import get_settings
+from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 
 _TRACER = trace.get_tracer("theo.embedding")
@@ -83,7 +84,19 @@ class EmbeddingService:
     def _encode(self, texts: Sequence[str]) -> list[list[float]]:
         model = self._ensure_model()
         if hasattr(model, "encode"):
-            embeddings = model.encode(texts)
+            try:
+                embeddings, metadata = resilient_operation(
+                    lambda: model.encode(texts),
+                    key=f"embedding:{self.model_name}",
+                    classification="embedding",
+                    policy=ResiliencePolicy(max_attempts=2),
+                )
+                span = trace.get_current_span()
+                if span is not None:
+                    span.set_attribute("embedding.resilience_attempts", metadata.attempts)
+                    span.set_attribute("embedding.resilience_duration", metadata.duration)
+            except ResilienceError:
+                raise
         else:  # pragma: no cover - extremely defensive
             embeddings = []
         if (
@@ -107,7 +120,12 @@ class EmbeddingService:
                 span.set_attribute("embedding.batch_index", batch_index)
                 span.set_attribute("embedding.batch_size", len(batch))
                 span.set_attribute("embedding.vector_dimensions", self.dimension)
-                vectors = self._encode(batch)
+                try:
+                    vectors = self._encode(batch)
+                except ResilienceError as exc:
+                    span.set_attribute("embedding.resilience_category", exc.metadata.category)
+                    span.set_attribute("embedding.resilience_attempts", exc.metadata.attempts)
+                    raise
                 span.set_attribute("embedding.output_count", len(vectors))
             batched.extend(vectors)
         return batched

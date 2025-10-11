@@ -8,18 +8,22 @@ from pathlib import Path
 from uuid import uuid4
 from typing import Any, AsyncIterator, Iterator
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
 from ..core.settings import get_settings
+from ..errors import IngestionError, Severity
 from ..ingest.exceptions import UnsupportedSourceError
 from ..models.documents import (
     DocumentIngestResponse,
     SimpleIngestRequest,
     UrlIngestRequest,
 )
+from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
+from ..telemetry import log_workflow_event
+from theo.services.cli import ingest_folder as cli_ingest
 from ..services.ingestion_service import IngestionService, get_ingestion_service
 
 _INGEST_ERROR_RESPONSES = {
@@ -40,8 +44,12 @@ def _parse_frontmatter(raw: str | None) -> dict[str, Any] | None:
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid frontmatter JSON"
+        raise IngestionError(
+            "Invalid frontmatter JSON",
+            code="INGESTION_INVALID_FRONTMATTER",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Ensure frontmatter is valid JSON before submitting the request.",
         ) from exc
 
 
@@ -93,17 +101,48 @@ async def _stream_upload_to_path(
     max_bytes: int | None,
     chunk_size: int = _UPLOAD_CHUNK_SIZE,
 ) -> int:
-    written = 0
-    with destination.open("wb") as handle:
-        async for chunk in _iter_upload_chunks(upload, chunk_size=chunk_size):
-            written += len(chunk)
-            if max_bytes is not None and written > max_bytes:
-                raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail="Upload exceeds maximum allowed size",
-                )
-            handle.write(chunk)
-    return written
+    async def _write() -> int:
+        written = 0
+        with destination.open("wb") as handle:
+            async for chunk in _iter_upload_chunks(upload, chunk_size=chunk_size):
+                written += len(chunk)
+                if max_bytes is not None and written > max_bytes:
+                    raise IngestionError(
+                        "Upload exceeds maximum allowed size",
+                        code="INGESTION_UPLOAD_TOO_LARGE",
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        severity=Severity.USER,
+                        hint="Reduce the file size or configure a larger quota before retrying.",
+                    )
+                try:
+                    handle.write(chunk)
+                except OSError as exc:
+                    raise IngestionError(
+                        "Failed to persist uploaded file",
+                        code="INGESTION_UPLOAD_IO_ERROR",
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        severity=Severity.TRANSIENT,
+                        hint="Retry the upload or check storage permissions.",
+                    ) from exc
+        return written
+
+    try:
+        result, _metadata = await resilient_async_operation(
+            _write,
+            key=f"ingest:upload:{destination.suffix or 'bin'}",
+            classification="file",
+            policy=ResiliencePolicy(max_attempts=1),
+        )
+    except ResilienceError as exc:
+        raise IngestionError(
+            "Upload failed due to storage error",
+            code="INGESTION_UPLOAD_FAILURE",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            severity=Severity.TRANSIENT,
+            hint="Retry the upload once the storage service is healthy.",
+            data={"resilience": exc.metadata.to_dict()},
+        ) from exc
+    return result
 
 
 def _encode_event(event: dict[str, Any]) -> bytes:
@@ -135,12 +174,25 @@ async def ingest_file(
             max_bytes=getattr(settings, "ingest_upload_max_bytes", None),
         )
         parsed_frontmatter = _parse_frontmatter(frontmatter)
-        document = ingestion_service.ingest_file(
-            session, tmp_path, parsed_frontmatter
-        )
+        document = run_pipeline_for_file(session, tmp_path, parsed_frontmatter)
+    except IngestionError:
+        raise
     except UnsupportedSourceError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        raise IngestionError(
+            str(exc),
+            code="INGESTION_UNSUPPORTED_SOURCE",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Verify the provided source is supported for ingestion.",
+        ) from exc
+    except ResilienceError as exc:
+        raise IngestionError(
+            "Ingestion pipeline failed while processing the file",
+            code="INGESTION_PIPELINE_FAILURE",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            severity=Severity.TRANSIENT,
+            hint="Retry the request once dependent services recover.",
+            data={"resilience": exc.metadata.to_dict()},
         ) from exc
     finally:
         try:
@@ -170,8 +222,21 @@ async def ingest_url(
             frontmatter=payload.frontmatter,
         )
     except UnsupportedSourceError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        raise IngestionError(
+            str(exc),
+            code="INGESTION_UNSUPPORTED_SOURCE",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Update the URL or whitelist it before retrying.",
+        ) from exc
+    except ResilienceError as exc:
+        raise IngestionError(
+            "Failed to fetch remote content",
+            code="INGESTION_NETWORK_FAILURE",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            severity=Severity.TRANSIENT,
+            hint="Retry after the upstream provider recovers.",
+            data={"resilience": exc.metadata.to_dict()},
         ) from exc
 
     return DocumentIngestResponse(document_id=document.id, status="processed")
@@ -192,8 +257,12 @@ async def simple_ingest(
         except StopIteration:
             first_event = None
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        raise IngestionError(
+            str(exc),
+            code="INGESTION_CONFIGURATION_ERROR",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Review the provided ingest sources and configuration.",
         ) from exc
 
     def _event_stream() -> Iterator[bytes]:
@@ -253,9 +322,24 @@ async def ingest_transcript(
                 else None
             ),
         )
+    except IngestionError:
+        raise
     except UnsupportedSourceError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        raise IngestionError(
+            str(exc),
+            code="INGESTION_UNSUPPORTED_SOURCE",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Supply a supported transcript format.",
+        ) from exc
+    except ResilienceError as exc:
+        raise IngestionError(
+            "Transcript processing failed",
+            code="INGESTION_TRANSCRIPT_FAILURE",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            severity=Severity.TRANSIENT,
+            hint="Retry once the transcription pipeline is healthy.",
+            data={"resilience": exc.metadata.to_dict()},
         ) from exc
     finally:
         try:

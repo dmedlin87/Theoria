@@ -48,6 +48,7 @@ from .persistence import (
     persist_transcript_document,
     refresh_creator_verse_rollups,
 )
+from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 
 _resolve_host_addresses = ingest_network.resolve_host_addresses
@@ -298,7 +299,20 @@ def run_pipeline_for_file(
     with instrument_workflow(
         "ingest.file", source_path=str(path), source_name=path.name
     ) as span:
-        raw_bytes = path.read_bytes()
+        try:
+            raw_bytes, read_meta = resilient_operation(
+                path.read_bytes,
+                key=f"ingest:file:read:{path.suffix or 'bin'}",
+                classification="file",
+                policy=ResiliencePolicy(max_attempts=2),
+            )
+        except ResilienceError as exc:
+            set_span_attribute(span, "resilience.file_read.category", exc.metadata.category)
+            set_span_attribute(span, "resilience.file_read.attempts", exc.metadata.attempts)
+            raise
+        else:
+            set_span_attribute(span, "resilience.file_read.attempts", read_meta.attempts)
+            set_span_attribute(span, "resilience.file_read.duration", read_meta.duration)
         sha256 = hashlib.sha256(raw_bytes).hexdigest()
 
         merged_frontmatter = merge_metadata(
@@ -420,7 +434,15 @@ def run_pipeline_for_url(
                     )
                 )
 
-            html, metadata = _fetch_web_document(settings, url)
+            try:
+                (html, metadata), fetch_meta = _fetch_web_document(settings, url)
+            except ResilienceError as exc:
+                set_span_attribute(span, "resilience.network.category", exc.metadata.category)
+                set_span_attribute(span, "resilience.network.attempts", exc.metadata.attempts)
+                raise
+            else:
+                set_span_attribute(span, "resilience.network.attempts", fetch_meta.attempts)
+                set_span_attribute(span, "resilience.network.duration", fetch_meta.duration)
             text_content = html_to_text(html)
             if not text_content:
                 raise UnsupportedSourceError(
@@ -519,7 +541,12 @@ build_opener = _urllib_build_opener
 
 
 def _fetch_web_document(settings, url: str):
-    return fetch_web_document(settings, url, opener_factory=build_opener)
+    return resilient_operation(
+        lambda: fetch_web_document(settings, url, opener_factory=build_opener),
+        key=f"ingest:web:{url}",
+        classification="network",
+        policy=ResiliencePolicy(max_attempts=3),
+    )
 
 
 
