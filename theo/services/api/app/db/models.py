@@ -280,12 +280,42 @@ class Passage(Base):
     tei_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="passages")
+    verse_links: Mapped[list["PassageVerse"]] = relationship(
+        "PassageVerse",
+        back_populates="passage",
+        cascade="all, delete-orphan",
+    )
     case_object: Mapped["CaseObject | None"] = relationship(
         "CaseObject",
         back_populates="passage",
         cascade="all, delete-orphan",
         uselist=False,
     )
+
+
+class PassageVerse(Base):
+    """Normalized verse mappings for passages."""
+
+    __tablename__ = "passage_verses"
+    __table_args__ = (
+        UniqueConstraint(
+            "passage_id",
+            "verse_id",
+            name="uq_passage_verses_passage_verse",
+        ),
+        Index("ix_passage_verses_verse_id", "verse_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    passage_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("passages.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    verse_id: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    passage: Mapped[Passage] = relationship("Passage", back_populates="verse_links")
 
 
 class AppSetting(Base):

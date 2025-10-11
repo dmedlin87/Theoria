@@ -21,6 +21,7 @@ from ..db.models import (
     CreatorClaim,
     Document,
     Passage,
+    PassageVerse,
     TranscriptQuote,
     TranscriptSegment,
     Video,
@@ -43,7 +44,7 @@ from .metadata import (
     serialise_frontmatter,
     truncate,
 )
-from .osis import detect_osis_references
+from .osis import detect_osis_references, expand_osis_reference
 from .sanitizer import sanitize_passage_text
 
 
@@ -445,6 +446,9 @@ def persist_text_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
+        verse_ids: set[int] = set()
+        for reference in normalized_refs:
+            verse_ids.update(expand_osis_reference(reference))
 
         segment = TranscriptSegment(
             document_id=document.id,
@@ -459,6 +463,10 @@ def persist_text_document(
         )
         session.add(segment)
         segments.append(segment)
+
+        if verse_ids:
+            for verse_id in sorted(verse_ids):
+                session.add(PassageVerse(passage=passage, verse_id=verse_id))
 
     session.flush()
 
@@ -837,6 +845,9 @@ def persist_transcript_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
+        verse_ids: set[int] = set()
+        for reference in normalized_refs:
+            verse_ids.update(expand_osis_reference(reference))
 
         segment = TranscriptSegment(
             document_id=document.id,
@@ -851,6 +862,10 @@ def persist_transcript_document(
         )
         session.add(segment)
         segments.append(segment)
+
+        if verse_ids:
+            for verse_id in sorted(verse_ids):
+                session.add(PassageVerse(passage=passage, verse_id=verse_id))
 
     session.flush()
 

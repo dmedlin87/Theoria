@@ -15,9 +15,14 @@ from theo.services.api.app.db.models import (
     CaseSource,
     Document,
     Passage,
+    PassageVerse,
 )
 from theo.services.api.app.ingest.chunking import Chunk
-from theo.services.api.app.ingest.persistence import persist_text_document
+from theo.services.api.app.ingest.persistence import (
+    persist_text_document,
+    persist_transcript_document,
+)
+from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.ingest.stages import IngestContext, Instrumentation
 
 
@@ -244,3 +249,79 @@ def test_persist_text_document_does_not_call_case_builder_when_disabled(
         source_url=None,
         text_content="Sample text",
     )
+
+
+def test_persist_text_document_creates_passage_verses(
+    sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="false")
+    settings = settings_module.get_settings()
+
+    context = IngestContext(
+        settings=settings,
+        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        instrumentation=Instrumentation(span=None),
+    )
+
+    chunk = Chunk(text="John 3:16-17 reappears", start_char=0, end_char=18, index=0)
+    document = persist_text_document(
+        sqlite_session,
+        context=context,
+        chunks=[chunk],
+        parser="plain",
+        parser_version="1.0.0",
+        frontmatter={"osis_refs": ["John.3.16-17", "John.3.16"]},
+        sha256="verse-tracking-text",
+        source_type="txt",
+        title="Sample",
+        source_url=None,
+        text_content="John 3:16-17 reappears",
+    )
+
+    assert document is not None
+    stored = sqlite_session.query(PassageVerse).all()
+    expected = expand_osis_reference("John.3.16-17")
+    assert len(stored) == len(expected)
+    assert {entry.verse_id for entry in stored} == set(expected)
+    assert {entry.passage_id for entry in stored} == {p.id for p in sqlite_session.query(Passage).all()}
+
+
+def test_persist_transcript_document_creates_passage_verses(
+    sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="false")
+    settings = settings_module.get_settings()
+
+    context = IngestContext(
+        settings=settings,
+        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        instrumentation=Instrumentation(span=None),
+    )
+
+    chunk = Chunk(
+        text="John 3:16-17 is quoted twice",  # ensures detection
+        start_char=0,
+        end_char=26,
+        index=0,
+        t_start=0.0,
+        t_end=10.0,
+    )
+    document = persist_transcript_document(
+        sqlite_session,
+        context=context,
+        chunks=[chunk],
+        parser="plain",
+        parser_version="1.0.0",
+        frontmatter={"osis_refs": ["John.3.16-17"]},
+        sha256="verse-tracking-transcript",
+        source_type="youtube",
+        title="Video",
+        duration_seconds=10,
+    )
+
+    assert document is not None
+    stored = sqlite_session.query(PassageVerse).all()
+    expected = expand_osis_reference("John.3.16-17")
+    assert len(stored) == len(expected)
+    assert {entry.verse_id for entry in stored} == set(expected)
+    assert {entry.passage_id for entry in stored} == {p.id for p in sqlite_session.query(Passage).all()}

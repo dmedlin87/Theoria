@@ -6,10 +6,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 
+from sqlalchemy import DateTime, Integer, case, cast, func, literal
 from sqlalchemy.orm import Session
 
-from ..db.models import Document, Passage
-from ..ingest.osis import osis_intersects
+from ..db.models import Document, Passage, PassageVerse
+from ..ingest.osis import expand_osis_reference
 from ..models.base import Passage as PassageSchema
 from ..models.verses import (
     VerseMention,
@@ -26,26 +27,55 @@ def _snippet(text: str, max_length: int = 280) -> str:
     return text[: max_length - 3].rstrip() + "..."
 
 
-def _collect_osis_refs(passage: Passage) -> set[str]:
-    """Return all OSIS references associated with *passage*."""
+def _bucket_start_expression(
+    session: Session,
+    reference_value,
+    window: Literal["week", "month", "quarter", "year"],
+):
+    """Return a SQL expression representing the bucket start for *window*."""
 
-    refs: set[str] = set()
-    if passage.osis_ref:
-        refs.add(passage.osis_ref)
-    meta = passage.meta or {}
-    if isinstance(meta, dict):
-        for key in (
-            "primary_osis",
-            "osis_refs",
-            "osis_refs_all",
-            "osis_refs_detected",
-        ):
-            value = meta.get(key)
-            if isinstance(value, str) and value:
-                refs.add(value)
-            elif isinstance(value, (list, tuple, set)):
-                refs.update(str(item) for item in value if item)
-    return refs
+    dialect = getattr(getattr(session.bind, "dialect", None), "name", "sqlite")
+    if dialect == "postgresql":
+        timestamp_value = cast(reference_value, DateTime(timezone=True))
+        return func.date_trunc(window, timestamp_value)
+
+    base_date = func.date(reference_value)
+    if window == "week":
+        weekday = func.cast(func.strftime("%w", base_date), Integer)
+        offset_days = case(
+            (weekday == 0, literal(-6)),
+            else_=literal(1) - weekday,
+        )
+        offset_spec = func.printf("%+d days", offset_days)
+        return func.date(base_date, offset_spec)
+    if window == "month":
+        return func.strftime("%Y-%m-01", base_date)
+    if window == "quarter":
+        month_num = func.cast(func.strftime("%m", base_date), Integer)
+        quarter_start_month = case(
+            (month_num <= 3, literal("01")),
+            (month_num <= 6, literal("04")),
+            (month_num <= 9, literal("07")),
+            else_=literal("10"),
+        )
+        return func.printf(
+            "%s-%s-01",
+            func.strftime("%Y", base_date),
+            quarter_start_month,
+        )
+    return func.printf("%s-01-01", func.strftime("%Y", base_date))
+
+
+def _coerce_bucket_date(raw: object) -> date:
+    """Coerce *raw* values emitted by SQL into :class:`date` objects."""
+
+    if isinstance(raw, datetime):
+        return raw.date()
+    if isinstance(raw, date):
+        return raw
+    if isinstance(raw, str) and raw:
+        return date.fromisoformat(raw)
+    raise TypeError(f"Unsupported bucket value: {raw!r}")
 
 
 def get_mentions_for_osis(
@@ -55,10 +85,16 @@ def get_mentions_for_osis(
 ) -> list[VerseMention]:
     """Return passages whose OSIS reference intersects the requested range."""
 
+    target_ids = expand_osis_reference(osis)
+    if not target_ids:
+        return []
+
     query = (
         session.query(Passage, Document)
+        .join(PassageVerse, PassageVerse.passage_id == Passage.id)
         .join(Document)
-        .filter(Passage.osis_ref.isnot(None))
+        .filter(PassageVerse.verse_id.in_(sorted(target_ids)))
+        .group_by(Passage.id, Document.id)
     )
     if filters:
         if filters.source_type:
@@ -68,12 +104,6 @@ def get_mentions_for_osis(
 
     mentions: list[VerseMention] = []
     for passage, document in query.all():
-        refs = _collect_osis_refs(passage)
-        if not refs:
-            continue
-        if not any(osis_intersects(ref, osis) for ref in refs):
-            continue
-
         if filters and filters.author:
             authors = document.authors or []
             if filters.author not in authors:
@@ -165,10 +195,37 @@ def get_verse_timeline(
     if window not in _WINDOW_TYPES:
         raise ValueError(f"Unsupported timeline window: {window}")
 
+    target_ids = expand_osis_reference(osis)
+    if not target_ids:
+        return VerseTimelineResponse(
+            osis=osis,
+            window=window,
+            buckets=[],
+            total_mentions=0,
+        )
+
+    reference_value = func.coalesce(Document.pub_date, func.date(Document.created_at))
+    bucket_start_expr = _bucket_start_expression(session, reference_value, window).label(
+        "bucket_start"
+    )
+
     query = (
-        session.query(Passage, Document)
+        session.query(
+            Passage.id.label("passage_id"),
+            Document.id.label("document_id"),
+            Document.authors.label("authors"),
+            bucket_start_expr,
+        )
+        .join(PassageVerse, PassageVerse.passage_id == Passage.id)
         .join(Document)
-        .filter(Passage.osis_ref.isnot(None))
+        .filter(PassageVerse.verse_id.in_(sorted(target_ids)))
+        .filter(reference_value.isnot(None))
+        .group_by(
+            Passage.id,
+            Document.id,
+            Document.authors,
+            bucket_start_expr,
+        )
     )
 
     if filters:
@@ -179,23 +236,13 @@ def get_verse_timeline(
 
     bucket_map: dict[datetime, _BucketData] = {}
 
-    for passage, document in query.all():
-        refs = _collect_osis_refs(passage)
-        if not refs or not any(osis_intersects(ref, osis) for ref in refs):
+    for row in query.all():
+        authors = row.authors or []
+        if filters and filters.author and filters.author not in authors:
             continue
 
-        if filters and filters.author:
-            authors = document.authors or []
-            if filters.author not in authors:
-                continue
-
-        reference_date = document.pub_date or (
-            document.created_at.date() if document.created_at else None
-        )
-        if not reference_date:
-            continue
-
-        label, start, end = _period_bounds(reference_date, window)
+        bucket_moment = _coerce_bucket_date(row.bucket_start)
+        label, start, end = _period_bounds(bucket_moment, window)
         bucket = bucket_map.setdefault(
             start,
             _BucketData(
@@ -205,8 +252,8 @@ def get_verse_timeline(
             ),
         )
         bucket.count = int(bucket.count) + 1
-        bucket.document_ids.add(document.id)
-        bucket.sample_passage_ids.add(passage.id)
+        bucket.document_ids.add(row.document_id)
+        bucket.sample_passage_ids.add(row.passage_id)
 
     sorted_keys = sorted(bucket_map.keys())
     if limit is not None and limit > 0:
