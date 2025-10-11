@@ -243,7 +243,56 @@ def export_citations(
         anchors=anchor_map,
         filters={},
     )
-    record_dicts = [dict(record) for record in citation_records]
+    manifest = manifest.model_copy(update={"type": "documents"})
+
+    def _strip_doi_prefix(value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        lowered = cleaned.lower()
+        prefixes = (
+            "https://doi.org/",
+            "http://doi.org/",
+            "https://dx.doi.org/",
+            "http://dx.doi.org/",
+            "doi.org/",
+        )
+        for prefix in prefixes:
+            if lowered.startswith(prefix):
+                return cleaned[len(prefix) :].strip() or None
+        if lowered.startswith("doi:"):
+            return cleaned[4:].strip() or None
+        return cleaned
+
+    detail_index = {detail.id: detail for detail in document_details}
+    record_dicts: list[dict[str, Any]] = []
+    for record in citation_records:
+        record_dict = dict(record)
+        document_id = record_dict.get("document_id")
+        detail = detail_index.get(document_id) if document_id else None
+        if detail:
+            passages = [
+                passage.model_dump(by_alias=True)
+                for passage in detail.passages
+            ]
+            if passages:
+                record_dict["passages"] = passages
+        doi_value = record_dict.get("doi")
+        if doi_value is not None:
+            record_dict["doi"] = _strip_doi_prefix(doi_value)
+        record_dicts.append(record_dict)
+
+    for entry in csl_entries:
+        doi_value = entry.get("DOI")
+        if doi_value is not None:
+            stripped = _strip_doi_prefix(doi_value)
+            if stripped:
+                entry["DOI"] = stripped
+            else:
+                entry.pop("DOI", None)
+
     manager_payload = {
         "format": "csl-json",
         "export_id": manifest.export_id,

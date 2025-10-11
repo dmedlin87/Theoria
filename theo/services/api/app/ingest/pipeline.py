@@ -150,6 +150,88 @@ def _persist_parser_result(
         parser_version=parser_result.parser_version,
         frontmatter=persist_kwargs.pop("frontmatter"),
         settings=settings,
+def _resolve_dependencies(
+    dependencies: PipelineDependencies | None,
+) -> PersistenceDependencies:
+    """Normalise optional dependency overrides for persistence helpers."""
+
+    if dependencies is None:
+        dependencies = PipelineDependencies()
+    return dependencies.for_persistence()
+
+
+def _set_chunk_span_metrics(span, parser_result: ParserResult) -> None:
+    chunk_count = len(parser_result.chunks)
+    set_span_attribute(span, "ingest.chunk_count", chunk_count)
+    set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
+
+
+def _ingest_transcript_document(
+    session: Session,
+    span,
+    *,
+    dependencies: PersistenceDependencies,
+    parser_result: ParserResult,
+    frontmatter: dict[str, Any],
+    settings,
+    sha256: str,
+    source_type: str,
+    title: str,
+    cache_status: str,
+    **persist_kwargs: Any,
+) -> Document:
+    """Persist transcript documents with consistent instrumentation."""
+
+    _set_chunk_span_metrics(span, parser_result)
+    set_span_attribute(span, "ingest.cache_status", cache_status)
+
+    document = persist_transcript_document(
+        session,
+        dependencies=dependencies,
+        chunks=parser_result.chunks,
+        parser=parser_result.parser,
+        parser_version=parser_result.parser_version,
+        frontmatter=frontmatter,
+        settings=settings,
+        sha256=sha256,
+        source_type=source_type,
+        title=title,
+        **persist_kwargs,
+    )
+    set_span_attribute(span, "ingest.document_id", document.id)
+    return document
+
+
+def _ingest_text_document(
+    session: Session,
+    span,
+    *,
+    dependencies: PersistenceDependencies,
+    parser_result: ParserResult,
+    frontmatter: dict[str, Any],
+    settings,
+    sha256: str,
+    source_type: str,
+    title: str,
+    cache_status: str,
+    **persist_kwargs: Any,
+) -> Document:
+    """Persist text documents with consistent instrumentation."""
+
+    _set_chunk_span_metrics(span, parser_result)
+    set_span_attribute(span, "ingest.cache_status", cache_status)
+
+    document = persist_text_document(
+        session,
+        dependencies=dependencies,
+        chunks=parser_result.chunks,
+        parser=parser_result.parser,
+        parser_version=parser_result.parser_version,
+        frontmatter=frontmatter,
+        settings=settings,
+        sha256=sha256,
+        source_type=source_type,
+        title=title,
         **persist_kwargs,
     )
     set_span_attribute(span, "ingest.document_id", document.id)
@@ -215,7 +297,9 @@ def run_pipeline_for_file(
 ) -> Document:
     """Execute the file ingestion pipeline synchronously."""
 
-    settings, persistence_dependencies = _resolve_context(dependencies)
+    persistence_dependencies = _resolve_dependencies(dependencies)
+
+    settings = get_settings()
     with instrument_workflow(
         "ingest.file", source_path=str(path), source_name=path.name
     ) as span:
@@ -241,12 +325,19 @@ def run_pipeline_for_file(
                 session=session,
                 parser_result=parser_result,
                 persistence_dependencies=persistence_dependencies,
+            return _ingest_transcript_document(
+                session,
+                span,
+                dependencies=persistence_dependencies,
+                parser_result=parser_result,
+                frontmatter=merged_frontmatter,
                 settings=settings,
                 span=span,
                 sha256=sha256,
                 frontmatter=merged_frontmatter,
                 source_type="transcript",
                 title=merged_frontmatter.get("title") or path.stem,
+                cache_status="n/a",
                 source_url=merged_frontmatter.get("source_url"),
                 transcript_path=path,
                 transcript_filename=path.name,
@@ -258,12 +349,20 @@ def run_pipeline_for_file(
             session=session,
             parser_result=parser_result,
             persistence_dependencies=persistence_dependencies,
+
+        return _ingest_text_document(
+            session,
+            span,
+            dependencies=persistence_dependencies,
+            parser_result=parser_result,
+            frontmatter=merged_frontmatter,
             settings=settings,
             span=span,
             sha256=sha256,
             frontmatter=merged_frontmatter,
             source_type=source_type,
             title=merged_frontmatter.get("title") or path.stem,
+            cache_status="n/a",
             source_url=merged_frontmatter.get("source_url"),
             text_content=text_content,
             original_path=path,
@@ -321,6 +420,7 @@ def run_pipeline_for_url(
                 title=merged_frontmatter.get("title")
                 or metadata.get("title")
                 or f"YouTube Video {video_id}",
+                cache_status=cache_status,
                 source_url=merged_frontmatter.get("source_url") or url,
                 channel=merged_frontmatter.get("channel") or metadata.get("channel"),
                 video_id=video_id,
@@ -360,6 +460,7 @@ def run_pipeline_for_url(
             frontmatter=merged_frontmatter,
             source_type="web_page",
             title=merged_frontmatter.get("title") or metadata.get("title") or url,
+            cache_status="n/a",
             source_url=merged_frontmatter.get("source_url")
             or metadata.get("canonical_url")
             or url,
@@ -410,6 +511,7 @@ def run_pipeline_for_transcript(
             frontmatter=merged_frontmatter,
             source_type=source_type,
             title=title,
+            cache_status="n/a",
             source_url=merged_frontmatter.get("source_url"),
             channel=merged_frontmatter.get("channel"),
             video_id=merged_frontmatter.get("video_id"),
