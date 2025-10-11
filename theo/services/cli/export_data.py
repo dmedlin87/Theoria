@@ -7,21 +7,30 @@ from collections import OrderedDict
 from collections.abc import Mapping, Sequence as SequenceABC
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Sequence
+from typing import Any, Iterator, Sequence, cast
 
 import click
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..api.app.core.database import get_engine
+from ..api.app.db.models import Document
+from ..api.app.export.citations import build_citation_export, render_citation_markdown
 from ..api.app.export.formatters import (
     build_document_export,
     build_search_export,
     generate_export_id,
     render_bundle,
 )
-from ..api.app.models.export import DocumentExportFilters, ExportManifest
+from ..api.app.models.export import (
+    CitationStyleLiteral,
+    DocumentExportFilters,
+    ExportManifest,
+)
 from ..api.app.models.search import HybridSearchFilters, HybridSearchRequest
 from ..api.app.retriever.export import export_documents, export_search_results
+from ..api.app.retriever.verses import get_mentions_for_osis
+from ..api.app.models.verses import VerseMentionsFilters
 
 STATE_DIR = Path(".export_state")
 
@@ -92,6 +101,19 @@ def _flatten_passages(
             entry["meta"] = passage.get("meta")
             flattened.append(entry)
     return flattened
+
+
+def _format_anchor_label(passage) -> str | None:
+    page_no = getattr(passage, "page_no", None)
+    if isinstance(page_no, int):
+        return f"p.{page_no}"
+    t_start = getattr(passage, "t_start", None)
+    t_end = getattr(passage, "t_end", None)
+    if isinstance(t_start, (int, float)):
+        if isinstance(t_end, (int, float)) and t_end != t_start:
+            return f"{int(t_start)}-{int(t_end)}s"
+        return f"{int(t_start)}s"
+    return None
 
 
 @click.group()
@@ -220,6 +242,141 @@ def export_search_command(
     if not body.endswith("\n"):
         output.write("\n")
     _persist_state(manifest)
+
+
+@export.command("citations")
+@click.option(
+    "--style",
+    type=click.Choice(["apa", "chicago", "csl-json"], case_sensitive=False),
+    default="apa",
+    show_default=True,
+    help="Citation style to render.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["markdown", "json", "ndjson", "csv"], case_sensitive=False),
+    default="markdown",
+    show_default=True,
+    help="Output format for the citation bundle.",
+)
+@click.option(
+    "--document-id",
+    "document_ids",
+    type=str,
+    multiple=True,
+    help="Document identifier to include (may be repeated).",
+)
+@click.option("--osis", type=str, default=None, help="OSIS reference to collect mentions for.")
+@click.option("--collection", type=str, default=None, help="Filter mentions by collection.")
+@click.option("--author", type=str, default=None, help="Filter mentions by author.")
+@click.option("--source-type", type=str, default=None, help="Filter mentions by source type.")
+@click.option(
+    "--limit",
+    type=click.IntRange(1, 1000),
+    default=None,
+    help="Maximum number of verse mentions to inspect.",
+)
+@click.option("--export-id", type=str, default=None, help="Optional export identifier.")
+@click.option(
+    "--output",
+    type=click.File("w", encoding="utf-8"),
+    default="-",
+    help="File to write to (defaults to stdout).",
+)
+def export_citations_command(
+    *,
+    style: str,
+    output_format: str,
+    document_ids: tuple[str, ...],
+    osis: str | None,
+    collection: str | None,
+    author: str | None,
+    source_type: str | None,
+    limit: int | None,
+    export_id: str | None,
+    output,
+) -> None:
+    """Render citations for explicit documents or verse aggregator results."""
+
+    normalized_style = style.lower()
+    normalized_format = output_format.lower()
+    filters = DocumentExportFilters(
+        collection=collection, author=author, source_type=source_type
+    )
+
+    ordered_ids: list[str] = []
+    seen: set[str] = set()
+    for candidate in document_ids:
+        doc_id = candidate.strip()
+        if not doc_id or doc_id in seen:
+            continue
+        ordered_ids.append(doc_id)
+        seen.add(doc_id)
+
+    anchor_map: dict[str, list[dict[str, Any]]] = {}
+
+    with _session_scope() as session:
+        if osis:
+            verse_filters = VerseMentionsFilters(
+                source_type=source_type, collection=collection, author=author
+            )
+            mentions = get_mentions_for_osis(session, osis, verse_filters)
+            if limit is not None:
+                mentions = mentions[:limit]
+            for mention in mentions:
+                doc_id = mention.passage.document_id
+                if doc_id not in seen:
+                    ordered_ids.append(doc_id)
+                    seen.add(doc_id)
+                anchors = anchor_map.setdefault(doc_id, [])
+                label = _format_anchor_label(mention.passage)
+                anchors.append(
+                    {
+                        "osis": mention.passage.osis_ref or osis,
+                        "label": label,
+                        "snippet": mention.context_snippet,
+                        "passage_id": mention.passage.id,
+                        "page_no": mention.passage.page_no,
+                        "t_start": mention.passage.t_start,
+                        "t_end": mention.passage.t_end,
+                    }
+                )
+
+        if not ordered_ids:
+            raise click.ClickException("No documents matched the requested selection.")
+
+        rows = session.execute(
+            select(Document).where(Document.id.in_(ordered_ids))
+        ).scalars()
+        document_index = {row.id: row for row in rows}
+        missing = [doc_id for doc_id in ordered_ids if doc_id not in document_index]
+        if missing:
+            raise click.ClickException(
+                f"Unknown document(s): {', '.join(sorted(missing))}"
+            )
+        documents = [document_index[doc_id] for doc_id in ordered_ids]
+
+    filter_payload = filters.model_dump(exclude_none=True)
+    if osis:
+        filter_payload["osis"] = osis
+
+    manifest, records, _ = build_citation_export(
+        documents,
+        style=cast(CitationStyleLiteral, normalized_style),
+        anchors=anchor_map,
+        filters=filter_payload,
+        export_id=export_id,
+    )
+
+    if normalized_format == "markdown":
+        body = render_citation_markdown(manifest, records)
+    else:
+        body, _ = render_bundle(manifest, records, output_format=normalized_format)
+
+    output.write(body)
+    if not body.endswith("\n"):
+        output.write("\n")
 
 
 @export.command("documents")

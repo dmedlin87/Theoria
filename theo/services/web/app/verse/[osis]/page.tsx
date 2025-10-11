@@ -9,6 +9,8 @@ import ResearchPanels from "../../research/ResearchPanels";
 import { fetchResearchFeatures } from "../../research/features";
 import type { ResearchFeatureFlags } from "../../research/types";
 import ReliabilityOverviewCard from "./ReliabilityOverviewCard";
+import VerseGraphSection from "./VerseGraphSection";
+import type { VerseGraphResponse } from "./graphTypes";
 
 const TIMELINE_WINDOWS = ["week", "month", "quarter", "year"] as const;
 type TimelineWindow = (typeof TIMELINE_WINDOWS)[number];
@@ -52,6 +54,29 @@ interface VerseTimelineResponse {
   window: TimelineWindow;
   buckets: VerseTimelineBucket[];
   total_mentions: number;
+}
+
+async function fetchGraph(
+  osis: string,
+  searchParams: VersePageProps["searchParams"],
+): Promise<VerseGraphResponse> {
+  const params = buildMentionFilterQuery(searchParams);
+  const query = params.toString();
+  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+  const response = await fetch(
+    `${baseUrl}/verses/${encodeURIComponent(osis)}/graph${
+      query ? `?${query}` : ""
+    }`,
+    {
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to load graph: ${response.statusText}`);
+  }
+
+  return (await response.json()) as VerseGraphResponse;
 }
 
 function getParamValue(
@@ -150,6 +175,19 @@ function getActiveMode(searchParams: VersePageProps["searchParams"]): StudyMode 
   return (STUDY_MODES.find((mode) => mode === candidate) ?? "apologetic") as StudyMode;
 }
 
+function isPromise<T>(value: unknown): value is Promise<T> {
+  return Boolean(
+    value && typeof value === "object" && typeof (value as Promise<T>).then === "function",
+  );
+}
+
+async function resolveMaybePromise<T>(value: T | Promise<T>): Promise<T> {
+  if (isPromise<T>(value)) {
+    return value;
+  }
+  return value as T;
+}
+
 function TimelineSection({
   timeline,
   window: activeWindow,
@@ -229,21 +267,28 @@ function TimelineSection({
 }
 
 export default async function VersePage({ params, searchParams }: VersePageProps) {
-  const windowParam = getTimelineWindow(searchParams);
-  const sourceType = getParamValue(searchParams, "source_type") ?? "";
-  const collection = getParamValue(searchParams, "collection") ?? "";
-  const author = getParamValue(searchParams, "author") ?? "";
-  const activeMode = getActiveMode(searchParams);
+  const resolvedParams = await resolveMaybePromise(params);
+  const normalizedSearchParams = searchParams
+    ? await resolveMaybePromise(searchParams)
+    : undefined;
+
+  const windowParam = getTimelineWindow(normalizedSearchParams);
+  const sourceType = getParamValue(normalizedSearchParams, "source_type") ?? "";
+  const collection = getParamValue(normalizedSearchParams, "collection") ?? "";
+  const author = getParamValue(normalizedSearchParams, "author") ?? "";
+  const activeMode = getActiveMode(normalizedSearchParams);
 
   let data: VerseMentionsResponse | null = null;
   let error: string | null = null;
   let features: ResearchFeatureFlags = {};
   let timeline: VerseTimelineResponse | null = null;
   let timelineError: string | null = null;
+  let graph: VerseGraphResponse | null = null;
+  let graphError: string | null = null;
 
   try {
     const [mentionsResponse, featureFlags] = await Promise.all([
-      fetchMentions(params.osis, searchParams),
+      fetchMentions(resolvedParams.osis, normalizedSearchParams),
       fetchResearchFeatures(),
     ]);
     data = mentionsResponse;
@@ -253,9 +298,16 @@ export default async function VersePage({ params, searchParams }: VersePageProps
     error = err instanceof Error ? err.message : "Unknown error";
   }
 
+  try {
+    graph = await fetchGraph(resolvedParams.osis, normalizedSearchParams);
+  } catch (graphErr) {
+    console.error("Failed to load verse graph", graphErr);
+    graphError = graphErr instanceof Error ? graphErr.message : "Unknown error";
+  }
+
   if (!error && features.verse_timeline) {
     try {
-      timeline = await fetchTimeline(params.osis, searchParams, windowParam);
+      timeline = await fetchTimeline(resolvedParams.osis, normalizedSearchParams, windowParam);
     } catch (timelineErr) {
       console.error("Failed to load verse timeline", timelineErr);
       timelineError =
@@ -263,7 +315,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
     }
   }
 
-  const osis = data?.osis ?? params.osis;
+  const osis = data?.osis ?? resolvedParams.osis;
   const mentions = data?.mentions ?? [];
   const total = data?.total ?? 0;
   const deliverableFilters: Record<string, string> = {};
@@ -319,6 +371,14 @@ export default async function VersePage({ params, searchParams }: VersePageProps
               Unable to load mentions. {error}
             </p>
           ) : null}
+
+          {graphError ? (
+            <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+              Unable to load relationship graph. {graphError}
+            </p>
+          ) : null}
+
+          {!graphError ? <VerseGraphSection graph={graph} /> : null}
 
           <form method="get" style={{ margin: "1rem 0", display: "grid", gap: "0.75rem", maxWidth: 480 }}>
             <label style={{ display: "block" }}>

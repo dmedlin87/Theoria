@@ -92,6 +92,149 @@ class Document(Base):
     )
 
 
+class NotebookCollaboratorRole(str, Enum):
+    """Roles controlling notebook access levels."""
+
+    OWNER = "owner"
+    EDITOR = "editor"
+    VIEWER = "viewer"
+
+
+class Notebook(Base):
+    """Team notebooks used for collaborative research."""
+
+    __tablename__ = "notebooks"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    team_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    entries: Mapped[list["NotebookEntry"]] = relationship(
+        "NotebookEntry",
+        back_populates="notebook",
+        cascade="all, delete-orphan",
+        order_by="NotebookEntry.created_at",
+    )
+    collaborators: Mapped[list["NotebookCollaborator"]] = relationship(
+        "NotebookCollaborator",
+        back_populates="notebook",
+        cascade="all, delete-orphan",
+    )
+
+
+class NotebookEntry(Base):
+    """Notebook entry tied to a source document and optional verse reference."""
+
+    __tablename__ = "notebook_entries"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    notebook_id: Mapped[str] = mapped_column(
+        String, ForeignKey("notebooks.id", ondelete="CASCADE"), nullable=False
+    )
+    document_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
+    osis_ref: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    notebook: Mapped[Notebook] = relationship("Notebook", back_populates="entries")
+    document: Mapped[Document | None] = relationship("Document")
+    mentions: Mapped[list["EntryMention"]] = relationship(
+        "EntryMention",
+        back_populates="entry",
+        cascade="all, delete-orphan",
+    )
+
+
+class EntryMention(Base):
+    """Explicit verse mentions associated with a notebook entry."""
+
+    __tablename__ = "entry_mentions"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    entry_id: Mapped[str] = mapped_column(
+        String, ForeignKey("notebook_entries.id", ondelete="CASCADE"), nullable=False
+    )
+    document_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
+    osis_ref: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    entry: Mapped[NotebookEntry] = relationship("NotebookEntry", back_populates="mentions")
+    document: Mapped[Document | None] = relationship("Document")
+
+
+class NotebookCollaborator(Base):
+    """Explicit collaborator access assignments for a notebook."""
+
+    __tablename__ = "notebook_collaborators"
+    __table_args__ = (
+        UniqueConstraint(
+            "notebook_id",
+            "subject",
+            name="uq_notebook_collaborators_subject",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    notebook_id: Mapped[str] = mapped_column(
+        String, ForeignKey("notebooks.id", ondelete="CASCADE"), nullable=False
+    )
+    subject: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    role: Mapped[NotebookCollaboratorRole] = mapped_column(
+        SQLEnum(NotebookCollaboratorRole),
+        default=NotebookCollaboratorRole.VIEWER,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    notebook: Mapped[Notebook] = relationship("Notebook", back_populates="collaborators")
+
+
 class Passage(Base):
     """Chunked content extracted from a document."""
 

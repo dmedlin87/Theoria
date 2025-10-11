@@ -97,6 +97,35 @@ def _ensure_perspective_column(
     if _table_has_column(session, table.name, "perspective", schema=table.schema):
         return True
 
+    bind = session.get_bind()
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+
+    if bind is not None and dialect_name == "sqlite":
+        try:
+            with bind.begin() as connection:  # type: ignore[call-arg]
+                connection.exec_driver_sql(
+                    f"ALTER TABLE {table.name} ADD COLUMN perspective TEXT"
+                )
+        except OperationalError as exc:
+            message = str(getattr(exc, "orig", exc)).lower()
+            duplicate_indicators = ("duplicate column", "already exists")
+            if not any(indicator in message for indicator in duplicate_indicators):
+                logger.warning(
+                    "Unable to backfill missing 'perspective' column for %s seeds: %s",
+                    dataset_label,
+                    exc,
+                )
+            # Whether or not the ALTER TABLE succeeded, re-check below so we
+            # respect any concurrent migrations that resolved the column.
+        else:
+            logger.info(
+                "Added missing 'perspective' column for %s seeds via SQLite fallback",
+                dataset_label,
+            )
+
+    if _table_has_column(session, table.name, "perspective", schema=table.schema):
+        return True
+
     session.rollback()
     logger.warning(
         "Skipping %s seeds because 'perspective' column is missing", dataset_label
