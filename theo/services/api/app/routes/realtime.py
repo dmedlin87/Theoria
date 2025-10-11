@@ -33,7 +33,7 @@ class NotebookEventBroker:
             connections = self._connections.get(notebook_id)
             if connections and websocket in connections:
                 connections.remove(websocket)
-            if connections and not connections:
+            if connections is not None and not connections:
                 self._connections.pop(notebook_id, None)
 
     def current_version(self, notebook_id: str) -> int:
