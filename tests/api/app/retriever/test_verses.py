@@ -52,16 +52,22 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
             id="doc-hit",
             title="Target",  # ensures meta composition remains intact
             source_type="pdf",
+            collection="series",
+            authors=["Matched Author"],
         )
         doc_range = Document(
             id="doc-range",
             title="Range",  # should also be included
             source_type="pdf",
+            collection="series",
+            authors=["Matched Author"],
         )
         doc_miss = Document(
             id="doc-miss",
             title="Miss",  # should be filtered out
             source_type="pdf",
+            collection="series",
+            authors=["Other Author"],
         )
         session.add_all([doc_hit, doc_range, doc_miss])
         session.flush()
@@ -77,6 +83,8 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
                 text="Primary hit",
                 osis_ref=None,
                 osis_verse_ids=None,
+                osis_start_verse_id=john_316_ids[0],
+                osis_end_verse_id=john_316_ids[-1],
             ),
             Passage(
                 id="passage-range",
@@ -84,6 +92,8 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
                 text="Range hit",
                 osis_ref="John.3.16-John.3.17",
                 osis_verse_ids=john_range_ids,
+                osis_start_verse_id=john_range_ids[0],
+                osis_end_verse_id=john_range_ids[-1],
             ),
             Passage(
                 id="passage-miss",
@@ -91,6 +101,8 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
                 text="Mismatched ids",
                 osis_ref="John.3.16",  # legacy metadata but wrong ids
                 osis_verse_ids=john_317_ids,
+                osis_start_verse_id=john_317_ids[0],
+                osis_end_verse_id=john_317_ids[-1],
             ),
         ]
         session.add_all(passages)
@@ -113,7 +125,10 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
         mentions = get_mentions_for_osis(
             session=session,
             osis="John.3.16",
-            filters=VerseMentionsFilters(),
+            filters=VerseMentionsFilters(
+                collection="series",
+                author="Matched Author",
+            ),
         )
 
     returned_ids = {mention.passage.id for mention in mentions}
@@ -131,12 +146,16 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
             title="Timeline Hit",
             source_type="pdf",
             pub_date=date(2023, 1, 10),
+            collection="timeline",
+            authors=["Timeline Author"],
         )
         miss_doc = Document(
             id="timeline-miss",
             title="Timeline Miss",
             source_type="pdf",
             pub_date=date(2023, 1, 12),
+            collection="timeline",
+            authors=["Other Author"],
         )
         session.add_all([hit_doc, miss_doc])
         session.flush()
@@ -152,6 +171,8 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
                     text="Timeline target",
                     osis_ref="John.3.16",
                     osis_verse_ids=None,
+                    osis_start_verse_id=john_316_ids[0],
+                    osis_end_verse_id=john_316_ids[-1],
                 ),
                 Passage(
                     id="timeline-miss-passage",
@@ -159,6 +180,8 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
                     text="Timeline miss",
                     osis_ref="John.3.16",
                     osis_verse_ids=john_317_ids,
+                    osis_start_verse_id=john_317_ids[0],
+                    osis_end_verse_id=john_317_ids[-1],
                 ),
             ]
         )
@@ -178,7 +201,10 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
             session=session,
             osis="John.3.16",
             window="month",
-            filters=VerseMentionsFilters(),
+            filters=VerseMentionsFilters(
+                collection="timeline",
+                author="Timeline Author",
+            ),
         )
 
     assert response.total_mentions == 1

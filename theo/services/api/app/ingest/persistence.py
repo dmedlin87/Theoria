@@ -46,7 +46,7 @@ from .metadata import (
     serialise_frontmatter,
     truncate,
 )
-from .osis import detect_osis_references, expand_osis_reference
+from .osis import canonical_verse_range, detect_osis_references, expand_osis_reference
 from .sanitizer import sanitize_passage_text
 
 
@@ -71,25 +71,12 @@ def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
         raise UnsupportedSourceError("Document already ingested")
 
 
-def _collect_verse_ids(references: Sequence[str] | None) -> list[int] | None:
-    """Return sorted verse identifiers for *references* or ``None`` when empty."""
+def _collect_verse_metadata(
+    references: Sequence[str] | None,
+) -> tuple[list[int] | None, int | None, int | None]:
+    """Return verse identifiers and canonical bounds for *references*."""
 
-    if not references:
-        return None
-
-    verse_ids: set[int] = set()
-    for reference in references:
-        if not reference:
-            continue
-        try:
-            verse_ids.update(expand_osis_reference(reference))
-        except Exception:  # pragma: no cover - defensive in case of malformed refs
-            continue
-
-    if not verse_ids:
-        return None
-
-    return sorted(verse_ids)
+    return canonical_verse_range(references)
 
 
 def refresh_creator_verse_rollups(
@@ -452,7 +439,10 @@ def persist_text_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
-        verse_ids = _collect_verse_ids(normalized_refs) or []
+        verse_id_list, start_verse_id, end_verse_id = _collect_verse_metadata(
+            normalized_refs
+        )
+        verse_ids = verse_id_list or []
 
         passage = Passage(
             document_id=document.id,
@@ -465,7 +455,9 @@ def persist_text_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
-            osis_verse_ids=verse_ids or None,
+            osis_verse_ids=verse_id_list or None,
+            osis_start_verse_id=start_verse_id,
+            osis_end_verse_id=end_verse_id,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -485,7 +477,7 @@ def persist_text_document(
             text=sanitized_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
-            osis_verse_ids=verse_ids or None,
+            osis_verse_ids=verse_id_list or None,
             topics=None,
             entities=None,
         )
@@ -865,7 +857,10 @@ def persist_transcript_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
-        verse_ids = _collect_verse_ids(normalized_refs) or []
+        verse_id_list, start_verse_id, end_verse_id = _collect_verse_metadata(
+            normalized_refs
+        )
+        verse_ids = verse_id_list or []
 
         passage = Passage(
             document_id=document.id,
@@ -878,7 +873,9 @@ def persist_transcript_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
-            osis_verse_ids=verse_ids or None,
+            osis_verse_ids=verse_id_list or None,
+            osis_start_verse_id=start_verse_id,
+            osis_end_verse_id=end_verse_id,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -898,7 +895,7 @@ def persist_transcript_document(
             text=sanitized_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
-            osis_verse_ids=verse_ids or None,
+            osis_verse_ids=verse_id_list or None,
             topics=None,
             entities=None,
         )
