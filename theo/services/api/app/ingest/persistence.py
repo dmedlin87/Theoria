@@ -43,7 +43,7 @@ from .metadata import (
     serialise_frontmatter,
     truncate,
 )
-from .osis import detect_osis_references
+from .osis import detect_osis_references, expand_osis_reference
 from .sanitizer import sanitize_passage_text
 
 
@@ -51,6 +51,20 @@ logger = logging.getLogger(__name__)
 
 
 from .stages import IngestContext
+
+
+def _collect_osis_verse_ids(references: Sequence[str]) -> list[int]:
+    """Return sorted verse identifiers for the supplied OSIS references."""
+
+    verse_ids: set[int] = set()
+    for reference in references:
+        if not reference:
+            continue
+        try:
+            verse_ids.update(expand_osis_reference(reference))
+        except Exception:  # pragma: no cover - defensive in case of malformed refs
+            continue
+    return sorted(verse_ids)
 
 
 def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
@@ -446,6 +460,8 @@ def persist_text_document(
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
 
+        verse_ids = _collect_osis_verse_ids(normalized_refs)
+
         segment = TranscriptSegment(
             document_id=document.id,
             video_id=video_record.id if video_record else None,
@@ -454,6 +470,7 @@ def persist_text_document(
             text=sanitized_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
+            osis_verse_ids=verse_ids or None,
             topics=None,
             entities=None,
         )
@@ -838,6 +855,8 @@ def persist_transcript_document(
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
 
+        verse_ids = _collect_osis_verse_ids(normalized_refs)
+
         segment = TranscriptSegment(
             document_id=document.id,
             video_id=video_record.id if video_record else None,
@@ -846,6 +865,7 @@ def persist_transcript_document(
             text=sanitized_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
+            osis_verse_ids=verse_ids or None,
             topics=None,
             entities=None,
         )

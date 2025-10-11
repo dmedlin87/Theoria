@@ -2,36 +2,11 @@
 
 from __future__ import annotations
 
-from sqlalchemy import or_
+from sqlalchemy import Integer, cast, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..db.models import TranscriptSegment, Video
 from ..ingest.osis import expand_osis_reference
-
-
-def _matches_osis(segment: TranscriptSegment, osis: str) -> bool:
-    """Return True when *segment* overlaps the requested OSIS reference."""
-
-    references: list[str] = []
-    if segment.primary_osis:
-        references.append(segment.primary_osis)
-    if segment.osis_refs:
-        references.extend(ref for ref in segment.osis_refs if ref)
-
-    try:
-        target_ids = expand_osis_reference(osis)
-    except Exception:  # pragma: no cover - defensive against malformed input
-        return False
-    if not target_ids:
-        return False
-
-    for reference in references:
-        try:
-            if expand_osis_reference(reference) & target_ids:
-                return True
-        except Exception:  # pragma: no cover - defensive against malformed data
-            continue
-    return False
 
 
 def build_source_ref(video: Video | None, t_start: float | None) -> str | None:
@@ -60,6 +35,9 @@ def search_transcript_segments(
 ) -> list[TranscriptSegment]:
     """Return transcript segments filtered by OSIS and/or video identifier."""
 
+    if limit <= 0:
+        return []
+
     query = session.query(TranscriptSegment).outerjoin(
         Video, TranscriptSegment.video_id == Video.id
     )
@@ -72,14 +50,32 @@ def search_transcript_segments(
             )
         )
 
+    bind = session.get_bind()
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+
+    if osis:
+        try:
+            query_ids = sorted(expand_osis_reference(osis))
+        except Exception:  # pragma: no cover - defensive against malformed input
+            query_ids = []
+        if not query_ids:
+            return []
+
+        if dialect_name == "postgresql":
+            query = query.filter(TranscriptSegment.osis_verse_ids.op("&&")(query_ids))
+        else:
+            json_each = func.json_each(TranscriptSegment.osis_verse_ids).table_valued(
+                "value"
+            )
+            overlap_clause = exists(
+                select(1)
+                .select_from(json_each)
+                .where(cast(json_each.c.value, Integer).in_(query_ids))
+            )
+            query = query.filter(overlap_clause)
+
     ordered = query.order_by(
         TranscriptSegment.t_start.asc(), TranscriptSegment.created_at.asc()
-    ).all()
-    results: list[TranscriptSegment] = []
-    for segment in ordered:
-        if osis and not _matches_osis(segment, osis):
-            continue
-        results.append(segment)
-        if len(results) >= limit:
-            break
-    return results
+    )
+    limited = ordered.limit(limit)
+    return limited.all()
