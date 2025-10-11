@@ -156,7 +156,9 @@ class WriteSecurityPolicy:
         if actor is None:
             return
         with self._lock:
-            self._idempotency_cache[(tool, actor, idempotency_key)] = response.model_copy(deep=True)
+            self._idempotency_cache[(tool, actor, idempotency_key)] = response.model_copy(
+                deep=True
+            )
 
 
 _POLICY: WriteSecurityPolicy | None = None
