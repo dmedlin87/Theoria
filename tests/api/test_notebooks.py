@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from fastapi import Request
 from theo.services.api.app.core.database import get_session
-from theo.services.api.app.db.models import Document
+from theo.services.api.app.db.models import Document, Notebook
 from theo.services.api.app.main import app
 from theo.services.api.app.security import require_principal
 
@@ -157,3 +157,44 @@ def test_collaborator_can_update_entry(notebook_client) -> None:
         assert update_response.json()["content"] == "Updated by collaborator"
     finally:
         app.dependency_overrides.pop(require_principal, None)
+
+
+@pytest.mark.no_auth_override
+def test_list_notebooks_anonymous_only_public(
+    notebook_client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, session_factory = notebook_client
+
+    from theo.services.api.app.core import settings as settings_module
+
+    monkeypatch.setenv("THEO_AUTH_ALLOW_ANONYMOUS", "true")
+    monkeypatch.setenv("THEO_API_KEYS", "[]")
+    settings_module.get_settings.cache_clear()
+
+    try:
+        with session_factory() as session:
+            public_notebook = Notebook(
+                title="Public",
+                created_by="owner-1",
+                is_public=True,
+            )
+            private_notebook = Notebook(
+                title="Private",
+                created_by="owner-2",
+                is_public=False,
+            )
+            session.add_all([public_notebook, private_notebook])
+            session.commit()
+
+            public_id = public_notebook.id
+            private_id = private_notebook.id
+
+        response = client.get("/notebooks/")
+        assert response.status_code == 200
+
+        payload = response.json()
+        returned_ids = [notebook["id"] for notebook in payload["notebooks"]]
+        assert returned_ids == [public_id]
+        assert private_id not in returned_ids
+    finally:
+        settings_module.get_settings.cache_clear()

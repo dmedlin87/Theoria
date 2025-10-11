@@ -212,17 +212,18 @@ class NotebookService:
     def list_notebooks(self) -> NotebookListResponse:
         subject = _principal_subject(self.principal)
         teams = _principal_teams(self.principal)
+        visibility_clauses = [
+            Notebook.is_public.is_(True),
+            Notebook.created_by == subject,
+            and_(Notebook.team_id.is_not(None), Notebook.team_id.in_(teams)),
+        ]
+        if subject:
+            visibility_clauses.append(NotebookCollaborator.subject == subject)
+
         stmt = (
             select(Notebook)
             .outerjoin(NotebookCollaborator)
-            .where(
-                or_(
-                    Notebook.is_public.is_(True),
-                    Notebook.created_by == subject,
-                    and_(Notebook.team_id.is_not(None), Notebook.team_id.in_(teams)),
-                    NotebookCollaborator.subject == subject,
-                )
-            )
+            .where(or_(*visibility_clauses))
             .order_by(Notebook.updated_at.desc())
         )
         notebooks = self.session.execute(stmt).scalars().unique().all()
