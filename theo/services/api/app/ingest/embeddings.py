@@ -5,14 +5,17 @@ from __future__ import annotations
 import hashlib
 import math
 import threading
-from typing import Protocol, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Protocol, cast
 
 from opentelemetry import trace
+from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ClauseElement
 
 try:  # pragma: no cover - heavy dependency may be unavailable in tests
-    from FlagEmbedding import FlagModel as _RuntimeFlagModel  # type: ignore
+    from FlagEmbedding import FlagModel as _RuntimeFlagModel
 except Exception:  # pragma: no cover - optional dependency
-    _RuntimeFlagModel = None  # type: ignore
+    _RuntimeFlagModel = None
 
 
 class _EmbeddingBackend(Protocol):
@@ -22,6 +25,7 @@ class _EmbeddingBackend(Protocol):
         ...
 
 from ..core.settings import get_settings
+from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 
 _TRACER = trace.get_tracer("theo.embedding")
@@ -74,7 +78,7 @@ class EmbeddingService:
         with self._lock:
             if self._model is None:
                 if _RuntimeFlagModel is not None:
-                    self._model = _RuntimeFlagModel(self.model_name, use_fp16=False)  # type: ignore[call-arg]
+                    self._model = _RuntimeFlagModel(self.model_name, use_fp16=False)
                 else:
                     self._model = _FallbackEmbedder(self.dimension)
         assert self._model is not None
@@ -82,18 +86,39 @@ class EmbeddingService:
 
     def _encode(self, texts: Sequence[str]) -> list[list[float]]:
         model = self._ensure_model()
+        raw_embeddings: object
         if hasattr(model, "encode"):
-            embeddings = model.encode(texts)
+            try:
+                embeddings, metadata = resilient_operation(
+                    lambda: model.encode(texts),
+                    key=f"embedding:{self.model_name}",
+                    classification="embedding",
+                    policy=ResiliencePolicy(max_attempts=2),
+                )
+                span = trace.get_current_span()
+                if span is not None:
+                    span.set_attribute("embedding.resilience_attempts", metadata.attempts)
+                    span.set_attribute("embedding.resilience_duration", metadata.duration)
+                raw_embeddings = embeddings
+            except ResilienceError:
+                raise
         else:  # pragma: no cover - extremely defensive
-            embeddings = []
-        if (
-            isinstance(embeddings, list)
-            and embeddings
-            and isinstance(embeddings[0], list)
-        ):
-            raw_vectors = embeddings
+            raw_embeddings = []
+
+        if isinstance(raw_embeddings, Sequence):
+            if len(raw_embeddings) > 0 and isinstance(raw_embeddings[0], Sequence):
+                vectors_iterable: Iterable[Iterable[float]] = cast(
+                    Sequence[Sequence[float]], raw_embeddings
+                )
+            else:
+                vectors_iterable = cast(Iterable[Iterable[float]], raw_embeddings)
         else:
-            raw_vectors = [list(vector) for vector in embeddings]  # type: ignore[arg-type]
+            vectors_iterable = cast(Iterable[Iterable[float]], raw_embeddings)
+
+        raw_vectors = [
+            [float(component) for component in vector]
+            for vector in vectors_iterable
+        ]
         return [_normalise(vector) for vector in raw_vectors]
 
     def embed(self, texts: Sequence[str], *, batch_size: int = 32) -> list[list[float]]:
@@ -107,7 +132,12 @@ class EmbeddingService:
                 span.set_attribute("embedding.batch_index", batch_index)
                 span.set_attribute("embedding.batch_size", len(batch))
                 span.set_attribute("embedding.vector_dimensions", self.dimension)
-                vectors = self._encode(batch)
+                try:
+                    vectors = self._encode(batch)
+                except ResilienceError as exc:
+                    span.set_attribute("embedding.resilience_category", exc.metadata.category)
+                    span.set_attribute("embedding.resilience_attempts", exc.metadata.attempts)
+                    raise
                 span.set_attribute("embedding.output_count", len(vectors))
             batched.extend(vectors)
         return batched
@@ -126,7 +156,7 @@ def get_embedding_service() -> EmbeddingService:
     return _service
 
 
-def lexical_representation(session, text: str) -> str | object:
+def lexical_representation(session: Session, text: str) -> ClauseElement | str:
     """Return a stored representation for lexical indexing.
 
     When a PostgreSQL connection is available a ``to_tsvector`` expression is

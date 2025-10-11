@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Dict, Iterable, Mapping, Type, TypeVar
+from typing import Annotated, Any, Awaitable, Callable, Dict, Generic, Iterable, Mapping, TypeVar, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, Header
@@ -15,31 +15,31 @@ from .tools import read, write
 LOGGER = logging.getLogger(__name__)
 
 
-RequestModel = TypeVar("RequestModel", bound=schemas.ToolRequestBase)
-ResponseModel = TypeVar("ResponseModel", bound=schemas.ToolResponseBase)
+RequestModelT = TypeVar("RequestModelT", bound=schemas.ToolRequestBase)
+ResponseModelT = TypeVar("ResponseModelT", bound=schemas.ToolResponseBase)
 
 
 @dataclass(frozen=True)
-class ToolDefinition:
+class ToolDefinition(Generic[RequestModelT, ResponseModelT]):
     """Description of a single MCP tool."""
 
     name: str
     description: str
-    request_model: Type[RequestModel]
-    response_model: Type[ResponseModel]
-    handler: Callable[[RequestModel, str], Awaitable[ResponseModel]]
+    request_model: type[RequestModelT]
+    response_model: type[ResponseModelT]
+    handler: Callable[..., Awaitable[ResponseModelT]]
 
 
 def _build_stub_handler(
     tool_name: str,
-    response_model: Type[ResponseModel],
-) -> Callable[[RequestModel, str], Awaitable[ResponseModel]]:
+    response_model: type[ResponseModelT],
+) -> Callable[..., Awaitable[ResponseModelT]]:
     """Return a stub handler that logs invocation metadata."""
 
     async def _handler(
-        request: RequestModel,
-        end_user_id: str = Header(..., alias="X-End-User-Id"),
-    ) -> ResponseModel:
+        request: RequestModelT,
+        end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
+    ) -> ResponseModelT:
         run_id = str(uuid4())
         LOGGER.info(
             "Invoked MCP tool",
@@ -56,7 +56,7 @@ def _build_stub_handler(
             run_id=run_id,
         )
 
-    return _handler
+    return cast(Callable[..., Awaitable[ResponseModelT]], _handler)
 
 
 def _schema_base_url() -> str:
@@ -145,7 +145,9 @@ def _tools_enabled() -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-TOOLS: tuple[ToolDefinition, ...] = _build_tools() if _tools_enabled() else tuple()
+TOOLS: tuple[ToolDefinition[Any, Any], ...] = (
+    _build_tools() if _tools_enabled() else tuple()
+)
 
 app = FastAPI(title="Theo Engine MCP Server", version="0.1.0")
 
@@ -154,17 +156,19 @@ def _register_tool_routes(application: FastAPI, tools: Iterable[ToolDefinition])
     """Register POST routes for each tool definition."""
 
     for tool in tools:
-        application.post(
+        application.add_api_route(
             f"/tools/{tool.name}",
+            tool.handler,
             response_model=tool.response_model,
             name=f"tool_{tool.name}",
-        )(tool.handler)
+            methods=["POST"],
+        )
 
 
 _register_tool_routes(app, TOOLS)
 
 
-def _collect_schemas(tools: Iterable[ToolDefinition]) -> Mapping[str, Dict[str, Any]]:
+def _collect_schemas(tools: Iterable[ToolDefinition[Any, Any]]) -> Mapping[str, Dict[str, Any]]:
     """Build JSON Schema documents for every tool."""
 
     schema_map: dict[str, Dict[str, Any]] = {}
@@ -184,7 +188,6 @@ def _collect_schemas(tools: Iterable[ToolDefinition]) -> Mapping[str, Dict[str, 
     return schema_map
 
 
-@app.get("/metadata", response_model=dict[str, Any])
 def metadata() -> Dict[str, Any]:
     """Return MCP metadata including tool descriptions and JSON Schemas."""
 
@@ -211,8 +214,11 @@ def metadata() -> Dict[str, Any]:
     }
 
 
-@app.post("/health", response_model=dict[str, str])
 def healthcheck() -> Dict[str, str]:
     """Simple healthcheck endpoint for deployments."""
 
     return {"status": "ok"}
+
+
+app.get("/metadata", response_model=dict[str, Any])(metadata)
+app.post("/health", response_model=dict[str, str])(healthcheck)

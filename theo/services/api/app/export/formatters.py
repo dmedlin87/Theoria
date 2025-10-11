@@ -312,22 +312,17 @@ def _document_to_record(
         base_record.pop("passages", None)
         field_order = tuple(key for key in DOCUMENT_FIELD_ORDER if key != "passages")
     if allowed_fields is not None:
-        if "metadata" not in allowed_fields:
-            metadata_selectors = {
-                field.split(".", 1)[1]
-                for field in allowed_fields
-                if field.startswith("metadata.") and "." in field
-            }
-            if metadata_selectors:
-                filtered_metadata = _select_nested_mapping_values(
-                    document.metadata, metadata_selectors
-                )
-                if filtered_metadata:
-                    base_record["metadata"] = filtered_metadata
-                else:
-                    base_record.pop("metadata", None)
-            else:
-                base_record.pop("metadata", None)
+        metadata_selectors = {
+            field.split(".", 1)[1]
+            for field in allowed_fields
+            if field.startswith("metadata.") and "." in field
+        }
+        if metadata_selectors:
+            base_record["metadata"] = _select_nested_mapping_values(
+                document.metadata, metadata_selectors
+            )
+        elif "metadata" not in allowed_fields:
+            base_record.pop("metadata", None)
     return _filter_values(base_record, allowed_fields, field_order)
 
 

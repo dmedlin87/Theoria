@@ -7,7 +7,7 @@ import sys
 import logging
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -16,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.core.database import Base
 from theo.services.api.app.db import seeds
+from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 from theo.services.api.app.db.models import ContradictionSeed, GeoPlace
 
 
@@ -147,4 +148,59 @@ def test_seeders_skip_when_perspective_missing(caplog) -> None:
     assert "Skipping contradiction seeds because 'perspective' column is missing" in messages
     assert "Skipping harmony seeds because 'perspective' column is missing" in messages
     assert "Skipping commentary excerpt seeds because 'perspective' column is missing" in messages
+
+
+def test_seed_reference_data_provides_perspective_column(tmp_path, monkeypatch) -> None:
+    """Seeding a new SQLite database should surface the perspective column."""
+
+    seed_dir = tmp_path / "seeds"
+    seed_dir.mkdir()
+
+    contradictions_path = seed_dir / "contradictions.json"
+    _write_seed(
+        contradictions_path,
+        [
+            {
+                "osis_a": "Gen.1.1",
+                "osis_b": "Gen.1.2",
+                "source": "test",
+                "summary": "first",
+                "perspective": "skeptical",
+            }
+        ],
+    )
+
+    monkeypatch.setattr(seeds, "SEED_ROOT", seed_dir)
+    monkeypatch.setattr(seeds, "seed_openbible_geo", lambda session: None)
+
+    database_path = tmp_path / "fresh.sqlite"
+    engine = create_engine(f"sqlite:///{database_path}", future=True)
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE contradiction_seeds (
+                id TEXT PRIMARY KEY,
+                osis_a TEXT NOT NULL,
+                osis_b TEXT NOT NULL,
+                summary TEXT,
+                source TEXT,
+                tags JSON,
+                weight FLOAT NOT NULL DEFAULT 1.0,
+                created_at TIMESTAMP NOT NULL
+            )
+            """
+        )
+
+    Base.metadata.create_all(engine)
+    run_sql_migrations(engine)
+
+    with Session(engine) as session:
+        seeds.seed_reference_data(session)
+
+    with Session(engine) as session:
+        perspectives = session.execute(
+            select(ContradictionSeed.perspective)
+        ).scalars().all()
+        assert perspectives == ["skeptical"]
 

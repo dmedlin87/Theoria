@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, cast
+from typing import Annotated, Any, Dict, Iterator, Mapping, cast
 from uuid import uuid4
 
 from fastapi import Header, HTTPException
@@ -84,7 +84,7 @@ def _note_preview_payload(preview: Any) -> Dict[str, Any]:
     }
 
 
-def _evidence_preview_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _evidence_preview_payload(payload: Mapping[str, Any]) -> Dict[str, Any]:
     preview = dict(payload)
     tags = preview.get("tags") or []
     if isinstance(tags, list):
@@ -94,9 +94,11 @@ def _evidence_preview_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 async def note_write(
     request: schemas.NoteWriteRequest,
-    end_user_id: str = Header(..., alias="X-End-User-Id"),
-    tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
-    idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
+    tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
+    idempotency_key: Annotated[
+        str | None, Header(alias="X-Idempotency-Key")
+    ] = None,
 ) -> schemas.NoteWriteResponse:
     tenant_id = _normalize_header(tenant_id)
     idempotency_key = _normalize_header(idempotency_key)
@@ -172,9 +174,11 @@ async def note_write(
 
 async def index_refresh(
     request: schemas.IndexRefreshRequest,
-    end_user_id: str = Header(..., alias="X-End-User-Id"),
-    tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
-    idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
+    tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
+    idempotency_key: Annotated[
+        str | None, Header(alias="X-Idempotency-Key")
+    ] = None,
 ) -> schemas.IndexRefreshResponse:
     tenant_id = _normalize_header(tenant_id)
     idempotency_key = _normalize_header(idempotency_key)
@@ -240,9 +244,11 @@ async def index_refresh(
 
 async def evidence_card_create(
     request: schemas.EvidenceCardCreateRequest,
-    end_user_id: str = Header(..., alias="X-End-User-Id"),
-    tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
-    idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
+    tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
+    idempotency_key: Annotated[
+        str | None, Header(alias="X-Idempotency-Key")
+    ] = None,
 ) -> schemas.EvidenceCardCreateResponse:
     tenant_id = _normalize_header(tenant_id)
     idempotency_key = _normalize_header(idempotency_key)

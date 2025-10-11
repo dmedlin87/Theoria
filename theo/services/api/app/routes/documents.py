@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from ..models.documents import (
     DocumentPassagesResponse,
     DocumentUpdateRequest,
 )
+from ..errors import RetrievalError, Severity
 from ..retriever.documents import (
     create_annotation,
     delete_annotation,
@@ -58,8 +59,12 @@ def latest_digest_document(
     try:
         return get_latest_digest_document(session)
     except KeyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        raise RetrievalError(
+            str(exc),
+            code="RETRIEVAL_DOCUMENT_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Verify the document exists before requesting the digest.",
         ) from exc
 
 
@@ -76,8 +81,12 @@ def document_detail(
     try:
         return get_document(session, document_id)
     except KeyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        raise RetrievalError(
+            str(exc),
+            code="RETRIEVAL_DOCUMENT_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Confirm the document identifier is correct.",
         ) from exc
 
 
@@ -97,8 +106,12 @@ def document_passages(
     try:
         return get_document_passages(session, document_id, limit=limit, offset=offset)
     except KeyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        raise RetrievalError(
+            str(exc),
+            code="RETRIEVAL_DOCUMENT_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Confirm the document identifier is correct.",
         ) from exc
 
 
@@ -117,8 +130,12 @@ def update_document_metadata(
     try:
         return update_document(session, document_id, payload)
     except KeyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        raise RetrievalError(
+            str(exc),
+            code="RETRIEVAL_DOCUMENT_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Confirm the document identifier is correct.",
         ) from exc
 
 
@@ -136,8 +153,12 @@ def document_annotations(
     try:
         return list_annotations(session, document_id)
     except KeyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        raise RetrievalError(
+            str(exc),
+            code="RETRIEVAL_DOCUMENT_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Confirm the document identifier is correct.",
         ) from exc
 
 
@@ -157,12 +178,20 @@ def create_document_annotation(
     try:
         return create_annotation(session, document_id, payload)
     except KeyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        raise RetrievalError(
+            str(exc),
+            code="RETRIEVAL_DOCUMENT_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Confirm the document identifier is correct.",
         ) from exc
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise RetrievalError(
+            str(exc),
+            code="RETRIEVAL_INVALID_ANNOTATION",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            severity=Severity.USER,
+            hint="Adjust the annotation payload to satisfy validation rules.",
         ) from exc
 
 
@@ -181,7 +210,11 @@ def delete_document_annotation(
     try:
         delete_annotation(session, document_id, annotation_id)
     except KeyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        raise RetrievalError(
+            str(exc),
+            code="RETRIEVAL_DOCUMENT_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Confirm the document and annotation identifiers are correct.",
         ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

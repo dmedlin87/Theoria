@@ -8,13 +8,14 @@ from datetime import UTC, datetime
 from collections.abc import Sequence
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
 from ..db.models import Document
+from ..errors import ExportError, Severity
 from ..export.citations import build_citation_export, render_citation_markdown
 from ..export.formatters import (
     DEFAULT_FILENAME_PREFIX,
@@ -99,12 +100,21 @@ def export_citation_bundle(
 
     normalized_format = payload.format.lower()
     if normalized_format not in {"json", "ndjson", "csv", "markdown"}:
-        raise HTTPException(status_code=400, detail="Unsupported citation format")
+        raise ExportError(
+            "Unsupported citation format",
+            code="EXPORT_UNSUPPORTED_FORMAT",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Use json, ndjson, csv, or markdown when requesting citations.",
+        )
 
     if not payload.document_ids and not payload.osis:
-        raise HTTPException(
-            status_code=400,
-            detail="document_ids or osis must be supplied for citation exports",
+        raise ExportError(
+            "document_ids or osis must be supplied for citation exports",
+            code="EXPORT_MISSING_TARGET",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Provide document identifiers or an OSIS reference to export citations.",
         )
 
     ordered_ids: list[str] = []
@@ -147,7 +157,13 @@ def export_citation_bundle(
             )
 
     if not ordered_ids:
-        raise HTTPException(status_code=404, detail="No documents matched the request")
+        raise ExportError(
+            "No documents matched the request",
+            code="EXPORT_NO_DOCUMENTS",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Adjust filters so at least one document is selected.",
+        )
 
     rows = session.execute(
         select(Document).where(Document.id.in_(ordered_ids))
@@ -155,9 +171,12 @@ def export_citation_bundle(
     document_index = {row.id: row for row in rows}
     missing = [doc_id for doc_id in ordered_ids if doc_id not in document_index]
     if missing:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Unknown document(s): {', '.join(sorted(missing))}",
+        raise ExportError(
+            f"Unknown document(s): {', '.join(sorted(missing))}",
+            code="EXPORT_UNKNOWN_DOCUMENT",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Confirm the requested documents exist before exporting.",
         )
 
     documents = [document_index[doc_id] for doc_id in ordered_ids]
@@ -215,30 +234,43 @@ def export_deliverable(payload: DeliverableRequest) -> DeliverableResponse:
     filters = payload.filters.model_dump(exclude_none=True)
     export_id = _determine_export_id(payload)
 
-    try:
-        if payload.type == "sermon":
-            if not payload.topic:
-                raise HTTPException(
-                    status_code=400,
-                    detail="topic is required for sermon deliverables",
-                )
-        elif payload.type == "transcript":
-            if not payload.document_id:
-                raise HTTPException(
-                    status_code=400,
-                    detail="document_id is required for transcript deliverables",
-                )
-        else:  # pragma: no cover - payload validation guards this
-            raise HTTPException(status_code=400, detail="Unsupported deliverable type")
-    except ValueError as exc:  # pragma: no cover - format guard
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if payload.type == "sermon" and not payload.topic:
+        raise ExportError(
+            "topic is required for sermon deliverables",
+            code="EXPORT_MISSING_TOPIC",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Provide a topic value to generate sermon deliverables.",
+        )
+    if payload.type == "transcript" and not payload.document_id:
+        raise ExportError(
+            "document_id is required for transcript deliverables",
+            code="EXPORT_MISSING_DOCUMENT",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Select a transcript document before exporting.",
+        )
+    if payload.type not in {"sermon", "transcript"}:  # pragma: no cover - validation guard
+        raise ExportError(
+            "Unsupported deliverable type",
+            code="EXPORT_UNSUPPORTED_DELIVERABLE",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Choose either sermon or transcript deliverables.",
+        )
 
     try:
         asset_plan = worker_tasks.plan_deliverable_outputs(
             payload.type, formats, export_id
         )
     except ValueError as exc:  # pragma: no cover - guarded above
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise ExportError(
+            str(exc),
+            code="EXPORT_INVALID_DELIVERABLE",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Verify the deliverable configuration before retrying.",
+        ) from exc
 
     task_kwargs = {
         "export_type": payload.type,
@@ -305,10 +337,20 @@ def export_search(
 
     normalized_format = output_format.lower()
     if normalized_format not in {"json", "ndjson", "csv"}:
-        raise HTTPException(status_code=400, detail="Unsupported format")
+        raise ExportError(
+            "Unsupported format",
+            code="EXPORT_UNSUPPORTED_FORMAT",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Choose json, ndjson, or csv for search exports.",
+        )
     if mode == "mentions" and not osis:
-        raise HTTPException(
-            status_code=400, detail="mode=mentions requires an osis parameter"
+        raise ExportError(
+            "mode=mentions requires an osis parameter",
+            code="EXPORT_MISSING_OSIS",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Provide an OSIS reference when exporting verse mentions.",
         )
     field_set = _parse_fields(fields)
     limit_value = limit or k
@@ -338,7 +380,13 @@ def export_search(
             output_format=normalized_format,
         )
     except ValueError as exc:  # pragma: no cover - validated earlier
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise ExportError(
+            str(exc),
+            code="EXPORT_RENDER_ERROR",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Adjust export parameters to render the requested format.",
+        ) from exc
     body_bytes = body.encode("utf-8")
     filename_extension = normalized_format
     headers: dict[str, str] = {}
@@ -397,8 +445,12 @@ def export_documents_endpoint(
 
     normalized_format = output_format.lower()
     if normalized_format not in {"json", "ndjson"}:
-        raise HTTPException(
-            status_code=400, detail="Unsupported format for document export"
+        raise ExportError(
+            "Unsupported format for document export",
+            code="EXPORT_UNSUPPORTED_FORMAT",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Choose json or ndjson when exporting documents.",
         )
 
     filters = DocumentExportFilters(
@@ -425,7 +477,13 @@ def export_documents_endpoint(
             output_format=normalized_format,
         )
     except ValueError as exc:  # pragma: no cover - validated earlier
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise ExportError(
+            str(exc),
+            code="EXPORT_RENDER_ERROR",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Adjust export parameters to render the requested format.",
+        ) from exc
     body_bytes = body.encode("utf-8")
     filename_extension = normalized_format
     headers: dict[str, str] = {}

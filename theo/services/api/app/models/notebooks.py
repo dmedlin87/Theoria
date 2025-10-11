@@ -5,9 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
-from .base import APIModel
+from .base import APIModel, BaseModel
 
 
 NotebookRole = Literal["owner", "editor", "viewer"]

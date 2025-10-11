@@ -11,6 +11,7 @@ from theo.services.api.app.core.settings import get_settings
 from theo.services.api.app.main import app
 from theo.services.api.app.models.search import HybridSearchResult
 from theo.services.api.app.routes import search as search_route
+from theo.services.api.app.services import retrieval_service as retrieval_service_module
 
 
 class _WeightedModel:
@@ -91,7 +92,7 @@ def test_search_rejects_reranker_with_hash_mismatch(
     def _fake_search(session, request):  # type: ignore[unused-argument]
         return [item.model_copy(deep=True) for item in results]
 
-    monkeypatch.setattr(search_route, "hybrid_search", _fake_search)
+    monkeypatch.setattr(retrieval_service_module, "hybrid_search", _fake_search)
     monkeypatch.setenv("STORAGE_ROOT", str(storage_root))
     monkeypatch.setenv("RERANKER_ENABLED", "true")
     monkeypatch.setenv("RERANKER_MODEL_PATH", str(model_path))
@@ -112,3 +113,84 @@ def test_search_rejects_reranker_with_hash_mismatch(
     failure = failures[-1]
     assert getattr(failure, "model_path", "") == str(model_path)
     assert "Hash mismatch" in getattr(failure, "error", "")
+
+
+def test_reranker_cache_recovers_after_cooldown(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    current_time = {"value": 0.0}
+
+    def fake_monotonic() -> float:
+        return current_time["value"]
+
+    monkeypatch.setattr(retrieval_service_module.time, "monotonic", fake_monotonic)
+
+    calls: list[str] = []
+
+    class _StubReranker:
+        def rerank(self, items):  # pragma: no cover - protocol satisfaction
+            return items
+
+    def loader(path: str, expected_sha256: str | None) -> _StubReranker:
+        calls.append(path)
+        if len(calls) == 1:
+            raise RuntimeError("boom")
+        return _StubReranker()
+
+    cache = retrieval_service_module._RerankerCache(loader, cooldown_seconds=5.0)
+
+    model_path = tmp_path / "stub.joblib"
+    model_path.write_bytes(b"payload")
+
+    assert cache.resolve(model_path, None) is None
+    assert cache.failed is True
+    assert len(calls) == 1
+
+    # Repeated call before cooldown should not hit the loader again.
+    assert cache.resolve(model_path, None) is None
+    assert len(calls) == 1
+
+    # Advance time beyond the cooldown and ensure the loader is retried.
+    current_time["value"] = 10.0
+    reranker = cache.resolve(model_path, None)
+    assert isinstance(reranker, _StubReranker)
+    assert cache.failed is False
+    assert len(calls) == 2
+
+
+def test_reranker_cache_retries_when_artifact_changes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    current_time = {"value": 0.0}
+
+    def fake_monotonic() -> float:
+        return current_time["value"]
+
+    monkeypatch.setattr(retrieval_service_module.time, "monotonic", fake_monotonic)
+
+    loads: list[str] = []
+
+    def loader(path: str, expected_sha256: str | None) -> str:
+        loads.append(Path(path).read_text())
+        if len(loads) == 1:
+            raise RuntimeError("initial failure")
+        return loads[-1]
+
+    cache = retrieval_service_module._RerankerCache(loader, cooldown_seconds=60.0)
+
+    model_path = tmp_path / "stub.joblib"
+    model_path.write_text("v1")
+
+    # Initial failure populates the failure state.
+    assert cache.resolve(model_path, None) is None
+    assert cache.failed is True
+    assert len(loads) == 1
+
+    # Update the artifact before the cooldown elapses.
+    model_path.write_text("version-two")
+
+    # The cache should detect the new artifact and retry immediately.
+    reranker = cache.resolve(model_path, None)
+    assert reranker == "version-two"
+    assert cache.failed is False
+    assert len(loads) == 2

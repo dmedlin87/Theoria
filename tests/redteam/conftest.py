@@ -54,13 +54,12 @@ def configure_redteam_environment(
     setattr(settings_module, "settings", settings)
 
     engine = configure_engine(settings.database_url)
-    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     try:
         yield
     finally:
-        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
         shutil.rmtree(storage_root, ignore_errors=True)
         if db_path.exists():
             db_path.unlink()
