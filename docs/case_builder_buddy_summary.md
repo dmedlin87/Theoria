@@ -1,5 +1,7 @@
 # Case Builder Buddy – Convergence Triggers Blueprint Summary
 
+> **Latest Case Builder spec:** [`case builder v4.md`](../case%20builder%20v4.md)
+
 ## Objective
 The system detects when independently sourced theological evidence begins to align or diverge, producing actionable insights that cite their supporting rationale and provenance.
 
