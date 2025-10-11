@@ -22,7 +22,9 @@ from ..db.models import (
     Document,
     Passage,
     TranscriptQuote,
+    TranscriptQuoteVerse,
     TranscriptSegment,
+    TranscriptSegmentVerse,
     Video,
 )
 from .embeddings import lexical_representation
@@ -43,7 +45,7 @@ from .metadata import (
     serialise_frontmatter,
     truncate,
 )
-from .osis import detect_osis_references
+from .osis import detect_osis_references, expand_osis_reference
 from .sanitizer import sanitize_passage_text
 
 
@@ -397,6 +399,7 @@ def persist_text_document(
 
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
+    segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
@@ -460,6 +463,21 @@ def persist_text_document(
         session.add(segment)
         segments.append(segment)
 
+        if normalized_refs:
+            verse_ids = sorted(
+                {
+                    int(verse_id)
+                    for ref in normalized_refs
+                    for verse_id in expand_osis_reference(ref)
+                }
+            )
+            if verse_ids:
+                segment_verse_ids[segment] = verse_ids
+                for verse_id in verse_ids:
+                    session.add(
+                        TranscriptSegmentVerse(segment=segment, verse_id=verse_id)
+                    )
+
     session.flush()
 
     if getattr(settings, "case_builder_enabled", False):
@@ -516,6 +534,7 @@ def persist_text_document(
     )
 
     for segment in segments:
+        verse_ids = segment_verse_ids.get(segment, [])
         if segment.osis_refs:
             quote = TranscriptQuote(
                 video_id=video_record.id if video_record else None,
@@ -528,6 +547,11 @@ def persist_text_document(
                 salience=1.0,
             )
             session.add(quote)
+            if verse_ids:
+                for verse_id in verse_ids:
+                    session.add(
+                        TranscriptQuoteVerse(quote=quote, verse_id=verse_id)
+                    )
 
     if creator_profile and topics:
         for segment in segments:
@@ -789,6 +813,7 @@ def persist_transcript_document(
 
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
+    segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
@@ -852,6 +877,21 @@ def persist_transcript_document(
         session.add(segment)
         segments.append(segment)
 
+        if normalized_refs:
+            verse_ids = sorted(
+                {
+                    int(verse_id)
+                    for ref in normalized_refs
+                    for verse_id in expand_osis_reference(ref)
+                }
+            )
+            if verse_ids:
+                segment_verse_ids[segment] = verse_ids
+                for verse_id in verse_ids:
+                    session.add(
+                        TranscriptSegmentVerse(segment=segment, verse_id=verse_id)
+                    )
+
     session.flush()
 
     if getattr(settings, "case_builder_enabled", False):
@@ -908,6 +948,7 @@ def persist_transcript_document(
     )
 
     for segment in segments:
+        verse_ids = segment_verse_ids.get(segment, [])
         if segment.osis_refs:
             quote = TranscriptQuote(
                 video_id=video_record.id if video_record else None,
@@ -920,6 +961,11 @@ def persist_transcript_document(
                 salience=1.0,
             )
             session.add(quote)
+            if verse_ids:
+                for verse_id in verse_ids:
+                    session.add(
+                        TranscriptQuoteVerse(quote=quote, verse_id=verse_id)
+                    )
 
     if creator_profile and topics:
         for segment in segments:

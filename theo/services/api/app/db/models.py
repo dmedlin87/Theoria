@@ -654,6 +654,35 @@ class TranscriptSegment(Base):
     claims: Mapped[list["CreatorClaim"]] = relationship(
         "CreatorClaim", back_populates="segment", cascade="all, delete-orphan"
     )
+    verse_index: Mapped[list["TranscriptSegmentVerse"]] = relationship(
+        "TranscriptSegmentVerse",
+        back_populates="segment",
+        cascade="all, delete-orphan",
+    )
+
+
+class TranscriptSegmentVerse(Base):
+    """Association table linking transcript segments to verse identifiers."""
+
+    __tablename__ = "transcript_segment_verses"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    segment_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("transcript_segments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    verse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    segment: Mapped[TranscriptSegment] = relationship(
+        "TranscriptSegment", back_populates="verse_index"
+    )
 
 
 class CreatorClaim(Base):
@@ -731,6 +760,35 @@ class TranscriptQuote(Base):
     video: Mapped[Video | None] = relationship("Video", back_populates="quotes")
     segment: Mapped[TranscriptSegment | None] = relationship(
         "TranscriptSegment", back_populates="quotes"
+    )
+    verse_index: Mapped[list["TranscriptQuoteVerse"]] = relationship(
+        "TranscriptQuoteVerse",
+        back_populates="quote",
+        cascade="all, delete-orphan",
+    )
+
+
+class TranscriptQuoteVerse(Base):
+    """Association table linking transcript quotes to verse identifiers."""
+
+    __tablename__ = "transcript_quote_verses"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    quote_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("transcript_quotes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    verse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    quote: Mapped[TranscriptQuote] = relationship(
+        "TranscriptQuote", back_populates="verse_index"
     )
 
 
