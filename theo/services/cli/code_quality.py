@@ -38,14 +38,45 @@ DEFAULT_RUFF_PATHS: tuple[Path, ...] = (Path("mcp_server"),)
 DEFAULT_PYTEST_PATHS: tuple[Path, ...] = (Path("tests/mcp_tools"),)
 DEFAULT_MYPY_PATHS: tuple[Path, ...] = (Path("mcp_server"),)
 
+_ALLOWED_EXECUTABLES: frozenset[str] = frozenset({"ruff", "pytest", "mypy"})
+
 
 def _format_command(command: Sequence[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
 
+def _validate_command(command: Sequence[str]) -> None:
+    if not command:
+        msg = "Command must contain at least one argument."
+        raise ValueError(msg)
+
+    program = command[0]
+    if Path(program).name != program:
+        msg = (
+            "Executable names containing path separators are not allowed: "
+            f"{program!r}"
+        )
+        raise ValueError(msg)
+
+    if program not in _ALLOWED_EXECUTABLES:
+        allowed = ", ".join(sorted(_ALLOWED_EXECUTABLES))
+        msg = f"Executable {program!r} is not in the allowlist: {allowed}"
+        raise ValueError(msg)
+
+
 def _execute(request: CheckRequest) -> CheckOutcome:
     try:
-        completed = subprocess.run(
+        _validate_command(request.command)
+    except ValueError as exc:
+        return CheckOutcome(
+            request=request,
+            returncode=1,
+            stdout="",
+            stderr="",
+            error=str(exc),
+        )
+    try:
+        completed = subprocess.run(  # noqa: S603 - command is validated against an allowlist
             list(request.command),
             capture_output=True,
             text=True,

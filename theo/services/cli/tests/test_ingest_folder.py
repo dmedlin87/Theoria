@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import os
 import shutil
+from pathlib import Path
 from types import SimpleNamespace
+import sys
 
 import pytest
 from click.testing import CliRunner
+
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+if str(PROJECT_ROOT) not in sys.path:  # pragma: no branch - defensive guard
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.core import settings as settings_module
 from theo.services.api.app.core.database import Base, configure_engine

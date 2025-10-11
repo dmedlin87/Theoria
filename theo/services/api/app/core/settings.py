@@ -165,7 +165,7 @@ class Settings(BaseSettings):
         ),
         description="Allow unauthenticated requests (intended for testing only)",
     )
-    
+
     @field_validator("auth_allow_anonymous", mode="before")
     @classmethod
     def _parse_bool_with_comment(cls, value: object) -> bool | str:
@@ -320,7 +320,7 @@ class Settings(BaseSettings):
         # Only validate reranker configuration if reranker is enabled
         if not self.reranker_enabled:
             return self
-            
+
         if self.reranker_model_path is None:
             if self.reranker_model_sha256:
                 raise ValueError(
