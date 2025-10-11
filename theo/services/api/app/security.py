@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 import jwt
-from fastapi import Header, HTTPException, Request, status
+from fastapi import Header, HTTPException, Request, WebSocket, status
 from fastapi.security.utils import get_authorization_scheme_param
+from starlette.requests import HTTPConnection
 
 from .core.settings import Settings, get_settings
 
@@ -113,12 +114,12 @@ def _auth_configured(settings: Settings) -> bool:
     return bool(settings.api_keys or settings.has_auth_jwt_credentials())
 
 
-def require_principal(
-    request: Request,
-    authorization: str | None = Header(default=None),
-    api_key_header: str | None = Header(default=None, alias="X-API-Key"),
+def _resolve_principal(
+    connection: HTTPConnection,
+    authorization: str | None,
+    api_key_header: str | None,
 ) -> Principal:
-    """Validate API credentials and attach the resolved principal to the request."""
+    """Resolve a principal from HTTP headers and attach it to the connection state."""
 
     settings = get_settings()
     principal: Principal | None = None
@@ -141,12 +142,12 @@ def require_principal(
             _reject_forbidden("Authentication is not configured")
         if not authorization and not api_key_header:
             principal = _anonymous_principal()
-            request.state.principal = principal
+            connection.state.principal = principal
             return principal
 
     if allow_anonymous and not authorization and not api_key_header:
         principal = _anonymous_principal()
-        request.state.principal = principal
+        connection.state.principal = principal
         return principal
     if api_key_header:
         principal = _authenticate_api_key(api_key_header)
@@ -166,8 +167,26 @@ def require_principal(
     if principal is None:  # pragma: no cover - defensive
         raise RuntimeError("Failed to resolve principal")
 
-    request.state.principal = principal
+    connection.state.principal = principal
     return principal
 
 
-__all__ = ["Principal", "require_principal"]
+def require_principal(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    api_key_header: str | None = Header(default=None, alias="X-API-Key"),
+) -> Principal:
+    """Validate API credentials and attach the resolved principal to the request."""
+
+    return _resolve_principal(request, authorization, api_key_header)
+
+
+def require_websocket_principal(websocket: WebSocket) -> Principal:
+    """Authenticate websocket callers using the same rules as HTTP requests."""
+
+    authorization = websocket.headers.get("Authorization")
+    api_key_header = websocket.headers.get("X-API-Key")
+    return _resolve_principal(websocket, authorization, api_key_header)
+
+
+__all__ = ["Principal", "require_principal", "require_websocket_principal"]

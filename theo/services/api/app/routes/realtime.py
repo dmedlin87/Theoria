@@ -7,9 +7,10 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any, DefaultDict
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from ..models.notebooks import NotebookRealtimeSnapshot
+from ..security import Principal, require_principal, require_websocket_principal
 
 
 router = APIRouter()
@@ -74,7 +75,11 @@ def publish_notebook_update(notebook_id: str, payload: dict[str, Any]) -> None:
 
 
 @router.websocket("/notebooks/{notebook_id}")
-async def notebook_updates(websocket: WebSocket, notebook_id: str) -> None:
+async def notebook_updates(
+    websocket: WebSocket,
+    notebook_id: str,
+    principal: Principal = Depends(require_websocket_principal),
+) -> None:
     await _BROKER.connect(notebook_id, websocket)
     try:
         await websocket.send_json(
@@ -90,7 +95,11 @@ async def notebook_updates(websocket: WebSocket, notebook_id: str) -> None:
         await _BROKER.disconnect(notebook_id, websocket)
 
 
-@router.get("/notebooks/{notebook_id}/poll", response_model=NotebookRealtimeSnapshot)
+@router.get(
+    "/notebooks/{notebook_id}/poll",
+    response_model=NotebookRealtimeSnapshot,
+    dependencies=[Depends(require_principal)],
+)
 async def poll_notebook_events(notebook_id: str) -> NotebookRealtimeSnapshot:
     return _BROKER.snapshot(notebook_id)
 
