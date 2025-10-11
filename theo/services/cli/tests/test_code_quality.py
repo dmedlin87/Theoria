@@ -51,3 +51,68 @@ def test_validate_command_rejects_pathlike_program() -> None:
     with pytest.raises(ValueError):
         code_quality._validate_command(("../ruff", "check"))
 
+
+def test_format_command_quotes_arguments_with_spaces() -> None:
+    formatted = code_quality._format_command(
+        ("ruff", "--config", "path with spaces.toml")
+    )
+
+    assert formatted == "ruff --config 'path with spaces.toml'"
+
+
+def test_build_checks_constructs_expected_requests() -> None:
+    checks = code_quality._build_checks(
+        ruff_paths=[Path("pkg"), Path("tests")],
+        pytest_paths=[Path("tests/unit"), Path("tests/integration")],
+        mypy_paths=[Path("pkg")],
+        skip_ruff=False,
+        skip_pytest=False,
+        include_mypy=True,
+        ruff_args=("--fix",),
+        pytest_args=("-q", "-k", "pattern"),
+        mypy_args=("--strict",),
+        mypy_config=Path("mypy.ini"),
+    )
+
+    assert [check.label for check in checks] == [
+        "ruff (pkg)",
+        "ruff (tests)",
+        "pytest",
+        "mypy",
+    ]
+    assert checks[0].command == ["ruff", "check", "pkg", "--fix"]
+    assert checks[1].command == ["ruff", "check", "tests", "--fix"]
+    assert checks[2].command == [
+        "pytest",
+        "tests/unit",
+        "tests/integration",
+        "-q",
+        "-k",
+        "pattern",
+    ]
+    assert checks[3].command == [
+        "mypy",
+        "--config-file",
+        "mypy.ini",
+        "pkg",
+        "--strict",
+    ]
+    assert checks[3].optional is True
+
+
+def test_build_checks_respects_skip_flags() -> None:
+    checks = code_quality._build_checks(
+        ruff_paths=[Path("pkg")],
+        pytest_paths=[Path("tests")],
+        mypy_paths=[Path("pkg")],
+        skip_ruff=True,
+        skip_pytest=True,
+        include_mypy=False,
+        ruff_args=(),
+        pytest_args=(),
+        mypy_args=(),
+        mypy_config=None,
+    )
+
+    assert checks == []
+
