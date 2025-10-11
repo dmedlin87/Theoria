@@ -286,7 +286,9 @@ def test_simple_ingest_rejects_bad_source(
     response = api_client.post("/ingest/simple", json={"sources": ["missing"]})
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "does not exist" in response.json()["detail"]
+    payload = response.json()
+    assert payload.get("error", {}).get("message")
+    assert "does not exist" in payload["error"]["message"]
 
 
 def test_simple_ingest_allows_sources_under_configured_roots(
@@ -377,7 +379,9 @@ def test_simple_ingest_rejects_sources_outside_allowlist(
         )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "not within an allowed ingest root" in response.json()["detail"]
+    payload = response.json()
+    assert payload.get("error", {}).get("message")
+    assert "not within an allowed ingest root" in payload["error"]["message"]
 
 
 
@@ -444,7 +448,7 @@ def test_ingest_url_times_out_on_slow_response(
         print(f"Response status: {response.status_code}")
         print(f"Response body: {response.text}")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json()["detail"] == "Fetching URL timed out after 0.5 seconds"
+    assert response.json() == {"detail": "Fetching URL timed out after 0.5 seconds"}
     assert call_counter["count"] == 1
 
 
@@ -489,10 +493,9 @@ def test_ingest_url_rejects_oversized_response(
 
     response = api_client.post("/ingest/url", json={"url": "https://large.example.com"})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert (
-        response.json()["detail"]
-        == "Fetched content exceeded maximum allowed size of 10 bytes"
-    )
+    assert response.json() == {
+        "detail": "Fetched content exceeded maximum allowed size of 10 bytes"
+    }
     assert call_counter["count"] == 1
 
 
@@ -557,7 +560,7 @@ def test_ingest_url_detects_redirect_loop(
 
     response = api_client.post("/ingest/url", json={"url": "https://loop.example.com"})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json()["detail"] == "URL redirect loop detected"
+    assert response.json() == {"detail": "URL redirect loop detected"}
     assert call_counter["count"] == 1
 
 def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:

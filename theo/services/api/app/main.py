@@ -187,7 +187,7 @@ def create_app() -> FastAPI:
     async def unsupported_source_error_with_trace(
         request: Request, exc: UnsupportedSourceError
     ) -> Response:
-        del request
+        request.state._last_domain_error = exc  # type: ignore[attr-defined]
         response = JSONResponse({"detail": str(exc)}, status_code=status.HTTP_400_BAD_REQUEST)
         return _attach_trace_headers(response)
 

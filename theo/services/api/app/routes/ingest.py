@@ -15,14 +15,12 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
-from ..ingest.exceptions import UnsupportedSourceError
 from ..models.documents import (
     DocumentIngestResponse,
     SimpleIngestRequest,
     UrlIngestRequest,
 )
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
-from ..telemetry import log_workflow_event
 from theo.services.cli import ingest_folder as cli_ingest
 from ..services.ingestion_service import IngestionService, get_ingestion_service
 
@@ -134,6 +132,9 @@ async def _stream_upload_to_path(
             policy=ResiliencePolicy(max_attempts=1),
         )
     except ResilienceError as exc:
+        cause = exc.__cause__
+        if isinstance(cause, IngestionError):
+            raise cause
         raise IngestionError(
             "Upload failed due to storage error",
             code="INGESTION_UPLOAD_FAILURE",
@@ -174,17 +175,13 @@ async def ingest_file(
             max_bytes=getattr(settings, "ingest_upload_max_bytes", None),
         )
         parsed_frontmatter = _parse_frontmatter(frontmatter)
-        document = run_pipeline_for_file(session, tmp_path, parsed_frontmatter)
+        document = ingestion_service.ingest_file(
+            session,
+            tmp_path,
+            parsed_frontmatter,
+        )
     except IngestionError:
         raise
-    except UnsupportedSourceError as exc:
-        raise IngestionError(
-            str(exc),
-            code="INGESTION_UNSUPPORTED_SOURCE",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            severity=Severity.USER,
-            hint="Verify the provided source is supported for ingestion.",
-        ) from exc
     except ResilienceError as exc:
         raise IngestionError(
             "Ingestion pipeline failed while processing the file",
@@ -221,14 +218,6 @@ async def ingest_url(
             source_type=payload.source_type,
             frontmatter=payload.frontmatter,
         )
-    except UnsupportedSourceError as exc:
-        raise IngestionError(
-            str(exc),
-            code="INGESTION_UNSUPPORTED_SOURCE",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            severity=Severity.USER,
-            hint="Update the URL or whitelist it before retrying.",
-        ) from exc
     except ResilienceError as exc:
         raise IngestionError(
             "Failed to fetch remote content",
@@ -324,14 +313,6 @@ async def ingest_transcript(
         )
     except IngestionError:
         raise
-    except UnsupportedSourceError as exc:
-        raise IngestionError(
-            str(exc),
-            code="INGESTION_UNSUPPORTED_SOURCE",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            severity=Severity.USER,
-            hint="Supply a supported transcript format.",
-        ) from exc
     except ResilienceError as exc:
         raise IngestionError(
             "Transcript processing failed",
