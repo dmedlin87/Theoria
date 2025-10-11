@@ -186,3 +186,29 @@ def test_evaluate_agent_trails_filters_by_window_and_workflow(
     assert report.total_trails == 1
     assert report.completed_trails == 1
     assert report.tool_usage[0].tool == "search.hybrid"
+
+
+def test_evaluate_agent_trails_counts_zero_llm_tokens(session: Session) -> None:
+    """Token aggregation should include steps that emit zero tokens."""
+
+    zero_token_trail = _make_trail(
+        workflow="verse_copilot",
+        status="completed",
+        started_at=datetime(2024, 6, 1, tzinfo=UTC),
+        plan_md=None,
+        steps=[
+            AgentStep(step_index=0, tool="llm.generate", tokens_in=0, tokens_out=0),
+            AgentStep(step_index=1, tool="llm.generate", tokens_in=10, tokens_out=0),
+        ],
+        snapshots=[],
+    )
+
+    session.add(zero_token_trail)
+    session.commit()
+
+    report = evaluate_agent_trails(session)
+
+    assert report.average_llm_tokens_in == pytest.approx(5.0)
+    assert report.average_llm_tokens_out == pytest.approx(0.0)
+    assert report.tool_usage[0].tokens_in == 10
+    assert report.tool_usage[0].tokens_out == 0
