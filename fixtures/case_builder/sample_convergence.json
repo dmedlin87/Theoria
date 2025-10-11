@@ -1,0 +1,104 @@
+{
+  "source": {
+    "id": "4f3d8078-0b8d-4c83-82a2-4f5b2c90fb44",
+    "document_id": "df6cefb7-4f58-4285-8dd6-7bb9c2cf31f3",
+    "origin": "Theo Archives",
+    "author": "J. Wesley",
+    "year": 1765,
+    "url": "https://example.org/sermons/field-journal",
+    "modality": "text",
+    "meta": {
+      "collection": "Revival Sermons",
+      "language": "en"
+    },
+    "created_at": "2024-05-01T12:00:00Z",
+    "updated_at": "2024-05-01T12:00:00Z"
+  },
+  "objects": [
+    {
+      "id": "7417d04b-7f2c-4060-b1c1-801228e46fb6",
+      "source_id": "4f3d8078-0b8d-4c83-82a2-4f5b2c90fb44",
+      "document_id": "df6cefb7-4f58-4285-8dd6-7bb9c2cf31f3",
+      "passage_id": "d273a9e8-5f51-4d1f-890f-7b358f56f6ab",
+      "object_type": "passage",
+      "title": "Grace extends to the weary",
+      "body": "Come unto me, all ye that labour and are heavy laden...",
+      "osis_ranges": ["Matt.11.28-Matt.11.30"],
+      "modality": "text",
+      "tags": ["invitation", "rest"],
+      "embedding": [0.12, 0.44, -0.05],
+      "stability": 0.82,
+      "meta": {
+        "token_count": 118,
+        "source_page": 4
+      },
+      "published_at": "2024-04-28T09:00:00Z",
+      "created_at": "2024-05-01T12:00:00Z",
+      "updated_at": "2024-05-01T12:00:00Z"
+    },
+    {
+      "id": "49d6fb7d-a1ab-49ae-a6bd-827a94c4781f",
+      "source_id": "4f3d8078-0b8d-4c83-82a2-4f5b2c90fb44",
+      "document_id": "df6cefb7-4f58-4285-8dd6-7bb9c2cf31f3",
+      "annotation_id": "6b84e53a-5353-45b7-b6b5-d32f940572ad",
+      "object_type": "annotation",
+      "title": "Cross-reference to Isaiah",
+      "body": "Analyst noted that the invitation mirrors Isaiah 55.",
+      "tags": ["analyst-note"],
+      "meta": {
+        "notebook_id": "f527e578-9e33-493d-9214-430528d589a1"
+      },
+      "created_at": "2024-05-01T12:05:00Z",
+      "updated_at": "2024-05-01T12:05:00Z"
+    }
+  ],
+  "edges": [
+    {
+      "id": "5ca21f10-3797-4566-9fe6-a64056e58e2d",
+      "src_object_id": "7417d04b-7f2c-4060-b1c1-801228e46fb6",
+      "dst_object_id": "49d6fb7d-a1ab-49ae-a6bd-827a94c4781f",
+      "kind": "semantic_sim",
+      "weight": 0.78,
+      "features": {
+        "cosine": 0.78,
+        "shared_tags": ["rest"]
+      },
+      "created_at": "2024-05-01T12:10:00Z",
+      "updated_at": "2024-05-01T12:10:00Z"
+    }
+  ],
+  "insights": [
+    {
+      "id": "d8bc3f25-71db-4cf5-8a72-0137b3259cbb",
+      "primary_object_id": "7417d04b-7f2c-4060-b1c1-801228e46fb6",
+      "insight_type": "convergence",
+      "score": 0.91,
+      "cluster_id": "revival-2024-week18",
+      "payload": {
+        "neighbors": [
+          {
+            "object_id": "49d6fb7d-a1ab-49ae-a6bd-827a94c4781f",
+            "edge_id": "5ca21f10-3797-4566-9fe6-a64056e58e2d",
+            "weight": 0.78
+          }
+        ],
+        "explanation": "High similarity between sermon excerpt and analyst annotation."
+      },
+      "created_at": "2024-05-01T12:15:00Z",
+      "updated_at": "2024-05-01T12:15:00Z"
+    }
+  ],
+  "user_actions": [
+    {
+      "id": "3f62f522-1355-4e03-8722-7d923fa92a3d",
+      "insight_id": "d8bc3f25-71db-4cf5-8a72-0137b3259cbb",
+      "action": "accept",
+      "confidence": 0.95,
+      "payload": {
+        "note": "Matches current revival research thread."
+      },
+      "created_at": "2024-05-01T12:20:00Z",
+      "updated_at": "2024-05-01T12:20:00Z"
+    }
+  ]
+}
