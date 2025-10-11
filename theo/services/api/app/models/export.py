@@ -13,6 +13,9 @@ from .documents import DocumentDetailResponse
 from .search import HybridSearchFilters
 
 
+CitationStyleLiteral = Literal["csl-json", "apa", "chicago"]
+
+
 class ExportedDocumentSummary(APIModel):
     """Metadata describing a document referenced by an export row."""
 
@@ -82,7 +85,7 @@ class ExportManifest(APIModel):
     export_id: str
     schema_version: str
     created_at: datetime
-    type: Literal["search", "documents"]
+    type: Literal["search", "documents", "citations"]
     filters: dict[str, Any]
     totals: dict[str, int]
     app_git_sha: str | None = None
@@ -90,6 +93,40 @@ class ExportManifest(APIModel):
     cursor: str | None = None
     next_cursor: str | None = None
     mode: str | None = None
+
+
+class CitationExportRequest(APIModel):
+    """Parameters accepted by the citation export endpoint."""
+
+    style: CitationStyleLiteral = Field(
+        default="apa", description="Citation style to render."
+    )
+    format: Literal["json", "ndjson", "csv", "markdown"] = Field(
+        default="json", description="Output format to render."
+    )
+    document_ids: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        description="Explicit document identifiers to include.",
+    )
+    osis: str | None = Field(
+        default=None,
+        description="Optional OSIS reference to derive citations from verse mentions.",
+    )
+    filters: DocumentExportFilters = Field(
+        default_factory=DocumentExportFilters,
+        description="Document filters applied when expanding OSIS references.",
+    )
+    limit: int | None = Field(
+        default=None,
+        ge=1,
+        le=1000,
+        description="Maximum number of verse mentions to inspect for each OSIS query.",
+    )
+    export_id: str | None = Field(
+        default=None,
+        description="Optional identifier to embed in the resulting manifest.",
+    )
 
 
 class DeliverableManifest(APIModel):

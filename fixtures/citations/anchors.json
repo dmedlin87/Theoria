@@ -1,0 +1,18 @@
+{
+  "doc-1": [
+    {
+      "osis": "John.1.1",
+      "label": "p.5",
+      "snippet": "In the beginning was the Word",
+      "passage_id": "passage-1"
+    }
+  ],
+  "doc-2": [
+    {
+      "osis": "John.3.16",
+      "label": "12s",
+      "snippet": "For God so loved the world",
+      "passage_id": "passage-2"
+    }
+  ]
+}

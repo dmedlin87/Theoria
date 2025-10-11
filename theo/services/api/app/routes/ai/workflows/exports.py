@@ -16,7 +16,7 @@ from theo.services.api.app.ai import (
 from theo.services.api.app.ai.rag import GuardrailError, RAGCitation
 from theo.services.api.app.core.database import get_session
 from theo.services.api.app.db.models import Document, Passage
-from theo.services.api.app.export.formatters import build_document_export
+from theo.services.api.app.export.citations import build_citation_export
 from theo.services.api.app.models.ai import (
     CitationExportRequest,
     CitationExportResponse,
@@ -27,11 +27,7 @@ from theo.services.api.app.models.ai import (
 )
 from theo.services.api.app.models.base import Passage as PassageSchema
 from theo.services.api.app.models.documents import DocumentDetailResponse
-from theo.services.api.app.models.export import (
-    DocumentExportFilters,
-    DocumentExportResponse,
-    serialise_asset_content,
-)
+from theo.services.api.app.models.export import serialise_asset_content
 from .guardrails import guardrail_http_exception
 
 router = APIRouter()
@@ -58,82 +54,6 @@ def _extract_primary_topic(document: Document) -> str | None:
         if isinstance(primary, str):
             return primary
     return None
-
-
-def _normalise_author(name: str) -> dict[str, str]:
-    parts = [segment.strip() for segment in name.replace("  ", " ").split()] if name else []
-    if "," in name:
-        family, given = [segment.strip() for segment in name.split(",", 1)]
-        if family and given:
-            return {"given": given, "family": family}
-    if len(parts) >= 2:
-        return {"given": " ".join(parts[:-1]), "family": parts[-1]}
-    return {"literal": name}
-
-
-_CSL_TYPE_MAP = {
-    "article": "article-journal",
-    "journal": "article-journal",
-    "book": "book",
-    "video": "motion_picture",
-    "audio": "song",
-    "sermon": "speech",
-    "web": "webpage",
-}
-
-
-def _infer_csl_type(source_type: str | None) -> str:
-    if not source_type:
-        return "article-journal"
-    normalized = source_type.lower()
-    for key, value in _CSL_TYPE_MAP.items():
-        if key in normalized:
-            return value
-    return "article-journal"
-
-
-def _build_csl_entry(
-    record: Mapping[str, Any], citations: Sequence[RAGCitation]
-) -> dict[str, Any]:
-    authors: list[dict[str, str]] = []
-    for name in record.get("authors") or []:
-        if isinstance(name, str) and name.strip():
-            authors.append(_normalise_author(name.strip()))
-
-    entry: dict[str, Any] = {
-        "id": record.get("document_id"),
-        "type": _infer_csl_type(record.get("source_type")),
-        "title": record.get("title"),
-    }
-    if authors:
-        entry["author"] = authors
-    year = record.get("year")
-    if isinstance(year, int):
-        entry["issued"] = {"date-parts": [[year]]}
-    doi = record.get("doi")
-    if isinstance(doi, str) and doi:
-        entry["DOI"] = doi
-    url = record.get("source_url")
-    if isinstance(url, str) and url:
-        entry["URL"] = url
-    venue = record.get("venue")
-    if isinstance(venue, str) and venue:
-        entry["container-title"] = venue
-    collection = record.get("collection")
-    if isinstance(collection, str) and collection:
-        entry["collection-title"] = collection
-    abstract = record.get("abstract")
-    if isinstance(abstract, str) and abstract:
-        entry["abstract"] = abstract
-
-    anchor_entries = []
-    for citation in citations:
-        anchor_label = f"{citation.osis} ({citation.anchor})" if citation.anchor else citation.osis
-        anchor_entries.append(anchor_label)
-    if anchor_entries:
-        entry["note"] = "Anchors: " + "; ".join(anchor_entries)
-
-    return entry
 
 
 def _build_document_detail(
@@ -266,41 +186,33 @@ def export_citations(
         passage_index = {row.id: row for row in passage_rows}
 
     document_details: list[DocumentDetailResponse] = []
-    total_passages = 0
     for doc_id in document_order:
         document = document_index[doc_id]
         doc_citations = citation_map[doc_id]
         detail = _build_document_detail(document, doc_citations, passage_index)
-        total_passages += len(detail.passages)
         document_details.append(detail)
 
-    export_payload = DocumentExportResponse(
-        filters=DocumentExportFilters(),
-        include_passages=True,
-        limit=None,
-        cursor=None,
-        next_cursor=None,
-        total_documents=len(document_details),
-        total_passages=total_passages,
-        documents=document_details,
+    anchor_map: dict[str, list[dict[str, Any]]] = {}
+    for document_id, citations in citation_map.items():
+        entries: list[dict[str, Any]] = []
+        for citation in citations:
+            entries.append(
+                {
+                    "osis": citation.osis,
+                    "label": citation.anchor,
+                    "snippet": citation.snippet,
+                    "passage_id": citation.passage_id,
+                }
+            )
+        anchor_map[document_id] = entries
+
+    manifest, citation_records, csl_entries = build_citation_export(
+        document_details,
+        style="csl-json",
+        anchors=anchor_map,
+        filters={},
     )
-    manifest, records = build_document_export(
-        export_payload,
-        include_passages=True,
-        include_text=False,
-        fields=None,
-        export_id=None,
-    )
-    record_dicts = [dict(record) for record in records]
-    csl_entries: list[dict[str, Any]] = []
-    for record in record_dicts:
-        raw_document_id = record.get("document_id")
-        citations = (
-            citation_map.get(raw_document_id, [])
-            if isinstance(raw_document_id, str)
-            else []
-        )
-        csl_entries.append(_build_csl_entry(record, citations))
+    record_dicts = [dict(record) for record in citation_records]
     manager_payload = {
         "format": "csl-json",
         "export_id": manifest.export_id,
