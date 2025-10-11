@@ -79,11 +79,6 @@ def _range_overlap_clause(query: _VerseQuery):
 def _matches_query(passage: Passage, query: _VerseQuery) -> bool:
     """Return ``True`` when *passage* overlaps the requested verse range."""
 
-    start = passage.osis_start_verse_id
-    end = passage.osis_end_verse_id
-    if start is not None and end is not None:
-        return start <= query.end_id and end >= query.start_id
-
     verse_candidates: set[int] = set()
     if passage.osis_verse_ids:
         try:
@@ -97,10 +92,15 @@ def _matches_query(passage: Passage, query: _VerseQuery) -> bool:
         except Exception:  # pragma: no cover - malformed legacy metadata
             return False
 
-    if not verse_candidates:
-        return False
+    if verse_candidates:
+        return any(verse_id in query.verse_ids for verse_id in verse_candidates)
 
-    return any(query.start_id <= verse_id <= query.end_id for verse_id in verse_candidates)
+    start = passage.osis_start_verse_id
+    end = passage.osis_end_verse_id
+    if start is not None and end is not None:
+        return start <= query.end_id and end >= query.start_id
+
+    return False
 
 
 def get_mentions_for_osis(
