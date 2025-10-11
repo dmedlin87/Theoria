@@ -125,7 +125,6 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
 
   const handleMetadataSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsSavingMetadata(true);
     setMetadataError(null);
     setMetadataMessage(null);
 
@@ -147,17 +146,43 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
       abstract: document.abstract ?? null,
     };
 
+    const nextMetadata: MetadataSnapshot = {
+      title,
+      collection,
+      authors,
+      source_type: sourceType || null,
+      abstract: abstract || null,
+    };
+
+    const normalizeAuthors = (values: string[]): string[] =>
+      values.map((value) => value.trim()).filter(Boolean);
+
+    const previousAuthors = normalizeAuthors(previousMetadata.authors);
+    const nextAuthors = normalizeAuthors(nextMetadata.authors);
+
+    const authorsMatch =
+      previousAuthors.length === nextAuthors.length &&
+      previousAuthors.every((value, index) => value === nextAuthors[index]);
+
+    const metadataUnchanged =
+      nextMetadata.title === previousMetadata.title &&
+      nextMetadata.collection === previousMetadata.collection &&
+      authorsMatch &&
+      nextMetadata.source_type === previousMetadata.source_type &&
+      nextMetadata.abstract === previousMetadata.abstract;
+
+    if (metadataUnchanged) {
+      setMetadataMessage("No changes to save");
+      return;
+    }
+
+    setIsSavingMetadata(true);
+
     try {
       const response = await fetch(`${baseUrl}/documents/${document.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          collection,
-          authors,
-          source_type: sourceType || null,
-          abstract: abstract || null,
-        }),
+        body: JSON.stringify(nextMetadata),
       });
       if (!response.ok) {
         throw new Error(await response.text());
