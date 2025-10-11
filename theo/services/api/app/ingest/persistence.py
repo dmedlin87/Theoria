@@ -6,9 +6,8 @@ import json
 import shutil
 import tempfile
 import logging
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, Sequence
+from typing import Any, Sequence
 from uuid import uuid4
 
 from sqlalchemy import func
@@ -16,7 +15,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..case_builder import sync_passages_case_objects
-from ..core.settings import get_settings
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import (
     Creator,
@@ -52,14 +50,7 @@ from .sanitizer import sanitize_passage_text
 logger = logging.getLogger(__name__)
 
 
-class EmbeddingServiceProtocol(Protocol):
-    def embed(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
-        ...
-
-
-@dataclass
-class PersistenceDependencies:
-    embedding_service: EmbeddingServiceProtocol
+from .stages import IngestContext
 
 
 def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
@@ -78,7 +69,10 @@ def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
 
 
 def refresh_creator_verse_rollups(
-    session: Session, segments: list[TranscriptSegment]
+    session: Session,
+    segments: list[TranscriptSegment],
+    *,
+    context: IngestContext,
 ) -> None:
     """Refresh cached creator verse rollups impacted by *segments*."""
 
@@ -90,7 +84,7 @@ def refresh_creator_verse_rollups(
     if not osis_refs:
         return
 
-    settings = get_settings()
+    settings = context.settings
     sorted_refs = sorted(osis_refs)
     if getattr(settings, "creator_verse_rollups_async_refresh", False):
         try:
@@ -310,12 +304,11 @@ def get_or_create_video(
 def persist_text_document(
     session: Session,
     *,
-    dependencies: PersistenceDependencies,
+    context: IngestContext,
     chunks,
     parser: str,
     parser_version: str,
     frontmatter: dict[str, Any],
-    settings,
     sha256: str,
     source_type: str,
     title: str | None,
@@ -329,6 +322,8 @@ def persist_text_document(
 
     if not isinstance(chunks, list) or not all(isinstance(c, Chunk) for c in chunks):
         raise ValueError("chunks must be a list of Chunk instances")
+
+    settings = context.settings
 
     tradition, topic_domains = extract_guardrail_profile(frontmatter)
 
@@ -395,7 +390,7 @@ def persist_text_document(
     chunk_hints = ensure_list(frontmatter.get("osis_refs"))
 
     raw_texts, sanitized_texts = sanitise_chunks(chunks)
-    embeddings = dependencies.embedding_service.embed(sanitized_texts)
+    embeddings = context.embedding_service.embed(sanitized_texts)
     sanitized_document_text = "\n\n".join(
         text for text in sanitized_texts if text
     ) or sanitize_passage_text(text_content)
@@ -699,12 +694,11 @@ def _write_document_metadata(
 def persist_transcript_document(
     session: Session,
     *,
-    dependencies: PersistenceDependencies,
+    context: IngestContext,
     chunks,
     parser: str,
     parser_version: str,
     frontmatter: dict[str, Any],
-    settings,
     sha256: str,
     source_type: str,
     title: str,
@@ -787,7 +781,8 @@ def persist_transcript_document(
 
     chunk_hints = ensure_list(frontmatter.get("osis_refs"))
     raw_texts, sanitized_texts = sanitise_chunks(chunks)
-    embeddings = dependencies.embedding_service.embed(sanitized_texts)
+    settings = context.settings
+    embeddings = context.embedding_service.embed(sanitized_texts)
     sanitized_document_text = "\n\n".join(
         text for text in sanitized_texts if text
     )
@@ -1064,7 +1059,7 @@ def persist_transcript_document(
             shutil.rmtree(temp_dir_path, ignore_errors=True)
         raise
 
-    refresh_creator_verse_rollups(session, segments)
+    refresh_creator_verse_rollups(session, segments, context=context)
 
     return document
 

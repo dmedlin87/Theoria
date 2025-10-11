@@ -25,6 +25,11 @@ from theo.services.api.app.db.models import (  # noqa: E402
     Passage,
 )
 from theo.services.api.app.ingest import pipeline  # noqa: E402
+from theo.services.api.app.ingest.exceptions import UnsupportedSourceError  # noqa: E402
+from theo.services.api.app.ingest.parsers import TranscriptSegment  # noqa: E402
+from theo.services.api.app.ingest.stages import ErrorDecision  # noqa: E402
+from theo.services.api.app.ingest.stages.fetchers import UrlSourceFetcher  # noqa: E402
+from theo.services.api.app.ingest.stages.parsers import TranscriptParser  # noqa: E402
 
 
 def _prepare_database(tmp_path: Path) -> None:
@@ -45,7 +50,9 @@ def _capture_span_attributes(monkeypatch):
     return recorded
 
 
-def _assert_ingest_metrics(recorded, document_id: str, expected_cache_status: str) -> None:
+def _assert_ingest_metrics(
+    recorded, document_id: str, expected_cache_status: str
+) -> None:
     ingest_attributes = {}
     for key, value in recorded:
         if key.startswith("ingest."):
@@ -153,8 +160,10 @@ def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
     settings.case_builder_enabled = True
 
     try:
-        markdown = "---\ntitle: Case Doc\n---\n\nVerse driven content." \
+        markdown = (
+            "---\ntitle: Case Doc\n---\n\nVerse driven content."
             "\n\nAnother passage with OSIS John.1.1"
+        )
         doc_path = tmp_path / "case_doc.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
@@ -304,7 +313,9 @@ def test_run_pipeline_for_file_inlines_snapshot_when_small(tmp_path) -> None:
         assert normalized_path.exists()
 
         normalized_payload = json.loads(normalized_path.read_text("utf-8"))
-        assert normalized_payload["document"]["text"].strip().startswith("Short content")
+        assert (
+            normalized_payload["document"]["text"].strip().startswith("Short content")
+        )
         assert "chunks" in normalized_payload
         assert normalized_payload["chunks"]
         assert "snapshot_manifest" not in normalized_payload
@@ -391,7 +402,7 @@ def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
         markdown = (
             "---\n"
             "title: Unsafe Doc\n"
-            "source_url: \"javascript:alert(1)\"\n"
+            'source_url: "javascript:alert(1)"\n'
             "---\n\n"
             "This document links to a javascript URI."
         )
@@ -427,7 +438,10 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
         transcript_payload = [{"text": "Hello world", "start": 0.0, "end": 2.5}]
         transcript_path.write_text(json.dumps(transcript_payload), encoding="utf-8")
 
-        frontmatter = {"title": "Unsafe Transcript", "source_url": "javascript:alert(1)"}
+        frontmatter = {
+            "title": "Unsafe Transcript",
+            "source_url": "javascript:alert(1)",
+        }
 
         with Session(engine) as session:
             document = pipeline.run_pipeline_for_transcript(
@@ -446,7 +460,9 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
         settings.storage_root = original_storage
 
 
-def test_run_pipeline_for_transcript_records_span_metrics(tmp_path, monkeypatch) -> None:
+def test_run_pipeline_for_transcript_records_span_metrics(
+    tmp_path, monkeypatch
+) -> None:
     """Transcript ingestion records span metrics alongside persistence."""
 
     _prepare_database(tmp_path)
@@ -463,7 +479,10 @@ def test_run_pipeline_for_transcript_records_span_metrics(tmp_path, monkeypatch)
         segments = [{"text": "Hello world", "start": 0.0, "end": 2.5}]
         transcript_path.write_text(json.dumps(segments), encoding="utf-8")
 
-        frontmatter = {"title": "Transcript Doc", "source_url": "https://example.com/video"}
+        frontmatter = {
+            "title": "Transcript Doc",
+            "source_url": "https://example.com/video",
+        }
 
         with Session(engine) as session:
             document = pipeline.run_pipeline_for_transcript(
@@ -485,6 +504,170 @@ def test_run_pipeline_for_transcript_records_span_metrics(tmp_path, monkeypatch)
         settings.storage_root = original_storage
 
 
+def test_transcript_pipeline_retries_parser_failure(tmp_path, monkeypatch) -> None:
+    """Transcript ingestion respects retry decisions from error policies."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    settings.storage_root = tmp_path / "storage"
+
+    transcript_path = tmp_path / "segments.json"
+    transcript_payload = [
+        {"text": "Hello world", "start": 0.0, "end": 2.0},
+        {"text": "Goodbye", "start": 2.0, "end": 4.0},
+    ]
+    transcript_path.write_text(json.dumps(transcript_payload), encoding="utf-8")
+
+    original_parse = TranscriptParser.parse
+    parse_invocations = {"count": 0}
+
+    def flaky_parse(self, *, context, state):  # type: ignore[override]
+        parse_invocations["count"] += 1
+        if parse_invocations["count"] == 1:
+            raise RuntimeError("transient parser failure")
+        return original_parse(self, context=context, state=state)
+
+    monkeypatch.setattr(TranscriptParser, "parse", flaky_parse)
+
+    class RecordingPolicy:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, int, type[Exception]]] = []
+
+        def decide(self, *, stage, error, attempt, context):  # type: ignore[override]
+            self.calls.append((stage, attempt, type(error)))
+            if stage == "transcript_parser":
+                return ErrorDecision(retry=True, max_retries=1)
+            return ErrorDecision()
+
+    policy = RecordingPolicy()
+
+    try:
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_transcript(
+                session,
+                transcript_path,
+                dependencies=pipeline.PipelineDependencies(error_policy=policy),
+            )
+            assert document is not None
+    finally:
+        settings.storage_root = original_storage
+
+    assert parse_invocations["count"] == 2
+    assert any(stage == "transcript_parser" for stage, _, _ in policy.calls)
+
+
+def test_youtube_fetch_retries_with_error_policy(tmp_path, monkeypatch) -> None:
+    """URL ingestion retries fetch failures via injected error policies."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    settings.storage_root = tmp_path / "storage"
+
+    segments = [TranscriptSegment(text="Hello", start=0.0, end=1.0)]
+
+    monkeypatch.setattr(
+        "theo.services.api.app.ingest.pipeline.ensure_url_allowed",
+        lambda _settings, _url: None,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.ingest.stages.fetchers.extract_youtube_video_id",
+        lambda url: "abc123",
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.ingest.stages.fetchers.is_youtube_url",
+        lambda url: True,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.ingest.stages.fetchers.load_youtube_metadata",
+        lambda settings, video_id: {"title": "Retry Video", "channel": "Channel"},
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.ingest.stages.fetchers.load_youtube_transcript",
+        lambda settings, video_id: (segments, None),
+    )
+
+    original_fetch = UrlSourceFetcher.fetch
+    fetch_invocations = {"count": 0}
+
+    def flaky_fetch(self, *, context, state):  # type: ignore[override]
+        fetch_invocations["count"] += 1
+        if fetch_invocations["count"] == 1:
+            raise UnsupportedSourceError("temporary outage")
+        return original_fetch(self, context=context, state=state)
+
+    monkeypatch.setattr(UrlSourceFetcher, "fetch", flaky_fetch)
+
+    class RetryPolicy:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, int, type[Exception]]] = []
+
+        def decide(self, *, stage, error, attempt, context):  # type: ignore[override]
+            self.calls.append((stage, attempt, type(error)))
+            if stage == "url_source_fetcher":
+                return ErrorDecision(retry=True, max_retries=1)
+            return ErrorDecision()
+
+    policy = RetryPolicy()
+
+    try:
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_url(
+                session,
+                "https://youtu.be/example",
+                dependencies=pipeline.PipelineDependencies(error_policy=policy),
+            )
+            assert document.source_type == "youtube"
+    finally:
+        settings.storage_root = original_storage
+
+    assert fetch_invocations["count"] == 2
+    assert any(stage == "url_source_fetcher" for stage, _, _ in policy.calls)
+
+
+def test_duplicate_file_ingest_triggers_error_policy(tmp_path) -> None:
+    """Duplicate detection surfaces stage failures to injected policies."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    settings.storage_root = tmp_path / "storage"
+
+    doc_path = tmp_path / "duplicate.md"
+    doc_path.write_text("Simple duplicate test", encoding="utf-8")
+
+    try:
+        with Session(engine) as session:
+            pipeline.run_pipeline_for_file(session, doc_path)
+
+        class RecordingPolicy:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, int, type[Exception]]] = []
+
+            def decide(self, *, stage, error, attempt, context):  # type: ignore[override]
+                self.calls.append((stage, attempt, type(error)))
+                return ErrorDecision()
+
+        policy = RecordingPolicy()
+
+        with Session(engine) as session:
+            with pytest.raises(UnsupportedSourceError):
+                pipeline.run_pipeline_for_file(
+                    session,
+                    doc_path,
+                    dependencies=pipeline.PipelineDependencies(error_policy=policy),
+                )
+    finally:
+        settings.storage_root = original_storage
+
+    assert any(stage == "text_document_persister" for stage, _, _ in policy.calls)
 @pytest.mark.parametrize(
     "blocked_url",
     [
@@ -569,7 +752,9 @@ def test_pipeline_sanitises_adversarial_html(tmp_path, monkeypatch) -> None:
 
     try:
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_url(session, "https://example.com/injected")
+            document = pipeline.run_pipeline_for_url(
+                session, "https://example.com/injected"
+            )
             document_id = document.id
 
         with Session(engine) as session:
@@ -586,7 +771,6 @@ def test_pipeline_sanitises_adversarial_html(tmp_path, monkeypatch) -> None:
         assert "USER:" in raw_blob
     finally:
         settings.storage_root = original_storage
-
 
 
 def test_run_pipeline_for_url_rejects_oversized_responses(monkeypatch) -> None:

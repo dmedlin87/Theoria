@@ -47,7 +47,7 @@ from .security import require_principal
 from .telemetry import configure_console_tracer
 from .tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
 from .services import router_registry as _router_registry  # noqa: F401
-from .services.registry import iter_router_registrations
+from .services.registry import RouterRegistration, iter_router_registrations
 GenerateLatestFn = Callable[[], bytes]
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
 generate_latest: Optional[GenerateLatestFn] = None
@@ -277,3 +277,5 @@ def _secret_features_enabled() -> bool:
 
 
 app = create_app()
+ROUTER_REGISTRATIONS: tuple[RouterRegistration, ...] = iter_router_registrations()
+

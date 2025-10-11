@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, Sequence
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import Field, model_validator
 
 from ..ai.rag import (
     CollaborationResponse,
@@ -91,10 +91,23 @@ class ChatMemoryEntry(APIModel):
     created_at: datetime
 
 
-class ChatSessionRequest(APIModel):
+class ModeAliasMixin:
+    """Mixin translating deprecated ``mode`` payloads to the ``model`` field."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _promote_mode_alias(cls, data: object) -> object:
+        if isinstance(data, dict) and "model" not in data and "mode" in data:
+            promoted = dict(data)
+            promoted["model"] = promoted.pop("mode")
+            return promoted
+        return data
+
+
+class ChatSessionRequest(ModeAliasMixin, APIModel):
     messages: Sequence[ChatSessionMessage]
     session_id: str | None = None
-    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
+    model: str | None = None
     prompt: str | None = None
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
@@ -233,12 +246,12 @@ class ProviderSettingsResponse(APIModel):
     has_api_key: bool = False
 
 
-class VerseCopilotRequest(APIModel):
+class VerseCopilotRequest(ModeAliasMixin, APIModel):
     osis: str | None = None
     passage: str | None = None
     question: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
-    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
+    model: str | None = None
     recorder_metadata: RecorderMetadata | None = None
 
     @model_validator(mode="after")
@@ -248,11 +261,11 @@ class VerseCopilotRequest(APIModel):
         return self
 
 
-class SermonPrepRequest(APIModel):
+class SermonPrepRequest(ModeAliasMixin, APIModel):
     topic: str
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
-    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
+    model: str | None = None
     recorder_metadata: RecorderMetadata | None = None
     outline_template: list[str] | None = Field(
         default=None,
@@ -266,28 +279,28 @@ class SermonPrepRequest(APIModel):
     )
 
 
-class ComparativeAnalysisRequest(APIModel):
+class ComparativeAnalysisRequest(ModeAliasMixin, APIModel):
     osis: str
     participants: Sequence[str]
-    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
+    model: str | None = None
 
 
-class MultimediaDigestRequest(APIModel):
+class MultimediaDigestRequest(ModeAliasMixin, APIModel):
     collection: str | None = None
-    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
+    model: str | None = None
 
 
-class DevotionalRequest(APIModel):
+class DevotionalRequest(ModeAliasMixin, APIModel):
     osis: str
     focus: str = Field(default="reflection")
-    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
+    model: str | None = None
 
 
-class CollaborationRequest(APIModel):
+class CollaborationRequest(ModeAliasMixin, APIModel):
     thread: str
     osis: str
     viewpoints: Sequence[str]
-    model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
+    model: str | None = None
 
 
 class CorpusCurationRequest(APIModel):
