@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -23,10 +23,25 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from ..core.database import Base
 from ..core.settings import get_settings
 from .types import TSVectorType, VectorType
+
+
+if TYPE_CHECKING:
+    class DeclarativeBase:
+        """Typed façade for SQLAlchemy's declarative base."""
+
+        metadata: Any
+        registry: Any
+
+else:  # pragma: no cover - executed only at runtime
+    from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    """Declarative base class shared by all ORM models."""
+
+    pass
 
 
 class Document(Base):
@@ -1501,6 +1516,7 @@ class CaseUserAction(Base):
 
 
 __all__ = [
+    "Base",
     "Document",
     "Passage",
     "AppSetting",
