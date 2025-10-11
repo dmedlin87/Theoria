@@ -78,14 +78,32 @@ def compute_verse_id_ranges(references: Iterable[str]) -> dict[str, VerseWindow]
     return ranges
 
 
-def _range_condition(start_column, end_column, target: VerseWindow):
+def _merge_numeric_windows(windows: Iterable[VerseWindow]) -> list[tuple[int, int]]:
+    """Coalesce overlapping numeric windows for SQL filtering."""
+
+    intervals = sorted((window.start, window.end) for window in windows)
+    merged: list[list[int]] = []
+    for start, end in intervals:
+        if not merged:
+            merged.append([start, end])
+            continue
+        last = merged[-1]
+        if start <= last[1] + 1:
+            if end > last[1]:
+                last[1] = end
+        else:
+            merged.append([start, end])
+    return [(start, end) for start, end in merged]
+
+
+def _range_condition(start_column, end_column, start: int, end: int):
     if start_column is None or end_column is None:
         return None
     return and_(
         start_column.isnot(None),
         end_column.isnot(None),
-        start_column <= target.end,
-        end_column >= target.start,
+        start_column <= end,
+        end_column >= start,
     )
 
 
@@ -124,12 +142,12 @@ def query_pair_seed_rows(
     end_b = getattr(model, "end_verse_id_b", None)
 
     window_conditions = []
-    for window in windows:
+    for start, end in _merge_numeric_windows(windows):
         per_window: list = []
-        condition_a = _range_condition(start_a, end_a, window)
+        condition_a = _range_condition(start_a, end_a, start, end)
         if condition_a is not None:
             per_window.append(condition_a)
-        condition_b = _range_condition(start_b, end_b, window)
+        condition_b = _range_condition(start_b, end_b, start, end)
         if condition_b is not None:
             per_window.append(condition_b)
         if per_window:
@@ -168,8 +186,8 @@ def query_commentary_seed_rows(
     if not windows:
         return []
 
-    for window in windows:
-        condition = _range_condition(start_column, end_column, window)
+    for start, end in _merge_numeric_windows(windows):
+        condition = _range_condition(start_column, end_column, start, end)
         if condition is not None:
             conditions.append(condition)
 
