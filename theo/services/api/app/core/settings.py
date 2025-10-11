@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     )
     embedding_model: str = Field(default="BAAI/bge-m3")
     embedding_dim: int = Field(default=1024)
+    embedding_cache_size: int | None = Field(
+        default=1024,
+        description="Maximum number of embedding vectors retained in the in-memory cache",
+    )
     reranker_enabled: bool = Field(default=False)
     reranker_model_path: Path | None = Field(default=None)
     reranker_model_sha256: str | None = Field(
