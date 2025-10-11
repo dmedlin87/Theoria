@@ -281,7 +281,12 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [segment.strip() for segment in value.split(",") if segment.strip()]
         if isinstance(value, (list, tuple, set)):
-            return [str(item) for item in value]
+            cleaned: list[str] = []
+            for item in value:
+                item_str = str(item).strip()
+                if item_str:
+                    cleaned.append(item_str)
+            return cleaned
         raise ValueError("Invalid list configuration")
 
     @field_validator(
