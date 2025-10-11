@@ -187,6 +187,21 @@ def _passage_to_dict(
         field_order = tuple(key for key in PASSAGE_FIELD_ORDER if key != "text")
     if allowed is not None and "text" not in allowed and "passages.text" not in allowed:
         record.pop("text", None)
+    if allowed is not None:
+        if "meta" not in allowed:
+            meta_selectors = {
+                field.split(".", 1)[1]
+                for field in allowed
+                if field.startswith("meta.") and "." in field
+            }
+            if meta_selectors:
+                filtered_meta = _select_nested_mapping_values(record.get("meta"), meta_selectors)
+                if filtered_meta:
+                    record["meta"] = filtered_meta
+                else:
+                    record.pop("meta", None)
+            else:
+                record.pop("meta", None)
     return _filter_values(record, allowed, field_order)
 
 

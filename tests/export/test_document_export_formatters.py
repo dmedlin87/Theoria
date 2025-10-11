@@ -17,7 +17,9 @@ from theo.services.api.app.models.export import (
 )
 
 
-def _build_document_with_passage(text: str) -> DocumentDetailResponse:
+def _build_document_with_passage(
+    text: str, meta: dict | None = None
+) -> DocumentDetailResponse:
     now = datetime.now(timezone.utc)
     return DocumentDetailResponse(
         id="doc-1",
@@ -46,6 +48,7 @@ def _build_document_with_passage(text: str) -> DocumentDetailResponse:
                 id="passage-1",
                 document_id="doc-1",
                 text=text,
+                meta=meta,
             )
         ],
     )
@@ -127,4 +130,24 @@ def test_document_export_metadata_field_subset() -> None:
 
     assert records == [
         {"metadata": {"title": "Document Metadata Title"}}
+    ]
+
+
+def test_document_export_passage_meta_subset() -> None:
+    """Selecting nested passage meta fields should drop unrelated data."""
+
+    document = _build_document_with_passage(
+        "Passage", {"notes": {"summary": "brief", "tags": ["a", "b"]}, "other": 3}
+    )
+    response = _build_document_export(document)
+
+    _, records = build_document_export(
+        response,
+        include_passages=True,
+        include_text=False,
+        fields={"passages.meta.notes.summary"},
+    )
+
+    assert records == [
+        {"passages": [{"meta": {"notes": {"summary": "brief"}}}]}
     ]
