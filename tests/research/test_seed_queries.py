@@ -273,6 +273,66 @@ def test_search_commentaries_uses_range_filters() -> None:
         assert none == []
 
 
+def test_search_commentaries_handles_multiple_references() -> None:
+    engine = _setup_engine()
+    with Session(engine) as session:
+        start_john16, end_john16 = _range("John.3.16")
+        session.add(
+            CommentaryExcerptSeed(
+                id="m-john16",
+                osis="John.3.16",
+                title="John 3:16",
+                excerpt="Love the world",
+                source="Digest",
+                perspective="neutral",
+                tags=["love"],
+                start_verse_id=start_john16,
+                end_verse_id=end_john16,
+            )
+        )
+
+        start_john17, end_john17 = _range("John.3.17")
+        session.add(
+            CommentaryExcerptSeed(
+                id="m-john17",
+                osis="John.3.17",
+                title="John 3:17",
+                excerpt="Not to condemn",
+                source="Digest",
+                perspective="neutral",
+                tags=["love"],
+                start_verse_id=start_john17,
+                end_verse_id=end_john17,
+            )
+        )
+
+        off_start, off_end = _range("Gen.1.1")
+        session.add(
+            CommentaryExcerptSeed(
+                id="m-genesis",
+                osis="Gen.1.1",
+                title="Genesis",
+                excerpt="Creation",
+                source="Digest",
+                perspective="neutral",
+                tags=["creation"],
+                start_verse_id=off_start,
+                end_verse_id=off_end,
+            )
+        )
+        session.commit()
+
+        with _count_selects(engine) as stats:
+            results = search_commentaries(
+                session,
+                osis=["John.3.16", "John.3.17"],
+                limit=10,
+            )
+
+        assert stats["count"] == 1
+        assert {item.id for item in results} == {"m-john16", "m-john17"}
+
+
 def test_load_seed_relationships_bounds_queries() -> None:
     engine = _setup_engine()
     with Session(engine) as session:
