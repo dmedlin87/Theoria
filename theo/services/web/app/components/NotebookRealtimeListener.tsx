@@ -51,6 +51,11 @@ export default function NotebookRealtimeListener({
   const [state, setState] = useState<ConnectionState>("connecting");
   const [version, setVersion] = useState<number>(initialVersion);
   const wsRef = useRef<WebSocket | null>(null);
+  const onUpdateRef = useRef(onUpdate);
+
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
 
   useEffect(() => {
     const websocket = new WebSocket(buildRealtimeUrl(notebookId));
@@ -73,7 +78,7 @@ export default function NotebookRealtimeListener({
           console.warn("Failed to parse realtime payload", error);
         }
       }
-      onUpdate?.(event);
+      onUpdateRef.current?.(event);
     };
 
     websocket.onclose = () => {
@@ -88,7 +93,7 @@ export default function NotebookRealtimeListener({
       websocket.close();
       wsRef.current = null;
     };
-  }, [notebookId, onUpdate]);
+  }, [notebookId]);
 
   useEffect(() => {
     if (state === "connected") {
