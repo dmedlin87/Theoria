@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
+import shutil
 
 import importlib
 
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import event
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.core import database as database_module
 from theo.services.api.app.core.database import Base, configure_engine, get_engine
 from theo.services.api.app.db.models import AppSetting
 from theo.services.api.app.main import app
+from theo.services.api.app.db.run_sql_migrations import (
+    MIGRATIONS_PATH,
+    _SQLITE_PERSPECTIVE_MIGRATION,
+    run_sql_migrations,
+)
+from theo.services.api.app.db.seeds import seed_contradiction_claims
 
 
 @pytest.mark.enable_migrations
@@ -112,3 +121,68 @@ def test_cli_entry_point_invokes_runner(
     assert captured["migrations_path"] == migrations_dir
     assert captured["force"] is True
     assert isinstance(captured["engine"], DummyEngine)
+
+
+def test_sqlite_reapplies_missing_perspective_migration(tmp_path: Path) -> None:
+    db_path = tmp_path / "legacy.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+
+    try:
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        shutil.copy(
+            MIGRATIONS_PATH / _SQLITE_PERSPECTIVE_MIGRATION,
+            migrations_dir / _SQLITE_PERSPECTIVE_MIGRATION,
+        )
+
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE contradiction_seeds (
+                    id VARCHAR PRIMARY KEY,
+                    osis_a VARCHAR NOT NULL,
+                    osis_b VARCHAR NOT NULL,
+                    summary TEXT,
+                    source VARCHAR,
+                    tags TEXT,
+                    weight FLOAT,
+                    created_at DATETIME
+                );
+                """
+            )
+
+        AppSetting.__table__.create(bind=engine, checkfirst=True)
+
+        ledger_key = f"db:migration:{_SQLITE_PERSPECTIVE_MIGRATION}"
+        with Session(engine) as session:
+            session.add(
+                AppSetting(
+                    key=ledger_key,
+                    value={
+                        "applied_at": datetime.now(UTC).isoformat(),
+                        "filename": _SQLITE_PERSPECTIVE_MIGRATION,
+                    },
+                )
+            )
+            session.commit()
+
+        # Column should be absent prior to running migrations
+        with engine.connect() as connection:
+            result = connection.exec_driver_sql("PRAGMA table_info('contradiction_seeds')")
+            assert all(row[1] != "perspective" for row in result)
+
+        applied = run_sql_migrations(engine=engine, migrations_path=migrations_dir)
+        assert _SQLITE_PERSPECTIVE_MIGRATION in applied
+
+        with Session(engine) as session:
+            try:
+                seed_contradiction_claims(session)
+            except OperationalError as exc:  # pragma: no cover - defensive assertion
+                pytest.fail(f"seed_contradiction_claims raised OperationalError: {exc}")
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
+        for residual in db_path.parent.glob(f"{db_path.name}*"):
+            residual.unlink(missing_ok=True)
