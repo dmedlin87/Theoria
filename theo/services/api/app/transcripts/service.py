@@ -79,3 +79,30 @@ def search_transcript_segments(
     )
     limited = ordered.limit(limit)
     return limited.all()
+
+
+def _matches_osis(segment: TranscriptSegment, query: str | None) -> bool:
+    """Return ``True`` when *segment* overlaps with an OSIS *query*."""
+
+    if not query:
+        return False
+
+    query_ids = expand_osis_reference(query)
+    if not query_ids:
+        return False
+
+    references: list[str] = []
+    if segment.primary_osis:
+        references.append(segment.primary_osis)
+    if segment.osis_refs:
+        references.extend(ref for ref in segment.osis_refs if ref)
+
+    for reference in references:
+        try:
+            reference_ids = expand_osis_reference(reference)
+        except Exception:  # pragma: no cover - defensive against malformed refs
+            reference_ids = frozenset()
+        if reference_ids and not reference_ids.isdisjoint(query_ids):
+            return True
+
+    return False
