@@ -330,6 +330,7 @@ def run_pipeline_for_file(
                 transcript_path=path,
                 transcript_filename=path.name,
             )
+            return document
 
         document = _ingest_text_document(
             session,
@@ -346,6 +347,8 @@ def run_pipeline_for_file(
             text_content=text_content,
             original_path=path,
         )
+
+        return document
 
 
 def run_pipeline_for_url(
@@ -405,43 +408,49 @@ def run_pipeline_for_url(
                 transcript_path=transcript_path,
                 transcript_filename=(transcript_path.name if transcript_path else None),
             )
+            return document
 
-        if resolved_source_type not in {"web_page", "html", "website"}:
-            raise UnsupportedSourceError(
-                (
-                    "Unsupported source type for URL ingestion: "
-                    f"{resolved_source_type}. Supported types are: "
-                    "youtube, web_page, html, website"
+        else:
+            if resolved_source_type not in {"web_page", "html", "website"}:
+                raise UnsupportedSourceError(
+                    (
+                        "Unsupported source type for URL ingestion: "
+                        f"{resolved_source_type}. Supported types are: "
+                        "youtube, web_page, html, website"
+                    )
                 )
+
+            html, metadata = _fetch_web_document(settings, url)
+            text_content = html_to_text(html)
+            if not text_content:
+                raise UnsupportedSourceError(
+                    "Fetched HTML did not contain extractable text"
+                )
+
+            merged_frontmatter = merge_metadata(metadata, load_frontmatter(frontmatter))
+            parser_result = prepare_text_chunks(text_content, settings=settings)
+            sha256 = _hash_parser_result(parser_result)
+
+            document = _ingest_text_document(
+                session,
+                span,
+                dependencies=persistence_dependencies,
+                parser_result=parser_result,
+                frontmatter=merged_frontmatter,
+                settings=settings,
+                sha256=sha256,
+                source_type="web_page",
+                title=merged_frontmatter.get("title") or metadata.get("title") or url,
+                cache_status="n/a",
+                source_url=merged_frontmatter.get("source_url")
+                or metadata.get("canonical_url")
+                or url,
+                text_content=parser_result.text,
+                raw_content=html,
+                raw_filename="source.html",
             )
 
-        html, metadata = _fetch_web_document(settings, url)
-        text_content = html_to_text(html)
-        if not text_content:
-            raise UnsupportedSourceError("Fetched HTML did not contain extractable text")
-
-        merged_frontmatter = merge_metadata(metadata, load_frontmatter(frontmatter))
-        parser_result = prepare_text_chunks(text_content, settings=settings)
-        sha256 = _hash_parser_result(parser_result)
-
-        document = _ingest_text_document(
-            session,
-            span,
-            dependencies=persistence_dependencies,
-            parser_result=parser_result,
-            frontmatter=merged_frontmatter,
-            settings=settings,
-            sha256=sha256,
-            source_type="web_page",
-            title=merged_frontmatter.get("title") or metadata.get("title") or url,
-            cache_status="n/a",
-            source_url=merged_frontmatter.get("source_url")
-            or metadata.get("canonical_url")
-            or url,
-            text_content=parser_result.text,
-            raw_content=html,
-            raw_filename="source.html",
-        )
+            return document
 
 
 def run_pipeline_for_transcript(
@@ -493,6 +502,8 @@ def run_pipeline_for_transcript(
             transcript_filename=transcript_filename or transcript_path.name,
             audio_filename=audio_filename,
         )
+
+        return document
 
 def _refresh_creator_verse_rollups(
     session: Session, segments: Iterable[TranscriptSegment]
