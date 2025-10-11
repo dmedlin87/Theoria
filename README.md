@@ -94,6 +94,10 @@ Open <http://localhost:3000> in your browser.
 
 **Note**: The web proxy that backs `/api/search` reads `THEO_SEARCH_API_KEY` on every request. If the value starts with `Bearer`, it's forwarded as an `Authorization` header; otherwise it's sent via `X-API-Key`.
 
+#### Research modes in the web UI
+
+The Next.js frontend exposes a `ModeProvider`/`useMode` pair that keeps the selected research mode in sync with storage and refreshes queries when users switch contexts. All components should import these helpers from [`theo/services/web/app/mode-context.tsx`](theo/services/web/app/mode-context.tsx), which is the canonical context implementation.
+
 ### One-Command Local Dev
 
 Launch both API and Web services with a single command:

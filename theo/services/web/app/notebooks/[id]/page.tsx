@@ -169,6 +169,18 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
     ? await fetchResearchFeatures()
     : { features: null, error: null };
   const features: ResearchFeatureFlags | null = fetchedFeatures;
+
+  let features: ResearchFeatureFlags | null = null;
+  let featureDiscoveryFailed = false;
+  if (osisRefs.length) {
+    try {
+      features = await fetchResearchFeatures();
+    } catch (error) {
+      featureDiscoveryFailed = true;
+      console.error("Failed to fetch research features", error);
+      features = null;
+    }
+  }
   const version = await fetchRealtimeVersion(notebook.id);
 
   const exportPayload: DeliverableRequestPayload | null = notebook.primary_osis
@@ -220,6 +232,21 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
       </section>
 
       {osisRefs.length > 0 ? (
+      {featureDiscoveryFailed ? (
+        <p
+          role="alert"
+          style={{
+            background: "var(--muted, #fef2f2)",
+            color: "var(--muted-foreground, #b91c1c)",
+            borderRadius: "0.5rem",
+            padding: "0.75rem 1rem",
+          }}
+        >
+          Research features are temporarily unavailable. Notebook entries remain accessible.
+        </p>
+      ) : null}
+
+      {osisRefs.length > 0 && features ? (
         <section style={{ display: "grid", gap: "1.5rem" }}>
           <header>
             <h2 style={{ margin: 0 }}>Verse Aggregator</h2>

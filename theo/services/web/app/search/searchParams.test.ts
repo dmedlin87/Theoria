@@ -1,5 +1,18 @@
 import { parseSearchParams, serializeSearchParams } from "./searchParams";
 
+jest.mock("next/link", () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe("searchParams helpers", () => {
   it("round-trips filters while trimming whitespace", () => {
     const queryString = serializeSearchParams({
@@ -103,5 +116,32 @@ describe("searchParams helpers", () => {
     expect(parsed.variantFacets).toEqual(["disputed", "archaeology"]);
     expect(parsed.includeVariants).toBe(true);
     expect(parsed.includeDisputed).toBe(true);
+  });
+
+  describe("normalizeStringArray", () => {
+    let normalizeStringArray: (value: unknown) => string[];
+
+    beforeAll(async () => {
+      ({ normalizeStringArray } = await import("./components/SearchPageClient"));
+    });
+
+    it("filters non-string entries from arrays", () => {
+      const mixedValues = [
+        "  Alpha  ",
+        123,
+        null,
+        undefined,
+        "Beta",
+        { label: "Gamma" },
+        "",
+      ] as unknown[];
+
+      expect(normalizeStringArray(mixedValues)).toEqual(["Alpha", "Beta"]);
+    });
+
+    it("returns empty arrays for non-array non-string inputs", () => {
+      expect(normalizeStringArray(42)).toEqual([]);
+      expect(normalizeStringArray({ bad: "data" })).toEqual([]);
+    });
   });
 });

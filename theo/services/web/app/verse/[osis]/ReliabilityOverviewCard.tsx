@@ -5,6 +5,11 @@ type OverviewBullet = {
   citations: string[];
 };
 
+type ApiOverviewBullet = {
+  summary?: unknown;
+  citations?: unknown;
+};
+
 type ReliabilityOverviewResponse = {
   osis: string;
   mode: string;
@@ -12,6 +17,29 @@ type ReliabilityOverviewResponse = {
   disputed: OverviewBullet[];
   manuscripts: OverviewBullet[];
 };
+
+type ApiReliabilityOverviewResponse = {
+  osis?: string;
+  mode?: string;
+  consensus?: unknown;
+  disputed?: unknown;
+  manuscripts?: unknown;
+};
+
+function normalizeOverviewList(items: unknown): OverviewBullet[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return (items as ApiOverviewBullet[])
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      summary: typeof item.summary === "string" ? item.summary : String(item.summary ?? ""),
+      citations: Array.isArray(item.citations)
+        ? (item.citations as unknown[]).filter((citation): citation is string => typeof citation === "string")
+        : [],
+    }));
+}
 
 type StudyMode = "apologetic" | "skeptical";
 
@@ -83,7 +111,15 @@ export default async function ReliabilityOverviewCard({
     if (!response.ok) {
       throw new Error((await response.text()) || response.statusText);
     }
-    overview = (await response.json()) as ReliabilityOverviewResponse;
+    const data = (await response.json()) as ApiReliabilityOverviewResponse;
+
+    overview = {
+      osis: typeof data.osis === "string" ? data.osis : osis,
+      mode: typeof data.mode === "string" ? data.mode : mode,
+      consensus: normalizeOverviewList(data.consensus),
+      disputed: normalizeOverviewList(data.disputed),
+      manuscripts: normalizeOverviewList(data.manuscripts),
+    } satisfies ReliabilityOverviewResponse;
   } catch (fetchError) {
     console.error("Failed to load reliability overview", fetchError);
     error = fetchError instanceof Error ? fetchError.message : "Unknown error";
@@ -94,6 +130,12 @@ export default async function ReliabilityOverviewCard({
     mode === "skeptical"
       ? "Skeptical mode looks for weak points and open questions."
       : "Apologetic mode highlights harmony and trusted support.";
+
+  const consensusItems = overview?.consensus ?? [];
+  const disputedItems = overview?.disputed ?? [];
+  const manuscriptItems = overview?.manuscripts ?? [];
+  const hasOverviewContent =
+    consensusItems.length > 0 || disputedItems.length > 0 || manuscriptItems.length > 0;
 
   return (
     <div
@@ -128,17 +170,15 @@ export default async function ReliabilityOverviewCard({
       ) : null}
 
       {overview && !error ? (
-        overview.consensus.length === 0 &&
-        overview.disputed.length === 0 &&
-        overview.manuscripts.length === 0 ? (
+        !hasOverviewContent ? (
           <p style={{ margin: 0 }}>
             No overview data is available yet. Add research notes to build this snapshot.
           </p>
         ) : (
           <div style={{ display: "grid", gap: "1rem" }}>
-            <SectionList title="Consensus threads" items={overview.consensus} />
-            <SectionList title="Disputed points" items={overview.disputed} />
-            <SectionList title="Key manuscripts" items={overview.manuscripts} />
+            <SectionList title="Consensus threads" items={consensusItems} />
+            <SectionList title="Disputed points" items={disputedItems} />
+            <SectionList title="Key manuscripts" items={manuscriptItems} />
           </div>
         )
       ) : null}

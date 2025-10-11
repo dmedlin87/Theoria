@@ -16,9 +16,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    const outboundHeaders = new Headers({ "Content-Type": "application/json" });
+    forwardTraceHeaders(request.headers, outboundHeaders);
     const response = await fetch(`${baseUrl}/ingest/simple`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: outboundHeaders,
       body: JSON.stringify(payload),
     });
 

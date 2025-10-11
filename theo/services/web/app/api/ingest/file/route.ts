@@ -6,10 +6,13 @@ import { forwardTraceHeaders } from "../../trace";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const formData = await request.formData();
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+  const outboundHeaders = new Headers();
+  forwardTraceHeaders(request.headers, outboundHeaders);
 
   try {
     const response = await fetch(`${baseUrl}/ingest/file`, {
       method: "POST",
+      headers: outboundHeaders,
       body: formData,
     });
     const body = await response.text();

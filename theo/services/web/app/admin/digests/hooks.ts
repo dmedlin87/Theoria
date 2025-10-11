@@ -258,41 +258,67 @@ export function useWatchlistPagination(watchlists: WatchlistResponse[], pageSize
   };
 }
 
-type WatchlistEventState = {
-  events: WatchlistRunResponse[];
-  eventsLoading: boolean;
-  eventsError: string | null;
-  eventsWatchlistId: string | null;
-  loadEvents: (watchlistId: string, since: string) => Promise<void>;
-};
+  type WatchlistEventState = {
+    events: WatchlistRunResponse[];
+    eventsLoading: boolean;
+    eventsError: string | null;
+    eventsWatchlistId: string | null;
+    loadEvents: (watchlistId: string, since: string) => Promise<void>;
+    cancelEventsRequest: () => void;
+  };
 
-export function useWatchlistEvents(client?: TheoApiClient): WatchlistEventState {
-  const api = useMemo(() => client ?? createTheoApiClient(), [client]);
-  const [events, setEvents] = useState<WatchlistRunResponse[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventsError, setEventsError] = useState<string | null>(null);
-  const [eventsWatchlistId, setEventsWatchlistId] = useState<string | null>(null);
-  const loadEvents = useCallback(
-    async (watchlistId: string, since: string) => {
-      setEvents([]);
-      setEventsError(null);
-      setEventsLoading(true);
-      try {
-        const payload = await api.fetchWatchlistEvents(watchlistId, since);
-        setEvents(payload);
-        setEventsWatchlistId(watchlistId);
-      } catch (eventsError) {
-        setEventsError(extractErrorMessage(eventsError));
-        setEventsWatchlistId(watchlistId);
-      } finally {
-        setEventsLoading(false);
-      }
-    },
-    [api],
-  );
+  export function useWatchlistEvents(client?: TheoApiClient): WatchlistEventState {
+    const api = useMemo(() => client ?? createTheoApiClient(), [client]);
+    const [events, setEvents] = useState<WatchlistRunResponse[]>([]);
+    const [eventsLoading, setEventsLoading] = useState(false);
+    const [eventsError, setEventsError] = useState<string | null>(null);
+    const [eventsWatchlistId, setEventsWatchlistId] = useState<string | null>(null);
+    const eventsRequestTokenRef = useRef(0);
 
-  return { events, eventsLoading, eventsError, eventsWatchlistId, loadEvents };
-}
+    const cancelEventsRequest = useCallback(() => {
+      eventsRequestTokenRef.current += 1;
+      setEventsLoading(false);
+    }, []);
+
+    const loadEvents = useCallback(
+      async (watchlistId: string, since: string) => {
+        const requestToken = eventsRequestTokenRef.current + 1;
+        eventsRequestTokenRef.current = requestToken;
+
+        setEventsLoading(true);
+        if (eventsRequestTokenRef.current === requestToken) {
+          setEvents([]);
+          setEventsError(null);
+        }
+        try {
+          const payload = await api.fetchWatchlistEvents(watchlistId, since);
+          if (eventsRequestTokenRef.current === requestToken) {
+            setEvents(payload);
+            setEventsWatchlistId(watchlistId);
+          }
+        } catch (eventsError) {
+          if (eventsRequestTokenRef.current === requestToken) {
+            setEventsError(extractErrorMessage(eventsError));
+            setEventsWatchlistId(watchlistId);
+          }
+        } finally {
+          if (eventsRequestTokenRef.current === requestToken) {
+            setEventsLoading(false);
+          }
+        }
+      },
+      [api],
+    );
+
+    return {
+      events,
+      eventsLoading,
+      eventsError,
+      eventsWatchlistId,
+      loadEvents,
+      cancelEventsRequest,
+    };
+  }
 
 type CommaListHelpers = {
   toCommaList: (values: string[] | null | undefined) => string;
