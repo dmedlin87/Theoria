@@ -6,11 +6,13 @@ import { forwardTraceHeaders } from "../../trace";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const payload = await request.json();
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+  const outboundHeaders = new Headers({ "Content-Type": "application/json" });
+  forwardTraceHeaders(request.headers, outboundHeaders);
 
   try {
     const response = await fetch(`${baseUrl}/ingest/url`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: outboundHeaders,
       body: JSON.stringify(payload),
     });
     const body = await response.text();
