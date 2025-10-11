@@ -452,9 +452,12 @@ def test_ingest_url_times_out_on_slow_response(
         print(f"Response body: {response.text}")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     payload = response.json()
-    assert payload.get("error", {}).get(
-        "message"
-    ) == "Fetching URL timed out after 0.5 seconds"
+    assert payload.get("error", {}).get("code") == "INGESTION_UNSUPPORTED_SOURCE"
+    assert (
+        payload.get("error", {}).get("message")
+        == "Fetching URL timed out after 0.5 seconds"
+    )
+    assert payload.get("error", {}).get("severity") == "user"
     assert call_counter["count"] == 1
 
 
@@ -500,9 +503,12 @@ def test_ingest_url_rejects_oversized_response(
     response = api_client.post("/ingest/url", json={"url": "https://large.example.com"})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     payload = response.json()
-    assert payload.get("error", {}).get(
-        "message"
-    ) == "Fetched content exceeded maximum allowed size of 10 bytes"
+    assert payload.get("error", {}).get("code") == "INGESTION_UNSUPPORTED_SOURCE"
+    assert (
+        payload.get("error", {}).get("message")
+        == "Fetched content exceeded maximum allowed size of 10 bytes"
+    )
+    assert payload.get("error", {}).get("severity") == "user"
     assert call_counter["count"] == 1
 
 
@@ -568,7 +574,9 @@ def test_ingest_url_detects_redirect_loop(
     response = api_client.post("/ingest/url", json={"url": "https://loop.example.com"})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     payload = response.json()
+    assert payload.get("error", {}).get("code") == "INGESTION_UNSUPPORTED_SOURCE"
     assert payload.get("error", {}).get("message") == "URL redirect loop detected"
+    assert payload.get("error", {}).get("severity") == "user"
     assert call_counter["count"] == 1
 
 def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:

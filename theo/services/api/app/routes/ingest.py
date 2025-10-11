@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
+from theo.services.api.app.ingest.exceptions import UnsupportedSourceError
 from ..ingest.exceptions import UnsupportedSourceError
 from ..models.documents import (
     DocumentIngestResponse,
