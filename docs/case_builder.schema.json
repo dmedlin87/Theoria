@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://theoengine.dev/schemas/case_builder.schema.json",
+  "title": "Theo Engine Case Builder Record",
+  "description": "Contract describing Case Builder graph payloads persisted by the Theo Engine API.",
+  "type": "object",
+  "required": ["source", "objects"],
+  "properties": {
+    "source": {
+      "$ref": "#/$defs/CaseSource"
+    },
+    "objects": {
+      "type": "array",
+      "description": "Objects derived from the source document, aligned with `CaseObject` records.",
+      "items": {
+        "$ref": "#/$defs/CaseObject"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "description": "Graph relationships between Case Builder objects.",
+      "items": {
+        "$ref": "#/$defs/CaseEdge"
+      }
+    },
+    "insights": {
+      "type": "array",
+      "description": "Insights emitted by scoring pipelines.",
+      "items": {
+        "$ref": "#/$defs/CaseInsight"
+      }
+    },
+    "user_actions": {
+      "type": "array",
+      "description": "Analyst feedback captured on insights.",
+      "items": {
+        "$ref": "#/$defs/CaseUserAction"
+      }
+    }
+  },
+  "$defs": {
+    "CaseSource": {
+      "type": "object",
+      "description": "Source metadata powering case-builder evidence objects (mirrors `CaseSource`).",
+      "required": ["id", "created_at", "updated_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable UUID for the source record."
+        },
+        "document_id": {
+          "type": ["string", "null"],
+          "description": "Optional ID of the backing `Document`."
+        },
+        "origin": {
+          "type": ["string", "null"],
+          "description": "Origin system or pipeline tag."
+        },
+        "author": {
+          "type": ["string", "null"],
+          "description": "Primary author for the source."
+        },
+        "year": {
+          "type": ["integer", "null"],
+          "description": "Publication year."
+        },
+        "url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "Canonical URL for the source artifact."
+        },
+        "modality": {
+          "type": ["string", "null"],
+          "description": "Content modality (text, audio, video, etc.)."
+        },
+        "meta": {
+          "type": ["object", "array", "null"],
+          "description": "Additional pipeline metadata forwarded from ingestion."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the source was created."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the source was last updated."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CaseObject": {
+      "type": "object",
+      "description": "Evidence object evaluated by the Case Builder pipeline (mirrors `CaseObject`).",
+      "required": [
+        "id",
+        "object_type",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable UUID for the object."
+        },
+        "source_id": {
+          "type": ["string", "null"],
+          "description": "ID of the parent `CaseSource`."
+        },
+        "document_id": {
+          "type": ["string", "null"],
+          "description": "Optional ID of the originating `Document`."
+        },
+        "passage_id": {
+          "type": ["string", "null"],
+          "description": "Optional ID of the referenced `Passage`."
+        },
+        "annotation_id": {
+          "type": ["string", "null"],
+          "description": "Optional ID of the referenced `DocumentAnnotation`."
+        },
+        "object_type": {
+          "type": "string",
+          "enum": [
+            "passage",
+            "note",
+            "claim",
+            "evidence",
+            "annotation"
+          ],
+          "description": "Case Builder object classification."
+        },
+        "title": {
+          "type": ["string", "null"],
+          "description": "Human-readable title for the object."
+        },
+        "body": {
+          "type": ["string", "null"],
+          "description": "Primary textual content."
+        },
+        "osis_ranges": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          },
+          "description": "List of OSIS verse ranges associated with the object."
+        },
+        "modality": {
+          "type": ["string", "null"],
+          "description": "Content modality for the object (text, audio clip, etc.)."
+        },
+        "tags": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional labels assigned to the object."
+        },
+        "embedding": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "number"
+          },
+          "description": "Vector embedding generated for similarity search."
+        },
+        "stability": {
+          "type": ["number", "null"],
+          "description": "Optional stability score produced by ingestion."
+        },
+        "meta": {
+          "type": ["object", "null"],
+          "description": "Arbitrary structured metadata (feature flags, heuristics, etc.)."
+        },
+        "published_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Timestamp when the underlying content was published."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the object was created."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the object was last updated."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CaseEdge": {
+      "type": "object",
+      "description": "Property-graph edge captured between Case Builder objects (mirrors `CaseEdge`).",
+      "required": [
+        "id",
+        "src_object_id",
+        "dst_object_id",
+        "kind",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable UUID for the edge."
+        },
+        "src_object_id": {
+          "type": "string",
+          "description": "Source object identifier."
+        },
+        "dst_object_id": {
+          "type": "string",
+          "description": "Destination object identifier."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "semantic_sim",
+            "co_citation",
+            "verse_overlap",
+            "topic_overlap",
+            "contradiction"
+          ],
+          "description": "Relationship type connecting the objects."
+        },
+        "weight": {
+          "type": ["number", "null"],
+          "description": "Optional scalar summarizing edge strength."
+        },
+        "features": {
+          "type": ["object", "null"],
+          "description": "Structured feature payload used for scoring/explainability."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the edge was created."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the edge was last updated."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CaseInsight": {
+      "type": "object",
+      "description": "Insight record emitted by the Case Builder pipeline (mirrors `CaseInsight`).",
+      "required": [
+        "id",
+        "insight_type",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable UUID for the insight."
+        },
+        "primary_object_id": {
+          "type": ["string", "null"],
+          "description": "Optional ID of the primary `CaseObject` driving the insight."
+        },
+        "insight_type": {
+          "type": "string",
+          "enum": [
+            "convergence",
+            "collision",
+            "lead",
+            "bundle"
+          ],
+          "description": "Category of insight generated by the scoring pipeline."
+        },
+        "score": {
+          "type": ["number", "null"],
+          "description": "Optional numeric score for ranking."
+        },
+        "cluster_id": {
+          "type": ["string", "null"],
+          "description": "Identifier for the cluster the insight belongs to."
+        },
+        "payload": {
+          "type": ["object", "null"],
+          "description": "Structured metadata explaining why the insight fired."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the insight was created."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the insight was last updated."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CaseUserAction": {
+      "type": "object",
+      "description": "Analyst feedback captured for Case Builder insights (mirrors `CaseUserAction`).",
+      "required": [
+        "id",
+        "insight_id",
+        "action",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable UUID for the user action."
+        },
+        "insight_id": {
+          "type": "string",
+          "description": "ID of the associated `CaseInsight`."
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "accept",
+            "snooze",
+            "discard",
+            "pin",
+            "mute"
+          ],
+          "description": "Type of feedback recorded."
+        },
+        "confidence": {
+          "type": ["number", "null"],
+          "description": "Optional analyst confidence score."
+        },
+        "payload": {
+          "type": ["object", "null"],
+          "description": "Optional structured payload for additional context."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the user action was created."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when the user action was last updated."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

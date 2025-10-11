@@ -165,6 +165,10 @@ def _resolve_dependencies(
     if dependencies is None:
         dependencies = PipelineDependencies()
     return dependencies.for_persistence()
+def _set_chunk_span_metrics(span, parser_result: ParserResult) -> None:
+    chunk_count = len(parser_result.chunks)
+    set_span_attribute(span, "ingest.chunk_count", chunk_count)
+    set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
 
 
 def _ingest_transcript_document(
@@ -290,9 +294,7 @@ def run_pipeline_for_file(
 ) -> Document:
     """Execute the file ingestion pipeline synchronously."""
 
-    persistence_dependencies = _resolve_dependencies(dependencies)
-
-    settings = get_settings()
+    settings, persistence_dependencies = _resolve_context(dependencies)
     with instrument_workflow(
         "ingest.file", source_path=str(path), source_name=path.name
     ) as span:
@@ -313,7 +315,7 @@ def run_pipeline_for_file(
         )
 
         if source_type == "transcript":
-            return _ingest_transcript_document(
+            document = _ingest_transcript_document(
                 session,
                 span,
                 dependencies=persistence_dependencies,
@@ -329,7 +331,7 @@ def run_pipeline_for_file(
                 transcript_filename=path.name,
             )
 
-        return _ingest_text_document(
+        document = _ingest_text_document(
             session,
             span,
             dependencies=persistence_dependencies,
@@ -382,7 +384,7 @@ def run_pipeline_for_url(
             if transcript_path:
                 set_span_attribute(span, "ingest.transcript_fixture", transcript_path.name)
 
-            return _ingest_transcript_document(
+            document = _ingest_transcript_document(
                 session,
                 span,
                 dependencies=persistence_dependencies,
@@ -391,11 +393,9 @@ def run_pipeline_for_url(
                 settings=settings,
                 sha256=sha256,
                 source_type="youtube",
-                title=(
-                    merged_frontmatter.get("title")
-                    or metadata.get("title")
-                    or f"YouTube Video {video_id}"
-                ),
+                title=merged_frontmatter.get("title")
+                or metadata.get("title")
+                or f"YouTube Video {video_id}",
                 cache_status=cache_status,
                 source_url=merged_frontmatter.get("source_url") or url,
                 channel=merged_frontmatter.get("channel") or metadata.get("channel"),
@@ -424,7 +424,7 @@ def run_pipeline_for_url(
         parser_result = prepare_text_chunks(text_content, settings=settings)
         sha256 = _hash_parser_result(parser_result)
 
-        return _ingest_text_document(
+        document = _ingest_text_document(
             session,
             span,
             dependencies=persistence_dependencies,
@@ -473,7 +473,7 @@ def run_pipeline_for_transcript(
         title = merged_frontmatter.get("title") or transcript_path.stem
 
         set_span_attribute(span, "ingest.source_type", source_type)
-        return _ingest_transcript_document(
+        document = _ingest_transcript_document(
             session,
             span,
             dependencies=persistence_dependencies,
