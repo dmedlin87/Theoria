@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..core.settings import get_settings
 from ..db.models import (
     CaseObject,
+    CaseObjectType,
     CaseSource,
     Document,
     DocumentAnnotation,
@@ -135,7 +136,7 @@ def _update_case_object(
     source: CaseSource | None,
     document: Document,
     body: str,
-    object_type: str,
+    object_type: CaseObjectType,
     osis_ranges: list[str] | None,
     modality: str | None,
     tags: list[str] | None,
@@ -146,12 +147,12 @@ def _update_case_object(
     annotation: DocumentAnnotation | None = None,
 ) -> tuple[CaseObject, bool]:
     now = datetime.now(UTC)
+    created = False
     if case_object is None:
         case_object = CaseObject(
             source_id=source.id if source else None,
             document_id=document.id,
             passage_id=passage.id if passage else None,
-            annotation_id=annotation.id if annotation else None,
             object_type=object_type,
             title=document.title,
             body=body,
@@ -164,9 +165,9 @@ def _update_case_object(
             meta=meta,
         )
         session.add(case_object)
-        return case_object, True
+        created = True
 
-    changed = False
+    changed = created
     if source and case_object.source_id != source.id:
         case_object.source_id = source.id
         changed = True
@@ -175,9 +176,6 @@ def _update_case_object(
         changed = True
     if passage and case_object.passage_id != passage.id:
         case_object.passage_id = passage.id
-        changed = True
-    if annotation and case_object.annotation_id != annotation.id:
-        case_object.annotation_id = annotation.id
         changed = True
     if case_object.object_type != object_type:
         case_object.object_type = object_type
@@ -208,6 +206,10 @@ def _update_case_object(
         changed = True
     if case_object.meta != meta:
         case_object.meta = meta
+        changed = True
+    if annotation and annotation.case_object is not case_object:
+        annotation.case_object = case_object
+        session.add(annotation)
         changed = True
     if changed:
         case_object.updated_at = now
@@ -272,7 +274,7 @@ def sync_passages_case_objects(
             passage=passage,
             annotation=None,
             body=passage.text,
-            object_type="passage",
+            object_type=CaseObjectType.PASSAGE,
             osis_ranges=osis_ranges,
             modality=document.source_type,
             tags=tags,
@@ -301,9 +303,9 @@ def sync_annotation_case_object(
         return None
 
     source = _ensure_case_source(session, document, None)
-    case_object = session.execute(
-        select(CaseObject).where(CaseObject.annotation_id == annotation.id)
-    ).scalar_one_or_none()
+    case_object = annotation.case_object
+    if case_object is None and annotation.case_object_id:
+        case_object = session.get(CaseObject, annotation.case_object_id)
 
     body = annotation.body.strip()
     if not body:
@@ -328,7 +330,7 @@ def sync_annotation_case_object(
         passage=None,
         annotation=annotation,
         body=body,
-        object_type="annotation",
+        object_type=CaseObjectType.NOTE,
         osis_ranges=None,
         modality=document.source_type,
         tags=tags,

@@ -17,7 +17,12 @@ from theo.services.api.app.core.database import (  # noqa: E402
     get_engine,
     get_settings,
 )
-from theo.services.api.app.db.models import CaseObject, Document  # noqa: E402
+from theo.services.api.app.db.models import (  # noqa: E402
+    CaseObject,
+    CaseObjectType,
+    Document,
+    DocumentAnnotation,
+)
 from theo.services.api.app.ingest import pipeline  # noqa: E402
 from theo.services.api.app.models.documents import (  # noqa: E402
     DocumentAnnotationCreate,
@@ -58,15 +63,13 @@ def test_create_annotation_persists_case_object(tmp_path) -> None:
 
         with Session(engine) as session:
             response = documents_api.create_annotation(session, document_id, payload)
-            case_object = (
-                session.query(CaseObject)
-                .filter(CaseObject.annotation_id == response.id)
-                .one_or_none()
-            )
+            annotation = session.get(DocumentAnnotation, response.id)
+            case_object = annotation.case_object if annotation else None
             stored_document = session.get(Document, document_id)
 
+        assert annotation is not None
         assert case_object is not None
-        assert case_object.object_type == "annotation"
+        assert case_object.object_type == CaseObjectType.NOTE
         assert case_object.document_id == document_id
         assert case_object.embedding is not None
         assert stored_document is not None
