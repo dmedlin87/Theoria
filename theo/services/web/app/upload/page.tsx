@@ -191,6 +191,7 @@ export default function UploadPage(): JSX.Element {
   const [simpleSuccess, setSimpleSuccess] = useState<string | null>(null);
   const [isRunningSimple, setIsRunningSimple] = useState(false);
   const simpleFormRef = useRef<HTMLFormElement | null>(null);
+  const simpleIngestAbortControllerRef = useRef<AbortController | null>(null);
 
   const [status, setStatus] = useState<UploadStatus | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -334,6 +335,10 @@ export default function UploadPage(): JSX.Element {
       payload.metadata = metadata;
     }
 
+    simpleIngestAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    simpleIngestAbortControllerRef.current = controller;
+
     setIsRunningSimple(true);
     let shouldRefreshJobs = false;
     try {
@@ -341,6 +346,7 @@ export default function UploadPage(): JSX.Element {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -423,6 +429,12 @@ export default function UploadPage(): JSX.Element {
         }
       }
     } catch (error) {
+      if (
+        (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError") ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        return;
+      }
       const fallbackMessage =
         error instanceof Error
           ? error.message
@@ -435,12 +447,22 @@ export default function UploadPage(): JSX.Element {
           : fallbackMessage;
       setSimpleError(message);
     } finally {
+      if (simpleIngestAbortControllerRef.current === controller) {
+        simpleIngestAbortControllerRef.current = null;
+      }
       setIsRunningSimple(false);
       if (shouldRefreshJobs && fetchJobsRef.current) {
         void fetchJobsRef.current();
       }
     }
   };
+
+  useEffect(() => {
+    return () => {
+      simpleIngestAbortControllerRef.current?.abort();
+      simpleIngestAbortControllerRef.current = null;
+    };
+  }, []);
 
   const handleFileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
