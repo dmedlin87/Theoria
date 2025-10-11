@@ -191,6 +191,33 @@ def test_seed_reference_data_provides_perspective_column(tmp_path, monkeypatch) 
             )
             """
         )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE harmony_seeds (
+                id TEXT PRIMARY KEY,
+                osis_a TEXT NOT NULL,
+                osis_b TEXT NOT NULL,
+                summary TEXT,
+                source TEXT,
+                tags JSON,
+                weight FLOAT NOT NULL DEFAULT 1.0,
+                perspective TEXT
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE commentary_excerpt_seeds (
+                id TEXT PRIMARY KEY,
+                osis TEXT NOT NULL,
+                title TEXT,
+                excerpt TEXT NOT NULL,
+                source TEXT,
+                perspective TEXT,
+                tags JSON
+            )
+            """
+        )
 
     Base.metadata.create_all(engine)
     run_sql_migrations(engine)

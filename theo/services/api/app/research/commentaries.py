@@ -6,8 +6,10 @@ from typing import Iterable
 
 from sqlalchemy.orm import Session
 
-from ..db.models import CommentaryExcerptSeed
-from ..ingest.osis import osis_intersects
+from ..db.verse_graph import (
+    compute_verse_id_ranges,
+    query_commentary_seed_rows,
+)
 from ..models.research import CommentaryExcerptItem
 
 
@@ -48,20 +50,17 @@ def search_commentaries(
     if perspectives and not allowed_perspectives:
         return []
 
-    seeds = session.query(CommentaryExcerptSeed).all()
+    range_map = compute_verse_id_ranges(candidates)
+    if not range_map:
+        return []
+    verse_ranges = list(range_map.values())
+
+    seeds = query_commentary_seed_rows(session, verse_ranges)
     matched: list[CommentaryExcerptItem] = []
 
     for seed in seeds:
         perspective = _normalize_perspective(seed.perspective)
         if allowed_perspectives and perspective not in allowed_perspectives:
-            continue
-
-        intersects = any(
-            osis_intersects(seed.osis, requested)
-            or osis_intersects(requested, seed.osis)
-            for requested in candidates
-        )
-        if not intersects:
             continue
 
         matched.append(

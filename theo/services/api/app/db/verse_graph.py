@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable, TypeVar
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference
 from .models import CommentaryExcerptSeed, ContradictionSeed, HarmonySeed
 
 _ALLOWED_PERSPECTIVES = {"apologetic", "skeptical", "neutral"}
@@ -17,6 +19,9 @@ def _normalize_perspective(raw: str | None, *, default: str) -> str:
     if value not in _ALLOWED_PERSPECTIVES:
         return default
     return value
+
+
+PairSeedModel = TypeVar("PairSeedModel", ContradictionSeed, HarmonySeed)
 
 
 def _normalize_tags(tags: list[str] | None) -> list[str] | None:
@@ -30,10 +35,95 @@ def _normalize_tags(tags: list[str] | None) -> list[str] | None:
     return normalised or None
 
 
-def _osis_matches(candidate: str, requested: str) -> bool:
-    return bool(
-        osis_intersects(candidate, requested) or osis_intersects(requested, candidate)
+def compute_verse_id_ranges(references: Iterable[str]) -> dict[str, tuple[int, int]]:
+    """Return a mapping of normalized OSIS references to verse-id ranges."""
+
+    ranges: dict[str, tuple[int, int]] = {}
+    for value in references:
+        if not value:
+            continue
+        normalized = value.strip()
+        if not normalized or normalized in ranges:
+            continue
+        verse_ids = expand_osis_reference(normalized)
+        if not verse_ids:
+            continue
+        start = min(verse_ids)
+        end = max(verse_ids)
+        ranges[normalized] = (start, end)
+    return ranges
+
+
+def _range_condition(start_column, end_column, target: tuple[int, int]):
+    if start_column is None or end_column is None:
+        return None
+    start, end = target
+    return and_(
+        start_column.isnot(None),
+        end_column.isnot(None),
+        start_column <= end,
+        end_column >= start,
     )
+
+
+def query_pair_seed_rows(
+    session: Session,
+    verse_ranges: Iterable[tuple[int, int]],
+    model: type[PairSeedModel],
+) -> list[PairSeedModel]:
+    """Return ORM rows for pairwise seeds overlapping ``verse_ranges``."""
+
+    conditions = []
+    for verse_range in verse_ranges:
+        per_range: list = []
+        per_range.append(
+            _range_condition(getattr(model, "start_verse_id", None), getattr(model, "end_verse_id", None), verse_range)
+        )
+        per_range.append(
+            _range_condition(
+                getattr(model, "start_verse_id_b", None),
+                getattr(model, "end_verse_id_b", None),
+                verse_range,
+            )
+        )
+        per_range = [condition for condition in per_range if condition is not None]
+        if per_range:
+            conditions.append(or_(*per_range))
+
+    if not conditions:
+        return []
+
+    query = session.query(model).filter(or_(*conditions))
+    seen: dict[str, PairSeedModel] = {}
+    for seed in query:
+        seen[seed.id] = seed
+    return list(seen.values())
+
+
+def query_commentary_seed_rows(
+    session: Session, verse_ranges: Iterable[tuple[int, int]]
+) -> list[CommentaryExcerptSeed]:
+    """Return commentary seeds overlapping ``verse_ranges``."""
+
+    conditions = []
+    start_column = getattr(CommentaryExcerptSeed, "start_verse_id", None)
+    end_column = getattr(CommentaryExcerptSeed, "end_verse_id", None)
+    if start_column is None or end_column is None:
+        return []
+
+    for verse_range in verse_ranges:
+        condition = _range_condition(start_column, end_column, verse_range)
+        if condition is not None:
+            conditions.append(condition)
+
+    if not conditions:
+        return []
+
+    query = session.query(CommentaryExcerptSeed).filter(or_(*conditions))
+    seen: dict[str, CommentaryExcerptSeed] = {}
+    for seed in query:
+        seen[seed.id] = seed
+    return list(seen.values())
 
 
 @dataclass(slots=True)
@@ -75,10 +165,10 @@ class VerseSeedRelationships:
 def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationships:
     """Return normalized seed records intersecting ``osis``."""
 
+    ranges = list(compute_verse_id_ranges([osis]).values())
+
     contradictions: list[PairSeedRecord] = []
-    for seed in session.query(ContradictionSeed).all():
-        if not (_osis_matches(seed.osis_a, osis) or _osis_matches(seed.osis_b, osis)):
-            continue
+    for seed in query_pair_seed_rows(session, ranges, ContradictionSeed):
         perspective = _normalize_perspective(seed.perspective, default="skeptical")
         contradictions.append(
             PairSeedRecord(
@@ -94,9 +184,7 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
         )
 
     harmonies: list[PairSeedRecord] = []
-    for seed in session.query(HarmonySeed).all():
-        if not (_osis_matches(seed.osis_a, osis) or _osis_matches(seed.osis_b, osis)):
-            continue
+    for seed in query_pair_seed_rows(session, ranges, HarmonySeed):
         perspective = _normalize_perspective(seed.perspective, default="apologetic")
         harmonies.append(
             PairSeedRecord(
@@ -112,9 +200,7 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
         )
 
     commentaries: list[CommentarySeedRecord] = []
-    for seed in session.query(CommentaryExcerptSeed).all():
-        if not _osis_matches(seed.osis, osis):
-            continue
+    for seed in query_commentary_seed_rows(session, ranges):
         perspective = _normalize_perspective(seed.perspective, default="neutral")
         commentaries.append(
             CommentarySeedRecord(

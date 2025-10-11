@@ -14,6 +14,7 @@ from theo.services.api.app.db.models import (
     HarmonySeed,
     Passage,
 )
+from theo.services.api.app.ingest.osis import expand_osis_reference
 
 
 @pytest.fixture()
@@ -58,6 +59,14 @@ def _seed_graph_data(engine) -> None:
         )
         session.add_all([passage_pdf, passage_markdown])
 
+        def _range(osis: str) -> tuple[int | None, int | None]:
+            ids = expand_osis_reference(osis)
+            if not ids:
+                return None, None
+            return min(ids), max(ids)
+
+        start_a, end_a = _range("John.3.16")
+        start_b, end_b = _range("Matthew.5.44")
         contradiction = ContradictionSeed(
             id=str(uuid4()),
             osis_a="John.3.16",
@@ -67,7 +76,13 @@ def _seed_graph_data(engine) -> None:
             tags=["tension"],
             weight=1.2,
             perspective="skeptical",
+            start_verse_id=start_a,
+            end_verse_id=end_a,
+            start_verse_id_b=start_b,
+            end_verse_id_b=end_b,
         )
+        h_start_a, h_end_a = _range("John.3.16")
+        h_start_b, h_end_b = _range("Luke.6.27")
         harmony = HarmonySeed(
             id=str(uuid4()),
             osis_a="John.3.16",
@@ -77,7 +92,12 @@ def _seed_graph_data(engine) -> None:
             tags=["love"],
             weight=0.8,
             perspective="apologetic",
+            start_verse_id=h_start_a,
+            end_verse_id=h_end_a,
+            start_verse_id_b=h_start_b,
+            end_verse_id_b=h_end_b,
         )
+        c_start, c_end = _range("John.3.16")
         commentary = CommentaryExcerptSeed(
             id=str(uuid4()),
             osis="John.3.16",
@@ -86,6 +106,8 @@ def _seed_graph_data(engine) -> None:
             source="Church Fathers",
             tags=["historical"],
             perspective=None,
+            start_verse_id=c_start,
+            end_verse_id=c_end,
         )
         session.add_all([contradiction, harmony, commentary])
         session.commit()
