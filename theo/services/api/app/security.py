@@ -33,8 +33,7 @@ def _reject_forbidden(detail: str) -> None:
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
-def _authenticate_api_key(key: str) -> Principal:
-    settings = get_settings()
+def _authenticate_api_key(key: str, settings: Settings) -> Principal:
     allowed_keys = set(settings.api_keys or [])
     if not allowed_keys:
         _reject_forbidden("API key authentication is not configured")
@@ -43,8 +42,7 @@ def _authenticate_api_key(key: str) -> Principal:
     return {"method": "api_key", "subject": key, "token": key}
 
 
-def _decode_jwt(token: str) -> Principal:
-    settings = get_settings()
+def _decode_jwt(token: str, settings: Settings) -> Principal:
     if not settings.has_auth_jwt_credentials():
         _reject_forbidden("JWT authentication is not configured")
 
@@ -113,6 +111,43 @@ def _auth_configured(settings: Settings) -> bool:
     return bool(settings.api_keys or settings.has_auth_jwt_credentials())
 
 
+def _principal_from_authorization(authorization: str, settings: Settings) -> Principal:
+    scheme, credentials = get_authorization_scheme_param(authorization)
+    if not credentials:
+        _reject_unauthorized("Missing bearer token")
+    if scheme.lower() != "bearer":
+        _reject_unauthorized("Unsupported authorization scheme")
+    if credentials.count(".") == 2:
+        return _decode_jwt(credentials, settings)
+    return _authenticate_api_key(credentials, settings)
+
+
+def _principal_from_headers(
+    authorization: str | None, api_key_header: str | None, settings: Settings
+) -> Principal:
+    if api_key_header:
+        return _authenticate_api_key(api_key_header, settings)
+    if authorization:
+        return _principal_from_authorization(authorization, settings)
+    _reject_unauthorized("Missing credentials")
+
+
+def _resolve_settings_with_credentials() -> tuple[Settings, bool]:
+    settings = get_settings()
+    credentials_configured = _auth_configured(settings)
+    if credentials_configured:
+        return settings, credentials_configured
+
+    # Tests (and some local tooling) mutate environment variables at runtime to
+    # toggle authentication strategies. When this happens between requests we may
+    # still be holding on to a cached ``Settings`` instance without the refreshed
+    # credentials. Attempt a single cache refresh before treating the
+    # configuration as missing so we honour the latest environment changes.
+    get_settings.cache_clear()
+    settings = get_settings()
+    return settings, _auth_configured(settings)
+
+
 def require_principal(
     request: Request,
     authorization: str | None = Header(default=None),
@@ -120,19 +155,7 @@ def require_principal(
 ) -> Principal:
     """Validate API credentials and attach the resolved principal to the request."""
 
-    settings = get_settings()
-    principal: Principal | None = None
-
-    credentials_configured = bool(settings.api_keys) or settings.has_auth_jwt_credentials()
-    if not credentials_configured:
-        # Tests (and some local tooling) mutate environment variables at runtime to
-        # toggle authentication strategies. When this happens between requests we may
-        # still be holding on to a cached ``Settings`` instance without the refreshed
-        # credentials. Attempt a single cache refresh before treating the
-        # configuration as missing so we honour the latest environment changes.
-        get_settings.cache_clear()
-        settings = get_settings()
-        credentials_configured = bool(settings.api_keys) or settings.has_auth_jwt_credentials()
+    settings, credentials_configured = _resolve_settings_with_credentials()
 
     allow_anonymous = settings.auth_allow_anonymous and not credentials_configured
 
@@ -148,23 +171,8 @@ def require_principal(
         principal = _anonymous_principal()
         request.state.principal = principal
         return principal
-    if api_key_header:
-        principal = _authenticate_api_key(api_key_header)
-    elif authorization:
-        scheme, credentials = get_authorization_scheme_param(authorization)
-        if not credentials:
-            _reject_unauthorized("Missing bearer token")
-        if scheme.lower() != "bearer":
-            _reject_unauthorized("Unsupported authorization scheme")
-        if credentials.count(".") == 2:
-            principal = _decode_jwt(credentials)
-        else:
-            principal = _authenticate_api_key(credentials)
-    else:
-        _reject_unauthorized("Missing credentials")
 
-    if principal is None:  # pragma: no cover - defensive
-        raise RuntimeError("Failed to resolve principal")
+    principal = _principal_from_headers(authorization, api_key_header, settings)
 
     request.state.principal = principal
     return principal
