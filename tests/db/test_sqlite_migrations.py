@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from sqlalchemy import JSON, DateTime, Float, String, Text, create_engine, inspect
+from sqlalchemy import JSON, DateTime, Float, Integer, String, Text, create_engine, inspect
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from theo.services.api.app.db.run_sql_migrations import (
@@ -48,6 +48,10 @@ class HarmonySeed(_Base):
     tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     perspective: Mapped[str | None] = mapped_column(String, nullable=True)
+    start_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    start_verse_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_verse_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
@@ -63,6 +67,8 @@ class CommentaryExcerptSeed(_Base):
     __tablename__ = "commentary_excerpt_seeds"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    start_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class GeoPlace(_Base):
