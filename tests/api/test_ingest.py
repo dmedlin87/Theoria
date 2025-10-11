@@ -333,15 +333,21 @@ def _install_url_pipeline_stub(
     opener_factory,
     *,
     expected_failure_message: str,
-) -> None:
+) -> dict[str, int]:
+    monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
     monkeypatch.setattr(pipeline_module, "build_opener", opener_factory)
+
+    call_counter = {"count": 0}
 
     def _fake_run(session, url: str, source_type=None, frontmatter=None):  # noqa: ANN001
         # Directly raise the expected exception without calling _fetch_web_document
         # since the monkeypatched build_opener should make it work correctly anyway
+        call_counter["count"] += 1
         raise pipeline_module.UnsupportedSourceError(expected_failure_message)
 
     monkeypatch.setattr(ingest_module, "run_pipeline_for_url", _fake_run)
+
+    return call_counter
 
 
 def test_ingest_url_times_out_on_slow_response(
@@ -372,7 +378,7 @@ def test_ingest_url_times_out_on_slow_response(
         def open(self, request, timeout=None):  # noqa: ANN001, D401
             return _TimeoutResponse()
 
-    _install_url_pipeline_stub(
+    call_counter = _install_url_pipeline_stub(
         monkeypatch,
         settings,
         lambda *handlers: _TimeoutOpener(handlers[0]),
@@ -385,6 +391,7 @@ def test_ingest_url_times_out_on_slow_response(
         print(f"Response body: {response.text}")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["detail"] == "Fetching URL timed out after 0.5 seconds"
+    assert call_counter["count"] == 1
 
 
 def test_ingest_url_rejects_oversized_response(
@@ -417,7 +424,7 @@ def test_ingest_url_rejects_oversized_response(
         def open(self, request, timeout=None):  # noqa: ANN001, D401
             return _OversizedResponse()
 
-    _install_url_pipeline_stub(
+    call_counter = _install_url_pipeline_stub(
         monkeypatch,
         settings,
         lambda *handlers: _OversizedOpener(handlers[0]),
@@ -432,6 +439,7 @@ def test_ingest_url_rejects_oversized_response(
         response.json()["detail"]
         == "Fetched content exceeded maximum allowed size of 10 bytes"
     )
+    assert call_counter["count"] == 1
 
 
 def test_ingest_url_detects_redirect_loop(
@@ -486,7 +494,7 @@ def test_ingest_url_detects_redirect_loop(
                 return self.open(new_request, timeout=timeout)
             return response
 
-    _install_url_pipeline_stub(
+    call_counter = _install_url_pipeline_stub(
         monkeypatch,
         settings,
         lambda *handlers: _RedirectLoopOpener(handlers[0]),
@@ -496,6 +504,7 @@ def test_ingest_url_detects_redirect_loop(
     response = api_client.post("/ingest/url", json={"url": "https://loop.example.com"})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["detail"] == "URL redirect loop detected"
+    assert call_counter["count"] == 1
 
 def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:
     pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "password_protected.pdf"
