@@ -49,21 +49,29 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
       return;
     }
 
-    const stored = localStorage.getItem(MODE_STORAGE_KEY);
     let persisted: ResearchModeId | undefined;
 
-    if (stored && isResearchModeId(stored)) {
-      persisted = stored;
-    } else {
-      const cookiePrefix = `${MODE_COOKIE_KEY}=`;
-      const cookieValue = document.cookie
-        .split("; ")
-        .find((entry) => entry.startsWith(cookiePrefix))
-        ?.slice(cookiePrefix.length);
+    try {
+      const stored =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem(MODE_STORAGE_KEY)
+          : null;
 
-      if (cookieValue && isResearchModeId(cookieValue)) {
-        persisted = cookieValue;
+      if (stored && isResearchModeId(stored)) {
+        persisted = stored;
+      } else {
+        const cookiePrefix = `${MODE_COOKIE_KEY}=`;
+        const cookieValue = document.cookie
+          .split("; ")
+          .find((entry) => entry.startsWith(cookiePrefix))
+          ?.slice(cookiePrefix.length);
+
+        if (cookieValue && isResearchModeId(cookieValue)) {
+          persisted = cookieValue;
+        }
       }
+    } catch {
+      persisted = undefined;
     }
 
     if (persisted) {
@@ -77,9 +85,13 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
     if (typeof window === "undefined" || !hasHydrated) {
       return;
     }
-    localStorage.setItem(MODE_STORAGE_KEY, modeId);
-    const maxAge = 60 * 60 * 24 * 365;
-    document.cookie = `${MODE_COOKIE_KEY}=${modeId}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+    try {
+      window.localStorage.setItem(MODE_STORAGE_KEY, modeId);
+      const maxAge = 60 * 60 * 24 * 365;
+      document.cookie = `${MODE_COOKIE_KEY}=${modeId}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+    } catch {
+      return;
+    }
     if (hasUserInteracted.current) {
       router.refresh();
     }
