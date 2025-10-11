@@ -94,11 +94,11 @@ def _evidence_preview_payload(payload: Mapping[str, Any]) -> Dict[str, Any]:
 
 async def note_write(
     request: schemas.NoteWriteRequest,
-    end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
-    tenant_id: Annotated[str | None, Header(default=None, alias="X-Tenant-Id")],
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
+    tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
     idempotency_key: Annotated[
-        str | None, Header(default=None, alias="X-Idempotency-Key")
-    ],
+        str | None, Header(alias="X-Idempotency-Key")
+    ] = None,
 ) -> schemas.NoteWriteResponse:
     tenant_id = _normalize_header(tenant_id)
     idempotency_key = _normalize_header(idempotency_key)
@@ -174,11 +174,11 @@ async def note_write(
 
 async def index_refresh(
     request: schemas.IndexRefreshRequest,
-    end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
-    tenant_id: Annotated[str | None, Header(default=None, alias="X-Tenant-Id")],
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
+    tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
     idempotency_key: Annotated[
-        str | None, Header(default=None, alias="X-Idempotency-Key")
-    ],
+        str | None, Header(alias="X-Idempotency-Key")
+    ] = None,
 ) -> schemas.IndexRefreshResponse:
     tenant_id = _normalize_header(tenant_id)
     idempotency_key = _normalize_header(idempotency_key)
@@ -244,11 +244,11 @@ async def index_refresh(
 
 async def evidence_card_create(
     request: schemas.EvidenceCardCreateRequest,
-    end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
-    tenant_id: Annotated[str | None, Header(default=None, alias="X-Tenant-Id")],
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
+    tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
     idempotency_key: Annotated[
-        str | None, Header(default=None, alias="X-Idempotency-Key")
-    ],
+        str | None, Header(alias="X-Idempotency-Key")
+    ] = None,
 ) -> schemas.EvidenceCardCreateResponse:
     tenant_id = _normalize_header(tenant_id)
     idempotency_key = _normalize_header(idempotency_key)

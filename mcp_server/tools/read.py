@@ -116,7 +116,7 @@ def _select_search_filters(filters: dict[str, Any] | None) -> HybridSearchFilter
 
 async def search_library(
     request: schemas.SearchLibraryRequest,
-    end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
 ) -> schemas.SearchLibraryResponse:
     """Execute hybrid search and project results to the MCP schema."""
 
@@ -186,7 +186,7 @@ def _aggregate_text(
 
 async def aggregate_verses(
     request: schemas.AggregateVersesRequest,
-    end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
 ) -> schemas.AggregateVersesResponse:
     """Aggregate scripture text for the requested OSIS range."""
 
@@ -241,7 +241,7 @@ def _render_timeline_html(buckets: Sequence[schemas.TimelineBucket]) -> str:
 
 async def get_timeline(
     request: schemas.GetTimelineRequest,
-    end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
 ) -> schemas.GetTimelineResponse:
     """Return aggregated timeline information for an OSIS passage."""
 
@@ -315,7 +315,7 @@ def _quote_from_model(quote: TranscriptQuote) -> schemas.QuoteRecord:
 
 async def quote_lookup(
     request: schemas.QuoteLookupRequest,
-    end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
 ) -> schemas.QuoteLookupResponse:
     """Retrieve transcript quote snippets using fuzzy passage search."""
 
@@ -382,7 +382,7 @@ def _summarise_source_entry(
 
 async def source_registry_list(
     request: schemas.SourceRegistryListRequest,
-    end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
+    end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
 ) -> schemas.SourceRegistryListResponse:
     """Return source registry entries backed by Theo documents."""
 
