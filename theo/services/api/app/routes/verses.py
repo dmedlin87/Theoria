@@ -10,10 +10,12 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..core.settings import get_settings
 from ..models.verses import (
+    VerseGraphResponse,
     VerseMentionsFilters,
     VerseMentionsResponse,
     VerseTimelineResponse,
 )
+from ..retriever.graph import get_verse_graph
 from ..retriever.verses import get_mentions_for_osis, get_verse_timeline
 
 router = APIRouter()
@@ -36,6 +38,24 @@ def verse_mentions(
     )
     mentions = get_mentions_for_osis(session, osis, filters)
     return VerseMentionsResponse(osis=osis, mentions=mentions, total=len(mentions))
+
+
+@router.get("/{osis}/graph", response_model=VerseGraphResponse)
+def verse_graph(
+    osis: str,
+    source_type: str | None = Query(default=None, description="Filter by source type"),
+    collection: str | None = Query(default=None, description="Filter by collection"),
+    author: str | None = Query(default=None, description="Filter by author"),
+    session: Session = Depends(get_session),
+) -> VerseGraphResponse:
+    """Return graph data linking verse mentions and seed relationships."""
+
+    filters = VerseMentionsFilters(
+        source_type=source_type,
+        collection=collection,
+        author=author,
+    )
+    return get_verse_graph(session, osis, filters)
 
 
 @router.get("/{osis}/timeline", response_model=VerseTimelineResponse)
