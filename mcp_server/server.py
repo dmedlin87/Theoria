@@ -38,7 +38,7 @@ def _build_stub_handler(
 
     async def _handler(
         request: RequestModelT,
-        end_user_id: Annotated[str, Header(..., alias="X-End-User-Id")],
+        end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
     ) -> ResponseModelT:
         run_id = str(uuid4())
         LOGGER.info(
