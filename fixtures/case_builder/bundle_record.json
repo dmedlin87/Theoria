@@ -1,0 +1,77 @@
+{
+  "source": {
+    "id": "src-4444-aaaa-bbbb-cccc-000000000001",
+    "document_id": "doc-4444-aaaa-bbbb-cccc-000000000001",
+    "origin": "ingest.pipeline.v4",
+    "author": "Theo Digest",
+    "year": 2024,
+    "url": "https://example.org/newsletters/momentum-insights",
+    "modality": "text",
+    "meta": {
+      "issue": "2024-05-05",
+      "topic": "revival"
+    },
+    "created_at": "2024-05-05T07:00:00Z",
+    "updated_at": "2024-05-05T07:00:00Z"
+  },
+  "objects": [
+    {
+      "id": "obj-4444-aaaa-bbbb-cccc-000000000001",
+      "source_id": "src-4444-aaaa-bbbb-cccc-000000000001",
+      "document_id": "doc-4444-aaaa-bbbb-cccc-000000000001",
+      "object_type": "evidence",
+      "title": "Prayer gatherings increasing",
+      "body": "Reports from three cities note nightly prayer vigils with growing attendance.",
+      "modality": "text",
+      "tags": ["revival", "prayer"],
+      "embedding": [0.44, 0.09, -0.18],
+      "created_at": "2024-05-05T07:00:00Z",
+      "updated_at": "2024-05-05T07:00:00Z"
+    },
+    {
+      "id": "obj-4444-aaaa-bbbb-cccc-000000000002",
+      "source_id": "src-4444-aaaa-bbbb-cccc-000000000001",
+      "document_id": "doc-4444-aaaa-bbbb-cccc-000000000001",
+      "object_type": "evidence",
+      "title": "Baptisms surge",
+      "body": "Regional network recorded a 35% increase in baptisms compared to last quarter.",
+      "modality": "text",
+      "tags": ["revival", "baptism"],
+      "embedding": [0.39, 0.16, -0.12],
+      "created_at": "2024-05-05T07:00:00Z",
+      "updated_at": "2024-05-05T07:00:00Z"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-4444-aaaa-bbbb-cccc-000000000001",
+      "src_object_id": "obj-4444-aaaa-bbbb-cccc-000000000001",
+      "dst_object_id": "obj-4444-aaaa-bbbb-cccc-000000000002",
+      "kind": "co_citation",
+      "weight": 0.72,
+      "features": {
+        "shared_sources": 2,
+        "temporal_overlap_days": 14
+      },
+      "created_at": "2024-05-05T07:00:00Z",
+      "updated_at": "2024-05-05T07:00:00Z"
+    }
+  ],
+  "insights": [
+    {
+      "id": "insight-4444-aaaa-bbbb-cccc-000000000001",
+      "primary_object_id": "obj-4444-aaaa-bbbb-cccc-000000000001",
+      "insight_type": "bundle",
+      "score": 0.76,
+      "cluster_id": "revival-bundle-2024",
+      "payload": {
+        "supporting_object_ids": ["obj-4444-aaaa-bbbb-cccc-000000000002"],
+        "momentum_days": 14,
+        "diversity_score": 0.61
+      },
+      "created_at": "2024-05-05T07:00:00Z",
+      "updated_at": "2024-05-05T07:00:00Z"
+    }
+  ],
+  "user_actions": []
+}
