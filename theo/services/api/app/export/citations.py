@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Sequence, TYPE_CHECKING, Literal
+from typing import Any, Iterable, Mapping, Sequence, TYPE_CHECKING, Literal, cast
 
 from ..models.export import ExportManifest
 from .formatters import build_manifest
@@ -93,11 +93,12 @@ def _get_value(obj: Any, mapping: Mapping[str, Any] | None, *keys: str) -> Any:
             for key in keys:
                 if key in meta:
                     return meta[key]
-    if hasattr(obj, "meta") and isinstance(getattr(obj, "meta"), Mapping):
-        meta = getattr(obj, "meta")
-        for key in keys:
-            if key in meta:
-                return meta[key]
+    if hasattr(obj, "meta"):
+        meta_attr = cast(Any, obj).meta
+        if isinstance(meta_attr, Mapping):
+            for key in keys:
+                if key in meta_attr:
+                    return meta_attr[key]
     return None
 
 
