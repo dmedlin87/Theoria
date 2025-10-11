@@ -220,19 +220,29 @@ def run_sql_migrations(
             key = _migration_key(migration_name)
 
             existing_entry = session.get(AppSetting, key)
-            if existing_entry:
-                if (
-                    dialect_name == "sqlite"
-                    and migration_name == _SQLITE_PERSPECTIVE_MIGRATION
-                    and not _sqlite_has_column(
-                        engine, "contradiction_seeds", "perspective"
-                    )
-                ):
+
+            is_sqlite_perspective_migration = (
+                dialect_name == "sqlite"
+                and migration_name == _SQLITE_PERSPECTIVE_MIGRATION
+            )
+            has_perspective_column = True
+            if is_sqlite_perspective_migration:
+                has_perspective_column = _sqlite_has_column(
+                    engine, "contradiction_seeds", "perspective"
+                )
+                if not has_perspective_column:
                     logger.info(
-                        "Reapplying SQLite perspective migration due to missing column"
+                        "SQLite perspective column missing prior to migration; enforcing recreation"
+                    )
+
+            if existing_entry:
+                if is_sqlite_perspective_migration and not has_perspective_column:
+                    logger.info(
+                        "Reapplying SQLite perspective migration; removing existing ledger entry"
                     )
                     session.delete(existing_entry)
                     session.commit()
+                    existing_entry = None
                 else:
                     continue
 
@@ -254,9 +264,9 @@ def run_sql_migrations(
 
             should_execute = True
             if (
-                dialect_name == "sqlite"
-                and migration_name == _SQLITE_PERSPECTIVE_MIGRATION
-                and _sqlite_has_column(engine, "contradiction_seeds", "perspective")
+                is_sqlite_perspective_migration
+                and has_perspective_column
+                and existing_entry is None
             ):
                 logger.debug(
                     "Skipping SQLite perspective migration; column already exists",
@@ -302,6 +312,19 @@ def run_sql_migrations(
                             connection.exec_driver_sql(statement)
                     else:
                         connection.exec_driver_sql(sql)
+
+                if is_sqlite_perspective_migration:
+                    recreated = _sqlite_has_column(
+                        engine, "contradiction_seeds", "perspective"
+                    )
+                    if recreated:
+                        logger.info(
+                            "SQLite perspective column present after migration execution",
+                        )
+                    else:
+                        logger.warning(
+                            "SQLite perspective column still missing after migration execution",
+                        )
 
             session.add(
                 AppSetting(
