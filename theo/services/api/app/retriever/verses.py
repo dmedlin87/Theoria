@@ -612,6 +612,8 @@ def get_verse_timeline(
             total_mentions=0,
         )
 
+    range_start, range_end = verse_ids[0], verse_ids[-1]
+
     bind = session.get_bind()
     dialect_name = bind.dialect.name if bind is not None else ""
 
@@ -680,8 +682,6 @@ def get_verse_timeline(
                 ),
             )
         )
-
-    range_start, range_end = verse_ids[0], verse_ids[-1]
 
     if not bucket_records:
         legacy_buckets, legacy_total = _legacy_timeline(
