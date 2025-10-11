@@ -48,7 +48,13 @@ def _principal_teams(principal: Principal | None) -> set[str]:
     if not principal:
         return set()
     claims = principal.get("claims") or {}
-    teams: Iterable[Any] = claims.get("teams") or claims.get("team_ids") or []
+    teams_claim = claims.get("teams") or claims.get("team_ids") or []
+    if isinstance(teams_claim, str):
+        teams: Iterable[Any] = [teams_claim]
+    elif isinstance(teams_claim, Iterable):
+        teams = teams_claim
+    else:
+        teams = [teams_claim]
     normalized: set[str] = set()
     for item in teams:
         if item:
