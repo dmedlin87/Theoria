@@ -85,15 +85,21 @@ describe("/api/search proxy", () => {
   });
 
   it("forwards trace headers from the upstream search service", async () => {
+    // The upstream search service returns correlation identifiers for every response
+    // (e.g. traceparent, x-trace-id, and x-request-id). Maintaining these headers in
+    // the proxy response allows client-side logs and support tooling to cross-reference
+    // specific requests. This contract ensures we do not accidentally drop any of them.
     process.env.THEO_SEARCH_API_KEY = "plain-key";
-    const traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
-    const traceId = "abc123";
+    const upstreamTraceHeaders = {
+      traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "x-trace-id": "abc123",
+      "x-request-id": "req-456",
+    } as const;
     const mockResponse = new Response("{}", {
       status: 200,
       headers: {
         "content-type": "application/json",
-        traceparent,
-        "x-trace-id": traceId,
+        ...upstreamTraceHeaders,
       },
     });
     const fetchMock = jest.fn().mockResolvedValue(mockResponse) as jest.MockedFunction<typeof fetch>;
@@ -102,8 +108,9 @@ describe("/api/search proxy", () => {
     const request = createRequest("q=grace");
     const response = await GET(request);
 
-    expect(response.headers.get("traceparent")).toBe(traceparent);
-    expect(response.headers.get("x-trace-id")).toBe(traceId);
+    for (const [header, value] of Object.entries(upstreamTraceHeaders)) {
+      expect(response.headers.get(header)).toBe(value);
+    }
   });
 
   it("forwards trace headers from the client request to the upstream search service", async () => {
