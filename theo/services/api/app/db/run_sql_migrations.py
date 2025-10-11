@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from inspect import signature
 import importlib.util
 import logging
 from pathlib import Path
@@ -207,11 +208,21 @@ def _execute_python_migration(path: Path, *, session: Session, engine: Engine) -
     module = runpy.run_path(str(path))
     upgrade = module.get("upgrade")
     if not callable(upgrade):
+        upgrade = module.get("apply")
+    if not callable(upgrade):
         raise RuntimeError(
-            f"Python migration {path.name} must define an 'upgrade' callable"
+            "Python migration %s must define an 'upgrade' or 'apply' callable"
+            % path.name
         )
 
-    upgrade(session=session, engine=engine)
+    parameters = signature(upgrade).parameters
+    kwargs: dict[str, object] = {}
+    if "session" in parameters:
+        kwargs["session"] = session
+    if "engine" in parameters:
+        kwargs["engine"] = engine
+
+    upgrade(**kwargs)
 
 
 def run_sql_migrations(
