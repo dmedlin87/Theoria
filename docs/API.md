@@ -376,6 +376,8 @@ Query parameters:
 | --------- | ------ | ------------------------------------------------ |
 | `osis`    | list   | One or more OSIS ranges (`osis=Luke.2.1-7`).     |
 | `topic`   | str    | Optional tag filter (e.g., `chronology`).        |
+| `perspective` | list   | Perspective (apologetic/skeptical/neutral).     |
+|               |        | Multiple values allowed.                        |
 | `limit`   | int    | Max number of items to return (default 25).      |
 
 Response (truncated):
