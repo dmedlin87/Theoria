@@ -15,9 +15,11 @@ from theo.services.api.app.db.models import (
     CaseSource,
     Document,
     Passage,
+    PassageVerse,
 )
 from theo.services.api.app.ingest.chunking import Chunk
-from theo.services.api.app.ingest.persistence import persist_text_document
+from theo.services.api.app.ingest.osis import expand_osis_reference
+from theo.services.api.app.ingest.persistence import persist_text_document, persist_transcript_document
 from theo.services.api.app.ingest.stages import IngestContext, Instrumentation
 
 
@@ -244,3 +246,72 @@ def test_persist_text_document_does_not_call_case_builder_when_disabled(
         source_url=None,
         text_content="Sample text",
     )
+
+
+def test_persist_text_document_creates_passage_verses(sqlite_session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="false")
+    settings = settings_module.get_settings()
+
+    context = IngestContext(
+        settings=settings,
+        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        instrumentation=Instrumentation(span=None),
+    )
+    chunk = Chunk(text="Reference chunk", start_char=0, end_char=17, index=0)
+
+    document = persist_text_document(
+        sqlite_session,
+        context=context,
+        chunks=[chunk],
+        parser="plain",
+        parser_version="1.0.0",
+        frontmatter={"osis_refs": ["John.3.16", "John.3.16-John.3.17"]},
+        sha256="passage-verse-test",
+        source_type="txt",
+        title="Verse Test",
+        source_url=None,
+        text_content="Reference chunk",
+    )
+
+    passage = sqlite_session.query(Passage).filter_by(document_id=document.id).one()
+    verse_rows = sqlite_session.query(PassageVerse).filter_by(passage_id=passage.id).all()
+    expected_ids = sorted(set(expand_osis_reference("John.3.16-John.3.17")))
+    assert sorted(row.verse_id for row in verse_rows) == expected_ids
+    assert passage.osis_verse_ids == expected_ids
+
+
+def test_persist_transcript_document_creates_passage_verses(sqlite_session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="false")
+    settings = settings_module.get_settings()
+
+    context = IngestContext(
+        settings=settings,
+        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        instrumentation=Instrumentation(span=None),
+    )
+    chunk = Chunk(
+        text="Transcript reference",
+        t_start=0.0,
+        t_end=5.0,
+        start_char=0,
+        end_char=len("Transcript reference"),
+        index=0,
+    )
+
+    document = persist_transcript_document(
+        sqlite_session,
+        context=context,
+        chunks=[chunk],
+        parser="plain",
+        parser_version="1.0.0",
+        frontmatter={"osis_refs": ["John.3.16"]},
+        sha256="transcript-verse-test",
+        source_type="transcript",
+        title="Transcript",
+    )
+
+    passage = sqlite_session.query(Passage).filter_by(document_id=document.id).one()
+    verse_rows = sqlite_session.query(PassageVerse).filter_by(passage_id=passage.id).all()
+    expected_ids = sorted(set(expand_osis_reference("John.3.16")))
+    assert sorted(row.verse_id for row in verse_rows) == expected_ids
+    assert passage.osis_verse_ids == expected_ids

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..db.models import ContradictionSeed, HarmonySeed
 from ..ingest.osis import expand_osis_reference, osis_intersects
+from ..db.verse_graph import compute_verse_id_ranges, query_pair_seed_rows
 from ..models.research import ContradictionItem
 
 PERSPECTIVE_CHOICES: tuple[str, ...] = ("apologetic", "skeptical", "neutral")
@@ -73,6 +74,14 @@ def search_contradictions(
     if not candidate_ranges:
         return []
 
+    windows = list(compute_verse_id_ranges(candidates).values())
+    if not windows:
+        return []
+
+    contradiction_seeds = query_pair_seed_rows(
+        session, windows, ContradictionSeed
+    )
+    harmony_seeds = query_pair_seed_rows(session, windows, HarmonySeed)
     topic_lower = topic.lower() if topic else None
     scored: list[_ScoredSeed] = []
 
@@ -141,14 +150,6 @@ def search_contradictions(
         if not _should_include(seed.tags):
             continue
 
-        intersects = any(
-            osis_intersects(seed.osis_a, requested)
-            or osis_intersects(seed.osis_b, requested)
-            for requested in candidates
-        )
-        if not intersects:
-            continue
-
         score = float(seed.weight or 0.0)
         scored.append(_ScoredSeed(seed=seed, score=score, perspective=perspective))
 
@@ -157,14 +158,6 @@ def search_contradictions(
         if not _allowed_perspective(perspective):
             continue
         if not _should_include(seed.tags):
-            continue
-
-        intersects = any(
-            osis_intersects(seed.osis_a, requested)
-            or osis_intersects(seed.osis_b, requested)
-            for requested in candidates
-        )
-        if not intersects:
             continue
 
         score = float(seed.weight or 0.0)

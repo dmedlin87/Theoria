@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 
 from ..db.models import CommentaryExcerptSeed
 from ..ingest.osis import expand_osis_reference, osis_intersects
+from ..db.verse_graph import (
+    compute_verse_id_ranges,
+    query_commentary_seed_rows,
+)
 from ..models.research import CommentaryExcerptItem
 
 
@@ -75,19 +79,16 @@ def search_commentaries(
         seed_query = seed_query.filter(or_(*range_predicates))
 
     seeds = seed_query.all()
+    windows = list(compute_verse_id_ranges(candidates).values())
+    if not windows:
+        return []
+
+    seeds = query_commentary_seed_rows(session, windows)
     matched: list[CommentaryExcerptItem] = []
 
     for seed in seeds:
         perspective = _normalize_perspective(seed.perspective)
         if allowed_perspectives and perspective not in allowed_perspectives:
-            continue
-
-        intersects = any(
-            osis_intersects(seed.osis, requested)
-            or osis_intersects(requested, seed.osis)
-            for requested in candidates
-        )
-        if not intersects:
             continue
 
         matched.append(

@@ -172,6 +172,20 @@ def test_parse_float_variants():
     assert _parse_float("not-a-number") is None
 
 
+def test_compose_search_terms_normalizes_deduplicates():
+    compose = seed_openbible_geo_module._compose_search_terms
+    result = compose(
+        "Bethlehem",
+        [
+            {"name": "Bethlehem"},
+            "Bethlehem Ephrathah",
+            {"name": "bethlehem"},
+        ],
+    )
+
+    assert result == ["bethlehem", "bethlehem ephrathah"]
+
+
 def test_load_geometry_payload(tmp_path):
     geometry_folder = tmp_path
     (geometry_folder / "feature.json").write_text(json.dumps({"type": "Feature"}), "utf-8")

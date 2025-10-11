@@ -7,6 +7,9 @@ from difflib import SequenceMatcher
 from typing import Any, Iterable
 
 import pythonbible as pb
+from sqlalchemy import case, func, select, true
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from ..core.settings_store import load_setting
@@ -70,6 +73,28 @@ def _fuzzy_score(query: str, candidate: str) -> float:
     return matcher.ratio()
 
 
+def _build_geo_items(locations: Iterable[GeoModernLocation]) -> list[GeoPlaceItem]:
+    items: list[GeoPlaceItem] = []
+    for location in locations:
+        aliases = _location_aliases(location)
+        items.append(
+            GeoPlaceItem(
+                modern_id=location.modern_id,
+                slug=location.modern_id,
+                name=location.friendly_id,
+                lat=location.latitude,
+                lng=location.longitude,
+                geom_kind=location.geom_kind,
+                confidence=location.confidence,
+                aliases=aliases or None,
+                sources=location.raw.get("coordinates_source")
+                if isinstance(location.raw, dict)
+                else None,
+            )
+        )
+    return items
+
+
 def lookup_geo_places(
     session: Session,
     *,
@@ -82,10 +107,80 @@ def lookup_geo_places(
     if not normalized_query:
         return []
 
-    locations = session.query(GeoModernLocation).all()
+    bind = session.get_bind()
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+    locations: list[GeoModernLocation]
+
+    if dialect_name == "postgresql":
+        ilike_pattern = f"%{normalized_query}%"
+        alias_terms = func.unnest(
+            func.coalesce(
+                GeoModernLocation.search_terms,
+                postgresql.array([func.lower(GeoModernLocation.friendly_id)]),
+            )
+        ).table_valued("term")
+
+        alias_stats = (
+            select(
+                func.max(
+                    func.greatest(
+                        func.similarity(func.lower(alias_terms.c.term), normalized_query),
+                        func.word_similarity(func.lower(alias_terms.c.term), normalized_query),
+                    )
+                ).label("alias_similarity"),
+                func.max(
+                    case(
+                        (alias_terms.c.term.ilike(ilike_pattern), 1),
+                        else_=0,
+                    )
+                ).label("alias_match"),
+            )
+            .select_from(alias_terms)
+            .lateral("alias_stats")
+        )
+
+        friendly_similarity = func.greatest(
+            func.similarity(func.lower(GeoModernLocation.friendly_id), normalized_query),
+            func.word_similarity(func.lower(GeoModernLocation.friendly_id), normalized_query),
+        )
+        alias_similarity = func.coalesce(alias_stats.c.alias_similarity, 0.0)
+        score_expr_base = func.greatest(friendly_similarity, alias_similarity)
+        score_expr = score_expr_base.label("score")
+        friendly_match = case(
+            (GeoModernLocation.friendly_id.ilike(ilike_pattern), 1),
+            else_=0,
+        )
+        alias_match = func.coalesce(alias_stats.c.alias_match, 0)
+        match_rank_base = func.greatest(friendly_match, alias_match)
+
+        stmt = (
+            select(GeoModernLocation, score_expr, match_rank_base.label("match"))
+            .join(alias_stats, true(), isouter=True)
+            .where(
+                (friendly_match > 0)
+                | (alias_match > 0)
+                | (score_expr_base > 0.0)
+            )
+            .order_by(
+                match_rank_base.desc(),
+                score_expr_base.desc(),
+                GeoModernLocation.confidence.desc().nullslast(),
+                GeoModernLocation.friendly_id,
+            )
+            .limit(limit)
+        )
+
+        try:
+            results = session.execute(stmt).all()
+        except (ProgrammingError, OperationalError):
+            session.rollback()
+        else:
+            return _build_geo_items([row[0] for row in results])
+
+    rows = session.query(GeoModernLocation).all()
     scored: list[_ScoredLocation] = []
 
-    for location in locations:
+    for location in rows:
         best_score = 0.0
         for candidate in _candidate_strings(location):
             candidate_norm = candidate.casefold()
@@ -104,28 +199,9 @@ def lookup_geo_places(
             entry.location.friendly_id,
         )
     )
+    locations = [entry.location for entry in scored[:limit]]
 
-    items: list[GeoPlaceItem] = []
-    for entry in scored[:limit]:
-        location = entry.location
-        aliases = _location_aliases(location)
-        items.append(
-            GeoPlaceItem(
-                modern_id=location.modern_id,
-                slug=location.modern_id,
-                name=location.friendly_id,
-                lat=location.latitude,
-                lng=location.longitude,
-                geom_kind=location.geom_kind,
-                confidence=location.confidence,
-                aliases=aliases or None,
-                sources=location.raw.get("coordinates_source")
-                if isinstance(location.raw, dict)
-                else None,
-            )
-        )
-
-    return items
+    return _build_geo_items(locations)
 
 
 def _normalize_osis(reference: str) -> list[str]:

@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session
 from theo.services.geo import seed_openbible_geo
 from ..ingest.osis import expand_osis_reference
 
+from ..ingest.osis import expand_osis_reference
+
 from .models import (
     CommentaryExcerptSeed,
     ContradictionSeed,
@@ -84,6 +86,29 @@ def _iter_seed_entries(*paths: Path) -> list[dict]:
     return entries
 
 
+def _verse_range(reference: str | None) -> tuple[int, int] | None:
+    if not reference:
+        return None
+    verse_ids = expand_osis_reference(str(reference))
+    if not verse_ids:
+        return None
+    return min(verse_ids), max(verse_ids)
+
+
+def _assign_range(record, start_attr: str, end_attr: str, reference: str | None) -> bool:
+    changed = False
+    verse_range = _verse_range(reference)
+    start_value = verse_range[0] if verse_range else None
+    end_value = verse_range[1] if verse_range else None
+    if getattr(record, start_attr, None) != start_value:
+        setattr(record, start_attr, start_value)
+        changed = True
+    if getattr(record, end_attr, None) != end_value:
+        setattr(record, end_attr, end_value)
+        changed = True
+    return changed
+
+
 def _table_has_column(session: Session, table_name: str, column_name: str, *, schema: str | None = None) -> bool:
     """Check whether the bound database exposes ``column_name`` on ``table_name``."""
 
@@ -139,6 +164,27 @@ def _ensure_perspective_column(
     return False
 
 
+def _ensure_range_columns(
+    session: Session, table: Table, dataset_label: str, columns: Iterable[str]
+) -> bool:
+    missing = [
+        column
+        for column in columns
+        if not _table_has_column(session, table.name, column, schema=table.schema)
+    ]
+    if not missing:
+        return True
+
+    session.rollback()
+    formatted = ", ".join(sorted(missing))
+    logger.warning(
+        "Skipping %s seeds because verse range column(s) are missing: %s",
+        dataset_label,
+        formatted,
+    )
+    return False
+
+
 def _handle_missing_perspective_error(
     session: Session, dataset_label: str, exc: OperationalError
 ) -> bool:
@@ -170,6 +216,13 @@ def seed_contradiction_claims(session: Session) -> None:
 
     table = ContradictionSeed.__table__
     if not _ensure_perspective_column(session, table, "contradiction"):
+        return
+    if not _ensure_range_columns(
+        session,
+        table,
+        "contradiction",
+        ("start_verse_id", "end_verse_id", "start_verse_id_b", "end_verse_id_b"),
+    ):
         return
 
     payload = _iter_seed_entries(
@@ -208,6 +261,12 @@ def seed_contradiction_claims(session: Session) -> None:
             tags = _coerce_list(entry.get("tags"))
             weight = float(entry.get("weight", 1.0))
             summary = entry.get("summary")
+            range_a = _verse_range(str(osis_a))
+            range_b = _verse_range(str(osis_b))
+            start_a = range_a[0] if range_a else None
+            end_a = range_a[1] if range_a else None
+            start_b = range_b[0] if range_b else None
+            end_b = range_b[1] if range_b else None
 
             if record is None:
                 record = ContradictionSeed(
@@ -221,6 +280,8 @@ def seed_contradiction_claims(session: Session) -> None:
                     perspective=perspective,
                     start_verse_id_a=start_a,
                     end_verse_id_a=end_a,
+                    start_verse_id=start_a,
+                    end_verse_id=end_a,
                     start_verse_id_b=start_b,
                     end_verse_id_b=end_b,
                 )
@@ -248,6 +309,13 @@ def seed_contradiction_claims(session: Session) -> None:
                     record.start_verse_id_b = start_b
                 if record.end_verse_id_b != end_b:
                     record.end_verse_id_b = end_b
+                _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a))
+                _assign_range(
+                    record,
+                    "start_verse_id_b",
+                    "end_verse_id_b",
+                    str(osis_b),
+                )
     except OperationalError as exc:
         session.rollback()
         message = str(exc).lower()
@@ -281,6 +349,13 @@ def seed_harmony_claims(session: Session) -> None:
 
     table = HarmonySeed.__table__
     if not _ensure_perspective_column(session, table, "harmony"):
+        return
+    if not _ensure_range_columns(
+        session,
+        table,
+        "harmony",
+        ("start_verse_id", "end_verse_id", "start_verse_id_b", "end_verse_id_b"),
+    ):
         return
 
     payload = _iter_seed_entries(
@@ -321,6 +396,12 @@ def seed_harmony_claims(session: Session) -> None:
         record = session.get(HarmonySeed, identifier)
         tags = _coerce_list(entry.get("tags"))
         weight = float(entry.get("weight", 1.0))
+        range_a = _verse_range(str(osis_a))
+        range_b = _verse_range(str(osis_b))
+        start_a = range_a[0] if range_a else None
+        end_a = range_a[1] if range_a else None
+        start_b = range_b[0] if range_b else None
+        end_b = range_b[1] if range_b else None
 
         if record is None:
             record = HarmonySeed(
@@ -334,6 +415,8 @@ def seed_harmony_claims(session: Session) -> None:
                 perspective=perspective,
                 start_verse_id_a=start_a,
                 end_verse_id_a=end_a,
+                start_verse_id=start_a,
+                end_verse_id=end_a,
                 start_verse_id_b=start_b,
                 end_verse_id_b=end_b,
             )
@@ -372,6 +455,14 @@ def seed_harmony_claims(session: Session) -> None:
                 updated = True
             if record.end_verse_id_b != end_b:
                 record.end_verse_id_b = end_b
+            if _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a)):
+                updated = True
+            if _assign_range(
+                record,
+                "start_verse_id_b",
+                "end_verse_id_b",
+                str(osis_b),
+            ):
                 updated = True
             if updated:
                 record.updated_at = datetime.now(UTC)
@@ -396,6 +487,13 @@ def seed_commentary_excerpts(session: Session) -> None:
 
     table = CommentaryExcerptSeed.__table__
     if not _ensure_perspective_column(session, table, "commentary excerpt"):
+        return
+    if not _ensure_range_columns(
+        session,
+        table,
+        "commentary excerpt",
+        ("start_verse_id", "end_verse_id"),
+    ):
         return
 
     payload = _iter_seed_entries(
@@ -426,6 +524,9 @@ def seed_commentary_excerpts(session: Session) -> None:
         record = session.get(CommentaryExcerptSeed, identifier)
         tags = _coerce_list(entry.get("tags"))
         title = entry.get("title")
+        verse_range = _verse_range(str(osis))
+        start_value = verse_range[0] if verse_range else None
+        end_value = verse_range[1] if verse_range else None
 
         if record is None:
             record = CommentaryExcerptSeed(
@@ -438,6 +539,8 @@ def seed_commentary_excerpts(session: Session) -> None:
                 tags=tags,
                 start_verse_id=start_verse_id,
                 end_verse_id=end_verse_id,
+                start_verse_id=start_value,
+                end_verse_id=end_value,
             )
             session.add(record)
         else:
@@ -465,6 +568,7 @@ def seed_commentary_excerpts(session: Session) -> None:
                 updated = True
             if record.end_verse_id != end_verse_id:
                 record.end_verse_id = end_verse_id
+            if _assign_range(record, "start_verse_id", "end_verse_id", str(osis)):
                 updated = True
             if updated:
                 record.updated_at = datetime.now(UTC)

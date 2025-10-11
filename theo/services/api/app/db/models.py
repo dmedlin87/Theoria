@@ -23,8 +23,9 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects import postgresql
 from ..core.settings import get_settings
-from .types import TSVectorType, VectorType
+from .types import IntArrayType, TSVectorType, VectorType
 
 
 if TYPE_CHECKING:
@@ -255,7 +256,14 @@ class Passage(Base):
     """Chunked content extracted from a document."""
 
     __tablename__ = "passages"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        Index(
+            "ix_passages_osis_verse_ids",
+            "osis_verse_ids",
+            postgresql_using="gin",
+        ),
+        {"extend_existing": True},
+    )
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
@@ -269,6 +277,16 @@ class Passage(Base):
     start_char: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_char: Mapped[int | None] = mapped_column(Integer, nullable=True)
     osis_ref: Mapped[str | None] = mapped_column(String, index=True)
+    osis_verse_ids: Mapped[list[int] | None] = mapped_column(
+        postgresql.ARRAY(Integer).with_variant(JSON, "sqlite"),
+        nullable=True,
+    )
+    osis_start_verse_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
+    osis_end_verse_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -280,12 +298,35 @@ class Passage(Base):
     tei_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="passages")
+    verses: Mapped[list["PassageVerse"]] = relationship(
+        "PassageVerse",
+        back_populates="passage",
+        cascade="all, delete-orphan",
+    )
     case_object: Mapped["CaseObject | None"] = relationship(
         "CaseObject",
         back_populates="passage",
         cascade="all, delete-orphan",
         uselist=False,
     )
+
+
+class PassageVerse(Base):
+    """Association table connecting passages to verse identifiers."""
+
+    __tablename__ = "passage_verses"
+    __table_args__ = (
+        Index("ix_passage_verses_verse_id", "verse_id"),
+    )
+
+    passage_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("passages.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    verse_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    passage: Mapped["Passage"] = relationship("Passage", back_populates="verses")
 
 
 class AppSetting(Base):
@@ -615,6 +656,13 @@ class TranscriptSegment(Base):
     """Time-coded transcript span enriched with metadata."""
 
     __tablename__ = "transcript_segments"
+    __table_args__ = (
+        Index(
+            "ix_transcript_segments_osis_verse_ids",
+            "osis_verse_ids",
+            postgresql_using="gin",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
@@ -634,6 +682,9 @@ class TranscriptSegment(Base):
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     primary_osis: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
     osis_refs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    osis_verse_ids: Mapped[list[int] | None] = mapped_column(
+        IntArrayType(), nullable=True
+    )
     topics: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     entities: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -653,6 +704,35 @@ class TranscriptSegment(Base):
     )
     claims: Mapped[list["CreatorClaim"]] = relationship(
         "CreatorClaim", back_populates="segment", cascade="all, delete-orphan"
+    )
+    verse_index: Mapped[list["TranscriptSegmentVerse"]] = relationship(
+        "TranscriptSegmentVerse",
+        back_populates="segment",
+        cascade="all, delete-orphan",
+    )
+
+
+class TranscriptSegmentVerse(Base):
+    """Association table linking transcript segments to verse identifiers."""
+
+    __tablename__ = "transcript_segment_verses"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    segment_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("transcript_segments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    verse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    segment: Mapped[TranscriptSegment] = relationship(
+        "TranscriptSegment", back_populates="verse_index"
     )
 
 
@@ -732,6 +812,35 @@ class TranscriptQuote(Base):
     segment: Mapped[TranscriptSegment | None] = relationship(
         "TranscriptSegment", back_populates="quotes"
     )
+    verse_index: Mapped[list["TranscriptQuoteVerse"]] = relationship(
+        "TranscriptQuoteVerse",
+        back_populates="quote",
+        cascade="all, delete-orphan",
+    )
+
+
+class TranscriptQuoteVerse(Base):
+    """Association table linking transcript quotes to verse identifiers."""
+
+    __tablename__ = "transcript_quote_verses"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    quote_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("transcript_quotes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    verse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    quote: Mapped[TranscriptQuote] = relationship(
+        "TranscriptQuote", back_populates="verse_index"
+    )
 
 
 class CreatorVerseRollup(Base):
@@ -802,6 +911,14 @@ class ContradictionSeed(Base):
             "ix_contradiction_seeds_range_a",
             "start_verse_id_a",
             "end_verse_id_a",
+        Index("ix_contradiction_seeds_start_verse_id", "start_verse_id"),
+        Index("ix_contradiction_seeds_end_verse_id", "end_verse_id"),
+        Index("ix_contradiction_seeds_start_verse_id_b", "start_verse_id_b"),
+        Index("ix_contradiction_seeds_end_verse_id_b", "end_verse_id_b"),
+        Index(
+            "ix_contradiction_seeds_range_a",
+            "start_verse_id",
+            "end_verse_id",
         ),
         Index(
             "ix_contradiction_seeds_range_b",
@@ -820,6 +937,8 @@ class ContradictionSeed(Base):
     perspective: Mapped[str | None] = mapped_column(String, nullable=True)
     start_verse_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_verse_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    start_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_verse_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_verse_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -836,6 +955,16 @@ class HarmonySeed(Base):
         Index("ix_harmony_seeds_osis_b", "osis_b"),
         Index("ix_harmony_seeds_range_a", "start_verse_id_a", "end_verse_id_a"),
         Index("ix_harmony_seeds_range_b", "start_verse_id_b", "end_verse_id_b"),
+        Index("ix_harmony_seeds_start_verse_id", "start_verse_id"),
+        Index("ix_harmony_seeds_end_verse_id", "end_verse_id"),
+        Index("ix_harmony_seeds_start_verse_id_b", "start_verse_id_b"),
+        Index("ix_harmony_seeds_end_verse_id_b", "end_verse_id_b"),
+        Index("ix_harmony_seeds_range_a", "start_verse_id", "end_verse_id"),
+        Index(
+            "ix_harmony_seeds_range_b",
+            "start_verse_id_b",
+            "end_verse_id_b",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -848,6 +977,8 @@ class HarmonySeed(Base):
     perspective: Mapped[str | None] = mapped_column(String, nullable=True)
     start_verse_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_verse_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    start_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_verse_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_verse_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -867,6 +998,8 @@ class CommentaryExcerptSeed(Base):
     __tablename__ = "commentary_excerpt_seeds"
     __table_args__ = (
         Index("ix_commentary_excerpt_seeds_osis", "osis"),
+        Index("ix_commentary_excerpt_seeds_start_verse_id", "start_verse_id"),
+        Index("ix_commentary_excerpt_seeds_end_verse_id", "end_verse_id"),
         Index(
             "ix_commentary_excerpt_seeds_range",
             "start_verse_id",
@@ -1188,6 +1321,10 @@ class GeoModernLocation(Base):
     geom_kind: Mapped[str | None] = mapped_column(String, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     names: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    search_terms: Mapped[list[str] | None] = mapped_column(
+        postgresql.ARRAY(String).with_variant(JSON, "sqlite"),
+        nullable=True,
+    )
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     raw: Mapped[dict] = mapped_column(JSON, nullable=False)

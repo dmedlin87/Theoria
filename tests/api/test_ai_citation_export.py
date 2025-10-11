@@ -15,7 +15,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.core.database import get_session
-from theo.services.api.app.db.models import Document, Passage
+from theo.services.api.app.db.models import Document, Passage, PassageVerse
+from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.main import app
 from theo.services.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _build_csl_entry
 
@@ -44,17 +45,22 @@ def client(api_engine) -> Generator[TestClient, None, None]:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
+        john_ids = list(sorted(expand_osis_reference("John.1.1")))
         passage = Passage(
             id="passage-1",
             document_id="doc-1",
             text="In the beginning was the Word.",
             osis_ref="John.1.1",
+            osis_verse_ids=john_ids,
             page_no=1,
             t_start=0.0,
             t_end=5.0,
         )
         session.add(document)
         session.add(passage)
+        session.add_all(
+            [PassageVerse(passage_id=passage.id, verse_id=verse_id) for verse_id in john_ids]
+        )
         session.commit()
 
     def _override_session() -> Generator[Session, None, None]:

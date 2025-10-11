@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 import threading
+from collections import OrderedDict
 from collections.abc import Iterable, Sequence
 from typing import Protocol, cast
 
@@ -66,11 +67,21 @@ class _FallbackEmbedder:
 class EmbeddingService:
     """Lazily-loaded embedding backend supporting batching and normalisation."""
 
-    def __init__(self, model_name: str, dimension: int) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        dimension: int,
+        *,
+        cache_max_size: int | None = 1024,
+    ) -> None:
         self.model_name = model_name
         self.dimension = dimension
         self._model: _EmbeddingBackend | None = None
         self._lock = threading.Lock()
+        if cache_max_size is not None and cache_max_size < 0:
+            raise ValueError("cache_max_size must be non-negative or None")
+        self._cache_max_size = cache_max_size
+        self._cache: "OrderedDict[str, tuple[float, ...]]" = OrderedDict()
 
     def _ensure_model(self) -> _EmbeddingBackend:
         if self._model is not None:
@@ -132,15 +143,66 @@ class EmbeddingService:
                 span.set_attribute("embedding.batch_index", batch_index)
                 span.set_attribute("embedding.batch_size", len(batch))
                 span.set_attribute("embedding.vector_dimensions", self.dimension)
+                cached_vectors: list[list[float] | None] = [None] * len(batch)
+                miss_requests: list[tuple[int, str]] = []
+                unique_misses: list[str] = []
+                seen_misses: set[str] = set()
+                with self._lock:
+                    for index, text in enumerate(batch):
+                        cached = self._cache.get(text)
+                        if cached is not None:
+                            self._cache.move_to_end(text)
+                            cached_vectors[index] = list(cached)
+                        else:
+                            miss_requests.append((index, text))
+                            if text not in seen_misses:
+                                seen_misses.add(text)
+                                unique_misses.append(text)
+                span.set_attribute("embedding.cache_miss_count", len(unique_misses))
+                span.set_attribute("embedding.cache_hit_count", len(batch) - len(miss_requests))
+                new_vectors: dict[str, list[float]] = {}
                 try:
-                    vectors = self._encode(batch)
+                    if unique_misses:
+                        encoded = self._encode(unique_misses)
+                        new_vectors = {
+                            text: list(vector)
+                            for text, vector in zip(unique_misses, encoded)
+                        }
                 except ResilienceError as exc:
                     span.set_attribute("embedding.resilience_category", exc.metadata.category)
                     span.set_attribute("embedding.resilience_attempts", exc.metadata.attempts)
                     raise
+                if unique_misses and len(new_vectors) != len(unique_misses):  # pragma: no cover
+                    raise RuntimeError("Embedding backend returned unexpected vector count")
+                if new_vectors:
+                    for index, text in miss_requests:
+                        cached_vectors[index] = list(new_vectors[text])
+                    if self._cache_max_size is None or self._cache_max_size > 0:
+                        with self._lock:
+                            for text, vector in new_vectors.items():
+                                self._cache[text] = tuple(vector)
+                                self._cache.move_to_end(text)
+                                if self._cache_max_size is not None:
+                                    while len(self._cache) > self._cache_max_size:
+                                        self._cache.popitem(last=False)
+                for index, _text in miss_requests:
+                    if cached_vectors[index] is None:  # pragma: no cover - defensive
+                        raise RuntimeError("Missing embedding vector for cache miss")
+                vectors = [
+                    cached_vectors[index]
+                    if cached_vectors[index] is not None
+                    else [0.0] * self.dimension
+                    for index in range(len(batch))
+                ]
                 span.set_attribute("embedding.output_count", len(vectors))
             batched.extend(vectors)
         return batched
+
+    def clear_cache(self) -> None:
+        """Clear any cached embedding vectors."""
+
+        with self._lock:
+            self._cache.clear()
 
 
 _service: EmbeddingService | None = None
@@ -152,8 +214,20 @@ def get_embedding_service() -> EmbeddingService:
     global _service
     if _service is None:
         settings = get_settings()
-        _service = EmbeddingService(settings.embedding_model, settings.embedding_dim)
+        _service = EmbeddingService(
+            settings.embedding_model,
+            settings.embedding_dim,
+            cache_max_size=settings.embedding_cache_size,
+        )
     return _service
+
+
+def clear_embedding_cache() -> None:
+    """Clear cached embeddings held by the shared service instance."""
+
+    global _service
+    if _service is not None:
+        _service.clear_cache()
 
 
 def lexical_representation(session: Session, text: str) -> ClauseElement | str:

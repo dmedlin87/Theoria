@@ -21,8 +21,11 @@ from ..db.models import (
     CreatorClaim,
     Document,
     Passage,
+    PassageVerse,
     TranscriptQuote,
+    TranscriptQuoteVerse,
     TranscriptSegment,
+    TranscriptSegmentVerse,
     Video,
 )
 from .embeddings import lexical_representation
@@ -43,7 +46,7 @@ from .metadata import (
     serialise_frontmatter,
     truncate,
 )
-from .osis import detect_osis_references
+from .osis import canonical_verse_range, detect_osis_references, expand_osis_reference
 from .sanitizer import sanitize_passage_text
 
 
@@ -66,6 +69,14 @@ def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
     )
     if existing is not None:
         raise UnsupportedSourceError("Document already ingested")
+
+
+def _collect_verse_metadata(
+    references: Sequence[str] | None,
+) -> tuple[list[int] | None, int | None, int | None]:
+    """Return verse identifiers and canonical bounds for *references*."""
+
+    return canonical_verse_range(references)
 
 
 def refresh_creator_verse_rollups(
@@ -397,6 +408,7 @@ def persist_text_document(
 
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
+    segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
@@ -421,6 +433,17 @@ def persist_text_document(
             meta.setdefault("topic_domains", topic_domains)
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         embedding = embeddings[idx] if idx < len(embeddings) else None
+        osis_all: list[str] = []
+        if meta.get("osis_refs_all"):
+            osis_all.extend(meta["osis_refs_all"])
+        if osis_value:
+            osis_all.append(osis_value)
+        normalized_refs = sorted({ref for ref in osis_all if ref})
+        verse_id_list, start_verse_id, end_verse_id = _collect_verse_metadata(
+            normalized_refs
+        )
+        verse_ids = verse_id_list or []
+
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
@@ -432,6 +455,9 @@ def persist_text_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
+            osis_verse_ids=verse_id_list or None,
+            osis_start_verse_id=start_verse_id,
+            osis_end_verse_id=end_verse_id,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -439,12 +465,9 @@ def persist_text_document(
         session.add(passage)
         passages.append(passage)
 
-        osis_all: list[str] = []
-        if meta.get("osis_refs_all"):
-            osis_all.extend(meta["osis_refs_all"])
-        if osis_value:
-            osis_all.append(osis_value)
-        normalized_refs = sorted({ref for ref in osis_all if ref})
+        if verse_ids:
+            for verse_id in verse_ids:
+                session.add(PassageVerse(passage=passage, verse_id=verse_id))
 
         segment = TranscriptSegment(
             document_id=document.id,
@@ -454,11 +477,19 @@ def persist_text_document(
             text=sanitized_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
+            osis_verse_ids=verse_id_list or None,
             topics=None,
             entities=None,
         )
         session.add(segment)
         segments.append(segment)
+
+        if verse_ids:
+            segment_verse_ids[segment] = verse_ids
+            for verse_id in verse_ids:
+                session.add(
+                    TranscriptSegmentVerse(segment=segment, verse_id=verse_id)
+                )
 
     session.flush()
 
@@ -516,6 +547,7 @@ def persist_text_document(
     )
 
     for segment in segments:
+        verse_ids = segment_verse_ids.get(segment, [])
         if segment.osis_refs:
             quote = TranscriptQuote(
                 video_id=video_record.id if video_record else None,
@@ -528,6 +560,11 @@ def persist_text_document(
                 salience=1.0,
             )
             session.add(quote)
+            if verse_ids:
+                for verse_id in verse_ids:
+                    session.add(
+                        TranscriptQuoteVerse(quote=quote, verse_id=verse_id)
+                    )
 
     if creator_profile and topics:
         for segment in segments:
@@ -789,6 +826,7 @@ def persist_transcript_document(
 
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
+    segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
@@ -813,6 +851,17 @@ def persist_transcript_document(
             meta.setdefault("topic_domains", topic_domains)
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         embedding = embeddings[idx] if idx < len(embeddings) else None
+        osis_all: list[str] = []
+        if meta.get("osis_refs_all"):
+            osis_all.extend(meta["osis_refs_all"])
+        if osis_value:
+            osis_all.append(osis_value)
+        normalized_refs = sorted({ref for ref in osis_all if ref})
+        verse_id_list, start_verse_id, end_verse_id = _collect_verse_metadata(
+            normalized_refs
+        )
+        verse_ids = verse_id_list or []
+
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
@@ -824,6 +873,9 @@ def persist_transcript_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
+            osis_verse_ids=verse_id_list or None,
+            osis_start_verse_id=start_verse_id,
+            osis_end_verse_id=end_verse_id,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -831,12 +883,9 @@ def persist_transcript_document(
         session.add(passage)
         passages.append(passage)
 
-        osis_all: list[str] = []
-        if meta.get("osis_refs_all"):
-            osis_all.extend(meta["osis_refs_all"])
-        if osis_value:
-            osis_all.append(osis_value)
-        normalized_refs = sorted({ref for ref in osis_all if ref})
+        if verse_ids:
+            for verse_id in verse_ids:
+                session.add(PassageVerse(passage=passage, verse_id=verse_id))
 
         segment = TranscriptSegment(
             document_id=document.id,
@@ -846,11 +895,19 @@ def persist_transcript_document(
             text=sanitized_text,
             primary_osis=osis_value,
             osis_refs=normalized_refs or None,
+            osis_verse_ids=verse_id_list or None,
             topics=None,
             entities=None,
         )
         session.add(segment)
         segments.append(segment)
+
+        if verse_ids:
+            segment_verse_ids[segment] = verse_ids
+            for verse_id in verse_ids:
+                session.add(
+                    TranscriptSegmentVerse(segment=segment, verse_id=verse_id)
+                )
 
     session.flush()
 
@@ -908,6 +965,7 @@ def persist_transcript_document(
     )
 
     for segment in segments:
+        verse_ids = segment_verse_ids.get(segment, [])
         if segment.osis_refs:
             quote = TranscriptQuote(
                 video_id=video_record.id if video_record else None,
@@ -920,6 +978,11 @@ def persist_transcript_document(
                 salience=1.0,
             )
             session.add(quote)
+            if verse_ids:
+                for verse_id in verse_ids:
+                    session.add(
+                        TranscriptQuoteVerse(quote=quote, verse_id=verse_id)
+                    )
 
     if creator_profile and topics:
         for segment in segments:

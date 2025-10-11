@@ -128,8 +128,18 @@ def ensure_url_allowed(settings, url: str) -> None:
         raise UnsupportedSourceError("URL must include a hostname")
 
     normalised_host = normalise_host(host)
-    allowed_hosts = {item.lower() for item in settings.ingest_url_allowed_hosts}
-    blocked_hosts = {item.lower() for item in settings.ingest_url_blocked_hosts}
+    allowed_hosts = {
+        normalised
+        for item in settings.ingest_url_allowed_hosts
+        for normalised in [normalise_host(item)]
+        if normalised
+    }
+    blocked_hosts = {
+        normalised
+        for item in settings.ingest_url_blocked_hosts
+        for normalised in [normalise_host(item)]
+        if normalised
+    }
     host_is_allowed = normalised_host in allowed_hosts if allowed_hosts else False
 
     if allowed_hosts and not host_is_allowed:

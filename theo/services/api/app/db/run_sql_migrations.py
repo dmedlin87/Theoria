@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import importlib.util
 import logging
 from pathlib import Path
 from typing import Iterable
 import runpy
+from types import ModuleType
+from typing import Callable, Iterable
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -30,7 +33,19 @@ def _iter_migration_files(migrations_path: Path) -> Iterable[Path]:
         path
         for path in migrations_path.iterdir()
         if path.is_file() and path.suffix.lower() in _SUPPORTED_EXTENSIONS
+        if path.is_file() and path.suffix.lower() in {".sql", ".py"}
     )
+
+
+def _load_python_migration(path: Path) -> ModuleType:
+    """Dynamically import a Python migration module."""
+
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load migration module from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _migration_key(filename: str) -> str:
@@ -304,61 +319,100 @@ def run_sql_migrations(
             ):
                 logger.debug(
                     "Skipping SQLite perspective migration; column already exists",
+                if existing_entry:
+                    continue
+
+                module = _load_python_migration(path)
+                apply_callable: Callable[[Session], None] | None = getattr(
+                    module, "apply", None
                 )
-                should_execute = False
-            # Skip Postgres-only operations when using SQLite. These include
-            # pgvector/tsvector types and index methods not supported by SQLite.
-            if dialect_name == "sqlite":
-                sql_upper = sql.upper()
-                postgres_only_markers = (
-                    "VECTOR(",        # pgvector type
-                    "TSVECTOR",       # full text search type
-                    "TO_TSVECTOR(",   # FTS function
-                    "USING HNSW",     # pgvector index method
-                    "VECTOR_L2_OPS",  # pgvector operator class
-                    "USING GIN",      # Postgres index method
-                    "USING GIST",     # Postgres index method
-                    "JSONB",          # Postgres JSON storage
-                    "TIMESTAMPTZ",    # Postgres timestamp with TZ
-                    "::JSON",         # Postgres casting syntax
-                    "::JSONB",        # Postgres casting syntax
-                    "NOW()",          # Postgres-specific default
-                    "DOUBLE PRECISION",  # Postgres float alias
-                    "CONCURRENTLY",   # Concurrent index creation
-                )
-                if any(marker in sql_upper for marker in postgres_only_markers):
+                if not callable(apply_callable):
+                    raise RuntimeError(
+                        f"Python migration {migration_name} must define an 'apply(session)' callable"
+                    )
+
+                logger.info("Applying Python migration: %s", migration_name)
+                apply_callable(session)
+            else:
+                sql = path.read_text(encoding="utf-8")
+                if not sql.strip():
+                    logger.debug("Skipping empty migration file: %s", migration_name)
+                    session.add(
+                        AppSetting(
+                            key=key,
+                            value={
+                                "applied_at": datetime.now(UTC).isoformat(),
+                                "filename": migration_name,
+                            },
+                        )
+                    )
+                    session.commit()
+                    applied.append(migration_name)
+                    continue
+
+                should_execute = True
+                if (
+                    is_sqlite_perspective_migration
+                    and has_perspective_column
+                    and existing_entry is None
+                ):
                     logger.debug(
-                        "Skipping migration %s for SQLite (Postgres-only constructs detected)",
-                        migration_name,
+                        "Skipping SQLite perspective migration; column already exists",
                     )
                     should_execute = False
-
-            if should_execute:
-                logger.info("Applying SQL migration: %s", migration_name)
-                if dialect_name == "postgresql" and _requires_autocommit(sql):
-                    session.flush()
-                    session.commit()
-                    _execute_autocommit(engine, sql)
-                else:
-                    connection = session.connection()
-                    if dialect_name == "sqlite":
-                        for statement in _split_sql_statements(sql):
-                            connection.exec_driver_sql(statement)
-                    else:
-                        connection.exec_driver_sql(sql)
-
-                if is_sqlite_perspective_migration:
-                    recreated = _sqlite_has_column(
-                        engine, "contradiction_seeds", "perspective"
+                # Skip Postgres-only operations when using SQLite. These include
+                # pgvector/tsvector types and index methods not supported by SQLite.
+                if dialect_name == "sqlite":
+                    sql_upper = sql.upper()
+                    postgres_only_markers = (
+                        "VECTOR(",        # pgvector type
+                        "TSVECTOR",       # full text search type
+                        "TO_TSVECTOR(",   # FTS function
+                        "USING HNSW",     # pgvector index method
+                        "VECTOR_L2_OPS",  # pgvector operator class
+                        "USING GIN",      # Postgres index method
+                        "USING GIST",     # Postgres index method
+                        "JSONB",          # Postgres JSON storage
+                        "TIMESTAMPTZ",    # Postgres timestamp with TZ
+                        "::JSON",         # Postgres casting syntax
+                        "::JSONB",        # Postgres casting syntax
+                        "NOW()",          # Postgres-specific default
+                        "DOUBLE PRECISION",  # Postgres float alias
+                        "CONCURRENTLY",   # Concurrent index creation
                     )
-                    if recreated:
-                        logger.info(
-                            "SQLite perspective column present after migration execution",
+                    if any(marker in sql_upper for marker in postgres_only_markers):
+                        logger.debug(
+                            "Skipping migration %s for SQLite (Postgres-only constructs detected)",
+                            migration_name,
                         )
+                        should_execute = False
+
+                if should_execute:
+                    logger.info("Applying SQL migration: %s", migration_name)
+                    if dialect_name == "postgresql" and _requires_autocommit(sql):
+                        session.flush()
+                        session.commit()
+                        _execute_autocommit(engine, sql)
                     else:
-                        logger.warning(
-                            "SQLite perspective column still missing after migration execution",
+                        connection = session.connection()
+                        if dialect_name == "sqlite":
+                            for statement in _split_sql_statements(sql):
+                                connection.exec_driver_sql(statement)
+                        else:
+                            connection.exec_driver_sql(sql)
+
+                    if is_sqlite_perspective_migration:
+                        recreated = _sqlite_has_column(
+                            engine, "contradiction_seeds", "perspective"
                         )
+                        if recreated:
+                            logger.info(
+                                "SQLite perspective column present after migration execution",
+                            )
+                        else:
+                            logger.warning(
+                                "SQLite perspective column still missing after migration execution",
+                            )
 
             session.add(
                 AppSetting(

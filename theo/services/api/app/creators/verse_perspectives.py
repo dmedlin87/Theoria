@@ -16,10 +16,12 @@ from ..db.models import (
     CreatorClaim,
     CreatorVerseRollup,
     TranscriptQuote,
+    TranscriptQuoteVerse,
     TranscriptSegment,
+    TranscriptSegmentVerse,
     Video,
 )
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.creators import (
     CreatorVersePerspectiveCreator,
     CreatorVersePerspectiveMeta,
@@ -123,6 +125,69 @@ class CreatorVersePerspectiveService:
         return self._load_rollups(osis)
 
     def _collect_claims(self, osis: str) -> dict[str, _CreatorAggregate]:
+        verse_ids = sorted(expand_osis_reference(osis))
+        if not verse_ids:
+            return self._collect_claims_fallback(osis)
+
+        stmt = (
+            select(CreatorClaim)
+            .join(CreatorClaim.segment)
+            .join(TranscriptSegmentVerse)
+            .where(TranscriptSegmentVerse.verse_id.in_(verse_ids))
+            .options(
+                joinedload(CreatorClaim.creator),
+                joinedload(CreatorClaim.segment).joinedload(TranscriptSegment.video),
+            )
+        )
+
+        claims = list(self._session.scalars(stmt).unique())
+        if not claims:
+            return {}
+
+        segment_ids = {
+            claim.segment_id for claim in claims if getattr(claim, "segment_id", None)
+        }
+        quotes_by_segment: dict[str, list[TranscriptQuote]] = {}
+        if segment_ids:
+            quote_stmt = (
+                select(TranscriptQuote)
+                .join(TranscriptQuoteVerse)
+                .where(TranscriptQuote.segment_id.in_(segment_ids))
+                .where(TranscriptQuoteVerse.verse_id.in_(verse_ids))
+                .options(
+                    joinedload(TranscriptQuote.video),
+                    joinedload(TranscriptQuote.segment).joinedload(
+                        TranscriptSegment.video
+                    ),
+                )
+            )
+            for quote in self._session.scalars(quote_stmt).unique():
+                if quote.segment_id:
+                    quotes_by_segment.setdefault(quote.segment_id, []).append(quote)
+
+        aggregates: dict[str, _CreatorAggregate] = {}
+        for claim in claims:
+            creator = claim.creator
+            segment = claim.segment
+            if creator is None or segment is None:
+                continue
+
+            aggregate = aggregates.setdefault(
+                creator.id,
+                _CreatorAggregate(creator=creator),
+            )
+            aggregate.claims.append(claim)
+            if claim.stance:
+                aggregate.stance_counts[claim.stance.lower()] += 1
+            if claim.confidence is not None:
+                aggregate.confidences.append(float(claim.confidence))
+
+            for quote in quotes_by_segment.get(segment.id, []):
+                aggregate.quotes.setdefault(quote.id, quote)
+
+        return aggregates
+
+    def _collect_claims_fallback(self, osis: str) -> dict[str, _CreatorAggregate]:
         stmt = (
             select(CreatorClaim)
             .options(
