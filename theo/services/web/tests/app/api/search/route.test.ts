@@ -94,4 +94,26 @@ describe("/api/search proxy", () => {
     expect(calledHeaders).not.toHaveProperty("Authorization");
     expect(calledHeaders).not.toHaveProperty("X-API-Key");
   });
+
+  it("forwards trace headers from the upstream search service", async () => {
+    process.env.THEO_SEARCH_API_KEY = "plain-key";
+    const traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    const traceId = "abc123";
+    const mockResponse = new Response("{}", {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        traceparent,
+        "x-trace-id": traceId,
+      },
+    });
+    const fetchMock = jest.fn().mockResolvedValue(mockResponse) as jest.MockedFunction<typeof fetch>;
+    global.fetch = fetchMock;
+
+    const request = createRequest("q=grace");
+    const response = await GET(request);
+
+    expect(response.headers.get("traceparent")).toBe(traceparent);
+    expect(response.headers.get("x-trace-id")).toBe(traceId);
+  });
 });
