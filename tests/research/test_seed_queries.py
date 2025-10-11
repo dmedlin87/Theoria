@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
-from sqlalchemy import create_engine
+from contextlib import contextmanager
+
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.db.models import Base, CommentaryExcerptSeed, ContradictionSeed, HarmonySeed
+from theo.services.api.app.db.models import (
+    Base,
+    CommentaryExcerptSeed,
+    ContradictionSeed,
+    HarmonySeed,
+)
+from theo.services.api.app.db.verse_graph import load_seed_relationships
 from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.research.commentaries import search_commentaries
 from theo.services.api.app.research.contradictions import search_contradictions
@@ -22,6 +30,21 @@ def _setup_engine():
     engine = create_engine("sqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     return engine
+
+
+@contextmanager
+def _count_selects(engine):
+    stats = {"count": 0}
+
+    def _before_execute(_, __, statement, ___, ____, _____):
+        if statement.lstrip().upper().startswith("SELECT"):
+            stats["count"] += 1
+
+    event.listen(engine, "before_cursor_execute", _before_execute)
+    try:
+        yield stats
+    finally:
+        event.remove(engine, "before_cursor_execute", _before_execute)
 
 
 def test_search_contradictions_uses_range_filters() -> None:
@@ -82,17 +105,38 @@ def test_search_contradictions_uses_range_filters() -> None:
                 end_verse_id_b=g_end_b,
             )
         )
+        # Stale row with incorrect OSIS but overlapping numeric range should be ignored.
+        session.add(
+            ContradictionSeed(
+                id="c3",
+                osis_a="Gen.1.1",
+                osis_b="Gen.1.2",
+                summary="Stale",
+                source="Digest",
+                tags=["creation"],
+                weight=1.0,
+                perspective="skeptical",
+                start_verse_id=start_a,
+                end_verse_id=end_a,
+                start_verse_id_b=start_b,
+                end_verse_id_b=end_b,
+            )
+        )
         session.commit()
 
-        results = search_contradictions(session, osis="John.3.16", limit=5)
+        with _count_selects(engine) as stats:
+            results = search_contradictions(session, osis="John.3.16", limit=5)
+        assert stats["count"] == 2
         assert [item.id for item in results] == ["c1", "h1"]
 
-        filtered = search_contradictions(
-            session,
-            osis="John.3.16",
-            perspectives=["apologetic"],
-            limit=5,
-        )
+        with _count_selects(engine) as stats:
+            filtered = search_contradictions(
+                session,
+                osis=["John.3.16", "John.3.17"],
+                perspectives=["apologetic"],
+                limit=5,
+            )
+        assert stats["count"] == 2
         assert [item.id for item in filtered] == ["h1"]
 
 
@@ -127,15 +171,94 @@ def test_search_commentaries_uses_range_filters() -> None:
                 end_verse_id=g_end,
             )
         )
+        # Row with mismatched numeric range should be filtered at Python level.
+        session.add(
+            CommentaryExcerptSeed(
+                id="m3",
+                osis="Gen.1.1",
+                title="Mismatch",
+                excerpt="Mismatch",
+                source="Digest",
+                perspective="neutral",
+                tags=["creation"],
+                start_verse_id=start_value,
+                end_verse_id=end_value,
+            )
+        )
         session.commit()
 
-        results = search_commentaries(session, osis="John.3.16", limit=5)
+        with _count_selects(engine) as stats:
+            results = search_commentaries(session, osis="John.3.16", limit=5)
+        assert stats["count"] == 1
         assert [item.id for item in results] == ["m1"]
 
-        none = search_commentaries(
-            session,
-            osis="John.3.16",
-            perspectives=["skeptical"],
-            limit=5,
-        )
+        with _count_selects(engine) as stats:
+            none = search_commentaries(
+                session,
+                osis="John.3.16",
+                perspectives=["skeptical"],
+                limit=5,
+            )
+        assert stats["count"] == 1
         assert none == []
+
+
+def test_load_seed_relationships_bounds_queries() -> None:
+    engine = _setup_engine()
+    with Session(engine) as session:
+        start_a, end_a = _range("John.3.16")
+        start_b, end_b = _range("Luke.6.27")
+        session.add(
+            HarmonySeed(
+                id="h-loaded",
+                osis_a="John.3.16",
+                osis_b="Luke.6.27",
+                summary="Harmony",
+                source="Notes",
+                tags=["love"],
+                weight=1.0,
+                perspective="apologetic",
+                start_verse_id=start_a,
+                end_verse_id=end_a,
+                start_verse_id_b=start_b,
+                end_verse_id_b=end_b,
+            )
+        )
+        session.add(
+            ContradictionSeed(
+                id="c-loaded",
+                osis_a="John.3.16",
+                osis_b="Matthew.5.44",
+                summary="Tension",
+                source="Digest",
+                tags=["love"],
+                weight=2.0,
+                perspective="skeptical",
+                start_verse_id=start_a,
+                end_verse_id=end_a,
+                start_verse_id_b=start_b,
+                end_verse_id_b=end_b,
+            )
+        )
+        session.add(
+            CommentaryExcerptSeed(
+                id="m-loaded",
+                osis="John.3.16",
+                title="Commentary",
+                excerpt="Insight",
+                source="Digest",
+                perspective="neutral",
+                tags=["love"],
+                start_verse_id=start_a,
+                end_verse_id=end_a,
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        with _count_selects(engine) as stats:
+            relationships = load_seed_relationships(session, "John.3.16")
+        assert stats["count"] == 3
+        assert {item.id for item in relationships.contradictions} == {"c-loaded"}
+        assert {item.id for item in relationships.harmonies} == {"h-loaded"}
+        assert {item.id for item in relationships.commentaries} == {"m-loaded"}

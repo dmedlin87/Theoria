@@ -905,6 +905,16 @@ class ContradictionSeed(Base):
         Index("ix_contradiction_seeds_end_verse_id", "end_verse_id"),
         Index("ix_contradiction_seeds_start_verse_id_b", "start_verse_id_b"),
         Index("ix_contradiction_seeds_end_verse_id_b", "end_verse_id_b"),
+        Index(
+            "ix_contradiction_seeds_range_a",
+            "start_verse_id",
+            "end_verse_id",
+        ),
+        Index(
+            "ix_contradiction_seeds_range_b",
+            "start_verse_id_b",
+            "end_verse_id_b",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -935,6 +945,12 @@ class HarmonySeed(Base):
         Index("ix_harmony_seeds_end_verse_id", "end_verse_id"),
         Index("ix_harmony_seeds_start_verse_id_b", "start_verse_id_b"),
         Index("ix_harmony_seeds_end_verse_id_b", "end_verse_id_b"),
+        Index("ix_harmony_seeds_range_a", "start_verse_id", "end_verse_id"),
+        Index(
+            "ix_harmony_seeds_range_b",
+            "start_verse_id_b",
+            "end_verse_id_b",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -968,6 +984,11 @@ class CommentaryExcerptSeed(Base):
         Index("ix_commentary_excerpt_seeds_osis", "osis"),
         Index("ix_commentary_excerpt_seeds_start_verse_id", "start_verse_id"),
         Index("ix_commentary_excerpt_seeds_end_verse_id", "end_verse_id"),
+        Index(
+            "ix_commentary_excerpt_seeds_range",
+            "start_verse_id",
+            "end_verse_id",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)

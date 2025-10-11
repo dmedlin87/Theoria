@@ -24,6 +24,25 @@ from .seeds import (
 _ALLOWED_PERSPECTIVES = {"apologetic", "skeptical", "neutral"}
 
 
+@dataclass(frozen=True, slots=True)
+class VerseWindow:
+    """Normalized verse slice used for range checks."""
+
+    reference: str
+    start: int
+    end: int
+    verse_ids: frozenset[int]
+
+    def intersects(self, candidate: frozenset[int]) -> bool:
+        if not candidate:
+            return False
+        candidate_start = min(candidate)
+        candidate_end = max(candidate)
+        if candidate_end < self.start or candidate_start > self.end:
+            return False
+        return not self.verse_ids.isdisjoint(candidate)
+
+
 def _normalize_perspective(raw: str | None, *, default: str) -> str:
     value = (raw or default).strip().lower()
     if value not in _ALLOWED_PERSPECTIVES:
@@ -45,10 +64,10 @@ def _normalize_tags(tags: list[str] | None) -> list[str] | None:
     return normalised or None
 
 
-def compute_verse_id_ranges(references: Iterable[str]) -> dict[str, tuple[int, int]]:
-    """Return a mapping of normalized OSIS references to verse-id ranges."""
+def compute_verse_id_ranges(references: Iterable[str]) -> dict[str, VerseWindow]:
+    """Return a mapping of normalized OSIS references to verse windows."""
 
-    ranges: dict[str, tuple[int, int]] = {}
+    ranges: dict[str, VerseWindow] = {}
     for value in references:
         if not value:
             continue
@@ -60,28 +79,54 @@ def compute_verse_id_ranges(references: Iterable[str]) -> dict[str, tuple[int, i
             continue
         start = min(verse_ids)
         end = max(verse_ids)
-        ranges[normalized] = (start, end)
+        ranges[normalized] = VerseWindow(
+            reference=normalized,
+            start=start,
+            end=end,
+            verse_ids=verse_ids,
+        )
     return ranges
 
 
-def _range_condition(start_column, end_column, target: tuple[int, int]):
+def _range_condition(start_column, end_column, target: VerseWindow):
     if start_column is None or end_column is None:
         return None
-    start, end = target
     return and_(
         start_column.isnot(None),
         end_column.isnot(None),
-        start_column <= end,
-        end_column >= start,
+        start_column <= target.end,
+        end_column >= target.start,
     )
+
+
+def _reference_intersects(
+    reference: str | None,
+    windows: list[VerseWindow],
+    cache: dict[str, frozenset[int]],
+) -> bool:
+    if not reference:
+        return False
+    normalized = reference.strip()
+    if not normalized:
+        return False
+    if normalized not in cache:
+        cache[normalized] = expand_osis_reference(normalized)
+    candidate = cache[normalized]
+    if not candidate:
+        return False
+    return any(window.intersects(candidate) for window in windows)
 
 
 def query_pair_seed_rows(
     session: Session,
-    verse_ranges: Iterable[tuple[int, int]],
+    verse_windows: Iterable[VerseWindow],
     model: type[PairSeedModel],
 ) -> list[PairSeedModel]:
-    """Return ORM rows for pairwise seeds overlapping ``verse_ranges``."""
+    """Return ORM rows for pairwise seeds overlapping ``verse_windows``."""
+
+    windows = list(verse_windows)
+    if not windows:
+        return []
 
     verse_ranges_list = list(verse_ranges)
 
@@ -105,6 +150,20 @@ def query_pair_seed_rows(
                 _column("start_verse_id_b"),
                 _column("end_verse_id_b"),
                 verse_range,
+    for window in windows:
+        per_range: list = []
+        per_range.append(
+            _range_condition(
+                getattr(model, "start_verse_id", None),
+                getattr(model, "end_verse_id", None),
+                window,
+            )
+        )
+        per_range.append(
+            _range_condition(
+                getattr(model, "start_verse_id_b", None),
+                getattr(model, "end_verse_id_b", None),
+                window,
             )
         )
         per_range = [condition for condition in per_range if condition is not None]
@@ -198,15 +257,23 @@ def query_pair_seed_rows(
 
     query = session.query(model).filter(or_(*conditions))
     seen: dict[str, PairSeedModel] = {}
+    cache: dict[str, frozenset[int]] = {}
     for seed in query:
-        seen[seed.id] = seed
+        intersects_a = _reference_intersects(
+            getattr(seed, "osis_a", None), windows, cache
+        )
+        intersects_b = _reference_intersects(
+            getattr(seed, "osis_b", None), windows, cache
+        )
+        if intersects_a or intersects_b:
+            seen[seed.id] = seed
     return list(seen.values())
 
 
 def query_commentary_seed_rows(
-    session: Session, verse_ranges: Iterable[tuple[int, int]]
+    session: Session, verse_windows: Iterable[VerseWindow]
 ) -> list[CommentaryExcerptSeed]:
-    """Return commentary seeds overlapping ``verse_ranges``."""
+    """Return commentary seeds overlapping ``verse_windows``."""
 
     conditions = []
     start_column = getattr(CommentaryExcerptSeed, "start_verse_id", None)
@@ -214,8 +281,12 @@ def query_commentary_seed_rows(
     if start_column is None or end_column is None:
         return []
 
-    for verse_range in verse_ranges:
-        condition = _range_condition(start_column, end_column, verse_range)
+    windows = list(verse_windows)
+    if not windows:
+        return []
+
+    for window in windows:
+        condition = _range_condition(start_column, end_column, window)
         if condition is not None:
             conditions.append(condition)
 
@@ -224,8 +295,10 @@ def query_commentary_seed_rows(
 
     query = session.query(CommentaryExcerptSeed).filter(or_(*conditions))
     seen: dict[str, CommentaryExcerptSeed] = {}
+    cache: dict[str, frozenset[int]] = {}
     for seed in query:
-        seen[seed.id] = seed
+        if _reference_intersects(seed.osis, windows, cache):
+            seen[seed.id] = seed
     return list(seen.values())
 
 
@@ -268,10 +341,10 @@ class VerseSeedRelationships:
 def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationships:
     """Return normalized seed records intersecting ``osis``."""
 
-    ranges = list(compute_verse_id_ranges([osis]).values())
+    windows = list(compute_verse_id_ranges([osis]).values())
 
     contradictions: list[PairSeedRecord] = []
-    for seed in query_pair_seed_rows(session, ranges, ContradictionSeed):
+    for seed in query_pair_seed_rows(session, windows, ContradictionSeed):
         perspective = _normalize_perspective(seed.perspective, default="skeptical")
         contradictions.append(
             PairSeedRecord(
@@ -284,10 +357,10 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
                 weight=float(seed.weight) if seed.weight is not None else None,
                 perspective=perspective,
             )
-        )
+    )
 
     harmonies: list[PairSeedRecord] = []
-    for seed in query_pair_seed_rows(session, ranges, HarmonySeed):
+    for seed in query_pair_seed_rows(session, windows, HarmonySeed):
         perspective = _normalize_perspective(seed.perspective, default="apologetic")
         harmonies.append(
             PairSeedRecord(
@@ -303,7 +376,7 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
         )
 
     commentaries: list[CommentarySeedRecord] = []
-    for seed in query_commentary_seed_rows(session, ranges):
+    for seed in query_commentary_seed_rows(session, windows):
         perspective = _normalize_perspective(seed.perspective, default="neutral")
         commentaries.append(
             CommentarySeedRecord(

@@ -50,12 +50,11 @@ def search_commentaries(
     if perspectives and not allowed_perspectives:
         return []
 
-    range_map = compute_verse_id_ranges(candidates)
-    if not range_map:
+    windows = list(compute_verse_id_ranges(candidates).values())
+    if not windows:
         return []
-    verse_ranges = list(range_map.values())
 
-    seeds = query_commentary_seed_rows(session, verse_ranges)
+    seeds = query_commentary_seed_rows(session, windows)
     matched: list[CommentaryExcerptItem] = []
 
     for seed in seeds:
