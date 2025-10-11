@@ -36,15 +36,18 @@ This guide turns the high-level MCP integration plan into a concrete runbook for
    - PDF or DOCX files referencing well-known scripture (e.g., `John 1:1`).
    - Markdown or text files containing footnotes and OSIS references.
    - Audio/Video transcripts (plain text or JSON) to exercise quote lookup.
-2. Run the ingestion CLI against the TheoEngine API:
+2. Run the ingestion CLI from the repository root (it connects directly to the
+   configured database when operating in the default `api` mode):
    ```bash
-   poetry run python -m theo.services.cli.ingest_folder \
-     --path /path/to/corpus \
-     --api-url http://localhost:8000 \
-     --api-key "$THEO_API_KEYS" \
-     --batch-size 5
+   python -m theo.services.cli.ingest_folder /path/to/corpus \
+     --batch-size 5 \
+     --meta collection=seed_corpus
    ```
-   Use `--dry-run` first to review detected metadata without persisting records.
+   Set any required environment variables (for example `THEO_API_KEYS`,
+   database credentials, or storage paths) before executing the command. Use
+   `--dry-run` to review detected metadata without persisting records, or pass
+   `--mode worker` if you prefer to enqueue Celery jobs instead of running the
+   ingestion pipeline inline.
 3. Monitor Celery worker logs to ensure parsing and chunking jobs finish. Once complete, verify passage counts via `GET /admin/passage-count` (if enabled) or by querying the `documents` and `passages` tables directly.
 
 ## 4. Exercise MCP read tools with live data
