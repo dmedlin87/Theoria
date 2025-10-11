@@ -1,5 +1,9 @@
 "use client";
 
+// Canonical research mode context for the web app. All consumers should import
+// ModeProvider, useMode, and related helpers from this module rather than any
+// legacy exports that previously lived under app/context/ModeContext.
+
 import {
   ReactNode,
   createContext,
