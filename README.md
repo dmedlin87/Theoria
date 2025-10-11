@@ -2,7 +2,7 @@
 
 **A research engine for theology** that indexes your library (papers, notes, YouTube transcripts, audio), normalizes Scripture references (OSIS), and provides deterministic, verse-anchored search with a Verse Aggregator across your entire corpus.
 
-See [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) for the complete system architecture.
+See [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and [`case builder v4.md`](case%20builder%20v4.md) for the complete system architecture and latest case builder specifications.
 
 ## Features
 
