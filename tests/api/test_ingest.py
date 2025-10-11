@@ -209,7 +209,10 @@ def test_ingest_url_blocks_private_targets(
     response = api_client.post("/ingest/url", json={"url": blocked_url})
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json()["detail"] == "URL target is not allowed for ingestion"
+    payload = response.json()
+    assert payload.get("error", {}).get(
+        "message"
+    ) == "URL target is not allowed for ingestion"
 
 
 def test_simple_ingest_streams_progress(

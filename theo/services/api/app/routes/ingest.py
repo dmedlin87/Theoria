@@ -16,6 +16,7 @@ from ..core.database import get_session
 from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
 from theo.services.api.app.ingest.exceptions import UnsupportedSourceError
+from ..ingest.exceptions import UnsupportedSourceError
 from ..models.documents import (
     DocumentIngestResponse,
     SimpleIngestRequest,
@@ -225,6 +226,7 @@ async def ingest_url(
             code="INGESTION_UNSUPPORTED_SOURCE",
             status_code=status.HTTP_400_BAD_REQUEST,
             severity=Severity.USER,
+            hint="Review the URL and ensure it meets ingestion requirements.",
         ) from exc
     except ResilienceError as exc:
         raise IngestionError(
