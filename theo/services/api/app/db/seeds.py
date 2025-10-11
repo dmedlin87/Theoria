@@ -11,6 +11,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 import yaml
 from sqlalchemy import Table, delete, inspect
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -79,6 +80,30 @@ def _table_has_column(session: Session, table_name: str, column_name: str, *, sc
     bind = session.get_bind()
     if bind is None:
         return False
+
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+    if dialect_name == "sqlite":
+        connection: Connection | None = None
+        should_close = False
+        try:
+            if isinstance(bind, Engine):
+                connection = bind.connect()
+                should_close = True
+            else:
+                connection = bind  # type: ignore[assignment]
+            escaped_table = table_name.replace("'", "''")
+            result = connection.exec_driver_sql(
+                f"PRAGMA table_info('{escaped_table}')"
+            )
+            for row in result:
+                if len(row) > 1 and row[1] == column_name:
+                    return True
+            return False
+        except Exception:  # pragma: no cover - defensive: unexpected SQLite errors
+            return False
+        finally:
+            if should_close and connection is not None:
+                connection.close()
 
     inspector = inspect(bind)
     try:
