@@ -107,7 +107,9 @@ export function AppShell({
             </button>
           </div>
         </div>
-        <main className="app-shell-v2__content">{children}</main>
+        <main className="app-shell-v2__content" id="main-content">
+          {children}
+        </main>
         <footer className="app-shell-v2__footer">
           <div>{footerMeta}</div>
           {footerLinks.length > 0 ? (

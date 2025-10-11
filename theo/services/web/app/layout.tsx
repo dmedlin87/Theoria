@@ -67,6 +67,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body className="app-shell">
+        <a className="skip-link" href="#main-content">
+          Skip to main content
+        </a>
         <ModeProvider initialMode={initialMode}>
           {enableUiV2 ? (
             <AppShell
@@ -103,7 +106,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <ModeSwitcher />
                 </div>
               </section>
-              <main className="site-main">
+              <main className="site-main" id="main-content">
                 <div className="container">{children}</div>
               </main>
               <footer className="site-footer">
