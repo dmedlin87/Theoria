@@ -907,6 +907,10 @@ class ContradictionSeed(Base):
     __table_args__ = (
         Index("ix_contradiction_seeds_osis_a", "osis_a"),
         Index("ix_contradiction_seeds_osis_b", "osis_b"),
+        Index(
+            "ix_contradiction_seeds_range_a",
+            "start_verse_id_a",
+            "end_verse_id_a",
         Index("ix_contradiction_seeds_start_verse_id", "start_verse_id"),
         Index("ix_contradiction_seeds_end_verse_id", "end_verse_id"),
         Index("ix_contradiction_seeds_start_verse_id_b", "start_verse_id_b"),
@@ -931,6 +935,8 @@ class ContradictionSeed(Base):
     tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     perspective: Mapped[str | None] = mapped_column(String, nullable=True)
+    start_verse_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_verse_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_verse_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -947,6 +953,8 @@ class HarmonySeed(Base):
     __table_args__ = (
         Index("ix_harmony_seeds_osis_a", "osis_a"),
         Index("ix_harmony_seeds_osis_b", "osis_b"),
+        Index("ix_harmony_seeds_range_a", "start_verse_id_a", "end_verse_id_a"),
+        Index("ix_harmony_seeds_range_b", "start_verse_id_b", "end_verse_id_b"),
         Index("ix_harmony_seeds_start_verse_id", "start_verse_id"),
         Index("ix_harmony_seeds_end_verse_id", "end_verse_id"),
         Index("ix_harmony_seeds_start_verse_id_b", "start_verse_id_b"),
@@ -967,6 +975,8 @@ class HarmonySeed(Base):
     tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     perspective: Mapped[str | None] = mapped_column(String, nullable=True)
+    start_verse_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_verse_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_verse_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_verse_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)

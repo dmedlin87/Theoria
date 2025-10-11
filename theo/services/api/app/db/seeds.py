@@ -16,6 +16,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from theo.services.geo import seed_openbible_geo
+from ..ingest.osis import expand_osis_reference
 
 from ..ingest.osis import expand_osis_reference
 
@@ -65,6 +66,15 @@ def _coerce_list(value: object) -> list[str] | None:
             result.append(str(item))
         return result or None
     return None
+
+
+def _verse_bounds(reference: str | None) -> tuple[int | None, int | None]:
+    if not reference:
+        return (None, None)
+    verse_ids = expand_osis_reference(str(reference))
+    if not verse_ids:
+        return (None, None)
+    return (min(verse_ids), max(verse_ids))
 
 
 def _iter_seed_entries(*paths: Path) -> list[dict]:
@@ -227,6 +237,10 @@ def seed_contradiction_claims(session: Session) -> None:
             osis_b = entry.get("osis_b")
             if not osis_a or not osis_b:
                 continue
+            osis_a_value = str(osis_a)
+            osis_b_value = str(osis_b)
+            start_a, end_a = _verse_bounds(osis_a_value)
+            start_b, end_b = _verse_bounds(osis_b_value)
             source = entry.get("source") or "community"
             perspective = (entry.get("perspective") or "skeptical").strip().lower()
             identifier = str(
@@ -257,13 +271,15 @@ def seed_contradiction_claims(session: Session) -> None:
             if record is None:
                 record = ContradictionSeed(
                     id=identifier,
-                    osis_a=str(osis_a),
-                    osis_b=str(osis_b),
+                    osis_a=osis_a_value,
+                    osis_b=osis_b_value,
                     summary=summary,
                     source=source,
                     tags=tags,
                     weight=weight,
                     perspective=perspective,
+                    start_verse_id_a=start_a,
+                    end_verse_id_a=end_a,
                     start_verse_id=start_a,
                     end_verse_id=end_a,
                     start_verse_id_b=start_b,
@@ -271,10 +287,10 @@ def seed_contradiction_claims(session: Session) -> None:
                 )
                 session.add(record)
             else:
-                if record.osis_a != osis_a:
-                    record.osis_a = str(osis_a)
-                if record.osis_b != osis_b:
-                    record.osis_b = str(osis_b)
+                if record.osis_a != osis_a_value:
+                    record.osis_a = osis_a_value
+                if record.osis_b != osis_b_value:
+                    record.osis_b = osis_b_value
                 if record.summary != summary:
                     record.summary = summary
                 if record.source != source:
@@ -285,6 +301,14 @@ def seed_contradiction_claims(session: Session) -> None:
                     record.weight = weight
                 if record.perspective != perspective:
                     record.perspective = perspective
+                if record.start_verse_id_a != start_a:
+                    record.start_verse_id_a = start_a
+                if record.end_verse_id_a != end_a:
+                    record.end_verse_id_a = end_a
+                if record.start_verse_id_b != start_b:
+                    record.start_verse_id_b = start_b
+                if record.end_verse_id_b != end_b:
+                    record.end_verse_id_b = end_b
                 _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a))
                 _assign_range(
                     record,
@@ -349,6 +373,10 @@ def seed_harmony_claims(session: Session) -> None:
         summary = entry.get("summary")
         if not osis_a or not osis_b or not summary:
             continue
+        osis_a_value = str(osis_a)
+        osis_b_value = str(osis_b)
+        start_a, end_a = _verse_bounds(osis_a_value)
+        start_b, end_b = _verse_bounds(osis_b_value)
         source = entry.get("source") or "community"
         perspective = (entry.get("perspective") or "apologetic").strip().lower()
         identifier = str(
@@ -378,13 +406,15 @@ def seed_harmony_claims(session: Session) -> None:
         if record is None:
             record = HarmonySeed(
                 id=identifier,
-                osis_a=str(osis_a),
-                osis_b=str(osis_b),
+                osis_a=osis_a_value,
+                osis_b=osis_b_value,
                 summary=summary,
                 source=source,
                 tags=tags,
                 weight=weight,
                 perspective=perspective,
+                start_verse_id_a=start_a,
+                end_verse_id_a=end_a,
                 start_verse_id=start_a,
                 end_verse_id=end_a,
                 start_verse_id_b=start_b,
@@ -393,11 +423,11 @@ def seed_harmony_claims(session: Session) -> None:
             session.add(record)
         else:
             updated = False
-            if record.osis_a != osis_a:
-                record.osis_a = str(osis_a)
+            if record.osis_a != osis_a_value:
+                record.osis_a = osis_a_value
                 updated = True
-            if record.osis_b != osis_b:
-                record.osis_b = str(osis_b)
+            if record.osis_b != osis_b_value:
+                record.osis_b = osis_b_value
                 updated = True
             if record.summary != summary:
                 record.summary = summary
@@ -414,6 +444,17 @@ def seed_harmony_claims(session: Session) -> None:
             if record.perspective != perspective:
                 record.perspective = perspective
                 updated = True
+            if record.start_verse_id_a != start_a:
+                record.start_verse_id_a = start_a
+                updated = True
+            if record.end_verse_id_a != end_a:
+                record.end_verse_id_a = end_a
+                updated = True
+            if record.start_verse_id_b != start_b:
+                record.start_verse_id_b = start_b
+                updated = True
+            if record.end_verse_id_b != end_b:
+                record.end_verse_id_b = end_b
             if _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a)):
                 updated = True
             if _assign_range(
@@ -469,6 +510,8 @@ def seed_commentary_excerpts(session: Session) -> None:
         excerpt = entry.get("excerpt")
         if not osis or not excerpt:
             continue
+        osis_value = str(osis)
+        start_verse_id, end_verse_id = _verse_bounds(osis_value)
         source = entry.get("source") or "community"
         perspective = (entry.get("perspective") or "neutral").strip().lower()
         identifier = str(
@@ -488,20 +531,22 @@ def seed_commentary_excerpts(session: Session) -> None:
         if record is None:
             record = CommentaryExcerptSeed(
                 id=identifier,
-                osis=str(osis),
+                osis=osis_value,
                 title=title,
                 excerpt=excerpt,
                 source=source,
                 perspective=perspective,
                 tags=tags,
+                start_verse_id=start_verse_id,
+                end_verse_id=end_verse_id,
                 start_verse_id=start_value,
                 end_verse_id=end_value,
             )
             session.add(record)
         else:
             updated = False
-            if record.osis != osis:
-                record.osis = str(osis)
+            if record.osis != osis_value:
+                record.osis = osis_value
                 updated = True
             if record.title != title:
                 record.title = title
@@ -518,6 +563,11 @@ def seed_commentary_excerpts(session: Session) -> None:
             if record.tags != tags:
                 record.tags = tags
                 updated = True
+            if record.start_verse_id != start_verse_id:
+                record.start_verse_id = start_verse_id
+                updated = True
+            if record.end_verse_id != end_verse_id:
+                record.end_verse_id = end_verse_id
             if _assign_range(record, "start_verse_id", "end_verse_id", str(osis)):
                 updated = True
             if updated:
