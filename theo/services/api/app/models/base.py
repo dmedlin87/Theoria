@@ -1,4 +1,9 @@
-"""Shared Pydantic schemas used across API responses."""
+"""Shared Pydantic schemas used across API responses.
+
+The base model explicitly clears Pydantic's protected namespaces so response
+schemas can expose attributes like ``model_`` without triggering warnings.
+Future fields should avoid relying on protected names unless intentional.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +16,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class APIModel(BaseModel):
     """Base schema configuration enabling ORM compatibility."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        protected_namespaces=(),
+    )
 
 
 class TimestampedModel(APIModel):
