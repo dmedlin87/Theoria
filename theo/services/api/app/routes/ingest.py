@@ -16,11 +16,6 @@ from ..core.database import get_session
 from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
 from ..ingest.exceptions import UnsupportedSourceError
-from ..ingest.pipeline import (
-    run_pipeline_for_file,
-    run_pipeline_for_transcript,
-    run_pipeline_for_url,
-)
 from ..models.documents import (
     DocumentIngestResponse,
     SimpleIngestRequest,
@@ -29,6 +24,7 @@ from ..models.documents import (
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
 from ..telemetry import log_workflow_event
 from theo.services.cli import ingest_folder as cli_ingest
+from ..services.ingestion_service import IngestionService, get_ingestion_service
 
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
@@ -163,6 +159,7 @@ async def ingest_file(
     file: UploadFile = File(...),
     frontmatter: str | None = Form(default=None),
     session: Session = Depends(get_session),
+    ingestion_service: IngestionService = Depends(get_ingestion_service),
 ) -> DocumentIngestResponse:
     """Accept a file upload and synchronously process it into passages."""
 
@@ -215,9 +212,10 @@ async def ingest_file(
 async def ingest_url(
     payload: UrlIngestRequest,
     session: Session = Depends(get_session),
+    ingestion_service: IngestionService = Depends(get_ingestion_service),
 ) -> DocumentIngestResponse:
     try:
-        document = run_pipeline_for_url(
+        document = ingestion_service.ingest_url(
             session,
             payload.url,
             source_type=payload.source_type,
@@ -248,11 +246,16 @@ async def ingest_url(
     "/simple",
     responses=_INGEST_ERROR_RESPONSES,
 )
-async def simple_ingest(payload: SimpleIngestRequest) -> StreamingResponse:
-    settings = get_settings()
-    allowlist = getattr(settings, "simple_ingest_allowed_roots", None)
+async def simple_ingest(
+    payload: SimpleIngestRequest,
+    ingestion_service: IngestionService = Depends(get_ingestion_service),
+) -> StreamingResponse:
     try:
-        items = cli_ingest._discover_items(payload.sources, allowlist)
+        events = ingestion_service.stream_simple_ingest(payload)
+        try:
+            first_event = next(events)
+        except StopIteration:
+            first_event = None
     except ValueError as exc:
         raise IngestionError(
             str(exc),
@@ -262,136 +265,11 @@ async def simple_ingest(payload: SimpleIngestRequest) -> StreamingResponse:
             hint="Review the provided ingest sources and configuration.",
         ) from exc
 
-    overrides = cli_ingest._apply_default_metadata(payload.metadata or {})
-    post_batch_steps = cli_ingest._parse_post_batch_steps(
-        tuple(payload.post_batch or ())
-    )
-    mode = payload.mode.lower()
-
     def _event_stream() -> Iterator[bytes]:
-        total = len(items)
-        log_workflow_event(
-            "api.simple_ingest.started",
-            workflow="api.simple_ingest",
-            total=total,
-            mode=mode,
-            dry_run=payload.dry_run,
-        )
-        yield _encode_event(
-            {
-                "event": "start",
-                "total": total,
-                "mode": mode,
-                "dry_run": payload.dry_run,
-                "batch_size": payload.batch_size,
-            }
-        )
-        if not items:
-            log_workflow_event(
-                "api.simple_ingest.empty",
-                workflow="api.simple_ingest",
-                mode=mode,
-            )
-            yield _encode_event({"event": "empty"})
-            return
-
-        for item in items:
-            yield _encode_event(
-                {
-                    "event": "discovered",
-                    "target": item.label,
-                    "source_type": item.source_type,
-                    "remote": item.is_remote,
-                }
-            )
-
-        processed = 0
-        queued = 0
-
-        try:
-            for batch_number, batch in enumerate(
-                cli_ingest._batched(items, payload.batch_size),
-                start=1,
-            ):
-                yield _encode_event(
-                    {
-                        "event": "batch",
-                        "number": batch_number,
-                        "size": len(batch),
-                        "mode": mode,
-                    }
-                )
-                if payload.dry_run:
-                    for item in batch:
-                        yield _encode_event(
-                            {
-                                "event": "dry-run",
-                                "target": item.label,
-                                "source_type": item.source_type,
-                            }
-                        )
-                    continue
-
-                if mode == "api":
-                    document_ids = cli_ingest._ingest_batch_via_api(
-                        batch, overrides, post_batch_steps
-                    )
-                    for item, doc_id in zip(batch, document_ids):
-                        processed += 1
-                        yield _encode_event(
-                            {
-                                "event": "processed",
-                                "target": item.label,
-                                "document_id": doc_id,
-                            }
-                        )
-                else:
-                    if post_batch_steps:
-                        yield _encode_event(
-                            {
-                                "event": "warning",
-                                "message": "Post-batch steps require API mode; skipping.",
-                            }
-                        )
-                    task_ids = cli_ingest._queue_batch_via_worker(batch, overrides)
-                    for item, task_id in zip(batch, task_ids):
-                        queued += 1
-                        yield _encode_event(
-                            {
-                                "event": "queued",
-                                "target": item.label,
-                                "task_id": task_id,
-                            }
-                        )
-        except Exception as exc:  # pragma: no cover - defensive streaming guard
-            log_workflow_event(
-                "api.simple_ingest.failed",
-                workflow="api.simple_ingest",
-                mode=mode,
-                dry_run=payload.dry_run,
-                error=str(exc),
-            )
-            yield _encode_event({"event": "error", "message": str(exc)})
-            return
-
-        log_workflow_event(
-            "api.simple_ingest.completed",
-            workflow="api.simple_ingest",
-            mode=mode,
-            dry_run=payload.dry_run,
-            processed=processed,
-            queued=queued,
-            total=total,
-        )
-        yield _encode_event(
-            {
-                "event": "complete",
-                "processed": processed,
-                "queued": queued,
-                "total": total,
-                "mode": mode,
-            }
-        )
+        if first_event is not None:
+            yield _encode_event(first_event)
+        for event in events:
+            yield _encode_event(event)
 
     return StreamingResponse(
         _event_stream(), media_type="application/x-ndjson"
@@ -408,6 +286,7 @@ async def ingest_transcript(
     audio: UploadFile | None = File(default=None),
     frontmatter: str | None = Form(default=None),
     session: Session = Depends(get_session),
+    ingestion_service: IngestionService = Depends(get_ingestion_service),
 ) -> DocumentIngestResponse:
     """Accept a transcript (and optional audio) and process it into passages."""
 
@@ -429,7 +308,7 @@ async def ingest_transcript(
 
         parsed_frontmatter = _parse_frontmatter(frontmatter)
 
-        document = run_pipeline_for_transcript(
+        document = ingestion_service.ingest_transcript(
             session,
             transcript_path,
             frontmatter=parsed_frontmatter,

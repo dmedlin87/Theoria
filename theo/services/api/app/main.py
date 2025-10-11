@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
-
 import importlib
 import inspect
 import logging
 import os
 from functools import wraps
-from typing import Callable, Optional, Sequence, cast
+from typing import Callable, Optional, cast
 
-from fastapi import APIRouter, Depends, FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,70 +46,12 @@ from .routes import (
 from .security import require_principal
 from .telemetry import configure_console_tracer
 from .tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
+from .services import router_registry as _router_registry  # noqa: F401
+from .services.registry import iter_router_registrations
 GenerateLatestFn = Callable[[], bytes]
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
 generate_latest: Optional[GenerateLatestFn] = None
 
-
-@dataclass(frozen=True)
-class RouterRegistration:
-    router: APIRouter
-    prefix: str | None
-    tags: Sequence[str]
-    requires_security: bool = True
-
-
-ROUTER_REGISTRATIONS: tuple[RouterRegistration, ...] = (
-    RouterRegistration(router=ingest.router, prefix="/ingest", tags=("ingest",)),
-    RouterRegistration(router=jobs.router, prefix="/jobs", tags=("jobs",)),
-    RouterRegistration(router=search.router, prefix="/search", tags=("search",)),
-    RouterRegistration(router=export.router, prefix="/export", tags=("export",)),
-    RouterRegistration(router=verses.router, prefix="/verses", tags=("verses",)),
-    RouterRegistration(
-        router=documents.router,
-        prefix="/documents",
-        tags=("documents",),
-    ),
-    RouterRegistration(
-        router=features.router,
-        prefix="/features",
-        tags=("features",),
-    ),
-    RouterRegistration(
-        router=research.router,
-        prefix="/research",
-        tags=("research",),
-    ),
-    RouterRegistration(
-        router=creators.router,
-        prefix="/creators",
-        tags=("creators",),
-    ),
-    RouterRegistration(
-        router=transcripts.router,
-        prefix="/transcripts",
-        tags=("transcripts",),
-    ),
-    RouterRegistration(router=trails.router, prefix="/trails", tags=("trails",)),
-    RouterRegistration(
-        router=notebooks.router,
-        prefix="/notebooks",
-        tags=("notebooks",),
-    ),
-    RouterRegistration(
-        router=analytics.router,
-        prefix="/analytics",
-        tags=("analytics",),
-    ),
-    RouterRegistration(router=ai.router, prefix="/ai", tags=("ai",)),
-    RouterRegistration(router=ai.settings_router, prefix=None, tags=("ai-settings",)),
-    RouterRegistration(
-        router=realtime.router,
-        prefix="/realtime",
-        tags=("realtime",),
-        requires_security=False,
-    ),
-)
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +210,7 @@ def create_app() -> FastAPI:
         return _attach_trace_headers(response, trace_headers)
 
     security_dependencies = [Depends(require_principal)]
-    for registration in ROUTER_REGISTRATIONS:
+    for registration in iter_router_registrations():
         include_kwargs: dict[str, object] = {
             "router": registration.router,
             "tags": list(registration.tags),

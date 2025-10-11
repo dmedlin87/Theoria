@@ -11,6 +11,7 @@ from theo.services.api.app.core.settings import get_settings
 from theo.services.api.app.main import app
 from theo.services.api.app.models.search import HybridSearchResult
 from theo.services.api.app.routes import search as search_route
+from theo.services.api.app.services import retrieval_service as retrieval_service_module
 
 
 class _WeightedModel:
@@ -91,7 +92,7 @@ def test_search_rejects_reranker_with_hash_mismatch(
     def _fake_search(session, request):  # type: ignore[unused-argument]
         return [item.model_copy(deep=True) for item in results]
 
-    monkeypatch.setattr(search_route, "hybrid_search", _fake_search)
+    monkeypatch.setattr(retrieval_service_module, "hybrid_search", _fake_search)
     monkeypatch.setenv("STORAGE_ROOT", str(storage_root))
     monkeypatch.setenv("RERANKER_ENABLED", "true")
     monkeypatch.setenv("RERANKER_MODEL_PATH", str(model_path))
