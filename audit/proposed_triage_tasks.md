@@ -1,0 +1,29 @@
+# Proposed follow-up tasks
+
+## Fix typo in product vision goal
+- **Location**: `docs/more_features.md`
+- **Issue**: The goal statement says "citable evidence-on tap" with an extra hyphen that breaks the phrase.
+- **Why it matters**: Polishing copy in public-facing vision docs keeps the messaging professional.
+- **Suggested fix**: Replace "evidence-on" with "evidence on" in the goal sentence.
+- **References**: [`docs/more_features.md`](../docs/more_features.md) line 3. 
+
+## Make reranker retry after transient load failures
+- **Location**: `theo/services/api/app/routes/search.py`
+- **Issue**: `_RerankerCache.resolve()` latches `_RERANKER_CACHE.failed = True` after the first load error and never retries while the cache key stays the same, so temporary filesystem or checksum issues permanently disable reranking until the process restarts.
+- **Why it matters**: Allowing retries ensures search quality recovers automatically once the model artifact becomes available.
+- **Suggested fix**: Clear the `failed` flag when enough time has passed or when the backing file hash changes so `_resolve_reranker` can attempt to load again.
+- **References**: [`theo/services/api/app/routes/search.py`](../theo/services/api/app/routes/search.py) lines 47-84.
+
+## Update feature discovery documentation
+- **Location**: `docs/API.md`
+- **Issue**: The documented `/features` response lists only four keys, but the route currently exposes additional toggles (cross references, textual variants, morphology, verse timeline, etc.), so the example payload is stale.
+- **Why it matters**: Accurate examples help client developers rely on the available feature flags without inspecting the source.
+- **Suggested fix**: Expand the example JSON (or add a note) to reflect the full set of flags returned by `list_features()`.
+- **References**: [`docs/API.md`](../docs/API.md) lines 647-665 and [`theo/services/api/app/routes/features.py`](../theo/services/api/app/routes/features.py) lines 12-44.
+
+## Strengthen feature flag tests
+- **Location**: `theo/services/api/tests/test_features.py`
+- **Issue**: The test suite only asserts that certain keys exist in the payloads; it never toggles environment-driven settings such as `contradictions_enabled` or `geo_enabled`, so configuration regressions would slip through.
+- **Why it matters**: Exercising flag flips ensures API responses stay aligned with settings.
+- **Suggested fix**: Monkeypatch `get_settings()` (or related environment variables) so the tests assert both enabled and disabled states for optional flags in `/features` and `/features/discovery`.
+- **References**: [`theo/services/api/tests/test_features.py`](../theo/services/api/tests/test_features.py) lines 1-24 and [`theo/services/api/app/routes/features.py`](../theo/services/api/app/routes/features.py) lines 12-44.
