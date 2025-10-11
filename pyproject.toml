@@ -63,6 +63,7 @@ files = [
 ]
 ignore_missing_imports = true
 warn_unused_configs = true
+warn_unused_ignores = true
 follow_imports = "skip"
 
 [tool.pytest.ini_options]

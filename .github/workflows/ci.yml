@@ -46,6 +46,10 @@ jobs:
       - name: Run mypy
         run: mypy --config-file mypy.ini
 
+      - name: Run mypy with warn-unused-ignores (enable after Phase 1)
+        if: ${{ vars.ENABLE_WARN_UNUSED_IGNORES == 'true' }}
+        run: mypy --config-file mypy.ini --warn-unused-ignores
+
       - name: Run ESLint and TypeScript checks
         working-directory: theo/services/web
         run: npm run lint
