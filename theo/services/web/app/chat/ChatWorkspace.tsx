@@ -100,6 +100,10 @@ export default function ChatWorkspace({
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoSubmitRef = useRef(false);
 
+  useEffect(() => {
+    autoSubmitRef.current = false;
+  }, [initialPrompt]);
+
   const sampleQuestions = useMemo(
     () => [
       "How does John 1:1 connect with Genesis 1?",
