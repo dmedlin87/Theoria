@@ -16,6 +16,7 @@ from theo.services.api.app.ai import (
 from theo.services.api.app.ai.rag import GuardrailError, RAGCitation
 from theo.services.api.app.core.database import get_session
 from theo.services.api.app.db.models import Document, Passage
+from theo.services.api.app.export import citations as citation_exports
 from theo.services.api.app.export.citations import build_citation_export
 from theo.services.api.app.models.ai import (
     CitationExportRequest,
@@ -31,6 +32,36 @@ from theo.services.api.app.models.export import serialise_asset_content
 from .guardrails import guardrail_http_exception
 
 router = APIRouter()
+
+
+# NOTE:
+# ``tests/api/test_ai_citation_export.py`` imports ``_CSL_TYPE_MAP`` and
+# ``_build_csl_entry`` from this module.  Historically these helpers lived here
+# and the test suite (and potentially downstream code) still relies on that
+# public contract.  A recent refactor moved the implementation into
+# ``theo.services.api.app.export.citations`` but forgot to keep the re-export in
+# place, breaking import at test collection time.  Restoring the thin wrapper
+# keeps the more robust shared implementation while maintaining the old import
+# path.
+_CSL_TYPE_MAP: dict[str, str] = {
+    "sermon": citation_exports._infer_csl_type("sermon"),
+    "video": citation_exports._infer_csl_type("video"),
+    "web": citation_exports._infer_csl_type("web"),
+}
+
+
+def _build_csl_entry(
+    record: Mapping[str, Any], citations: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Return a CSL entry for the provided *record*.
+
+    The heavy lifting lives in :mod:`theo.services.api.app.export.citations`.
+    This wrapper only exists to preserve the historical public API of this
+    module, delegating to the shared implementation for the actual conversion.
+    """
+
+    source = citation_exports.CitationSource.from_object(record)
+    return citation_exports._build_csl_entry(source, citations)
 
 
 def _extract_primary_topic(document: Document) -> str | None:
@@ -315,6 +346,8 @@ def transcript_export(
 
 
 __all__ = [
+    "_CSL_TYPE_MAP",
+    "_build_csl_entry",
     "router",
     "export_citations",
     "sermon_prep_export",
