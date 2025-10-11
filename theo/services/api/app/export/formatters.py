@@ -138,6 +138,36 @@ def _filter_values(
     return output
 
 
+def _select_nested_mapping_values(
+    data: Mapping[str, Any] | None, selectors: set[str]
+) -> dict[str, Any]:
+    """Return a subset of *data* matching dotted *selectors*."""
+
+    if not data or not selectors:
+        return {}
+
+    result: dict[str, Any] = {}
+    for key, value in data.items():
+        include_entire_value = key in selectors
+        nested_prefix = f"{key}."
+        nested_selectors = {
+            selector[len(nested_prefix) :]
+            for selector in selectors
+            if selector.startswith(nested_prefix)
+        }
+
+        if include_entire_value:
+            result[key] = value
+            continue
+
+        if nested_selectors and isinstance(value, Mapping):
+            nested_value = _select_nested_mapping_values(value, nested_selectors)
+            if nested_value:
+                result[key] = nested_value
+
+    return result
+
+
 def _passage_to_dict(
     passage: Passage, include_text: bool, allowed: set[str] | None
 ) -> OrderedDict:
@@ -266,8 +296,23 @@ def _document_to_record(
     if not include_passages:
         base_record.pop("passages", None)
         field_order = tuple(key for key in DOCUMENT_FIELD_ORDER if key != "passages")
-    if allowed_fields is not None and "metadata" not in allowed_fields:
-        base_record.pop("metadata", None)
+    if allowed_fields is not None:
+        if "metadata" not in allowed_fields:
+            metadata_selectors = {
+                field.split(".", 1)[1]
+                for field in allowed_fields
+                if field.startswith("metadata.") and "." in field
+            }
+            if metadata_selectors:
+                filtered_metadata = _select_nested_mapping_values(
+                    document.metadata, metadata_selectors
+                )
+                if filtered_metadata:
+                    base_record["metadata"] = filtered_metadata
+                else:
+                    base_record.pop("metadata", None)
+            else:
+                base_record.pop("metadata", None)
     return _filter_values(base_record, allowed_fields, field_order)
 
 
