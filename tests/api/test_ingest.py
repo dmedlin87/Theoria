@@ -339,7 +339,7 @@ def _install_url_pipeline_stub(
     def _fake_run(session, url: str, source_type=None, frontmatter=None):  # noqa: ANN001
         # Directly raise the expected exception without calling _fetch_web_document
         # since the monkeypatched build_opener should make it work correctly anyway
-        raise pipeline_module.UnsupportedSourceError(expected_failure_message)
+        raise ingest_module.UnsupportedSourceError(expected_failure_message)
 
     monkeypatch.setattr(ingest_module, "run_pipeline_for_url", _fake_run)
 
