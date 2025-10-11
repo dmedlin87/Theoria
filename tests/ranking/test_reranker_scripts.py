@@ -29,7 +29,7 @@ def test_train_and_eval_scripts(tmp_path):
         "2025-02-21T00:00:00Z",
     ]
 
-    subprocess.run(train_cmd, check=True)
+    subprocess.run(train_cmd, check=True)  # noqa: S603 - command constructed from trusted constants
     assert model_path.exists()
 
     eval_cmd = [
@@ -45,7 +45,12 @@ def test_train_and_eval_scripts(tmp_path):
         str(report_path),
     ]
 
-    result = subprocess.run(eval_cmd, check=True, capture_output=True, text=True)
+    result = subprocess.run(  # noqa: S603 - command constructed from trusted constants
+        eval_cmd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     output = result.stdout
     assert "Baseline metrics" in output
     assert "Reranked metrics" in output

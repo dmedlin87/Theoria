@@ -23,7 +23,7 @@ def test_passage_retriever_falls_back_to_guardrail(monkeypatch: pytest.MonkeyPat
     fallback_result = HybridSearchResult(
         id="fallback",
         document_id="doc-2",
-        text="fallback", 
+        text="fallback",
         snippet="fallback",
         osis_ref="John.1.1",
         score=0.9,
