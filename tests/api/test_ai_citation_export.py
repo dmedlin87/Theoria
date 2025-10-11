@@ -16,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.core.database import get_session
 from theo.services.api.app.db.models import Document, Passage
+from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.main import app
 from theo.services.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _build_csl_entry
 
@@ -49,6 +50,7 @@ def client(api_engine) -> Generator[TestClient, None, None]:
             document_id="doc-1",
             text="In the beginning was the Word.",
             osis_ref="John.1.1",
+            osis_verse_ids=list(sorted(expand_osis_reference("John.1.1"))),
             page_no=1,
             t_start=0.0,
             t_end=5.0,

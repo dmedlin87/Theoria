@@ -14,6 +14,7 @@ from theo.services.api.app.db.models import (
     HarmonySeed,
     Passage,
 )
+from theo.services.api.app.ingest.osis import expand_osis_reference
 
 
 @pytest.fixture()
@@ -46,6 +47,7 @@ def _seed_graph_data(engine) -> None:
             document_id=doc_pdf.id,
             text="For God so loved the world",
             osis_ref="John.3.16",
+            osis_verse_ids=list(sorted(expand_osis_reference("John.3.16"))),
             page_no=3,
             t_start=12.5,
             t_end=18.0,
@@ -55,6 +57,7 @@ def _seed_graph_data(engine) -> None:
             document_id=doc_markdown.id,
             text="Study notes on John 3:16",
             osis_ref="John.3.16",
+            osis_verse_ids=list(sorted(expand_osis_reference("John.3.16"))),
         )
         session.add_all([passage_pdf, passage_markdown])
 

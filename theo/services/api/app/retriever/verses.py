@@ -6,10 +6,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 
-from sqlalchemy.orm import Session
+from sqlalchemy import Integer, cast, exists, false, func, select
+from sqlalchemy.orm import Session, joinedload
 
 from ..db.models import Document, Passage
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference
 from ..models.base import Passage as PassageSchema
 from ..models.verses import (
     VerseMention,
@@ -26,26 +27,33 @@ def _snippet(text: str, max_length: int = 280) -> str:
     return text[: max_length - 3].rstrip() + "..."
 
 
-def _collect_osis_refs(passage: Passage) -> set[str]:
-    """Return all OSIS references associated with *passage*."""
+def _resolve_query_ids(osis: str) -> list[int]:
+    """Expand *osis* into stable verse identifiers."""
 
-    refs: set[str] = set()
-    if passage.osis_ref:
-        refs.add(passage.osis_ref)
-    meta = passage.meta or {}
-    if isinstance(meta, dict):
-        for key in (
-            "primary_osis",
-            "osis_refs",
-            "osis_refs_all",
-            "osis_refs_detected",
-        ):
-            value = meta.get(key)
-            if isinstance(value, str) and value:
-                refs.add(value)
-            elif isinstance(value, (list, tuple, set)):
-                refs.update(str(item) for item in value if item)
-    return refs
+    try:
+        return list(sorted(expand_osis_reference(osis)))
+    except Exception:  # pragma: no cover - defensive guard for malformed input
+        return []
+
+
+def _verse_overlap_clause(column, verse_ids: list[int], dialect_name: str):
+    """Return a SQL expression testing overlap with *verse_ids*."""
+
+    if not verse_ids:
+        return None
+
+    if dialect_name == "postgresql":
+        return column.op("&&")(verse_ids)
+
+    if dialect_name == "sqlite":
+        json_each = func.json_each(column).table_valued("key", "value")
+        return exists(
+            select(1)
+            .select_from(json_each)
+            .where(cast(json_each.c.value, Integer).in_(verse_ids))
+        )
+
+    return column.isnot(None)
 
 
 def get_mentions_for_osis(
@@ -55,23 +63,36 @@ def get_mentions_for_osis(
 ) -> list[VerseMention]:
     """Return passages whose OSIS reference intersects the requested range."""
 
-    query = (
-        session.query(Passage, Document)
-        .join(Document)
-        .filter(Passage.osis_ref.isnot(None))
+    verse_ids = _resolve_query_ids(osis)
+    if not verse_ids:
+        return []
+
+    bind = session.get_bind()
+    dialect_name = bind.dialect.name if bind is not None else ""
+    overlap_clause = _verse_overlap_clause(Passage.osis_verse_ids, verse_ids, dialect_name)
+    if overlap_clause is None:
+        return []
+
+    stmt = (
+        select(Passage)
+        .join(Document, Passage.document)
+        .options(joinedload(Passage.document))
+        .where(Passage.osis_verse_ids.isnot(None))
+        .where(overlap_clause)
     )
     if filters:
         if filters.source_type:
-            query = query.filter(Document.source_type == filters.source_type)
+            stmt = stmt.where(Document.source_type == filters.source_type)
         if filters.collection:
-            query = query.filter(Document.collection == filters.collection)
+            stmt = stmt.where(Document.collection == filters.collection)
 
+    result = session.execute(
+        stmt.execution_options(stream_results=True, yield_per=128)
+    )
     mentions: list[VerseMention] = []
-    for passage, document in query.all():
-        refs = _collect_osis_refs(passage)
-        if not refs:
-            continue
-        if not any(osis_intersects(ref, osis) for ref in refs):
+    for passage in result.scalars():
+        document = passage.document
+        if document is None:
             continue
 
         if filters and filters.author:
@@ -165,23 +186,45 @@ def get_verse_timeline(
     if window not in _WINDOW_TYPES:
         raise ValueError(f"Unsupported timeline window: {window}")
 
-    query = (
-        session.query(Passage, Document)
-        .join(Document)
-        .filter(Passage.osis_ref.isnot(None))
+    verse_ids = _resolve_query_ids(osis)
+    if not verse_ids:
+        return VerseTimelineResponse(
+            osis=osis,
+            window=window,
+            buckets=[],
+            total_mentions=0,
+        )
+
+    bind = session.get_bind()
+    dialect_name = bind.dialect.name if bind is not None else ""
+    overlap_clause = _verse_overlap_clause(Passage.osis_verse_ids, verse_ids, dialect_name)
+
+    stmt = (
+        select(Passage)
+        .join(Document, Passage.document)
+        .options(joinedload(Passage.document))
+        .where(Passage.osis_verse_ids.isnot(None))
     )
+
+    if overlap_clause is not None:
+        stmt = stmt.where(overlap_clause)
+    else:
+        stmt = stmt.where(false())
 
     if filters:
         if filters.source_type:
-            query = query.filter(Document.source_type == filters.source_type)
+            stmt = stmt.where(Document.source_type == filters.source_type)
         if filters.collection:
-            query = query.filter(Document.collection == filters.collection)
+            stmt = stmt.where(Document.collection == filters.collection)
 
+    result = session.execute(
+        stmt.execution_options(stream_results=True, yield_per=256)
+    )
     bucket_map: dict[datetime, _BucketData] = {}
 
-    for passage, document in query.all():
-        refs = _collect_osis_refs(passage)
-        if not refs or not any(osis_intersects(ref, osis) for ref in refs):
+    for passage in result.scalars():
+        document = passage.document
+        if document is None:
             continue
 
         if filters and filters.author:

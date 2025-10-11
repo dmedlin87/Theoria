@@ -82,6 +82,23 @@ def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
         raise UnsupportedSourceError("Document already ingested")
 
 
+def _collect_verse_ids(references: Sequence[str] | None) -> list[int] | None:
+    """Return sorted verse identifiers for *references* or ``None`` when empty."""
+
+    if not references:
+        return None
+
+    verse_ids: set[int] = set()
+    for reference in references:
+        if reference:
+            verse_ids.update(expand_osis_reference(reference))
+
+    if not verse_ids:
+        return None
+
+    return sorted(verse_ids)
+
+
 def refresh_creator_verse_rollups(
     session: Session,
     segments: list[TranscriptSegment],
@@ -435,6 +452,14 @@ def persist_text_document(
             meta.setdefault("topic_domains", topic_domains)
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         embedding = embeddings[idx] if idx < len(embeddings) else None
+        osis_all: list[str] = []
+        if meta.get("osis_refs_all"):
+            osis_all.extend(meta["osis_refs_all"])
+        if osis_value:
+            osis_all.append(osis_value)
+        normalized_refs = sorted({ref for ref in osis_all if ref})
+        verse_ids = _collect_verse_ids(normalized_refs)
+
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
@@ -446,6 +471,7 @@ def persist_text_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
+            osis_verse_ids=verse_ids,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -830,6 +856,14 @@ def persist_transcript_document(
             meta.setdefault("topic_domains", topic_domains)
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         embedding = embeddings[idx] if idx < len(embeddings) else None
+        osis_all: list[str] = []
+        if meta.get("osis_refs_all"):
+            osis_all.extend(meta["osis_refs_all"])
+        if osis_value:
+            osis_all.append(osis_value)
+        normalized_refs = sorted({ref for ref in osis_all if ref})
+        verse_ids = _collect_verse_ids(normalized_refs)
+
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
@@ -841,6 +875,7 @@ def persist_transcript_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
+            osis_verse_ids=verse_ids,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
