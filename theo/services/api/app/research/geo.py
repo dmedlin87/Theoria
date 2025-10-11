@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 from typing import Any, Iterable
 
 import pythonbible as pb
+from sqlalchemy import case, func, text
 from sqlalchemy.orm import Session
 
 from ..core.settings_store import load_setting
@@ -36,25 +37,50 @@ class _ScoredLocation:
     score: float
 
 
+_TRGM_SUPPORT_CACHE: dict[int, bool] = {}
+
+
 def _normalize(value: str) -> str:
     return value.casefold().strip()
 
 
-def _location_aliases(location: GeoModernLocation) -> list[str]:
-    names = location.names
+def _extract_aliases_from_names(
+    names: Any, friendly_id: str
+) -> list[str]:  # pragma: no cover - exercised via callers
     aliases: list[str] = []
     if isinstance(names, list):
+        friendly_norm = friendly_id.casefold()
         for entry in names:
             label: str | None = None
             if isinstance(entry, dict):
-                label = entry.get("name")
+                value = entry.get("name")
+                label = str(value) if value else None
             elif isinstance(entry, str):
                 label = entry
             if not label:
                 continue
-            if label != location.friendly_id and label not in aliases:
+            if label.casefold() == friendly_norm:
+                continue
+            if label not in aliases:
                 aliases.append(label)
     return aliases
+
+
+def _location_aliases(location: GeoModernLocation) -> list[str]:
+    if location.search_aliases:
+        friendly_norm = location.friendly_id.casefold()
+        cleaned: list[str] = []
+        for alias in location.search_aliases:
+            if not alias:
+                continue
+            if alias.casefold() == friendly_norm:
+                continue
+            if alias not in cleaned:
+                cleaned.append(alias)
+        if cleaned:
+            return cleaned
+    names = location.names
+    return _extract_aliases_from_names(names, location.friendly_id)
 
 
 def _candidate_strings(location: GeoModernLocation) -> Iterable[str]:
@@ -70,18 +96,100 @@ def _fuzzy_score(query: str, candidate: str) -> float:
     return matcher.ratio()
 
 
-def lookup_geo_places(
-    session: Session,
-    *,
-    query: str,
-    limit: int = 10,
+def _database_supports_trigram(session: Session) -> bool:
+    bind = session.get_bind()
+    if bind is None:
+        return False
+    engine = getattr(bind, "engine", bind)
+    key = id(engine)
+    cached = _TRGM_SUPPORT_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    dialect_name = getattr(engine.dialect, "name", "")
+    if dialect_name != "postgresql":
+        _TRGM_SUPPORT_CACHE[key] = False
+        return False
+
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(
+                text("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
+            )
+            supported = result.scalar() is not None
+    except Exception:  # pragma: no cover - safety net for missing extension
+        supported = False
+
+    _TRGM_SUPPORT_CACHE[key] = supported
+    return supported
+
+
+def _build_place_item(location: GeoModernLocation, aliases: list[str]) -> GeoPlaceItem:
+    sources = None
+    raw = location.raw
+    if isinstance(raw, dict):
+        source_info = raw.get("coordinates_source")
+        if source_info:
+            sources = source_info
+
+    return GeoPlaceItem(
+        modern_id=location.modern_id,
+        slug=location.modern_id,
+        name=location.friendly_id,
+        lat=location.latitude,
+        lng=location.longitude,
+        geom_kind=location.geom_kind,
+        confidence=location.confidence,
+        aliases=aliases or None,
+        sources=sources,
+    )
+
+
+def _lookup_geo_places_postgres(
+    session: Session, normalized_query: str, limit: int
 ) -> list[GeoPlaceItem]:
-    """Return ranked modern geographic entries for the given query."""
+    pattern = f"%{normalized_query}%"
+    friendly_norm = func.lower(GeoModernLocation.friendly_id)
+    alias_text = func.coalesce(
+        func.array_to_string(GeoModernLocation.search_aliases, " "),
+        "",
+    )
+    alias_norm = func.lower(alias_text)
 
-    normalized_query = _normalize(query)
-    if not normalized_query:
-        return []
+    friendly_match = case((friendly_norm.like(pattern), 1.0), else_=0.0)
+    alias_match = case((alias_norm.like(pattern), 1.0), else_=0.0)
+    friendly_similarity = func.similarity(friendly_norm, normalized_query)
+    alias_similarity = func.similarity(alias_norm, normalized_query)
+    score_expr = func.greatest(
+        friendly_match,
+        alias_match,
+        friendly_similarity,
+        alias_similarity,
+    )
+    score = score_expr.label("score")
 
+    rows = (
+        session.query(GeoModernLocation, score)
+        .filter(score_expr > 0)
+        .order_by(
+            score.desc(),
+            func.coalesce(GeoModernLocation.confidence, 0.0).desc(),
+            GeoModernLocation.friendly_id.asc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+    items: list[GeoPlaceItem] = []
+    for location, _ in rows:
+        aliases = _location_aliases(location)
+        items.append(_build_place_item(location, aliases))
+    return items
+
+
+def _lookup_geo_places_python(
+    session: Session, normalized_query: str, limit: int
+) -> list[GeoPlaceItem]:
     locations = session.query(GeoModernLocation).all()
     scored: list[_ScoredLocation] = []
 
@@ -109,23 +217,25 @@ def lookup_geo_places(
     for entry in scored[:limit]:
         location = entry.location
         aliases = _location_aliases(location)
-        items.append(
-            GeoPlaceItem(
-                modern_id=location.modern_id,
-                slug=location.modern_id,
-                name=location.friendly_id,
-                lat=location.latitude,
-                lng=location.longitude,
-                geom_kind=location.geom_kind,
-                confidence=location.confidence,
-                aliases=aliases or None,
-                sources=location.raw.get("coordinates_source")
-                if isinstance(location.raw, dict)
-                else None,
-            )
-        )
-
+        items.append(_build_place_item(location, aliases))
     return items
+
+
+def lookup_geo_places(
+    session: Session,
+    *,
+    query: str,
+    limit: int = 10,
+) -> list[GeoPlaceItem]:
+    """Return ranked modern geographic entries for the given query."""
+
+    normalized_query = _normalize(query)
+    if not normalized_query:
+        return []
+
+    if _database_supports_trigram(session):
+        return _lookup_geo_places_postgres(session, normalized_query, limit)
+    return _lookup_geo_places_python(session, normalized_query, limit)
 
 
 def _normalize_osis(reference: str) -> list[str]:

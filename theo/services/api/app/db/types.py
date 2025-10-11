@@ -97,3 +97,42 @@ class TSVectorType(_TypeDecorator[str | None]):
         if value is None:
             return None
         return str(value)
+
+
+class StringArrayType(_TypeDecorator[list[str] | None]):
+    """Database-agnostic representation for arrays of strings."""
+
+    cache_ok = True
+    impl = SQLiteJSON
+
+    def load_dialect_impl(self, dialect: Any) -> sqltypes.TypeEngine[Any]:
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import ARRAY
+
+            return dialect.type_descriptor(ARRAY(sqltypes.Text()))
+        if dialect.name == "sqlite":
+            return dialect.type_descriptor(SQLiteJSON())
+        return dialect.type_descriptor(sqltypes.JSON())
+
+    def process_bind_param(
+        self, value: Sequence[str] | None, dialect: Any
+    ) -> Any:  # pragma: no cover - trivial
+        if value is None:
+            return None
+        return [str(component) for component in value if component]
+
+    def process_result_value(self, value: Any, dialect: Any) -> list[str] | None:
+        if value is None:
+            return None
+        if isinstance(value, (list, tuple)):
+            return [str(component) for component in value if component]
+        if isinstance(value, str):
+            # Some drivers may return arrays as comma-delimited strings.
+            stripped = value.strip().strip("{}")
+            if not stripped:
+                return []
+            return [segment for segment in stripped.split(",") if segment]
+        try:
+            return [str(component) for component in list(value) if component]
+        except TypeError:  # pragma: no cover - defensive guard
+            return None

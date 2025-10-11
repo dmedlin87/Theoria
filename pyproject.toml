@@ -71,6 +71,7 @@ markers = [
     "redteam: OWASP LLM red-team regression suite",
     "no_auth_override: disable authentication override fixture for security assertions",
     "slow: slower end-to-end smoke tests",
+    "integration: requires external Postgres database",
     "enable_migrations: allow database migrations to execute in tests",
 ]
 filterwarnings = [

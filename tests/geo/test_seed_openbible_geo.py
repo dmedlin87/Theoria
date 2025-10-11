@@ -247,6 +247,7 @@ def test_seed_sample_dataset(session, caplog):
     assert any(verse.osis_ref == "Mic.5.2" for verse in verses)
     modern = session.get(GeoModernLocation, "bethlehem")
     assert modern and modern.longitude == pytest.approx(35.2003)
+    assert modern.search_aliases == ["Bethlehem Ephrathah"]
 
     metadata = load_setting(session, seed_openbible_geo_module._METADATA_SETTING_KEY)
     assert metadata and metadata["commit_sha"] == "sample-dataset"

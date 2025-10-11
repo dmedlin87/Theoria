@@ -60,6 +60,7 @@ _SAMPLE_MODERN_LOCATIONS = [
             {"name": "Bethlehem"},
             {"name": "Bethlehem Ephrathah"},
         ],
+        "search_aliases": ["Bethlehem Ephrathah"],
         "longitude": 35.2003,
         "latitude": 31.7054,
         "raw": {
@@ -101,6 +102,29 @@ def _normalize_osis(reference: str | None) -> list[str]:
     if not normalized:
         return []
     return [format_osis(ref) for ref in normalized]
+
+
+def _derive_search_aliases(entry: dict[str, Any], friendly_id: str) -> list[str] | None:
+    names = entry.get("names")
+    if not isinstance(names, list):
+        return None
+
+    friendly_norm = friendly_id.casefold()
+    aliases: list[str] = []
+    for candidate in names:
+        alias: str | None = None
+        if isinstance(candidate, dict):
+            value = candidate.get("name")
+            alias = value if isinstance(value, str) else None
+        elif isinstance(candidate, str):
+            alias = candidate
+        if not alias:
+            continue
+        if alias.casefold() == friendly_norm:
+            continue
+        if alias not in aliases:
+            aliases.append(alias)
+    return aliases or None
 
 
 def _upsert_rows(
@@ -329,6 +353,7 @@ def seed_openbible_geo(
                 "geom_kind": entry.get("geometry"),
                 "confidence": _parse_float(entry.get("confidence")),
                 "names": entry.get("names"),
+                "search_aliases": _derive_search_aliases(entry, friendly_id),
                 "longitude": lon,
                 "latitude": lat,
                 "raw": entry,

@@ -24,7 +24,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.settings import get_settings
-from .types import TSVectorType, VectorType
+from .types import StringArrayType, TSVectorType, VectorType
 
 
 if TYPE_CHECKING:
@@ -1156,6 +1156,10 @@ class GeoModernLocation(Base):
 
     modern_id: Mapped[str] = mapped_column(String, primary_key=True)
     friendly_id: Mapped[str] = mapped_column(String, nullable=False)
+    search_aliases: Mapped[list[str] | None] = mapped_column(
+        StringArrayType(),
+        nullable=True,
+    )
     geom_kind: Mapped[str | None] = mapped_column(String, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     names: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
