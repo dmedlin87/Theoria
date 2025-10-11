@@ -1,12 +1,12 @@
 """Application configuration for the Theo Engine API."""
-
 from __future__ import annotations
 
 import base64
 import hashlib
+import re
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
-import re
 
 from cryptography.fernet import Fernet
 from pydantic import AliasChoices, Field, field_validator, model_validator
@@ -186,78 +186,82 @@ class Settings(BaseSettings):
         ),
     )
 
-    @field_validator("api_keys", mode="before")
-    @classmethod
-    def _parse_api_keys(cls, value: object) -> list[str]:
+    @staticmethod
+    def _parse_json_or_comma_collection(
+        value: object,
+        *,
+        default: list[str] | None = None,
+        transform: Callable[[str], str] | None = None,
+        error_message: str = "Invalid list configuration",
+    ) -> list[str]:
         import json
-        
+
+        def apply_transform(item: object) -> str | None:
+            item_str = str(item).strip()
+            if not item_str:
+                return None
+            if transform is not None:
+                item_str = transform(item_str)
+            return item_str
+
+        default_value = list(default) if default is not None else []
+
         if value in (None, ""):
-            return []
+            return list(default_value)
+
         if isinstance(value, str):
-            # Try parsing as JSON first (for array strings like '["key1","key2"]')
             value_stripped = value.strip()
             if value_stripped.startswith("[") and value_stripped.endswith("]"):
                 try:
                     parsed = json.loads(value_stripped)
-                    if isinstance(parsed, list):
-                        return [str(item).strip() for item in parsed if str(item).strip()]
                 except (json.JSONDecodeError, ValueError):
-                    pass
-            # Otherwise treat as comma-separated
-            return [segment.strip() for segment in value.split(",") if segment.strip()]
+                    parsed = None
+                if isinstance(parsed, list):
+                    items = [
+                        transformed
+                        for transformed in (apply_transform(item) for item in parsed)
+                        if transformed
+                    ]
+                    return items or list(default_value)
+            items = [
+                transformed
+                for transformed in (apply_transform(segment) for segment in value.split(","))
+                if transformed
+            ]
+            return items or list(default_value)
+
         if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        raise ValueError("Invalid API key configuration")
+            items = [
+                transformed
+                for transformed in (apply_transform(item) for item in value)
+                if transformed
+            ]
+            return items or list(default_value)
+
+        raise ValueError(error_message)
+
+    @field_validator("api_keys", mode="before")
+    @classmethod
+    def _parse_api_keys(cls, value: object) -> list[str]:
+        return cls._parse_json_or_comma_collection(
+            value, default=[], error_message="Invalid API key configuration"
+        )
 
     @field_validator("auth_jwt_algorithms", mode="before")
     @classmethod
     def _parse_algorithms(cls, value: object) -> list[str]:
-        import json
-        
-        if value in (None, ""):
-            return ["HS256"]
-        if isinstance(value, str):
-            # Try parsing as JSON first (for array strings like '["HS256","RS256"]')
-            value_stripped = value.strip()
-            if value_stripped.startswith("[") and value_stripped.endswith("]"):
-                try:
-                    parsed = json.loads(value_stripped)
-                    if isinstance(parsed, list):
-                        normalized = [str(item).strip().upper() for item in parsed if str(item).strip()]
-                        return normalized or ["HS256"]
-                except (json.JSONDecodeError, ValueError):
-                    pass
-            # Otherwise treat as comma-separated
-            parsed = [
-                segment.strip().upper() for segment in value.split(",") if segment.strip()
-            ]
-            return parsed or ["HS256"]
-        if isinstance(value, list):
-            normalized = [str(item).strip().upper() for item in value if str(item).strip()]
-            return normalized or ["HS256"]
-        raise ValueError("Invalid JWT algorithm configuration")
+        return cls._parse_json_or_comma_collection(
+            value,
+            default=["HS256"],
+            transform=lambda item: item.upper(),
+            error_message="Invalid JWT algorithm configuration",
+        )
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> list[str]:
-        import json
-        
-        if value in (None, ""):
-            return []
-        if isinstance(value, str):
-            # Try parsing as JSON first (for array strings like '["url1","url2"]')
-            value_stripped = value.strip()
-            if value_stripped.startswith("[") and value_stripped.endswith("]"):
-                try:
-                    parsed = json.loads(value_stripped)
-                    if isinstance(parsed, list):
-                        return [str(item).strip() for item in parsed if str(item).strip()]
-                except (json.JSONDecodeError, ValueError):
-                    pass
-            # Otherwise treat as comma-separated
-            return [segment.strip() for segment in value.split(",") if segment.strip()]
-        if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        raise ValueError("Invalid CORS origin configuration")
+        return cls._parse_json_or_comma_collection(
+            value, default=[], error_message="Invalid CORS origin configuration"
+        )
 
     def has_auth_jwt_credentials(self) -> bool:
         return bool(
