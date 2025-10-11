@@ -33,6 +33,7 @@ class Document(Base):
     """Source artifact ingested into the system."""
 
     __tablename__ = "documents"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
@@ -95,6 +96,7 @@ class Passage(Base):
     """Chunked content extracted from a document."""
 
     __tablename__ = "passages"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())

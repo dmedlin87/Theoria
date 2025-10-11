@@ -115,8 +115,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SETTINGS_SECRET_KEY", "settings_secret_key"),
         description="Secret used to derive the Fernet key for persisted settings",
     )
-    api_keys: list[str] = Field(
-        default_factory=list,
+    api_keys: str | list[str] = Field(
+        default="",
         validation_alias=AliasChoices("THEO_API_KEYS", "API_KEYS"),
         description="List of accepted API keys for first-party integrations",
     )
@@ -151,8 +151,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("THEO_AUTH_JWT_ISSUER", "AUTH_JWT_ISSUER"),
         description="Optional issuer claim enforced for JWT authentication",
     )
-    auth_jwt_algorithms: list[str] = Field(
-        default_factory=lambda: ["HS256"],
+    auth_jwt_algorithms: str | list[str] = Field(
+        default="HS256",
         validation_alias=AliasChoices(
             "THEO_AUTH_JWT_ALGORITHMS", "AUTH_JWT_ALGORITHMS"
         ),
@@ -165,11 +165,8 @@ class Settings(BaseSettings):
         ),
         description="Allow unauthenticated requests (intended for testing only)",
     )
-    cors_allowed_origins: list[str] = Field(
-        default_factory=lambda: [
-            "http://127.0.0.1:3000",
-            "http://localhost:3000",
-        ],
+    cors_allowed_origins: str | list[str] = Field(
+        default="http://127.0.0.1:3000,http://localhost:3000",
         validation_alias=AliasChoices(
             "THEO_CORS_ALLOWED_ORIGINS",
             "CORS_ALLOWED_ORIGINS",
@@ -182,20 +179,45 @@ class Settings(BaseSettings):
     @field_validator("api_keys", mode="before")
     @classmethod
     def _parse_api_keys(cls, value: object) -> list[str]:
+        import json
+        
         if value in (None, ""):
             return []
         if isinstance(value, str):
+            # Try parsing as JSON first (for array strings like '["key1","key2"]')
+            value_stripped = value.strip()
+            if value_stripped.startswith("[") and value_stripped.endswith("]"):
+                try:
+                    parsed = json.loads(value_stripped)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            # Otherwise treat as comma-separated
             return [segment.strip() for segment in value.split(",") if segment.strip()]
         if isinstance(value, list):
-            return value
+            return [str(item).strip() for item in value if str(item).strip()]
         raise ValueError("Invalid API key configuration")
 
     @field_validator("auth_jwt_algorithms", mode="before")
     @classmethod
     def _parse_algorithms(cls, value: object) -> list[str]:
+        import json
+        
         if value in (None, ""):
             return ["HS256"]
         if isinstance(value, str):
+            # Try parsing as JSON first (for array strings like '["HS256","RS256"]')
+            value_stripped = value.strip()
+            if value_stripped.startswith("[") and value_stripped.endswith("]"):
+                try:
+                    parsed = json.loads(value_stripped)
+                    if isinstance(parsed, list):
+                        normalized = [str(item).strip().upper() for item in parsed if str(item).strip()]
+                        return normalized or ["HS256"]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            # Otherwise treat as comma-separated
             parsed = [
                 segment.strip().upper() for segment in value.split(",") if segment.strip()
             ]
@@ -207,12 +229,24 @@ class Settings(BaseSettings):
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> list[str]:
+        import json
+        
         if value in (None, ""):
             return []
         if isinstance(value, str):
+            # Try parsing as JSON first (for array strings like '["url1","url2"]')
+            value_stripped = value.strip()
+            if value_stripped.startswith("[") and value_stripped.endswith("]"):
+                try:
+                    parsed = json.loads(value_stripped)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            # Otherwise treat as comma-separated
             return [segment.strip() for segment in value.split(",") if segment.strip()]
         if isinstance(value, list):
-            return value
+            return [str(item).strip() for item in value if str(item).strip()]
         raise ValueError("Invalid CORS origin configuration")
 
     def has_auth_jwt_credentials(self) -> bool:
@@ -264,6 +298,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_reranker_configuration(self) -> "Settings":
+        # Only validate reranker configuration if reranker is enabled
+        if not self.reranker_enabled:
+            return self
+            
         if self.reranker_model_path is None:
             if self.reranker_model_sha256:
                 raise ValueError(
