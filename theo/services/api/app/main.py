@@ -35,6 +35,8 @@ from .routes import (
     features,
     ingest,
     jobs,
+    notebooks,
+    realtime,
     research,
     search,
     trails,
@@ -241,6 +243,12 @@ def create_app() -> FastAPI:
     app.include_router(
         trails.router, prefix="/trails", tags=["trails"], dependencies=security_dependencies
     )
+    app.include_router(
+        notebooks.router,
+        prefix="/notebooks",
+        tags=["notebooks"],
+        dependencies=security_dependencies,
+    )
 
     app.include_router(
         analytics.router,
@@ -256,6 +264,11 @@ def create_app() -> FastAPI:
         ai.settings_router,
         tags=["ai-settings"],
         dependencies=security_dependencies,
+    )
+    app.include_router(
+        realtime.router,
+        prefix="/realtime",
+        tags=["realtime"],
     )
 
     if generate_latest is not None:
