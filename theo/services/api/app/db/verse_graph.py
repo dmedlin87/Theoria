@@ -35,10 +35,12 @@ def _normalize_tags(tags: list[str] | None) -> list[str] | None:
     return normalised or None
 
 
-def compute_verse_id_ranges(references: Iterable[str]) -> dict[str, tuple[int, int]]:
+def compute_verse_id_ranges(
+    references: Iterable[str],
+) -> dict[str, list[tuple[int, int]]]:
     """Return a mapping of normalized OSIS references to verse-id ranges."""
 
-    ranges: dict[str, tuple[int, int]] = {}
+    ranges: dict[str, list[tuple[int, int]]] = {}
     for value in references:
         if not value:
             continue
@@ -48,9 +50,18 @@ def compute_verse_id_ranges(references: Iterable[str]) -> dict[str, tuple[int, i
         verse_ids = expand_osis_reference(normalized)
         if not verse_ids:
             continue
-        start = min(verse_ids)
-        end = max(verse_ids)
-        ranges[normalized] = (start, end)
+        sorted_ids = sorted(set(verse_ids))
+        start = sorted_ids[0]
+        end = start
+        segments: list[tuple[int, int]] = []
+        for current in sorted_ids[1:]:
+            if current == end + 1:
+                end = current
+                continue
+            segments.append((start, end))
+            start = end = current
+        segments.append((start, end))
+        ranges[normalized] = segments
     return ranges
 
 
@@ -165,7 +176,11 @@ class VerseSeedRelationships:
 def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationships:
     """Return normalized seed records intersecting ``osis``."""
 
-    ranges = list(compute_verse_id_ranges([osis]).values())
+    ranges = [
+        verse_range
+        for ranges in compute_verse_id_ranges([osis]).values()
+        for verse_range in ranges
+    ]
 
     contradictions: list[PairSeedRecord] = []
     for seed in query_pair_seed_rows(session, ranges, ContradictionSeed):

@@ -63,7 +63,11 @@ def search_contradictions(
     range_map = compute_verse_id_ranges(candidates)
     if not range_map:
         return []
-    verse_ranges = list(range_map.values())
+    verse_ranges = [
+        verse_range
+        for ranges in range_map.values()
+        for verse_range in ranges
+    ]
 
     contradiction_seeds = query_pair_seed_rows(
         session, verse_ranges, ContradictionSeed

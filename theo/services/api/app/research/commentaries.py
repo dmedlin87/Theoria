@@ -53,7 +53,11 @@ def search_commentaries(
     range_map = compute_verse_id_ranges(candidates)
     if not range_map:
         return []
-    verse_ranges = list(range_map.values())
+    verse_ranges = [
+        verse_range
+        for ranges in range_map.values()
+        for verse_range in ranges
+    ]
 
     seeds = query_commentary_seed_rows(session, verse_ranges)
     matched: list[CommentaryExcerptItem] = []
