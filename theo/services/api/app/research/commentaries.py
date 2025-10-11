@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Iterable
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from ..db.models import CommentaryExcerptSeed
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.research import CommentaryExcerptItem
 
 
@@ -48,7 +49,32 @@ def search_commentaries(
     if perspectives and not allowed_perspectives:
         return []
 
-    seeds = session.query(CommentaryExcerptSeed).all()
+    candidate_ranges: list[tuple[str, int, int]] = []
+    for requested in candidates:
+        verse_ids = expand_osis_reference(requested)
+        if not verse_ids:
+            continue
+        candidate_ranges.append((requested, min(verse_ids), max(verse_ids)))
+    if not candidate_ranges:
+        return []
+
+    seed_query = session.query(CommentaryExcerptSeed)
+    if allowed_perspectives:
+        seed_query = seed_query.filter(
+            CommentaryExcerptSeed.perspective.in_(list(allowed_perspectives))
+        )
+
+    range_predicates = [
+        and_(
+            CommentaryExcerptSeed.start_verse_id <= end,
+            CommentaryExcerptSeed.end_verse_id >= start,
+        )
+        for _, start, end in candidate_ranges
+    ]
+    if range_predicates:
+        seed_query = seed_query.filter(or_(*range_predicates))
+
+    seeds = seed_query.all()
     matched: list[CommentaryExcerptItem] = []
 
     for seed in seeds:

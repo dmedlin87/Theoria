@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference, osis_intersects
 from .models import CommentaryExcerptSeed, ContradictionSeed, HarmonySeed
 
 _ALLOWED_PERSPECTIVES = {"apologetic", "skeptical", "neutral"}
@@ -75,8 +76,25 @@ class VerseSeedRelationships:
 def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationships:
     """Return normalized seed records intersecting ``osis``."""
 
+    target_ids = expand_osis_reference(osis)
+    target_start = min(target_ids) if target_ids else None
+    target_end = max(target_ids) if target_ids else None
+
     contradictions: list[PairSeedRecord] = []
-    for seed in session.query(ContradictionSeed).all():
+    contradiction_query = session.query(ContradictionSeed)
+    if target_start is not None and target_end is not None:
+        range_predicate = or_(
+            and_(
+                ContradictionSeed.start_verse_id_a <= target_end,
+                ContradictionSeed.end_verse_id_a >= target_start,
+            ),
+            and_(
+                ContradictionSeed.start_verse_id_b <= target_end,
+                ContradictionSeed.end_verse_id_b >= target_start,
+            ),
+        )
+        contradiction_query = contradiction_query.filter(range_predicate)
+    for seed in contradiction_query.all():
         if not (_osis_matches(seed.osis_a, osis) or _osis_matches(seed.osis_b, osis)):
             continue
         perspective = _normalize_perspective(seed.perspective, default="skeptical")
@@ -94,7 +112,21 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
         )
 
     harmonies: list[PairSeedRecord] = []
-    for seed in session.query(HarmonySeed).all():
+    harmony_query = session.query(HarmonySeed)
+    if target_start is not None and target_end is not None:
+        harmony_query = harmony_query.filter(
+            or_(
+                and_(
+                    HarmonySeed.start_verse_id_a <= target_end,
+                    HarmonySeed.end_verse_id_a >= target_start,
+                ),
+                and_(
+                    HarmonySeed.start_verse_id_b <= target_end,
+                    HarmonySeed.end_verse_id_b >= target_start,
+                ),
+            )
+        )
+    for seed in harmony_query.all():
         if not (_osis_matches(seed.osis_a, osis) or _osis_matches(seed.osis_b, osis)):
             continue
         perspective = _normalize_perspective(seed.perspective, default="apologetic")
@@ -112,7 +144,15 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
         )
 
     commentaries: list[CommentarySeedRecord] = []
-    for seed in session.query(CommentaryExcerptSeed).all():
+    commentary_query = session.query(CommentaryExcerptSeed)
+    if target_start is not None and target_end is not None:
+        commentary_query = commentary_query.filter(
+            and_(
+                CommentaryExcerptSeed.start_verse_id <= target_end,
+                CommentaryExcerptSeed.end_verse_id >= target_start,
+            )
+        )
+    for seed in commentary_query.all():
         if not _osis_matches(seed.osis, osis):
             continue
         perspective = _normalize_perspective(seed.perspective, default="neutral")

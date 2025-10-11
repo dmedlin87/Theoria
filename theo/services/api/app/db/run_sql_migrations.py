@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 import logging
 from pathlib import Path
 from typing import Iterable
+import runpy
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -19,13 +20,16 @@ MIGRATIONS_PATH = Path(__file__).resolve().parent / "migrations"
 _MIGRATION_KEY_PREFIX = "db:migration:"
 
 
+_SUPPORTED_EXTENSIONS = {".sql", ".py"}
+
+
 def _iter_migration_files(migrations_path: Path) -> Iterable[Path]:
     if not migrations_path.exists():
         return []
     return sorted(
         path
         for path in migrations_path.iterdir()
-        if path.is_file() and path.suffix.lower() == ".sql"
+        if path.is_file() and path.suffix.lower() in _SUPPORTED_EXTENSIONS
     )
 
 
@@ -182,6 +186,19 @@ def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
     return False
 
 
+def _execute_python_migration(path: Path, *, session: Session, engine: Engine) -> None:
+    """Execute a Python-based migration script."""
+
+    module = runpy.run_path(str(path))
+    upgrade = module.get("upgrade")
+    if not callable(upgrade):
+        raise RuntimeError(
+            f"Python migration {path.name} must define an 'upgrade' callable"
+        )
+
+    upgrade(session=session, engine=engine)
+
+
 def run_sql_migrations(
     engine: Engine | None = None,
     migrations_path: Path | None = None,
@@ -246,6 +263,23 @@ def run_sql_migrations(
                 else:
                     continue
 
+            suffix = path.suffix.lower()
+            if suffix == ".py":
+                logger.info("Applying Python migration: %s", migration_name)
+                _execute_python_migration(path, session=session, engine=engine)
+                session.add(
+                    AppSetting(
+                        key=key,
+                        value={
+                            "applied_at": datetime.now(UTC).isoformat(),
+                            "filename": migration_name,
+                        },
+                    )
+                )
+                session.commit()
+                applied.append(migration_name)
+                continue
+
             sql = path.read_text(encoding="utf-8")
             if not sql.strip():
                 logger.debug("Skipping empty migration file: %s", migration_name)
@@ -263,7 +297,7 @@ def run_sql_migrations(
                 continue
 
             should_execute = True
-            if (
+            if ( 
                 is_sqlite_perspective_migration
                 and has_perspective_column
                 and existing_entry is None
