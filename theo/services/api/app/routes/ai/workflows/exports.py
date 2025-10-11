@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping
+from typing import Any, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -51,7 +52,7 @@ _CSL_TYPE_MAP: dict[str, str] = {
 
 
 def _build_csl_entry(
-    record: Mapping[str, Any], citations: Sequence[Mapping[str, Any]]
+    record: Mapping[str, Any], citations: Sequence[Mapping[str, Any] | RAGCitation]
 ) -> dict[str, Any]:
     """Return a CSL entry for the provided *record*.
 
@@ -60,8 +61,37 @@ def _build_csl_entry(
     module, delegating to the shared implementation for the actual conversion.
     """
 
+    anchor_entries: list[Mapping[str, Any]] = []
+    for citation in citations:
+        if isinstance(citation, Mapping):
+            anchor_entries.append(citation)
+            continue
+
+        entry: dict[str, Any]
+        if hasattr(citation, "model_dump"):
+            try:
+                entry = dict(citation.model_dump())  # type: ignore[call-arg]
+            except TypeError:
+                entry = {}
+        else:
+            entry = {}
+
+        if not entry:
+            entry = {
+                "osis": getattr(citation, "osis", None),
+                "anchor": getattr(citation, "anchor", None),
+                "snippet": getattr(citation, "snippet", None),
+                "passage_id": getattr(citation, "passage_id", None),
+                "document_id": getattr(citation, "document_id", None),
+            }
+
+        label = entry.get("label") or entry.get("anchor") or getattr(citation, "anchor", None)
+        if label is not None:
+            entry.setdefault("label", label)
+        anchor_entries.append(entry)
+
     source = citation_exports.CitationSource.from_object(record)
-    return citation_exports._build_csl_entry(source, citations)
+    return citation_exports._build_csl_entry(source, anchor_entries)
 
 
 def _extract_primary_topic(document: Document) -> str | None:
