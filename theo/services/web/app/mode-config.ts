@@ -50,7 +50,7 @@ export const MODE_COOKIE_KEY = "theo-mode";
 export const MODE_STORAGE_KEY = "theo.mode.preference";
 
 export function isResearchModeId(value: unknown): value is ResearchModeId {
-  return typeof value === "string" && value in RESEARCH_MODES;
+  return typeof value === "string" && Object.hasOwn(RESEARCH_MODES, value);
 }
 
 export function formatEmphasisSummary(mode: ResearchMode): string {
