@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import logging
 import os
 from pathlib import Path
 import sqlite3
@@ -45,6 +46,9 @@ class InflightRow:
     error: str | None
     updated_at: float
     completed_at: float | None
+
+
+logger = logging.getLogger(__name__)
 
 
 class LedgerTransaction:
@@ -525,6 +529,28 @@ class SharedLedger:
                 time.sleep(poll_interval)
                 continue
             if row.status == "success":
+                if not row.output:
+                    logger.warning(
+                        "Inflight success for %s missing output; clearing stale entry",
+                        cache_key,
+                    )
+                    with self.transaction() as txn:
+                        txn.clear_single_inflight(cache_key)
+                        cached = txn.get_cache_entry(cache_key)
+                    if cached is not None:
+                        stale_error_message = None
+                        stale_error_cleared_at = None
+                        transient_error_seen_at = None
+                        transient_error_updated_at = None
+                        return cached
+                    stale_error_message = (
+                        "Deduplicated generation completed without a result"
+                    )
+                    stale_error_cleared_at = time.time()
+                    transient_error_seen_at = None
+                    transient_error_updated_at = None
+                    time.sleep(poll_interval)
+                    continue
                 transient_error_seen_at = None
                 transient_error_updated_at = None
                 return _row_to_record(row)
