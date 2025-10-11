@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import socket
 from functools import lru_cache
+from http.client import HTTPException, IncompleteRead
 from ipaddress import ip_address, ip_network
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError, URLError
+from urllib.error import ContentTooShortError, HTTPError, URLError
 from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -218,6 +219,14 @@ def fetch_web_document(
         raise UnsupportedSourceError(
             f"Fetching URL timed out after {timeout} seconds"
         ) from exc
+    except (IncompleteRead, ContentTooShortError) as exc:
+        raise UnsupportedSourceError(
+            "Network connection ended before the response completed"
+        ) from exc
+    except HTTPException as exc:
+        raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
+    except OSError as exc:
+        raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
     finally:
         response.close()
 
