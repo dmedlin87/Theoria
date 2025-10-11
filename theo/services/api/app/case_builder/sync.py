@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Iterable, Sequence
 
-from sqlalchemy import select, text
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
@@ -306,6 +306,24 @@ def sync_annotation_case_object(
     case_object = annotation.case_object
     if case_object is None and annotation.case_object_id:
         case_object = session.get(CaseObject, annotation.case_object_id)
+    if case_object is None:
+        legacy_case_object = None
+        bind = session.get_bind()
+        if bind is not None:
+            inspector = inspect(bind)
+            try:
+                case_object_columns = inspector.get_columns("case_objects")
+            except Exception:  # pragma: no cover - defensive fallback
+                case_object_columns = []
+            if any(column["name"] == "annotation_id" for column in case_object_columns):
+                legacy_case_object = session.execute(
+                    select(CaseObject).where(
+                        text("case_objects.annotation_id = :annotation_id")
+                    ),
+                    {"annotation_id": annotation.id},
+                ).scalar_one_or_none()
+        if legacy_case_object is not None:
+            case_object = legacy_case_object
 
     body = annotation.body.strip()
     if not body:
