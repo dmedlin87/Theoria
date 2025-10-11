@@ -5,7 +5,7 @@ from __future__ import annotations
 import heapq
 from time import perf_counter
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from opentelemetry import trace
 from sqlalchemy import and_, func, literal, or_, select
@@ -16,6 +16,7 @@ from ..db.models import Document, Passage
 from ..db.types import VectorType
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import expand_osis_reference, osis_intersects
+from ..models.documents import DocumentAnnotationResponse
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from .annotations import index_annotations_by_passage, load_annotations_for_documents
 from .utils import compose_passage_meta
@@ -101,6 +102,46 @@ def _build_highlights(
     return highlights
 
 
+def _build_result(
+    passage: Passage,
+    document: Document,
+    annotations: Sequence[DocumentAnnotationResponse] | None,
+    *,
+    score: float,
+    lexical_score: float | None,
+    vector_score: float | None,
+    osis_distance: float | None,
+) -> HybridSearchResult:
+    meta = compose_passage_meta(passage, document)
+    if annotations:
+        meta = {**(meta or {})}
+        meta["annotations"] = [
+            annotation.model_dump(mode="json") for annotation in annotations
+        ]
+
+    return HybridSearchResult(
+        id=passage.id,
+        document_id=passage.document_id,
+        text=passage.text,
+        raw_text=passage.raw_text,
+        osis_ref=passage.osis_ref,
+        start_char=passage.start_char,
+        end_char=passage.end_char,
+        page_no=passage.page_no,
+        t_start=passage.t_start,
+        t_end=passage.t_end,
+        score=score,
+        meta=meta,
+        document_title=document.title,
+        snippet=_snippet(passage.text),
+        rank=0,
+        highlights=None,
+        lexical_score=lexical_score,
+        vector_score=vector_score,
+        osis_distance=osis_distance,
+    )
+
+
 def _apply_document_ranks(
     results: list[HybridSearchResult],
     doc_scores: dict[str, float],
@@ -158,27 +199,11 @@ def _score_candidates(
             score += 0.35 * tei_score
         if candidate.osis_match:
             score += osis_bonus
-        meta = compose_passage_meta(passage, document)
-        if annotation_notes:
-            meta = {**(meta or {})}
-            meta["annotations"] = [note.model_dump(mode="json") for note in annotation_notes]
-        result = HybridSearchResult(
-            id=passage.id,
-            document_id=passage.document_id,
-            text=passage.text,
-            raw_text=passage.raw_text,
-            osis_ref=passage.osis_ref,
-            start_char=passage.start_char,
-            end_char=passage.end_char,
-            page_no=passage.page_no,
-            t_start=passage.t_start,
-            t_end=passage.t_end,
+        result = _build_result(
+            passage,
+            document,
+            annotation_notes,
             score=score,
-            meta=meta,
-            document_title=document.title,
-            snippet=_snippet(passage.text),
-            rank=0,
-            highlights=None,
             lexical_score=candidate.lexical_score or None,
             vector_score=candidate.vector_score or None,
             osis_distance=candidate.osis_distance,
@@ -435,30 +460,11 @@ def _fallback_search(
             if request.query and passage.lexeme:
                 score += 0.1 * len(request.query)
 
-            meta = compose_passage_meta(passage, document)
-            if annotation_notes:
-                meta = {**(meta or {})}
-                meta["annotations"] = [
-                    note.model_dump(mode="json") for note in annotation_notes
-                ]
-
-            result = HybridSearchResult(
-                id=passage.id,
-                document_id=passage.document_id,
-                text=passage.text,
-                raw_text=passage.raw_text,
-                osis_ref=passage.osis_ref,
-                start_char=passage.start_char,
-                end_char=passage.end_char,
-                page_no=passage.page_no,
-                t_start=passage.t_start,
-                t_end=passage.t_end,
+            result = _build_result(
+                passage,
+                document,
+                annotation_notes,
                 score=score,
-                meta=meta,
-                document_title=document.title,
-                snippet=_snippet(passage.text),
-                rank=0,
-                highlights=None,
                 lexical_score=lexical,
                 vector_score=None,
                 osis_distance=osis_distance,
