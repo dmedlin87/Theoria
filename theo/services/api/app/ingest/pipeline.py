@@ -2,52 +2,38 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import urlparse
 from urllib.request import build_opener as _urllib_build_opener
 
 from sqlalchemy.orm import Session
 
 from ..core.settings import get_settings
-from ..telemetry import instrument_workflow, set_span_attribute
 from ..db.models import Document, TranscriptSegment
+from ..telemetry import instrument_workflow, set_span_attribute
 from .embeddings import get_embedding_service
 from .exceptions import UnsupportedSourceError
-from .metadata import (
-    detect_source_type,
-    html_to_text,
-    load_frontmatter,
-    merge_metadata,
-    parse_text_file,
-    prepare_pdf_chunks,
-    prepare_text_chunks,
-    prepare_transcript_chunks,
-)
+from .metadata import load_frontmatter, merge_metadata, parse_text_file
 from . import network as ingest_network
-from .network import (
-    extract_youtube_video_id,
-    fetch_web_document,
-    is_youtube_url,
-    load_youtube_metadata,
-    load_youtube_transcript,
-)
-from .parsers import (
-    ParserResult,
-    load_transcript,
-    parse_audio_document,
-    parse_docx_document,
-    parse_html_document,
-)
-from .persistence import (
+from .network import fetch_web_document
+from .orchestrator import IngestOrchestrator, OrchestratorResult
+from .persistence import refresh_creator_verse_rollups
+from .stages import (
+    DefaultErrorPolicy,
     EmbeddingServiceProtocol,
-    PersistenceDependencies,
-    persist_text_document,
-    persist_transcript_document,
-    refresh_creator_verse_rollups,
+    Enricher,
+    ErrorPolicy,
+    IngestContext,
+    Instrumentation,
+    Parser,
+    Persister,
+    SourceFetcher,
 )
+from .stages.enrichers import DocumentEnricher
+from .stages.fetchers import FileSourceFetcher, TranscriptSourceFetcher, UrlSourceFetcher
+from .stages.parsers import FileParser, TranscriptParser, UrlParser
+from .stages.persisters import TextDocumentPersister, TranscriptDocumentPersister
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 
@@ -65,11 +51,58 @@ __all__ = [
     "parse_text_file",
     "_refresh_creator_verse_rollups",
     "build_opener",
+    "_fetch_web_document",
+    "_WEB_FETCH_CHUNK_SIZE",
     "ensure_url_allowed",
     "run_pipeline_for_file",
     "run_pipeline_for_transcript",
     "run_pipeline_for_url",
 ]
+
+
+_parse_text_file = parse_text_file
+
+
+@dataclass(slots=True)
+class PipelineDependencies:
+    """Runtime dependencies for the ingestion orchestrator."""
+
+    embedding_service: EmbeddingServiceProtocol | None = None
+    error_policy: ErrorPolicy | None = None
+
+    def build_context(self, *, span) -> IngestContext:
+        settings = get_settings()
+        embedding = self.embedding_service or get_embedding_service()
+        policy = self.error_policy or DefaultErrorPolicy()
+        instrumentation = Instrumentation(span=span, setter=set_span_attribute)
+        return IngestContext(
+            settings=settings,
+            embedding_service=embedding,
+            instrumentation=instrumentation,
+            error_policy=policy,
+        )
+
+
+def _default_orchestrator(
+    stages: Iterable[SourceFetcher | Parser | Enricher | Persister]
+) -> IngestOrchestrator:
+    return IngestOrchestrator(stages)
+
+
+def _ensure_success(result: OrchestratorResult) -> Document:
+    if result.status == "success" and result.document is not None:
+        return result.document
+
+    if result.failures:
+        failure = result.failures[-1]
+    elif result.stages:
+        failure = result.stages[-1]
+    else:  # pragma: no cover - defensive branch
+        raise UnsupportedSourceError("Ingestion failed without stage execution")
+
+    if failure.error:
+        raise failure.error
+    raise UnsupportedSourceError("Ingestion failed without error metadata")
 
 
 def ensure_url_allowed(settings, url: str) -> None:
@@ -80,6 +113,8 @@ def ensure_url_allowed(settings, url: str) -> None:
     try:
         ingest_network.ensure_url_allowed(settings, url)
     except UnsupportedSourceError:
+        from urllib.parse import urlparse
+
         parsed = urlparse(url)
         host = parsed.hostname
         if host:
@@ -94,196 +129,46 @@ def ensure_url_allowed(settings, url: str) -> None:
         ingest_network.resolve_host_addresses = original_resolver
 
 
+_resolve_host_addresses = ingest_network.resolve_host_addresses
 
 
-
-@dataclass
-class PipelineDependencies:
-    """Runtime dependencies for the ingestion orchestrator."""
-
-    embedding_service: EmbeddingServiceProtocol | None = None
-
-    def for_persistence(self) -> PersistenceDependencies:
-        service = self.embedding_service or get_embedding_service()
-        return PersistenceDependencies(embedding_service=service)
+build_opener = _urllib_build_opener
+_WEB_FETCH_CHUNK_SIZE = 64 * 1024
 
 
-def _resolve_context(
+def _fetch_web_document(settings, url: str):
+    return fetch_web_document(settings, url, opener_factory=build_opener)
+
+
+def _orchestrate(
+    *,
+    session: Session,
     dependencies: PipelineDependencies | None,
-):
-    """Resolve shared runtime state for orchestration entry points."""
-
+    stages: Iterable[SourceFetcher | Parser | Enricher | Persister],
+    workflow: str,
+    workflow_kwargs: dict[str, Any],
+) -> Document:
     pipeline_dependencies = dependencies or PipelineDependencies()
-    persistence_dependencies = pipeline_dependencies.for_persistence()
-    settings = get_settings()
-    return settings, persistence_dependencies
+    with instrument_workflow(workflow, **workflow_kwargs) as span:
+        context = pipeline_dependencies.build_context(span=span)
+        orchestrator = _default_orchestrator(stages)
+        result = orchestrator.run(context=context)
+        document = _ensure_success(result)
+        return document
 
 
-def _hash_parser_result(parser_result: ParserResult) -> str:
-    payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
+def _file_title_default(state: dict[str, Any]) -> str:
+    path = state.get("path")
+    if isinstance(path, Path):
+        return path.stem
+    return Path(str(path)).stem if path else "Document"
 
 
-def _persist_parser_result(
-    persist_fn,
-    *,
-    session: Session,
-    parser_result: ParserResult,
-    persistence_dependencies: PersistenceDependencies,
-    settings,
-    span,
-    frontmatter: dict[str, Any],
-    cache_status: str | None = "n/a",
-    **persist_kwargs,
-):
-    """Persist parsed content while recording common telemetry."""
-
-    chunk_count = len(parser_result.chunks)
-    set_span_attribute(span, "ingest.chunk_count", chunk_count)
-    set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
-    if cache_status is not None:
-        set_span_attribute(span, "ingest.cache_status", cache_status)
-
-    document = persist_fn(
-        session,
-        dependencies=persistence_dependencies,
-        chunks=parser_result.chunks,
-        parser=parser_result.parser,
-        parser_version=parser_result.parser_version,
-        frontmatter=frontmatter,
-        settings=settings,
-        **persist_kwargs,
-    )
-    set_span_attribute(span, "ingest.document_id", document.id)
-    return document
-
-
-def _resolve_dependencies(
-    dependencies: PipelineDependencies | None,
-) -> PersistenceDependencies:
-    """Normalise optional dependency overrides for persistence helpers."""
-
-    if dependencies is None:
-        dependencies = PipelineDependencies()
-    return dependencies.for_persistence()
-def _set_chunk_span_metrics(span, parser_result: ParserResult) -> None:
-    chunk_count = len(parser_result.chunks)
-    set_span_attribute(span, "ingest.chunk_count", chunk_count)
-    set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
-
-
-def _ingest_transcript_document(
-    session: Session,
-    span,
-    *,
-    dependencies: PersistenceDependencies,
-    parser_result: ParserResult,
-    frontmatter: dict[str, Any],
-    settings,
-    sha256: str,
-    source_type: str,
-    title: str,
-    cache_status: str,
-    **persist_kwargs: Any,
-) -> Document:
-    """Persist transcript documents with consistent instrumentation."""
-
-    return _persist_parser_result(
-        persist_transcript_document,
-        session=session,
-        parser_result=parser_result,
-        persistence_dependencies=dependencies,
-        settings=settings,
-        span=span,
-        frontmatter=frontmatter,
-        cache_status=cache_status,
-        sha256=sha256,
-        source_type=source_type,
-        title=title,
-        **persist_kwargs,
-    )
-
-
-def _ingest_text_document(
-    session: Session,
-    span,
-    *,
-    dependencies: PersistenceDependencies,
-    parser_result: ParserResult,
-    frontmatter: dict[str, Any],
-    settings,
-    sha256: str,
-    source_type: str,
-    title: str,
-    cache_status: str,
-    **persist_kwargs: Any,
-) -> Document:
-    """Persist text documents with consistent instrumentation."""
-
-    return _persist_parser_result(
-        persist_text_document,
-        session=session,
-        parser_result=parser_result,
-        persistence_dependencies=dependencies,
-        settings=settings,
-        span=span,
-        frontmatter=frontmatter,
-        cache_status=cache_status,
-        sha256=sha256,
-        source_type=source_type,
-        title=title,
-        **persist_kwargs,
-    )
-
-
-def _prepare_parser_result(
-    source_type: str,
-    path: Path,
-    *,
-    frontmatter: dict[str, Any],
-    settings,
-) -> tuple[ParserResult, dict[str, Any], str]:
-    parser_result: ParserResult | None = None
-    text_content = ""
-    merged_frontmatter = dict(frontmatter)
-
-    if source_type in {"markdown", "txt", "file"}:
-        text_content, parsed_frontmatter = parse_text_file(path)
-        merged_frontmatter = merge_metadata(parsed_frontmatter, merged_frontmatter)
-        parser_result = prepare_text_chunks(text_content, settings=settings)
-    elif source_type == "docx":
-        parser_result = parse_docx_document(path, max_tokens=settings.max_chunk_tokens)
-        merged_frontmatter = merge_metadata(parser_result.metadata, merged_frontmatter)
-        text_content = parser_result.text
-    elif source_type == "html":
-        parser_result = parse_html_document(path, max_tokens=settings.max_chunk_tokens)
-        merged_frontmatter = merge_metadata(parser_result.metadata, merged_frontmatter)
-        text_content = parser_result.text
-    elif source_type == "pdf":
-        parser_result = prepare_pdf_chunks(path, settings=settings)
-        text_content = parser_result.text
-    elif source_type == "transcript":
-        segments = load_transcript(path)
-        parser_result = prepare_transcript_chunks(segments, settings=settings)
-        text_content = parser_result.text
-    elif source_type == "audio":
-        parser_result = parse_audio_document(
-            path,
-            max_tokens=settings.max_chunk_tokens,
-            settings=settings,
-            frontmatter=merged_frontmatter,
-        )
-        merged_frontmatter = merge_metadata(parser_result.metadata, merged_frontmatter)
-        text_content = parser_result.text
-    else:
-        text_content, parsed_frontmatter = parse_text_file(path)
-        merged_frontmatter = merge_metadata(parsed_frontmatter, merged_frontmatter)
-        parser_result = prepare_text_chunks(text_content, settings=settings)
-
-    if parser_result is None:
-        raise UnsupportedSourceError(f"Unable to parse source type {source_type}")
-
-    return parser_result, merged_frontmatter, text_content
+def _transcript_title_default(state: dict[str, Any]) -> str:
+    path = state.get("transcript_path")
+    if isinstance(path, Path):
+        return path.stem
+    return "Transcript"
 
 
 def run_pipeline_for_file(
@@ -295,6 +180,20 @@ def run_pipeline_for_file(
 ) -> Document:
     """Execute the file ingestion pipeline synchronously."""
 
+    frontmatter_payload = merge_metadata({}, load_frontmatter(frontmatter))
+    stages = [
+        FileSourceFetcher(path=path, frontmatter=frontmatter_payload),
+        FileParser(),
+        DocumentEnricher(default_title_factory=_file_title_default),
+        TextDocumentPersister(session=session),
+    ]
+    return _orchestrate(
+        session=session,
+        dependencies=dependencies,
+        stages=stages,
+        workflow="ingest.file",
+        workflow_kwargs={"source_path": str(path), "source_name": path.name},
+    )
     settings, persistence_dependencies = _resolve_context(dependencies)
     with instrument_workflow(
         "ingest.file", source_path=str(path), source_name=path.name
@@ -328,41 +227,13 @@ def run_pipeline_for_file(
             settings=settings,
         )
 
-        if source_type == "transcript":
-            document = _ingest_transcript_document(
-                session,
-                span,
-                dependencies=persistence_dependencies,
-                parser_result=parser_result,
-                frontmatter=merged_frontmatter,
-                settings=settings,
-                sha256=sha256,
-                source_type="transcript",
-                title=merged_frontmatter.get("title") or path.stem,
-                cache_status="n/a",
-                source_url=merged_frontmatter.get("source_url"),
-                transcript_path=path,
-                transcript_filename=path.name,
-            )
-            return document
 
-        document = _ingest_text_document(
-            session,
-            span,
-            dependencies=persistence_dependencies,
-            parser_result=parser_result,
-            frontmatter=merged_frontmatter,
-            settings=settings,
-            sha256=sha256,
-            source_type=source_type,
-            title=merged_frontmatter.get("title") or path.stem,
-            cache_status="n/a",
-            source_url=merged_frontmatter.get("source_url"),
-            text_content=text_content,
-            original_path=path,
-        )
-
-        return document
+def _url_title_default(state: dict[str, Any]) -> str:
+    if state.get("source_type") == "youtube":
+        video_id = state.get("video_id")
+        if video_id:
+            return f"YouTube Video {video_id}"
+    return state.get("url") or "Document"
 
 
 def run_pipeline_for_url(
@@ -375,6 +246,40 @@ def run_pipeline_for_url(
 ) -> Document:
     """Ingest supported URLs into the document store."""
 
+    frontmatter_payload = merge_metadata({}, load_frontmatter(frontmatter))
+
+    class _UrlDocumentPersister(Persister):
+        name = "url_document_persister"
+
+        def __init__(self, *, session: Session) -> None:
+            self._text_persister = TextDocumentPersister(session=session)
+            self._transcript_persister = TranscriptDocumentPersister(session=session)
+
+        def persist(self, *, context, state: dict[str, Any]):  # type: ignore[override]
+            if state.get("source_type") == "youtube":
+                return self._transcript_persister.persist(context=context, state=state)
+            return self._text_persister.persist(context=context, state=state)
+
+    stages = [
+        UrlSourceFetcher(
+            url=url,
+            source_type=source_type,
+            frontmatter=frontmatter_payload,
+            ensure_url_allowed_fn=ensure_url_allowed,
+            fetch_document_fn=_fetch_web_document,
+        ),
+        UrlParser(),
+        DocumentEnricher(default_title_factory=_url_title_default),
+        _UrlDocumentPersister(session=session),
+    ]
+
+    return _orchestrate(
+        session=session,
+        dependencies=dependencies,
+        stages=stages,
+        workflow="ingest.url",
+        workflow_kwargs={"source_url": url, "requested_source_type": source_type},
+    )
     settings, persistence_dependencies = _resolve_context(dependencies)
     with instrument_workflow(
         "ingest.url", source_url=url, requested_source_type=source_type
@@ -487,68 +392,35 @@ def run_pipeline_for_transcript(
 ) -> Document:
     """Ingest a transcript file and optional audio into the document store."""
 
-    settings, persistence_dependencies = _resolve_context(dependencies)
-    with instrument_workflow(
-        "ingest.transcript",
-        transcript_path=str(transcript_path),
-        audio_path=str(audio_path) if audio_path else None,
-    ) as span:
-        merged_frontmatter = merge_metadata({}, load_frontmatter(frontmatter))
-
-        segments = load_transcript(transcript_path)
-        parser_result = prepare_transcript_chunks(segments, settings=settings)
-
-        sha256 = _hash_parser_result(parser_result)
-
-        source_type = str(merged_frontmatter.get("source_type") or "transcript")
-        title = merged_frontmatter.get("title") or transcript_path.stem
-
-        set_span_attribute(span, "ingest.source_type", source_type)
-        document = _ingest_transcript_document(
-            session,
-            span,
-            dependencies=persistence_dependencies,
-            parser_result=parser_result,
-            frontmatter=merged_frontmatter,
-            settings=settings,
-            sha256=sha256,
-            source_type=source_type,
-            title=title,
-            cache_status="n/a",
-            source_url=merged_frontmatter.get("source_url"),
-            channel=merged_frontmatter.get("channel"),
-            video_id=merged_frontmatter.get("video_id"),
-            duration_seconds=merged_frontmatter.get("duration_seconds"),
+    frontmatter_payload = merge_metadata({}, load_frontmatter(frontmatter))
+    stages = [
+        TranscriptSourceFetcher(
             transcript_path=transcript_path,
+            frontmatter=frontmatter_payload,
             audio_path=audio_path,
-            transcript_filename=transcript_filename or transcript_path.name,
+            transcript_filename=transcript_filename,
             audio_filename=audio_filename,
-        )
+        ),
+        TranscriptParser(),
+        DocumentEnricher(default_title_factory=_transcript_title_default),
+        TranscriptDocumentPersister(session=session),
+    ]
+    return _orchestrate(
+        session=session,
+        dependencies=dependencies,
+        stages=stages,
+        workflow="ingest.transcript",
+        workflow_kwargs={
+            "transcript_path": str(transcript_path),
+            "audio_path": str(audio_path) if audio_path else None,
+        },
+    )
 
-        return document
 
 def _refresh_creator_verse_rollups(
     session: Session, segments: Iterable[TranscriptSegment]
 ) -> None:
     """Backwards-compatible wrapper for legacy imports."""
 
-    refresh_creator_verse_rollups(session, list(segments))
-
-
-
-_WEB_FETCH_CHUNK_SIZE = 64 * 1024
-build_opener = _urllib_build_opener
-
-
-def _fetch_web_document(settings, url: str):
-    return resilient_operation(
-        lambda: fetch_web_document(settings, url, opener_factory=build_opener),
-        key=f"ingest:web:{url}",
-        classification="network",
-        policy=ResiliencePolicy(max_attempts=3),
-    )
-
-
-
-
-
+    context = PipelineDependencies().build_context(span=None)
+    refresh_creator_verse_rollups(session, list(segments), context=context)

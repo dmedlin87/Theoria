@@ -5,6 +5,7 @@ Theo Engine exposes a FastAPI application located at
 multipart uploads for binary content.
 
 - **Base URL:** `/` (all paths below are relative to the FastAPI root)
+
 - **Content type:** `application/json` unless noted otherwise
 - **Authentication:** required. Supply either an API key (`THEO_API_KEYS`) or
   a JWT bearer token (`THEO_AUTH_JWT_*`). For isolated local testing you may

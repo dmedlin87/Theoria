@@ -8,8 +8,8 @@ from datetime import date, datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any
 from collections.abc import Mapping
+from typing import Protocol, TypeAlias
 
 import yaml
 
@@ -30,7 +30,25 @@ from .chunking import Chunk, chunk_text, chunk_transcript
 from .sanitizer import sanitize_passage_text
 
 
-def parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
+JSONPrimitive: TypeAlias = str | int | float | bool | None
+JSONValue: TypeAlias = JSONPrimitive | list["JSONValue"] | dict[str, "JSONValue"]
+Frontmatter: TypeAlias = dict[str, object]
+FrontmatterMapping: TypeAlias = Mapping[str, object]
+
+
+class _TopicsProvider(Protocol):
+    topics: object
+
+
+class _ChunkSettings(Protocol):
+    max_chunk_tokens: int
+
+
+class _PdfChunkSettings(_ChunkSettings, Protocol):
+    doc_max_pages: int
+
+
+def parse_frontmatter_from_markdown(text: str) -> tuple[Frontmatter, str]:
     """Split a markdown document into frontmatter and body."""
 
     if not text.startswith("---"):
@@ -48,13 +66,16 @@ def parse_frontmatter_from_markdown(text: str) -> tuple[dict[str, Any], str]:
 
     frontmatter_text = "\n".join(lines[1:end_index])
     body = "\n".join(lines[end_index + 1 :])
-    data = yaml.safe_load(frontmatter_text) or {}
-    if not isinstance(data, dict):
+    loaded = yaml.safe_load(frontmatter_text) or {}
+    data: Frontmatter
+    if isinstance(loaded, dict):
+        data = {str(key): value for key, value in loaded.items()}
+    else:
         data = {}
     return data, body
 
 
-def parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:
+def parse_text_file(path: Path) -> tuple[str, Frontmatter]:
     """Read a text file, extracting markdown frontmatter when present."""
 
     try:
@@ -69,7 +90,7 @@ def parse_text_file(path: Path) -> tuple[str, dict[str, Any]]:
     return content, {}
 
 
-def load_frontmatter(frontmatter: dict[str, Any] | None) -> dict[str, Any]:
+def load_frontmatter(frontmatter: Frontmatter | None) -> Frontmatter:
     """Normalise a frontmatter mapping for downstream processing."""
 
     if not frontmatter:
@@ -77,7 +98,7 @@ def load_frontmatter(frontmatter: dict[str, Any] | None) -> dict[str, Any]:
     return dict(frontmatter)
 
 
-def detect_source_type(path: Path, frontmatter: dict[str, Any]) -> str:
+def detect_source_type(path: Path, frontmatter: FrontmatterMapping) -> str:
     if frontmatter.get("source_type"):
         return str(frontmatter["source_type"])
     ext = path.suffix.lower()
@@ -98,10 +119,10 @@ def detect_source_type(path: Path, frontmatter: dict[str, Any]) -> str:
     return "file"
 
 
-def merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+def merge_metadata(base: FrontmatterMapping, overrides: FrontmatterMapping) -> Frontmatter:
     """Merge metadata dictionaries preferring override values when present."""
 
-    combined = {**base}
+    combined: Frontmatter = dict(base)
     for key, override_value in overrides.items():
         if override_value is None:
             continue
@@ -113,27 +134,29 @@ def merge_metadata(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str,
     return combined
 
 
-def serialise_frontmatter(frontmatter: dict[str, Any]) -> str:
+def serialise_frontmatter(frontmatter: FrontmatterMapping) -> str:
     """Render a frontmatter dictionary to JSON, normalising complex types."""
 
-    def _normalise(value: Any):  # type: ignore[override]
+    def _normalise(value: object) -> JSONValue:
         if isinstance(value, (str, int, float, bool)) or value is None:
             return value
         if isinstance(value, (date, datetime)):
             return value.isoformat()
         if isinstance(value, Path):
             return str(value)
-        if isinstance(value, dict):
-            return {k: _normalise(v) for k, v in value.items()}
+        if isinstance(value, Mapping):
+            return {str(k): _normalise(v) for k, v in value.items()}
         if isinstance(value, (list, tuple, set)):
             return [_normalise(item) for item in value]
         return str(value)
 
-    normalised = {key: _normalise(val) for key, val in frontmatter.items()}
+    normalised: dict[str, JSONValue] = {
+        key: _normalise(val) for key, val in frontmatter.items()
+    }
     return json.dumps(normalised, indent=2, ensure_ascii=False)
 
 
-def ensure_list(value: Any) -> list[str] | None:
+def ensure_list(value: object) -> list[str] | None:
     if value is None:
         return None
     if isinstance(value, list):
@@ -141,14 +164,14 @@ def ensure_list(value: Any) -> list[str] | None:
     return [str(value)]
 
 
-def _normalise_guardrail_value(value: Any) -> str | None:
+def _normalise_guardrail_value(value: object) -> str | None:
     if value is None:
         return None
     text = str(value).strip()
     return text or None
 
 
-def _normalise_guardrail_collection(value: Any) -> list[str] | None:
+def _normalise_guardrail_collection(value: object) -> list[str] | None:
     if value is None:
         return None
     items: list[str] = []
@@ -173,7 +196,9 @@ def _normalise_guardrail_collection(value: Any) -> list[str] | None:
     return unique or None
 
 
-def extract_guardrail_profile(frontmatter: dict[str, Any]) -> tuple[str | None, list[str] | None]:
+def extract_guardrail_profile(
+    frontmatter: FrontmatterMapping,
+) -> tuple[str | None, list[str] | None]:
     tradition = _normalise_guardrail_value(frontmatter.get("theological_tradition"))
     topic_domains = _normalise_guardrail_collection(
         frontmatter.get("topic_domains") or frontmatter.get("topic_domain")
@@ -203,7 +228,7 @@ def extract_guardrail_profile(frontmatter: dict[str, Any]) -> tuple[str | None, 
     return tradition, topic_domains or None
 
 
-def coerce_date(value: Any) -> date | None:
+def coerce_date(value: object) -> date | None:
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -217,7 +242,7 @@ def coerce_date(value: Any) -> date | None:
         return None
 
 
-def coerce_datetime(value: Any) -> datetime | None:
+def coerce_datetime(value: object) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -232,11 +257,16 @@ def coerce_datetime(value: Any) -> datetime | None:
     return parsed
 
 
-def coerce_int(value: Any) -> int | None:
+def coerce_int(value: object) -> int | None:
     if value is None:
         return None
+    if isinstance(value, (int, float, str)):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return None
     try:
-        return int(float(value))
+        return int(float(str(value)))
     except (TypeError, ValueError):
         return None
 
@@ -257,7 +287,7 @@ def normalise_passage_meta(
     chunker_version: str,
     chunk_index: int,
     speakers: list[str] | None = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     hint_list = [hint for hint in hints or [] if hint]
     detected_refs = [ref for ref in detected.all if ref]
     matched_hints, unmatched_hints = classify_osis_matches(
@@ -267,7 +297,7 @@ def normalise_passage_meta(
 
     combined_refs = sorted({*detected_refs, *matched_hints, *unmatched_hints})
 
-    meta: dict[str, Any] = {
+    meta: dict[str, object] = {
         "parser": parser,
         "parser_version": parser_version,
         "chunker_version": chunker_version,
@@ -454,7 +484,10 @@ def normalise_source_url(value: str | None) -> str | None:
     return None
 
 
-def collect_topics(document, frontmatter: dict[str, Any]) -> list[str]:
+def collect_topics(
+    document: _TopicsProvider,
+    frontmatter: FrontmatterMapping,
+) -> list[str]:
     topics: list[str] = []
     doc_topics = document.topics
     if isinstance(doc_topics, dict):
@@ -468,7 +501,9 @@ def collect_topics(document, frontmatter: dict[str, Any]) -> list[str]:
     return [topic for topic in (topic.strip() for topic in topics) if topic]
 
 
-def normalise_topics_field(*candidates: Any) -> dict | None:
+def normalise_topics_field(
+    *candidates: object,
+) -> dict[str, str | list[str]] | None:
     values: list[str] = []
     seen: set[str] = set()
     for candidate in candidates:
@@ -509,14 +544,14 @@ def truncate(text: str, limit: int = 280) -> str:
     return cleaned[: limit - 3].rstrip() + "..."
 
 
-def prepare_text_chunks(text: str, *, settings) -> ParserResult:
+def prepare_text_chunks(text: str, *, settings: _ChunkSettings) -> ParserResult:
     chunks = chunk_text(text, max_tokens=settings.max_chunk_tokens)
     return ParserResult(
         text=text, chunks=chunks, parser="plain_text", parser_version="0.1.0"
     )
 
 
-def prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
+def prepare_pdf_chunks(path: Path, *, settings: _PdfChunkSettings) -> ParserResult:
     result = parse_pdf_document(
         path,
         max_pages=settings.doc_max_pages,
@@ -526,6 +561,8 @@ def prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
         raise UnsupportedSourceError(
             "Unable to extract text from PDF; the file may be password protected or corrupted."
         )
+    if not isinstance(result, ParserResult):
+        raise UnsupportedSourceError("PDF contained no extractable text")
     if not result.chunks:
         raise UnsupportedSourceError("PDF contained no extractable text")
     return result
@@ -534,7 +571,7 @@ def prepare_pdf_chunks(path: Path, *, settings) -> ParserResult:
 def prepare_transcript_chunks(
     segments: list[ParsedTranscriptSegment],
     *,
-    settings,
+    settings: _ChunkSettings,
 ) -> ParserResult:
     if not segments:
         raise UnsupportedSourceError("Transcript file contained no segments")

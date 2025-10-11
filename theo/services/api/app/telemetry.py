@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import Mapping
 from contextlib import contextmanager
 from time import perf_counter
-from collections.abc import Mapping
-from typing import Any, ContextManager, Iterable, Iterator, Protocol, cast
+from typing import Any, ContextManager, Iterable, Iterator, Protocol, Self, cast
 
 
 class SpanProtocol(Protocol):
@@ -30,6 +30,10 @@ class TracerProtocol(Protocol):
         ...
 
 
+trace: Any | None
+Status: Any | None
+StatusCode: Any | None
+
 try:  # pragma: no cover - optional dependency
     trace = importlib.import_module("opentelemetry.trace")
 except ImportError:  # pragma: no cover - graceful degradation
@@ -47,13 +51,33 @@ else:
         StatusCode = getattr(status_module, "StatusCode", None)
 
 
+Counter: type[Any] | None
+Histogram: type[Any] | None
+
 try:  # pragma: no cover - optional dependency
     prometheus_client = importlib.import_module("prometheus_client")
 except ImportError:  # pragma: no cover - graceful degradation
-    Counter = Histogram = None  # type: ignore[assignment]
+    Counter = None
+    Histogram = None
 else:
-    Counter = cast(Any, getattr(prometheus_client, "Counter", None))
-    Histogram = cast(Any, getattr(prometheus_client, "Histogram", None))
+    Counter = cast(type[Any], getattr(prometheus_client, "Counter", None))
+    Histogram = cast(type[Any], getattr(prometheus_client, "Histogram", None))
+
+
+class CounterMetric(Protocol):
+    def labels(self, **labels: Any) -> Self:
+        ...
+
+    def inc(self, amount: float = 1.0) -> None:
+        ...
+
+
+class HistogramMetric(Protocol):
+    def labels(self, **labels: Any) -> Self:
+        ...
+
+    def observe(self, amount: float) -> None:
+        ...
 
 
 class _NoopSpan:
@@ -85,44 +109,50 @@ def _get_tracer(name: str) -> TracerProtocol:
 
 LOGGER = logging.getLogger("theo.workflow")
 
-if Counter is None or Histogram is None:  # pragma: no cover - metrics disabled
+class _NoopMetric:
+    def labels(self, **_: Any) -> Self:
+        return self
 
-    class _NoopMetric:
-        def labels(self, **_: Any) -> "_NoopMetric":
-            return self
+    def inc(self, *_: Any, **__: Any) -> None:
+        return
 
-        def inc(self, *_: Any, **__: Any) -> None:
-            return
+    def observe(self, *_: Any, **__: Any) -> None:
+        return
 
-        def observe(self, *_: Any, **__: Any) -> None:
-            return
 
-    WORKFLOW_RUNS = _NoopMetric()
-    WORKFLOW_LATENCY = _NoopMetric()
-    RAG_CACHE_EVENTS = _NoopMetric()
-    CITATION_DRIFT_EVENTS = _NoopMetric()
-else:
-    WORKFLOW_RUNS = Counter(
-        "theo_workflow_runs_total",
-        "Count of Theo Engine workflow executions by status.",
-        labelnames=("workflow", "status"),
-    )
-    WORKFLOW_LATENCY = Histogram(
-        "theo_workflow_latency_seconds",
-        "Theo Engine workflow execution latency.",
-        labelnames=("workflow",),
-        buckets=(0.25, 0.5, 1, 2, 4, 8, 16, float("inf")),
-    )
-    RAG_CACHE_EVENTS = Counter(
-        "theo_rag_cache_events_total",
-        "Theo Engine RAG cache events by status.",
-        labelnames=("status",),
-    )
-    CITATION_DRIFT_EVENTS = Counter(
-        "theo_citation_drift_events_total",
-        "Theo Engine cached citation validation outcomes.",
-        labelnames=("status",),
-    )
+def _build_counter(*args: Any, **kwargs: Any) -> CounterMetric:
+    if Counter is None:  # pragma: no cover - metrics disabled
+        return cast(CounterMetric, _NoopMetric())
+    return cast(CounterMetric, Counter(*args, **kwargs))
+
+
+def _build_histogram(*args: Any, **kwargs: Any) -> HistogramMetric:
+    if Histogram is None:  # pragma: no cover - metrics disabled
+        return cast(HistogramMetric, _NoopMetric())
+    return cast(HistogramMetric, Histogram(*args, **kwargs))
+
+
+WORKFLOW_RUNS: CounterMetric = _build_counter(
+    "theo_workflow_runs_total",
+    "Count of Theo Engine workflow executions by status.",
+    labelnames=("workflow", "status"),
+)
+WORKFLOW_LATENCY: HistogramMetric = _build_histogram(
+    "theo_workflow_latency_seconds",
+    "Theo Engine workflow execution latency.",
+    labelnames=("workflow",),
+    buckets=(0.25, 0.5, 1, 2, 4, 8, 16, float("inf")),
+)
+RAG_CACHE_EVENTS: CounterMetric = _build_counter(
+    "theo_rag_cache_events_total",
+    "Theo Engine RAG cache events by status.",
+    labelnames=("status",),
+)
+CITATION_DRIFT_EVENTS: CounterMetric = _build_counter(
+    "theo_citation_drift_events_total",
+    "Theo Engine cached citation validation outcomes.",
+    labelnames=("status",),
+)
 
 
 def _serialise_value(value: Any) -> Any:

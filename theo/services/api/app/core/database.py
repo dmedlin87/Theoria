@@ -6,12 +6,13 @@ from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
+from ..db.models import Base
 from .settings import get_settings
 
-Base = declarative_base()
+__all__ = ["Base", "configure_engine", "get_engine", "get_session"]
 
 _engine: Engine | None = None
 _SessionLocal: sessionmaker[Session] | None = None

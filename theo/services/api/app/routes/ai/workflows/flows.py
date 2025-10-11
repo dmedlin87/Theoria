@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING, TypeAlias
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -17,7 +18,16 @@ from theo.services.api.app.ai import (
     run_research_reconciliation,
 )
 from theo.services.api.app.ai.passage import PassageResolutionError, resolve_passage_reference
-from theo.services.api.app.ai.rag import GuardrailError
+from theo.services.api.app.ai.rag import (
+    CollaborationResponse,
+    ComparativeAnalysisResponse,
+    CorpusCurationReport,
+    DevotionalResponse,
+    GuardrailError,
+    MultimediaDigestResponse,
+    SermonPrepResponse,
+    VerseCopilotResponse,
+)
 from theo.services.api.app.ai.trails import TrailService
 from theo.services.api.app.core.database import get_session
 from theo.services.api.app.models.ai import (
@@ -30,6 +40,24 @@ from theo.services.api.app.models.ai import (
     VerseCopilotRequest,
 )
 from .guardrails import guardrail_http_exception
+
+
+if TYPE_CHECKING:
+    from fastapi.responses import JSONResponse
+
+    VerseCopilotReturn: TypeAlias = VerseCopilotResponse | JSONResponse
+    SermonPrepReturn: TypeAlias = SermonPrepResponse | JSONResponse
+    DevotionalReturn: TypeAlias = DevotionalResponse | JSONResponse
+    CollaborationReturn: TypeAlias = CollaborationResponse | JSONResponse
+    ComparativeReturn: TypeAlias = ComparativeAnalysisResponse | JSONResponse
+    MultimediaReturn: TypeAlias = MultimediaDigestResponse | JSONResponse
+else:  # pragma: no cover - runtime type hints for FastAPI decorators
+    VerseCopilotReturn: TypeAlias = VerseCopilotResponse
+    SermonPrepReturn: TypeAlias = SermonPrepResponse
+    DevotionalReturn: TypeAlias = DevotionalResponse
+    CollaborationReturn: TypeAlias = CollaborationResponse
+    ComparativeReturn: TypeAlias = ComparativeAnalysisResponse
+    MultimediaReturn: TypeAlias = MultimediaDigestResponse
 
 router = APIRouter()
 _BAD_REQUEST_RESPONSE = {status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}}
@@ -83,14 +111,19 @@ CORPUS_CURATION_PLAN = "\n".join(
 )
 
 
-@router.post("/verse", response_model_exclude_none=True)
+@router.post(
+    "/verse",
+    response_model=VerseCopilotResponse,
+    response_model_exclude_none=True,
+)
 def verse_copilot(
     payload: VerseCopilotRequest,
     session: Session = Depends(get_session),
-):
+) -> VerseCopilotReturn:
     trail_service = TrailService(session)
     osis_value = (payload.osis or "").strip() or None
     passage_value = (payload.passage or "").strip() or None
+    result: VerseCopilotReturn
     try:
         resolved_osis = osis_value or (
             resolve_passage_reference(passage_value) if passage_value else None
@@ -120,23 +153,29 @@ def verse_copilot(
                 recorder=recorder,
             )
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
-            return response
+            result = response
     except GuardrailError as exc:
-        return guardrail_http_exception(
+        result = guardrail_http_exception(
             exc,
             session=session,
             question=payload.question,
             osis=resolved_osis,
             filters=payload.filters,
         )
+    return result
 
 
-@router.post("/sermon-prep", response_model_exclude_none=True)
+@router.post(
+    "/sermon-prep",
+    response_model=SermonPrepResponse,
+    response_model_exclude_none=True,
+)
 def sermon_prep(
     payload: SermonPrepRequest,
     session: Session = Depends(get_session),
-):
+) -> SermonPrepReturn:
     trail_service = TrailService(session)
+    result: SermonPrepReturn
     try:
         with trail_service.start_trail(
             workflow="sermon_prep",
@@ -160,23 +199,29 @@ def sermon_prep(
                 key_points_limit=payload.key_points_limit,
             )
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
-            return response
+            result = response
     except GuardrailError as exc:
-        return guardrail_http_exception(
+        result = guardrail_http_exception(
             exc,
             session=session,
             question=None,
             osis=payload.osis,
             filters=payload.filters,
         )
+    return result
 
 
-@router.post("/devotional", response_model_exclude_none=True)
+@router.post(
+    "/devotional",
+    response_model=DevotionalResponse,
+    response_model_exclude_none=True,
+)
 def devotional_flow(
     payload: DevotionalRequest,
     session: Session = Depends(get_session),
-):
+) -> DevotionalReturn:
     trail_service = TrailService(session)
+    result: DevotionalReturn
     try:
         with trail_service.start_trail(
             workflow="devotional",
@@ -196,15 +241,16 @@ def devotional_flow(
                 final_md=response.reflection,
                 output_payload=response,
             )
-            return response
+            result = response
     except GuardrailError as exc:
-        return guardrail_http_exception(
+        result = guardrail_http_exception(
             exc,
             session=session,
             question=payload.focus,
             osis=payload.osis,
             filters=None,
         )
+    return result
 
 
 @router.post(
@@ -215,10 +261,11 @@ def devotional_flow(
 def collaboration(
     payload: CollaborationRequest,
     session: Session = Depends(get_session),
-):
+) -> CollaborationReturn:
     if not payload.viewpoints:
         raise HTTPException(status_code=400, detail="viewpoints cannot be empty")
     trail_service = TrailService(session)
+    result: CollaborationReturn
     try:
         with trail_service.start_trail(
             workflow="research_reconciliation",
@@ -239,15 +286,16 @@ def collaboration(
                 final_md=response.synthesized_view,
                 output_payload=response,
             )
-            return response
+            result = response
     except GuardrailError as exc:
-        return guardrail_http_exception(
+        result = guardrail_http_exception(
             exc,
             session=session,
             question="; ".join(payload.viewpoints) if payload.viewpoints else None,
             osis=payload.osis,
             filters=None,
         )
+    return result
 
 
 @router.post(
@@ -258,7 +306,7 @@ def collaboration(
 def corpus_curation(
     payload: CorpusCurationRequest,
     session: Session = Depends(get_session),
-):
+) -> CorpusCurationReport:
     since_dt = None
     if payload.since:
         try:
@@ -278,7 +326,7 @@ def corpus_curation(
         response = run_corpus_curation(session, since=since_dt, recorder=recorder)
         digest = "\n".join(response.summaries)
         recorder.finalize(final_md=digest or None, output_payload=response)
-        return response
+    return response
 
 
 @router.post(
@@ -289,32 +337,39 @@ def corpus_curation(
 def comparative_analysis(
     payload: ComparativeAnalysisRequest,
     session: Session = Depends(get_session),
-):
+) -> ComparativeReturn:
     if not payload.participants:
         raise HTTPException(status_code=400, detail="participants cannot be empty")
+    result: ComparativeReturn
     try:
-        return generate_comparative_analysis(
+        result = generate_comparative_analysis(
             session,
             osis=payload.osis,
             participants=payload.participants,
             model_name=payload.model,
         )
     except GuardrailError as exc:
-        return guardrail_http_exception(
+        result = guardrail_http_exception(
             exc,
             session=session,
             question=None,
             osis=payload.osis,
             filters=None,
         )
+    return result
 
 
-@router.post("/multimedia", response_model_exclude_none=True)
+@router.post(
+    "/multimedia",
+    response_model=MultimediaDigestResponse,
+    response_model_exclude_none=True,
+)
 def multimedia_digest(
     payload: MultimediaDigestRequest,
     session: Session = Depends(get_session),
-):
+) -> MultimediaReturn:
     trail_service = TrailService(session)
+    result: MultimediaReturn
     try:
         with trail_service.start_trail(
             workflow="multimedia_digest",
@@ -331,15 +386,16 @@ def multimedia_digest(
             )
             final_md = response.answer.summary or "\n".join(response.highlights)
             recorder.finalize(final_md=final_md, output_payload=response)
-            return response
+            result = response
     except GuardrailError as exc:
-        return guardrail_http_exception(
+        result = guardrail_http_exception(
             exc,
             session=session,
             question=payload.collection,
             osis=None,
             filters=None,
         )
+    return result
 
 
 __all__ = [

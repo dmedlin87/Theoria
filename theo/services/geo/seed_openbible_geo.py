@@ -6,7 +6,8 @@ import json
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, Iterable
+from collections.abc import Iterator
+from typing import Any
 
 import pythonbible as pb
 from sqlalchemy import delete, tuple_
@@ -72,18 +73,22 @@ _SAMPLE_MODERN_LOCATIONS = [
 ]
 
 
-def _stream_json_lines(path: Path) -> Iterable[dict[str, Any]]:
+def _stream_json_lines(path: Path) -> Iterator[dict[str, Any]]:
     if not path.exists():
         logger.warning("OpenBible geo payload missing: %s", path)
-        return []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
-            try:
-                yield json.loads(line)
-            except json.JSONDecodeError:  # pragma: no cover - defensive guard
-                logger.exception("Failed to parse JSON line from %s", path)
+        return iter(())
+
+    def _iter_lines() -> Iterator[dict[str, Any]]:
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError:  # pragma: no cover - defensive guard
+                    logger.exception("Failed to parse JSON line from %s", path)
+
+    return _iter_lines()
 
 
 def _normalize_osis(reference: str | None) -> list[str]:
@@ -250,6 +255,7 @@ def seed_openbible_geo(
             continue
         seen_ancient.add(ancient_id)
         classification = entry.get("class") or entry.get("types")
+        classification_value: str | None
         if isinstance(classification, list):
             classification_value = ",".join(str(item) for item in classification)
         else:
@@ -398,9 +404,11 @@ def seed_openbible_geo(
             else:
                 continue
             thumb_details = thumbnails.get(owner_id) if isinstance(thumbnails, dict) else None
-            thumb_file = None
+            thumb_file: str | None = None
             if isinstance(thumb_details, dict):
-                thumb_file = thumb_details.get("file")
+                candidate_file = thumb_details.get("file")
+                if isinstance(candidate_file, str):
+                    thumb_file = candidate_file
             key = (
                 image_id,
                 owner_kind,
