@@ -537,8 +537,6 @@ def seed_commentary_excerpts(session: Session) -> None:
                 source=source,
                 perspective=perspective,
                 tags=tags,
-                start_verse_id=start_verse_id,
-                end_verse_id=end_verse_id,
                 start_verse_id=start_value,
                 end_verse_id=end_value,
             )

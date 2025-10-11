@@ -911,6 +911,7 @@ class ContradictionSeed(Base):
             "ix_contradiction_seeds_range_a",
             "start_verse_id_a",
             "end_verse_id_a",
+        ),
         Index("ix_contradiction_seeds_start_verse_id", "start_verse_id"),
         Index("ix_contradiction_seeds_end_verse_id", "end_verse_id"),
         Index("ix_contradiction_seeds_start_verse_id_b", "start_verse_id_b"),

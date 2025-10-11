@@ -730,6 +730,8 @@ def test_duplicate_file_ingest_triggers_error_policy(tmp_path) -> None:
         settings.storage_root = original_storage
 
     assert any(stage == "text_document_persister" for stage, _, _ in policy.calls)
+
+
 @pytest.mark.parametrize(
     "blocked_url",
     [
