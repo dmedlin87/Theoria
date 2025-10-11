@@ -1159,6 +1159,7 @@ class GeoModernLocation(Base):
     geom_kind: Mapped[str | None] = mapped_column(String, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     names: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    search_terms: Mapped[str | None] = mapped_column(Text, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     raw: Mapped[dict] = mapped_column(JSON, nullable=False)
