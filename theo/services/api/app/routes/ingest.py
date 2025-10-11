@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
+from ..ingest.exceptions import UnsupportedSourceError
 from ..models.documents import (
     DocumentIngestResponse,
     SimpleIngestRequest,
@@ -218,6 +219,14 @@ async def ingest_url(
             source_type=payload.source_type,
             frontmatter=payload.frontmatter,
         )
+    except UnsupportedSourceError as exc:
+        raise IngestionError(
+            str(exc),
+            code="INGESTION_UNSUPPORTED_SOURCE",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Review the URL and ensure it meets ingestion requirements.",
+        ) from exc
     except ResilienceError as exc:
         raise IngestionError(
             "Failed to fetch remote content",
