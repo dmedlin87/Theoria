@@ -7,6 +7,7 @@ Intelligent all-in-one scripts for running TheoEngine services with automatic en
 ## 🚀 Quick Start
 
 ### Windows (PowerShell)
+
 ```powershell
 # Navigate to project root
 cd C:\Users\dmedl\Projects\TheoEngine
@@ -19,6 +20,7 @@ cd C:\Users\dmedl\Projects\TheoEngine
 ```
 
 ### Linux/macOS (Bash)
+
 ```bash
 # Navigate to project root
 cd ~/Projects/TheoEngine
@@ -35,6 +37,7 @@ chmod +x scripts/run.sh
 ## 📋 Available Modes
 
 ### `full` (Default)
+
 Starts both FastAPI backend and Next.js frontend
 
 ```powershell
@@ -46,11 +49,13 @@ Starts both FastAPI backend and Next.js frontend
 ```
 
 **Output:**
-- API: http://127.0.0.1:8000
-- Web: http://127.0.0.1:3001
-- Docs: http://127.0.0.1:8000/docs
+
+- API: <http://127.0.0.1:8000>
+- Web: <http://127.0.0.1:3001>
+- Docs: <http://127.0.0.1:8000/docs>
 
 ### `api`
+
 Starts only the FastAPI backend
 
 ```powershell
@@ -64,6 +69,7 @@ Starts only the FastAPI backend
 **Use when:** You want to test API endpoints or develop API features separately.
 
 ### `web`
+
 Starts only the Next.js frontend
 
 ```powershell
@@ -77,6 +83,7 @@ Starts only the Next.js frontend
 **⚠️ Warning:** The web app requires the API to be running. Start API first or use `full` mode.
 
 ### `dev`
+
 Development mode with enhanced logging (same as `full` but more verbose)
 
 ```powershell
@@ -88,6 +95,7 @@ Development mode with enhanced logging (same as `full` but more verbose)
 ```
 
 ### `check`
+
 Validates environment and dependencies without starting services
 
 ```powershell
@@ -99,6 +107,7 @@ Validates environment and dependencies without starting services
 ```
 
 **Checks:**
+
 - Python 3.11+ installed
 - Node.js installed
 - npm installed
@@ -107,6 +116,7 @@ Validates environment and dependencies without starting services
 - Dependencies
 
 ### `test`
+
 Runs all test suites (Python, Node.js, E2E)
 
 ```powershell
@@ -152,24 +162,28 @@ Runs all test suites (Python, Node.js, E2E)
 ## 🔧 What the Scripts Do Automatically
 
 ### 1. **Environment Setup**
+
 - Creates virtual environment if missing
 - Installs/updates Python dependencies
 - Installs/updates Node.js dependencies
 - Creates `.env` and `.env.local` files if missing
 
 ### 2. **Prerequisite Checks**
+
 - Verifies Python 3.11+
 - Verifies Node.js and npm
 - Checks port availability
 - Validates directory structure
 
 ### 3. **Service Management**
+
 - Stops existing services on required ports
 - Starts services with proper configuration
 - Waits for health checks before confirming startup
 - Monitors service health
 
 ### 4. **Error Handling**
+
 - Graceful shutdown on Ctrl+C
 - Detailed error messages
 - Automatic cleanup of failed starts
@@ -181,7 +195,7 @@ Runs all test suites (Python, Node.js, E2E)
 
 The scripts automatically create these files if they don't exist:
 
-```
+```text
 TheoEngine/
 ├── .env                    # Main environment variables
 ├── .venv/                  # Python virtual environment
@@ -190,6 +204,7 @@ TheoEngine/
 ```
 
 ### `.env` (Auto-generated)
+
 ```bash
 database_url=sqlite:///./theo.db
 storage_root=./storage
@@ -201,6 +216,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 ### `.env.local` (Auto-generated)
+
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 API_BASE_URL=http://127.0.0.1:8000
@@ -229,6 +245,7 @@ lsof -ti :8000 | xargs kill -9
 **Symptom:** "Python 3.11+ not found"
 
 **Solution:**
+
 1. Install Python 3.11 or higher
 2. Ensure `python` or `python3` is in PATH
 3. Run `.\scripts\run.ps1 -Mode check` to verify
@@ -238,7 +255,8 @@ lsof -ti :8000 | xargs kill -9
 **Symptom:** "Node.js not found"
 
 **Solution:**
-1. Install Node.js 18+ from https://nodejs.org
+
+1. Install Node.js 18+ from <https://nodejs.org>
 2. Verify with: `node --version`
 3. Run `.\scripts\run.ps1 -Mode check` to verify
 
@@ -247,11 +265,13 @@ lsof -ti :8000 | xargs kill -9
 **Symptom:** "API service did not respond within 30 seconds"
 
 **Possible causes:**
+
 1. **Missing dependencies:** Run `.\scripts\run.ps1 -Mode check`
 2. **Database issues:** Delete `theo.db` and restart
 3. **Port conflict:** Change port with `-Port 8080`
 
 **Debug:**
+
 ```powershell
 # Check API logs
 .\scripts\run.ps1 -Mode api -Verbose
@@ -264,6 +284,7 @@ lsof -ti :8000 | xargs kill -9
 **Cause:** API is not running or not reachable
 
 **Solution:**
+
 ```powershell
 # Always run full stack
 .\scripts\run.ps1 -Mode full
@@ -278,6 +299,7 @@ lsof -ti :8000 | xargs kill -9
 **Symptom:** Import errors or missing modules
 
 **Solution:**
+
 ```powershell
 # Force reinstall all dependencies
 Remove-Item -Recurse -Force .venv, theo\services\web\node_modules
@@ -362,17 +384,21 @@ npm run test:e2e                    # E2E tests (requires services running)
 ## 🔒 Security Notes
 
 ### `.env` Files
+
 - Never commit `.env` or `.env.local` files
 - They contain sensitive configuration
 - Scripts create them from `.env.example`
 
 ### Default Configuration
+
 The auto-generated config uses:
+
 - SQLite (local file database)
 - Anonymous auth (development only)
 - Local storage (not S3/cloud)
 
 **⚠️ For production:** Manually configure `.env` with:
+
 - PostgreSQL database
 - JWT authentication
 - API keys
@@ -449,7 +475,7 @@ npm --version
 
 ## 🎨 Script Output Example
 
-```
+```text
 ████████╗██╗  ██╗███████╗ ██████╗     ███████╗███╗   ██╗ ██████╗ ██╗███╗   ██╗███████╗
 ╚══██╔══╝██║  ██║██╔════╝██╔═══██╗    ██╔════╝████╗  ██║██╔════╝ ██║████╗  ██║██╔════╝
    ██║   ███████║█████╗  ██║   ██║    █████╗  ██╔██╗ ██║██║  ███╗██║██╔██╗ ██║█████╗  
@@ -538,11 +564,13 @@ export THEO_WEB_PORT=3000
 ### Stopping Services
 
 **Graceful shutdown:** Press `Ctrl+C`
+
 - Services stop cleanly
 - Connections closed properly
 - Resources released
 
 **Force stop:**
+
 ```powershell
 # PowerShell
 Get-Process | Where-Object { $_.MainWindowTitle -like "*uvicorn*" } | Stop-Process -Force
@@ -558,7 +586,7 @@ pkill -f "next dev"
 
 ### Script Architecture
 
-```
+```text
 run.ps1 / run.sh
 ├── Prerequisite checks
 │   ├── Python version
@@ -614,13 +642,14 @@ git log scripts/
 ## 📚 Additional Resources
 
 - **Main Documentation**: See `README.md` in project root
-- **API Documentation**: http://127.0.0.1:8000/docs (when running)
+- **API Documentation**: <http://127.0.0.1:8000/docs> (when running)
 - **UI Documentation**: `theo/services/web/UI_IMPROVEMENTS.md`
 - **Architecture**: `docs/BLUEPRINT.md`
 
 ---
 
 **Questions or Issues?**
+
 - Check troubleshooting section above
 - Run `.\scripts\run.ps1 -Mode check` for diagnostics
 - Enable verbose mode: `.\scripts\run.ps1 -Verbose`
