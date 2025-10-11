@@ -106,7 +106,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <ModeSwitcher />
                 </div>
               </section>
-              <main className="site-main" id="main-content">
+              <main className="site-main" id="main-content" tabIndex={-1}>
                 <div className="container">{children}</div>
               </main>
               <footer className="site-footer">

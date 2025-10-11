@@ -107,7 +107,11 @@ export function AppShell({
             </button>
           </div>
         </div>
-        <main className="app-shell-v2__content" id="main-content">
+        <main
+          className="app-shell-v2__content"
+          id="main-content"
+          tabIndex={-1}
+        >
           {children}
         </main>
         <footer className="app-shell-v2__footer">
