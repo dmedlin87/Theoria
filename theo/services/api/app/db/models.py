@@ -23,6 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects import postgresql
 from ..core.settings import get_settings
 from .types import TSVectorType, VectorType
 
@@ -255,7 +256,14 @@ class Passage(Base):
     """Chunked content extracted from a document."""
 
     __tablename__ = "passages"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        Index(
+            "ix_passages_osis_verse_ids",
+            "osis_verse_ids",
+            postgresql_using="gin",
+        ),
+        {"extend_existing": True},
+    )
 
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
@@ -269,6 +277,10 @@ class Passage(Base):
     start_char: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_char: Mapped[int | None] = mapped_column(Integer, nullable=True)
     osis_ref: Mapped[str | None] = mapped_column(String, index=True)
+    osis_verse_ids: Mapped[list[int] | None] = mapped_column(
+        postgresql.ARRAY(Integer).with_variant(JSON, "sqlite"),
+        nullable=True,
+    )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)

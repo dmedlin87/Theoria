@@ -19,6 +19,7 @@ from theo.services.api.app.core.database import (  # noqa: E402  # import after 
     get_engine,
 )
 from theo.services.api.app.db.models import Document, Passage  # noqa: E402
+from theo.services.api.app.ingest.osis import expand_osis_reference  # noqa: E402
 from theo.services.api.app.models.verses import VerseMentionsFilters  # noqa: E402
 from theo.services.api.app.retriever.verses import (  # noqa: E402
     get_verse_timeline,
@@ -67,11 +68,37 @@ def _seed_documents(session: Session) -> None:
     session.add_all([doc1, doc2, doc3, doc4])
     session.flush()
 
+    john_ids = list(sorted(expand_osis_reference("John.3.16")))
+
     passages = [
-        Passage(id="p-1", document_id=doc1.id, text="Ref", osis_ref="John.3.16"),
-        Passage(id="p-2", document_id=doc2.id, text="Ref", osis_ref="John.3.16"),
-        Passage(id="p-3", document_id=doc3.id, text="Ref", osis_ref="John.3.16"),
-        Passage(id="p-4", document_id=doc4.id, text="Ref", osis_ref="John.3.16"),
+        Passage(
+            id="p-1",
+            document_id=doc1.id,
+            text="Ref",
+            osis_ref="John.3.16",
+            osis_verse_ids=john_ids,
+        ),
+        Passage(
+            id="p-2",
+            document_id=doc2.id,
+            text="Ref",
+            osis_ref="John.3.16",
+            osis_verse_ids=john_ids,
+        ),
+        Passage(
+            id="p-3",
+            document_id=doc3.id,
+            text="Ref",
+            osis_ref="John.3.16",
+            osis_verse_ids=john_ids,
+        ),
+        Passage(
+            id="p-4",
+            document_id=doc4.id,
+            text="Ref",
+            osis_ref="John.3.16",
+            osis_verse_ids=john_ids,
+        ),
     ]
     session.add_all(passages)
     session.commit()
@@ -190,10 +217,30 @@ def test_get_verse_timeline_filters_by_author_for_week_window(tmp_path) -> None:
             session.add_all(documents)
             session.flush()
 
+            john_ids = list(sorted(expand_osis_reference("John.3.16")))
+
             passages = [
-                Passage(id="multi-p1", document_id="multi-1", text="Ref", osis_ref="John.3.16"),
-                Passage(id="multi-p2", document_id="multi-2", text="Ref", osis_ref="John.3.16"),
-                Passage(id="multi-p3", document_id="multi-3", text="Ref", osis_ref="John.3.16"),
+                Passage(
+                    id="multi-p1",
+                    document_id="multi-1",
+                    text="Ref",
+                    osis_ref="John.3.16",
+                    osis_verse_ids=john_ids,
+                ),
+                Passage(
+                    id="multi-p2",
+                    document_id="multi-2",
+                    text="Ref",
+                    osis_ref="John.3.16",
+                    osis_verse_ids=john_ids,
+                ),
+                Passage(
+                    id="multi-p3",
+                    document_id="multi-3",
+                    text="Ref",
+                    osis_ref="John.3.16",
+                    osis_verse_ids=john_ids,
+                ),
             ]
             session.add_all(passages)
             session.commit()
