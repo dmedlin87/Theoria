@@ -657,12 +657,22 @@ Response:
 
 ```json
 {
-  "gpt5_codex_preview": true,
+  "gpt5_codex_preview": false,
   "job_tracking": true,
   "document_annotations": true,
-  "ai_copilot": true
+  "ai_copilot": true,
+  "cross_references": true,
+  "textual_variants": true,
+  "morphology": true,
+  "commentaries": true,
+  "verse_timeline": false
 }
 ```
+
+Environment-specific flags may appear as `false` in some deployments even when
+they are enabled elsewhere. In particular, both `gpt5_codex_preview` and
+`verse_timeline` depend on per-environment configuration toggles, so their
+values can vary across staging, QA, and production instances.
 
 ### `GET /features/discovery`
 
