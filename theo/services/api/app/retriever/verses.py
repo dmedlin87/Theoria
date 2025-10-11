@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
-from typing import Literal
+from typing import Literal, cast as typing_cast
 
-from sqlalchemy import Integer, cast, exists, false, func, select
+from sqlalchemy import Date, DateTime, Integer, cast, case, exists, false, func, select, inspect as sa_inspect
 from sqlalchemy.orm import Session, joinedload
 
-from ..db.models import Document, Passage
+from ..db.models import Document, Passage, PassageVerse
 from ..ingest.osis import expand_osis_reference
 from ..models.base import Passage as PassageSchema
 from ..models.verses import (
@@ -36,8 +35,66 @@ def _resolve_query_ids(osis: str) -> list[int]:
         return []
 
 
-def _verse_overlap_clause(column, verse_ids: list[int], dialect_name: str):
-    """Return a SQL expression testing overlap with *verse_ids*."""
+def _document_ids_for_author(session: Session, verse_ids: list[int], author: str) -> list[str]:
+    """Return document identifiers mentioning *author* within *verse_ids*."""
+
+    if not author:
+        return []
+
+    stmt = (
+        select(Document.id, Document.authors)
+        .join(Passage, Document.passages)
+        .join(PassageVerse, PassageVerse.passage_id == Passage.id)
+        .where(PassageVerse.verse_id.in_(verse_ids))
+        .distinct()
+    )
+
+    rows = session.execute(stmt).all()
+    allowed: list[str] = []
+    for doc_id, authors in rows:
+        if isinstance(authors, list) and author in authors:
+            allowed.append(doc_id)
+    return allowed
+
+
+def _parse_aggregated_ids(value: object, dialect_name: str) -> list[str]:
+    """Normalise aggregated identifier payloads from SQL into sorted strings."""
+
+    if value is None:
+        return []
+    if dialect_name == "postgresql" and isinstance(value, (list, tuple)):
+        candidates = [item for item in value if item]
+    elif isinstance(value, str):
+        candidates = [item for item in value.split(",") if item]
+    elif isinstance(value, (list, tuple, set)):
+        candidates = [item for item in value if item]
+    else:
+        candidates = [value] if value else []
+
+    return sorted({str(item) for item in candidates})
+
+
+def _coerce_bucket_start(value: object) -> date | None:
+    """Convert SQL bucket values into ``date`` instances."""
+
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value[:10])
+        except ValueError:  # pragma: no cover - defensive
+            return None
+    return None
+
+
+
+
+def _legacy_overlap_clause(column, verse_ids: list[int], dialect_name: str):
+    """Return a SQL expression mirroring the legacy array overlap logic."""
 
     if not verse_ids:
         return None
@@ -56,6 +113,58 @@ def _verse_overlap_clause(column, verse_ids: list[int], dialect_name: str):
     return column.isnot(None)
 
 
+def _bucket_start_expression(
+    window: Literal["week", "month", "quarter", "year"],
+    dialect_name: str,
+):
+    """Return a SQL expression yielding the bucket start date for *window*."""
+
+    if dialect_name == "sqlite":
+        reference_date = func.coalesce(Document.pub_date, func.date(Document.created_at))
+        weekday = cast(func.strftime("%w", reference_date), Integer)
+
+        if window == "week":
+            return case(
+                (weekday == 0, func.date(reference_date, "-6 day")),
+                (weekday == 1, reference_date),
+                (weekday == 2, func.date(reference_date, "-1 day")),
+                (weekday == 3, func.date(reference_date, "-2 day")),
+                (weekday == 4, func.date(reference_date, "-3 day")),
+                (weekday == 5, func.date(reference_date, "-4 day")),
+                (weekday == 6, func.date(reference_date, "-5 day")),
+                else_=reference_date,
+            )
+
+        if window == "month":
+            return func.date(reference_date, "start of month")
+
+        if window == "quarter":
+            month = cast(func.strftime("%m", reference_date), Integer)
+            quarter_start = case(
+                (month <= 3, "01"),
+                (month <= 6, "04"),
+                (month <= 9, "07"),
+                else_="10",
+            )
+            return func.date(
+                func.printf("%s-%s-01", func.strftime("%Y", reference_date), quarter_start)
+            )
+
+        return func.date(func.printf("%s-01-01", func.strftime("%Y", reference_date)))
+
+    reference_ts = func.coalesce(cast(Document.pub_date, DateTime), Document.created_at)
+    if window == "week":
+        bucket_ts = func.date_trunc("week", reference_ts)
+    elif window == "month":
+        bucket_ts = func.date_trunc("month", reference_ts)
+    elif window == "quarter":
+        bucket_ts = func.date_trunc("quarter", reference_ts)
+    else:
+        bucket_ts = func.date_trunc("year", reference_ts)
+
+    return cast(bucket_ts, Date)
+
+
 def get_mentions_for_osis(
     session: Session,
     osis: str,
@@ -67,30 +176,53 @@ def get_mentions_for_osis(
     if not verse_ids:
         return []
 
-    bind = session.get_bind()
-    dialect_name = bind.dialect.name if bind is not None else ""
-    overlap_clause = _verse_overlap_clause(Passage.osis_verse_ids, verse_ids, dialect_name)
-    if overlap_clause is None:
-        return []
-
     stmt = (
         select(Passage)
+        .join(PassageVerse, PassageVerse.passage_id == Passage.id)
         .join(Document, Passage.document)
         .options(joinedload(Passage.document))
-        .where(Passage.osis_verse_ids.isnot(None))
-        .where(overlap_clause)
+        .where(PassageVerse.verse_id.in_(verse_ids))
     )
+
+    allowed_doc_ids: list[str] | None = None
     if filters:
         if filters.source_type:
             stmt = stmt.where(Document.source_type == filters.source_type)
         if filters.collection:
             stmt = stmt.where(Document.collection == filters.collection)
+        if filters.author:
+            allowed_doc_ids = _document_ids_for_author(session, verse_ids, filters.author)
+            if not allowed_doc_ids:
+                return []
+            stmt = stmt.where(Document.id.in_(allowed_doc_ids))
 
     result = session.execute(
-        stmt.execution_options(stream_results=True, yield_per=128)
+        stmt.execution_options(stream_results=True)
     )
+    passages = list(result.scalars().unique())
+
+    if not passages:
+        bind = session.get_bind()
+        dialect_name = bind.dialect.name if bind is not None else ""
+        overlap_clause = _legacy_overlap_clause(Passage.osis_verse_ids, verse_ids, dialect_name)
+        if overlap_clause is not None:
+            legacy_stmt = (
+                select(Passage)
+                .join(Document, Passage.document)
+                .options(joinedload(Passage.document))
+                .where(Passage.osis_verse_ids.isnot(None))
+                .where(overlap_clause)
+            )
+            if filters:
+                if filters.source_type:
+                    legacy_stmt = legacy_stmt.where(Document.source_type == filters.source_type)
+                if filters.collection:
+                    legacy_stmt = legacy_stmt.where(Document.collection == filters.collection)
+            legacy_result = session.execute(legacy_stmt.execution_options(stream_results=True))
+            passages = list(legacy_result.scalars())
+
     mentions: list[VerseMention] = []
-    for passage in result.scalars():
+    for passage in passages:
         document = passage.document
         if document is None:
             continue
@@ -166,14 +298,91 @@ def _period_bounds(moment: date, window: Literal["week", "month", "quarter", "ye
 
 
 
-@dataclass
-class _BucketData:
-    label: str
-    start: datetime
-    end: datetime
-    count: int = 0
-    document_ids: set[str] = field(default_factory=set)
-    sample_passage_ids: set[str] = field(default_factory=set)
+
+
+def _legacy_timeline(
+    session: Session,
+    verse_ids: list[int],
+    filters: VerseMentionsFilters | None,
+    window: Literal["week", "month", "quarter", "year"],
+    limit: int | None,
+    dialect_name: str,
+) -> tuple[list[VerseTimelineBucket], int]:
+    overlap_clause = _legacy_overlap_clause(Passage.osis_verse_ids, verse_ids, dialect_name)
+    if overlap_clause is None:
+        return [], 0
+
+    stmt = (
+        select(Passage)
+        .join(Document, Passage.document)
+        .options(joinedload(Passage.document))
+        .where(Passage.osis_verse_ids.isnot(None))
+        .where(overlap_clause)
+    )
+
+    if filters:
+        if filters.source_type:
+            stmt = stmt.where(Document.source_type == filters.source_type)
+        if filters.collection:
+            stmt = stmt.where(Document.collection == filters.collection)
+
+    result = session.execute(stmt.execution_options(stream_results=True))
+
+    bucket_map: dict[datetime, dict[str, object]] = {}
+    for passage in result.scalars():
+        document = passage.document
+        if document is None:
+            continue
+
+        if filters and filters.author:
+            authors = document.authors or []
+            if filters.author not in authors:
+                continue
+
+        reference_date = document.pub_date or (
+            document.created_at.date() if document.created_at else None
+        )
+        if not reference_date:
+            continue
+
+        label, start_dt, end_dt = _period_bounds(reference_date, window)
+        data = bucket_map.setdefault(
+            start_dt,
+            {
+                "label": label,
+                "start": start_dt,
+                "end": end_dt,
+                "count": 0,
+                "docs": set(),
+                "passages": set(),
+            },
+        )
+        data["count"] = int(data["count"]) + 1
+        typing_cast(set, data["docs"]).add(document.id)
+        typing_cast(set, data["passages"]).add(passage.id)
+
+    sorted_keys = sorted(bucket_map.keys())
+    if limit and limit > 0:
+        sorted_keys = sorted_keys[-limit:]
+
+    buckets: list[VerseTimelineBucket] = []
+    total_mentions = 0
+    for key in sorted_keys:
+        data = bucket_map[key]
+        count = int(data["count"])
+        total_mentions += count
+        buckets.append(
+            VerseTimelineBucket(
+                label=data["label"],
+                start=data["start"],
+                end=data["end"],
+                count=count,
+                document_ids=sorted(typing_cast(set, data["docs"])),
+                sample_passage_ids=sorted(typing_cast(set, data["passages"])),
+            )
+        )
+
+    return buckets, total_mentions
 
 
 def get_verse_timeline(
@@ -197,79 +406,87 @@ def get_verse_timeline(
 
     bind = session.get_bind()
     dialect_name = bind.dialect.name if bind is not None else ""
-    overlap_clause = _verse_overlap_clause(Passage.osis_verse_ids, verse_ids, dialect_name)
+
+    bucket_start = _bucket_start_expression(window, dialect_name).label("bucket_start")
+    mention_count = func.count(func.distinct(Passage.id)).label("mention_count")
+    if dialect_name == "postgresql":
+        document_ids_expr = func.array_agg(func.distinct(Document.id)).label("document_ids")
+        passage_ids_expr = func.array_agg(func.distinct(Passage.id)).label("passage_ids")
+    else:
+        document_ids_expr = func.group_concat(func.distinct(Document.id)).label("document_ids")
+        passage_ids_expr = func.group_concat(func.distinct(Passage.id)).label("passage_ids")
 
     stmt = (
-        select(Passage)
+        select(bucket_start, mention_count, document_ids_expr, passage_ids_expr)
+        .join(PassageVerse, PassageVerse.passage_id == Passage.id)
         .join(Document, Passage.document)
-        .options(joinedload(Passage.document))
-        .where(Passage.osis_verse_ids.isnot(None))
+        .where(PassageVerse.verse_id.in_(verse_ids))
+        .where(func.coalesce(Document.pub_date, Document.created_at).isnot(None))
     )
 
-    if overlap_clause is not None:
-        stmt = stmt.where(overlap_clause)
-    else:
-        stmt = stmt.where(false())
-
+    allowed_doc_ids: list[str] | None = None
     if filters:
         if filters.source_type:
             stmt = stmt.where(Document.source_type == filters.source_type)
         if filters.collection:
             stmt = stmt.where(Document.collection == filters.collection)
+        if filters.author:
+            allowed_doc_ids = _document_ids_for_author(session, verse_ids, filters.author)
+            if not allowed_doc_ids:
+                return VerseTimelineResponse(osis=osis, window=window, buckets=[], total_mentions=0)
+            stmt = stmt.where(Document.id.in_(allowed_doc_ids))
 
-    result = session.execute(
-        stmt.execution_options(stream_results=True, yield_per=256)
-    )
-    bucket_map: dict[datetime, _BucketData] = {}
+    stmt = stmt.group_by(bucket_start).order_by(bucket_start)
 
-    for passage in result.scalars():
-        document = passage.document
-        if document is None:
+    rows = session.execute(stmt).all()
+
+    bucket_records: list[tuple[datetime, int, VerseTimelineBucket]] = []
+    for bucket_value, count_value, doc_values, passage_values in rows:
+        bucket_date = _coerce_bucket_start(bucket_value)
+        if not bucket_date:
             continue
 
-        if filters and filters.author:
-            authors = document.authors or []
-            if filters.author not in authors:
-                continue
-
-        reference_date = document.pub_date or (
-            document.created_at.date() if document.created_at else None
-        )
-        if not reference_date:
-            continue
-
-        label, start, end = _period_bounds(reference_date, window)
-        bucket = bucket_map.setdefault(
-            start,
-            _BucketData(
-                label=label,
-                start=start,
-                end=end,
-            ),
-        )
-        bucket.count = int(bucket.count) + 1
-        bucket.document_ids.add(document.id)
-        bucket.sample_passage_ids.add(passage.id)
-
-    sorted_keys = sorted(bucket_map.keys())
-    if limit is not None and limit > 0:
-        sorted_keys = sorted_keys[-limit:]
-
-    buckets: list[VerseTimelineBucket] = []
-    for key in sorted_keys:
-        data = bucket_map[key]
-        buckets.append(
-            VerseTimelineBucket(
-                label=data.label,
-                start=data.start,
-                end=data.end,
-                count=int(data.count),
-                document_ids=sorted(data.document_ids),
-                sample_passage_ids=sorted(data.sample_passage_ids),
+        label, start_dt, end_dt = _period_bounds(bucket_date, window)
+        document_ids = _parse_aggregated_ids(doc_values, dialect_name)
+        passage_ids = _parse_aggregated_ids(passage_values, dialect_name)
+        count_int = int(count_value or 0)
+        bucket_records.append(
+            (
+                start_dt,
+                count_int,
+                VerseTimelineBucket(
+                    label=label,
+                    start=start_dt,
+                    end=end_dt,
+                    count=count_int,
+                    document_ids=document_ids,
+                    sample_passage_ids=passage_ids,
+                ),
             )
         )
 
-    total_mentions = sum(bucket.count for bucket in buckets)
+    if not bucket_records:
+        legacy_buckets, legacy_total = _legacy_timeline(
+            session=session,
+            verse_ids=verse_ids,
+            filters=filters,
+            window=window,
+            limit=limit,
+            dialect_name=dialect_name,
+        )
+        if legacy_buckets:
+            return VerseTimelineResponse(
+                osis=osis,
+                window=window,
+                buckets=legacy_buckets,
+                total_mentions=legacy_total,
+            )
+
+    if limit and limit > 0:
+        bucket_records = bucket_records[-limit:]
+
+    buckets = [bucket for _, _, bucket in bucket_records]
+    total_mentions = sum(count for _, count, _ in bucket_records)
 
     return VerseTimelineResponse(
         osis=osis,

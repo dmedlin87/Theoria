@@ -292,12 +292,35 @@ class Passage(Base):
     tei_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="passages")
+    verses: Mapped[list["PassageVerse"]] = relationship(
+        "PassageVerse",
+        back_populates="passage",
+        cascade="all, delete-orphan",
+    )
     case_object: Mapped["CaseObject | None"] = relationship(
         "CaseObject",
         back_populates="passage",
         cascade="all, delete-orphan",
         uselist=False,
     )
+
+
+class PassageVerse(Base):
+    """Association table connecting passages to verse identifiers."""
+
+    __tablename__ = "passage_verses"
+    __table_args__ = (
+        Index("ix_passage_verses_verse_id", "verse_id"),
+    )
+
+    passage_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("passages.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    verse_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    passage: Mapped["Passage"] = relationship("Passage", back_populates="verses")
 
 
 class AppSetting(Base):
