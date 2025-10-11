@@ -35,6 +35,36 @@ def _prepare_database(tmp_path: Path) -> None:
     Base.metadata.create_all(engine)
 
 
+def _capture_span_attributes(monkeypatch):
+    recorded = []
+
+    def _record(span, key, value):  # noqa: ANN001
+        recorded.append((key, value))
+
+    monkeypatch.setattr(pipeline, "set_span_attribute", _record)
+    return recorded
+
+
+def _assert_ingest_metrics(recorded, document_id: str, expected_cache_status: str) -> None:
+    ingest_attributes = {}
+    for key, value in recorded:
+        if key.startswith("ingest."):
+            ingest_attributes[key] = value
+
+    assert "ingest.chunk_count" in ingest_attributes
+    chunk_count = ingest_attributes["ingest.chunk_count"]
+    assert chunk_count >= 1
+
+    assert "ingest.batch_size" in ingest_attributes
+    assert ingest_attributes["ingest.batch_size"] == min(chunk_count, 32)
+
+    assert "ingest.cache_status" in ingest_attributes
+    assert ingest_attributes["ingest.cache_status"] == expected_cache_status
+
+    assert "ingest.document_id" in ingest_attributes
+    assert ingest_attributes["ingest.document_id"] == document_id
+
+
 def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
     """File ingestion stores a document, passages, and artifacts."""
 
@@ -74,6 +104,38 @@ def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
         stored_frontmatter = json.loads(frontmatter_path.read_text("utf-8"))
         assert stored_frontmatter["title"] == "Sample Doc"
         assert stored_frontmatter["authors"] == ["Jane Doe"]
+    finally:
+        settings.storage_root = original_storage
+
+
+def test_run_pipeline_for_file_records_span_metrics(tmp_path, monkeypatch) -> None:
+    """File ingestion records span metrics alongside persistence."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    settings.storage_root = tmp_path / "storage"
+
+    recorded = _capture_span_attributes(monkeypatch)
+
+    try:
+        markdown = "---\ntitle: Telemetry Doc\n---\n\nShort body."
+        doc_path = tmp_path / "telemetry.md"
+        doc_path.write_text(markdown, encoding="utf-8")
+
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document_id = document.id
+
+        with Session(engine) as session:
+            stored = session.get(Document, document_id)
+
+        assert stored is not None
+        assert stored.title == "Telemetry Doc"
+
+        _assert_ingest_metrics(recorded, document_id, "n/a")
     finally:
         settings.storage_root = original_storage
 
@@ -170,6 +232,42 @@ def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
         stored_frontmatter = json.loads(frontmatter_path.read_text("utf-8"))
         assert stored_frontmatter["title"] == "Example"
         assert stored_frontmatter["canonical_url"] == "https://example.com/foo"
+    finally:
+        settings.storage_root = original_storage
+
+
+def test_run_pipeline_for_url_records_span_metrics(tmp_path, monkeypatch) -> None:
+    """URL ingestion records span metrics alongside persistence."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    settings.storage_root = tmp_path / "storage"
+
+    recorded = _capture_span_attributes(monkeypatch)
+
+    def _fake_fetch(settings_obj, url: str):
+        html = "<html><head><title>Example</title></head><body><p>Hello world</p></body></html>"
+        metadata = {"title": "Example", "canonical_url": url}
+        return html, metadata
+
+    monkeypatch.setattr(pipeline, "_fetch_web_document", _fake_fetch)
+
+    try:
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_url(session, "https://example.com/foo")
+            document_id = document.id
+
+        with Session(engine) as session:
+            stored = session.get(Document, document_id)
+
+        assert stored is not None
+        assert stored.title == "Example"
+        assert stored.source_type == "web_page"
+
+        _assert_ingest_metrics(recorded, document_id, "n/a")
     finally:
         settings.storage_root = original_storage
 
@@ -344,6 +442,45 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
 
         assert stored is not None
         assert stored.source_url is None
+    finally:
+        settings.storage_root = original_storage
+
+
+def test_run_pipeline_for_transcript_records_span_metrics(tmp_path, monkeypatch) -> None:
+    """Transcript ingestion records span metrics alongside persistence."""
+
+    _prepare_database(tmp_path)
+    engine = get_engine()
+
+    settings = get_settings()
+    original_storage = settings.storage_root
+    settings.storage_root = tmp_path / "storage"
+
+    recorded = _capture_span_attributes(monkeypatch)
+
+    try:
+        transcript_path = tmp_path / "segments.json"
+        segments = [{"text": "Hello world", "start": 0.0, "end": 2.5}]
+        transcript_path.write_text(json.dumps(segments), encoding="utf-8")
+
+        frontmatter = {"title": "Transcript Doc", "source_url": "https://example.com/video"}
+
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_transcript(
+                session,
+                transcript_path,
+                frontmatter=frontmatter,
+            )
+            document_id = document.id
+
+        with Session(engine) as session:
+            stored = session.get(Document, document_id)
+
+        assert stored is not None
+        assert stored.title == "Transcript Doc"
+        assert stored.source_type == "transcript"
+
+        _assert_ingest_metrics(recorded, document_id, "n/a")
     finally:
         settings.storage_root = original_storage
 
