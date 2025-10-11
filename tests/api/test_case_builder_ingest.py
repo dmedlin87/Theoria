@@ -17,10 +17,8 @@ from theo.services.api.app.db.models import (
     Passage,
 )
 from theo.services.api.app.ingest.chunking import Chunk
-from theo.services.api.app.ingest.persistence import (
-    PersistenceDependencies,
-    persist_text_document,
-)
+from theo.services.api.app.ingest.persistence import persist_text_document
+from theo.services.api.app.ingest.stages import IngestContext, Instrumentation
 
 
 @pytest.fixture()
@@ -186,20 +184,21 @@ def test_persist_text_document_invokes_case_builder_sync(
         _fake_sync,
     )
 
-    dependencies = PersistenceDependencies(
-        embedding_service=_DummyEmbeddingService(settings.embedding_dim)
+    context = IngestContext(
+        settings=settings,
+        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        instrumentation=Instrumentation(span=None),
     )
 
     chunk = Chunk(text="Sample text", start_char=0, end_char=11, index=0)
 
     persist_text_document(
         sqlite_session,
-        dependencies=dependencies,
+        context=context,
         chunks=[chunk],
         parser="plain",
         parser_version="1.0.0",
         frontmatter={},
-        settings=settings,
         sha256="case-builder-test",
         source_type="txt",
         title="Sample",
@@ -225,19 +224,20 @@ def test_persist_text_document_does_not_call_case_builder_when_disabled(
         _fail_sync,
     )
 
-    dependencies = PersistenceDependencies(
-        embedding_service=_DummyEmbeddingService(settings.embedding_dim)
+    context = IngestContext(
+        settings=settings,
+        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        instrumentation=Instrumentation(span=None),
     )
     chunk = Chunk(text="Sample text", start_char=0, end_char=11, index=0)
 
     persist_text_document(
         sqlite_session,
-        dependencies=dependencies,
+        context=context,
         chunks=[chunk],
         parser="plain",
         parser_version="1.0.0",
         frontmatter={},
-        settings=settings,
         sha256="case-builder-test-disabled",
         source_type="txt",
         title="Sample",
