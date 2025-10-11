@@ -107,6 +107,49 @@ class PipelineDependencies:
         return PersistenceDependencies(embedding_service=service)
 
 
+def _resolve_context(
+    dependencies: PipelineDependencies | None,
+):
+    """Resolve shared runtime state for orchestration entry points."""
+
+    pipeline_dependencies = dependencies or PipelineDependencies()
+    persistence_dependencies = pipeline_dependencies.for_persistence()
+    settings = get_settings()
+    return settings, persistence_dependencies
+
+
+def _hash_parser_result(parser_result: ParserResult) -> str:
+    payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _persist_parser_result(
+    persist_fn,
+    *,
+    session: Session,
+    parser_result: ParserResult,
+    persistence_dependencies: PersistenceDependencies,
+    settings,
+    span,
+    cache_status: str | None = "n/a",
+    **persist_kwargs,
+):
+    """Persist parsed content while recording common telemetry."""
+
+    chunk_count = len(parser_result.chunks)
+    set_span_attribute(span, "ingest.chunk_count", chunk_count)
+    set_span_attribute(span, "ingest.batch_size", min(chunk_count, 32))
+    if cache_status is not None:
+        set_span_attribute(span, "ingest.cache_status", cache_status)
+
+    document = persist_fn(
+        session,
+        dependencies=persistence_dependencies,
+        chunks=parser_result.chunks,
+        parser=parser_result.parser,
+        parser_version=parser_result.parser_version,
+        frontmatter=persist_kwargs.pop("frontmatter"),
+        settings=settings,
 def _resolve_dependencies(
     dependencies: PipelineDependencies | None,
 ) -> PersistenceDependencies:
@@ -277,6 +320,11 @@ def run_pipeline_for_file(
         )
 
         if source_type == "transcript":
+            document = _persist_parser_result(
+                persist_transcript_document,
+                session=session,
+                parser_result=parser_result,
+                persistence_dependencies=persistence_dependencies,
             return _ingest_transcript_document(
                 session,
                 span,
@@ -284,7 +332,9 @@ def run_pipeline_for_file(
                 parser_result=parser_result,
                 frontmatter=merged_frontmatter,
                 settings=settings,
+                span=span,
                 sha256=sha256,
+                frontmatter=merged_frontmatter,
                 source_type="transcript",
                 title=merged_frontmatter.get("title") or path.stem,
                 cache_status="n/a",
@@ -292,6 +342,13 @@ def run_pipeline_for_file(
                 transcript_path=path,
                 transcript_filename=path.name,
             )
+            return document
+
+        document = _persist_parser_result(
+            persist_text_document,
+            session=session,
+            parser_result=parser_result,
+            persistence_dependencies=persistence_dependencies,
 
         return _ingest_text_document(
             session,
@@ -300,7 +357,9 @@ def run_pipeline_for_file(
             parser_result=parser_result,
             frontmatter=merged_frontmatter,
             settings=settings,
+            span=span,
             sha256=sha256,
+            frontmatter=merged_frontmatter,
             source_type=source_type,
             title=merged_frontmatter.get("title") or path.stem,
             cache_status="n/a",
@@ -308,6 +367,7 @@ def run_pipeline_for_file(
             text_content=text_content,
             original_path=path,
         )
+        return document
 
 
 def run_pipeline_for_url(
@@ -320,9 +380,7 @@ def run_pipeline_for_url(
 ) -> Document:
     """Ingest supported URLs into the document store."""
 
-    persistence_dependencies = _resolve_dependencies(dependencies)
-
-    settings = get_settings()
+    settings, persistence_dependencies = _resolve_context(dependencies)
     with instrument_workflow(
         "ingest.url", source_url=url, requested_source_type=source_type
     ) as span:
@@ -342,22 +400,22 @@ def run_pipeline_for_url(
 
             segments, transcript_path = load_youtube_transcript(settings, video_id)
             parser_result = prepare_transcript_chunks(segments, settings=settings)
-            sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
-                "utf-8"
-            )
-            sha256 = hashlib.sha256(sha_payload).hexdigest()
+            sha256 = _hash_parser_result(parser_result)
 
             cache_status = "hit" if transcript_path else "miss"
             if transcript_path:
                 set_span_attribute(span, "ingest.transcript_fixture", transcript_path.name)
-            return _ingest_transcript_document(
-                session,
-                span,
-                dependencies=persistence_dependencies,
+
+            document = _persist_parser_result(
+                persist_transcript_document,
+                session=session,
                 parser_result=parser_result,
-                frontmatter=merged_frontmatter,
+                persistence_dependencies=persistence_dependencies,
                 settings=settings,
+                span=span,
+                cache_status=cache_status,
                 sha256=sha256,
+                frontmatter=merged_frontmatter,
                 source_type="youtube",
                 title=merged_frontmatter.get("title")
                 or metadata.get("title")
@@ -371,6 +429,7 @@ def run_pipeline_for_url(
                 transcript_path=transcript_path,
                 transcript_filename=(transcript_path.name if transcript_path else None),
             )
+            return document
 
         if resolved_source_type not in {"web_page", "html", "website"}:
             raise UnsupportedSourceError(
@@ -388,17 +447,17 @@ def run_pipeline_for_url(
 
         merged_frontmatter = merge_metadata(metadata, load_frontmatter(frontmatter))
         parser_result = prepare_text_chunks(text_content, settings=settings)
-        sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
-        sha256 = hashlib.sha256(sha_payload).hexdigest()
+        sha256 = _hash_parser_result(parser_result)
 
-        return _ingest_text_document(
-            session,
-            span,
-            dependencies=persistence_dependencies,
+        document = _persist_parser_result(
+            persist_text_document,
+            session=session,
             parser_result=parser_result,
-            frontmatter=merged_frontmatter,
+            persistence_dependencies=persistence_dependencies,
             settings=settings,
+            span=span,
             sha256=sha256,
+            frontmatter=merged_frontmatter,
             source_type="web_page",
             title=merged_frontmatter.get("title") or metadata.get("title") or url,
             cache_status="n/a",
@@ -409,6 +468,7 @@ def run_pipeline_for_url(
             raw_content=html,
             raw_filename="source.html",
         )
+        return document
 
 
 def run_pipeline_for_transcript(
@@ -423,9 +483,7 @@ def run_pipeline_for_transcript(
 ) -> Document:
     """Ingest a transcript file and optional audio into the document store."""
 
-    persistence_dependencies = _resolve_dependencies(dependencies)
-
-    settings = get_settings()
+    settings, persistence_dependencies = _resolve_context(dependencies)
     with instrument_workflow(
         "ingest.transcript",
         transcript_path=str(transcript_path),
@@ -436,24 +494,21 @@ def run_pipeline_for_transcript(
         segments = load_transcript(transcript_path)
         parser_result = prepare_transcript_chunks(segments, settings=settings)
 
-        sha_payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode(
-            "utf-8"
-        )
-        sha256 = hashlib.sha256(sha_payload).hexdigest()
+        sha256 = _hash_parser_result(parser_result)
 
         source_type = str(merged_frontmatter.get("source_type") or "transcript")
         title = merged_frontmatter.get("title") or transcript_path.stem
 
         set_span_attribute(span, "ingest.source_type", source_type)
-
-        return _ingest_transcript_document(
-            session,
-            span,
-            dependencies=persistence_dependencies,
+        document = _persist_parser_result(
+            persist_transcript_document,
+            session=session,
             parser_result=parser_result,
-            frontmatter=merged_frontmatter,
+            persistence_dependencies=persistence_dependencies,
             settings=settings,
+            span=span,
             sha256=sha256,
+            frontmatter=merged_frontmatter,
             source_type=source_type,
             title=title,
             cache_status="n/a",
@@ -466,6 +521,7 @@ def run_pipeline_for_transcript(
             transcript_filename=transcript_filename or transcript_path.name,
             audio_filename=audio_filename,
         )
+        return document
 
 def _refresh_creator_verse_rollups(
     session: Session, segments: Iterable[TranscriptSegment]
