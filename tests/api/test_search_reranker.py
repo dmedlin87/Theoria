@@ -13,6 +13,7 @@ from theo.services.api.app.main import app
 from theo.services.api.app.models.search import HybridSearchResult
 from theo.services.api.app.ranking.features import FEATURE_NAMES, extract_features
 from theo.services.api.app.routes import search as search_route
+from theo.services.api.app.services import retrieval_service as retrieval_service_module
 
 
 class _WeightedModel:
@@ -81,7 +82,7 @@ def test_search_without_reranker_preserves_order(monkeypatch: pytest.MonkeyPatch
     def _fake_search(session, request):  # type: ignore[unused-argument]
         return [item.model_copy(deep=True) for item in results]
 
-    monkeypatch.setattr(search_route, "hybrid_search", _fake_search)
+    monkeypatch.setattr(retrieval_service_module, "hybrid_search", _fake_search)
 
     with TestClient(app) as client:
         response = client.get("/search", params={"q": "query"})
@@ -106,7 +107,7 @@ def test_search_with_reranker_reorders_results(
     def _fake_search(session, request):  # type: ignore[unused-argument]
         return [item.model_copy(deep=True) for item in results]
 
-    monkeypatch.setattr(search_route, "hybrid_search", _fake_search)
+    monkeypatch.setattr(retrieval_service_module, "hybrid_search", _fake_search)
     monkeypatch.setenv("RERANKER_ENABLED", "true")
     monkeypatch.setenv("RERANKER_MODEL_PATH", str(model_path))
     monkeypatch.setenv("RERANKER_MODEL_SHA256", digest)
