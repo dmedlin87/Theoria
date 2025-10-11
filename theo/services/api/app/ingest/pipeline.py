@@ -34,6 +34,15 @@ from .stages.enrichers import DocumentEnricher
 from .stages.fetchers import FileSourceFetcher, TranscriptSourceFetcher, UrlSourceFetcher
 from .stages.parsers import FileParser, TranscriptParser, UrlParser
 from .stages.persisters import TextDocumentPersister, TranscriptDocumentPersister
+from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
+
+
+_resolve_host_addresses = ingest_network.resolve_host_addresses
+
+# Legacy alias retained for older tests/hooks that patch the private helper.
+# Keep this close to the imports so reloads and import * behaviour keep the
+# attribute available for existing integrations.
+_parse_text_file = parse_text_file
 
 
 __all__ = [
@@ -185,6 +194,38 @@ def run_pipeline_for_file(
         workflow="ingest.file",
         workflow_kwargs={"source_path": str(path), "source_name": path.name},
     )
+    settings, persistence_dependencies = _resolve_context(dependencies)
+    with instrument_workflow(
+        "ingest.file", source_path=str(path), source_name=path.name
+    ) as span:
+        try:
+            raw_bytes, read_meta = resilient_operation(
+                path.read_bytes,
+                key=f"ingest:file:read:{path.suffix or 'bin'}",
+                classification="file",
+                policy=ResiliencePolicy(max_attempts=2),
+            )
+        except ResilienceError as exc:
+            set_span_attribute(span, "resilience.file_read.category", exc.metadata.category)
+            set_span_attribute(span, "resilience.file_read.attempts", exc.metadata.attempts)
+            raise
+        else:
+            set_span_attribute(span, "resilience.file_read.attempts", read_meta.attempts)
+            set_span_attribute(span, "resilience.file_read.duration", read_meta.duration)
+        sha256 = hashlib.sha256(raw_bytes).hexdigest()
+
+        merged_frontmatter = merge_metadata(
+            {}, load_frontmatter(frontmatter)
+        )
+        source_type = detect_source_type(path, merged_frontmatter)
+        set_span_attribute(span, "ingest.source_type", source_type)
+
+        parser_result, merged_frontmatter, text_content = _prepare_parser_result(
+            source_type,
+            path,
+            frontmatter=merged_frontmatter,
+            settings=settings,
+        )
 
 
 def _url_title_default(state: dict[str, Any]) -> str:
@@ -239,6 +280,104 @@ def run_pipeline_for_url(
         workflow="ingest.url",
         workflow_kwargs={"source_url": url, "requested_source_type": source_type},
     )
+    settings, persistence_dependencies = _resolve_context(dependencies)
+    with instrument_workflow(
+        "ingest.url", source_url=url, requested_source_type=source_type
+    ) as span:
+        resolved_source_type = source_type or (
+            "youtube" if is_youtube_url(url) else "web_page"
+        )
+        set_span_attribute(span, "ingest.source_type", resolved_source_type)
+
+        ensure_url_allowed(settings, url)
+
+        if resolved_source_type == "youtube":
+            video_id = extract_youtube_video_id(url)
+            metadata = load_youtube_metadata(settings, video_id)
+            merged_frontmatter = merge_metadata(
+                metadata, load_frontmatter(frontmatter)
+            )
+
+            segments, transcript_path = load_youtube_transcript(settings, video_id)
+            parser_result = prepare_transcript_chunks(segments, settings=settings)
+            sha256 = _hash_parser_result(parser_result)
+
+            cache_status = "hit" if transcript_path else "miss"
+            if transcript_path:
+                set_span_attribute(span, "ingest.transcript_fixture", transcript_path.name)
+
+            document = _ingest_transcript_document(
+                session,
+                span,
+                dependencies=persistence_dependencies,
+                parser_result=parser_result,
+                frontmatter=merged_frontmatter,
+                settings=settings,
+                sha256=sha256,
+                source_type="youtube",
+                title=merged_frontmatter.get("title")
+                or metadata.get("title")
+                or f"YouTube Video {video_id}",
+                cache_status=cache_status,
+                source_url=merged_frontmatter.get("source_url") or url,
+                channel=merged_frontmatter.get("channel") or metadata.get("channel"),
+                video_id=video_id,
+                duration_seconds=merged_frontmatter.get("duration_seconds")
+                or metadata.get("duration_seconds"),
+                transcript_path=transcript_path,
+                transcript_filename=(transcript_path.name if transcript_path else None),
+            )
+            return document
+
+        else:
+            if resolved_source_type not in {"web_page", "html", "website"}:
+                raise UnsupportedSourceError(
+                    (
+                        "Unsupported source type for URL ingestion: "
+                        f"{resolved_source_type}. Supported types are: "
+                        "youtube, web_page, html, website"
+                    )
+                )
+
+            try:
+                (html, metadata), fetch_meta = _fetch_web_document(settings, url)
+            except ResilienceError as exc:
+                set_span_attribute(span, "resilience.network.category", exc.metadata.category)
+                set_span_attribute(span, "resilience.network.attempts", exc.metadata.attempts)
+                raise
+            else:
+                set_span_attribute(span, "resilience.network.attempts", fetch_meta.attempts)
+                set_span_attribute(span, "resilience.network.duration", fetch_meta.duration)
+            text_content = html_to_text(html)
+            if not text_content:
+                raise UnsupportedSourceError(
+                    "Fetched HTML did not contain extractable text"
+                )
+
+            merged_frontmatter = merge_metadata(metadata, load_frontmatter(frontmatter))
+            parser_result = prepare_text_chunks(text_content, settings=settings)
+            sha256 = _hash_parser_result(parser_result)
+
+            document = _ingest_text_document(
+                session,
+                span,
+                dependencies=persistence_dependencies,
+                parser_result=parser_result,
+                frontmatter=merged_frontmatter,
+                settings=settings,
+                sha256=sha256,
+                source_type="web_page",
+                title=merged_frontmatter.get("title") or metadata.get("title") or url,
+                cache_status="n/a",
+                source_url=merged_frontmatter.get("source_url")
+                or metadata.get("canonical_url")
+                or url,
+                text_content=parser_result.text,
+                raw_content=html,
+                raw_filename="source.html",
+            )
+
+            return document
 
 
 def run_pipeline_for_transcript(

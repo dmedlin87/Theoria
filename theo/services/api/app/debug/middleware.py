@@ -18,6 +18,7 @@ from .reporting import (
     build_debug_report,
     emit_debug_report,
 )
+from ..errors import TheoError
 
 
 class ErrorReportingMiddleware(BaseHTTPMiddleware):
@@ -51,6 +52,7 @@ class ErrorReportingMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except Exception as exc:
             report = self._build_report(request, body=body_capture, exc=exc)
+            self._attach_error_context(report, exc)
             emit_debug_report(report, logger=self.logger)
             if self.response_on_error:
                 payload = {"detail": "Internal Server Error", "debug_report_id": report.id}
@@ -59,10 +61,12 @@ class ErrorReportingMiddleware(BaseHTTPMiddleware):
 
         if self.include_client_errors and response.status_code >= 400:
             report = self._build_report(request, body=body_capture, exc=None)
+            self._attach_error_context(report, getattr(request.state, "_last_domain_error", None))
             report.context = {**report.context, "response_status": response.status_code}
             emit_debug_report(report, logger=self.logger)
         elif response.status_code >= 500:
             report = self._build_report(request, body=body_capture, exc=None)
+            self._attach_error_context(report, getattr(request.state, "_last_domain_error", None))
             report.context = {**report.context, "response_status": response.status_code}
             emit_debug_report(report, logger=self.logger)
 
@@ -169,6 +173,19 @@ class ErrorReportingMiddleware(BaseHTTPMiddleware):
             env_prefixes=self.env_prefixes,
             body_max_bytes=self.body_max_bytes,
         )
+
+    @staticmethod
+    def _attach_error_context(report: DebugReport, error: object | None) -> None:
+        if isinstance(error, TheoError):
+            enriched = {
+                "error_code": error.code,
+                "error_severity": error.severity.value,
+            }
+            if error.hint:
+                enriched["error_hint"] = error.hint
+            if error.data and "resilience" in error.data:
+                enriched["resilience"] = error.data["resilience"]
+            report.context = {**report.context, **enriched}
 
 
 __all__ = ["ErrorReportingMiddleware"]

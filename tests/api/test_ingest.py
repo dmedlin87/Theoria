@@ -19,6 +19,7 @@ from theo.services.api.app.core.database import get_session  # noqa: E402
 from theo.services.api.app.core.settings import Settings  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
+from theo.services.api.app.services import ingestion_service as ingestion_service_module  # noqa: E402
 from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E402
 from theo.services.api.app.ingest import network as network_module  # noqa: E402
 
@@ -82,7 +83,7 @@ def test_ingest_file_streams_large_upload_without_buffering(
         recorded_size["bytes"] = path.stat().st_size
         return _mkdoc()
 
-    monkeypatch.setattr(ingest_module, "run_pipeline_for_file", fake_pipeline)
+    monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_file", fake_pipeline)
 
     payload = b"x" * (11 * 1024 * 1024)
 
@@ -106,7 +107,7 @@ def test_ingest_file_logs_large_body_as_truncated(
     def failing_pipeline(_session, path: Path, frontmatter):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(ingest_module, "run_pipeline_for_file", failing_pipeline)
+    monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_file", failing_pipeline)
 
     payload = b"y" * (11 * 1024 * 1024)
 
@@ -139,7 +140,7 @@ def test_ingest_file_rejects_upload_exceeding_limit(
         called = True
         return _mkdoc()
 
-    monkeypatch.setattr(ingest_module, "run_pipeline_for_file", fake_pipeline)
+    monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_file", fake_pipeline)
 
     payload = b"z" * (2 * 1024 * 1024)
 
@@ -159,7 +160,7 @@ def test_ingest_url_allows_http(monkeypatch: pytest.MonkeyPatch, api_client: Tes
         captured["url"] = url
         return _mkdoc()
 
-    monkeypatch.setattr(ingest_module, "run_pipeline_for_url", fake_pipeline)
+    monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_url", fake_pipeline)
 
     response = api_client.post("/ingest/url", json={"url": "https://example.com"})
 
@@ -180,7 +181,7 @@ def test_ingest_url_rejects_disallowed_scheme(
     def fail_pipeline(*args, **kwargs):  # noqa: ANN001 - simple assertion helper
         raise AssertionError("URL validation should prevent pipeline execution")
 
-    monkeypatch.setattr(ingest_module, "run_pipeline_for_url", fail_pipeline)
+    monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_url", fail_pipeline)
 
     response = api_client.post("/ingest/url", json={"url": disallowed_url})
 
@@ -218,16 +219,20 @@ def test_simple_ingest_streams_progress(
     local_markdown.write_text("# Notes\n")
 
     items = [
-        ingest_module.cli_ingest.IngestItem(path=local_markdown, source_type="markdown"),
-        ingest_module.cli_ingest.IngestItem(url="https://example.com", source_type="web_page"),
+        ingestion_service_module.cli_ingest.IngestItem(path=local_markdown, source_type="markdown"),
+        ingestion_service_module.cli_ingest.IngestItem(url="https://example.com", source_type="web_page"),
     ]
 
     monkeypatch.setattr(
-        ingest_module.cli_ingest,
+        ingestion_service_module.cli_ingest,
         "_discover_items",
         lambda sources, allowlist=None: items,
     )
-    monkeypatch.setattr(ingest_module.cli_ingest, "_batched", lambda iterable, size: iter([list(iterable)]))
+    monkeypatch.setattr(
+        ingestion_service_module.cli_ingest,
+        "_batched",
+        lambda iterable, size: iter([list(iterable)]),
+    )
 
     captured_overrides: list[dict[str, object]] = []
 
@@ -237,7 +242,11 @@ def test_simple_ingest_streams_progress(
         assert post_batch_steps == set()
         return [f"doc-{idx}" for idx, _ in enumerate(batch, start=1)]
 
-    monkeypatch.setattr(ingest_module.cli_ingest, "_ingest_batch_via_api", fake_ingest)
+    monkeypatch.setattr(
+        ingestion_service_module.cli_ingest,
+        "_ingest_batch_via_api",
+        fake_ingest,
+    )
 
     with api_client.stream(
         "POST",
@@ -255,7 +264,10 @@ def test_simple_ingest_streams_progress(
     assert "processed" in event_names
     assert event_names[-1] == "complete"
     assert captured_overrides == [
-        {"collection": "archive", "author": ingest_module.cli_ingest.DEFAULT_AUTHOR}
+        {
+            "collection": "archive",
+            "author": ingestion_service_module.cli_ingest.DEFAULT_AUTHOR,
+        }
     ]
 
 
@@ -265,7 +277,11 @@ def test_simple_ingest_rejects_bad_source(
     def fail_discovery(_sources, allowlist=None):  # noqa: ANN001 - simple failure helper
         raise ValueError("Path 'missing' does not exist")
 
-    monkeypatch.setattr(ingest_module.cli_ingest, "_discover_items", fail_discovery)
+    monkeypatch.setattr(
+        ingestion_service_module.cli_ingest,
+        "_discover_items",
+        fail_discovery,
+    )
 
     response = api_client.post("/ingest/simple", json={"sources": ["missing"]})
 
@@ -285,19 +301,40 @@ def test_simple_ingest_allows_sources_under_configured_roots(
     settings.simple_ingest_allowed_roots = [allowed_root]
     monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
 
+    custom_service = ingestion_service_module.IngestionService(
+        settings=settings,
+        run_file_pipeline=ingestion_service_module.run_pipeline_for_file,
+        run_url_pipeline=ingestion_service_module.run_pipeline_for_url,
+        run_transcript_pipeline=ingestion_service_module.run_pipeline_for_transcript,
+        cli_module=ingestion_service_module.cli_ingest,
+        log_workflow=lambda *a, **k: None,
+    )
+    app.dependency_overrides[
+        ingestion_service_module.get_ingestion_service
+    ] = lambda: custom_service
+
     def fake_ingest(batch, overrides, post_batch_steps):  # noqa: ANN001 - test helper
         assert len(batch) == 1
         return ["doc-1"]
 
-    monkeypatch.setattr(ingest_module.cli_ingest, "_ingest_batch_via_api", fake_ingest)
+    monkeypatch.setattr(
+        ingestion_service_module.cli_ingest,
+        "_ingest_batch_via_api",
+        fake_ingest,
+    )
 
-    with api_client.stream(
-        "POST",
-        "/ingest/simple",
-        json={"sources": [str(allowed_file)]},
-    ) as response:
-        assert response.status_code == status.HTTP_200_OK
-        payload = [line for line in response.iter_lines() if line]
+    try:
+        with api_client.stream(
+            "POST",
+            "/ingest/simple",
+            json={"sources": [str(allowed_file)]},
+        ) as response:
+            assert response.status_code == status.HTTP_200_OK
+            payload = [line for line in response.iter_lines() if line]
+    finally:
+        app.dependency_overrides.pop(
+            ingestion_service_module.get_ingestion_service, None
+        )
 
     events = [json.loads(line) for line in payload]
     assert any(event.get("event") == "processed" for event in events)
@@ -317,10 +354,27 @@ def test_simple_ingest_rejects_sources_outside_allowlist(
     settings.simple_ingest_allowed_roots = [allowed_root]
     monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
 
-    response = api_client.post(
-        "/ingest/simple",
-        json={"sources": [str(forbidden_file)]},
+    custom_service = ingestion_service_module.IngestionService(
+        settings=settings,
+        run_file_pipeline=ingestion_service_module.run_pipeline_for_file,
+        run_url_pipeline=ingestion_service_module.run_pipeline_for_url,
+        run_transcript_pipeline=ingestion_service_module.run_pipeline_for_transcript,
+        cli_module=ingestion_service_module.cli_ingest,
+        log_workflow=lambda *a, **k: None,
     )
+    app.dependency_overrides[
+        ingestion_service_module.get_ingestion_service
+    ] = lambda: custom_service
+
+    try:
+        response = api_client.post(
+            "/ingest/simple",
+            json={"sources": [str(forbidden_file)]},
+        )
+    finally:
+        app.dependency_overrides.pop(
+            ingestion_service_module.get_ingestion_service, None
+        )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "not within an allowed ingest root" in response.json()["detail"]
@@ -345,7 +399,7 @@ def _install_url_pipeline_stub(
         call_counter["count"] += 1
         raise pipeline_module.UnsupportedSourceError(expected_failure_message)
 
-    monkeypatch.setattr(ingest_module, "run_pipeline_for_url", _fake_run)
+    monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_url", _fake_run)
 
     return call_counter
 
