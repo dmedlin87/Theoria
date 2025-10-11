@@ -138,6 +138,43 @@ def _metadata_first(metadata: Mapping[str, Any] | None, *keys: str) -> str | Non
     return None
 
 
+def _extract_passages(document: Any) -> list[dict[str, Any]] | None:
+    """Return serialisable passage entries for *document* if available."""
+
+    if isinstance(document, Mapping):
+        passages = document.get("passages")
+    else:
+        passages = getattr(document, "passages", None)
+
+    if not passages:
+        return None
+
+    serialised: list[dict[str, Any]] = []
+    for passage in passages:
+        if hasattr(passage, "model_dump"):
+            serialised.append(passage.model_dump(mode="json"))
+        elif isinstance(passage, Mapping):
+            serialised.append(dict(passage))
+        else:
+            payload: dict[str, Any] = {}
+            for field in (
+                "id",
+                "document_id",
+                "osis_ref",
+                "page_no",
+                "t_start",
+                "t_end",
+                "text",
+                "meta",
+            ):
+                if hasattr(passage, field):
+                    payload[field] = getattr(passage, field)
+            if payload:
+                serialised.append(payload)
+
+    return serialised or None
+
+
 def _coerce_str_list(value: Any) -> list[str] | None:
     if value is None:
         return None
@@ -163,8 +200,11 @@ def _coerce_int(value: Any) -> int | None:
 
 
 def _normalise_doi(value: Any) -> str | None:
+    """Normalise DOI strings to a canonical ``https://doi.org/...`` form."""
+
     if not isinstance(value, str):
         return None
+
     cleaned = value.strip()
     if not cleaned:
         return None
@@ -200,7 +240,41 @@ def _normalise_doi(value: Any) -> str | None:
         http_lower.startswith(prefix) for prefix in doi_http_prefixes
     ):
         return cleaned
+
+    lowered = cleaned.lower()
+    if lowered.startswith("http"):
+        # Assume fully qualified URLs are already canonical enough.
+        return cleaned
+
+    if lowered.startswith("doi:"):
+        cleaned = cleaned[len("doi:") :].strip()
+        lowered = cleaned.lower()
+
+    # Accept bare domains such as ``doi.org/10.123`` or ``dx.doi.org/10.123``.
+    for prefix in ("doi.org/", "dx.doi.org/"):
+        if lowered.startswith(prefix):
+            cleaned = cleaned[len(prefix) :].lstrip("/")
+            lowered = cleaned.lower()
+            break
+
+    if not cleaned:
+        return None
+
     return f"https://doi.org/{cleaned}"
+    lowered = cleaned.lower()
+    prefixes = (
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+        "doi:",
+    )
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            cleaned = cleaned[len(prefix) :].lstrip(" /")
+            lowered = cleaned.lower()
+            break
+    return cleaned or None
 
 
 def _normalise_author(name: str) -> dict[str, str]:
@@ -432,7 +506,7 @@ def build_citation_export(
 
     totals = {"citations": len(normalised_sources)}
     manifest = build_manifest(
-        export_type="citations",
+        export_type="documents",
         filters=dict(filters or {}),
         totals=totals,
         cursor=None,
@@ -444,7 +518,7 @@ def build_citation_export(
 
     records: list[OrderedDict[str, Any]] = []
     csl_entries: list[dict[str, Any]] = []
-    for source in normalised_sources:
+    for document, source in zip(documents, normalised_sources):
         anchor_entries = list(anchors.get(source.document_id, [])) if anchors else []
         citation_text, csl_entry = format_citation(
             source, style=style, anchors=anchor_entries
@@ -470,6 +544,9 @@ def build_citation_export(
         record["issue"] = source.issue
         if anchor_entries:
             record["anchors"] = anchor_entries
+        passages = _extract_passages(document)
+        if passages is not None:
+            record["passages"] = passages
         record["csl"] = csl_entry
         if source.metadata:
             record["metadata"] = source.metadata

@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.export.citations import (  # noqa: E402
+    CitationSource,
     build_citation_export,
     render_citation_markdown,
 )
@@ -76,3 +77,13 @@ def test_render_citation_markdown_matches_fixture(citation_fixture_data) -> None
     markdown = render_citation_markdown(fixed_manifest, records)
     expected_markdown = (fixtures_dir / "expected_markdown.md").read_text("utf-8")
     assert markdown == expected_markdown
+
+
+def test_citation_source_normalises_uppercase_prefix() -> None:
+    source = CitationSource.from_object({"document_id": "doc", "doi": "DOI:10.1000/ABC"})
+    assert source.doi == "https://doi.org/10.1000/ABC"
+
+
+def test_citation_source_handles_bare_doi_domain() -> None:
+    source = CitationSource.from_object({"document_id": "doc", "doi": "doi.org/10.1000/xyz"})
+    assert source.doi == "https://doi.org/10.1000/xyz"
