@@ -33,6 +33,7 @@ from .metadata import (
     coerce_datetime,
     coerce_int,
     collect_topics,
+    compute_passage_osis_range,
     derive_duration_from_chunks,
     ensure_list,
     extract_guardrail_profile,
@@ -421,6 +422,7 @@ def persist_text_document(
             meta.setdefault("topic_domains", topic_domains)
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         embedding = embeddings[idx] if idx < len(embeddings) else None
+        verse_start_id, verse_end_id = compute_passage_osis_range(osis_value, meta)
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
@@ -432,6 +434,8 @@ def persist_text_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
+            osis_start_verse_id=verse_start_id,
+            osis_end_verse_id=verse_end_id,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -813,6 +817,7 @@ def persist_transcript_document(
             meta.setdefault("topic_domains", topic_domains)
         osis_value = detected.primary or (chunk_hints[0] if chunk_hints else None)
         embedding = embeddings[idx] if idx < len(embeddings) else None
+        verse_start_id, verse_end_id = compute_passage_osis_range(osis_value, meta)
         passage = Passage(
             document_id=document.id,
             page_no=chunk.page_no,
@@ -824,6 +829,8 @@ def persist_transcript_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
+            osis_start_verse_id=verse_start_id,
+            osis_end_verse_id=verse_end_id,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,

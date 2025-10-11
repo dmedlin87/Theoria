@@ -6,10 +6,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from ..db.models import Document, Passage
-from ..ingest.osis import osis_intersects
+from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.base import Passage as PassageSchema
 from ..models.verses import (
     VerseMention,
@@ -48,12 +49,43 @@ def _collect_osis_refs(passage: Passage) -> set[str]:
     return refs
 
 
+def _target_range(osis: str) -> tuple[frozenset[int], int | None, int | None]:
+    """Expand *osis* into verse IDs, returning the IDs and range bounds."""
+
+    verse_ids = expand_osis_reference(osis)
+    if not verse_ids:
+        return frozenset(), None, None
+
+    start = min(verse_ids)
+    end = max(verse_ids)
+    return verse_ids, start, end
+
+
+def _refs_overlap_target(
+    refs: set[str], osis: str, target_ids: frozenset[int]
+) -> bool:
+    """Determine whether any reference overlaps the requested verse range."""
+
+    if not refs:
+        return False
+    if target_ids:
+        for reference in refs:
+            expanded = expand_osis_reference(reference)
+            if expanded and not expanded.isdisjoint(target_ids):
+                return True
+        return False
+    return any(osis_intersects(reference, osis) for reference in refs)
+
+
 def get_mentions_for_osis(
     session: Session,
     osis: str,
     filters: VerseMentionsFilters | None = None,
 ) -> list[VerseMention]:
     """Return passages whose OSIS reference intersects the requested range."""
+
+    target_ids, target_start, target_end = _target_range(osis)
+    use_range_filter = target_start is not None and target_end is not None
 
     query = (
         session.query(Passage, Document)
@@ -66,12 +98,34 @@ def get_mentions_for_osis(
         if filters.collection:
             query = query.filter(Document.collection == filters.collection)
 
+    if use_range_filter:
+        range_filter = and_(
+            Passage.osis_start_verse_id.isnot(None),
+            Passage.osis_end_verse_id.isnot(None),
+            Passage.osis_start_verse_id <= target_end,
+            Passage.osis_end_verse_id >= target_start,
+        )
+        query = query.filter(
+            or_(
+                Passage.osis_start_verse_id.is_(None),
+                Passage.osis_end_verse_id.is_(None),
+                range_filter,
+            )
+        )
+
     mentions: list[VerseMention] = []
     for passage, document in query.all():
         refs = _collect_osis_refs(passage)
         if not refs:
             continue
-        if not any(osis_intersects(ref, osis) for ref in refs):
+
+        if use_range_filter:
+            if (
+                passage.osis_start_verse_id is None
+                or passage.osis_end_verse_id is None
+            ) and not _refs_overlap_target(refs, osis, target_ids):
+                continue
+        elif not _refs_overlap_target(refs, osis, target_ids):
             continue
 
         if filters and filters.author:
@@ -165,6 +219,9 @@ def get_verse_timeline(
     if window not in _WINDOW_TYPES:
         raise ValueError(f"Unsupported timeline window: {window}")
 
+    target_ids, target_start, target_end = _target_range(osis)
+    use_range_filter = target_start is not None and target_end is not None
+
     query = (
         session.query(Passage, Document)
         .join(Document)
@@ -177,11 +234,35 @@ def get_verse_timeline(
         if filters.collection:
             query = query.filter(Document.collection == filters.collection)
 
+    if use_range_filter:
+        range_filter = and_(
+            Passage.osis_start_verse_id.isnot(None),
+            Passage.osis_end_verse_id.isnot(None),
+            Passage.osis_start_verse_id <= target_end,
+            Passage.osis_end_verse_id >= target_start,
+        )
+        query = query.filter(
+            or_(
+                Passage.osis_start_verse_id.is_(None),
+                Passage.osis_end_verse_id.is_(None),
+                range_filter,
+            )
+        )
+
     bucket_map: dict[datetime, _BucketData] = {}
 
     for passage, document in query.all():
         refs = _collect_osis_refs(passage)
-        if not refs or not any(osis_intersects(ref, osis) for ref in refs):
+        if not refs:
+            continue
+
+        if use_range_filter:
+            if (
+                passage.osis_start_verse_id is None
+                or passage.osis_end_verse_id is None
+            ) and not _refs_overlap_target(refs, osis, target_ids):
+                continue
+        elif not _refs_overlap_target(refs, osis, target_ids):
             continue
 
         if filters and filters.author:

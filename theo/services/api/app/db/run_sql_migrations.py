@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import json
 import logging
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
+from sqlalchemy import inspect, or_
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from ..core.database import get_engine
-from .models import AppSetting
+from ..ingest.metadata import compute_passage_osis_range
+from .models import AppSetting, Passage
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +171,139 @@ def _split_sql_statements(sql: str) -> list[str]:
 
 
 _SQLITE_PERSPECTIVE_MIGRATION = "20250129_add_perspective_to_contradiction_seeds.sql"
+_PASSAGE_RANGE_MIGRATION = "20250315_passage_osis_verse_ids.sql"
+
+
+def _normalise_passage_meta(meta: object) -> dict[str, object] | None:
+    """Convert persisted passage metadata into a dictionary when possible."""
+
+    if isinstance(meta, dict):
+        return meta
+    if isinstance(meta, str):
+        try:
+            loaded = json.loads(meta)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(loaded, dict):
+            return loaded
+    return None
+
+
+def _run_passage_verse_backfill(engine: Engine, *, batch_size: int = 500) -> int:
+    """Populate verse identifier ranges for existing passages in batches."""
+
+    inspector = inspect(engine)
+    if not inspector.has_table("passages"):
+        return 0
+
+    columns = {column["name"] for column in inspector.get_columns("passages")}
+    required = {"osis_start_verse_id", "osis_end_verse_id"}
+    if not required.issubset(columns):
+        logger.debug(
+            "Skipping passage verse backfill; required columns missing: %s",
+            ", ".join(sorted(required - columns)),
+        )
+        return 0
+
+    total_updated = 0
+    skipped_ids: set[str] = set()
+
+    with Session(engine) as session:
+        while True:
+            query = (
+                session.query(Passage)
+                .filter(
+                    or_(
+                        Passage.osis_start_verse_id.is_(None),
+                        Passage.osis_end_verse_id.is_(None),
+                    )
+                )
+                .filter(
+                    or_(
+                        Passage.osis_ref.isnot(None),
+                        Passage.meta.isnot(None),
+                    )
+                )
+                .order_by(Passage.id)
+                .limit(batch_size)
+            )
+            if skipped_ids:
+                query = query.filter(~Passage.id.in_(skipped_ids))
+
+            batch = query.all()
+            if not batch:
+                break
+
+            updated_in_batch = 0
+            newly_skipped: list[str] = []
+
+            for passage in batch:
+                meta = _normalise_passage_meta(passage.meta)
+                start_id, end_id = compute_passage_osis_range(passage.osis_ref, meta)
+                if start_id is None or end_id is None:
+                    newly_skipped.append(passage.id)
+                    continue
+
+                if (
+                    passage.osis_start_verse_id == start_id
+                    and passage.osis_end_verse_id == end_id
+                ):
+                    continue
+
+                passage.osis_start_verse_id = start_id
+                passage.osis_end_verse_id = end_id
+                updated_in_batch += 1
+
+            if updated_in_batch:
+                session.commit()
+                total_updated += updated_in_batch
+            else:
+                session.rollback()
+
+            if newly_skipped:
+                skipped_ids.update(newly_skipped)
+
+            if len(batch) < batch_size:
+                break
+
+    return total_updated
+
+
+_PYTHON_MIGRATIONS: list[tuple[str, Callable[[Engine], None]]] = [
+    ("20250315_backfill_passage_osis_verse_ids.py", _run_passage_verse_backfill),
+]
+
+
+def _run_python_migrations(
+    engine: Engine, *, force: bool = False
+) -> list[str]:
+    """Execute Python data migrations tracked alongside SQL scripts."""
+
+    applied: list[str] = []
+
+    with Session(engine) as session:
+        for name, handler in _PYTHON_MIGRATIONS:
+            key = _migration_key(name)
+            existing_entry = session.get(AppSetting, key)
+            if existing_entry and not force:
+                continue
+
+            logger.info("Applying Python migration: %s", name)
+            handler(engine)
+
+            session.merge(
+                AppSetting(
+                    key=key,
+                    value={
+                        "applied_at": datetime.now(UTC).isoformat(),
+                        "filename": name,
+                    },
+                )
+            )
+            session.commit()
+            applied.append(name)
+
+    return applied
 
 
 def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
@@ -246,6 +382,21 @@ def run_sql_migrations(
                 else:
                     continue
 
+            skip_passage_range_for_sqlite = False
+            if (
+                dialect_name == "sqlite"
+                and migration_name == _PASSAGE_RANGE_MIGRATION
+            ):
+                has_start = _sqlite_has_column(
+                    engine, "passages", "osis_start_verse_id"
+                )
+                has_end = _sqlite_has_column(engine, "passages", "osis_end_verse_id")
+                if has_start and has_end:
+                    logger.debug(
+                        "Skipping passage verse-id migration; columns already present on SQLite",
+                    )
+                    skip_passage_range_for_sqlite = True
+
             sql = path.read_text(encoding="utf-8")
             if not sql.strip():
                 logger.debug("Skipping empty migration file: %s", migration_name)
@@ -299,7 +450,7 @@ def run_sql_migrations(
                     )
                     should_execute = False
 
-            if should_execute:
+            if should_execute and not skip_passage_range_for_sqlite:
                 logger.info("Applying SQL migration: %s", migration_name)
                 if dialect_name == "postgresql" and _requires_autocommit(sql):
                     session.flush()
@@ -338,4 +489,5 @@ def run_sql_migrations(
             session.commit()
             applied.append(migration_name)
 
+    applied.extend(_run_python_migrations(engine, force=force))
     return applied

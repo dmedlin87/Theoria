@@ -14,7 +14,7 @@ from typing import Protocol, TypeAlias
 import yaml
 
 from .exceptions import UnsupportedSourceError
-from .osis import DetectedOsis, classify_osis_matches
+from .osis import DetectedOsis, classify_osis_matches, expand_osis_reference
 from .parsers import (
     PDF_EXTRACTION_UNSUPPORTED,
     ParserResult,
@@ -316,6 +316,46 @@ def normalise_passage_meta(
     if speakers:
         meta["speakers"] = speakers
     return meta
+
+
+def collect_passage_osis_refs(
+    osis_ref: str | None, meta: Mapping[str, object] | None
+) -> set[str]:
+    """Collect all OSIS references associated with a passage."""
+
+    refs: set[str] = set()
+    if osis_ref:
+        refs.add(osis_ref)
+    if isinstance(meta, Mapping):
+        for key in (
+            "primary_osis",
+            "osis_refs",
+            "osis_refs_all",
+            "osis_refs_detected",
+        ):
+            value = meta.get(key)
+            if isinstance(value, str) and value:
+                refs.add(value)
+            elif isinstance(value, (list, tuple, set)):
+                refs.update(str(item) for item in value if item)
+    return refs
+
+
+def compute_passage_osis_range(
+    osis_ref: str | None, meta: Mapping[str, object] | None
+) -> tuple[int | None, int | None]:
+    """Return the verse-id range covered by the supplied passage metadata."""
+
+    verse_ids: set[int] = set()
+    for reference in collect_passage_osis_refs(osis_ref, meta):
+        verse_ids.update(expand_osis_reference(reference))
+
+    if not verse_ids:
+        return None, None
+
+    start = min(verse_ids)
+    end = max(verse_ids)
+    return start, end
 
 
 class HTMLMetadataParser(HTMLParser):

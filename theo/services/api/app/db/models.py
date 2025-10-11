@@ -269,6 +269,12 @@ class Passage(Base):
     start_char: Mapped[int | None] = mapped_column(Integer, nullable=True)
     end_char: Mapped[int | None] = mapped_column(Integer, nullable=True)
     osis_ref: Mapped[str | None] = mapped_column(String, index=True)
+    osis_start_verse_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
+    osis_end_verse_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
