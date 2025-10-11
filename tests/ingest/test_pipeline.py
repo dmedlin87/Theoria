@@ -279,38 +279,38 @@ def test_run_pipeline_for_url_rejects_disallowed_scheme(monkeypatch) -> None:
 
 
 def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
-        """Unsafe source URLs are stripped during file ingestion."""
+    """Unsafe source URLs are stripped during file ingestion."""
 
-        _prepare_database(tmp_path)
-        engine = get_engine()
+    _prepare_database(tmp_path)
+    engine = get_engine()
 
-        settings = get_settings()
-        original_storage = settings.storage_root
-        storage_root = tmp_path / "storage"
-        settings.storage_root = storage_root
+    settings = get_settings()
+    original_storage = settings.storage_root
+    storage_root = tmp_path / "storage"
+    settings.storage_root = storage_root
 
-        try:
-            markdown = (
-                "---\n"
-                "title: Unsafe Doc\n"
-                "source_url: \"javascript:alert(1)\"\n"
-                "---\n\n"
-                "This document links to a javascript URI."
-            )
-            doc_path = tmp_path / "unsafe.md"
-            doc_path.write_text(markdown, encoding="utf-8")
+    try:
+        markdown = (
+            "---\n"
+            "title: Unsafe Doc\n"
+            "source_url: \"javascript:alert(1)\"\n"
+            "---\n\n"
+            "This document links to a javascript URI."
+        )
+        doc_path = tmp_path / "unsafe.md"
+        doc_path.write_text(markdown, encoding="utf-8")
 
-            with Session(engine) as session:
-                document = pipeline.run_pipeline_for_file(session, doc_path)
-                document_id = document.id
+        with Session(engine) as session:
+            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document_id = document.id
 
-            with Session(engine) as session:
-                stored = session.get(Document, document_id)
+        with Session(engine) as session:
+            stored = session.get(Document, document_id)
 
-            assert stored is not None
-            assert stored.source_url is None
-        finally:
-            settings.storage_root = original_storage
+        assert stored is not None
+        assert stored.source_url is None
+    finally:
+        settings.storage_root = original_storage
 
 
 def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> None:
