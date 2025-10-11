@@ -1,6 +1,6 @@
 # TheoEngine: Deep-Research Bible Reader & Critical Analysis Agent
 
-**Goal.** A verse-first Bible reader that turns every passage into a research workspace: textual variants, cross-references, morphology, historical context, contradiction/harmony checks, apologetic vs. skeptical notes, and citable evidence-on tap while you read.
+**Goal.** A verse-first Bible reader that turns every passage into a research workspace: textual variants, cross-references, morphology, historical context, contradiction/harmony checks, apologetic vs. skeptical notes, and citable evidence on tap while you read.
 
 **Why this approach.** Open biblical corpora (OSIS references, open translations and morphology datasets), cross-reference and geocoding datasets, and open scholarly indexes (e.g., OpenAlex/Crossref) now make a serious research UX feasible. The agent stays retrieval-grounded, runs short planning steps, calls tools for deterministic data, and only then writes analysis with citations.
 
@@ -44,7 +44,7 @@
 
 ---
 
-## 3) UX blueprint (reader-first, research-instant)
+## 3) UX blueprint (reader-first, research instant)
 
 **Layout**
 - **Top bar**: translation dropdown, search, **Mode** toggle (Neutral / Skeptical / Apologetic), "Deep-Dive" button.
