@@ -1099,25 +1099,12 @@ class CaseUserActionType(str, Enum):
 
 
 class CaseSource(Base):
-    """Normalized source metadata backing Case Builder objects."""
+    """Source metadata powering case-builder evidence objects."""
 
     __tablename__ = "case_sources"
     __table_args__ = (
         Index("ix_case_sources_document_id", "document_id"),
     )
-
-    id: Mapped[str] = mapped_column(
-        String, primary_key=True, default=lambda: str(uuid4())
-    )
-    document_id: Mapped[str | None] = mapped_column(
-        String,
-        ForeignKey("documents.id", ondelete="SET NULL"),
-        unique=True,
-        nullable=True,
-class CaseSource(Base):
-    """Source metadata powering case-builder evidence objects."""
-
-    __tablename__ = "case_sources"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
     document_id: Mapped[str | None] = mapped_column(
@@ -1318,8 +1305,6 @@ class CaseInsight(Base):
         "CaseUserAction",
         back_populates="insight",
         cascade="all, delete-orphan",
-    actions: Mapped[list["CaseUserAction"]] = relationship(
-        "CaseUserAction", back_populates="insight", cascade="all, delete-orphan"
     )
 
 
