@@ -168,6 +168,60 @@ describe("admin digest hooks", () => {
     expect(result.current.events).toEqual(events);
   });
 
+  it("ignores superseded watchlist event responses", async () => {
+    const api = createMockApi();
+    let resolveFirstRequest: ((value: WatchlistRunResponse[]) => void) | undefined;
+    const firstEvents: WatchlistRunResponse[] = [
+      {
+        id: "first",
+        watchlist_id: "1",
+        run_started: "",
+        run_completed: "",
+        window_start: "",
+        matches: [],
+        document_ids: [],
+        passage_ids: [],
+        delivery_status: null,
+        error: null,
+      },
+    ];
+    const secondEvents: WatchlistRunResponse[] = [
+      {
+        id: "second",
+        watchlist_id: "2",
+        run_started: "",
+        run_completed: "",
+        window_start: "",
+        matches: [],
+        document_ids: [],
+        passage_ids: [],
+        delivery_status: null,
+        error: null,
+      },
+    ];
+
+    api.fetchWatchlistEvents.mockImplementationOnce(
+      () =>
+        new Promise<WatchlistRunResponse[]>((resolve) => {
+          resolveFirstRequest = resolve;
+        }),
+    );
+    api.fetchWatchlistEvents.mockResolvedValueOnce(secondEvents);
+
+    const { result } = renderHook(() => useWatchlistEvents(api as unknown as TheoApiClient));
+
+    await act(async () => {
+      const firstLoad = result.current.loadEvents("1", "");
+      const secondLoad = result.current.loadEvents("2", "");
+      resolveFirstRequest?.(firstEvents);
+      await firstLoad;
+      await secondLoad;
+    });
+
+    expect(result.current.events).toEqual(secondEvents);
+    expect(result.current.eventsWatchlistId).toBe("2");
+  });
+
   it("handles watchlist event errors from non-Error values", async () => {
     const api = createMockApi();
     api.fetchWatchlistEvents.mockRejectedValueOnce("Events unavailable");
