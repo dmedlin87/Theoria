@@ -70,6 +70,14 @@ pytest
 
 ### Running the API
 
+Before launching the server you must configure authentication for the API by either providing an API key or explicitly enabling anonymous access. Set one of the following environment variables in your shell:
+
+```bash
+export THEO_API_KEYS='["local-dev-key"]'
+# or
+export THEO_AUTH_ALLOW_ANONYMOUS=1
+```
+
 Start the FastAPI service (SQLite default):
 
 ```bash

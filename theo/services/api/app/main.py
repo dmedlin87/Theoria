@@ -25,6 +25,24 @@ from .db.run_sql_migrations import run_sql_migrations
 from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware
 from .ingest.exceptions import UnsupportedSourceError
+from .errors import TheoError
+from .routes import (
+    ai,
+    analytics,
+    creators,
+    documents,
+    export,
+    features,
+    ingest,
+    jobs,
+    notebooks,
+    realtime,
+    research,
+    search,
+    trails,
+    transcripts,
+    verses,
+)
 from .security import require_principal
 from .telemetry import configure_console_tracer
 from .tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
@@ -152,6 +170,18 @@ def create_app() -> FastAPI:
     async def http_exception_with_trace(request: Request, exc: HTTPException) -> Response:  # type: ignore[override]
         response = await http_exception_handler(request, exc)
         return _attach_trace_headers(response)
+
+    @app.exception_handler(TheoError)
+    async def theo_error_handler(request: Request, exc: TheoError) -> Response:
+        trace_headers = get_current_trace_headers()
+        trace_id = trace_headers.get(TRACE_ID_HEADER_NAME) or request.headers.get(
+            TRACE_ID_HEADER_NAME
+        )
+        if trace_id and TRACE_ID_HEADER_NAME not in trace_headers:
+            trace_headers[TRACE_ID_HEADER_NAME] = trace_id
+        request.state._last_domain_error = exc  # type: ignore[attr-defined]
+        response = exc.to_response(trace_id=trace_id)
+        return _attach_trace_headers(response, trace_headers)
 
     @app.exception_handler(UnsupportedSourceError)
     async def unsupported_source_error_with_trace(
