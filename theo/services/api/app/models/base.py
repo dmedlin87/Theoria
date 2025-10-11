@@ -16,13 +16,12 @@ from pydantic import BaseModel, ConfigDict, Field
 class APIModel(BaseModel):
     """Base schema configuration enabling ORM compatibility."""
 
-    # Allow ORM population but retain default protected namespaces.  Clearing
-    # them entirely makes it possible to shadow ``BaseModel`` methods
-    # (``model_dump``/``model_validate``), which removes those callables from
-    # the instance and breaks serialization.
+    # Allow ORM population while leaving the default ``"model_"`` protected
+    # namespace intact.  Clearing or narrowing it makes it possible to shadow
+    # other ``BaseModel`` methods (for example ``model_json_schema``), which
+    # removes those callables from the instance and breaks serialization.
     model_config = ConfigDict(
         from_attributes=True,
-        protected_namespaces=("model_validate", "model_dump"),
     )
 
 
