@@ -4,6 +4,7 @@ import logging
 import socket
 from pathlib import Path
 import sys
+from ipaddress import ip_address
 
 import pytest
 from fastapi import status
@@ -57,6 +58,45 @@ class _FakeHeaders(dict):
 _PDF_EXTRACTION_ERROR = (
     "Unable to extract text from PDF; the file may be password protected or corrupted."
 )
+
+
+def _stub_address_resolution(monkeypatch: pytest.MonkeyPatch, address: str = "203.0.113.10") -> None:
+    fake_addresses = (ip_address(address),)
+
+    monkeypatch.setattr(
+        network_module,
+        "resolve_host_addresses",
+        lambda host: fake_addresses,
+    )
+    monkeypatch.setattr(
+        network_module,
+        "ensure_resolved_addresses_allowed",
+        lambda _settings, _addresses: None,
+    )
+
+
+def test_ensure_url_allowed_blocks_normalised_blocklist(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings()
+    settings.ingest_url_block_private_networks = False
+    settings.ingest_url_allowed_hosts = []
+    settings.ingest_url_blocked_hosts = [" Example.COM "]
+
+    _stub_address_resolution(monkeypatch)
+
+    with pytest.raises(network_module.UnsupportedSourceError):
+        network_module.ensure_url_allowed(settings, "https://EXAMPLE.com./path")
+
+
+def test_ensure_url_allowed_respects_normalised_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings()
+    settings.ingest_url_block_private_networks = False
+    settings.ingest_url_allowed_hosts = [" Example.COM "]
+    settings.ingest_url_blocked_hosts = ["blocked.example"]
+
+    _stub_address_resolution(monkeypatch)
+
+    # Should not raise when host is present in the allowlist after normalisation.
+    network_module.ensure_url_allowed(settings, "https://example.com/resource")
 
 
 def test_ingest_file_streams_large_upload_without_buffering(
