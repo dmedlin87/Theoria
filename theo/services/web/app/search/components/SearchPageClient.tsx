@@ -181,10 +181,11 @@ function normalizeString(value: unknown): string {
   return "";
 }
 
-function normalizeStringArray(value: unknown): string[] {
+export function normalizeStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value
-      .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "")))
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
       .filter(Boolean);
   }
   if (typeof value === "string") {
