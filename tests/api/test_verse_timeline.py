@@ -18,7 +18,7 @@ from theo.services.api.app.core.database import (  # noqa: E402  # import after 
     configure_engine,
     get_engine,
 )
-from theo.services.api.app.db.models import Document, Passage  # noqa: E402
+from theo.services.api.app.db.models import Document, Passage, PassageVerse  # noqa: E402
 from theo.services.api.app.ingest.osis import expand_osis_reference  # noqa: E402
 from theo.services.api.app.models.verses import VerseMentionsFilters  # noqa: E402
 from theo.services.api.app.retriever.verses import (  # noqa: E402
@@ -101,6 +101,13 @@ def _seed_documents(session: Session) -> None:
         ),
     ]
     session.add_all(passages)
+    session.add_all(
+        [
+            PassageVerse(passage_id=passage.id, verse_id=verse_id)
+            for passage in passages
+            for verse_id in john_ids
+        ]
+    )
     session.commit()
 @contextmanager
 def _seeded_session(tmp_path: Path):
@@ -243,6 +250,13 @@ def test_get_verse_timeline_filters_by_author_for_week_window(tmp_path) -> None:
                 ),
             ]
             session.add_all(passages)
+            session.add_all(
+                [
+                    PassageVerse(passage_id=passage.id, verse_id=verse_id)
+                    for passage in passages
+                    for verse_id in john_ids
+                ]
+            )
             session.commit()
 
             timeline = get_verse_timeline(

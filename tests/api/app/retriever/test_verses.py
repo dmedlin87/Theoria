@@ -17,7 +17,7 @@ from theo.services.api.app.core.database import (  # noqa: E402  # import after 
     configure_engine,
     get_engine,
 )
-from theo.services.api.app.db.models import Document, Passage  # noqa: E402
+from theo.services.api.app.db.models import Document, Passage, PassageVerse  # noqa: E402
 from theo.services.api.app.ingest.osis import expand_osis_reference  # noqa: E402
 from theo.services.api.app.models.verses import VerseMentionsFilters  # noqa: E402
 from theo.services.api.app.retriever.verses import (  # noqa: E402
@@ -76,7 +76,7 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
                 document_id=doc_hit.id,
                 text="Primary hit",
                 osis_ref=None,
-                osis_verse_ids=john_316_ids,
+                osis_verse_ids=None,
             ),
             Passage(
                 id="passage-range",
@@ -94,6 +94,20 @@ def test_get_mentions_for_osis_uses_verse_ids(tmp_path: Path) -> None:
             ),
         ]
         session.add_all(passages)
+        session.add_all(
+            [
+                PassageVerse(passage_id="passage-hit", verse_id=verse_id)
+                for verse_id in john_316_ids
+            ]
+            + [
+                PassageVerse(passage_id="passage-range", verse_id=verse_id)
+                for verse_id in john_range_ids
+            ]
+            + [
+                PassageVerse(passage_id="passage-miss", verse_id=verse_id)
+                for verse_id in john_317_ids
+            ]
+        )
         session.commit()
 
         mentions = get_mentions_for_osis(
@@ -137,7 +151,7 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
                     document_id=hit_doc.id,
                     text="Timeline target",
                     osis_ref="John.3.16",
-                    osis_verse_ids=john_316_ids,
+                    osis_verse_ids=None,
                 ),
                 Passage(
                     id="timeline-miss-passage",
@@ -146,6 +160,16 @@ def test_get_verse_timeline_uses_verse_ids(tmp_path: Path) -> None:
                     osis_ref="John.3.16",
                     osis_verse_ids=john_317_ids,
                 ),
+            ]
+        )
+        session.add_all(
+            [
+                PassageVerse(passage_id="timeline-hit-passage", verse_id=verse_id)
+                for verse_id in john_316_ids
+            ]
+            + [
+                PassageVerse(passage_id="timeline-miss-passage", verse_id=verse_id)
+                for verse_id in john_317_ids
             ]
         )
         session.commit()

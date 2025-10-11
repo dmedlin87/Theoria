@@ -21,6 +21,7 @@ from ..db.models import (
     CreatorClaim,
     Document,
     Passage,
+    PassageVerse,
     TranscriptQuote,
     TranscriptQuoteVerse,
     TranscriptSegment,
@@ -55,20 +56,6 @@ logger = logging.getLogger(__name__)
 from .stages import IngestContext
 
 
-def _collect_osis_verse_ids(references: Sequence[str]) -> list[int]:
-    """Return sorted verse identifiers for the supplied OSIS references."""
-
-    verse_ids: set[int] = set()
-    for reference in references:
-        if not reference:
-            continue
-        try:
-            verse_ids.update(expand_osis_reference(reference))
-        except Exception:  # pragma: no cover - defensive in case of malformed refs
-            continue
-    return sorted(verse_ids)
-
-
 def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
     """Raise if *sha256* already exists for another document."""
 
@@ -92,8 +79,12 @@ def _collect_verse_ids(references: Sequence[str] | None) -> list[int] | None:
 
     verse_ids: set[int] = set()
     for reference in references:
-        if reference:
+        if not reference:
+            continue
+        try:
             verse_ids.update(expand_osis_reference(reference))
+        except Exception:  # pragma: no cover - defensive in case of malformed refs
+            continue
 
     if not verse_ids:
         return None
@@ -461,7 +452,7 @@ def persist_text_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
-        verse_ids = _collect_verse_ids(normalized_refs)
+        verse_ids = _collect_verse_ids(normalized_refs) or []
 
         passage = Passage(
             document_id=document.id,
@@ -474,7 +465,7 @@ def persist_text_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
-            osis_verse_ids=verse_ids,
+            osis_verse_ids=verse_ids or None,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -482,14 +473,9 @@ def persist_text_document(
         session.add(passage)
         passages.append(passage)
 
-        osis_all: list[str] = []
-        if meta.get("osis_refs_all"):
-            osis_all.extend(meta["osis_refs_all"])
-        if osis_value:
-            osis_all.append(osis_value)
-        normalized_refs = sorted({ref for ref in osis_all if ref})
-
-        verse_ids = _collect_osis_verse_ids(normalized_refs)
+        if verse_ids:
+            for verse_id in verse_ids:
+                session.add(PassageVerse(passage=passage, verse_id=verse_id))
 
         segment = TranscriptSegment(
             document_id=document.id,
@@ -506,20 +492,12 @@ def persist_text_document(
         session.add(segment)
         segments.append(segment)
 
-        if normalized_refs:
-            verse_ids = sorted(
-                {
-                    int(verse_id)
-                    for ref in normalized_refs
-                    for verse_id in expand_osis_reference(ref)
-                }
-            )
-            if verse_ids:
-                segment_verse_ids[segment] = verse_ids
-                for verse_id in verse_ids:
-                    session.add(
-                        TranscriptSegmentVerse(segment=segment, verse_id=verse_id)
-                    )
+        if verse_ids:
+            segment_verse_ids[segment] = verse_ids
+            for verse_id in verse_ids:
+                session.add(
+                    TranscriptSegmentVerse(segment=segment, verse_id=verse_id)
+                )
 
     session.flush()
 
@@ -887,7 +865,7 @@ def persist_transcript_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
-        verse_ids = _collect_verse_ids(normalized_refs)
+        verse_ids = _collect_verse_ids(normalized_refs) or []
 
         passage = Passage(
             document_id=document.id,
@@ -900,7 +878,7 @@ def persist_transcript_document(
             raw_text=raw_text,
             tokens=len(sanitized_text.split()),
             osis_ref=osis_value,
-            osis_verse_ids=verse_ids,
+            osis_verse_ids=verse_ids or None,
             embedding=embedding,
             lexeme=lexical_representation(session, sanitized_text),
             meta=meta,
@@ -908,14 +886,9 @@ def persist_transcript_document(
         session.add(passage)
         passages.append(passage)
 
-        osis_all: list[str] = []
-        if meta.get("osis_refs_all"):
-            osis_all.extend(meta["osis_refs_all"])
-        if osis_value:
-            osis_all.append(osis_value)
-        normalized_refs = sorted({ref for ref in osis_all if ref})
-
-        verse_ids = _collect_osis_verse_ids(normalized_refs)
+        if verse_ids:
+            for verse_id in verse_ids:
+                session.add(PassageVerse(passage=passage, verse_id=verse_id))
 
         segment = TranscriptSegment(
             document_id=document.id,
@@ -932,20 +905,12 @@ def persist_transcript_document(
         session.add(segment)
         segments.append(segment)
 
-        if normalized_refs:
-            verse_ids = sorted(
-                {
-                    int(verse_id)
-                    for ref in normalized_refs
-                    for verse_id in expand_osis_reference(ref)
-                }
-            )
-            if verse_ids:
-                segment_verse_ids[segment] = verse_ids
-                for verse_id in verse_ids:
-                    session.add(
-                        TranscriptSegmentVerse(segment=segment, verse_id=verse_id)
-                    )
+        if verse_ids:
+            segment_verse_ids[segment] = verse_ids
+            for verse_id in verse_ids:
+                session.add(
+                    TranscriptSegmentVerse(segment=segment, verse_id=verse_id)
+                )
 
     session.flush()
 

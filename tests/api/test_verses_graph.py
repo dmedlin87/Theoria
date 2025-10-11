@@ -13,6 +13,7 @@ from theo.services.api.app.db.models import (
     Document,
     HarmonySeed,
     Passage,
+    PassageVerse,
 )
 from theo.services.api.app.ingest.osis import expand_osis_reference
 
@@ -42,12 +43,13 @@ def _seed_graph_data(engine) -> None:
         session.add_all([doc_pdf, doc_markdown])
         session.flush()
 
+        john_ids = list(sorted(expand_osis_reference("John.3.16")))
         passage_pdf = Passage(
             id="passage-pdf",
             document_id=doc_pdf.id,
             text="For God so loved the world",
             osis_ref="John.3.16",
-            osis_verse_ids=list(sorted(expand_osis_reference("John.3.16"))),
+            osis_verse_ids=john_ids,
             page_no=3,
             t_start=12.5,
             t_end=18.0,
@@ -57,9 +59,19 @@ def _seed_graph_data(engine) -> None:
             document_id=doc_markdown.id,
             text="Study notes on John 3:16",
             osis_ref="John.3.16",
-            osis_verse_ids=list(sorted(expand_osis_reference("John.3.16"))),
+            osis_verse_ids=john_ids,
         )
         session.add_all([passage_pdf, passage_markdown])
+        session.add_all(
+            [
+                PassageVerse(passage_id=passage_pdf.id, verse_id=verse_id)
+                for verse_id in john_ids
+            ]
+            + [
+                PassageVerse(passage_id=passage_markdown.id, verse_id=verse_id)
+                for verse_id in john_ids
+            ]
+        )
 
         def _range(osis: str) -> tuple[int | None, int | None]:
             ids = expand_osis_reference(osis)
