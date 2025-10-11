@@ -26,7 +26,7 @@ SET search_aliases = (
 WHERE target.search_aliases IS NULL OR target.search_aliases = '{}';
 
 CREATE INDEX IF NOT EXISTS idx_geo_location_friendly_id_trgm
-    ON geo_location USING GIN (friendly_id gin_trgm_ops);
+    ON geo_location USING GIN (lower(friendly_id) gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS idx_geo_location_aliases_trgm
-    ON geo_location USING GIN ((array_to_string(search_aliases, ' ')) gin_trgm_ops);
+    ON geo_location USING GIN ((lower(coalesce(array_to_string(search_aliases, ' '), ''))) gin_trgm_ops);
