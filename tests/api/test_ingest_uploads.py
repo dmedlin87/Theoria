@@ -40,7 +40,9 @@ def _mkdoc(document_id: str = "doc"):
 def test_ingest_file_sanitizes_uploaded_filename(tmp_path: Path, monkeypatch, api_client):
     captured: dict[str, Path] = {}
 
-    def fake_pipeline(_session, path: Path, frontmatter):
+    def fake_pipeline(
+        _session, path: Path, frontmatter, *, dependencies=None
+    ) -> object:
         captured["path"] = path
         return _mkdoc()
 
@@ -83,7 +85,8 @@ def test_ingest_transcript_sanitizes_uploaded_files(
         *,
         transcript_filename: str | None = None,
         audio_filename: str | None = None,
-    ):
+        dependencies=None,
+    ) -> object:
         captured_paths["transcript"] = transcript_path
         captured_paths["audio"] = audio_path
         captured_filenames["transcript"] = transcript_filename
@@ -134,7 +137,9 @@ def test_ingest_markdown_with_windows_1252_bytes(
 ) -> None:
     captured: dict[str, str] = {}
 
-    def fake_pipeline(_session, path: Path, frontmatter):
+    def fake_pipeline(
+        _session, path: Path, frontmatter, *, dependencies=None
+    ) -> object:
         body, _ = parse_text_file(path)
         captured["body"] = body
         return _mkdoc()
@@ -166,7 +171,9 @@ def test_ingest_html_with_windows_1252_bytes(
 ) -> None:
     captured: dict[str, str] = {}
 
-    def fake_pipeline(_session, path: Path, frontmatter):
+    def fake_pipeline(
+        _session, path: Path, frontmatter, *, dependencies=None
+    ) -> object:
         result = ingest_parsers.parse_html_document(path, max_tokens=256)
         captured["text"] = result.text
         return _mkdoc()

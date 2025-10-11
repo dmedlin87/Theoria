@@ -165,7 +165,9 @@ def test_ingest_folder_uses_selected_backend(monkeypatch, tmp_path: Path) -> Non
     api_overrides: list[dict[str, object]] = []
     worker_overrides: list[dict[str, object]] = []
 
-    def fake_ingest(batch, overrides, post_batch_steps=None):
+    def fake_ingest(
+        batch, overrides, post_batch_steps=None, *, dependencies=None
+    ):
         ingested_batches.append(batch)
         api_overrides.append(dict(overrides))
         assert not post_batch_steps

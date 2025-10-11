@@ -9,7 +9,7 @@ from urllib.request import build_opener as _urllib_build_opener
 
 from sqlalchemy.orm import Session
 
-from ..core.settings import get_settings
+from ..core.settings import Settings, get_settings
 from ..db.models import Document, TranscriptSegment
 from ..telemetry import instrument_workflow, set_span_attribute
 from .embeddings import get_embedding_service
@@ -67,11 +67,12 @@ _parse_text_file = parse_text_file
 class PipelineDependencies:
     """Runtime dependencies for the ingestion orchestrator."""
 
+    settings: Settings | None = None
     embedding_service: EmbeddingServiceProtocol | None = None
     error_policy: ErrorPolicy | None = None
 
     def build_context(self, *, span) -> IngestContext:
-        settings = get_settings()
+        settings = self.settings or get_settings()
         embedding = self.embedding_service or get_embedding_service()
         policy = self.error_policy or DefaultErrorPolicy()
         instrumentation = Instrumentation(span=span, setter=set_span_attribute)

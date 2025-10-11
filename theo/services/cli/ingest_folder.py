@@ -16,9 +16,14 @@ from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
 from ..api.app.core.database import get_engine
+from ..api.app.core.settings import get_settings
 from ..api.app.db.models import Document
 from ..api.app.enrich import MetadataEnricher
-from ..api.app.ingest.pipeline import run_pipeline_for_file, run_pipeline_for_url
+from ..api.app.ingest.pipeline import (
+    PipelineDependencies,
+    run_pipeline_for_file,
+    run_pipeline_for_url,
+)
 from ..api.app.workers import tasks as worker_tasks
 from ..api.app.telemetry import log_workflow_event
 
@@ -280,8 +285,11 @@ def _ingest_batch_via_api(
     batch: list[IngestItem],
     overrides: dict[str, object],
     post_batch_steps: set[str] | None = None,
+    *,
+    dependencies: PipelineDependencies | None = None,
 ) -> list[str]:
     engine = get_engine()
+    dependency_bundle = dependencies or PipelineDependencies(settings=get_settings())
     document_ids: list[str] = []
     with Session(engine) as session:
         for item in batch:
@@ -292,10 +300,14 @@ def _ingest_batch_via_api(
                     cast(str, item.url),
                     source_type=item.source_type,
                     frontmatter=frontmatter,
+                    dependencies=dependency_bundle,
                 )
             else:
                 document = run_pipeline_for_file(
-                    session, cast(Path, item.path), frontmatter
+                    session,
+                    cast(Path, item.path),
+                    frontmatter,
+                    dependencies=dependency_bundle,
                 )
             document_ids.append(document.id)
         if post_batch_steps:

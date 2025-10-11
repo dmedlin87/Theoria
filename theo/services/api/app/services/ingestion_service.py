@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..core.settings import Settings, get_settings
 from ..ingest.pipeline import (
+    PipelineDependencies,
     run_pipeline_for_file,
     run_pipeline_for_transcript,
     run_pipeline_for_url,
@@ -27,7 +28,7 @@ class IngestionService:
     """Coordinate ingestion workflows for API endpoints."""
 
     settings: Settings
-    run_file_pipeline: Callable[[Session, Path, dict[str, Any] | None], DocumentLike]
+    run_file_pipeline: Callable[..., DocumentLike]
     run_url_pipeline: Callable[..., DocumentLike]
     run_transcript_pipeline: Callable[..., DocumentLike]
     cli_module: Any
@@ -41,7 +42,12 @@ class IngestionService:
     ) -> DocumentLike:
         """Persist *source_path* via the file ingestion pipeline."""
 
-        return self.run_file_pipeline(session, source_path, frontmatter)
+        return self.run_file_pipeline(
+            session,
+            source_path,
+            frontmatter,
+            dependencies=PipelineDependencies(settings=self.settings),
+        )
 
     def ingest_url(
         self,
@@ -58,6 +64,7 @@ class IngestionService:
             url,
             source_type=source_type,
             frontmatter=frontmatter,
+            dependencies=PipelineDependencies(settings=self.settings),
         )
 
     def ingest_transcript(
@@ -79,6 +86,7 @@ class IngestionService:
             audio_path=audio_path,
             transcript_filename=transcript_filename,
             audio_filename=audio_filename,
+            dependencies=PipelineDependencies(settings=self.settings),
         )
 
     def stream_simple_ingest(
@@ -153,7 +161,10 @@ class IngestionService:
 
                 if mode == "api":
                     document_ids = self.cli_module._ingest_batch_via_api(
-                        batch, overrides, post_batch_steps
+                        batch,
+                        overrides,
+                        post_batch_steps,
+                        dependencies=PipelineDependencies(settings=self.settings),
                     )
                     for item, doc_id in zip(batch, document_ids):
                         processed += 1

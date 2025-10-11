@@ -47,12 +47,17 @@ def test_create_annotation_persists_case_object(tmp_path) -> None:
     settings.case_builder_enabled = True
 
     try:
+        dependencies = pipeline.PipelineDependencies(settings=settings)
         markdown = "---\ntitle: Annotated Doc\n---\n\nInitial passage text."
         doc_path = tmp_path / "annotated.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
         with Session(engine) as session:
-            document = pipeline.run_pipeline_for_file(session, doc_path)
+            document = pipeline.run_pipeline_for_file(
+                session,
+                doc_path,
+                dependencies=dependencies,
+            )
             document_id = document.id
 
         payload = DocumentAnnotationCreate(body="Important analyst note")

@@ -23,7 +23,9 @@ class _StubItem:
 class _StubCLI:
     def __init__(self, items: list[_StubItem]):
         self.items = items
-        self.ingest_calls: list[tuple[list[_StubItem], dict, set | None]] = []
+        self.ingest_calls: list[
+            tuple[list[_StubItem], dict, set | None, object | None]
+        ] = []
         self.queue_calls: list[tuple[list[_StubItem], dict]] = []
         self.discovered_sources: list[str] = []
 
@@ -44,9 +46,14 @@ class _StubCLI:
             yield items[index : index + batch_size]
 
     def _ingest_batch_via_api(
-        self, batch: list[_StubItem], overrides: dict[str, object], steps: set[str] | None
+        self,
+        batch: list[_StubItem],
+        overrides: dict[str, object],
+        steps: set[str] | None,
+        *,
+        dependencies=None,
     ) -> list[str]:
-        self.ingest_calls.append((list(batch), dict(overrides), steps))
+        self.ingest_calls.append((list(batch), dict(overrides), steps, dependencies))
         return [f"doc-{item.label}" for item in batch]
 
     def _queue_batch_via_worker(
@@ -64,10 +71,11 @@ def _settings() -> SimpleNamespace:
 def test_ingestion_service_ingest_file_invokes_pipeline(_settings: SimpleNamespace) -> None:
     captured: dict[str, object] = {}
 
-    def _run_file(session, path: Path, frontmatter):  # noqa: ANN001
+    def _run_file(session, path: Path, frontmatter, *, dependencies=None):  # noqa: ANN001
         captured["session"] = session
         captured["path"] = path
         captured["frontmatter"] = frontmatter
+        captured["dependencies"] = dependencies
         return SimpleNamespace(id="doc-42")
 
     service = IngestionService(

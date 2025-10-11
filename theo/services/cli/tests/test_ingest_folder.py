@@ -93,7 +93,7 @@ def test_api_mode_processes_batches_with_overrides(tmp_path, monkeypatch):
 
     ingested: list[tuple[str, dict[str, object]]] = []
 
-    def _fake_run_pipeline(session, path, frontmatter):
+    def _fake_run_pipeline(session, path, frontmatter, *, dependencies=None):
         ingested.append((str(path), dict(frontmatter)))
         return SimpleNamespace(
             id=f"doc-{len(ingested)}", source_type="markdown", title=path.stem
