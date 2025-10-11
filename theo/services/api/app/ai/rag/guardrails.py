@@ -402,7 +402,7 @@ def validate_model_completion(
     for entry in entries:
         entry_match = _CITATION_ENTRY_PATTERN.match(entry)
         if not entry_match:
-            mismatches.append(f"unparseable citation '{entry}'")
+            mismatches.append(f"unparsable citation '{entry}'")
             continue
 
         index = int(entry_match.group("index"))
