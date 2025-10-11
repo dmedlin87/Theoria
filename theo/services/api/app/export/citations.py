@@ -507,7 +507,7 @@ def build_citation_export(
 
     totals = {"citations": len(normalised_sources)}
     manifest = build_manifest(
-        export_type="documents",
+        export_type="citations",
         filters=dict(filters or {}),
         totals=totals,
         cursor=None,

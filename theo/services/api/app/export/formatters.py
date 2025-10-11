@@ -83,7 +83,7 @@ def generate_export_id() -> str:
 
 def build_manifest(
     *,
-    export_type: Literal["search", "documents"],
+    export_type: Literal["search", "documents", "citations"],
     filters: Mapping[str, Any],
     totals: Mapping[str, Any],
     cursor: str | None,
