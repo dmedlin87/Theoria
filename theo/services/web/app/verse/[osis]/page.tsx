@@ -211,9 +211,9 @@ function TimelineSection({
 
   if (timeline.buckets.length === 0) {
     return (
-      <div style={{ margin: "1.5rem 0" }}>
-        <h3 style={{ margin: "0 0 0.5rem" }}>Timeline</h3>
-        <p style={{ color: "var(--muted-foreground, #4b5563)" }}>
+      <div className="mt-3">
+        <h3 className="mb-2">Timeline</h3>
+        <p className="text-muted">
           No mentions found for the selected {activeWindow} window.
         </p>
       </div>
@@ -223,39 +223,39 @@ function TimelineSection({
   const maxCount = timeline.buckets.reduce((max, bucket) => Math.max(max, bucket.count), 0) || 1;
 
   return (
-    <div style={{ margin: "1.5rem 0" }}>
-      <h3 style={{ margin: "0 0 0.5rem" }}>Timeline</h3>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
+    <div className="mt-3">
+      <h3 className="mb-2">Timeline</h3>
+      <p className="text-muted mb-3">
         Showing {timeline.buckets.length} {activeWindow} buckets totaling {timeline.total_mentions} mentions.
       </p>
-      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "1rem" }}>
+      <ul className="stack-md" style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {timeline.buckets.map((bucket) => {
           const ratio = Math.max(bucket.count / maxCount, 0);
           return (
-            <li key={`${bucket.label}-${bucket.start}`} style={{ background: "#f8fafc", padding: "1rem", borderRadius: "0.75rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "1rem" }}>
+            <li key={`${bucket.label}-${bucket.start}`} className="panel">
+              <div className="cluster" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
                 <strong>{bucket.label}</strong>
-                <span style={{ color: "var(--muted-foreground, #4b5563)" }}>{bucket.count} mentions</span>
+                <span className="text-muted">{bucket.count} mentions</span>
               </div>
               <div
                 aria-hidden="true"
                 style={{
                   marginTop: "0.5rem",
                   height: "0.5rem",
-                  background: "#e2e8f0",
-                  borderRadius: "999px",
+                  background: "var(--color-border-subtle)",
+                  borderRadius: "var(--radius-full)",
                   overflow: "hidden",
                 }}
               >
                 <div
                   style={{
                     width: `${Math.round(ratio * 100)}%`,
-                    background: "#2563eb",
+                    background: "var(--color-accent)",
                     height: "100%",
                   }}
                 />
               </div>
-              <p style={{ margin: "0.5rem 0 0", color: "var(--muted-foreground, #4b5563)", fontSize: "0.875rem" }}>
+              <p className="text-sm text-muted mt-2 mb-0">
                 {bucket.document_ids.length} documents · {bucket.sample_passage_ids.length} passages
               </p>
             </li>
@@ -342,14 +342,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
 
   return (
     <section>
-      <div
-        style={{
-          display: "grid",
-          gap: "2rem",
-          alignItems: "start",
-          gridTemplateColumns: features.research ? "minmax(0, 2fr) minmax(0, 1fr)" : "1fr",
-        }}
-      >
+      <div className={features.research ? "sidebar-layout" : ""}>
         <div>
           <h2>Verse Mentions</h2>
           <p>
@@ -382,50 +375,66 @@ export default async function VersePage({ params, searchParams }: VersePageProps
 
           {!graphError ? <VerseGraphSection graph={graph} /> : null}
 
-          <form method="get" style={{ margin: "1rem 0", display: "grid", gap: "0.75rem", maxWidth: 480 }}>
-            <label style={{ display: "block" }}>
-              Source type
-              <select name="source_type" defaultValue={sourceType} style={{ width: "100%" }}>
-                <option value="">All sources</option>
-                <option value="pdf">PDF</option>
-                <option value="markdown">Markdown</option>
-                <option value="youtube">YouTube</option>
-                <option value="transcript">Transcript</option>
-              </select>
-            </label>
-            <label style={{ display: "block" }}>
-              Collection
-              <input
-                name="collection"
-                type="text"
-                defaultValue={collection}
-                placeholder="Collection"
-                style={{ width: "100%" }}
-              />
-            </label>
-            <label style={{ display: "block" }}>
-              Author
-              <input
-                name="author"
-                type="text"
-                defaultValue={author}
-                placeholder="Author"
-                style={{ width: "100%" }}
-              />
-            </label>
-            <label style={{ display: "block" }}>
-              Window
-              <select name="window" defaultValue={windowParam} style={{ width: "100%" }}>
-                {TIMELINE_WINDOWS.map((option) => (
-                  <option key={option} value={option}>
-                    {option.charAt(0).toUpperCase() + option.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit" style={{ marginTop: "0.5rem" }}>
-              Apply filters
-            </button>
+          <form method="get" className="card mt-3">
+            <div className="stack-md">
+              <div className="form-field">
+                <label htmlFor="source_type" className="form-label">
+                  Source type
+                </label>
+                <select id="source_type" name="source_type" defaultValue={sourceType} className="form-select">
+                  <option value="">All sources</option>
+                  <option value="pdf">PDF</option>
+                  <option value="markdown">Markdown</option>
+                  <option value="youtube">YouTube</option>
+                  <option value="transcript">Transcript</option>
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="collection" className="form-label">
+                  Collection
+                </label>
+                <input
+                  id="collection"
+                  name="collection"
+                  type="text"
+                  defaultValue={collection}
+                  placeholder="Collection"
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="author" className="form-label">
+                  Author
+                </label>
+                <input
+                  id="author"
+                  name="author"
+                  type="text"
+                  defaultValue={author}
+                  placeholder="Author"
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="window" className="form-label">
+                  Window
+                </label>
+                <select id="window" name="window" defaultValue={windowParam} className="form-select">
+                  {TIMELINE_WINDOWS.map((option) => (
+                    <option key={option} value={option}>
+                      {option.charAt(0).toUpperCase() + option.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button type="submit" className="btn btn-primary">
+                Apply filters
+              </button>
+            </div>
           </form>
 
           <p>
@@ -443,9 +452,11 @@ export default async function VersePage({ params, searchParams }: VersePageProps
           ) : null}
 
           {mentions.length === 0 ? (
-            <p>No mentions found for the selected filters.</p>
+            <div className="alert alert-info">
+              <div className="alert__message">No mentions found for the selected filters.</div>
+            </div>
           ) : (
-            <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: "1rem" }}>
+            <ul className="stack-md" style={{ listStyle: "none", padding: 0 }}>
               {mentions.map((mention) => {
                 const anchor = formatAnchor({
                   page_no: mention.passage.page_no ?? null,
@@ -455,20 +466,21 @@ export default async function VersePage({ params, searchParams }: VersePageProps
                 const documentTitle =
                   (mention.passage.meta?.document_title as string | undefined) ?? "Untitled document";
                 return (
-                  <li key={mention.passage.id} style={{ background: "#fff", padding: "1rem", borderRadius: "0.5rem" }}>
-                    <article>
-                      <header>
-                        <h3 style={{ margin: "0 0 0.5rem" }}>{documentTitle}</h3>
-                        {anchor && <p style={{ margin: "0 0 0.5rem" }}>{anchor}</p>}
-                        {mention.passage.osis_ref && <p style={{ margin: 0 }}>OSIS: {mention.passage.osis_ref}</p>}
+                  <li key={mention.passage.id} className="card">
+                    <article className="stack-sm">
+                      <header className="stack-xs">
+                        <h3 className="text-lg font-semibold mb-0">{documentTitle}</h3>
+                        {anchor && <p className="text-sm text-muted mb-0">{anchor}</p>}
+                        {mention.passage.osis_ref && <p className="text-sm text-muted mb-0">OSIS: {mention.passage.osis_ref}</p>}
                       </header>
-                      <p style={{ marginTop: "0.75rem" }}>{mention.context_snippet}</p>
-                      <footer style={{ marginTop: "0.75rem" }}>
+                      <p className="mb-0">{mention.context_snippet}</p>
+                      <footer>
                         <Link
                           href={buildPassageLink(mention.passage.document_id, mention.passage.id, {
                             pageNo: mention.passage.page_no ?? null,
                             tStart: mention.passage.t_start ?? null,
                           })}
+                          className="btn btn-secondary btn-sm"
                         >
                           Open document
                         </Link>
@@ -481,15 +493,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
           )}
         </div>
         {features.research ? (
-          <aside
-            aria-label="Research panels"
-            style={{
-              background: "#f8fafc",
-              borderRadius: "0.75rem",
-              padding: "1.5rem",
-              border: "1px solid var(--border, #e5e7eb)",
-            }}
-          >
+          <aside aria-label="Research panels" className="panel">
             <Suspense fallback={<p>Loading research tools…</p>}>
               <ResearchPanels osis={osis} features={features} />
             </Suspense>
