@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
+from threading import Lock
+from typing import Callable
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
@@ -21,20 +24,71 @@ from ..ranking.re_ranker import Reranker, load_reranker
 router = APIRouter()
 
 
-_RERANKER: Reranker | None = None
-_RERANKER_KEY: tuple[str, str | None] | None = None
-_RERANKER_FAILED: bool = False
 _RERANKER_TOP_K = 20
 
 
 LOGGER = logging.getLogger(__name__)
 
 
+@dataclass
+class _RerankerCache:
+    loader: Callable[[str, str | None], Reranker]
+    lock: Lock = field(default_factory=Lock)
+    reranker: Reranker | None = field(default=None, init=False)
+    key: tuple[str, str | None] | None = field(default=None, init=False)
+    failed: bool = field(default=False, init=False)
+
+    def reset(self) -> None:
+        with self.lock:
+            self.reranker = None
+            self.key = None
+            self.failed = False
+
+    def resolve(
+        self, model_path: str | Path | None, expected_sha256: str | None
+    ) -> Reranker | None:
+        if model_path is None:
+            return None
+
+        model_str = str(model_path)
+        cache_key = (model_str, expected_sha256)
+
+        with self.lock:
+            if self.key != cache_key:
+                self.reranker = None
+                self.failed = False
+                self.key = cache_key
+
+            if self.failed:
+                return None
+
+            if self.reranker is None:
+                try:
+                    self.reranker = self.loader(
+                        model_str, expected_sha256=expected_sha256
+                    )
+                except Exception as exc:  # pragma: no cover - logged for observability
+                    should_log = not self.failed
+                    self.failed = True
+                    if should_log:
+                        LOGGER.exception(
+                            "search.reranker_load_failed",
+                            extra={
+                                "event": "search.reranker_load_failed",
+                                "model_path": model_str,
+                                "error": str(exc),
+                            },
+                        )
+                    return None
+
+            return self.reranker
+
+
+_RERANKER_CACHE = _RerankerCache(load_reranker)
+
+
 def _reset_reranker_cache() -> None:
-    global _RERANKER, _RERANKER_KEY, _RERANKER_FAILED
-    _RERANKER = None
-    _RERANKER_KEY = None
-    _RERANKER_FAILED = False
+    _RERANKER_CACHE.reset()
 
 
 def reset_reranker_cache() -> None:
@@ -46,35 +100,8 @@ def reset_reranker_cache() -> None:
 def _resolve_reranker(
     model_path: str | Path | None, expected_sha256: str | None
 ) -> Reranker | None:
-    global _RERANKER, _RERANKER_KEY, _RERANKER_FAILED
 
-    if model_path is None:
-        return None
-    model_str = str(model_path)
-    cache_key = (model_str, expected_sha256)
-    if _RERANKER_KEY != cache_key:
-        _reset_reranker_cache()
-        _RERANKER_KEY = cache_key
-    if _RERANKER_FAILED:
-        return None
-    if _RERANKER is None:
-        try:
-            _RERANKER = load_reranker(
-                model_str, expected_sha256=expected_sha256
-            )
-        except Exception as exc:
-            if not _RERANKER_FAILED:
-                LOGGER.exception(
-                    "search.reranker_load_failed",
-                    extra={
-                        "event": "search.reranker_load_failed",
-                        "model_path": model_str,
-                        "error": str(exc),
-                    },
-                )
-            _RERANKER_FAILED = True
-            return None
-    return _RERANKER
+    return _RERANKER_CACHE.resolve(model_path, expected_sha256)
 
 
 @router.get("/", response_model=HybridSearchResponse)
