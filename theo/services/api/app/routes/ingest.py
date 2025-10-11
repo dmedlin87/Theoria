@@ -134,6 +134,8 @@ async def _stream_upload_to_path(
             policy=ResiliencePolicy(max_attempts=1),
         )
     except ResilienceError as exc:
+        if isinstance(exc.__cause__, IngestionError):
+            raise exc.__cause__
         raise IngestionError(
             "Upload failed due to storage error",
             code="INGESTION_UPLOAD_FAILURE",

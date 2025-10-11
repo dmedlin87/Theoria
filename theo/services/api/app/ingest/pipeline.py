@@ -48,6 +48,7 @@ from .persistence import (
     persist_transcript_document,
     refresh_creator_verse_rollups,
 )
+from ..errors import TheoError
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 
@@ -541,12 +542,17 @@ build_opener = _urllib_build_opener
 
 
 def _fetch_web_document(settings, url: str):
-    return resilient_operation(
-        lambda: fetch_web_document(settings, url, opener_factory=build_opener),
-        key=f"ingest:web:{url}",
-        classification="network",
-        policy=ResiliencePolicy(max_attempts=3),
-    )
+    try:
+        return resilient_operation(
+            lambda: fetch_web_document(settings, url, opener_factory=build_opener),
+            key=f"ingest:web:{url}",
+            classification="network",
+            policy=ResiliencePolicy(max_attempts=3),
+        )
+    except ResilienceError as exc:
+        if isinstance(exc.__cause__, (TheoError, UnsupportedSourceError)):
+            raise exc.__cause__
+        raise
 
 
 
