@@ -41,6 +41,14 @@ DEFAULT_MYPY_PATHS: tuple[Path, ...] = (Path("mcp_server"),)
 _ALLOWED_EXECUTABLES: frozenset[str] = frozenset({"ruff", "pytest", "mypy"})
 
 
+def _stringify_path(path: Path | str) -> str:
+    """Convert :class:`~pathlib.Path` objects to POSIX strings."""
+
+    if isinstance(path, Path):
+        return path.as_posix()
+    return path
+
+
 def _format_command(command: Sequence[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
@@ -115,18 +123,22 @@ def _build_checks(
 
     if not skip_ruff:
         for path in ruff_paths:
-            command = ["ruff", "check", str(path), *ruff_args]
+            command = ["ruff", "check", _stringify_path(path), *ruff_args]
             checks.append(CheckRequest(label=f"ruff ({path})", command=command))
 
     if not skip_pytest:
-        command = ["pytest", *[str(path) for path in pytest_paths], *pytest_args]
+        command = [
+            "pytest",
+            *[_stringify_path(path) for path in pytest_paths],
+            *pytest_args,
+        ]
         checks.append(CheckRequest(label="pytest", command=command))
 
     if include_mypy:
         command = ["mypy"]
         if mypy_config is not None:
-            command.extend(["--config-file", str(mypy_config)])
-        command.extend(str(path) for path in mypy_paths)
+            command.extend(["--config-file", _stringify_path(mypy_config)])
+        command.extend(_stringify_path(path) for path in mypy_paths)
         command.extend(mypy_args)
         checks.append(
             CheckRequest(
