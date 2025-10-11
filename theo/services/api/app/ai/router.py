@@ -109,7 +109,9 @@ class LLMRouterService:
 
             config = self._workflow_config(model, workflow)
             ceiling = self._as_float(config.get("spend_ceiling"))
-            estimated_cost = self._estimate_cost(model, prompt, None)
+            # Estimate cost with expected output tokens for more accurate budget projection
+            estimated_completion = " " * (max_output_tokens * 4)  # Rough approximation
+            estimated_cost = self._estimate_cost(model, prompt, estimated_completion)
             span.set_attribute("llm.estimated_cost", estimated_cost)
             if ceiling is not None:
                 span.set_attribute("llm.budget_ceiling", ceiling)

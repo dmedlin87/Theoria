@@ -816,6 +816,46 @@ def generate_verse_brief(
         )
 
 
+def _select_diverse_key_points(citations: list["RAGCitation"], limit: int) -> list[str]:
+    """
+    Select diverse key points from citations, preferring different books and avoiding duplicates.
+    
+    Args:
+        citations: List of RAG citations to select from
+        limit: Maximum number of key points to return
+        
+    Returns:
+        List of formatted key points as "osis: snippet"
+    """
+    if not citations:
+        return []
+    
+    selected: list[str] = []
+    seen_books: set[str] = set()
+    seen_osis: set[str] = set()
+    
+    # First pass: select citations from different books
+    for citation in citations:
+        if len(selected) >= limit:
+            break
+        # Extract book name from OSIS (e.g., "Gen.1.1" -> "Gen")
+        book = citation.osis.split(".")[0] if "." in citation.osis else citation.osis
+        if book not in seen_books and citation.osis not in seen_osis:
+            selected.append(f"{citation.osis}: {citation.snippet}")
+            seen_books.add(book)
+            seen_osis.add(citation.osis)
+    
+    # Second pass: fill remaining slots with any unique citations
+    for citation in citations:
+        if len(selected) >= limit:
+            break
+        if citation.osis not in seen_osis:
+            selected.append(f"{citation.osis}: {citation.snippet}")
+            seen_osis.add(citation.osis)
+    
+    return selected
+
+
 def generate_sermon_prep_outline(
     session: Session,
     *,
@@ -824,6 +864,8 @@ def generate_sermon_prep_outline(
     filters: HybridSearchFilters | None = None,
     model_name: str | None = None,
     recorder: "TrailRecorder | None" = None,
+    outline_template: list[str] | None = None,
+    key_points_limit: int = 4,
 ) -> SermonPrepResponse:
     filters = filters or HybridSearchFilters()
     query = topic if not osis else f"{topic} {osis}"
@@ -846,6 +888,15 @@ def generate_sermon_prep_outline(
             topic=topic,
             result_count=len(results),
         )
+        
+        # Validate sufficient sources are available
+        if not results:
+            raise GuardrailError(
+                message="Insufficient biblical sources found for this topic. Try broadening your search or adjusting filters.",
+                category="insufficient_context",
+                severity="error",
+            )
+        
         registry = get_llm_registry(session)
         if recorder:
             recorder.log_step(
@@ -895,15 +946,19 @@ def generate_sermon_prep_outline(
         )
         if recorder:
             recorder.record_citations(answer.citations)
-        outline = [
+        
+        # Use custom outline template or default liturgical structure
+        outline = outline_template or [
             "Opening: situate the passage within the wider canon",
             "Exposition: unpack key theological moves in the passages",
             "Application: connect the insights to contemporary discipleship",
             "Closing: invite response grounded in the cited witnesses",
         ]
-        key_points = [
-            f"{citation.osis}: {citation.snippet}" for citation in answer.citations[:4]
-        ]
+        
+        # Extract diverse key points from citations
+        key_points = _select_diverse_key_points(
+            answer.citations, limit=key_points_limit
+        )
         set_span_attribute(span, "workflow.outline_steps", len(outline))
         set_span_attribute(span, "workflow.key_point_count", len(key_points))
         log_workflow_event(

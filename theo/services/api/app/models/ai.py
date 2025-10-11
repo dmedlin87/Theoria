@@ -254,6 +254,16 @@ class SermonPrepRequest(APIModel):
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     model: str | None = Field(default=None, validation_alias=AliasChoices("model", "mode"))
     recorder_metadata: RecorderMetadata | None = None
+    outline_template: list[str] | None = Field(
+        default=None,
+        description="Custom outline structure (e.g., ['Opening', 'Body', 'Closing']). Defaults to a four-part liturgical structure.",
+    )
+    key_points_limit: int = Field(
+        default=4,
+        ge=1,
+        le=10,
+        description="Maximum number of key points to extract from citations (1-10)",
+    )
 
 
 class ComparativeAnalysisRequest(APIModel):

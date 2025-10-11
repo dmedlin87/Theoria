@@ -156,6 +156,8 @@ def sermon_prep(
                 filters=payload.filters,
                 model_name=payload.model,
                 recorder=recorder,
+                outline_template=payload.outline_template,
+                key_points_limit=payload.key_points_limit,
             )
             recorder.finalize(final_md=response.answer.summary, output_payload=response)
             return response
