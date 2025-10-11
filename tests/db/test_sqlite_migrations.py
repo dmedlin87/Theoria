@@ -271,6 +271,36 @@ def test_run_sql_migrations_reapplies_when_ledger_stale(tmp_path) -> None:
         assert setting is not None
 
 
+def test_run_sql_migrations_executes_python_migrations(tmp_path) -> None:
+    """Python migration modules should be executed and recorded."""
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'python.db'}", future=True)
+    AppSetting.__table__.create(bind=engine)
+
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+
+    migration_path = migrations_dir / "0002_create_marker.py"
+    migration_path.write_text(
+        """
+from sqlalchemy import text
+
+
+def apply(session):
+    session.execute(text("CREATE TABLE py_marker (id INTEGER PRIMARY KEY)") )
+        """.strip(),
+        encoding="utf-8",
+    )
+
+    applied = run_sql_migrations(engine, migrations_path=migrations_dir)
+
+    assert "0002_create_marker.py" in applied
+
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    assert "py_marker" in tables
+
+
 def test_seed_reference_data_tolerates_missing_perspective_column(
     tmp_path, monkeypatch
 ) -> None:

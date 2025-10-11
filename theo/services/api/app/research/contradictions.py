@@ -60,15 +60,14 @@ def search_contradictions(
         # If filters were provided but none are valid, return empty set.
         return []
 
-    range_map = compute_verse_id_ranges(candidates)
-    if not range_map:
+    windows = list(compute_verse_id_ranges(candidates).values())
+    if not windows:
         return []
-    verse_ranges = list(range_map.values())
 
     contradiction_seeds = query_pair_seed_rows(
-        session, verse_ranges, ContradictionSeed
+        session, windows, ContradictionSeed
     )
-    harmony_seeds = query_pair_seed_rows(session, verse_ranges, HarmonySeed)
+    harmony_seeds = query_pair_seed_rows(session, windows, HarmonySeed)
     topic_lower = topic.lower() if topic else None
     scored: list[_ScoredSeed] = []
 
