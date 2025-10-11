@@ -140,6 +140,76 @@ def test_search_contradictions_uses_range_filters() -> None:
         assert [item.id for item in filtered] == ["h1"]
 
 
+def test_search_contradictions_supports_multiple_references() -> None:
+    engine = _setup_engine()
+    with Session(engine) as session:
+        start_a, end_a = _range("John.3.16")
+        start_b, end_b = _range("Matthew.5.44")
+        session.add(
+            ContradictionSeed(
+                id="c-multi",
+                osis_a="John.3.16",
+                osis_b="Matthew.5.44",
+                summary="Overlap",
+                source="Digest",
+                tags=["love"],
+                weight=2.0,
+                perspective="skeptical",
+                start_verse_id=start_a,
+                end_verse_id=end_a,
+                start_verse_id_b=start_b,
+                end_verse_id_b=end_b,
+            )
+        )
+        h_start_a, h_end_a = _range("John.3.17")
+        h_start_b, h_end_b = _range("Luke.6.27")
+        session.add(
+            HarmonySeed(
+                id="h-multi",
+                osis_a="John.3.17",
+                osis_b="Luke.6.27",
+                summary="Harmony",
+                source="Notes",
+                tags=["love"],
+                weight=1.5,
+                perspective="apologetic",
+                start_verse_id=h_start_a,
+                end_verse_id=h_end_a,
+                start_verse_id_b=h_start_b,
+                end_verse_id_b=h_end_b,
+            )
+        )
+        off_start_a, off_end_a = _range("Gen.1.1")
+        off_start_b, off_end_b = _range("Gen.1.2")
+        session.add(
+            ContradictionSeed(
+                id="c-off",
+                osis_a="Gen.1.1",
+                osis_b="Gen.1.2",
+                summary="Creation",
+                source="Digest",
+                tags=["creation"],
+                weight=3.0,
+                perspective="skeptical",
+                start_verse_id=off_start_a,
+                end_verse_id=off_end_a,
+                start_verse_id_b=off_start_b,
+                end_verse_id_b=off_end_b,
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        with _count_selects(engine) as stats:
+            results = search_contradictions(
+                session,
+                osis=["John.3.16", "John.3.17"],
+                limit=10,
+            )
+        assert stats["count"] == 2
+        assert {item.id for item in results} == {"c-multi", "h-multi"}
+
+
 def test_search_commentaries_uses_range_filters() -> None:
     engine = _setup_engine()
     with Session(engine) as session:
