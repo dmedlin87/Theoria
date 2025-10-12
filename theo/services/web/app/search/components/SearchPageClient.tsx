@@ -561,6 +561,7 @@ export default function SearchPageClient({
     sortDocumentGroups(buildDocumentGroupsFromResponse(initialResults), sortKey),
   );
   const [isSearching, setIsSearching] = useState(false);
+  const [searchAbortController, setSearchAbortController] = useState<AbortController | null>(null);
   const [error, setError] = useState<ErrorDetails | null>(initialError);
   const [hasSearched, setHasSearched] = useState(initialHasSearched);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -692,6 +693,13 @@ export default function SearchPageClient({
 
   const runSearch = useCallback(
     async (filters: SearchFilters) => {
+      // Cancel any existing search
+      if (searchAbortController) {
+        searchAbortController.abort();
+      }
+
+      const abortController = new AbortController();
+      setSearchAbortController(abortController);
       setIsSearching(true);
       setError(null);
       setHasSearched(true);
@@ -708,6 +716,7 @@ export default function SearchPageClient({
         const searchQuery = serializeSearchParams(filters);
         const response = await fetch(`/api/search${searchQuery ? `?${searchQuery}` : ""}`, {
           cache: "no-store",
+          signal: abortController.signal,
         });
         const rerankerHeader = response.headers.get("x-reranker");
         setRerankerName(
@@ -733,6 +742,11 @@ export default function SearchPageClient({
           success = true;
         }
       } catch (fetchError) {
+        // Don't show error if the request was aborted
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          return;
+        }
+
         if (retrievalEnd === null && perf) {
           retrievalEnd = perf.now();
         }
@@ -749,6 +763,7 @@ export default function SearchPageClient({
         setGroups([]);
       } finally {
         setIsSearching(false);
+        setSearchAbortController(null);
         if (requestStart !== null) {
           const events: {
             event: string;
@@ -776,7 +791,7 @@ export default function SearchPageClient({
         }
       }
     },
-    [sortKey],
+    [sortKey, searchAbortController],
   );
 
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
@@ -816,10 +831,10 @@ export default function SearchPageClient({
   }, []);
 
   const handleRetrySearch = useCallback(() => {
-    if (lastSearchFilters) {
+    if (lastSearchFilters && !isSearching) {
       void runSearch(lastSearchFilters);
     }
-  }, [lastSearchFilters, runSearch]);
+  }, [lastSearchFilters, runSearch, isSearching]);
 
   const handlePassageClick = useCallback(
     (result: SearchResult) => {
@@ -853,30 +868,33 @@ export default function SearchPageClient({
   const handlePresetChange = useCallback(
     (value: string) => {
       if (value === CUSTOM_PRESET_VALUE) {
-      setPresetSelection(CUSTOM_PRESET_VALUE);
-      return;
-    }
-    setPresetSelection(value);
-    const presetConfig = MODE_PRESETS.find((candidate) => candidate.value === value);
-    const nextFilters: SearchFilters = {
-      ...currentFilters,
-      ...(presetConfig?.filters ?? {}),
-      collectionFacets: presetConfig?.filters?.collectionFacets
-        ? [...presetConfig.filters.collectionFacets]
-        : [...currentFilters.collectionFacets],
-      datasetFacets: presetConfig?.filters?.datasetFacets
-        ? [...presetConfig.filters.datasetFacets]
-        : [...currentFilters.datasetFacets],
-      variantFacets: presetConfig?.filters?.variantFacets
-        ? [...presetConfig.filters.variantFacets]
-        : [...currentFilters.variantFacets],
-      preset: value,
-    };
-    applyFilters(nextFilters);
-    updateUrlForFilters(nextFilters);
-    void runSearch(nextFilters);
+        setPresetSelection(CUSTOM_PRESET_VALUE);
+        return;
+      }
+      if (isSearching) {
+        return; // Prevent preset change during active search
+      }
+      setPresetSelection(value);
+      const presetConfig = MODE_PRESETS.find((candidate) => candidate.value === value);
+      const nextFilters: SearchFilters = {
+        ...currentFilters,
+        ...(presetConfig?.filters ?? {}),
+        collectionFacets: presetConfig?.filters?.collectionFacets
+          ? [...presetConfig.filters.collectionFacets]
+          : [...currentFilters.collectionFacets],
+        datasetFacets: presetConfig?.filters?.datasetFacets
+          ? [...presetConfig.filters.datasetFacets]
+          : [...currentFilters.datasetFacets],
+        variantFacets: presetConfig?.filters?.variantFacets
+          ? [...presetConfig.filters.variantFacets]
+          : [...currentFilters.variantFacets],
+        preset: value,
+      };
+      applyFilters(nextFilters);
+      updateUrlForFilters(nextFilters);
+      void runSearch(nextFilters);
     },
-    [applyFilters, currentFilters, runSearch, updateUrlForFilters],
+    [applyFilters, currentFilters, runSearch, updateUrlForFilters, isSearching],
   );
 
   const toggleFacet = useCallback(
@@ -952,11 +970,13 @@ export default function SearchPageClient({
 
   const handleApplySavedSearch = useCallback(
     async (saved: SavedSearch) => {
-      applyFilters(saved.filters);
-      updateUrlForFilters(saved.filters);
-      await runSearch(saved.filters);
+      if (!isSearching) {
+        applyFilters(saved.filters);
+        updateUrlForFilters(saved.filters);
+        await runSearch(saved.filters);
+      }
     },
-    [applyFilters, runSearch, updateUrlForFilters],
+    [applyFilters, runSearch, updateUrlForFilters, isSearching],
   );
 
   const handleDeleteSavedSearch = useCallback((id: string) => {
@@ -1394,6 +1414,10 @@ export default function SearchPageClient({
 
   return (
     <section className="search-page">
+      {/* Accessibility: Announce search status */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="visually-hidden">
+        {isSearching ? "Searching corpus..." : hasSearched && !error && groups.length === 0 ? "No results found" : hasSearched && groups.length > 0 ? `Found ${groups.length} document${groups.length === 1 ? "" : "s"}` : ""}
+      </div>
       <h2>Search</h2>
       <p>Hybrid search with lexical, vector, and OSIS-aware filtering.</p>
       <div className="search-ui-mode-wrapper">
@@ -1469,7 +1493,13 @@ export default function SearchPageClient({
           </details>
         )}
 
-        <button type="submit" className="search-form__button" disabled={isSearching}>
+        <button 
+          type="submit" 
+          className={isSearching ? "search-form__button is-loading" : "search-form__button"}
+          disabled={isSearching}
+          aria-label={isSearching ? "Searching corpus..." : "Search corpus"}
+        >
+          {isSearching && <span className="button-loading-spinner" aria-hidden="true" />}
           {isSearching ? "Searching..." : "Search"}
         </button>
       </form>

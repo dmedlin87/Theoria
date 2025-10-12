@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useState, useTransition } from "react";
+import { type ReactNode, useState, useTransition, useEffect } from "react";
 
 export type AppShellNavItem = {
   href: string;
@@ -44,22 +44,43 @@ export function AppShell({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [clickedHref, setClickedHref] = useState<string | null>(null);
+  const [navigationStatus, setNavigationStatus] = useState<string>("");
 
-  const handleLinkClick = (href: string, e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleLinkClick = (href: string, e: React.MouseEvent<HTMLAnchorElement>, label: string) => {
     // Allow default Link behavior for cmd/ctrl clicks
     if (e.metaKey || e.ctrlKey) return;
 
     e.preventDefault();
     setClickedHref(href);
+    setNavigationStatus(`Navigating to ${label}`);
     startTransition(() => {
       router.push(href);
-      // Clear after navigation
-      setTimeout(() => setClickedHref(null), 300);
+      // Clear after navigation with longer timeout for better UX
+      setTimeout(() => {
+        setClickedHref(null);
+        setNavigationStatus("");
+      }, 500);
     });
   };
 
+  // Clear navigation status if isPending changes to false
+  useEffect(() => {
+    if (!isPending && clickedHref) {
+      const timer = setTimeout(() => {
+        setClickedHref(null);
+        setNavigationStatus("");
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isPending, clickedHref]);
+
   return (
     <div className="app-shell-v2">
+      {/* Accessibility: Announce navigation status */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="visually-hidden">
+        {navigationStatus}
+      </div>
       <aside className="app-shell-v2__nav">
         <Link href="/" className="app-shell-v2__brand">
           <span className="app-shell-v2__brand-name">Theoria</span>
@@ -83,23 +104,18 @@ export function AppShell({
                         className={
                           isActive
                             ? "app-shell-v2__nav-link is-active"
+                            : isLoading
+                            ? "app-shell-v2__nav-link is-loading"
                             : "app-shell-v2__nav-link"
                         }
                         aria-current={isActive ? "page" : undefined}
-                        onClick={(e) => handleLinkClick(item.href, e)}
-                        style={{
-                          opacity: isLoading ? 0.6 : 1,
-                          pointerEvents: isLoading ? "none" : "auto",
-                        }}
+                        aria-disabled={isLoading}
+                        onClick={(e) => handleLinkClick(item.href, e, item.label)}
                       >
-                        {isLoading ? (
-                          <>
-                            <span className="nav-loading-spinner" />
-                            {item.label}
-                          </>
-                        ) : (
-                          item.label
+                        {isLoading && (
+                          <span className="nav-loading-spinner" aria-hidden="true" />
                         )}
+                        {item.label}
                       </Link>
                     </li>
                   );
@@ -131,24 +147,33 @@ export function AppShell({
           >
             <button
               type="button"
-              className="app-shell-v2__action"
+              className={
+                isPending && clickedHref === "/upload"
+                  ? "app-shell-v2__action is-loading"
+                  : "app-shell-v2__action"
+              }
               onClick={() => {
                 setClickedHref("/upload");
+                setNavigationStatus("Navigating to Upload sources");
                 startTransition(() => {
                   router.push("/upload");
-                  setTimeout(() => setClickedHref(null), 300);
+                  setTimeout(() => {
+                    setClickedHref(null);
+                    setNavigationStatus("");
+                  }, 500);
                 });
               }}
               disabled={isPending && clickedHref === "/upload"}
+              aria-label={
+                isPending && clickedHref === "/upload"
+                  ? "Navigating to upload page"
+                  : "Navigate to upload page"
+              }
             >
-              {isPending && clickedHref === "/upload" ? (
-                <>
-                  <span className="action-loading-spinner" />
-                  Navigating…
-                </>
-              ) : (
-                "Upload sources"
+              {isPending && clickedHref === "/upload" && (
+                <span className="action-loading-spinner" aria-hidden="true" />
               )}
+              {isPending && clickedHref === "/upload" ? "Navigating…" : "Upload sources"}
             </button>
           </div>
         </div>
