@@ -7,12 +7,14 @@ The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestr
 ## Key Features
 
 ### 🛡️ Auto-Recovery with Exponential Backoff
+
 - Automatically restarts failed services
 - Implements exponential backoff (5s → 10s → 20s → 40s → 80s)
 - Prevents restart loops with intelligent cooldown periods
 - Maximum 3 restart attempts per service
 
 ### 📊 Real-Time Metrics & Monitoring
+
 - Continuous health checks every 10 seconds
 - Response time tracking (current and rolling average)
 - Service uptime monitoring
@@ -20,18 +22,21 @@ The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestr
 - Optional live status dashboard
 
 ### 📝 Structured Logging
+
 - Console output with color-coded log levels
 - Optional JSON-formatted file logging
 - Metadata enrichment for all events
 - Searchable log files for post-mortem analysis
 
 ### 🎯 Enhanced Health Checks
+
 - Detailed diagnostic information (status codes, response times, errors)
 - HTTP timeout protection
 - Connection failure detection
 - Job state monitoring
 
 ### 🎨 Developer Experience
+
 - Beautiful console UI with status dashboards
 - Session summaries on shutdown
 - Verbose mode for troubleshooting
@@ -274,17 +279,20 @@ On graceful shutdown (Ctrl+C), the system displays a comprehensive session summa
 ### Service Won't Start
 
 1. **Check port availability**
+
    ```powershell
    netstat -ano | findstr :8000
    netstat -ano | findstr :3000
    ```
 
 2. **Enable verbose logging**
+
    ```powershell
    .\start-theoria.ps1 -Verbose
    ```
 
 3. **Check logs**
+
    ```powershell
    Get-Content logs/theoria-launcher.log | Select-Object -Last 50
    ```
@@ -299,6 +307,7 @@ On graceful shutdown (Ctrl+C), the system displays a comprehensive session summa
 ### Health Checks Failing
 
 1. Verify health endpoints are accessible:
+
    ```powershell
    Invoke-WebRequest http://127.0.0.1:8000/health
    Invoke-WebRequest http://127.0.0.1:3000
@@ -313,21 +322,25 @@ On graceful shutdown (Ctrl+C), the system displays a comprehensive session summa
 ### Development Workflow
 
 1. **Daily Development**
+
    ```powershell
    .\start-theoria.ps1
    ```
 
 2. **Debugging Issues**
+
    ```powershell
    .\start-theoria.ps1 -Verbose -LogToFile
    ```
 
 3. **Performance Monitoring**
+
    ```powershell
    .\start-theoria.ps1 -ShowMetrics
    ```
 
 4. **CI/CD Testing**
+
    ```powershell
    .\start-theoria.ps1 -SkipHealthChecks
    ```
@@ -354,46 +367,57 @@ For production deployments, consider:
 ### Functions
 
 #### `Start-Theoria`
+
 Main entry point that orchestrates the complete lifecycle.
 
 #### `Start-TheoriaApi`
+
 Launches FastAPI service with health check polling.
 
 **Returns**: `$true` if started successfully, `$false` otherwise
 
 #### `Start-TheoriaWeb`
+
 Launches Next.js service with dependency installation.
 
 **Returns**: `$true` if started successfully, `$false` otherwise
 
 #### `Stop-TheoriaService`
+
 Gracefully stops a service and captures final output.
 
 **Parameters**:
+
 - `ServiceKey`: "Api" or "Web"
 - `Force`: Skip graceful shutdown delay
 
 #### `Test-ServiceHealth`
+
 Performs HTTP health check with diagnostics.
 
 **Parameters**:
+
 - `Endpoint`: Health check URL
 - `Diagnostics`: Reference to diagnostic results
 
 **Returns**: `$true` if healthy, `$false` otherwise
 
 #### `Get-ServiceMetrics`
+
 Retrieves comprehensive service metrics.
 
 **Parameters**:
+
 - `ServiceKey`: "Api" or "Web"
 
 **Returns**: Hashtable of metrics
 
 #### `Show-ServiceStatus`
+
 Displays formatted status dashboard in console.
 
 #### `Start-HealthMonitor`
+
 Main monitoring loop with auto-recovery logic.
 
 ## Future Enhancements

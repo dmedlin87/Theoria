@@ -11,12 +11,14 @@ Comprehensive improvements to the TheoEngine service management and health monit
 **Before**: Fixed 5-second cooldown between all restart attempts, leading to rapid restart loops and resource exhaustion.
 
 **After**: Intelligent exponential backoff strategy:
+
 - 1st restart: 5 seconds
 - 2nd restart: 10 seconds  
 - 3rd restart: 20 seconds
 - 4th restart: 40 seconds
 
 **Benefits**:
+
 - Prevents rapid restart loops
 - Reduces system load during recovery
 - Increases success rate for transient failures
@@ -34,10 +36,12 @@ $currentCooldown = $script:RestartCooldown * $backoffMultiplier
 **Before**: Console-only logs that disappeared after session ended, no machine-readable format.
 
 **After**: Dual-channel logging system:
+
 - **Console**: Human-friendly, color-coded output
 - **File**: Structured JSON logs with full metadata
 
 **Benefits**:
+
 - Post-mortem analysis capability
 - Searchable log history
 - Integration with log aggregation tools
@@ -46,6 +50,7 @@ $currentCooldown = $script:RestartCooldown * $backoffMultiplier
 **Implementation**: Lines 114-169 in `start-theoria.ps1`
 
 **Example JSON Log Entry**:
+
 ```json
 {
   "timestamp": "2025-10-12 12:34:56.789",
@@ -61,6 +66,7 @@ $currentCooldown = $script:RestartCooldown * $backoffMultiplier
 ```
 
 **Usage**:
+
 ```powershell
 .\start-theoria.ps1 -LogToFile
 ```
@@ -70,6 +76,7 @@ $currentCooldown = $script:RestartCooldown * $backoffMultiplier
 **Before**: No visibility into service performance or reliability over time.
 
 **After**: Comprehensive metrics tracking per service:
+
 - **Uptime**: Total running time
 - **Health Check Success Rate**: Percentage of passing checks
 - **Response Times**: Current and rolling average
@@ -78,6 +85,7 @@ $currentCooldown = $script:RestartCooldown * $backoffMultiplier
 - **Failure Count**: Cumulative failures
 
 **Benefits**:
+
 - Performance trend analysis
 - Reliability measurement
 - Early warning of degradation
@@ -86,6 +94,7 @@ $currentCooldown = $script:RestartCooldown * $backoffMultiplier
 **Implementation**: Lines 451-472 in `start-theoria.ps1`
 
 **Service State Enhancement**:
+
 ```powershell
 StartTime = $null
 HealthCheckFailures = 0
@@ -100,12 +109,14 @@ LastError = $null
 **Before**: Boolean health status only (healthy/unhealthy).
 
 **After**: Rich diagnostic information for every check:
+
 - HTTP status code
 - Response time (milliseconds)
 - Error messages
 - Connection state
 
 **Benefits**:
+
 - Root cause analysis
 - Performance monitoring
 - Detailed error reporting
@@ -114,6 +125,7 @@ LastError = $null
 **Implementation**: Lines 225-255 in `start-theoria.ps1`
 
 **Diagnostic Structure**:
+
 ```powershell
 @{
     Healthy = $true/$false
@@ -124,6 +136,7 @@ LastError = $null
 ```
 
 **Rolling Average Calculation**:
+
 ```powershell
 # Lines 546-551
 if ($service.AverageResponseTime -eq 0) {
@@ -138,6 +151,7 @@ if ($service.AverageResponseTime -eq 0) {
 **Before**: No real-time visibility into service health during operation.
 
 **After**: Live status dashboard with:
+
 - Service status indicators (color-coded)
 - Current uptime
 - Health check success rates
@@ -146,6 +160,7 @@ if ($service.AverageResponseTime -eq 0) {
 - Total runtime
 
 **Benefits**:
+
 - Real-time monitoring
 - At-a-glance system health
 - Performance visibility
@@ -154,6 +169,7 @@ if ($service.AverageResponseTime -eq 0) {
 **Implementation**: Lines 474-513 in `start-theoria.ps1`
 
 **Dashboard Example**:
+
 ```
 ╔══════════════════════════════════════════════════════════╗
 ║               SERVICE STATUS DASHBOARD                  ║
@@ -170,6 +186,7 @@ if ($service.AverageResponseTime -eq 0) {
 **Display Frequency**: Every 60 seconds (6 health check cycles)
 
 **Usage**:
+
 ```powershell
 .\start-theoria.ps1 -ShowMetrics
 ```
@@ -179,6 +196,7 @@ if ($service.AverageResponseTime -eq 0) {
 **Before**: Basic shutdown with minimal feedback.
 
 **After**: Comprehensive shutdown sequence:
+
 - Graceful service termination
 - Uptime reporting per service
 - Session summary with full metrics
@@ -187,6 +205,7 @@ if ($service.AverageResponseTime -eq 0) {
 - Log file location reminder
 
 **Benefits**:
+
 - Session performance insights
 - Service reliability metrics
 - Development feedback loop
@@ -195,6 +214,7 @@ if ($service.AverageResponseTime -eq 0) {
 **Implementation**: Lines 724-767 in `start-theoria.ps1`
 
 **Session Summary Example**:
+
 ```
 ╔══════════════════════════════════════════════════════════╗
 ║                   SESSION SUMMARY                        ║
@@ -215,6 +235,7 @@ if ($service.AverageResponseTime -eq 0) {
 **Before**: Basic console output, limited configuration options.
 
 **After**: Rich feature set with:
+
 - New CLI parameters (`-LogToFile`, `-ShowMetrics`)
 - Startup time reporting
 - Feature status indicators in banner
@@ -224,6 +245,7 @@ if ($service.AverageResponseTime -eq 0) {
 - Recovery status messages
 
 **New Parameters**:
+
 - `-LogToFile`: Enable structured JSON logging
 - `-ShowMetrics`: Display real-time status dashboard
 
@@ -234,6 +256,7 @@ if ($service.AverageResponseTime -eq 0) {
 ### Error Handling & Diagnostics
 
 **Enhanced Error Tracking**:
+
 - Last error message stored per service
 - Error context in structured logs
 - Failure count persistence
@@ -244,11 +267,13 @@ if ($service.AverageResponseTime -eq 0) {
 ### Performance Monitoring
 
 **Response Time Tracking**:
+
 - Per-check response time measurement
 - Rolling average calculation (80/20 exponential smoothing)
 - Historical comparison capability
 
 **Startup Time Measurement**:
+
 ```powershell
 # Lines 326, 340
 $script:Services.Api.StartTime = Get-Date
@@ -258,6 +283,7 @@ Write-TheoriaLog "Theoria API is ready (startup time: ${waited}s)"
 ### Resilience Enhancements
 
 **Cooldown Period Tracking**:
+
 ```powershell
 # Lines 599-601
 $remainingCooldown = [int]($currentCooldown - $timeSinceLastRestart.TotalSeconds)
@@ -265,6 +291,7 @@ Write-TheoriaLog "$($service.Name) in cooldown period (${remainingCooldown}s rem
 ```
 
 **Failure Recovery Detection**:
+
 ```powershell
 # Lines 608-611
 if ($service.HealthCheckFailures -gt 0) {
@@ -286,6 +313,7 @@ if ($service.HealthCheckFailures -gt 0) {
 ### Service State Extensions
 
 Each service now tracks 6 additional metrics:
+
 1. `StartTime` - Service start timestamp
 2. `HealthCheckFailures` - Cumulative failure count
 3. `TotalHealthChecks` - Total checks performed
@@ -296,16 +324,19 @@ Each service now tracks 6 additional metrics:
 ## Usage Examples
 
 ### Basic Development
+
 ```powershell
 .\start-theoria.ps1
 ```
 
 ### Full Monitoring Mode
+
 ```powershell
 .\start-theoria.ps1 -Verbose -LogToFile -ShowMetrics
 ```
 
 ### Production Debugging
+
 ```powershell
 .\start-theoria.ps1 -LogToFile
 # Review logs after session
@@ -313,6 +344,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ```
 
 ### Performance Analysis
+
 ```powershell
 .\start-theoria.ps1 -ShowMetrics
 # Watch dashboard for response time trends
@@ -321,6 +353,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ## Backward Compatibility
 
 ✅ **Fully backward compatible** - all changes are additive:
+
 - Default behavior unchanged
 - New features opt-in via parameters
 - No breaking changes to existing workflows
@@ -329,6 +362,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ## Testing Recommendations
 
 ### 1. Basic Functionality
+
 ```powershell
 .\start-theoria.ps1
 # Verify both services start
@@ -336,6 +370,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ```
 
 ### 2. Auto-Recovery
+
 ```powershell
 .\start-theoria.ps1 -Verbose -ShowMetrics
 # Kill API process manually
@@ -343,6 +378,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ```
 
 ### 3. Structured Logging
+
 ```powershell
 .\start-theoria.ps1 -LogToFile
 # Verify logs/theoria-launcher.log creation
@@ -350,6 +386,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ```
 
 ### 4. Metrics Dashboard
+
 ```powershell
 .\start-theoria.ps1 -ShowMetrics
 # Wait for 60 seconds
@@ -357,6 +394,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ```
 
 ### 5. Graceful Shutdown
+
 ```powershell
 .\start-theoria.ps1
 # Run for several minutes
@@ -386,21 +424,25 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ## Future Enhancement Opportunities
 
 ### Metrics Export
+
 - Prometheus endpoint for metrics
 - StatsD integration
 - Custom webhook notifications
 
 ### Advanced Recovery
+
 - Circuit breaker pattern
 - Service dependency awareness
 - Cascading failure prevention
 
 ### Monitoring Extensions
+
 - Custom health check endpoints
 - Per-endpoint response time tracking
 - Request rate limiting
 
 ### Developer Tools
+
 - Web-based dashboard
 - Real-time log streaming
 - Performance profiling mode
@@ -408,9 +450,11 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 ## Documentation
 
 **New Documentation Created**:
+
 - `docs/SERVICE_MANAGEMENT.md` - Comprehensive reference guide
 
 **Updated Files**:
+
 - `start-theoria.ps1` - Core implementation (500+ lines)
 
 ## Migration Guide
@@ -418,6 +462,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 No migration required - all improvements are transparent to existing users.
 
 **Optional Adoption**:
+
 1. Add `-LogToFile` for production environments
 2. Use `-ShowMetrics` during development
 3. Review session summaries for reliability insights
@@ -426,6 +471,7 @@ No migration required - all improvements are transparent to existing users.
 ## Summary Statistics
 
 ### Code Changes
+
 - **Lines Modified**: ~300
 - **Lines Added**: ~200
 - **New Functions**: 2 (`Get-ServiceMetrics`, `Show-ServiceStatus`)
@@ -433,6 +479,7 @@ No migration required - all improvements are transparent to existing users.
 - **New Parameters**: 2
 
 ### Capabilities Added
+
 - Exponential backoff retry logic
 - Structured JSON logging
 - Real-time metrics collection
@@ -442,6 +489,7 @@ No migration required - all improvements are transparent to existing users.
 - Enhanced error tracking
 
 ### Quality Improvements
+
 - Better resilience (exponential backoff)
 - Better observability (structured logs + metrics)
 - Better developer experience (dashboard + summaries)
