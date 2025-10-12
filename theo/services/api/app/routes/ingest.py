@@ -17,6 +17,11 @@ from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
 from theo.services.api.app.ingest.exceptions import UnsupportedSourceError
 from ..ingest.exceptions import UnsupportedSourceError
+from ..ingest.pipeline import (
+    run_pipeline_for_file as _run_pipeline_for_file,
+    run_pipeline_for_transcript as _run_pipeline_for_transcript,
+    run_pipeline_for_url as _run_pipeline_for_url,
+)
 from ..models.documents import (
     DocumentIngestResponse,
     SimpleIngestRequest,
@@ -25,6 +30,14 @@ from ..models.documents import (
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
 from theo.services.cli import ingest_folder as cli_ingest
 from ..services.ingestion_service import IngestionService, get_ingestion_service
+
+# Backwards-compatible shims that mirror the previous direct pipeline imports.
+# Older tests and extensions reach into ``routes.ingest`` and replace these
+# attributes, so keep them stable and ensure the ingestion service picks up any
+# monkeypatching.
+run_pipeline_for_file = _run_pipeline_for_file
+run_pipeline_for_transcript = _run_pipeline_for_transcript
+run_pipeline_for_url = _run_pipeline_for_url
 
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
@@ -177,6 +190,8 @@ async def ingest_file(
             max_bytes=getattr(settings, "ingest_upload_max_bytes", None),
         )
         parsed_frontmatter = _parse_frontmatter(frontmatter)
+        if ingestion_service.run_file_pipeline is _run_pipeline_for_file:
+            ingestion_service.run_file_pipeline = run_pipeline_for_file
         document = ingestion_service.ingest_file(
             session,
             tmp_path,
@@ -214,6 +229,8 @@ async def ingest_url(
     ingestion_service: IngestionService = Depends(get_ingestion_service),
 ) -> DocumentIngestResponse:
     try:
+        if ingestion_service.run_url_pipeline is _run_pipeline_for_url:
+            ingestion_service.run_url_pipeline = run_pipeline_for_url
         document = ingestion_service.ingest_url(
             session,
             payload.url,
@@ -306,6 +323,8 @@ async def ingest_transcript(
             await _stream_upload_to_path(audio, audio_path, max_bytes=limit)
 
         parsed_frontmatter = _parse_frontmatter(frontmatter)
+        if ingestion_service.run_transcript_pipeline is _run_pipeline_for_transcript:
+            ingestion_service.run_transcript_pipeline = run_pipeline_for_transcript
 
         document = ingestion_service.ingest_transcript(
             session,
