@@ -90,11 +90,14 @@ def build_hypothesis_prompt(
         if isinstance(raw, Mapping):
             snippet = str(raw.get("snippet") or raw.get("text") or "").strip()
             osis = str(raw.get("osis") or raw.get("osis_ref") or "Unknown").strip()
+            meta = raw.get("meta")
+            if not isinstance(meta, Mapping):
+                meta = {}
             anchor = str(
                 raw.get("anchor")
                 or raw.get("page_no")
-                or raw.get("meta", {}).get("page")
-                or raw.get("meta", {}).get("anchor")
+                or meta.get("page")
+                or meta.get("anchor")
                 or "context"
             ).strip()
             score = raw.get("score")
