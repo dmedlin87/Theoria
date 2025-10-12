@@ -55,3 +55,4 @@ build/
 
 # OS-specific
 Thumbs.db
+trufflehog-findings.json

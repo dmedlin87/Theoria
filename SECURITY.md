@@ -47,8 +47,14 @@ Include the following:
 - **SAST:** GitHub CodeQL (Python + JavaScript) on pull requests and default branch.
 - **DAST:** Automated OWASP ZAP baseline scan of the staging API captured in the `STAGING_API_BASE_URL` secret (`.github/workflows/security-zap.yml`). Results publish to the repository security dashboard and block merges whenever a High-severity alert is detected.
 - **Secrets Management:** Long-lived credentials stored in managed secret store (Vault/Azure Key Vault) – never committed.
-- **Secrets Scanning:** TruffleHog executes on every push/pull request via the CI workflow to block new credential leaks and archive findings for triage.
+- **Secrets Scanning:** [Trufflehog](docs/security/secret-scanning.md) runs locally and in CI using the curated baseline at `docs/security/trufflehog-baseline.json`. The workflow fails if any finding falls outside that baseline and uploads the raw JSON artifact for review.
 - **Incident Response:** Centralized contact via security mailing list; create follow-up advisory in `docs/advisories/` when needed.
+
+## Secret Scanning Operations
+
+1. **Local validation.** Engineers can reproduce CI behaviour with `python scripts/security/run_trufflehog.py` (or `trufflehog --json --regex --entropy=False --repo_path . file://.`) to generate a JSON report matching CI output. Commit the refreshed results to `docs/security/trufflehog-baseline.json` only after confirming that every entry is a sanctioned template credential.
+2. **Allow-list maintenance.** The baseline file doubles as the allow-list. When a false-positive is accepted, append a new object capturing the commit hash, path, and matching string so auditors can trace the rationale. Do not delete historical entries; they evidence long-term exceptions.
+3. **Escalation.** Any new detection outside the baseline must follow the remediation flow below. After remediation, update the baseline and rotate credentials to keep future scans green.
 
 ## Secrets Exposure Response
 
