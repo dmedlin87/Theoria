@@ -42,3 +42,25 @@ def test_dss_links_endpoint_handles_missing_osis() -> None:
         assert payload["osis"] == "Nonexistent.1.1"
         assert payload["total"] == 0
         assert payload["links"] == []
+
+
+def test_dss_links_endpoint_ignores_malformed_records(monkeypatch) -> None:
+    from theo.services.api.app.research import dss_links as module
+
+    def fake_dataset() -> dict[str, list[dict[str, str]]]:
+        return {
+            "John.1.1": [
+                {"url": "https://example.org/without-id", "fragment": "4Q246"},
+                {"id": "missing-url", "title": "Should be skipped"},
+            ]
+        }
+
+    monkeypatch.setattr(module, "dss_links_dataset", fake_dataset)
+
+    with TestClient(app) as client:
+        response = client.get("/research/dss-links", params={"osis": "John.1.1"})
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 1
+        assert payload["links"][0]["id"].startswith("John.1.1:")
+        assert payload["links"][0]["url"] == "https://example.org/without-id"
