@@ -15,7 +15,7 @@ from fastapi.exception_handlers import http_exception_handler, request_validatio
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
@@ -123,7 +123,7 @@ async def lifespan(_: FastAPI):
     with Session(engine) as session:
         try:
             seed_reference_data(session)
-        except OperationalError as exc:  # pragma: no cover - defensive startup guard
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive startup guard
             session.rollback()
             logger.warning(
                 "Skipping reference data seeding due to database error", exc_info=exc
