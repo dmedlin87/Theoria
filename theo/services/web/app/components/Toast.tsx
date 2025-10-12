@@ -73,15 +73,6 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
       role="region"
       aria-label="Notifications"
       className="toast-container"
-      style={{
-        position: "fixed",
-        bottom: "var(--space-4)",
-        right: "var(--space-4)",
-        zIndex: 9999,
-        display: "grid",
-        gap: "var(--space-2)",
-        maxWidth: "min(420px, calc(100vw - var(--space-4) * 2))",
-      }}
     >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
@@ -91,7 +82,7 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
 }
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }): JSX.Element {
-  const alertClass = `alert alert-${toast.type}`;
+  const alertClass = `alert alert-${toast.type} toast-item`;
 
   return (
     <div
@@ -99,12 +90,8 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       aria-live="polite"
       aria-atomic="true"
       className={alertClass}
-      style={{
-        animation: "toast-slide-in 0.3s ease-out",
-        boxShadow: "var(--shadow-xl)",
-      }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
+      <div className="toast-item__content">
         <div className="stack-xs" style={{ flex: 1 }}>
           {toast.title && <div className="alert__title">{toast.title}</div>}
           <div className="alert__message">{toast.message}</div>
@@ -112,30 +99,12 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
         <button
           type="button"
           onClick={() => onRemove(toast.id)}
-          className="btn-ghost btn-sm"
+          className="btn-ghost btn-sm toast-item__close"
           aria-label="Dismiss notification"
-          style={{
-            padding: "0.25rem",
-            minWidth: "auto",
-            width: "1.75rem",
-            height: "1.75rem",
-          }}
         >
           ×
         </button>
       </div>
-      <style jsx>{`
-        @keyframes toast-slide-in {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-      `}</style>
     </div>
   );
 }

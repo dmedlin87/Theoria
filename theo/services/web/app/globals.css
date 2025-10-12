@@ -1849,7 +1849,69 @@ section + section {
   font-size: 0.9375rem;
 }
 
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  z-index: 9999;
+  display: grid;
+  gap: var(--space-2);
+  max-width: min(420px, calc(100vw - var(--space-4) * 2));
+  pointer-events: none;
+}
+
+.toast-item {
+  box-shadow: var(--shadow-xl);
+  animation: toast-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+}
+
+.toast-item__content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.toast-item__close {
+  padding: 0.25rem;
+  min-width: auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 /* Loading States */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  z-index: 9998;
+}
+
+[data-theme="dark"] .loading-overlay {
+  background: rgba(26, 31, 53, 0.9);
+}
+
 .skeleton {
   background: linear-gradient(90deg, var(--color-surface-muted) 0%, var(--color-surface-hover) 50%, var(--color-surface-muted) 100%);
   background-size: 200% 100%;
@@ -1984,6 +2046,26 @@ section + section {
 .p-3 { padding: var(--space-3); }
 .p-4 { padding: var(--space-4); }
 
+/* Pagination Components */
+.pagination-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  justify-content: center;
+  align-items: center;
+}
+
+.pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.pagination-page {
+  min-width: 2.5rem;
+}
+
 /* Accessibility Utilities */
 .sr-only {
   position: absolute;
@@ -2020,6 +2102,10 @@ section + section {
     animation-delay: 0ms !important;
     transition-duration: 0s !important;
     transition-delay: 0s !important;
+  }
+
+  .toast-item {
+    animation: none !important;
   }
 
   html:focus-within {

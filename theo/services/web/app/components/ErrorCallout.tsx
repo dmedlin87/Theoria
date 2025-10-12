@@ -24,22 +24,11 @@ export function ErrorCallout({
   const normalizedTraceId = typeof traceId === "string" && traceId.trim() ? traceId.trim() : null;
 
   return (
-    <div
-      role="alert"
-      style={{
-        border: "1px solid #fecaca",
-        background: "#fef2f2",
-        color: "#7f1d1d",
-        padding: "1rem",
-        borderRadius: "0.75rem",
-        display: "grid",
-        gap: "0.75rem",
-      }}
-    >
-      <p style={{ margin: 0 }}>{message}</p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
+    <div role="alert" className="alert alert-danger">
+      <p className="alert__message">{message}</p>
+      <div className="cluster-sm" style={{ alignItems: "center" }}>
         {onRetry && (
-          <button type="button" onClick={onRetry}>
+          <button type="button" onClick={onRetry} className="btn btn-sm btn-danger">
             {retryLabel}
           </button>
         )}
@@ -47,14 +36,8 @@ export function ErrorCallout({
           <button
             type="button"
             onClick={() => onShowDetails(normalizedTraceId)}
-            style={{
-              border: "none",
-              background: "transparent",
-              padding: 0,
-              color: "#7f1d1d",
-              textDecoration: "underline",
-              cursor: "pointer",
-            }}
+            className="btn-ghost btn-sm"
+            style={{ color: "var(--color-danger)" }}
           >
             {detailsLabel}
           </button>
@@ -62,7 +45,7 @@ export function ErrorCallout({
         {actions}
       </div>
       {normalizedTraceId && (
-        <p style={{ margin: 0, fontSize: "0.85rem", color: "#991b1b" }}>
+        <p className="text-sm text-danger" style={{ margin: 0 }}>
           Support code: <code>{normalizedTraceId}</code>
         </p>
       )}

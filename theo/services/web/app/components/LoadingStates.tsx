@@ -72,18 +72,7 @@ export function Spinner({ size = "md", className = "" }: SpinnerProps): JSX.Elem
 export function LoadingOverlay({ message = "Loading..." }: { message?: string }): JSX.Element {
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "var(--space-2)",
-        background: "rgba(255, 255, 255, 0.9)",
-        backdropFilter: "blur(var(--blur-sm))",
-        zIndex: 9998,
-      }}
+      className="loading-overlay"
       role="alert"
       aria-busy="true"
       aria-live="polite"

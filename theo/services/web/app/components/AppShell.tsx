@@ -120,7 +120,8 @@ export function AppShell({
                     key={link.href}
                     href={link.href}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
+                    aria-label={`${link.label} (opens in new tab)`}
                   >
                     {link.label}
                   </a>
