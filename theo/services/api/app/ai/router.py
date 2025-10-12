@@ -14,6 +14,11 @@ from .clients import GenerationError
 from .ledger import CacheRecord, SharedLedger
 from .registry import LLMModel, LLMRegistry, get_llm_registry
 
+try:  # pragma: no cover - optional dependency
+    from prometheus_client import Counter as _PrometheusCounter
+except Exception:  # pragma: no cover - metrics disabled
+    _PrometheusCounter = None  # type: ignore[assignment]
+
 
 @dataclass
 class RoutedGeneration:
@@ -44,6 +49,32 @@ _DEFAULT_WARNING_RATIO = 0.8
 
 
 _TRACER = trace.get_tracer("theo.router")
+
+
+class _NoopCounter:
+    def labels(self, *args: object, **kwargs: object) -> "_NoopCounter":
+        return self
+
+    def inc(self, amount: float = 1.0) -> None:
+        return None
+
+
+if _PrometheusCounter is not None:  # pragma: no cover - exercised when metrics enabled
+    _ROUTER_LEDGER_EVENTS = _PrometheusCounter(
+        "theo_router_dedup_events_total",
+        "Router deduplication events while coordinating inflight generations.",
+        labelnames=("event",),
+    )
+else:  # pragma: no cover - metrics disabled
+    _ROUTER_LEDGER_EVENTS = _NoopCounter()
+
+
+def _record_router_ledger_event(event: str, **extra: object) -> None:
+    LOGGER.debug("router.ledger.%s", event, extra=extra)
+    try:
+        _ROUTER_LEDGER_EVENTS.labels(event=event).inc()
+    except Exception:  # pragma: no cover - defensive guard
+        LOGGER.debug("failed to record router ledger metric", exc_info=True)
 
 
 class LLMRouterService:
@@ -188,33 +219,95 @@ class LLMRouterService:
                     )
                     cache_status = "miss" if cache_settings.enabled else "bypass"
                     owns_inflight = True
+                    _record_router_ledger_event(
+                        "acquired_inflight",
+                        cache_key=cache_key,
+                        model=model.name,
+                        workflow=workflow,
+                    )
                 elif inflight.status == "waiting":
                     cache_status = "wait"
                     owns_inflight = False
                     wait_observed_updated_at = inflight.updated_at
+                    _record_router_ledger_event(
+                        "dedup_waiting",
+                        cache_key=cache_key,
+                        model=model.name,
+                        workflow=workflow,
+                    )
                 else:
                     stale_status = inflight.status
                     owns_inflight = False
                     wait_observed_updated_at = inflight.updated_at
+                    _record_router_ledger_event(
+                        "stale_row_detected",
+                        cache_key=cache_key,
+                        status=inflight.status,
+                        model=model.name,
+                        workflow=workflow,
+                    )
 
             if stale_status is not None:
+                _record_router_ledger_event(
+                    "stale_row_wait",
+                    cache_key=cache_key,
+                    status=stale_status,
+                    model=model.name,
+                    workflow=workflow,
+                )
                 try:
                     self._ledger.wait_for_inflight(
                         cache_key, observed_updated_at=wait_observed_updated_at
                     )
                 except GenerationError:
+                    _record_router_ledger_event(
+                        "stale_row_wait_error",
+                        cache_key=cache_key,
+                        status=stale_status,
+                        model=model.name,
+                        workflow=workflow,
+                    )
                     pass
+                else:
+                    _record_router_ledger_event(
+                        "stale_row_wait_complete",
+                        cache_key=cache_key,
+                        status=stale_status,
+                        model=model.name,
+                        workflow=workflow,
+                    )
                 with self._ledger.transaction() as txn:
                     txn.create_inflight(
                         cache_key, model_name=model.name, workflow=workflow
                     )
+                _record_router_ledger_event(
+                    "stale_row_reset",
+                    cache_key=cache_key,
+                    status=stale_status,
+                    model=model.name,
+                    workflow=workflow,
+                )
                 cache_status = "miss" if cache_settings.enabled else "bypass"
                 owns_inflight = True
 
             if not owns_inflight:
+                _record_router_ledger_event(
+                    "wait_for_primary",
+                    cache_key=cache_key,
+                    status=cache_status,
+                    model=model.name,
+                    workflow=workflow,
+                )
                 span.set_attribute("llm.cache_status", cache_status)
                 record = self._ledger.wait_for_inflight(
                     cache_key, observed_updated_at=wait_observed_updated_at
+                )
+                _record_router_ledger_event(
+                    "wait_for_primary_complete",
+                    cache_key=cache_key,
+                    status=cache_status,
+                    model=model.name,
+                    workflow=workflow,
                 )
                 return self._record_to_generation(record)
 
