@@ -7,6 +7,7 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable, Iterable
+from collections.abc import Callable
 from uuid import NAMESPACE_URL, uuid5
 
 import yaml
@@ -16,8 +17,6 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from theo.services.geo import seed_openbible_geo
-from ..ingest.osis import expand_osis_reference
-
 from ..ingest.osis import expand_osis_reference
 
 from .models import (
@@ -209,6 +208,21 @@ def _handle_missing_perspective_error(
         "Skipping %s seeds because 'perspective' column is missing", dataset_label
     )
     return True
+
+
+def _run_seed_with_perspective_guard(
+    session: Session,
+    seed_fn: Callable[[Session], None],
+    dataset_label: str,
+) -> None:
+    """Execute *seed_fn* while gracefully handling missing perspective columns."""
+
+    try:
+        seed_fn(session)
+    except OperationalError as exc:
+        if _handle_missing_perspective_error(session, dataset_label, exc):
+            return
+        raise
 
 
 def seed_contradiction_claims(session: Session) -> None:
@@ -663,5 +677,8 @@ def seed_reference_data(session: Session) -> None:
     _safe_seed(session, seed_contradiction_claims, "contradiction")
     _safe_seed(session, seed_harmony_claims, "harmony")
     _safe_seed(session, seed_commentary_excerpts, "commentary excerpt")
+    _run_seed_with_perspective_guard(session, seed_contradiction_claims, "contradiction")
+    _run_seed_with_perspective_guard(session, seed_harmony_claims, "harmony")
+    _run_seed_with_perspective_guard(session, seed_commentary_excerpts, "commentary excerpt")
     seed_geo_places(session)
     seed_openbible_geo(session)
