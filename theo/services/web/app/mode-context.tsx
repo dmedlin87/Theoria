@@ -154,12 +154,15 @@ export function ModeSwitcher(): JSX.Element {
     [],
   );
 
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      setShowTooltip(false);
-    }
-  }, []);
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Escape" && showTooltip) {
+        event.stopPropagation();
+        setShowTooltip(false);
+      }
+    },
+    [showTooltip],
+  );
 
   useEffect(() => {
     if (!showTooltip) {
