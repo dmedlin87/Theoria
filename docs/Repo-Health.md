@@ -57,5 +57,5 @@
 
 1. Implement domain/application adapter reshuffle per modularity plan (Phase 2).
 2. Add container signing + provenance attestation once deployment pipeline is containerized.
-3. Run OWASP ZAP baseline scan against staging API and capture results in security dashboards.
+3. ✅ OWASP ZAP baseline scan now targets the staging API via the `STAGING_API_BASE_URL` secret, uploads SARIF, and gates merges on High alerts.
 4. Evaluate secrets scanning tooling (Trufflehog or GitHub Advanced Security) post-onboarding.
