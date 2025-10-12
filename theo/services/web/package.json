@@ -15,20 +15,20 @@
   "dependencies": {
     "d3": "^7.9.0",
     "next": "15.5.4",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
   },
   "devDependencies": {
     "@next/bundle-analyzer": "15.5.4",
     "@playwright/test": "1.56.0",
     "@testing-library/jest-dom": "6.6.3",
-    "@testing-library/react": "14.3.1",
+    "@testing-library/react": "16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/d3": "^7.4.3",
     "@types/jest": "29.5.12",
     "@types/node": "20.19.19",
-    "@types/react": "18.3.5",
-    "@types/react-dom": "18.3.0",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.1",
     "@typescript-eslint/eslint-plugin": "^8.13.0",
     "@typescript-eslint/parser": "^8.13.0",
     "eslint": "^9.14.0",
