@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from fastapi import FastAPI, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketDenialResponse
 
@@ -101,3 +101,55 @@ def test_realtime_websocket_requires_authentication(realtime_client: TestClient)
             pytest.fail("Unauthenticated websocket should not be accepted")
 
     assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.no_auth_override
+def test_realtime_websocket_denies_forbidden_access(
+    realtime_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _ForbiddenService:
+        def ensure_accessible(self, _notebook_id: str) -> None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+
+    def _service_override(_session, _principal):  # pragma: no cover - runtime dependency
+        return _ForbiddenService()
+
+    connect_called = False
+
+    async def _connect_override(_notebook_id: str, _websocket):
+        nonlocal connect_called
+        connect_called = True
+
+    monkeypatch.setattr(realtime, "_service", _service_override)
+    monkeypatch.setattr(realtime._BROKER, "connect", _connect_override)
+
+    with pytest.raises(WebSocketDenialResponse) as exc:
+        with realtime_client.websocket_connect(
+            "/realtime/notebooks/example",
+            headers={"X-API-Key": "pytest-default-key"},
+        ):
+            pytest.fail("Forbidden websocket should not be accepted")
+
+    assert exc.value.status_code == status.HTTP_403_FORBIDDEN
+    assert connect_called is False
+
+
+@pytest.mark.no_auth_override
+def test_realtime_poll_denies_forbidden_access(
+    realtime_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _ForbiddenService:
+        def ensure_accessible(self, _notebook_id: str) -> None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+
+    def _service_override(_session, _principal):  # pragma: no cover - runtime dependency
+        return _ForbiddenService()
+
+    monkeypatch.setattr(realtime, "_service", _service_override)
+
+    response = realtime_client.get(
+        "/realtime/notebooks/example/poll",
+        headers={"X-API-Key": "pytest-default-key"},
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN

@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, DefaultDict
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
-from starlette.datastructures import State
 
 from ..models.notebooks import NotebookRealtimeSnapshot
 from ..security import Principal, require_principal
@@ -32,7 +31,6 @@ class NotebookEventBroker:
         self._lock = asyncio.Lock()
 
     async def connect(self, notebook_id: str, websocket: WebSocket) -> None:
-        await websocket.accept()
         async with self._lock:
             self._connections[notebook_id].add(websocket)
 
@@ -79,11 +77,8 @@ def _service(session: Session, principal: Principal | None) -> "NotebookService"
 def require_websocket_principal(websocket: WebSocket) -> Principal:
     """Authenticate websocket connections using the standard principal helper."""
 
-    state = websocket.scope.get("state")
-    if not isinstance(state, State):
-        state = State()
-        websocket.scope["state"] = state
-    request = SimpleNamespace(state=state)
+    websocket.scope.setdefault("state", {})
+    request = SimpleNamespace(state=SimpleNamespace())
     authorization = websocket.headers.get("authorization")
     api_key_header = websocket.headers.get("x-api-key")
     principal = require_principal(
@@ -115,6 +110,7 @@ async def notebook_updates(
 ) -> None:
     service = _service(session, principal)
     service.ensure_accessible(notebook_id)
+    await websocket.accept()
     await _BROKER.connect(notebook_id, websocket)
     try:
         await websocket.send_json(
