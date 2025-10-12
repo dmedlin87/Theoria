@@ -27,6 +27,8 @@ env/
 .env.*
 !.env.example
 .envrc
+infra/certs/*.pem
+logs/*.jsonl
 
 # Python caches and tooling
 .pytest_cache/
@@ -53,3 +55,4 @@ build/
 
 # OS-specific
 Thumbs.db
+trufflehog-findings.json

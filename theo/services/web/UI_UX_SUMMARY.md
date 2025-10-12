@@ -198,6 +198,26 @@ Track these weekly:
 
 ---
 
+## ✅ Automated Quality Gates
+
+To keep refactors on track we now fail CI when the following regressions occur:
+
+- **Inline style growth** – custom ESLint rules read from `config/ui-quality-baseline.json` and `npm run quality:gates` fails if any file exceeds its allowance.
+- **Oversized React components** – the same gate enforces the maximum line counts documented in the baseline file.
+- **Accessibility regressions** – `npm run test:a11y` runs Playwright with axe against `/`, `/verse/John.3.16`, and `/copilot`, failing on critical violations.
+- **Performance regressions** – `npm run test:lighthouse:smoke` executes LHCI against the same key routes, enforcing Lighthouse assertions in `lighthouserc.json`.
+- **Coverage drift** – Vitest coverage thresholds (≥80% lines/statements/functions/branches) are enforced in CI.
+
+### Remediation Workflow
+
+1. Run `npm run quality:gates` locally before opening a PR to see the delta against baseline allowances.
+2. If you removed inline styles or broke down components, regenerate the baseline via `npm run quality:baseline` and commit the updated JSON.
+3. Fix failing axe scans by addressing the violation details attached to the Playwright report artifact.
+4. Use `npm run test:lighthouse:smoke` to reproduce Lighthouse failures locally; consult `.lighthouseci/` artifacts for detailed scores.
+5. Review the dashboard at `docs/dashboards/ui-quality-dashboard.md` for progress trends and reference the remediation checklist in `docs/ui-quality-gates.md` when planning sprint work.
+
+---
+
 ## 📁 Documentation
 
 Three comprehensive documents created:
