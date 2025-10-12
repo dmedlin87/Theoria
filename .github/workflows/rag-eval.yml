@@ -1,0 +1,55 @@
+name: RAG Evaluation
+
+on:
+  pull_request:
+    paths:
+      - 'theo/**'
+      - 'data/eval/**'
+      - 'scripts/perf/**'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'theo/**'
+      - 'data/eval/**'
+      - 'scripts/perf/**'
+
+jobs:
+  rag-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Determine affected modules
+        id: modules
+        run: |
+          MODULES="$(python scripts/perf/detect_rag_modules.py)"
+          echo "modules=$MODULES" >> "$GITHUB_OUTPUT"
+          echo "Detected modules: $MODULES"
+
+      - name: Run rag_eval comparisons
+        env:
+          RAG_MODULES: ${{ steps.modules.outputs.modules }}
+        run: |
+          python scripts/perf/collect_rag_eval_metrics.py --modules ${RAG_MODULES}
+
+      - name: Upload rag_eval artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-eval-metrics
+          path: perf_metrics/

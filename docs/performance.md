@@ -73,6 +73,16 @@ Field dashboards aggregate Core Web Vitals from CrUX, Web Vitals JS, and server 
 - **Account for release cadence** – CrUX data is delayed ~28 days. If CI shows improvement but field data is stale, annotate the report instead of reverting.
 - **Check cache hit ratios** – CDN or service-worker churn can tank field metrics even when Lighthouse is green.
 
+## Observability dashboards
+
+Keep these Grafana dashboards handy when triaging changes:
+
+- [Web Vitals Overview](https://grafana.theo.internal/d/web-vitals/core-web-vitals-overview) – LCP/CLS/INP trends for landing page, dashboard, and reader broken down by device class.
+- [RAG Retrieval Quality](https://grafana.theo.internal/d/rag-quality/rag-retrieval-efficacy) – Faithfulness, relevance, and fallback rate from nightly rag_eval comparison exports.
+- [Edge Latency & Throughput](https://grafana.theo.internal/d/edge-latency/api-latency-distribution) – CDN cache hit ratios, p95 response time, and concurrent request saturation for API pods.
+
+After deployment, confirm the expected trend direction in at least one of the dashboards above and link the panel snapshot in your release notes or PR.
+
 ## Common sources of discrepancies
 
 | Cause | Effect | Mitigation |
