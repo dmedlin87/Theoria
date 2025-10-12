@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_session
 from ..models.transcripts import TranscriptSearchResponse, TranscriptSegmentModel
-from ..transcripts.service import build_source_ref, search_transcript_segments
+from ..transcripts.service import (
+    build_source_ref,
+    canonical_primary_osis,
+    search_transcript_segments,
+)
 
 router = APIRouter()
 
@@ -34,7 +38,7 @@ def search_transcripts(
                 document_id=segment.document_id,
                 video_id=video_model.video_id if video_model else None,
                 text=segment.text,
-                primary_osis=segment.primary_osis,
+                primary_osis=canonical_primary_osis(segment),
                 osis_refs=segment.osis_refs,
                 t_start=segment.t_start,
                 t_end=segment.t_end,

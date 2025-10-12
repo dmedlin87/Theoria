@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import pythonbible as pb
 from sqlalchemy import Integer, cast, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..db.models import TranscriptSegment, Video
-from ..ingest.osis import expand_osis_reference
+from ..ingest.osis import expand_osis_reference, format_osis
 
 
 def build_source_ref(video: Video | None, t_start: float | None) -> str | None:
@@ -79,6 +80,48 @@ def search_transcript_segments(
     )
     limited = ordered.limit(limit)
     return limited.all()
+
+
+def canonical_primary_osis(segment: TranscriptSegment) -> str | None:
+    """Return a canonical single-verse OSIS string for *segment* if possible."""
+
+    target_id: int | None = None
+
+    if segment.primary_osis:
+        primary_ids = sorted(expand_osis_reference(segment.primary_osis))
+        if primary_ids:
+            target_id = primary_ids[0]
+
+    if target_id is None and segment.osis_verse_ids:
+        for verse_id in segment.osis_verse_ids:
+            try:
+                target_id = int(verse_id)
+            except (TypeError, ValueError):
+                continue
+            else:
+                break
+
+    if target_id is None and segment.osis_refs:
+        for reference in segment.osis_refs:
+            if not reference:
+                continue
+            reference_ids = sorted(expand_osis_reference(reference))
+            if reference_ids:
+                target_id = reference_ids[0]
+                break
+
+    if target_id is None:
+        return segment.primary_osis
+
+    try:
+        normalized = pb.convert_verse_ids_to_references([target_id])
+    except Exception:  # pragma: no cover - pythonbible defensive guard
+        return segment.primary_osis
+
+    if not normalized:
+        return segment.primary_osis
+
+    return format_osis(normalized[0])
 
 
 def _matches_osis(segment: TranscriptSegment, query: str | None) -> bool:
