@@ -140,6 +140,26 @@ def test_lookup_geo_places_sqlite_fallback_preserves_ordering(sqlite_session: Se
     assert len(items) == 2
 
 
+def test_lookup_geo_places_sqlite_uses_search_terms(sqlite_session: Session):
+    sqlite_session.add(
+        GeoModernLocation(
+            modern_id="jerusalem",
+            friendly_id="Jerusalem",
+            search_terms=["zion"],
+            confidence=0.9,
+            latitude=31.778,
+            longitude=35.235,
+            names=[{"name": "Jerusalem"}],
+            raw={"coordinates_source": {"name": "Sample"}},
+        )
+    )
+    sqlite_session.commit()
+
+    items = lookup_geo_places(sqlite_session, query="zion", limit=5)
+
+    assert [item.modern_id for item in items] == ["jerusalem"]
+
+
 def test_lookup_geo_places_postgres_without_trgm_rolls_back_and_falls_back():
     bethlehem = GeoModernLocation(
         modern_id="bethlehem",

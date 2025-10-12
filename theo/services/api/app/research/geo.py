@@ -61,9 +61,27 @@ def _location_aliases(location: GeoModernLocation) -> list[str]:
 
 
 def _candidate_strings(location: GeoModernLocation) -> Iterable[str]:
-    yield location.friendly_id
+    seen: set[str] = set()
+
+    def _emit(value: str | None) -> Iterable[str]:
+        if not value:
+            return
+        normalized = value.casefold()
+        if normalized in seen:
+            return
+        seen.add(normalized)
+        yield value
+
+    yield from _emit(location.friendly_id)
+
     for alias in _location_aliases(location):
-        yield alias
+        yield from _emit(alias)
+
+    search_terms = location.search_terms
+    if isinstance(search_terms, list):
+        for term in search_terms:
+            if isinstance(term, str):
+                yield from _emit(term)
 
 
 def _fuzzy_score(query: str, candidate: str) -> float:
