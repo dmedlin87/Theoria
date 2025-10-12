@@ -43,6 +43,10 @@ def search(
     source_type: str | None = Query(
         default=None, description="Restrict to a source type"
     ),
+    perspective: str | None = Query(
+        default=None,
+        description="Bias retrieval toward an interpretive perspective",
+    ),
     theological_tradition: str | None = Query(
         default=None,
         description="Restrict to documents aligned with a theological tradition",
@@ -57,6 +61,11 @@ def search(
 ) -> HybridSearchResponse:
     """Perform hybrid search over the indexed corpus."""
 
+    normalized_perspective = (perspective or "").strip().casefold()
+    perspective_tradition = None
+    if normalized_perspective in {"skeptical", "apologetic", "neutral"}:
+        perspective_tradition = normalized_perspective
+
     request = HybridSearchRequest(
         query=q,
         osis=osis,
@@ -64,7 +73,7 @@ def search(
             collection=collection,
             author=author,
             source_type=source_type,
-            theological_tradition=theological_tradition,
+            theological_tradition=theological_tradition or perspective_tradition,
             topic_domain=topic_domain,
         ),
         k=k,

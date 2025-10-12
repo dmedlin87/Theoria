@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from . import chat, exports, features, flows, llm, settings
+from . import chat, exports, features, flows, llm, perspectives, settings
 from .guardrails import (
     DEFAULT_REFUSAL_MESSAGE,
     extract_refusal_text,
@@ -18,6 +18,7 @@ router.include_router(chat.router)
 router.include_router(llm.router)
 router.include_router(exports.router)
 router.include_router(flows.router)
+router.include_router(perspectives.router)
 
 settings_router = settings.router
 

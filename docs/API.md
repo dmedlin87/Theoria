@@ -809,6 +809,60 @@ If `model` is omitted, the original configuration is reused. Response:
 null, and replay does not overwrite the stored `output_payload`. Clients should
 persist their own comparison history if needed.
 
+### `POST /ai/perspectives`
+
+Runs skeptical, apologetic, and neutral retrieval passes for a question and
+summarises areas of consensus or disagreement.
+
+Request body:
+
+```json
+{
+  "question": "How do the resurrection accounts align?",
+  "top_k": 5,
+  "filters": {
+    "collection": "Gospels"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "question": "How do the resurrection accounts align?",
+  "consensus_points": ["Shared insight."],
+  "tension_map": {
+    "skeptical": ["Highlights narrative divergence."]
+  },
+  "meta_analysis": "Shared insight. Skeptical focus: Highlights narrative divergence.",
+  "perspective_views": {
+    "skeptical": {
+      "perspective": "skeptical",
+      "answer": "Shared insight. Highlights narrative divergence.",
+      "confidence": 0.42,
+      "key_claims": [
+        "Shared insight.",
+        "Highlights narrative divergence."
+      ],
+      "citations": [
+        {
+          "document_id": "doc-1",
+          "document_title": "Skeptical Study",
+          "osis": "John.20.1",
+          "snippet": "Shared insight.",
+          "rank": 1,
+          "score": 0.8
+        }
+      ]
+    }
+  }
+}
+```
+
+The endpoint enforces `top_k` between 1 and 20 and clamps confidence values to
+the 0–1 range for consistent UI rendering.
+
 ## Reference datasets & seeds
 
 Theo Engine bundles starter datasets to light up the research dock without
