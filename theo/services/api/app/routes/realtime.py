@@ -110,11 +110,15 @@ def publish_notebook_update(notebook_id: str, payload: dict[str, Any]) -> None:
 async def notebook_updates(
     websocket: WebSocket,
     notebook_id: str,
-    session: Session = Depends(get_session),
     principal: Principal = Depends(require_websocket_principal),
 ) -> None:
-    service = _service(session, principal)
-    service.ensure_accessible(notebook_id)
+    session_generator = get_session()
+    session = next(session_generator)
+    try:
+        service = _service(session, principal)
+        service.ensure_accessible(notebook_id)
+    finally:
+        session_generator.close()
     await _BROKER.connect(notebook_id, websocket)
     try:
         await websocket.send_json(
