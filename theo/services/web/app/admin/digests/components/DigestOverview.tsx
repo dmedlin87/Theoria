@@ -1,3 +1,4 @@
+import FormError from "../../components/FormError";
 import type { TopicDigest } from "../types";
 
 type DigestOverviewProps = {
@@ -55,11 +56,7 @@ export default function DigestOverview({
         </form>
       </header>
       {isLoading ? <p>Loading digest…</p> : null}
-      {error ? (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      ) : null}
+      <FormError message={error} />
       {digest ? (
         <div className="stack" style={{ marginTop: "1rem", gap: "0.75rem" }}>
           <p>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import FormError from "../../components/FormError";
 import { createTheoApiClient } from "../../lib/api-client";
 import DigestOverview from "./components/DigestOverview";
 import WatchlistCreationForm from "./components/WatchlistCreationForm";
@@ -210,11 +211,7 @@ export default function DigestDashboard(): JSX.Element {
             Loaded {watchlistCrud.watchlists.length} watchlists for <strong>{watchlistCrud.loadedFor}</strong>.
           </p>
         ) : null}
-        {watchlistCrud.error ? (
-          <p role="alert" className="error">
-            {watchlistCrud.error}
-          </p>
-        ) : null}
+        <FormError message={watchlistCrud.error} />
 
         <WatchlistTable
           watchlists={paginatedWatchlists}

@@ -214,18 +214,9 @@ export function AppShell({
       </aside>
       <div className="app-shell-v2__workspace">
         <div className="app-shell-v2__command-bar" role="banner">
-          <button
-            type="button"
-            className="app-shell-v2__command-search"
-            aria-label="Open command palette (coming soon)"
-            aria-disabled="true"
-            disabled
-          >
-            <span>Search or jump to…</span>
-            <span className="app-shell-v2__command-search-kbd" aria-hidden="true">
-              ⌘K
-            </span>
-          </button>
+          <div className="app-shell-v2__command-placeholder" aria-hidden="true">
+            Command palette coming soon
+          </div>
           <div
             className="app-shell-v2__command-actions"
             aria-label="Quick actions"

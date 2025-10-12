@@ -51,6 +51,32 @@ export default function UploadPage(): JSX.Element {
   const { addToast } = useToast();
 
   useEffect(() => {
+    if (!status) {
+      return;
+    }
+    const toastType = status.kind === "error" ? "error" : status.kind === "success" ? "success" : "info";
+    const title =
+      status.kind === "success"
+        ? "Upload complete"
+        : status.kind === "error"
+        ? "Upload failed"
+        : "Upload update";
+    addToast({ type: toastType, title, message: status.message });
+  }, [status, addToast]);
+
+  useEffect(() => {
+    if (simpleError) {
+      addToast({ type: "error", title: "Simple ingest error", message: simpleError });
+    }
+  }, [simpleError, addToast]);
+
+  useEffect(() => {
+    if (simpleSuccess) {
+      addToast({ type: "success", title: "Simple ingest complete", message: simpleSuccess });
+    }
+  }, [simpleSuccess, addToast]);
+
+  useEffect(() => {
     let isMounted = true;
 
     const fetchJobs = async () => {

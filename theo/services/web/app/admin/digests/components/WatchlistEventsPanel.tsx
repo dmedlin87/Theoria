@@ -1,3 +1,4 @@
+import FormError from "../../components/FormError";
 import type { WatchlistRunResponse } from "../types";
 
 type WatchlistEventsPanelProps = {
@@ -32,11 +33,7 @@ export default function WatchlistEventsPanel({
         />
       </label>
       {eventsLoading ? <p>Loading events…</p> : null}
-      {eventsError ? (
-        <p role="alert" className="error">
-          {eventsError}
-        </p>
-      ) : null}
+      <FormError message={eventsError} />
       {eventsWatchlistId ? (
         <p>
           Showing {events.length} events for watchlist <strong>{eventsWatchlistId}</strong>.
@@ -49,7 +46,7 @@ export default function WatchlistEventsPanel({
               <strong>{formatDate(event.run_started)}</strong>
               <span>{event.delivery_status ?? "pending"}</span>
             </div>
-            {event.error ? <p role="alert">{event.error}</p> : null}
+            <FormError message={event.error} />
             <p>
               {event.matches.length} matches · {event.document_ids.length} documents
             </p>
