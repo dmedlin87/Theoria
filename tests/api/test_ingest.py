@@ -447,6 +447,7 @@ def _install_url_pipeline_stub(
 ) -> dict[str, int]:
     monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
     monkeypatch.setattr(pipeline_module, "build_opener", opener_factory)
+    _stub_address_resolution(monkeypatch)
 
     call_counter = {"count": 0}
 
@@ -458,10 +459,13 @@ def _install_url_pipeline_stub(
         *,
         dependencies=None,
     ):  # noqa: ANN001
-        # Directly raise the expected exception without calling _fetch_web_document
-        # since the monkeypatched build_opener should make it work correctly anyway
         call_counter["count"] += 1
-        raise pipeline_module.UnsupportedSourceError(expected_failure_message)
+        try:
+            pipeline_module._fetch_web_document(settings, url)
+        except pipeline_module.UnsupportedSourceError as exc:
+            assert str(exc) == expected_failure_message
+            raise
+        raise AssertionError("URL fetch unexpectedly succeeded")
 
     monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_url", _fake_run)
 
@@ -528,14 +532,15 @@ def test_ingest_url_rejects_oversized_response(
 
     class _OversizedResponse:
         def __init__(self) -> None:
-            self.headers = _FakeHeaders()
-            self._chunks = [b"a" * 8, b"b" * 8, b""]
+            self.headers = _FakeHeaders({"Content-Length": "16"})
+            self._read_called = False
 
         def geturl(self) -> str:
             return "https://large.example.com"
 
         def read(self, size: int | None = None) -> bytes:  # noqa: ARG002
-            return self._chunks.pop(0)
+            self._read_called = True
+            raise AssertionError("Read should not be attempted when Content-Length exceeds limit")
 
         def close(self) -> None:
             pass
