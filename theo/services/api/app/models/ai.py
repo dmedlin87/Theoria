@@ -313,6 +313,45 @@ class TranscriptExportRequest(APIModel):
     format: str = Field(default="markdown")
 
 
+class PerspectiveCitationModel(APIModel):
+    """Citation payload surfaced for each perspective run."""
+
+    document_id: str | None = None
+    document_title: str | None = None
+    osis: str | None = None
+    snippet: str
+    rank: int | None = None
+    score: float | None = None
+
+
+class PerspectiveViewModel(APIModel):
+    """Structured answer for a single theological perspective."""
+
+    perspective: Literal["skeptical", "apologetic", "neutral"]
+    answer: str
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    key_claims: list[str] = Field(default_factory=list)
+    citations: list[PerspectiveCitationModel] = Field(default_factory=list)
+
+
+class PerspectiveSynthesisRequest(APIModel):
+    """Request payload for the multi-perspective synthesis workflow."""
+
+    question: str
+    filters: HybridSearchFilters | None = None
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+class PerspectiveSynthesisResponse(APIModel):
+    """Response exposing consensus and tensions across perspectives."""
+
+    question: str
+    consensus_points: list[str] = Field(default_factory=list)
+    tension_map: dict[str, list[str]] = Field(default_factory=dict)
+    meta_analysis: str
+    perspective_views: dict[str, PerspectiveViewModel] = Field(default_factory=dict)
+
+
 ExportPresetId = Literal[
     "sermon-markdown",
     "sermon-ndjson",
@@ -452,6 +491,10 @@ __all__ = [
     "ExportPresetId",
     "CitationExportRequest",
     "CitationExportResponse",
+    "PerspectiveCitationModel",
+    "PerspectiveViewModel",
+    "PerspectiveSynthesisRequest",
+    "PerspectiveSynthesisResponse",
     "AIResponse",
     "GuardrailProfile",
     "GuardrailSettings",

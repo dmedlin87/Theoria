@@ -29,6 +29,37 @@ export { TheoApiError } from "./http";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
 
+export type PerspectiveCitation = {
+  document_id?: string | null;
+  document_title?: string | null;
+  osis?: string | null;
+  snippet: string;
+  rank?: number | null;
+  score?: number | null;
+};
+
+export type PerspectiveView = {
+  perspective: "skeptical" | "apologetic" | "neutral";
+  answer: string;
+  confidence: number;
+  key_claims: string[];
+  citations: PerspectiveCitation[];
+};
+
+export type PerspectiveSynthesisPayload = {
+  question: string;
+  top_k?: number;
+  filters?: HybridSearchFilters | null;
+};
+
+export type PerspectiveSynthesisResult = {
+  question: string;
+  consensus_points: string[];
+  tension_map: Record<string, string[]>;
+  meta_analysis: string;
+  perspective_views: Record<string, PerspectiveView>;
+};
+
 type VerseResponse = import("../copilot/components/types").VerseResponse;
 type SermonResponse = import("../copilot/components/types").SermonResponse;
 type ComparativeResponse = import("../copilot/components/types").ComparativeResponse;
@@ -60,6 +91,7 @@ type TheoApiClientShape = {
     viewpoints: string[];
   }): Promise<CollaborationResponse>;
   runCurationWorkflow(payload: { model: string; since?: string | null }): Promise<CorpusCurationReport>;
+  runPerspectiveSynthesis(payload: PerspectiveSynthesisPayload): Promise<PerspectiveSynthesisResult>;
   runSermonExport(payload: { model: string; topic: string; osis?: string | null; format: string }): Promise<ExportPresetResult>;
   runTranscriptExport(payload: { documentId: string; format: string }): Promise<ExportPresetResult>;
   exportCitations(payload: components["schemas"]["CitationExportRequest"]): Promise<CitationExportResponse>;
@@ -127,6 +159,13 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
     },
     runCurationWorkflow(payload) {
       return request<CorpusCurationReport>("/ai/curation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    runPerspectiveSynthesis(payload) {
+      return request<PerspectiveSynthesisResult>("/ai/perspectives", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
