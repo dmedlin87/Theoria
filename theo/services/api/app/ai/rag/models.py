@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from collections.abc import MutableMapping
+
 from pydantic import Field, model_serializer
 
 from ...models.base import APIModel
@@ -33,7 +35,7 @@ class RAGAnswer(APIModel):
         """Ensure the ``guardrail_profile`` key is present in serialized output."""
 
         data = handler(self)
-        if "guardrail_profile" not in data:
+        if isinstance(data, MutableMapping) and "guardrail_profile" not in data:
             data["guardrail_profile"] = None
         return data
 
