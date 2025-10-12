@@ -14,7 +14,7 @@ This guide turns the high-level MCP integration plan into a concrete runbook for
 2. Configure API auth before launching services:
    - Provide at least one API key via `THEO_API_KEYS="local-dev-key"`, or set `THEO_AUTH_ALLOW_ANONYMOUS=1` when running isolated local smoke tests.
    - If JWT auth is required, set `THEO_AUTH_JWT_SECRET` and corresponding issuer/audience values.
-3. Launch the core stack. Either run `docker compose --file infra/docker-compose.yml up --build` or use `./scripts/dev.ps1` / `./scripts/dev.sh` (depending on your platform). Ensure the following services report healthy status:
+3. Launch the core stack. Either run `docker compose --file infra/docker-compose.yml up --build` or use the convenience scripts (`./scripts/dev.ps1` in PowerShell or `./scripts/run.sh` in Bash). Ensure the following services report healthy status:
    - `api` – FastAPI application that serves REST requests and Celery task submissions.
    - `web` – Next.js web client (optional for MCP-only integrations but helpful for manual validation).
    - `worker` – Celery worker consuming ingestion and indexing jobs.
