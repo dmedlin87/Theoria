@@ -200,9 +200,7 @@ class DeliverableRequest(APIModel):
     """Parameters accepted by the deliverable export endpoint."""
 
     type: Literal["sermon", "transcript"]
-    formats: list[Literal["markdown", "ndjson", "csv", "pdf"]] = Field(
-        default_factory=lambda: ["markdown"]
-    )
+    formats: list[str] = Field(default_factory=lambda: ["markdown"])
     topic: str | None = None
     osis: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
