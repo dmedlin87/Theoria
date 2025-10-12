@@ -262,14 +262,15 @@ def test_ingest_url_blocks_private_targets(
 
 
 def test_simple_ingest_streams_progress(
-    monkeypatch: pytest.MonkeyPatch, api_client: TestClient, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
 ) -> None:
-    local_markdown = tmp_path / "file.md"
-    local_markdown.write_text("# Notes\n")
-
     items = [
-        ingestion_service_module.cli_ingest.IngestItem(path=local_markdown, source_type="markdown"),
-        ingestion_service_module.cli_ingest.IngestItem(url="https://example.com", source_type="web_page"),
+        ingestion_service_module.cli_ingest.IngestItem(
+            url="https://example.com/notes", source_type="web_page"
+        ),
+        ingestion_service_module.cli_ingest.IngestItem(
+            url="https://example.org/docs", source_type="web_page"
+        ),
     ]
 
     monkeypatch.setattr(
@@ -302,7 +303,10 @@ def test_simple_ingest_streams_progress(
     with api_client.stream(
         "POST",
         "/ingest/simple",
-        json={"sources": ["/data"], "metadata": {"collection": "archive"}},
+        json={
+            "sources": ["https://example.com/seed"],
+            "metadata": {"collection": "archive"},
+        },
     ) as response:
         assert response.status_code == 200
         payload = [line for line in response.iter_lines() if line]
@@ -323,23 +327,60 @@ def test_simple_ingest_streams_progress(
 
 
 def test_simple_ingest_rejects_bad_source(
-    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+    api_client: TestClient, tmp_path: Path
 ) -> None:
-    def fail_discovery(_sources, allowlist=None):  # noqa: ANN001 - simple failure helper
-        raise ValueError("Path 'missing' does not exist")
+    settings = Settings()
+    settings.simple_ingest_allowed_roots = [tmp_path]
 
-    monkeypatch.setattr(
-        ingestion_service_module.cli_ingest,
-        "_discover_items",
-        fail_discovery,
+    class _FailingCLI:
+        def _discover_items(self, _sources, allowlist=None):  # noqa: ANN001 - helper
+            raise ValueError("Path 'missing' does not exist")
+
+    custom_service = ingestion_service_module.IngestionService(
+        settings=settings,
+        run_file_pipeline=ingestion_service_module.run_pipeline_for_file,
+        run_url_pipeline=ingestion_service_module.run_pipeline_for_url,
+        run_transcript_pipeline=ingestion_service_module.run_pipeline_for_transcript,
+        cli_module=_FailingCLI(),
+        log_workflow=lambda *a, **k: None,
     )
 
-    response = api_client.post("/ingest/simple", json={"sources": ["missing"]})
+    app.dependency_overrides[
+        ingestion_service_module.get_ingestion_service
+    ] = lambda: custom_service
+
+    try:
+        response = api_client.post("/ingest/simple", json={"sources": ["missing"]})
+    finally:
+        app.dependency_overrides.pop(
+            ingestion_service_module.get_ingestion_service, None
+        )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     payload = response.json()
     assert payload.get("error", {}).get("message")
     assert "does not exist" in payload["error"]["message"]
+
+
+def test_simple_ingest_rejects_local_sources_without_allowlist(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient, tmp_path: Path
+) -> None:
+    local_file = tmp_path / "note.txt"
+    local_file.write_text("content", encoding="utf-8")
+
+    settings = Settings()
+    settings.simple_ingest_allowed_roots = []
+    monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
+
+    response = api_client.post(
+        "/ingest/simple",
+        json={"sources": [str(local_file)]},
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    payload = response.json()
+    assert payload.get("error", {}).get("code") == "INGESTION_LOCAL_SOURCES_DISABLED"
+    assert "Local ingestion is disabled" in payload["error"]["message"]
 
 
 def test_simple_ingest_allows_sources_under_configured_roots(
