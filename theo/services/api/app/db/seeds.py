@@ -495,14 +495,10 @@ def seed_contradiction_claims(session: Session) -> None:
                         str(osis_b),
                     )
         except OperationalError as exc:
-            message = str(exc).lower()
-            if "no such column" in message and "perspective" in message:
-                target_session.rollback()
-                logger.warning(
-                    "Skipping contradiction seeds because 'perspective' column is unavailable: %s",
-                    exc,
-                )
-                raise
+            if _handle_missing_perspective_error(
+                target_session, "contradiction", exc
+            ):
+                return
             raise
 
         if seen_ids:
