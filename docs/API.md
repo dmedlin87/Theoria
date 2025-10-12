@@ -673,14 +673,14 @@ Response:
   "textual_variants": true,
   "morphology": true,
   "commentaries": true,
-  "verse_timeline": false
+  "verse_timeline": true
 }
 ```
 
-Environment-specific flags may appear as `false` in some deployments even when
-they are enabled elsewhere. In particular, both `gpt5_codex_preview` and
-`verse_timeline` depend on per-environment configuration toggles, so their
-values can vary across staging, QA, and production instances.
+`job_tracking`, `document_annotations`, `ai_copilot`, `cross_references`,
+`textual_variants`, `morphology`, and `commentaries` are always enabled today.
+`gpt5_codex_preview` and `verse_timeline` reflect deployment-specific toggles
+and may be `false` when the corresponding features are unavailable.
 
 ### `GET /features/discovery`
 
@@ -690,14 +690,23 @@ Provides a structured capability map, including research sub-features. Example:
 {
   "features": {
     "research": true,
-    "contradictions": false,
-    "geo": true
+    "contradictions": true,
+    "geo": false,
+    "cross_references": true,
+    "textual_variants": true,
+    "morphology": true,
+    "commentaries": true,
+    "creator_verse_perspectives": false,
+    "verse_timeline": true
   }
 }
 ```
 
-Use `features.contradictions` and `features.geo` to decide whether to surface
-the corresponding panels in the research dock.
+`contradictions`, `geo`, `creator_verse_perspectives`, and `verse_timeline`
+mirror environment-level feature switches. The remaining research entries are
+always available. Clients can conditionally render panels by checking the
+corresponding keys (for example, `features.contradictions` or
+`features.creator_verse_perspectives`).
 
 ## Research trails
 
