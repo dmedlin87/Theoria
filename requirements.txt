@@ -1,7 +1,7 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-sqlalchemy==2.0.36
-celery==5.4.0
+fastapi==0.119.0
+uvicorn[standard]==0.37.0
+sqlalchemy==2.0.44
+celery==5.5.3
 pythonbible>=0.13.1,<0.14
 pydantic>=2.5,<3
 pydantic-settings>=2.1,<3
