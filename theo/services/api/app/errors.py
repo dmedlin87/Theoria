@@ -42,6 +42,9 @@ class TheoError(Exception):
                 "severity": self.severity.value,
             }
         }
+        # Include the human-readable message at the top level to maintain the
+        # legacy ``detail`` field expected by older clients and tests.
+        payload["detail"] = self.message
         if self.hint:
             payload["error"]["hint"] = self.hint
         if self.data:
