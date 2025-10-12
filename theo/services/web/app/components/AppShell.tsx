@@ -55,15 +55,10 @@ export function AppShell({
     setNavigationStatus(`Navigating to ${label}`);
     startTransition(() => {
       router.push(href);
-      // Clear after navigation with longer timeout for better UX
-      setTimeout(() => {
-        setClickedHref(null);
-        setNavigationStatus("");
-      }, 500);
     });
   };
 
-  // Clear navigation status if isPending changes to false
+  // Clear navigation status when transition completes
   useEffect(() => {
     if (!isPending && clickedHref) {
       const timer = setTimeout(() => {
@@ -112,10 +107,10 @@ export function AppShell({
                         aria-disabled={isLoading}
                         onClick={(e) => handleLinkClick(item.href, e, item.label)}
                       >
+                        {item.label}
                         {isLoading && (
                           <span className="nav-loading-spinner" aria-hidden="true" />
                         )}
-                        {item.label}
                       </Link>
                     </li>
                   );
@@ -157,10 +152,6 @@ export function AppShell({
                 setNavigationStatus("Navigating to Upload sources");
                 startTransition(() => {
                   router.push("/upload");
-                  setTimeout(() => {
-                    setClickedHref(null);
-                    setNavigationStatus("");
-                  }, 500);
                 });
               }}
               disabled={isPending && clickedHref === "/upload"}

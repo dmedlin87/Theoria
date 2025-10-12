@@ -25,6 +25,7 @@ import { sortDocumentGroups, SortableDocumentGroup } from "../groupSorting";
 import { SortControls } from "./SortControls";
 import { SavedSearchControls } from "./SavedSearchControls";
 import { DiffWorkspace } from "./DiffWorkspace";
+import { SearchSkeleton } from "./SearchSkeleton";
 import {
   parseSearchParams,
   serializeSearchParams,
@@ -556,6 +557,7 @@ export default function SearchPageClient({
   const [presetSelection, setPresetSelection] = useState<string>(
     () => initialFilters.preset || CUSTOM_PRESET_VALUE,
   );
+  const [isPresetChanging, setIsPresetChanging] = useState(false);
   const [sortKey, setSortKey] = usePersistentSort();
   const [groups, setGroups] = useState<DocumentGroup[]>(() =>
     sortDocumentGroups(buildDocumentGroupsFromResponse(initialResults), sortKey),
@@ -869,11 +871,13 @@ export default function SearchPageClient({
     (value: string) => {
       if (value === CUSTOM_PRESET_VALUE) {
         setPresetSelection(CUSTOM_PRESET_VALUE);
+        setIsPresetChanging(false);
         return;
       }
       if (isSearching) {
         return; // Prevent preset change during active search
       }
+      setIsPresetChanging(true);
       setPresetSelection(value);
       const presetConfig = MODE_PRESETS.find((candidate) => candidate.value === value);
       const nextFilters: SearchFilters = {
@@ -892,7 +896,7 @@ export default function SearchPageClient({
       };
       applyFilters(nextFilters);
       updateUrlForFilters(nextFilters);
-      void runSearch(nextFilters);
+      void runSearch(nextFilters).finally(() => setIsPresetChanging(false));
     },
     [applyFilters, currentFilters, runSearch, updateUrlForFilters, isSearching],
   );
@@ -1080,6 +1084,8 @@ export default function SearchPageClient({
             value={presetIsCustom ? CUSTOM_PRESET_VALUE : presetSelection}
             onChange={(event) => handlePresetChange(event.target.value)}
             className="search-form__select"
+            disabled={isSearching || isPresetChanging}
+            aria-busy={isPresetChanging}
           >
             {MODE_PRESETS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -1547,7 +1553,12 @@ export default function SearchPageClient({
         />
       )}
 
-      {isSearching && <p role="status" className="search-status">Searching...</p>}
+      {isSearching && (
+        <>
+          <p role="status" className="search-status">Searching...</p>
+          <SearchSkeleton count={3} />
+        </>
+      )}
       {error && (
         <div style={{ marginTop: "1rem" }}>
           <ErrorCallout
