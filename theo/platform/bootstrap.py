@@ -14,6 +14,7 @@ def bootstrap_application(
     retire_factory: Callable[[], Any],
     get_factory: Callable[[], Any],
     list_factory: Callable[[], Any],
+    research_factory: Callable[[], Any],
 ) -> ApplicationContainer:
     """Construct an :class:`ApplicationContainer` wired to registered adapters."""
 
@@ -21,10 +22,12 @@ def bootstrap_application(
     retire = retire_factory()
     get = get_factory()
     list_docs = list_factory()
+    research = research_factory()
 
     return ApplicationContainer(
         ingest_document=ingest,
         retire_document=retire,
         get_document=get,
         list_documents=list_docs,
+        research_service_factory=research,
     )

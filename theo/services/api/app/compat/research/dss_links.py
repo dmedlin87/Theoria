@@ -1,9 +1,9 @@
-"""Compatibility shim forwarding to :mod:`theo.domain.research.dss_links`."""
+"""Compatibility re-export for Dead Sea Scroll linkage helpers."""
 from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.dss_links import *  # noqa: F401,F403
+from theo.domain.research.dss_links import DssLinkEntry, fetch_dss_links
 
 warn(
     "Importing from 'theo.services.api.app.research.dss_links' is deprecated; "

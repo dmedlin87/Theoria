@@ -6,6 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
+from theo.application.facades.research import (
+    ResearchNoteDraft,
+    ResearchNoteEvidenceDraft,
+    ResearchService,
+    get_research_service,
+)
 from theo.application.facades.settings import get_settings
 from ..models.research import (
     CommentarySearchResponse,
@@ -39,26 +45,34 @@ from ..models.research import (
     VariantReading,
 )
 from ..research import (
-    build_reliability_overview,
-    create_research_note,
-    delete_research_note,
-    fallacy_detect,
-    fetch_cross_references,
-    fetch_dss_links,
-    fetch_morphology,
-    fetch_passage,
-    get_notes_for_osis,
-    historicity_search,
     lookup_geo_places,
     places_for_osis,
-    report_build,
     search_commentaries,
     search_contradictions,
-    update_research_note,
-    variants_apparatus,
 )
 
 router = APIRouter()
+
+
+def _research_service(session: Session = Depends(get_session)) -> ResearchService:
+    return get_research_service(session)
+
+def _to_evidence_drafts(
+    evidences: list[NoteEvidenceCreate] | None,
+) -> tuple[ResearchNoteEvidenceDraft, ...]:
+    if not evidences:
+        return ()
+    return tuple(
+        ResearchNoteEvidenceDraft(
+            source_type=evidence.source_type,
+            source_ref=evidence.source_ref,
+            osis_refs=tuple(evidence.osis_refs or []) or None,
+            citation=evidence.citation,
+            snippet=evidence.snippet,
+            meta=evidence.meta,
+        )
+        for evidence in evidences
+    )
 
 
 @router.get("/scripture", response_model=ScriptureResponse)
@@ -67,8 +81,9 @@ def get_scripture(
     translation: str | None = Query(
         default="SBLGNT", description="Preferred translation code"
     ),
+    service: ResearchService = Depends(_research_service),
 ) -> ScriptureResponse:
-    verses = fetch_passage(osis, translation)
+    verses = service.fetch_passage(osis, translation)
     translation_code = verses[0].translation if verses else (translation or "SBLGNT")
     return ScriptureResponse(
         osis=osis,
@@ -82,8 +97,9 @@ def get_scripture(
 def get_crossrefs(
     osis: str = Query(..., description="Verse to fetch cross-references for"),
     limit: int = Query(default=25, ge=1, le=100),
+    service: ResearchService = Depends(_research_service),
 ) -> CrossReferenceResponse:
-    results = fetch_cross_references(osis, limit=limit)
+    results = service.fetch_cross_references(osis, limit=limit)
     return CrossReferenceResponse(
         osis=osis,
         results=[CrossReference.model_validate(item) for item in results],
@@ -104,9 +120,10 @@ def get_variants(
         le=50,
         description="Maximum number of apparatus entries to return",
     ),
+    service: ResearchService = Depends(_research_service),
 ) -> VariantApparatusResponse:
     categories = category or None
-    entries = variants_apparatus(osis, categories=categories, limit=limit)
+    entries = service.variants_apparatus(osis, categories=categories, limit=limit)
     return VariantApparatusResponse(
         osis=osis,
         readings=[VariantReading.model_validate(entry) for entry in entries],
@@ -117,8 +134,9 @@ def get_variants(
 @router.get("/dss-links", response_model=DssLinksResponse)
 def get_dss_links(
     osis: str = Query(..., description="Verse or range to retrieve Dead Sea Scrolls parallels for"),
+    service: ResearchService = Depends(_research_service),
 ) -> DssLinksResponse:
-    links = fetch_dss_links(osis)
+    links = service.fetch_dss_links(osis)
     return DssLinksResponse(
         osis=osis,
         links=[DssLink.model_validate(entry) for entry in links],
@@ -133,9 +151,9 @@ def get_reliability_overview(
         default=None,
         description="Active study mode such as apologetic or skeptical",
     ),
-    session: Session = Depends(get_session),
+    service: ResearchService = Depends(_research_service),
 ) -> ReliabilityOverviewResponse:
-    overview = build_reliability_overview(session, osis, mode=mode)
+    overview = service.build_reliability_overview(osis, mode=mode)
     return ReliabilityOverviewResponse(
         osis=overview.osis,
         mode=overview.mode,
@@ -148,8 +166,9 @@ def get_reliability_overview(
 @router.get("/morphology", response_model=MorphologyResponse)
 def get_morphology(
     osis: str = Query(..., description="Verse to fetch morphology for"),
+    service: ResearchService = Depends(_research_service),
 ) -> MorphologyResponse:
-    tokens = fetch_morphology(osis)
+    tokens = service.fetch_morphology(osis)
     return MorphologyResponse(
         osis=osis,
         tokens=[MorphToken.model_validate(token) for token in tokens],
@@ -177,10 +196,9 @@ def list_notes(
         le=1.0,
         description="Minimum confidence score inclusive",
     ),
-    session: Session = Depends(get_session),
+    service: ResearchService = Depends(_research_service),
 ) -> ResearchNotesResponse:
-    notes = get_notes_for_osis(
-        session,
+    notes = service.list_notes(
         osis,
         stance=stance,
         claim_type=claim_type,
@@ -204,11 +222,12 @@ def get_historicity(
         default=None, description="Maximum publication year inclusive"
     ),
     limit: int = Query(default=20, ge=1, le=50),
+    service: ResearchService = Depends(_research_service),
 ) -> HistoricitySearchResponse:
     if year_from is not None and year_to is not None and year_from > year_to:
         raise HTTPException(status_code=422, detail="year_from cannot exceed year_to")
 
-    results = historicity_search(
+    results = service.historicity_search(
         query,
         year_from=year_from,
         year_to=year_to,
@@ -224,22 +243,22 @@ def get_historicity(
 @router.post("/notes", response_model=ResearchNoteResponse, status_code=201)
 def create_note(
     payload: ResearchNoteCreate,
-    session: Session = Depends(get_session),
+    service: ResearchService = Depends(_research_service),
 ) -> ResearchNoteResponse:
     if not payload.body.strip():
         raise HTTPException(status_code=422, detail="Note body cannot be empty")
 
-    note = create_research_note(
-        session,
+    draft = ResearchNoteDraft(
         osis=payload.osis,
-        title=payload.title,
         body=payload.body,
+        title=payload.title,
         stance=payload.stance,
         claim_type=payload.claim_type,
         confidence=payload.confidence,
-        tags=payload.tags,
-        evidences=[e.model_dump() for e in payload.evidences or []],
+        tags=tuple(payload.tags or []) or None,
+        evidences=_to_evidence_drafts(payload.evidences),
     )
+    note = service.create_note(draft)
     return ResearchNoteResponse(note=ResearchNote.model_validate(note))
 
 
@@ -247,7 +266,7 @@ def create_note(
 def patch_note(
     note_id: str,
     payload: ResearchNoteUpdate,
-    session: Session = Depends(get_session),
+    service: ResearchService = Depends(_research_service),
 ) -> ResearchNoteResponse:
     update_data = payload.model_dump(exclude_unset=True)
     if not update_data:
@@ -257,19 +276,15 @@ def patch_note(
         if not update_data["body"].strip():
             raise HTTPException(status_code=422, detail="Note body cannot be empty")
 
-    evidence_payload = None
+    evidence_drafts = None
     if "evidences" in update_data:
         raw_evidences = payload.evidences
-        evidence_payload = [] if raw_evidences is None else [
-            evidence.model_dump() for evidence in raw_evidences
-        ]
+        evidence_drafts = _to_evidence_drafts(raw_evidences)
         update_data.pop("evidences", None)
-
-    note = update_research_note(
-        session,
+    note = service.update_note(
         note_id,
-        changes=update_data,
-        evidences=evidence_payload,
+        update_data,
+        evidences=evidence_drafts,
     )
     return ResearchNoteResponse(note=ResearchNote.model_validate(note))
 
@@ -277,18 +292,21 @@ def patch_note(
 @router.delete("/notes/{note_id}", status_code=204)
 def delete_note(
     note_id: str,
-    session: Session = Depends(get_session),
+    service: ResearchService = Depends(_research_service),
 ) -> Response:
-    delete_research_note(session, note_id)
+    service.delete_note(note_id)
     return Response(status_code=204)
 
 
 @router.post("/fallacies", response_model=FallacyDetectResponse)
-def detect_fallacies(payload: FallacyDetectRequest) -> FallacyDetectResponse:
+def detect_fallacies(
+    payload: FallacyDetectRequest,
+    service: ResearchService = Depends(_research_service),
+) -> FallacyDetectResponse:
     if not payload.text.strip():
         raise HTTPException(status_code=422, detail="Text must not be empty")
 
-    detections = fallacy_detect(
+    detections = service.fallacy_detect(
         payload.text,
         min_confidence=payload.min_confidence,
     )
@@ -300,14 +318,17 @@ def detect_fallacies(payload: FallacyDetectRequest) -> FallacyDetectResponse:
 
 
 @router.post("/report", response_model=ResearchReportResponse)
-def build_report(payload: ReportBuildRequest) -> ResearchReportResponse:
+def build_report(
+    payload: ReportBuildRequest,
+    service: ResearchService = Depends(_research_service),
+) -> ResearchReportResponse:
     if payload.include_fallacies and not payload.narrative_text:
         raise HTTPException(
             status_code=422,
             detail="narrative_text is required when include_fallacies is true",
         )
 
-    report = report_build(
+    report = service.report_build(
         payload.osis,
         stance=payload.stance,
         claims=[claim.model_dump() for claim in payload.claims or []],
