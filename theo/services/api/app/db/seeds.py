@@ -108,23 +108,33 @@ def _assign_range(record, start_attr: str, end_attr: str, reference: str | None)
     return changed
 
 
-def _table_has_column(session: Session, table_name: str, column_name: str, *, schema: str | None = None) -> bool:
-    """Check whether the bound database exposes ``column_name`` on ``table_name``."""
+def _get_session_connection(session: Session) -> tuple[Connection | None, bool]:
+    """Return a connection bound to ``session`` and whether it should be closed."""
 
     bind = session.get_bind()
     if bind is None:
+        return (None, False)
+
+    if isinstance(bind, Engine):
+        # ``session.connection()`` ensures we operate on the same DB handle that the
+        # session will later use for ORM queries. This is essential for in-memory
+        # SQLite databases where each new engine connection represents a fresh
+        # database instance.
+        return (session.connection(), False)
+
+    return (bind, False)
+
+
+def _table_has_column(session: Session, table_name: str, column_name: str, *, schema: str | None = None) -> bool:
+    """Check whether the bound database exposes ``column_name`` on ``table_name``."""
+
+    connection, should_close = _get_session_connection(session)
+    if connection is None:
         return False
 
-    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+    dialect_name = getattr(getattr(connection, "dialect", None), "name", None)
     if dialect_name == "sqlite":
-        connection: Connection | None = None
-        should_close = False
         try:
-            if isinstance(bind, Engine):
-                connection = bind.connect()
-                should_close = True
-            else:
-                connection = bind  # type: ignore[assignment]
             escaped_table = table_name.replace("'", "''")
             result = connection.exec_driver_sql(
                 f"PRAGMA table_info('{escaped_table}')"
@@ -139,7 +149,7 @@ def _table_has_column(session: Session, table_name: str, column_name: str, *, sc
             if should_close and connection is not None:
                 connection.close()
 
-    inspector = inspect(bind)
+    inspector = inspect(connection)
     try:
         columns = inspector.get_columns(table_name, schema=schema)
     except Exception:  # pragma: no cover - defensive: DB might be mid-migration
@@ -153,21 +163,7 @@ def _add_sqlite_columns(
 ) -> bool:
     """Attempt to add *columns* with their SQL types to *table* when using SQLite."""
 
-    bind = session.get_bind()
-    if bind is None:
-        return False
-
-    engine: Engine | None = None
-    connection: Connection | None = None
-    should_close = False
-
-    if isinstance(bind, Engine):
-        engine = bind
-        connection = engine.connect()
-        should_close = True
-    else:
-        connection = bind  # type: ignore[assignment]
-
+    connection, should_close = _get_session_connection(session)
     if connection is None:
         return False
 
@@ -197,21 +193,17 @@ def _ensure_perspective_column(
 ) -> bool:
     """Verify the ``perspective`` column exists before reading from ``table``."""
 
-    if _table_has_column(session, table.name, "perspective", schema=table.schema):
+    initially_missing = not _table_has_column(
+        session, table.name, "perspective", schema=table.schema
+    )
+    if not initially_missing:
         return True
 
     bind = session.get_bind()
     dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
     if dialect_name == "sqlite" and bind is not None:
-        connection: Connection | None = None
-        should_close = False
+        connection, should_close = _get_session_connection(session)
         try:
-            if isinstance(bind, Engine):
-                connection = bind.connect()
-                should_close = True
-            else:
-                connection = bind  # type: ignore[assignment]
-
             if connection is not None:
                 statement = f'ALTER TABLE "{table.name}" ADD COLUMN perspective TEXT'
                 try:
@@ -236,7 +228,12 @@ def _ensure_perspective_column(
                 connection.close()
 
         if _table_has_column(session, table.name, "perspective", schema=table.schema):
-            return True
+            session.rollback()
+            logger.warning(
+                "Skipping %s seeds because 'perspective' column is missing",
+                dataset_label,
+            )
+            return False
 
     session.rollback()
     logger.warning(
@@ -386,18 +383,24 @@ def seed_contradiction_claims(session: Session) -> None:
     table = ContradictionSeed.__table__
     if not _ensure_perspective_column(session, table, "contradiction"):
         return
-    if not _ensure_range_columns(
-        session,
-        table,
-        "contradiction",
-        (
+
+    range_columns = [
+        column
+        for column in (
             "start_verse_id_a",
             "end_verse_id_a",
             "start_verse_id",
             "end_verse_id",
             "start_verse_id_b",
             "end_verse_id_b",
-        ),
+        )
+        if hasattr(ContradictionSeed, column)
+    ]
+    if range_columns and not _ensure_range_columns(
+        session,
+        table,
+        "contradiction",
+        range_columns,
     ):
         return
 
@@ -447,22 +450,30 @@ def seed_contradiction_claims(session: Session) -> None:
                 end_b = range_b[1] if range_b else None
 
                 if record is None:
-                    record = ContradictionSeed(
-                        id=identifier,
-                        osis_a=osis_a_value,
-                        osis_b=osis_b_value,
-                        summary=summary,
-                        source=source,
-                        tags=tags,
-                        weight=weight,
-                        perspective=perspective,
-                        start_verse_id_a=start_a,
-                        end_verse_id_a=end_a,
-                        start_verse_id=start_a,
-                        end_verse_id=end_a,
-                        start_verse_id_b=start_b,
-                        end_verse_id_b=end_b,
-                    )
+                    record_kwargs = {
+                        "id": identifier,
+                        "osis_a": osis_a_value,
+                        "osis_b": osis_b_value,
+                        "summary": summary,
+                        "source": source,
+                        "tags": tags,
+                        "weight": weight,
+                        "perspective": perspective,
+                    }
+                    if hasattr(ContradictionSeed, "start_verse_id_a"):
+                        record_kwargs["start_verse_id_a"] = start_a
+                    if hasattr(ContradictionSeed, "end_verse_id_a"):
+                        record_kwargs["end_verse_id_a"] = end_a
+                    if hasattr(ContradictionSeed, "start_verse_id"):
+                        record_kwargs["start_verse_id"] = start_a
+                    if hasattr(ContradictionSeed, "end_verse_id"):
+                        record_kwargs["end_verse_id"] = end_a
+                    if hasattr(ContradictionSeed, "start_verse_id_b"):
+                        record_kwargs["start_verse_id_b"] = start_b
+                    if hasattr(ContradictionSeed, "end_verse_id_b"):
+                        record_kwargs["end_verse_id_b"] = end_b
+
+                    record = ContradictionSeed(**record_kwargs)
                     target_session.add(record)
                 else:
                     if record.osis_a != osis_a_value:
@@ -479,21 +490,23 @@ def seed_contradiction_claims(session: Session) -> None:
                         record.weight = weight
                     if record.perspective != perspective:
                         record.perspective = perspective
-                    if record.start_verse_id_a != start_a:
+                    if hasattr(record, "start_verse_id_a") and record.start_verse_id_a != start_a:
                         record.start_verse_id_a = start_a
-                    if record.end_verse_id_a != end_a:
+                    if hasattr(record, "end_verse_id_a") and record.end_verse_id_a != end_a:
                         record.end_verse_id_a = end_a
-                    if record.start_verse_id_b != start_b:
+                    if hasattr(record, "start_verse_id_b") and record.start_verse_id_b != start_b:
                         record.start_verse_id_b = start_b
-                    if record.end_verse_id_b != end_b:
+                    if hasattr(record, "end_verse_id_b") and record.end_verse_id_b != end_b:
                         record.end_verse_id_b = end_b
-                    _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a))
-                    _assign_range(
-                        record,
-                        "start_verse_id_b",
-                        "end_verse_id_b",
-                        str(osis_b),
-                    )
+                    if hasattr(record, "start_verse_id") and hasattr(record, "end_verse_id"):
+                        _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a))
+                    if hasattr(record, "start_verse_id_b") and hasattr(record, "end_verse_id_b"):
+                        _assign_range(
+                            record,
+                            "start_verse_id_b",
+                            "end_verse_id_b",
+                            str(osis_b),
+                        )
         except OperationalError as exc:
             message = str(exc).lower()
             if "no such column" in message and "perspective" in message:
@@ -519,18 +532,24 @@ def seed_harmony_claims(session: Session) -> None:
     table = HarmonySeed.__table__
     if not _ensure_perspective_column(session, table, "harmony"):
         return
-    if not _ensure_range_columns(
-        session,
-        table,
-        "harmony",
-        (
+
+    harmony_range_columns = [
+        column
+        for column in (
             "start_verse_id_a",
             "end_verse_id_a",
             "start_verse_id",
             "end_verse_id",
             "start_verse_id_b",
             "end_verse_id_b",
-        ),
+        )
+        if hasattr(HarmonySeed, column)
+    ]
+    if harmony_range_columns and not _ensure_range_columns(
+        session,
+        table,
+        "harmony",
+        harmony_range_columns,
     ):
         return
 
@@ -581,22 +600,30 @@ def seed_harmony_claims(session: Session) -> None:
             end_b = range_b[1] if range_b else None
 
             if record is None:
-                record = HarmonySeed(
-                    id=identifier,
-                    osis_a=osis_a_value,
-                    osis_b=osis_b_value,
-                    summary=summary,
-                    source=source,
-                    tags=tags,
-                    weight=weight,
-                    perspective=perspective,
-                    start_verse_id_a=start_a,
-                    end_verse_id_a=end_a,
-                    start_verse_id=start_a,
-                    end_verse_id=end_a,
-                    start_verse_id_b=start_b,
-                    end_verse_id_b=end_b,
-                )
+                record_kwargs = {
+                    "id": identifier,
+                    "osis_a": osis_a_value,
+                    "osis_b": osis_b_value,
+                    "summary": summary,
+                    "source": source,
+                    "tags": tags,
+                    "weight": weight,
+                    "perspective": perspective,
+                }
+                if hasattr(HarmonySeed, "start_verse_id_a"):
+                    record_kwargs["start_verse_id_a"] = start_a
+                if hasattr(HarmonySeed, "end_verse_id_a"):
+                    record_kwargs["end_verse_id_a"] = end_a
+                if hasattr(HarmonySeed, "start_verse_id"):
+                    record_kwargs["start_verse_id"] = start_a
+                if hasattr(HarmonySeed, "end_verse_id"):
+                    record_kwargs["end_verse_id"] = end_a
+                if hasattr(HarmonySeed, "start_verse_id_b"):
+                    record_kwargs["start_verse_id_b"] = start_b
+                if hasattr(HarmonySeed, "end_verse_id_b"):
+                    record_kwargs["end_verse_id_b"] = end_b
+
+                record = HarmonySeed(**record_kwargs)
                 target_session.add(record)
             else:
                 updated = False
@@ -621,26 +648,28 @@ def seed_harmony_claims(session: Session) -> None:
                 if record.perspective != perspective:
                     record.perspective = perspective
                     updated = True
-                if record.start_verse_id_a != start_a:
+                if hasattr(record, "start_verse_id_a") and record.start_verse_id_a != start_a:
                     record.start_verse_id_a = start_a
                     updated = True
-                if record.end_verse_id_a != end_a:
+                if hasattr(record, "end_verse_id_a") and record.end_verse_id_a != end_a:
                     record.end_verse_id_a = end_a
                     updated = True
-                if record.start_verse_id_b != start_b:
+                if hasattr(record, "start_verse_id_b") and record.start_verse_id_b != start_b:
                     record.start_verse_id_b = start_b
                     updated = True
-                if record.end_verse_id_b != end_b:
+                if hasattr(record, "end_verse_id_b") and record.end_verse_id_b != end_b:
                     record.end_verse_id_b = end_b
-                if _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a)):
-                    updated = True
-                if _assign_range(
-                    record,
-                    "start_verse_id_b",
-                    "end_verse_id_b",
-                    str(osis_b),
-                ):
-                    updated = True
+                if hasattr(record, "start_verse_id") and hasattr(record, "end_verse_id"):
+                    if _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a)):
+                        updated = True
+                if hasattr(record, "start_verse_id_b") and hasattr(record, "end_verse_id_b"):
+                    if _assign_range(
+                        record,
+                        "start_verse_id_b",
+                        "end_verse_id_b",
+                        str(osis_b),
+                    ):
+                        updated = True
                 if updated:
                     record.updated_at = datetime.now(UTC)
 
