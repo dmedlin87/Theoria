@@ -34,7 +34,6 @@ def _iter_migration_files(migrations_path: Path) -> Iterable[Path]:
         path
         for path in migrations_path.iterdir()
         if path.is_file() and path.suffix.lower() in _SUPPORTED_EXTENSIONS
-        if path.is_file() and path.suffix.lower() in {".sql", ".py"}
     )
 
 
@@ -236,6 +235,47 @@ def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
 
     with engine.connect() as connection:
         return _sqlite_table_has_column(connection, table, column)
+
+
+_SQLITE_ADD_COLUMN_RE = re.compile(
+    r"^\s*ALTER\s+TABLE\s+(?P<table>[^\s]+)\s+ADD\s+COLUMN\s+(?P<column>[^\s]+)",
+    re.IGNORECASE,
+)
+
+
+def _normalize_identifier(identifier: str) -> str:
+    """Strip SQLite identifier quoting and schema prefixes."""
+
+    normalized = identifier.strip().strip("`\"[]")
+    if "." in normalized:
+        normalized = normalized.split(".")[-1]
+    return normalized
+
+
+def _sqlite_should_skip_statement(statement: str, *, engine: Engine) -> bool:
+    """Return ``True`` when a SQLite statement should be skipped.
+
+    SQLite raises ``OperationalError`` if ``ALTER TABLE ... ADD COLUMN`` is
+    executed for a column that already exists.  Test fixtures often call
+    ``Base.metadata.create_all`` before running migrations, which means schema
+    additions may already be present.  Detect these idempotent column additions
+    and silently skip them so the migration runner remains resilient.
+    """
+
+    match = _SQLITE_ADD_COLUMN_RE.match(statement)
+    if not match:
+        return False
+
+    table = _normalize_identifier(match.group("table"))
+    column = _normalize_identifier(match.group("column"))
+    if _sqlite_has_column(engine, table, column):
+        logger.debug(
+            "Skipping SQLite column addition for %s.%s; column already exists",
+            table,
+            column,
+        )
+        return True
+    return False
 
 
 def _execute_python_migration(path: Path, *, session: Session, engine: Engine) -> None:

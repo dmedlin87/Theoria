@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import Field
+from pydantic import Field, model_serializer
 
 from ...models.base import APIModel
 
@@ -27,6 +27,15 @@ class RAGAnswer(APIModel):
     model_name: str | None = None
     model_output: str | None = None
     guardrail_profile: dict[str, str] | None = None
+
+    @model_serializer(mode="wrap")
+    def _include_guardrail_profile(self, handler):
+        """Ensure the ``guardrail_profile`` key is present in serialized output."""
+
+        data = handler(self)
+        if "guardrail_profile" not in data:
+            data["guardrail_profile"] = None
+        return data
 
 
 class VerseCopilotResponse(APIModel):
