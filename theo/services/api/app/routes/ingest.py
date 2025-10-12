@@ -17,6 +17,10 @@ from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
 from theo.services.api.app.ingest.exceptions import UnsupportedSourceError
 from ..ingest.exceptions import UnsupportedSourceError
+from ..ingest.pipeline import (
+    run_pipeline_for_file as _default_run_pipeline_for_file,
+    run_pipeline_for_transcript as _default_run_pipeline_for_transcript,
+)
 from ..models.documents import (
     DocumentIngestResponse,
     SimpleIngestRequest,
@@ -30,6 +34,20 @@ _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
     status.HTTP_413_REQUEST_ENTITY_TOO_LARGE: {"description": "Upload too large"},
 }
+
+
+run_pipeline_for_file = _default_run_pipeline_for_file
+run_pipeline_for_transcript = _default_run_pipeline_for_transcript
+
+
+def _ingestion_service_with_overrides(
+    ingestion_service: IngestionService = Depends(get_ingestion_service),
+) -> IngestionService:
+    """Ensure ingestion dependencies respect route-level monkeypatches."""
+
+    ingestion_service.run_file_pipeline = run_pipeline_for_file
+    ingestion_service.run_transcript_pipeline = run_pipeline_for_transcript
+    return ingestion_service
 
 
 router = APIRouter()
@@ -162,7 +180,9 @@ async def ingest_file(
     file: UploadFile = File(...),
     frontmatter: str | None = Form(default=None),
     session: Session = Depends(get_session),
-    ingestion_service: IngestionService = Depends(get_ingestion_service),
+    ingestion_service: IngestionService = Depends(
+        _ingestion_service_with_overrides
+    ),
 ) -> DocumentIngestResponse:
     """Accept a file upload and synchronously process it into passages."""
 
@@ -285,7 +305,9 @@ async def ingest_transcript(
     audio: UploadFile | None = File(default=None),
     frontmatter: str | None = Form(default=None),
     session: Session = Depends(get_session),
-    ingestion_service: IngestionService = Depends(get_ingestion_service),
+    ingestion_service: IngestionService = Depends(
+        _ingestion_service_with_overrides
+    ),
 ) -> DocumentIngestResponse:
     """Accept a transcript (and optional audio) and process it into passages."""
 
