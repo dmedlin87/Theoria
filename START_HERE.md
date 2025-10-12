@@ -11,11 +11,14 @@
 That's it! The intelligent launcher will:
 
 - ✅ Check all prerequisites (Python, Node.js, npm)
+- ✅ Offer to install missing runtimes or fall back to Docker Compose automatically
 - ✅ Create `.env` file if missing
 - ✅ Install Node dependencies if needed
 - ✅ Start both API and Web services
 - ✅ Monitor health and auto-restart on failures
 - ✅ Show you exactly where to connect
+- ✅ Generate self-signed HTTPS certificates on demand
+- ✅ Capture optional telemetry (opt-in) so the team can spot common issues
 
 ## What You'll See
 
@@ -64,9 +67,10 @@ When you run the script, you'll see:
 
 ### 1. **Automatic Prerequisites Check**
 
-- Verifies Python, Node.js, and npm are installed
-- Shows version information for debugging
-- Provides helpful error messages if something is missing
+- Verifies Python, Node.js, npm, and Docker tooling
+- Shows version information for debugging (via `scripts/launcher_helpers.py check-prereqs`)
+- Offers to install missing runtimes when `winget`/`choco`/`brew` are available
+- Falls back to `docker compose` automatically when local runtimes are missing
 
 ### 2. **Environment Setup**
 
@@ -122,6 +126,68 @@ See detailed logs for debugging:
 ```powershell
 .\start-theoria.ps1 -ApiPort 8010 -Verbose
 ```
+
+### Environment Profiles
+
+Need staging-style ports and environment variables? Use the new `-Profile` switch:
+
+```powershell
+.\start-theoria.ps1 -Profile staging
+```
+
+Profiles automatically set sensible defaults:
+
+- `dev` (default): API `8000`, Web `3000`, `THEORIA_ENVIRONMENT=development`
+- `staging`: API `8100`, Web `3100`, `THEORIA_ENVIRONMENT=staging`
+
+You can still override ports with `-ApiPort`/`-WebPort`; the profile adjusts the downstream environment variables for you.
+
+### HTTPS for Local Testing
+
+Pass `-UseHttps` to spin up the API and Web UI with self-signed certificates:
+
+```powershell
+.\start-theoria.ps1 -UseHttps
+```
+
+The launcher generates development certificates under `infra/certs/` (one-time) and wires them into Uvicorn and Next.js. The health checks automatically trust the self-signed certificates, and the Web UI points to `https://localhost:<port>`.
+
+### Automatic Docker Compose Fallback
+
+If Python/Node/npm are missing and cannot be installed automatically, the launcher will offer a Docker-based escape hatch. Behind the scenes it runs:
+
+```powershell
+docker compose up --build
+```
+
+The bundled `docker-compose.yml` starts a hot-reloading API container plus a Node-powered Next.js dev server. You can run it manually when you want a fully containerized dev environment.
+
+### Telemetry (Opt-In) & Dashboard
+
+Telemetry is **disabled** by default. Opt in or out explicitly:
+
+```powershell
+.\start-theoria.ps1 -TelemetryOptIn
+.\start-theoria.ps1 -TelemetryOptOut
+```
+
+When enabled the launcher records anonymous session events (profile, ports, HTTPS usage). Visualize the history any time with the lightweight dashboard:
+
+```powershell
+python scripts/launcher_helpers.py dashboard --host 127.0.0.1 --port 8765
+```
+
+Open the printed URL to see aggregated counts by profile and event.
+
+### VS Code Tasks
+
+We now ship ready-made VS Code tasks so you can start Theoria right from the Command Palette:
+
+- **Start Theoria (dev)** – standard localhost run
+- **Start Theoria (dev HTTPS)** – runs with `-UseHttps`
+- **Start Theoria (staging)** – uses the staging profile defaults
+
+Open the Command Palette → *Tasks: Run Task* and choose the launcher you need.
 
 ## How It Works
 
