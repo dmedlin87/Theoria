@@ -1,0 +1,59 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    groups:
+      framework-stack:
+        patterns:
+          - "fastapi*"
+          - "uvicorn*"
+          - "sqlalchemy*"
+          - "celery*"
+      security-critical:
+        patterns:
+          - "cryptography"
+          - "PyJWT*"
+          - "httpx*"
+      ml-stack:
+        patterns:
+          - "numpy"
+          - "scipy"
+          - "scikit-learn"
+          - "FlagEmbedding*"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "npm"
+    directory: "/theo/services/web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "UTC"
+    groups:
+      next-runtime:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+      tooling:
+        patterns:
+          - "eslint*"
+          - "@typescript-eslint/*"
+          - "typescript"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "UTC"
+    groups:
+      gha-security:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
