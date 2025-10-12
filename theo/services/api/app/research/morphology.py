@@ -1,34 +1,15 @@
-"""Morphology lookup helpers."""
-
+"""Compatibility shim forwarding to :mod:`theo.domain.research.morphology`."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from warnings import warn
 
-from .datasets import morphology_dataset
+from ..compat.research.morphology import *  # noqa: F401,F403
 
+warn(
+    "Importing from 'theo.services.api.app.research.morphology' is deprecated; "
+    "use 'theo.domain.research.morphology' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-@dataclass(slots=True)
-class MorphToken:
-    osis: str
-    surface: str
-    lemma: str | None = None
-    morph: str | None = None
-    gloss: str | None = None
-    position: int | None = None
-
-
-def fetch_morphology(osis: str) -> list[MorphToken]:
-    """Return token-level morphology for a verse."""
-
-    entries = morphology_dataset().get(osis, [])
-    return [
-        MorphToken(
-            osis=osis,
-            surface=entry["surface"],
-            lemma=entry.get("lemma"),
-            morph=entry.get("morph"),
-            gloss=entry.get("gloss"),
-            position=entry.get("position"),
-        )
-        for entry in entries
-    ]
+__all__ = ["MorphToken", "fetch_morphology"]

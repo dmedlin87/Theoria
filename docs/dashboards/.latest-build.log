@@ -1,0 +1,43 @@
+Error: npm run build failed with code 1
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /workspace/Theoria/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /workspace/Theoria/theo/services/web/package-lock.json
+
+Failed to compile.
+
+./app/notebooks/[id]/page.tsx
+Error:   [31mx[0m An object member cannot be declared optional
+     ,-[[36;1;4m/workspace/Theoria/theo/services/web/app/notebooks/[id]/page.tsx[0m:235:1]
+ [2m232[0m |       </section>
+ [2m233[0m | 
+ [2m234[0m |       {osisRefs.length > 0 ? (
+ [2m235[0m |       {featureDiscoveryFailed ? (
+     : [35;1m                              ^[0m
+ [2m236[0m |         <p
+ [2m237[0m |           role="alert"
+ [2m238[0m |           style={{
+     `----
+  [31mx[0m Expected '</', got '('
+     ,-[[36;1;4m/workspace/Theoria/theo/services/web/app/notebooks/[id]/page.tsx[0m:235:1]
+ [2m232[0m |       </section>
+ [2m233[0m | 
+ [2m234[0m |       {osisRefs.length > 0 ? (
+ [2m235[0m |       {featureDiscoveryFailed ? (
+     : [35;1m                                ^[0m
+ [2m236[0m |         <p
+ [2m237[0m |           role="alert"
+ [2m238[0m |           style={{
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/notebooks/[id]/page.tsx
+
+
+> Build failed because of webpack errors

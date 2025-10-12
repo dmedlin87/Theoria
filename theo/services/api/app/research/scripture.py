@@ -1,73 +1,15 @@
-"""Utilities for retrieving scripture passages from bundled datasets."""
-
+"""Compatibility shim forwarding to :mod:`theo.domain.research.scripture`."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from warnings import warn
 
-from .datasets import scripture_dataset
+from ..compat.research.scripture import *  # noqa: F401,F403
 
+warn(
+    "Importing from 'theo.services.api.app.research.scripture' is deprecated; "
+    "use 'theo.domain.research.scripture' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-@dataclass(slots=True)
-class Verse:
-    osis: str
-    translation: str
-    text: str
-    book: str | None = None
-    chapter: int | None = None
-    verse: int | None = None
-
-
-def _normalize_translation(translation: str | None) -> str:
-    return (translation or "SBLGNT").upper()
-
-
-def fetch_passage(osis: str, translation: str | None = None) -> list[Verse]:
-    """Return a list of verses for the requested OSIS reference.
-
-    The starter implementation only supports single verses or contiguous
-    ranges within the same chapter. The bundled datasets can be replaced
-    with a full scripture engine once larger corpora are available.
-    """
-
-    translation_key = _normalize_translation(translation)
-    translations = scripture_dataset()
-    try:
-        verses_by_osis = translations[translation_key]
-    except KeyError as exc:  # pragma: no cover - defensive guard
-        raise KeyError(f"Unknown translation '{translation_key}'") from exc
-
-    if "." not in osis:
-        raise ValueError("OSIS references must include book and chapter segments")
-
-    if "-" not in osis:
-        verse_keys = [osis]
-    else:
-        start, end = osis.split("-", 1)
-        if "." not in end:
-            # Support short forms like John.1.1-3
-            end = f"{start.rsplit('.', 1)[0]}.{end}"
-        book_chapter = start.rsplit(".", 1)[0]
-        start_verse = int(start.split(".")[-1])
-        end_verse = int(end.split(".")[-1])
-        verse_keys = [
-            f"{book_chapter}.{idx}" for idx in range(start_verse, end_verse + 1)
-        ]
-
-    verses: list[Verse] = []
-    for key in verse_keys:
-        entry = verses_by_osis.get(key)
-        if not entry:
-            continue
-        verses.append(
-            Verse(
-                osis=key,
-                translation=translation_key,
-                text=entry["text"],
-                book=entry.get("book"),
-                chapter=entry.get("chapter"),
-                verse=entry.get("verse"),
-            )
-        )
-    if not verses:
-        raise KeyError(f"No scripture data available for '{osis}'")
-    return verses
+__all__ = ["Verse", "fetch_passage"]
