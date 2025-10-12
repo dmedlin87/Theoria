@@ -369,20 +369,28 @@ function Start-TheoriaApi {
         return $false
     }
     
+    # Verify virtual environment exists
+    $venvPython = Join-Path $script:ProjectRoot ".venv\Scripts\python.exe"
+    if (-not (Test-Path $venvPython)) {
+        Write-TheoriaLog "Virtual environment not found at $venvPython" -Level Error
+        Write-TheoriaLog "Please create a virtual environment first: python -m venv .venv" -Level Error
+        return $false
+    }
+    
     # Set environment variables and start API
     $scriptBlock = {
-        param($Port, $ProjectRoot)
+        param($Port, $ProjectRoot, $PythonExe)
         
         $env:THEO_AUTH_ALLOW_ANONYMOUS = "1"
         $env:THEO_ALLOW_INSECURE_STARTUP = "1"
         $env:PYTHONUNBUFFERED = "1"
         
         Set-Location $ProjectRoot
-        python -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port $Port 2>&1
+        & $PythonExe -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port $Port 2>&1
     }
     
     try {
-        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $ApiPort, $script:ProjectRoot
+        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $ApiPort, $script:ProjectRoot, $venvPython
         $script:Services.Api.Job = $job
         $script:Services.Api.Status = "Starting"
         $script:Services.Api.StartTime = Get-Date
