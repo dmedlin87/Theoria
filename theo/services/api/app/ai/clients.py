@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -40,6 +40,106 @@ class LanguageModelClient(Protocol):
     ) -> str:
         """Return a text completion."""
         ...
+
+
+def build_hypothesis_prompt(
+    question: str,
+    passages: Sequence[Mapping[str, Any] | Any],
+    *,
+    persona: str = "analyst",
+    max_hypotheses: int = 4,
+) -> str:
+    """Craft a structured prompt for hypothesis generation workflows.
+
+    The prompt mirrors the style used across RAG workflows: each passage is
+    enumerated with an index, OSIS reference, and anchor context. The language
+    model is instructed to respond with strictly formatted JSON to simplify
+    downstream parsing.
+
+    Args:
+        question: The theological research question under review.
+        passages: Retrieved passages or citation-like objects. Each item may
+            either be a mapping (``dict``/``pydantic`` model) or any object
+            exposing ``snippet``/``osis`` attributes. Unrecognised attributes
+            default to empty strings so the prompt remains robust when fed
+            heterogeneous retrieval payloads.
+        persona: Optional persona hint (``analyst`` | ``skeptic`` |
+            ``apologist`` | ``synthesizer``) which adjusts the framing given to
+            the model.
+        max_hypotheses: Upper bound on how many hypotheses the model should
+            return.
+
+    Returns:
+        A formatted prompt ready for :class:`LanguageModelClient.generate`.
+    """
+
+    persona_descriptions = {
+        "analyst": "Evaluate the evidence even-handedly and surface multiple competing explanations.",
+        "skeptic": "Interrogate confident claims and highlight tensions in the evidence.",
+        "apologist": "Explore ways the evidence could be harmonised without ignoring tensions.",
+        "synthesizer": "Balance scholarly and pastoral perspectives when framing possibilities.",
+    }
+    persona_key = persona.lower()
+    persona_instruction = persona_descriptions.get(
+        persona_key,
+        persona_descriptions["analyst"],
+    )
+
+    context_lines: list[str] = []
+    for idx, raw in enumerate(passages, start=1):
+        if isinstance(raw, Mapping):
+            snippet = str(raw.get("snippet") or raw.get("text") or "").strip()
+            osis = str(raw.get("osis") or raw.get("osis_ref") or "Unknown").strip()
+            anchor = str(
+                raw.get("anchor")
+                or raw.get("page_no")
+                or raw.get("meta", {}).get("page")
+                or raw.get("meta", {}).get("anchor")
+                or "context"
+            ).strip()
+            score = raw.get("score")
+        else:
+            snippet = str(getattr(raw, "snippet", getattr(raw, "text", ""))).strip()
+            osis = str(
+                getattr(raw, "osis", getattr(raw, "osis_ref", "Unknown"))
+            ).strip()
+            anchor = str(getattr(raw, "anchor", getattr(raw, "page_no", "context"))).strip()
+            score = getattr(raw, "score", None)
+
+        if not snippet:
+            snippet = "[No snippet provided]"
+        passage_line = f"[{idx}] {snippet} (OSIS {osis}, {anchor})"
+        if isinstance(score, (int, float)):
+            passage_line += f" — relevance {max(min(score, 1.0), 0.0):.2f}"
+        context_lines.append(passage_line)
+
+    if not context_lines:
+        context_lines.append("[No passages retrieved]")
+
+    instruction_block = "\n".join(
+        [
+            "You are Theo Engine's hypothesis {persona}.".format(
+                persona=persona_key if persona_key in persona_descriptions else "analyst"
+            ),
+            persona_instruction,
+            "Given the theological question and passages, generate {max_hypotheses} competing hypotheses.".format(
+                max_hypotheses=max_hypotheses,
+            ),
+            "Each hypothesis must be testable, cite relevant passage indices, and include confidence (0-1).",
+            "Respond **only** with JSON using this schema:",
+            '{"hypotheses": ['
+            '{"id": "string", "claim": "string", "confidence": 0-1, "supporting_indices": [int], "contradicting_indices": [int], "fallacy_notes": ["string"], "perspective_scores": {"apologetic": 0-1, "skeptical": 0-1, "neutral": 0-1}}'
+            "]}",
+        ]
+    )
+
+    prompt_parts = [instruction_block]
+    prompt_parts.append(f"Question: {question.strip()}" if question.strip() else "Question: [unspecified]")
+    prompt_parts.append("Passages:")
+    prompt_parts.extend(context_lines)
+    prompt_parts.append("Return JSON only. Do not include markdown fences or commentary.")
+
+    return "\n".join(prompt_parts)
 
 
 @dataclass
@@ -741,4 +841,5 @@ __all__ = [
     "VertexAIClient",
     "VertexAIConfig",
     "build_client",
+    "build_hypothesis_prompt",
 ]
