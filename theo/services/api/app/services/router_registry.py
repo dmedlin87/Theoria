@@ -70,7 +70,6 @@ _DEFAULT_REGISTRATIONS = (
         router=realtime.router,
         prefix="/realtime",
         tags=("realtime",),
-        requires_security=False,
     ),
 )
 

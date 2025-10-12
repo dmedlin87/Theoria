@@ -1,5 +1,13 @@
-import pytest
+import os
 
+import pytest
+from fastapi import FastAPI, status
+from fastapi.testclient import TestClient
+from starlette.testclient import WebSocketDenialResponse
+
+from theo.application.facades import settings as settings_module
+from theo.application.facades.database import get_session
+from theo.services.api.app.routes import realtime
 from theo.services.api.app.routes.realtime import NotebookEventBroker
 
 
@@ -53,3 +61,43 @@ async def test_disconnect_retains_non_empty_sets_until_last_connection_removed()
     await broker.disconnect("notebook-2", second)
 
     assert "notebook-2" not in broker._connections
+
+
+@pytest.fixture()
+def realtime_client() -> TestClient:
+    app = FastAPI()
+    app.include_router(realtime.router, prefix="/realtime")
+
+    os.environ.setdefault("THEO_API_KEYS", '["pytest-default-key"]')
+    settings_module.get_settings.cache_clear()
+    settings = settings_module.get_settings()
+    assert settings.api_keys, "API keys must be configured for authentication tests"
+
+    class _DummySession:
+        def get(self, *_args, **_kwargs):
+            return None
+
+    def _override_session():
+        yield _DummySession()
+
+    app.dependency_overrides[get_session] = _override_session
+
+    with TestClient(app) as client:
+        yield client
+    settings_module.get_settings.cache_clear()
+
+
+@pytest.mark.no_auth_override
+def test_realtime_poll_requires_authentication(realtime_client: TestClient) -> None:
+    response = realtime_client.get("/realtime/notebooks/example/poll")
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.no_auth_override
+def test_realtime_websocket_requires_authentication(realtime_client: TestClient) -> None:
+    with pytest.raises(WebSocketDenialResponse) as exc:
+        with realtime_client.websocket_connect("/realtime/notebooks/example"):
+            pytest.fail("Unauthenticated websocket should not be accepted")
+
+    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED

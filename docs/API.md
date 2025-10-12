@@ -28,6 +28,33 @@ deployments must configure real credentials.
 The sections below describe each resource group, required inputs, and response
 payloads.
 
+## Realtime notebooks
+
+Realtime collaboration endpoints live under `/realtime/notebooks/{id}` and use
+the same authentication headers as the rest of the notebook API. Clients must
+present a valid bearer token or API key during the WebSocket handshake and when
+issuing polling requests; unauthenticated callers receive **401 Unauthorized**
+responses and WebSocket connections are rejected before acceptance.
+
+Example WebSocket connection with an API key:
+
+```bash
+websocat \
+  -H "X-API-Key: $THEO_API_KEYS" \
+  wss://api.theo.app/realtime/notebooks/<notebook-id>
+```
+
+Polling clients use the same header conventions:
+
+```bash
+curl -H "Authorization: Bearer $THEO_API_TOKEN" \
+  https://api.theo.app/realtime/notebooks/<notebook-id>/poll
+```
+
+Authorization is evaluated before the connection is accepted, and notebook
+access controls (ownership, team membership, collaborators, or public
+visibility) are enforced consistently across realtime and REST requests.
+
 ## Ingestion
 
 Ingestion endpoints create or update documents that are later available for
