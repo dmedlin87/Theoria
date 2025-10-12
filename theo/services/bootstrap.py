@@ -9,6 +9,7 @@ from theo.application import ApplicationContainer
 from theo.application.facades.database import get_engine
 from theo.application.facades.settings import get_settings
 from theo.platform import bootstrap_application
+from theo.adapters.research.sqlalchemy import SqlAlchemyResearchNoteRepositoryFactory
 
 
 def _noop_command(*_args, **_kwargs):  # pragma: no cover - transitional shim
@@ -34,6 +35,10 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
     registry = AdapterRegistry()
     registry.register("settings", get_settings)
     registry.register("engine", get_engine)
+    registry.register(
+        "research_notes_repository_factory",
+        lambda: SqlAlchemyResearchNoteRepositoryFactory(),
+    )
 
     container = bootstrap_application(
         registry=registry,
@@ -41,5 +46,6 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
         retire_factory=lambda: _noop_retire,
         get_factory=lambda: _noop_get,
         list_factory=lambda: _noop_list,
+        research_factory=lambda: registry.resolve("research_notes_repository_factory"),
     )
     return container, registry

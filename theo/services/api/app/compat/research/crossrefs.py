@@ -1,9 +1,9 @@
-"""Compatibility shim forwarding to :mod:`theo.domain.research.crossrefs`."""
+"""Compatibility re-export for cross reference helpers."""
 from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.crossrefs import *  # noqa: F401,F403
+from theo.domain.research.crossrefs import CrossReferenceEntry, fetch_cross_references
 
 warn(
     "Importing from 'theo.services.api.app.research.crossrefs' is deprecated; "

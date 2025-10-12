@@ -1,9 +1,9 @@
-"""Compatibility shim forwarding to :mod:`theo.domain.research.datasets`."""
+"""Compatibility re-exports for research datasets."""
 from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.datasets import *  # noqa: F401,F403
+from theo.domain.research.datasets import *  # noqa: F401,F403
 
 warn(
     "Importing from 'theo.services.api.app.research.datasets' is deprecated; "
