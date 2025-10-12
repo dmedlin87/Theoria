@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,25 +16,27 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}
       SETTINGS_SECRET_KEY: geo-ci-secret
       FIXTURES_ROOT: ${{ github.workspace }}/fixtures
-
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@9bb56186c5da571f2b78bb0f1e0ed4f49845d2a1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@14e5d8d0cc76a3b4e5a962d648a3976db0f62d48
         with:
           python-version: '3.11'
           cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install mypy ruff
+          pip install -r requirements-dev.txt
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@0d8d6c353e9846fae10c9f4b8cc2f48ba5f3d580
         with:
           node-version: '20'
           cache: 'npm'
@@ -46,10 +52,6 @@ jobs:
       - name: Run mypy
         run: mypy --config-file mypy.ini
 
-      - name: Run mypy with warn-unused-ignores (enable after Phase 1)
-        if: ${{ vars.ENABLE_WARN_UNUSED_IGNORES == 'true' }}
-        run: mypy --config-file mypy.ini --warn-unused-ignores
-
       - name: Run ESLint and TypeScript checks
         working-directory: theo/services/web
         run: npm run lint
@@ -61,8 +63,27 @@ jobs:
       - name: Run pytest suite
         run: pytest
 
+      - name: Enforce critical coverage thresholds
+        run: python scripts/security/verify_critical_coverage.py
+
       - name: Run Geo pytest suite
         run: pytest tests/geo -q
 
       - name: Run contract tests
         run: pytest tests/contracts/test_schemathesis.py
+
+      - name: Generate Python SBOM
+        run: cyclonedx-bom --spec-version 1.5 --requirements requirements.txt --outfile sbom-python.json --format json
+
+      - name: Generate Node SBOM
+        working-directory: theo/services/web
+        run: npx --yes @cyclonedx/cyclonedx-npm@1.12.0 --output-format json --output-file ../../sbom-node.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: cyclonedx-sboms
+          path: |
+            sbom-python.json
+            sbom-node.json
+          if-no-files-found: error

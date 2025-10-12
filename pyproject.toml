@@ -67,6 +67,12 @@ warn_unused_ignores = true
 follow_imports = "skip"
 
 [tool.pytest.ini_options]
+addopts = [
+    "--cov=theo",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-fail-under=80",
+]
 markers = [
     "redteam: OWASP LLM red-team regression suite",
     "no_auth_override: disable authentication override fixture for security assertions",
