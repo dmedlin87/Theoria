@@ -476,6 +476,7 @@ class GuardedAnswerPipeline:
                                 model_output = original_model_output
                                 validation_result = original_validation_result
                             else:
+                                ensure_completion_safe(revision_result.revised_answer)
                                 revision_schema = revision_candidate
                                 model_output = revision_result.revised_answer
                                 validation_result = revised_validation
