@@ -35,11 +35,17 @@ Testing is being standardised in phases. Until the unified Make targets land, yo
   ```
   To exercise the pgvector-backed flows locally, add `--use-pgvector` (or set `PYTEST_USE_PGVECTOR=1`) so the shared Testcontainer fixtures bootstrap Postgres + pgvector and apply migrations once per session.
 
-- **Celery worker property tests**
+- **Scripture heuristics property tests**
+  ```bash
+  pytest tests/ingest/test_osis_property.py
+  ```
+  The Hypothesis suite stress-tests OSIS range parsing and chunking heuristics with generated data. When a failure is found the reproducible seed is printed so you can recreate the scenario locally.
+
+- **Celery worker retry/idempotency tests**
   ```bash
   pytest -q theo/services/api/tests/workers
   ```
-  The suite validates retry backoff and ingestion job idempotency with Hypothesis-based scenarios.
+  Tests in `tests/workers/test_tasks.py` use `celery.contrib.pytest` to validate retry backoff windows and ingestion job idempotency. Pass `--use-pgvector` if you need a Postgres + pgvector backend instead of the default in-memory SQLite database.
 
 - **Frontend unit tests**
   ```bash
@@ -55,7 +61,7 @@ Testing is being standardised in phases. Until the unified Make targets land, yo
   npm run test:e2e:smoke  # tagged fast journeys (CI default)
   npm run test:e2e:full   # full regression matrix with traces
   ```
-  The smoke suite runs tests tagged with `@smoke` while the full run covers both `@smoke` and `@full` journeys, retaining traces and screenshots for failures.
+  Smoke journeys run tests tagged with `@smoke`; full journeys focus on flows tagged `@full`. Each journey attaches synthetic artifacts (JSON payloads, screenshots, trace archives) which are persisted in CI for post-failure triage.
 
 Once the Makefile façade is introduced the following convenience commands will be available:
 - `make test` – run everything (Python + frontend + E2E as applicable).
