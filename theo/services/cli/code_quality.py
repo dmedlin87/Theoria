@@ -10,6 +10,11 @@ from typing import Iterable, Sequence
 
 import click
 
+from theo.services.bootstrap import resolve_application
+
+
+resolve_application()
+
 
 @dataclass(frozen=True)
 class CheckRequest:

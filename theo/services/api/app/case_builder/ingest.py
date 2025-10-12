@@ -8,7 +8,7 @@ from typing import Sequence
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..core.settings import Settings, get_settings
+from theo.application.facades.settings import Settings, get_settings
 from ..db.models import (
     CaseObject,
     CaseObjectType,

@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Query, Session
 
-from theo.services.api.app.core import settings as settings_module
+from theo.application.facades import settings as settings_module
 from theo.services.api.app.main import app
 from theo.services.api.app.research.notes import get_notes_for_osis
 

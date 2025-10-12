@@ -16,6 +16,18 @@
 | Image Signing | `cosign sign --key $COSIGN_KEY` | Store key material in HSM/KMS; enforce key rotation annually. |
 | Verification | `cosign verify` in CD pipeline | Fail deployment if signature missing or invalid. |
 
+### Automated signing workflow
+
+- The `Release Containers` GitHub Actions workflow (`.github/workflows/deployment-sign.yml`) builds the API container from
+  `theo/services/api/Dockerfile`, pushes it to GHCR, and publishes the digest that downstream deployments must consume.
+- The job uses GitHub OIDC for **keyless** Sigstore signing (`cosign sign --keyless`) and emits matching CycloneDX SBOM
+  attestations (`cosign attest --type cyclonedx`).
+- `anchore/sbom-action` generates the image SBOM that is attached as the predicate to the attestation artifact so the registry
+  always holds a verifiable provenance chain.
+- Workflow artifacts (`sbom-image.cdx.json` and `image-metadata.json`) are uploaded for release managers to review and archive
+  alongside the promotion checklist.
+- Consumers should verify signatures with `cosign verify --certificate-identity https://github.com/<org>/<repo> --certificate-oidc-issuer https://token.actions.githubusercontent.com <image@digest>` before rollout.
+
 ## Release Process
 
 1. Tag release (`git tag vX.Y.Z`).

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 import joblib  # type: ignore[import]
 
-from theo.services.api.app.core.settings import get_settings
+from theo.application.facades.settings import get_settings
 from theo.services.api.app.main import app
 from theo.services.api.app.models.search import HybridSearchResult
 from theo.services.api.app.ranking.features import FEATURE_NAMES, extract_features

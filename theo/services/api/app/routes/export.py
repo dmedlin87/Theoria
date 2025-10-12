@@ -13,7 +13,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..core.database import get_session
+from theo.application.facades.database import get_session
 from ..db.models import Document
 from ..errors import ExportError, Severity
 from ..export.citations import build_citation_export, render_citation_markdown

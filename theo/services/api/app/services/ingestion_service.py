@@ -10,7 +10,7 @@ from typing import Any, Callable, Iterator, Sequence
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from ..core.settings import Settings, get_settings
+from theo.application.facades.settings import Settings, get_settings
 from ..ingest.pipeline import (
     PipelineDependencies,
     run_pipeline_for_file,

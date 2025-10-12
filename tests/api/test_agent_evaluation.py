@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 from theo.services.api.app.analytics.agent_evaluation import (
     evaluate_agent_trails,
 )
-from theo.services.api.app.core.database import Base
+from theo.application.facades.database import Base
 from theo.services.api.app.db.models import (
     AgentStep,
     AgentTrail,

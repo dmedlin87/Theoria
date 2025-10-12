@@ -8,7 +8,7 @@ import jwt
 from fastapi import Header, HTTPException, Request, status
 from fastapi.security.utils import get_authorization_scheme_param
 
-from .core.settings import Settings, get_settings
+from theo.application.facades.settings import Settings, get_settings
 
 
 class Principal(TypedDict, total=False):

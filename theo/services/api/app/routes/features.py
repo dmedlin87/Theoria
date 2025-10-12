@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from ..core.settings import get_settings
+from theo.application.facades.settings import get_settings
 
 router = APIRouter()
 

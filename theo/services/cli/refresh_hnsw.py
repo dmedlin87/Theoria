@@ -11,6 +11,10 @@ from typing import cast
 from celery.app.task import Task
 
 from theo.services.api.app.workers.tasks import refresh_hnsw
+from theo.services.bootstrap import resolve_application
+
+
+resolve_application()
 
 
 @click.command()

@@ -46,6 +46,8 @@ def test_application_depends_only_on_domain_and_platform() -> None:
     allowed_prefixes = ("theo.application", "theo.domain", "theo.platform", "theo.adapters")
     forbidden_prefixes = ("theo.services",)
     for path in _iter_python_files("theo.application"):
+        if "facades" in path.parts:
+            continue
         for module in _gather_imports(path):
             if not module.startswith("theo"):
                 continue
@@ -71,3 +73,34 @@ def test_adapters_do_not_cross_import() -> None:
                     assert not module.startswith(target), (
                         f"Interface adapter {path} must not import '{module}'"
                     )
+
+
+def test_routes_depend_on_application_facades() -> None:
+    forbidden_prefix = "theo.services.api.app.core"
+    for path in _iter_python_files("theo/services/api/app/routes"):
+        imports = _gather_imports(path)
+        assert forbidden_prefix not in imports, (
+            f"Route module {path} must import facades instead of legacy core modules"
+        )
+
+
+def test_workers_use_platform_bootstrap() -> None:
+    workers_path = REPO_ROOT / "theo/services/api/app/workers"
+    for path in workers_path.rglob("*.py"):
+        if path.name == "__init__.py":
+            continue
+        imports = _gather_imports(path)
+        assert "theo.services.bootstrap" in imports, (
+            f"Worker module {path} must resolve adapters via theo.services.bootstrap"
+        )
+
+
+def test_cli_commands_use_platform_bootstrap() -> None:
+    cli_root = REPO_ROOT / "theo/services/cli"
+    for path in cli_root.rglob("*.py"):
+        if "/tests/" in path.as_posix():
+            continue
+        imports = _gather_imports(path)
+        assert "theo.services.bootstrap" in imports, (
+            f"CLI module {path} must resolve adapters via theo.services.bootstrap"
+        )

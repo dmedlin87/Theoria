@@ -9,13 +9,13 @@ import importlib
 
 from fastapi.testclient import TestClient
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core import database as database_module
-from theo.services.api.app.core.database import Base, configure_engine, get_engine
-from theo.services.api.app.core.settings import get_settings
+from theo.application.facades import database as database_module
+from theo.application.facades.database import Base, configure_engine, get_engine
+from theo.application.facades.settings import get_settings
 from theo.services.api.app.db import seeds as seeds_module
 from theo.services.api.app.db.models import AppSetting
 from theo.services.api.app.main import app
@@ -184,6 +184,80 @@ def test_sqlite_reapplies_missing_perspective_migration(tmp_path: Path) -> None:
                 seed_contradiction_claims(session)
             except OperationalError as exc:  # pragma: no cover - defensive assertion
                 pytest.fail(f"seed_contradiction_claims raised OperationalError: {exc}")
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
+        for residual in db_path.parent.glob(f"{db_path.name}*"):
+            residual.unlink(missing_ok=True)
+
+
+def test_sqlite_seed_loader_handles_disabled_migrations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "legacy_disabled.db"
+
+    with sqlite3.connect(db_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE contradiction_seeds (
+                id TEXT PRIMARY KEY,
+                osis_a TEXT NOT NULL,
+                osis_b TEXT NOT NULL,
+                summary TEXT,
+                source TEXT,
+                tags TEXT,
+                weight REAL,
+                created_at TEXT
+            );
+            """
+        )
+
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+
+    try:
+        sample_payload = [
+            {
+                "osis_a": "Gen.1.1",
+                "osis_b": "Gen.1.2",
+                "summary": "Legacy row",
+                "source": "test",
+                "tags": ["regression"],
+                "weight": 1.0,
+                "perspective": "skeptical",
+            }
+        ]
+
+        monkeypatch.setattr(
+            seeds_module,
+            "_iter_seed_entries",
+            lambda *paths: sample_payload,
+        )
+        monkeypatch.setattr(
+            seeds_module,
+            "_verse_bounds",
+            lambda reference: (None, None),
+        )
+        monkeypatch.setattr(
+            seeds_module,
+            "_verse_range",
+            lambda reference: None,
+        )
+
+        with Session(engine) as session:
+            seed_contradiction_claims(session)
+            value = session.execute(
+                text(
+                    "SELECT perspective FROM contradiction_seeds ORDER BY id LIMIT 1"
+                )
+            ).scalar_one()
+
+        assert value == "skeptical"
+
+        with engine.connect() as connection:
+            result = connection.exec_driver_sql("PRAGMA table_info('contradiction_seeds')")
+            assert any(row[1] == "perspective" for row in result)
     finally:
         engine.dispose()
         database_module._engine = None  # type: ignore[attr-defined]

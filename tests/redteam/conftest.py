@@ -47,8 +47,8 @@ def configure_redteam_environment(
     # without credentials.
     os.environ.pop("THEO_API_KEYS", None)
 
-    from theo.services.api.app.core import settings as settings_module
-    from theo.services.api.app.core.database import Base, configure_engine
+    from theo.application.facades import settings as settings_module
+    from theo.application.facades.database import Base, configure_engine
 
     settings_module.get_settings.cache_clear()
     settings = settings_module.get_settings()

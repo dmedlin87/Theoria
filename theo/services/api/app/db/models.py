@@ -24,7 +24,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects import postgresql
-from ..core.settings import get_settings
+from theo.application.facades.settings import get_settings
 from .types import IntArrayType, TSVectorType, VectorType
 
 

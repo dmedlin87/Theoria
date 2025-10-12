@@ -7,8 +7,8 @@ from typing import Literal, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from ..core.database import get_session
-from ..core.settings import get_settings
+from theo.application.facades.database import get_session
+from theo.application.facades.settings import get_settings
 from ..models.verses import (
     VerseGraphResponse,
     VerseMentionsFilters,

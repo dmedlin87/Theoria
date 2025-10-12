@@ -15,8 +15,6 @@ import httpx
 from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
-from ..api.app.core.database import get_engine
-from ..api.app.core.settings import get_settings
 from ..api.app.db.models import Document
 from ..api.app.enrich import MetadataEnricher
 from ..api.app.ingest.pipeline import (
@@ -26,6 +24,18 @@ from ..api.app.ingest.pipeline import (
 )
 from ..api.app.workers import tasks as worker_tasks
 from ..api.app.telemetry import log_workflow_event
+from theo.services.bootstrap import resolve_application
+
+
+APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+
+
+def get_settings():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("settings")
+
+
+def get_engine():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("engine")
 
 SUPPORTED_TRANSCRIPT_EXTENSIONS = {".vtt", ".webvtt", ".srt"}
 SUPPORTED_TEXT_EXTENSIONS = {".md", ".markdown", ".txt", ".html", ".htm"}

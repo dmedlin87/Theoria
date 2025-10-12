@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
-from theo.services.api.app.core import database as database_module
+from theo.application.facades import database as database_module
 from theo.services.api.app.db import seeds as seeds_module
 
 

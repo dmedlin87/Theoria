@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import schemas
-from theo.services.api.app.core.database import get_session
+from theo.application.facades.database import get_session
 from theo.services.api.app.db.models import Document, TranscriptQuote
 from theo.services.api.app.models.search import (
     HybridSearchFilters,

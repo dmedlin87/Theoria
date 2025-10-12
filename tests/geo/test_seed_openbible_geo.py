@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from theo.services.api.app.core.database import Base
-from theo.services.api.app.core.settings_store import load_setting
+from theo.application.facades.database import Base
+from theo.application.facades.settings_store import load_setting
 from theo.services.api.app.db.models import (
     GeoAncientPlace,
     GeoGeometry,

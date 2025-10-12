@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Callable
 
-from ...core.runtime import allow_insecure_startup
-from ...core.settings import get_settings
-from ...core.version import get_git_sha
+from theo.application.facades.runtime import allow_insecure_startup
+from theo.application.facades.settings import get_settings
+from theo.application.facades.version import get_git_sha
 
 try:  # pragma: no cover - optional dependency guard
     import redis

@@ -14,7 +14,7 @@ from theo.services.api.app.ai import (
     generate_sermon_prep_outline,
 )
 from theo.services.api.app.ai.rag import GuardrailError, RAGCitation
-from theo.services.api.app.core.database import get_session
+from theo.application.facades.database import get_session
 from theo.services.api.app.db.models import Document, Passage
 from theo.services.api.app.export import citations as citation_exports
 from theo.services.api.app.export.citations import build_citation_export

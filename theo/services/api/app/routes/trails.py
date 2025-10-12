@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..ai.trails import TrailService
-from ..core.database import get_session
+from theo.application.facades.database import get_session
 from ..models.trails import (
     AgentTrail,
     TrailReplayDiff,

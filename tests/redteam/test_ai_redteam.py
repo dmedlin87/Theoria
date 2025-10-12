@@ -209,7 +209,7 @@ def test_chat_rejects_message_exceeding_max_length(
 ) -> None:
     """Single messages longer than the allowed limit should be rejected early."""
 
-    from theo.services.api.app.core import settings as settings_module
+    from theo.application.facades import settings as settings_module
 
     settings = settings_module.get_settings()
     monkeypatch.setattr(settings, "auth_allow_anonymous", True, raising=False)
@@ -238,7 +238,7 @@ def test_chat_rejects_payload_exceeding_total_budget(
 ) -> None:
     """Cumulative message budgets must be enforced before invoking the LLM."""
 
-    from theo.services.api.app.core import settings as settings_module
+    from theo.application.facades import settings as settings_module
 
     settings = settings_module.get_settings()
     monkeypatch.setattr(settings, "auth_allow_anonymous", True, raising=False)

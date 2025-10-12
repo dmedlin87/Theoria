@@ -25,7 +25,7 @@ class _EmbeddingBackend(Protocol):
     def encode(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
         ...
 
-from ..core.settings import get_settings
+from theo.application.facades.settings import get_settings
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 

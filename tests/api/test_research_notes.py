@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from theo.services.api.app.core.database import Base
+from theo.application.facades.database import Base
 from theo.services.api.app.db.models import NoteEvidence, ResearchNote
 from theo.services.api.app.mcp.tools import handle_note_write
 from theo.services.api.app.research.notes import (

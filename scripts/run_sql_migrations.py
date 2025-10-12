@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
-from theo.services.api.app.core.database import configure_engine
+from theo.application.facades.database import configure_engine
 from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 
 

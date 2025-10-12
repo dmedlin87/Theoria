@@ -13,7 +13,7 @@ from typing import Callable, Sequence
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from ..core.settings import Settings, get_settings
+from theo.application.facades.settings import Settings, get_settings
 from ..models.search import HybridSearchRequest, HybridSearchResult
 from ..ranking.re_ranker import Reranker, load_reranker
 from ..retriever.hybrid import hybrid_search

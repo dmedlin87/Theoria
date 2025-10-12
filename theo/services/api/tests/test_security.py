@@ -9,7 +9,7 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from theo.services.api.app.core import settings as settings_module
+from theo.application.facades import settings as settings_module
 from theo.services.api.app.security import require_principal
 
 

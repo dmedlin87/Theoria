@@ -14,7 +14,7 @@ from theo.services.api.app.analytics.agent_evaluation import (
     _compute_retrieval_metrics,
     _compute_tool_metrics,
 )
-from theo.services.api.app.core.database import get_engine
+from theo.application.facades.database import get_engine
 from theo.services.api.app.db.models import (
     AgentStep,
     AgentTrail,

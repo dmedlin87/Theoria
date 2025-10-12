@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core.database import get_engine
-from theo.services.api.app.core.settings import get_settings
+from theo.application.facades.database import get_engine
+from theo.application.facades.settings import get_settings
 from theo.services.api.app.db.models import Document
 from theo.services.api.app.ingest.chunking import Chunk
 from theo.services.api.app.ingest.exceptions import UnsupportedSourceError

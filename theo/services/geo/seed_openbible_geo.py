@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core.settings_store import save_setting
+from theo.application.facades.settings_store import save_setting
 from theo.services.api.app.db.models import (
     GeoAncientPlace,
     GeoGeometry,

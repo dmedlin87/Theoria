@@ -8,8 +8,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from theo.services.api.app.case_builder import sync_case_objects_for_document
-from theo.services.api.app.core import settings as settings_module
-from theo.services.api.app.core.database import Base
+from theo.application.facades import settings as settings_module
+from theo.application.facades.database import Base
 from theo.services.api.app.db.models import (
     CaseObject,
     CaseSource,
