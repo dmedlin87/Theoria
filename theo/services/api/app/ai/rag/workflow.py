@@ -387,31 +387,10 @@ class GuardedAnswerPipeline:
             if last_error is not None:
                 raise last_error
             raise GenerationError("Language model routing failed to produce a completion")
-        if validation_result:
-            log_workflow_event(
-                "workflow.guardrails_validation",
-                workflow="rag",
-                status=validation_result.get("status", "passed"),
-                cache_status=cache_status,
-                cache_key_suffix=cache_key_suffix,
-                citation_count=validation_result.get("citation_count"),
-                cited_indices=validation_result.get("cited_indices"),
-            )
-            if self.recorder:
-                self.recorder.log_step(
-                    tool="guardrails.validate",
-                    action="check_citations",
-                    input_payload={
-                        "cache_status": cache_status,
-                        "cache_key_suffix": cache_key_suffix,
-                    },
-                    output_payload=validation_result,
-                    output_digest=f"status={validation_result.get('status', 'passed')}",
-                )
-
         critique_schema: ReasoningCritique | None = None
         revision_schema: RevisionDetails | None = None
         original_model_output = model_output
+        original_validation_result = validation_result
 
         if model_output:
             citation_payloads = [
@@ -453,33 +432,125 @@ class GuardedAnswerPipeline:
                                 error_message=str(exc),
                             )
                     else:
-                        revision_schema = _revision_to_schema(revision_result)
-                        if revision_result.revised_answer.strip():
-                            model_output = revision_result.revised_answer
-                        log_workflow_event(
-                            "workflow.reasoning_revision",
-                            workflow="rag",
-                            status="applied",
-                            quality_delta=revision_result.quality_delta,
-                            addressed=len(revision_result.critique_addressed),
-                        )
-                        if self.recorder:
-                            self.recorder.log_step(
-                                tool="rag.revise",
-                                action="revise_with_critique",
-                                input_payload={
-                                    "original_quality": critique_obj.reasoning_quality,
-                                },
-                                output_payload={
-                                    "quality_delta": revision_result.quality_delta,
-                                    "addressed": revision_result.critique_addressed,
-                                    "revised_quality": revision_result.revised_critique.reasoning_quality,
-                                },
-                                output_digest=(
-                                    f"delta={revision_result.quality_delta}, "
-                                    f"addressed={len(revision_result.critique_addressed)}"
-                                ),
+                        revision_candidate = _revision_to_schema(revision_result)
+                        revised_answer = revision_result.revised_answer.strip()
+                        if revised_answer:
+                            try:
+                                revised_validation = validate_model_completion(
+                                    revision_result.revised_answer,
+                                    citations,
+                                )
+                            except GuardrailError as exc:
+                                LOGGER.warning(
+                                    "Revised answer failed guardrail validation; reverting to original output",
+                                    exc_info=exc,
+                                )
+                                log_workflow_event(
+                                    "workflow.reasoning_revision",
+                                    workflow="rag",
+                                    status="rejected",
+                                    quality_delta=revision_result.quality_delta,
+                                    addressed=len(revision_result.critique_addressed),
+                                    error="guardrail_failed",
+                                )
+                                if self.recorder:
+                                    self.recorder.log_step(
+                                        tool="rag.revise",
+                                        action="revise_with_critique",
+                                        status="failed",
+                                        input_payload={
+                                            "original_quality": critique_obj.reasoning_quality,
+                                        },
+                                        output_payload={
+                                            "quality_delta": revision_result.quality_delta,
+                                            "addressed": revision_result.critique_addressed,
+                                            "revised_quality": revision_result.revised_critique.reasoning_quality,
+                                        },
+                                        output_digest=(
+                                            f"delta={revision_result.quality_delta}, "
+                                            f"addressed={len(revision_result.critique_addressed)}"
+                                        ),
+                                        error_message="guardrail validation failed for revised answer",
+                                    )
+                                revision_schema = None
+                                model_output = original_model_output
+                                validation_result = original_validation_result
+                            else:
+                                revision_schema = revision_candidate
+                                model_output = revision_result.revised_answer
+                                validation_result = revised_validation
+                                log_workflow_event(
+                                    "workflow.reasoning_revision",
+                                    workflow="rag",
+                                    status="applied",
+                                    quality_delta=revision_result.quality_delta,
+                                    addressed=len(revision_result.critique_addressed),
+                                )
+                                if self.recorder:
+                                    self.recorder.log_step(
+                                        tool="rag.revise",
+                                        action="revise_with_critique",
+                                        input_payload={
+                                            "original_quality": critique_obj.reasoning_quality,
+                                        },
+                                        output_payload={
+                                            "quality_delta": revision_result.quality_delta,
+                                            "addressed": revision_result.critique_addressed,
+                                            "revised_quality": revision_result.revised_critique.reasoning_quality,
+                                        },
+                                        output_digest=(
+                                            f"delta={revision_result.quality_delta}, "
+                                            f"addressed={len(revision_result.critique_addressed)}"
+                                        ),
+                                    )
+                        else:
+                            revision_schema = revision_candidate
+                            log_workflow_event(
+                                "workflow.reasoning_revision",
+                                workflow="rag",
+                                status="skipped",
+                                quality_delta=revision_result.quality_delta,
+                                addressed=len(revision_result.critique_addressed),
                             )
+                            if self.recorder:
+                                self.recorder.log_step(
+                                    tool="rag.revise",
+                                    action="revise_with_critique",
+                                    input_payload={
+                                        "original_quality": critique_obj.reasoning_quality,
+                                    },
+                                    output_payload={
+                                        "quality_delta": revision_result.quality_delta,
+                                        "addressed": revision_result.critique_addressed,
+                                        "revised_quality": revision_result.revised_critique.reasoning_quality,
+                                    },
+                                    output_digest=(
+                                        f"delta={revision_result.quality_delta}, "
+                                        f"addressed={len(revision_result.critique_addressed)}"
+                                    ),
+                                )
+
+        if validation_result:
+            log_workflow_event(
+                "workflow.guardrails_validation",
+                workflow="rag",
+                status=validation_result.get("status", "passed"),
+                cache_status=cache_status,
+                cache_key_suffix=cache_key_suffix,
+                citation_count=validation_result.get("citation_count"),
+                cited_indices=validation_result.get("cited_indices"),
+            )
+            if self.recorder:
+                self.recorder.log_step(
+                    tool="guardrails.validate",
+                    action="check_citations",
+                    input_payload={
+                        "cache_status": cache_status,
+                        "cache_key_suffix": cache_key_suffix,
+                    },
+                    output_payload=validation_result,
+                    output_digest=f"status={validation_result.get('status', 'passed')}",
+                )
 
         answer = RAGAnswer(
             summary=summary_text,
