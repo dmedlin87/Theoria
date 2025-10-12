@@ -506,8 +506,8 @@ export default function CopilotPage(): JSX.Element {
 
   if (enabled === false) {
     return (
-      <section>
-        <h2>Copilot</h2>
+      <section aria-labelledby="copilot-title">
+        <h1 id="copilot-title">Copilot</h1>
         <p>The AI copilot is not enabled for this deployment.</p>
         {error && <p role="alert">{error.message}</p>}
       </section>
@@ -516,16 +516,16 @@ export default function CopilotPage(): JSX.Element {
 
   if (enabled === null) {
     return (
-      <section>
-        <h2>Copilot</h2>
+      <section aria-labelledby="copilot-title">
+        <h1 id="copilot-title">Copilot</h1>
         <p>Loading feature flags…</p>
       </section>
     );
   }
 
   return (
-    <section>
-      <h2>Copilot</h2>
+    <section aria-labelledby="copilot-title">
+      <h1 id="copilot-title">Copilot</h1>
       <p>Run grounded workflows that stay anchored to your corpus.</p>
       <p style={{ marginTop: "0.5rem", color: "#4b5563" }}>{formatEmphasisSummary(mode)}</p>
       <ModeChangeBanner area="Copilot workspace" />

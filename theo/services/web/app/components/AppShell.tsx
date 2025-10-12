@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import FocusTrap from "focus-trap-react";
 import {
   type ReactNode,
   useState,
@@ -164,53 +165,58 @@ export function AppShell({
           </span>
           <span>{isNavOpen || !isMobileNav ? "Hide navigation" : "Show navigation"}</span>
         </button>
-        <div
-          id="app-shell-v2-nav-content"
-          className="app-shell-v2__nav-content"
-          data-open={!isMobileNav || isNavOpen}
-          aria-hidden={isMobileNav && !isNavOpen}
-          ref={navContentRef}
+        <FocusTrap
+          active={isMobileNav && isNavOpen}
+          focusTrapOptions={{ clickOutsideDeactivates: true, escapeDeactivates: false }}
         >
-          <nav className="app-shell-v2__nav-groups" aria-label="Primary">
-            {navSections.map((section) => (
-              <div key={section.label} className="app-shell-v2__nav-group">
-                <p className="app-shell-v2__nav-label">{section.label}</p>
-                <ul className="app-shell-v2__nav-list">
-                  {section.items.map((item) => {
-                    const isActive = item.match
-                      ? pathname.startsWith(item.match)
-                      : pathname === item.href;
-                    const isLoading = clickedHref === item.href && isPending;
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          prefetch={true}
-                          className={
-                            isActive
-                              ? "app-shell-v2__nav-link is-active"
-                              : isLoading
-                              ? "app-shell-v2__nav-link is-loading"
-                              : "app-shell-v2__nav-link"
-                          }
-                          aria-current={isActive ? "page" : undefined}
-                          aria-disabled={isLoading}
-                          onClick={(e) => handleLinkClick(item.href, e, item.label)}
-                        >
-                          {item.label}
-                          {isLoading && (
-                            <span className="nav-loading-spinner" aria-hidden="true" />
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </nav>
-          <div className="app-shell-v2__mode">{modeSwitcher}</div>
-        </div>
+          <div
+            id="app-shell-v2-nav-content"
+            className="app-shell-v2__nav-content"
+            data-open={!isMobileNav || isNavOpen}
+            aria-hidden={isMobileNav && !isNavOpen}
+            ref={navContentRef}
+          >
+            <nav className="app-shell-v2__nav-groups" aria-label="Primary">
+              {navSections.map((section) => (
+                <div key={section.label} className="app-shell-v2__nav-group">
+                  <p className="app-shell-v2__nav-label">{section.label}</p>
+                  <ul className="app-shell-v2__nav-list">
+                    {section.items.map((item) => {
+                      const isActive = item.match
+                        ? pathname.startsWith(item.match)
+                        : pathname === item.href;
+                      const isLoading = clickedHref === item.href && isPending;
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            prefetch={true}
+                            className={
+                              isActive
+                                ? "app-shell-v2__nav-link is-active"
+                                : isLoading
+                                ? "app-shell-v2__nav-link is-loading"
+                                : "app-shell-v2__nav-link"
+                            }
+                            aria-current={isActive ? "page" : undefined}
+                            aria-disabled={isLoading}
+                            onClick={(e) => handleLinkClick(item.href, e, item.label)}
+                          >
+                            {item.label}
+                            {isLoading && (
+                              <span className="nav-loading-spinner" aria-hidden="true" />
+                            )}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </nav>
+            <div className="app-shell-v2__mode">{modeSwitcher}</div>
+          </div>
+        </FocusTrap>
       </aside>
       <div className="app-shell-v2__workspace">
         <div className="app-shell-v2__command-bar" role="banner">

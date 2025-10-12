@@ -292,8 +292,8 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
   };
 
   return (
-    <section>
-      <h2>{document.title ?? "Document"}</h2>
+    <section aria-labelledby="document-title">
+      <h1 id="document-title">{document.title ?? "Document"}</h1>
       <p>Document ID: {document.id}</p>
 
       <details open style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>

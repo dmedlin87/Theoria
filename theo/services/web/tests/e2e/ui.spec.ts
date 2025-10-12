@@ -1,3 +1,4 @@
+import percySnapshot from "@percy/playwright";
 import { expect, test } from "./fixtures/error-guard";
 import type { APIRequestContext, Page } from "@playwright/test";
 import crypto from "node:crypto";
@@ -69,6 +70,7 @@ test.describe("Theo Engine UI", () => {
     await page.click("button[type='submit']");
     const firstResultLink = page.getByRole("link", { name: /Open passage/i }).first();
     await expect(firstResultLink).toBeVisible();
+    await percySnapshot(page, "Search results");
   });
 
   test("@full primary navigation links load", async ({ page }) => {
@@ -129,7 +131,19 @@ test.describe("Theo Engine UI", () => {
       ]);
 
       await assertion(page);
+      await percySnapshot(page, `Navigation - ${label}`);
     }
+  });
+
+  test("@full skip link moves focus to the main content landmark", async ({ page }) => {
+    await page.goto("/search");
+    await page.keyboard.press("Tab");
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await expect(skipLink).toBeFocused();
+    await skipLink.press("Enter");
+    await expect
+      .poll(() => page.evaluate(() => window.location.hash))
+      .toBe("#main-content");
   });
 
   test("@full runs copilot workflows", async ({ page }) => {

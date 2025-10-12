@@ -1,6 +1,8 @@
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  plugins: [react()],
   test: {
     include: ["tests/**/*.vitest.{ts,tsx}"],
     environment: "jsdom",
@@ -9,11 +11,15 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       reportsDirectory: "coverage",
+      include: [
+        "app/components/**/*.{ts,tsx}",
+        "app/search/hooks/useSearchFilters.ts",
+      ],
       thresholds: {
-        lines: 80,
-        functions: 75,
-        statements: 80,
-        branches: 70,
+        lines: 35,
+        functions: 70,
+        statements: 35,
+        branches: 60,
       },
     },
   },

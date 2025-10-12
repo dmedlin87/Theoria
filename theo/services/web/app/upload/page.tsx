@@ -371,8 +371,10 @@ export default function UploadPage(): JSX.Element {
   };
 
   return (
-    <section className="upload-page">
-      <h2 className="page-title">Upload</h2>
+    <section className="upload-page" aria-labelledby="upload-page-title">
+      <h1 id="upload-page-title" className="page-title">
+        Upload
+      </h1>
       <p className="page-description">
         Start with a quick ingest: paste server paths or canonical URLs and let Theo apply sensible defaults. Expand
         the advanced settings to tweak metadata or post-batch operations. Manual file and URL uploads remain available

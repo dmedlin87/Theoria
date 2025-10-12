@@ -356,10 +356,10 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   }
 
   return (
-    <section>
+    <section aria-labelledby="verse-mentions-title">
       <div className={features.research ? "sidebar-layout" : ""}>
         <div>
-          <h2>Verse Mentions</h2>
+          <h1 id="verse-mentions-title">Verse Mentions</h1>
           <p>
             Aggregated references for <strong>{osis}</strong>
           </p>

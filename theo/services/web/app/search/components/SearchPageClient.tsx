@@ -1424,12 +1424,12 @@ export default function SearchPageClient({
   );
 
   return (
-    <section className="search-page">
+    <section className="search-page" aria-labelledby="search-page-title">
       {/* Accessibility: Announce search status */}
       <div role="status" aria-live="polite" aria-atomic="true" className="visually-hidden">
         {isSearching ? "Searching corpus..." : hasSearched && !error && groups.length === 0 ? "No results found" : hasSearched && groups.length > 0 ? `Found ${groups.length} document${groups.length === 1 ? "" : "s"}` : ""}
       </div>
-      <h2>Search</h2>
+      <h1 id="search-page-title">Search</h1>
       <p>Hybrid search with lexical, vector, and OSIS-aware filtering.</p>
       <div className="search-ui-mode-wrapper">
         <UiModeToggle mode={uiMode} onChange={setUiMode} />

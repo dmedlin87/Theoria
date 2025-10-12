@@ -13,16 +13,21 @@
     "lint:types": "tsc --noEmit",
     "test:e2e": "playwright test --reporter=line,html",
     "test:e2e:smoke": "playwright test --grep @smoke --reporter=line,html",
+    "test:e2e:smoke:percy": "percy exec -- playwright test --grep @smoke --reporter=line,html",
     "test:e2e:full": "playwright test --reporter=line,html"
   },
   "dependencies": {
     "d3": "^7.9.0",
+    "focus-trap-react": "^11.0.4",
     "next": "15.5.4",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@next/bundle-analyzer": "15.5.4",
+    "@percy/cli": "^1.31.3",
+    "@percy/playwright": "^1.0.9",
     "@playwright/test": "1.56.0",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.0",
@@ -34,6 +39,9 @@
     "@types/react-dom": "19.2.1",
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.13.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "2.1.5",
+    "axe-core": "^4.11.0",
     "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsx-a11y": "^6.9.0",
@@ -46,7 +54,6 @@
     "ts-jest": "29.4.5",
     "typescript": "5.7.2",
     "undici": "7.16.0",
-    "@vitest/coverage-v8": "2.1.5",
     "vitest": "2.1.5"
   }
 }
