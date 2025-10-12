@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("THEO_API_KEYS", '["pytest-default-key"]')
+os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
 
 from pathlib import Path
 import sys

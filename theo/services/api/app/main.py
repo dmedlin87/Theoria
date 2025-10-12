@@ -21,6 +21,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from .core.database import Base, get_engine
+from .core.runtime import allow_insecure_startup
 from .core.settings import get_settings
 from .db.run_sql_migrations import run_sql_migrations
 from .db.seeds import seed_reference_data
@@ -252,13 +253,28 @@ def create_app() -> FastAPI:
 
 def _enforce_authentication_requirements() -> None:
     settings = get_settings()
-    if settings.auth_allow_anonymous:
-        return
+    insecure_ok = allow_insecure_startup()
+    if settings.auth_allow_anonymous and not insecure_ok:
+        message = (
+            "THEO_AUTH_ALLOW_ANONYMOUS requires THEO_ALLOW_INSECURE_STARTUP for local"
+            " testing. Disable anonymous access or set THEO_ALLOW_INSECURE_STARTUP"
+            "=1."
+        )
+        logger.critical(message)
+        raise RuntimeError(message)
     if settings.api_keys or settings.has_auth_jwt_credentials():
         return
+    if insecure_ok:
+        logger.warning(
+            "Starting without API credentials because THEO_ALLOW_INSECURE_STARTUP is"
+            " enabled. Do not use this configuration outside isolated development"
+            " environments."
+        )
+        return
     message = (
-        "API authentication is not configured. Set THEO_API_KEYS or JWT settings before "
-        "starting the service, or enable THEO_AUTH_ALLOW_ANONYMOUS for local testing."
+        "API authentication is not configured. Set THEO_API_KEYS or JWT settings"
+        " before starting the service, or enable THEO_ALLOW_INSECURE_STARTUP=1 for"
+        " local testing."
     )
     logger.critical(message)
     raise RuntimeError(message)
@@ -268,19 +284,19 @@ def _enforce_secret_requirements() -> None:
     settings = get_settings()
     if settings.settings_secret_key:
         return
-    if not _secret_features_enabled():
+    if allow_insecure_startup():
+        logger.warning(
+            "Starting without SETTINGS_SECRET_KEY because THEO_ALLOW_INSECURE_STARTUP"
+            " is enabled. Secrets will not be persisted securely."
+        )
         return
     message = (
-        "SETTINGS_SECRET_KEY must be configured to use the AI registry and provider "
-        "settings APIs. Set the environment variable and restart the service."
+        "SETTINGS_SECRET_KEY must be configured before starting the service. Set the"
+        " environment variable and restart the service or enable"
+        " THEO_ALLOW_INSECURE_STARTUP=1 for local development."
     )
     logger.error(message)
     raise RuntimeError(message)
-
-
-def _secret_features_enabled() -> bool:
-    toggle = os.getenv("THEO_DISABLE_AI_SETTINGS", "0").lower()
-    return toggle not in {"1", "true", "yes"}
 
 
 app = create_app()

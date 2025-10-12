@@ -9,7 +9,9 @@ The service accepts either static API keys or JWT bearer tokens. Define at least
 - **Static API keys** &mdash; Set the `THEO_API_KEYS` environment variable to a JSON array (e.g. `THEO_API_KEYS='["alpha","beta"]'`) or a comma-separated string (e.g. `THEO_API_KEYS="alpha,beta"`).
 - **JWT bearer tokens** &mdash; Provide `THEO_AUTH_JWT_SECRET` for HMAC signatures or `THEO_AUTH_JWT_PUBLIC_KEY` / `THEO_AUTH_JWT_PUBLIC_KEY_PATH` for asymmetric signatures. Optional `THEO_AUTH_JWT_ISSUER`, `THEO_AUTH_JWT_AUDIENCE`, and `THEO_AUTH_JWT_ALGORITHMS` tighten token validation when required.
 
-If neither strategy is configured, the API rejects requests unless `THEO_AUTH_ALLOW_ANONYMOUS=1` is explicitly enabled for isolated local testing.
+If neither strategy is configured, the API rejects requests unless `THEO_AUTH_ALLOW_ANONYMOUS=1` is explicitly enabled for isolated local testing and `THEO_ALLOW_INSECURE_STARTUP=1` is set to acknowledge the risk.
+
+> **Important:** `THEO_ALLOW_INSECURE_STARTUP` only exists to keep developer workstations unblocked. Production and shared staging environments must supply API keys or JWT credentials and omit the override so the service refuses to boot when authentication is misconfigured.
 
 ## Choose the correct header
 
