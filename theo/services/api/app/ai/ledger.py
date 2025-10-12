@@ -13,6 +13,11 @@ import threading
 import time
 from typing import ContextManager
 
+try:  # pragma: no cover - optional dependency
+    from prometheus_client import Counter
+except Exception:  # pragma: no cover - metrics disabled
+    Counter = None  # type: ignore[assignment]
+
 from .clients import GenerationError
 
 
@@ -49,6 +54,46 @@ class InflightRow:
 
 
 logger = logging.getLogger(__name__)
+
+
+class _NoopCounter:
+    """Fallback counter used when Prometheus metrics are unavailable."""
+
+    def labels(self, *args: object, **kwargs: object) -> "_NoopCounter":
+        return self
+
+    def inc(self, amount: float = 1.0) -> None:
+        return None
+
+
+if Counter is not None:  # pragma: no cover - exercised when metrics available
+    _LEDGER_STATE_TRANSITIONS = Counter(
+        "theo_router_ledger_state_transitions_total",
+        "Observed deduplicated inflight state transitions.",
+        labelnames=("status",),
+    )
+    _LEDGER_EVENTS = Counter(
+        "theo_router_ledger_events_total",
+        "Observed ledger wait events for deduplicated generations.",
+        labelnames=("event",),
+    )
+else:  # pragma: no cover - metrics disabled
+    _LEDGER_STATE_TRANSITIONS = _NoopCounter()
+    _LEDGER_EVENTS = _NoopCounter()
+
+
+def _record_event(event: str, cache_key: str, **extra: object) -> None:
+    """Record an observability event for inflight wait handling."""
+
+    logger.debug(
+        "ledger.wait.%s",
+        event,
+        extra={"cache_key": cache_key, **extra},
+    )
+    try:
+        _LEDGER_EVENTS.labels(event=event).inc()
+    except Exception:  # pragma: no cover - defensive guard
+        logger.debug("failed to record ledger metric", exc_info=True)
 
 
 class LedgerTransaction:
@@ -453,6 +498,9 @@ class SharedLedger:
         # message. We only clear stale inflight rows after the caller's timeout
         # to ensure the original owner can still update the shared record.
         last_error_message: str | None = None
+        last_status: str | None = None
+        last_updated_at: float | None = None
+        missing_logged = False
 
         def _row_to_record(row: InflightRow) -> CacheRecord:
             created_at = row.completed_at or row.updated_at
@@ -474,6 +522,12 @@ class SharedLedger:
             if deadline is not None and now >= deadline:
                 # Only purge stale inflight entries once we know the owning
                 # router can no longer update them.
+                _record_event(
+                    "timeout",
+                    cache_key,
+                    status=last_status,
+                    observed_updated_at=observed_updated_at,
+                )
                 with self.transaction() as txn:
                     txn.clear_single_inflight(cache_key)
                 raise GenerationError(
@@ -482,22 +536,62 @@ class SharedLedger:
             row = self._read_inflight(cache_key)
             if row is None:
                 # No inflight record – attempt to resolve from cache.
+                if not missing_logged:
+                    _record_event("missing_row", cache_key)
+                    missing_logged = True
                 with self.transaction() as txn:
                     cached = txn.get_cache_entry(cache_key)
                 if cached is not None:
+                    _record_event("cache_hit", cache_key, source="cache")
                     return cached
                 time.sleep(poll_interval)
                 continue
             else:
+                if missing_logged:
+                    _record_event("row_reappeared", cache_key)
+                    missing_logged = False
                 if observed_updated_at is None:
                     observed_updated_at = row.updated_at
                 if row.updated_at < comparison_floor:
+                    _record_event(
+                        "stale_row",
+                        cache_key,
+                        status=row.status,
+                        updated_at=row.updated_at,
+                        comparison_floor=comparison_floor,
+                    )
                     comparison_floor = row.updated_at
+                if (
+                    last_status != row.status
+                    or last_updated_at is None
+                    or row.updated_at > last_updated_at
+                ):
+                    _record_event(
+                        "state_transition",
+                        cache_key,
+                        status=row.status,
+                        updated_at=row.updated_at,
+                    )
+                    try:
+                        _LEDGER_STATE_TRANSITIONS.labels(status=row.status).inc()
+                    except Exception:  # pragma: no cover - defensive guard
+                        logger.debug("failed to record ledger state metric", exc_info=True)
+                    last_status = row.status
+                    last_updated_at = row.updated_at
             if (
-                row.output is not None
-                and row.completed_at is not None
-                and row.completed_at >= comparison_floor
+                row.status in {"success", "error"}
+                and row.output is not None
+                and (
+                    row.completed_at is None
+                    or row.completed_at >= comparison_floor
+                )
             ):
+                _record_event(
+                    "delivered",
+                    cache_key,
+                    source="ledger",
+                    status=row.status,
+                )
                 return _row_to_record(row)
             if row.status == "waiting":
                 if (
@@ -513,8 +607,19 @@ class SharedLedger:
                 time.sleep(poll_interval)
                 continue
             if row.status == "success":
-                if row.output:
+                if row.output is not None:
+                    _record_event(
+                        "delivered",
+                        cache_key,
+                        source="ledger",
+                        status=row.status,
+                    )
                     return _row_to_record(row)
+                with self.transaction() as txn:
+                    cached = txn.get_cache_entry(cache_key)
+                if cached is not None:
+                    _record_event("cache_hit", cache_key, source="cache")
+                    return cached
                 logger.warning(
                     "Inflight success for %s missing output; waiting for owner to finish",
                     cache_key,
@@ -525,18 +630,13 @@ class SharedLedger:
             if row.status == "error":
                 last_error_message = row.error or "Deduplicated generation failed"
                 if (
-                    row.output is not None
-                    and row.completed_at is not None
-                    and row.completed_at >= comparison_floor
-                ):
-                    return _row_to_record(row)
-                if (
                     observed_updated_at is not None
                     and row.updated_at > observed_updated_at
                 ):
                     with self.transaction() as txn:
                         cached = txn.get_cache_entry(cache_key)
                     if cached is not None:
+                        _record_event("cache_hit", cache_key, source="cache")
                         return cached
                     comparison_floor = row.updated_at
                     observed_updated_at = row.updated_at
@@ -548,6 +648,12 @@ class SharedLedger:
                     # A transient failure was observed, but the owning router may
                     # still be retrying. Keep polling instead of clearing the row so
                     # all waiters eventually share the successful output.
+                    _record_event(
+                        "transient_error",
+                        cache_key,
+                        status=row.status,
+                        error=row.error,
+                    )
                     time.sleep(poll_interval)
                     continue
                 # Preserve the inflight row so earlier waiters that began
@@ -557,8 +663,21 @@ class SharedLedger:
                 with self.transaction() as txn:
                     cached = txn.get_cache_entry(cache_key)
                 if cached is not None:
+                    _record_event("cache_hit", cache_key, source="cache")
                     return cached
+                _record_event(
+                    "error_raised",
+                    cache_key,
+                    status=row.status,
+                    error=row.error,
+                )
                 raise GenerationError(last_error_message)
+            _record_event(
+                "unknown_state",
+                cache_key,
+                status=row.status,
+                updated_at=row.updated_at,
+            )
             raise GenerationError(f"Unknown inflight status: {row.status}")
 
     # ------------------------------------------------------------------
