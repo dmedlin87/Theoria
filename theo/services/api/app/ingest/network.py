@@ -216,7 +216,24 @@ def fetch_web_document(
         raise UnsupportedSourceError(
             f"Fetching URL timed out after {timeout} seconds"
         ) from exc
-    except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+    except TimeoutError as exc:
+        raise UnsupportedSourceError(
+            f"Fetching URL timed out after {timeout} seconds"
+        ) from exc
+    except URLError as exc:
+        reason = getattr(exc, "reason", None)
+        if isinstance(reason, (TimeoutError, socket.timeout)):
+            raise UnsupportedSourceError(
+                f"Fetching URL timed out after {timeout} seconds"
+            ) from exc
+        if isinstance(reason, str) and "timed out" in reason.lower():
+            raise UnsupportedSourceError(
+                f"Fetching URL timed out after {timeout} seconds"
+            ) from exc
+        raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
+    except HTTPError as exc:
+        raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
+    except ValueError as exc:
         raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
 
     raw = bytearray()
@@ -225,6 +242,20 @@ def fetch_web_document(
     try:
         final_url = response.geturl()
         ensure_url_allowed(settings, final_url)
+
+        if max_bytes is not None:
+            content_length = response.headers.get("Content-Length")
+            if content_length:
+                try:
+                    total_bytes = int(content_length)
+                except (TypeError, ValueError):
+                    total_bytes = None
+                else:
+                    if total_bytes > max_bytes:
+                        raise UnsupportedSourceError(
+                            "Fetched content exceeded maximum allowed size of "
+                            f"{max_bytes} bytes"
+                        )
 
         while True:
             chunk = response.read(64 * 1024)
