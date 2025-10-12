@@ -9,6 +9,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       reportsDirectory: "coverage",
+      include: ["app/chat/useSessionRestoration.ts"],
       thresholds: {
         lines: 80,
         functions: 80,
