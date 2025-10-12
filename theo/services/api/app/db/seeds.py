@@ -6,8 +6,8 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Callable, Iterable
 from collections.abc import Callable
-from typing import Iterable
 from uuid import NAMESPACE_URL, uuid5
 
 import yaml
@@ -656,9 +656,27 @@ def seed_geo_places(session: Session) -> None:
     session.commit()
 
 
+def _safe_seed(
+    session: Session,
+    loader: Callable[[Session], None],
+    dataset_label: str,
+) -> None:
+    """Execute ``loader`` while downgrading missing perspective columns to warnings."""
+
+    try:
+        loader(session)
+    except OperationalError as exc:
+        if _handle_missing_perspective_error(session, dataset_label, exc):
+            return
+        raise
+
+
 def seed_reference_data(session: Session) -> None:
     """Entry point for loading all bundled reference datasets."""
 
+    _safe_seed(session, seed_contradiction_claims, "contradiction")
+    _safe_seed(session, seed_harmony_claims, "harmony")
+    _safe_seed(session, seed_commentary_excerpts, "commentary excerpt")
     _run_seed_with_perspective_guard(session, seed_contradiction_claims, "contradiction")
     _run_seed_with_perspective_guard(session, seed_harmony_claims, "harmony")
     _run_seed_with_perspective_guard(session, seed_commentary_excerpts, "commentary excerpt")

@@ -41,8 +41,17 @@ _resolve_host_addresses = ingest_network.resolve_host_addresses
 
 # Legacy alias retained for older tests/hooks that patch the private helper.
 # Keep this close to the imports so reloads and import * behaviour keep the
-# attribute available for existing integrations.
-_parse_text_file = parse_text_file
+# attribute available for existing integrations.  Some integration tests reach
+# into the module to swap out the helper and expect it to exist even if the
+# public ``parse_text_file`` symbol is renamed.  Using an explicit wrapper keeps
+# the attribute stable across reloads and avoids AttributeErrors when tests
+# access ``_parse_text_file`` before monkeypatching.
+
+
+def _parse_text_file(path):
+    """Backward compatible wrapper around :func:`parse_text_file`."""
+
+    return parse_text_file(path)
 
 
 __all__ = [
@@ -60,7 +69,7 @@ __all__ = [
 ]
 
 
-_parse_text_file = parse_text_file
+
 
 
 @dataclass(slots=True)
