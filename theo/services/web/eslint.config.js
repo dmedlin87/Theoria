@@ -10,7 +10,7 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import theoriaPlugin from './eslint-rules/index.js';
-import qualityBaseline from './config/ui-quality-baseline.json' with { type: 'json' };
+import qualityBaseline from './config/ui-quality-baseline.json' assert { type: 'json' };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
