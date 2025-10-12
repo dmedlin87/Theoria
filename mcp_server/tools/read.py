@@ -16,6 +16,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import schemas
+from ..security import WriteSecurityError, get_read_security_policy
+from ..validators import (
+    validate_end_user_id,
+    validate_filters,
+    validate_osis_reference,
+    validate_query,
+)
 from theo.application.facades.database import get_session
 from theo.services.api.app.db.models import Document, TranscriptQuote
 from theo.services.api.app.models.search import (
@@ -120,7 +127,20 @@ async def search_library(
 ) -> schemas.SearchLibraryResponse:
     """Execute hybrid search and project results to the MCP schema."""
 
-    with _tool_instrumentation("search_library", request, end_user_id) as (
+    # Validate inputs
+    validated_user_id = validate_end_user_id(end_user_id)
+    validate_query(request.query)
+    validate_filters(request.filters)
+
+    # Enforce rate limiting
+    policy = get_read_security_policy()
+    try:
+        policy.enforce_rate_limit("search_library", validated_user_id)
+    except WriteSecurityError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    with _tool_instrumentation("search_library", request, validated_user_id) as (
         run_id,
         span,
     ):
@@ -190,7 +210,19 @@ async def aggregate_verses(
 ) -> schemas.AggregateVersesResponse:
     """Aggregate scripture text for the requested OSIS range."""
 
-    with _tool_instrumentation("aggregate_verses", request, end_user_id) as (
+    # Validate inputs
+    validated_user_id = validate_end_user_id(end_user_id)
+    validate_osis_reference(request.osis)
+
+    # Enforce rate limiting
+    policy = get_read_security_policy()
+    try:
+        policy.enforce_rate_limit("aggregate_verses", validated_user_id)
+    except WriteSecurityError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    with _tool_instrumentation("aggregate_verses", request, validated_user_id) as (
         run_id,
         span,
     ):
@@ -245,7 +277,20 @@ async def get_timeline(
 ) -> schemas.GetTimelineResponse:
     """Return aggregated timeline information for an OSIS passage."""
 
-    with _tool_instrumentation("get_timeline", request, end_user_id) as (
+    # Validate inputs
+    validated_user_id = validate_end_user_id(end_user_id)
+    validate_osis_reference(request.osis)
+    validate_filters(request.filters)
+
+    # Enforce rate limiting
+    policy = get_read_security_policy()
+    try:
+        policy.enforce_rate_limit("get_timeline", validated_user_id)
+    except WriteSecurityError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    with _tool_instrumentation("get_timeline", request, validated_user_id) as (
         run_id,
         span,
     ):
@@ -319,7 +364,22 @@ async def quote_lookup(
 ) -> schemas.QuoteLookupResponse:
     """Retrieve transcript quote snippets using fuzzy passage search."""
 
-    with _tool_instrumentation("quote_lookup", request, end_user_id) as (
+    # Validate inputs
+    validated_user_id = validate_end_user_id(end_user_id)
+    if request.osis:
+        validate_osis_reference(request.osis)
+    from ..validators import validate_array_length
+    validate_array_length(request.quote_ids, "quote_ids", max_length=50)
+
+    # Enforce rate limiting
+    policy = get_read_security_policy()
+    try:
+        policy.enforce_rate_limit("quote_lookup", validated_user_id)
+    except WriteSecurityError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    with _tool_instrumentation("quote_lookup", request, validated_user_id) as (
         run_id,
         span,
     ):
@@ -386,7 +446,18 @@ async def source_registry_list(
 ) -> schemas.SourceRegistryListResponse:
     """Return source registry entries backed by Theo documents."""
 
-    with _tool_instrumentation("source_registry_list", request, end_user_id) as (
+    # Validate inputs
+    validated_user_id = validate_end_user_id(end_user_id)
+
+    # Enforce rate limiting
+    policy = get_read_security_policy()
+    try:
+        policy.enforce_rate_limit("source_registry_list", validated_user_id)
+    except WriteSecurityError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    with _tool_instrumentation("source_registry_list", request, validated_user_id) as (
         run_id,
         span,
     ):

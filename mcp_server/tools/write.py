@@ -13,6 +13,14 @@ from opentelemetry import trace
 
 from .. import schemas
 from ..security import WriteSecurityError, get_write_security_policy
+from ..validators import (
+    validate_body_text,
+    validate_end_user_id,
+    validate_osis_reference,
+    validate_tenant_id,
+    validate_idempotency_key,
+    validate_array_length,
+)
 from .read import _session_scope
 from theo.services.api.app.models.jobs import HNSWRefreshJobRequest
 from theo.services.api.app.research.notes import (
@@ -100,22 +108,31 @@ async def note_write(
         str | None, Header(alias="X-Idempotency-Key")
     ] = None,
 ) -> schemas.NoteWriteResponse:
-    tenant_id = _normalize_header(tenant_id)
-    idempotency_key = _normalize_header(idempotency_key)
+    # Validate headers
+    validated_user_id = validate_end_user_id(end_user_id)
+    validated_tenant_id = validate_tenant_id(_normalize_header(tenant_id))
+    validated_idempotency_key = validate_idempotency_key(_normalize_header(idempotency_key))
+
+    # Validate request inputs
+    validate_osis_reference(request.osis)
+    validate_body_text(request.body)
+    validate_array_length(request.tags, "tags", max_length=20)
+    validate_array_length(request.evidences, "evidences", max_length=50)
+
     policy = get_write_security_policy()
     cached = policy.resolve_cached_response(
-        "note_write", request.commit, tenant_id, end_user_id, idempotency_key
+        "note_write", request.commit, validated_tenant_id, validated_user_id, validated_idempotency_key
     )
     if cached is not None:
         return cast(schemas.NoteWriteResponse, cached)
 
     try:
-        policy.ensure_allowed("note_write", request.commit, tenant_id, end_user_id)
-        policy.enforce_rate_limit("note_write", request.commit, tenant_id, end_user_id)
+        policy.ensure_allowed("note_write", request.commit, validated_tenant_id, validated_user_id)
+        policy.enforce_rate_limit("note_write", request.commit, validated_tenant_id, validated_user_id)
     except WriteSecurityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
-    with _write_instrumentation("note_write", request, end_user_id, tenant_id, idempotency_key) as (
+    with _write_instrumentation("note_write", request, validated_user_id, validated_tenant_id, validated_idempotency_key) as (
         run_id,
         span,
     ):
@@ -132,8 +149,8 @@ async def note_write(
                     evidences=request.evidences,
                     commit=True,
                     request_id=request.request_id,
-                    end_user_id=end_user_id,
-                    tenant_id=tenant_id,
+                    end_user_id=validated_user_id,
+                    tenant_id=validated_tenant_id,
                 )
                 response = schemas.NoteWriteResponse(
                     request_id=request.request_id,
@@ -164,9 +181,9 @@ async def note_write(
                 )
         span.set_attribute("tool.commit", response.commit)
 
-    if request.commit and idempotency_key:
+    if request.commit and validated_idempotency_key:
         policy.store_idempotent_response(
-            "note_write", tenant_id, end_user_id, idempotency_key, response
+            "note_write", validated_tenant_id, validated_user_id, validated_idempotency_key, response
         )
 
     return response
@@ -180,22 +197,25 @@ async def index_refresh(
         str | None, Header(alias="X-Idempotency-Key")
     ] = None,
 ) -> schemas.IndexRefreshResponse:
-    tenant_id = _normalize_header(tenant_id)
-    idempotency_key = _normalize_header(idempotency_key)
+    # Validate headers
+    validated_user_id = validate_end_user_id(end_user_id)
+    validated_tenant_id = validate_tenant_id(_normalize_header(tenant_id))
+    validated_idempotency_key = validate_idempotency_key(_normalize_header(idempotency_key))
+
     policy = get_write_security_policy()
     cached = policy.resolve_cached_response(
-        "index_refresh", request.commit, tenant_id, end_user_id, idempotency_key
+        "index_refresh", request.commit, validated_tenant_id, validated_user_id, validated_idempotency_key
     )
     if cached is not None:
         return cast(schemas.IndexRefreshResponse, cached)
 
     try:
-        policy.ensure_allowed("index_refresh", request.commit, tenant_id, end_user_id)
-        policy.enforce_rate_limit("index_refresh", request.commit, tenant_id, end_user_id)
+        policy.ensure_allowed("index_refresh", request.commit, validated_tenant_id, validated_user_id)
+        policy.enforce_rate_limit("index_refresh", request.commit, validated_tenant_id, validated_user_id)
     except WriteSecurityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
-    with _write_instrumentation("index_refresh", request, end_user_id, tenant_id, idempotency_key) as (
+    with _write_instrumentation("index_refresh", request, validated_user_id, validated_tenant_id, validated_idempotency_key) as (
         run_id,
         span,
     ):
@@ -234,9 +254,9 @@ async def index_refresh(
         if response.job:
             span.set_attribute("tool.job_id", response.job.get("id"))
 
-    if request.commit and idempotency_key:
+    if request.commit and validated_idempotency_key:
         policy.store_idempotent_response(
-            "index_refresh", tenant_id, end_user_id, idempotency_key, response
+            "index_refresh", validated_tenant_id, validated_user_id, validated_idempotency_key, response
         )
 
     return response
@@ -250,23 +270,33 @@ async def evidence_card_create(
         str | None, Header(alias="X-Idempotency-Key")
     ] = None,
 ) -> schemas.EvidenceCardCreateResponse:
-    tenant_id = _normalize_header(tenant_id)
-    idempotency_key = _normalize_header(idempotency_key)
+    # Validate headers
+    validated_user_id = validate_end_user_id(end_user_id)
+    validated_tenant_id = validate_tenant_id(_normalize_header(tenant_id))
+    validated_idempotency_key = validate_idempotency_key(_normalize_header(idempotency_key))
+
+    # Validate request inputs
+    validate_osis_reference(request.osis)
+    if request.claim_summary:
+        from ..validators import validate_string_length, MAX_QUERY_LENGTH
+        validate_string_length(request.claim_summary, "claim_summary", MAX_QUERY_LENGTH)
+    validate_array_length(request.tags, "tags", max_length=20)
+
     policy = get_write_security_policy()
     cached = policy.resolve_cached_response(
-        "evidence_card_create", request.commit, tenant_id, end_user_id, idempotency_key
+        "evidence_card_create", request.commit, validated_tenant_id, validated_user_id, validated_idempotency_key
     )
     if cached is not None:
         return cast(schemas.EvidenceCardCreateResponse, cached)
 
     try:
-        policy.ensure_allowed("evidence_card_create", request.commit, tenant_id, end_user_id)
-        policy.enforce_rate_limit("evidence_card_create", request.commit, tenant_id, end_user_id)
+        policy.ensure_allowed("evidence_card_create", request.commit, validated_tenant_id, validated_user_id)
+        policy.enforce_rate_limit("evidence_card_create", request.commit, validated_tenant_id, validated_user_id)
     except WriteSecurityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
     with _write_instrumentation(
-        "evidence_card_create", request, end_user_id, tenant_id, idempotency_key
+        "evidence_card_create", request, validated_user_id, validated_tenant_id, validated_idempotency_key
     ) as (run_id, span):
         with _session_scope() as session:
             if request.commit:
@@ -278,8 +308,8 @@ async def evidence_card_create(
                     tags=request.tags,
                     commit=True,
                     request_id=request.request_id,
-                    end_user_id=end_user_id,
-                    tenant_id=tenant_id,
+                    end_user_id=validated_user_id,
+                    tenant_id=validated_tenant_id,
                 )
                 response = schemas.EvidenceCardCreateResponse(
                     request_id=request.request_id,
@@ -309,9 +339,9 @@ async def evidence_card_create(
         if response.preview:
             span.set_attribute("tool.preview_tags", len(response.preview.get("tags", []) or []))
 
-    if request.commit and idempotency_key:
+    if request.commit and validated_idempotency_key:
         policy.store_idempotent_response(
-            "evidence_card_create", tenant_id, end_user_id, idempotency_key, response
+            "evidence_card_create", validated_tenant_id, validated_user_id, validated_idempotency_key, response
         )
 
     return response

@@ -26,6 +26,7 @@ _CITATION_ENTRY_PATTERN = re.compile(
 _SENTENCE_PATTERN = re.compile(r"[^.!?]*[.!?]|[^.!?]+$")
 
 _DISALLOWED_COMPLETION_PATTERNS: tuple[tuple[Pattern[str], str], ...] = (
+    # SQL injection patterns
     (
         re.compile(r"\bselect\b[^\n]+\bfrom\b", re.IGNORECASE),
         "SQL SELECT pattern",
@@ -37,11 +38,32 @@ _DISALLOWED_COMPLETION_PATTERNS: tuple[tuple[Pattern[str], str], ...] = (
         ),
         "SQL modification pattern",
     ),
+    (
+        re.compile(r";\s*(drop|delete|truncate)\b", re.IGNORECASE),
+        "SQL statement chaining",
+    ),
+    # XSS and script injection
     (re.compile(r"<\s*/?script\b", re.IGNORECASE), "script markup"),
+    (re.compile(r"<\s*/?iframe\b", re.IGNORECASE), "iframe markup"),
+    (re.compile(r"javascript\s*:", re.IGNORECASE), "javascript protocol"),
+    (re.compile(r"on\w+\s*=\s*[\"']", re.IGNORECASE), "inline event handler"),
+    # Credential leakage
     (re.compile(r"password\s*[:=]", re.IGNORECASE), "credential disclosure"),
-    (re.compile(r"api[-_\s]*key", re.IGNORECASE), "credential disclosure"),
-    (re.compile(r"access\s*token", re.IGNORECASE), "credential disclosure"),
-    (re.compile(r"secret\s*(?:key|token)", re.IGNORECASE), "credential disclosure"),
+    (re.compile(r"api[-_\s]*key\s*[:=]", re.IGNORECASE), "credential disclosure"),
+    (re.compile(r"access\s*token\s*[:=]", re.IGNORECASE), "credential disclosure"),
+    (re.compile(r"secret\s*(?:key|token)\s*[:=]", re.IGNORECASE), "credential disclosure"),
+    (re.compile(r"bearer\s+[a-zA-Z0-9_\-\.]{20,}", re.IGNORECASE), "bearer token"),
+    # Command injection
+    (re.compile(r"\$\(.*\)", re.IGNORECASE), "command substitution"),
+    (re.compile(r"`.*`"), "backtick command execution"),
+    (re.compile(r"&&|;|\||>\s*/", re.IGNORECASE), "shell metacharacters"),
+    # Path traversal
+    (re.compile(r"\.\./", re.IGNORECASE), "path traversal"),
+    (re.compile(r"\.\.\\", re.IGNORECASE), "path traversal (Windows)"),
+    # Prompt injection patterns
+    (re.compile(r"ignore\s+(previous|all)\s+instructions?", re.IGNORECASE), "prompt override"),
+    (re.compile(r"system\s*:\s*you\s+are", re.IGNORECASE), "system prompt injection"),
+    (re.compile(r"</\s*context\s*>", re.IGNORECASE), "context escape"),
 )
 
 
