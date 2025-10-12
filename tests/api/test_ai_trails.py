@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.services.api.app.ai.trails import TrailService
-from theo.services.api.app.core.database import Base
+from theo.application.facades.database import Base
 from theo.services.api.app.db.models import AgentTrail
 
 

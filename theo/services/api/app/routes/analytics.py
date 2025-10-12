@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..analytics.telemetry import record_client_telemetry, record_feedback_from_payload
-from ..core.database import get_session
+from theo.application.facades.database import get_session
 from ..models.analytics import FeedbackEventPayload, TelemetryBatch
 
 router = APIRouter()

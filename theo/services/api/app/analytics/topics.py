@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..core.settings_store import load_setting, save_setting
+from theo.application.facades.settings_store import load_setting, save_setting
 from ..db.models import Document
 from ..models.base import APIModel
 from .openalex import OpenAlexClient

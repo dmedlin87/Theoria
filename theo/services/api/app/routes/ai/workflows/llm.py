@@ -11,7 +11,7 @@ from theo.services.api.app.ai.registry import (
     get_llm_registry,
     save_llm_registry,
 )
-from theo.services.api.app.core.database import get_session
+from theo.application.facades.database import get_session
 from theo.services.api.app.models.ai import (
     LLMDefaultRequest,
     LLMModelRequest,

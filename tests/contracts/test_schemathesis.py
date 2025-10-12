@@ -26,7 +26,7 @@ from theo.services.api.app.ai.registry import (  # noqa: E402
     LLMRegistry,
     save_llm_registry,
 )
-from theo.services.api.app.core.database import (  # noqa: E402
+from theo.application.facades.database import (  # noqa: E402
     Base,
     configure_engine,
     get_engine,

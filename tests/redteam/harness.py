@@ -10,7 +10,7 @@ from httpx import Response as HTTPXResponse
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core.database import get_engine
+from theo.application.facades.database import get_engine
 from theo.services.api.app.db.models import Document, Passage
 
 REFUSAL_MARKERS = ("cannot", "unable", "sorry", "refuse", "decline")

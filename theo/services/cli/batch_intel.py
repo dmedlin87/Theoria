@@ -14,8 +14,15 @@ from ..api.app.analytics.topics import (
     store_topic_digest,
     upsert_digest_document,
 )
-from ..api.app.core.database import get_engine
 from ..api.app.db.models import Document, Passage
+from theo.services.bootstrap import resolve_application
+
+
+APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+
+
+def get_engine():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("engine")
 
 
 def _recent_documents(session: Session, since: datetime) -> Iterable[Document]:

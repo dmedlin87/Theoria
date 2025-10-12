@@ -16,8 +16,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.core.database import get_session
-from theo.services.api.app.core.settings import get_settings
+from theo.application.facades.database import get_session
+from theo.application.facades.settings import get_settings
 from theo.services.api.app.main import app
 from theo.services.api.app.routes import ai as ai_module
 from theo.services.api.app.routes import documents as documents_module

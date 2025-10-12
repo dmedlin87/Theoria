@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 from theo.services.api.app.ai import run_guarded_chat
 from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer, ensure_completion_safe
 from theo.services.api.app.ai.trails import TrailService
-from theo.services.api.app.core.database import get_session
-from theo.services.api.app.core.settings import get_settings
+from theo.application.facades.database import get_session
+from theo.application.facades.settings import get_settings
 from theo.services.api.app.db.models import ChatSession
 from theo.services.api.app.intent.tagger import get_intent_tagger
 from theo.services.api.app.models.ai import (

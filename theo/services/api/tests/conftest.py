@@ -47,8 +47,8 @@ def configure_test_environment(
     for key, value in env_overrides.items():
         os.environ[key] = value
 
-    from theo.services.api.app.core import settings as settings_module
-    from theo.services.api.app.core.database import Base, configure_engine
+    from theo.application.facades import settings as settings_module
+    from theo.application.facades.database import Base, configure_engine
 
     settings_module.get_settings.cache_clear()
     settings = settings_module.get_settings()

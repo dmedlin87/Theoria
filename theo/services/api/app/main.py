@@ -20,9 +20,9 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
-from .core.database import Base, get_engine
-from .core.runtime import allow_insecure_startup
-from .core.settings import get_settings
+from theo.application.facades.database import Base, get_engine
+from theo.application.facades.runtime import allow_insecure_startup
+from theo.application.facades.settings import get_settings
 from .db.run_sql_migrations import run_sql_migrations
 from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware

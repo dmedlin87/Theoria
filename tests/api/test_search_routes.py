@@ -7,7 +7,7 @@ import joblib  # type: ignore[import]
 import pytest
 from fastapi.testclient import TestClient
 
-from theo.services.api.app.core.settings import get_settings
+from theo.application.facades.settings import get_settings
 from theo.services.api.app.main import app
 from theo.services.api.app.models.search import HybridSearchResult
 from theo.services.api.app.routes import search as search_route

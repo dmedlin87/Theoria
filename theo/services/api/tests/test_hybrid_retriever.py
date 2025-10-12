@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core.database import get_engine
+from theo.application.facades.database import get_engine
 from theo.services.api.app.db.models import Document, DocumentAnnotation, Passage
 from theo.services.api.app.models.documents import DocumentAnnotationResponse
 from theo.services.api.app.models.search import HybridSearchRequest

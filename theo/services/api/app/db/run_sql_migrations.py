@@ -15,7 +15,7 @@ from typing import Iterable
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from ..core.database import get_engine
+from theo.application.facades.database import get_engine
 from .models import AppSetting
 
 logger = logging.getLogger(__name__)

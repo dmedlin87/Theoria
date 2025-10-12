@@ -12,8 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.core import database as database_module  # noqa: E402
-from theo.services.api.app.core.database import (  # noqa: E402
+from theo.application.facades import database as database_module  # noqa: E402
+from theo.application.facades.database import (  # noqa: E402
     Base,
     configure_engine,
     get_engine,

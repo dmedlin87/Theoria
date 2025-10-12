@@ -29,7 +29,7 @@ from theo.services.api.app.ai.rag import (
     VerseCopilotResponse,
 )
 from theo.services.api.app.ai.trails import TrailService
-from theo.services.api.app.core.database import get_session
+from theo.application.facades.database import get_session
 from theo.services.api.app.models.ai import (
     CollaborationRequest,
     ComparativeAnalysisRequest,

@@ -9,8 +9,8 @@ from typing import Any, Iterable
 from cryptography.fernet import InvalidToken
 from sqlalchemy.orm import Session
 
-from ..core.settings import get_settings, get_settings_cipher
-from ..core.settings_store import load_setting, save_setting
+from theo.application.facades.settings import get_settings, get_settings_cipher
+from theo.application.facades.settings_store import load_setting, save_setting
 from .clients import GenerationError, LanguageModelClient, build_client
 
 SETTINGS_KEY = "llm"

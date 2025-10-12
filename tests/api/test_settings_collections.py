@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.core.settings import Settings
+from theo.application.facades.settings import Settings
 
 
 def test_ingest_string_collections_strip_and_filter_blank_entries(monkeypatch: pytest.MonkeyPatch) -> None:

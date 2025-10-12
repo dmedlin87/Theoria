@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core.database import get_session
-from theo.services.api.app.core.settings_store import load_setting, save_setting
+from theo.application.facades.database import get_session
+from theo.application.facades.settings_store import load_setting, save_setting
 from theo.services.api.app.models.ai import ProviderSettingsRequest, ProviderSettingsResponse
 
 router = APIRouter(prefix="/settings/ai", tags=["ai-settings"])

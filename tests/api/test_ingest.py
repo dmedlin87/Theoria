@@ -16,8 +16,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.core.database import get_session  # noqa: E402
-from theo.services.api.app.core.settings import Settings  # noqa: E402
+from theo.application.facades.database import get_session  # noqa: E402
+from theo.application.facades.settings import Settings  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
 from theo.services.api.app.services import ingestion_service as ingestion_service_module  # noqa: E402

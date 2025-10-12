@@ -29,13 +29,13 @@ def _configure_environment(database_url: str | None, api_key: str) -> None:
     if database_url:
         os.environ["DATABASE_URL"] = database_url
 
-    from theo.services.api.app.core import settings as settings_module
+    from theo.application.facades import settings as settings_module
 
     settings_module.get_settings.cache_clear()
 
 
 def _load_settings():
-    from theo.services.api.app.core.settings import get_settings
+    from theo.application.facades.settings import get_settings
 
     return get_settings()
 
@@ -83,7 +83,7 @@ def _seed_reference_data(engine: Engine) -> None:
 
 
 def _reset_schema(engine: Engine) -> None:
-    from theo.services.api.app.core.database import Base
+    from theo.application.facades.database import Base
 
     logging.info("Dropping existing tables")
     Base.metadata.drop_all(bind=engine)
@@ -154,7 +154,7 @@ def main() -> None:
     _configure_environment(args.database_url, args.api_key)
     settings = _load_settings()
 
-    from theo.services.api.app.core.database import configure_engine
+    from theo.application.facades.database import configure_engine
 
     engine = configure_engine(settings.database_url)
 

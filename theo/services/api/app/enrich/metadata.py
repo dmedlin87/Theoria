@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 
 from sqlalchemy.orm import Session
 
-from ..core.settings import get_settings
+from theo.application.facades.settings import get_settings
 from ..db.models import Document
 
 LOGGER = logging.getLogger(__name__)

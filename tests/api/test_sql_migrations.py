@@ -13,9 +13,9 @@ from sqlalchemy import event
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core import database as database_module
-from theo.services.api.app.core.database import Base, configure_engine, get_engine
-from theo.services.api.app.core.settings import get_settings
+from theo.application.facades import database as database_module
+from theo.application.facades.database import Base, configure_engine, get_engine
+from theo.application.facades.settings import get_settings
 from theo.services.api.app.db import seeds as seeds_module
 from theo.services.api.app.db.models import AppSetting
 from theo.services.api.app.main import app

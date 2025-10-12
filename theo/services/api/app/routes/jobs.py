@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..core.database import get_session
+from theo.application.facades.database import get_session
 from ..db.models import Document, IngestionJob
 from ..models.jobs import (
     CitationValidationJobRequest,

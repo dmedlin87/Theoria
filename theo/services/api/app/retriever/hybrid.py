@@ -11,7 +11,7 @@ from opentelemetry import trace
 from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session
 
-from ..core.settings import get_settings
+from theo.application.facades.settings import get_settings
 from ..db.models import Document, Passage
 from ..db.types import VectorType
 from ..ingest.embeddings import get_embedding_service
