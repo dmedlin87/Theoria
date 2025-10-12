@@ -362,6 +362,59 @@ def test_simple_ingest_rejects_bad_source(
     assert "does not exist" in payload["error"]["message"]
 
 
+def test_simple_ingest_allows_remote_sources_without_allowlist(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+) -> None:
+    settings = Settings()
+    settings.simple_ingest_allowed_roots = []
+    monkeypatch.setattr(ingest_module, "get_settings", lambda: settings)
+
+    custom_service = ingestion_service_module.IngestionService(
+        settings=settings,
+        run_file_pipeline=ingestion_service_module.run_pipeline_for_file,
+        run_url_pipeline=ingestion_service_module.run_pipeline_for_url,
+        run_transcript_pipeline=ingestion_service_module.run_pipeline_for_transcript,
+        cli_module=ingestion_service_module.cli_ingest,
+        log_workflow=lambda *a, **k: None,
+    )
+    app.dependency_overrides[
+        ingestion_service_module.get_ingestion_service
+    ] = lambda: custom_service
+
+    def fake_ingest(
+        batch, overrides, post_batch_steps, *, dependencies=None
+    ):  # noqa: ANN001 - test helper
+        assert all(item.is_remote for item in batch)
+        return ["doc-1"]
+
+    monkeypatch.setattr(
+        ingestion_service_module.cli_ingest,
+        "_ingest_batch_via_api",
+        fake_ingest,
+    )
+
+    try:
+        with api_client.stream(
+            "POST",
+            "/ingest/simple",
+            json={"sources": ["https://example.com/seed"]},
+        ) as response:
+            assert response.status_code == status.HTTP_200_OK
+            payload = [line for line in response.iter_lines() if line]
+    finally:
+        app.dependency_overrides.pop(
+            ingestion_service_module.get_ingestion_service, None
+        )
+
+    events = [json.loads(line) for line in payload]
+    assert any(event.get("event") == "processed" for event in events)
+    assert all(
+        event.get("remote") is True
+        for event in events
+        if event.get("event") == "discovered"
+    )
+
+
 def test_simple_ingest_rejects_local_sources_without_allowlist(
     monkeypatch: pytest.MonkeyPatch, api_client: TestClient, tmp_path: Path
 ) -> None:
