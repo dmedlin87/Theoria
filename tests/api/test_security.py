@@ -116,6 +116,15 @@ def _client_context(monkeypatch):
 
     app.dependency_overrides[get_session] = _override_session
     try:
+        monkeypatch.setattr(
+            "theo.services.api.app.main.run_sql_migrations",
+            lambda *args, **kwargs: [],
+        )
+        monkeypatch.setattr(
+            "theo.services.api.app.main.seed_reference_data",
+            lambda *args, **kwargs: None,
+        )
+
         def _fake_pipeline(session, url, **kwargs):  # noqa: ANN001 - signature controlled by patch
             class _Doc:
                 id = "doc-1"
