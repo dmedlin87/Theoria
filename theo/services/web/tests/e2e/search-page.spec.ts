@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures/error-guard";
 const SEARCH_API_ROUTE = "**/api/search**";
 
 test.describe("Search page interactions", () => {
-  test("shows a loading status while awaiting results", async ({ page }) => {
+  test("@smoke shows a loading status while awaiting results", async ({ page }) => {
     let releaseSearch: () => void = () => {};
     const pending = new Promise<void>((resolve) => {
       releaseSearch = resolve;

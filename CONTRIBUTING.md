@@ -33,27 +33,29 @@ Testing is being standardised in phases. Until the unified Make targets land, yo
   ```bash
   pytest -q
   ```
-  This command will evolve to include coverage (`--cov --cov-branch`) once thresholds are enforced.
+  To exercise the pgvector-backed flows locally, add `--use-pgvector` (or set `PYTEST_USE_PGVECTOR=1`) so the shared Testcontainer fixtures bootstrap Postgres + pgvector and apply migrations once per session.
 
-- **Celery worker tests** (placeholder)
+- **Celery worker property tests**
   ```bash
-  pytest -q tests/workers
+  pytest -q theo/services/api/tests/workers
   ```
-  A dedicated `celery` marker and live-worker toggle will be added alongside the new fixtures.
+  The suite validates retry backoff and ingestion job idempotency with Hypothesis-based scenarios.
 
 - **Frontend unit tests**
   ```bash
   cd theo/services/web
-  npm test
+  npm test          # legacy Jest assertions
+  npm run test:vitest  # Vitest + coverage thresholds
   ```
-  The migration to Vitest + Testing Library is tracked in the testing roadmap.
+  Vitest aggregates V8 coverage and enforces the configured thresholds; Jest remains for backwards compatibility during the migration window.
 
 - **Playwright E2E**
   ```bash
   cd theo/services/web
-  npx playwright test
+  npm run test:e2e:smoke  # tagged fast journeys (CI default)
+  npm run test:e2e:full   # full regression matrix with traces
   ```
-  Smoke vs full suites will be tagged (`@smoke`, `@full`) in upcoming work.
+  The smoke suite runs tests tagged with `@smoke` while the full run covers both `@smoke` and `@full` journeys, retaining traces and screenshots for failures.
 
 Once the Makefile façade is introduced the following convenience commands will be available:
 - `make test` – run everything (Python + frontend + E2E as applicable).

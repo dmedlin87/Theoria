@@ -7,10 +7,13 @@
     "build": "next build",
     "start": "next start",
     "test": "THEO_AUTH_ALLOW_ANONYMOUS=1 jest",
+    "test:vitest": "vitest run --coverage",
     "lint": "npm run lint:eslint && npm run lint:types",
     "lint:eslint": "eslint . --ext .ts,.tsx --max-warnings=0",
     "lint:types": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test --reporter=line,html",
+    "test:e2e:smoke": "playwright test --grep @smoke --reporter=line,html",
+    "test:e2e:full": "playwright test --reporter=line,html"
   },
   "dependencies": {
     "d3": "^7.9.0",
@@ -42,6 +45,8 @@
     "openapi-typescript": "^7.9.1",
     "ts-jest": "29.4.5",
     "typescript": "5.7.2",
-    "undici": "7.16.0"
+    "undici": "7.16.0",
+    "@vitest/coverage-v8": "2.1.5",
+    "vitest": "2.1.5"
   }
 }

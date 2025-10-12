@@ -24,17 +24,31 @@ from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 from theo.services.api.app.security import require_principal
 
 
+def _use_pgvector_backend(request: pytest.FixtureRequest) -> bool:
+    return bool(
+        request.config.getoption("use_pgvector")
+        or os.environ.get("PYTEST_USE_PGVECTOR")
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def configure_test_environment(
     tmp_path_factory: pytest.TempPathFactory,
+    request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
     """Configure database and storage paths for tests."""
 
+    use_pgvector = _use_pgvector_backend(request)
     db_path = tmp_path_factory.mktemp("db") / "test.db"
     storage_root = tmp_path_factory.mktemp("storage")
 
+    if use_pgvector:
+        database_url: str = request.getfixturevalue("pgvector_migrated_database_url")
+    else:
+        database_url = f"sqlite:///{db_path}"
+
     env_overrides = {
-        "DATABASE_URL": f"sqlite:///{db_path}",
+        "DATABASE_URL": database_url,
         "STORAGE_ROOT": str(storage_root),
         "FIXTURES_ROOT": str(PROJECT_ROOT / "fixtures"),
         "INGEST_URL_BLOCK_PRIVATE_NETWORKS": "false",
@@ -61,8 +75,9 @@ def configure_test_environment(
         yield
     finally:
         Base.metadata.drop_all(bind=engine)
+        engine.dispose()
         shutil.rmtree(storage_root, ignore_errors=True)
-        if db_path.exists():
+        if not use_pgvector and db_path.exists():
             db_path.unlink()
         for key, value in original_env.items():
             if value is None:

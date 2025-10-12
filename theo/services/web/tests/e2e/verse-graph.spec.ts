@@ -114,7 +114,7 @@ const OVERVIEW_RESPONSE = {
 };
 
 test.describe("Verse relationship graph", () => {
-  test("renders network and supports filtering", async ({ page }) => {
+  test("@full renders network and supports filtering", async ({ page }) => {
     await page.route("**/features/discovery", async (route) => {
       await route.fulfill({
         status: 200,

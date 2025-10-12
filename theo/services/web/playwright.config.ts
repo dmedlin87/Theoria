@@ -11,12 +11,17 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
-  reporter: "list",
+  reporter: [
+    ["github"],
+    ["html", { open: "never", outputFolder: "playwright-report" }],
+  ],
   use: {
     baseURL: "http://127.0.0.1:3000",
-    trace: "on",
-    video: "off",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
   },
+  outputDir: "playwright-artifacts",
   projects: [
     {
       name: "chromium",

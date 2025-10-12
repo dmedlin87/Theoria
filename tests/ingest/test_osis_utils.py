@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from pythonbible import Book, NormalizedReference, convert_reference_to_verse_ids
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from hypothesis.strategies import composite
+from pythonbible import (
+    Book,
+    NormalizedReference,
+    convert_reference_to_verse_ids,
+    convert_verse_ids_to_references,
+    get_number_of_chapters,
+    get_number_of_verses,
+)
 
 from theo.services.api.app.ingest.osis import (
     DetectedOsis,
@@ -29,6 +39,60 @@ def build_reference(
         end_verse=end_verse,
         end_book=None,
     )
+
+
+@composite
+def normalized_references(draw: st.DrawFn) -> NormalizedReference:
+    book = draw(st.sampled_from(list(Book)))
+    max_chapter = get_number_of_chapters(book)
+    start_chapter = draw(st.integers(min_value=1, max_value=max_chapter))
+    start_max_verse = get_number_of_verses(book, start_chapter)
+    start_verse = draw(st.integers(min_value=1, max_value=start_max_verse))
+
+    end_chapter = draw(st.integers(min_value=start_chapter, max_value=max_chapter))
+    end_min_verse = 1 if end_chapter != start_chapter else start_verse
+    end_max_verse = get_number_of_verses(book, end_chapter)
+    end_verse = draw(st.integers(min_value=end_min_verse, max_value=end_max_verse))
+
+    return NormalizedReference(
+        book=book,
+        start_chapter=start_chapter,
+        start_verse=start_verse,
+        end_chapter=end_chapter,
+        end_verse=end_verse,
+        end_book=None,
+    )
+
+
+@composite
+def contiguous_reference_groups(
+    draw: st.DrawFn,
+) -> tuple[NormalizedReference, list[NormalizedReference]]:
+    reference = draw(normalized_references())
+    verse_ids = list(convert_reference_to_verse_ids(reference))
+    if len(verse_ids) <= 1:
+        return reference, [reference]
+
+    split_points = draw(
+        st.lists(
+            st.integers(min_value=1, max_value=len(verse_ids) - 1),
+            unique=True,
+            max_size=min(len(verse_ids) - 1, 4),
+        )
+    )
+    split_points.sort()
+    slices = [0, *split_points, len(verse_ids)]
+
+    segments: list[NormalizedReference] = []
+    for start, end in zip(slices, slices[1:]):
+        segment_ids = verse_ids[start:end]
+        if not segment_ids:
+            continue
+        segments.extend(convert_verse_ids_to_references(list(segment_ids)))
+
+    if not segments:
+        segments = [reference]
+    return reference, segments
 
 
 def test_format_osis_handles_single_verse_and_ranges() -> None:
@@ -96,3 +160,42 @@ def test_detect_osis_references_combines_primary() -> None:
 
     empty = detect_osis_references("no scripture here")
     assert empty == DetectedOsis(primary=None, all=[])
+
+
+@given(normalized_references())
+@settings(max_examples=40)
+def test_expand_roundtrip_matches_pythonbible(reference: NormalizedReference) -> None:
+    osis_value = format_osis(reference)
+    expected_ids = frozenset(convert_reference_to_verse_ids(reference))
+    assert expand_osis_reference(osis_value) == expected_ids
+
+
+@given(contiguous_reference_groups())
+@settings(max_examples=40)
+def test_combine_references_stabilises_contiguous_sequences(
+    data: tuple[NormalizedReference, list[NormalizedReference]]
+) -> None:
+    reference, segments = data
+    combined = combine_references(segments)
+    expected_ids = tuple(convert_reference_to_verse_ids(reference))
+    if combined is not None:
+        assert tuple(convert_reference_to_verse_ids(combined)) == expected_ids
+    else:
+        flattened = []
+        for segment in segments:
+            flattened.extend(convert_reference_to_verse_ids(segment))
+        assert tuple(sorted(flattened)) == expected_ids
+
+
+@given(normalized_references())
+@settings(max_examples=25)
+def test_detect_references_from_human_readable_round_trip(
+    reference: NormalizedReference,
+) -> None:
+    osis_value = format_osis(reference)
+    readable = _osis_to_readable(osis_value)
+    detected = detect_osis_references(readable)
+    assert osis_value in detected.all
+    if detected.primary:
+        expanded_primary = expand_osis_reference(detected.primary)
+        assert expand_osis_reference(osis_value).issubset(expanded_primary)
