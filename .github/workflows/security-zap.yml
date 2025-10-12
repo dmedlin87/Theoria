@@ -40,9 +40,6 @@ jobs:
           target: ${{ env.STAGING_API_BASE_URL }}
           cmd_options: '-J zap-baseline-report.json -r zap-baseline-report.html -w zap-baseline-warn.md'
 
-      - name: Fail on high severity alerts
-        run: python scripts/security/zap_severity_gate.py zap-baseline-report.json --fail-on high
-
       - name: Convert ZAP report to SARIF
         run: python scripts/security/zap_to_sarif.py zap-baseline-report.json zap-baseline-report.sarif
 
@@ -63,3 +60,7 @@ jobs:
             zap-baseline-warn.md
             zap-baseline-report.sarif
           if-no-files-found: warn
+
+      - name: Fail on high severity alerts
+        if: always()
+        run: python scripts/security/zap_severity_gate.py zap-baseline-report.json --fail-on high
