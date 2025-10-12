@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useState, useTransition, useEffect } from "react";
+import {
+  type ReactNode,
+  useState,
+  useTransition,
+  useEffect,
+  useRef,
+} from "react";
 
 export type AppShellNavItem = {
   href: string;
@@ -45,6 +51,64 @@ export function AppShell({
   const [isPending, startTransition] = useTransition();
   const [clickedHref, setClickedHref] = useState<string | null>(null);
   const [navigationStatus, setNavigationStatus] = useState<string>("");
+  const [isMobileNav, setIsMobileNav] = useState(false);
+  const [isNavOpen, setIsNavOpen] = useState(true);
+  const navContentRef = useRef<HTMLDivElement | null>(null);
+  const navToggleRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1024px)");
+
+    const updateMatches = () => {
+      setIsMobileNav(mediaQuery.matches);
+    };
+
+    updateMatches();
+
+    mediaQuery.addEventListener("change", updateMatches);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateMatches);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isMobileNav) {
+      setIsNavOpen(false);
+    } else {
+      setIsNavOpen(true);
+    }
+  }, [isMobileNav]);
+
+  useEffect(() => {
+    if (!isMobileNav) return;
+
+    if (isNavOpen) {
+      const firstFocusable = navContentRef.current?.querySelector<HTMLElement>(
+        "a, button, [tabindex]:not([tabindex='-1'])",
+      );
+      firstFocusable?.focus();
+    } else {
+      navToggleRef.current?.focus();
+    }
+  }, [isMobileNav, isNavOpen]);
+
+  useEffect(() => {
+    if (!isMobileNav || !isNavOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsNavOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileNav, isNavOpen]);
 
   const handleLinkClick = (href: string, e: React.MouseEvent<HTMLAnchorElement>, label: string) => {
     // Allow default Link behavior for cmd/ctrl clicks
@@ -53,6 +117,10 @@ export function AppShell({
     e.preventDefault();
     setClickedHref(href);
     setNavigationStatus(`Navigating to ${label}`);
+    if (isMobileNav) {
+      setIsNavOpen(false);
+      navToggleRef.current?.focus();
+    }
     startTransition(() => {
       router.push(href);
     });
@@ -81,45 +149,68 @@ export function AppShell({
           <span className="app-shell-v2__brand-name">Theoria</span>
           <span className="app-shell-v2__brand-tagline">Research workspace</span>
         </Link>
-        <nav className="app-shell-v2__nav-groups" aria-label="Primary">
-          {navSections.map((section) => (
-            <div key={section.label} className="app-shell-v2__nav-group">
-              <p className="app-shell-v2__nav-label">{section.label}</p>
-              <ul className="app-shell-v2__nav-list">
-                {section.items.map((item) => {
-                  const isActive = item.match
-                    ? pathname.startsWith(item.match)
-                    : pathname === item.href;
-                  const isLoading = clickedHref === item.href && isPending;
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        prefetch={true}
-                        className={
-                          isActive
-                            ? "app-shell-v2__nav-link is-active"
-                            : isLoading
-                            ? "app-shell-v2__nav-link is-loading"
-                            : "app-shell-v2__nav-link"
-                        }
-                        aria-current={isActive ? "page" : undefined}
-                        aria-disabled={isLoading}
-                        onClick={(e) => handleLinkClick(item.href, e, item.label)}
-                      >
-                        {item.label}
-                        {isLoading && (
-                          <span className="nav-loading-spinner" aria-hidden="true" />
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </nav>
-        <div className="app-shell-v2__mode">{modeSwitcher}</div>
+        <button
+          type="button"
+          className="app-shell-v2__nav-toggle"
+          aria-expanded={!isMobileNav || isNavOpen}
+          aria-controls="app-shell-v2-nav-content"
+          onClick={() => setIsNavOpen((open) => !open)}
+          ref={navToggleRef}
+        >
+          <span className="app-shell-v2__nav-toggle-icon" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span>{isNavOpen || !isMobileNav ? "Hide navigation" : "Show navigation"}</span>
+        </button>
+        <div
+          id="app-shell-v2-nav-content"
+          className="app-shell-v2__nav-content"
+          data-open={!isMobileNav || isNavOpen}
+          aria-hidden={isMobileNav && !isNavOpen}
+          ref={navContentRef}
+        >
+          <nav className="app-shell-v2__nav-groups" aria-label="Primary">
+            {navSections.map((section) => (
+              <div key={section.label} className="app-shell-v2__nav-group">
+                <p className="app-shell-v2__nav-label">{section.label}</p>
+                <ul className="app-shell-v2__nav-list">
+                  {section.items.map((item) => {
+                    const isActive = item.match
+                      ? pathname.startsWith(item.match)
+                      : pathname === item.href;
+                    const isLoading = clickedHref === item.href && isPending;
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          prefetch={true}
+                          className={
+                            isActive
+                              ? "app-shell-v2__nav-link is-active"
+                              : isLoading
+                              ? "app-shell-v2__nav-link is-loading"
+                              : "app-shell-v2__nav-link"
+                          }
+                          aria-current={isActive ? "page" : undefined}
+                          aria-disabled={isLoading}
+                          onClick={(e) => handleLinkClick(item.href, e, item.label)}
+                        >
+                          {item.label}
+                          {isLoading && (
+                            <span className="nav-loading-spinner" aria-hidden="true" />
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </nav>
+          <div className="app-shell-v2__mode">{modeSwitcher}</div>
+        </div>
       </aside>
       <div className="app-shell-v2__workspace">
         <div className="app-shell-v2__command-bar" role="banner">

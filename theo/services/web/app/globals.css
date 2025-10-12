@@ -169,6 +169,57 @@ textarea {
   -webkit-backdrop-filter: blur(var(--blur-md));
 }
 
+.app-shell-v2__nav-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.app-shell-v2__nav-toggle {
+  display: none;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-nav-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-base),
+    color var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.app-shell-v2__nav-toggle:hover,
+.app-shell-v2__nav-toggle:focus-visible {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-shell-v2__nav-toggle:focus-visible {
+  outline: none;
+}
+
+.app-shell-v2__nav-toggle-icon {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app-shell-v2__nav-toggle-icon span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  border-radius: var(--radius-pill);
+  transition: transform var(--transition-base), opacity var(--transition-base);
+}
+
 .app-shell-v2__brand {
   display: flex;
   flex-direction: column;
@@ -472,23 +523,50 @@ textarea {
   .app-shell-v2__nav {
     position: sticky;
     top: 0;
-    flex-direction: row;
+    flex-direction: column;
     align-items: stretch;
-    gap: var(--space-3);
+    gap: var(--space-2);
     min-height: auto;
-    padding: var(--space-3) var(--space-3) var(--space-2);
+    padding: var(--space-3);
     border-right: none;
     border-bottom: 1px solid var(--color-nav-border);
-    overflow-x: auto;
+    width: 100%;
+    z-index: 10;
+  }
+
+  .app-shell-v2__nav-toggle {
+    display: inline-flex;
+  }
+
+  .app-shell-v2__nav-content {
+    width: 100%;
+    gap: var(--space-3);
+    max-height: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    overflow: hidden;
+    transform: translateY(-0.5rem);
+    transition: max-height var(--transition-base), opacity var(--transition-base),
+      transform var(--transition-base);
+  }
+
+  .app-shell-v2__nav-content[data-open="true"] {
+    max-height: 100vh;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    overflow: visible;
+    transform: translateY(0);
   }
 
   .app-shell-v2__nav-groups {
-    flex-direction: row;
-    gap: var(--space-3);
+    flex-direction: column;
+    gap: var(--space-2);
   }
 
   .app-shell-v2__mode {
-    min-width: 260px;
+    width: 100%;
   }
 
   .app-shell-v2__command-bar {
