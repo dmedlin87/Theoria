@@ -15,6 +15,9 @@ export default defineConfig({
         statements: 80,
         branches: 80,
       },
+      all: true,
+      include: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
+      exclude: ["tests/**"],
     },
   },
 });

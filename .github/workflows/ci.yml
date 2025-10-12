@@ -76,8 +76,20 @@ jobs:
         working-directory: theo/services/web
         run: npm run test:e2e:smoke
 
+      - name: Run Playwright full suite
+        working-directory: theo/services/web
+        run: npm run test:e2e:full
+
       - name: Run pytest suite
-        run: pytest
+        run: pytest --cov=theo --cov=tests --cov-report=xml --cov-report=term --cov-fail-under=80
+
+      - name: Upload pytest coverage report
+        if: always()
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: pytest-coverage
+          path: coverage.xml
+          if-no-files-found: error
 
       - name: Enforce critical coverage thresholds
         run: python scripts/security/verify_critical_coverage.py
