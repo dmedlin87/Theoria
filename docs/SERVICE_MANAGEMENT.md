@@ -20,6 +20,9 @@ The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestr
 - Service uptime monitoring
 - Health check success rate calculation
 - Optional live status dashboard
+- Prometheus-compatible `/metrics` endpoint (default `http://localhost:9101/metrics`)
+- Metrics export file (`metrics/service_metrics.prom`) for integrations without HTTP access
+- Optional CPU and memory sampling when profiling is enabled
 
 ### 📝 Structured Logging
 
@@ -34,6 +37,8 @@ The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestr
 - HTTP timeout protection
 - Connection failure detection
 - Job state monitoring
+- Per-service health intervals configurable in `scripts/service-config.json`
+- Support for overriding health endpoints on a per-deployment-slot basis
 
 ### 🎨 Developer Experience
 
@@ -41,6 +46,9 @@ The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestr
 - Session summaries on shutdown
 - Verbose mode for troubleshooting
 - Graceful shutdown with uptime reporting
+- Cross-platform launcher (`scripts/start-theoria.sh`) for macOS/Linux developers
+- Docker definition in `infra/service-manager/` to run the entire stack in containers
+- Lightweight React dashboard (`dashboard/index.html`) that consumes manager metrics
 
 ## Usage
 
@@ -68,6 +76,9 @@ The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestr
 
 # Full monitoring setup
 .\start-theoria.ps1 -Verbose -LogToFile -ShowMetrics
+
+# Switch to green deployment slot and enable profiling with alerts
+.\start-theoria.ps1 -ActiveDeploymentColor green -EnableProfiling -EnableAlerts
 ```
 
 ## Architecture
@@ -142,7 +153,7 @@ The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestr
 
 ## Configuration
 
-### Script Variables
+### Script Variables & Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -152,6 +163,31 @@ The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestr
 | `$MaxRestartAttempts` | 3 | Maximum auto-restart attempts |
 | `$RestartCooldown` | 5s | Base cooldown before retry |
 | `$HealthCheckTimeout` | 5s | HTTP request timeout |
+
+Additional capabilities are managed in `scripts/service-config.json`:
+
+| Field | Description |
+|-------|-------------|
+| `services[].healthIntervalSeconds` | Interval for each service health poll |
+| `services[].deployment.slots` | Blue/green deployment targets with dedicated ports and health URLs |
+| `services[].dependencies` | Other services that must be healthy before startup |
+| `alerts` | Email and Slack webhook definitions for automatic paging |
+| `metrics` | HTTP port and export file destination for Prometheus metrics |
+| `profiling.enabled` | Enables CPU/memory sampling exposed in the console and metrics |
+
+Override the active color with `-ActiveDeploymentColor green` or set metrics/alert toggles via CLI switches. The manager now halts startup when required dependencies are unavailable.
+
+### Dashboard & Visualizations
+
+- Run the React dashboard by serving `dashboard/` with any static server (for example `npx serve dashboard`).
+- Configure a custom metrics URL by setting `window.METRICS_URL` before the React app loads (defaults to `http://localhost:9101/metrics`).
+- The dashboard displays health, latency, restart counts, and profiling data updated every 5 seconds.
+
+### Docker & Cross-Platform Tooling
+
+- `scripts/start-theoria.sh` wraps the PowerShell launcher so macOS/Linux users can start the stack via Bash.
+- `infra/service-manager/Dockerfile` builds a container image with all dependencies ready to launch the service orchestrator.
+- `infra/service-manager/docker-compose.yml` provides a compose target that exposes API, web, and metrics ports for easy local orchestration.
 
 ### Service State Tracking
 
