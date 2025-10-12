@@ -6,6 +6,14 @@ adapters can be swapped without modifying business workflows.
 """
 
 from .interfaces import CommandService, QueryService
+from .research import ReportSection, ResearchReport, ResearchService
 from .services import ApplicationContainer
 
-__all__ = ["CommandService", "QueryService", "ApplicationContainer"]
+__all__ = [
+    "CommandService",
+    "QueryService",
+    "ApplicationContainer",
+    "ReportSection",
+    "ResearchReport",
+    "ResearchService",
+]
