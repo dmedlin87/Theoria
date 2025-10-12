@@ -33,6 +33,28 @@ We currently monitor the following metrics in CI and production dashboards:
 
 TBT is a Lighthouse-only proxy for responsiveness, while INP is the corresponding Core Web Vital in the field.
 
+## CI automation and baselines
+
+GitHub Actions runs Lighthouse via [`lighthouserc.json`](../lighthouserc.json) on every PR, scheduled audit, and deployment to
+`main`/`develop`. The workflow enforces the lab targets above with LHCI assertions:
+
+- Performance score ≥ 0.90
+- LCP ≤ 2.2 s
+- CLS ≤ 0.08
+- TBT ≤ 150 ms
+- Speed Index ≤ 3.5 s
+
+When `.lighthouseci/baseline/manifest.json` is present, the job writes a Markdown summary comparing the stored baseline against
+the latest run. Review the job summary on your PR for per-URL deltas and copy the key numbers into the pull request template.
+If a regression appears, record hypotheses (cache churn, flag flips, backend latency, etc.) and the mitigation owner in the PR
+description so the team can follow up after merge.
+
+To update the baseline after improvements land:
+
+1. Check out `main` and run `npx @lhci/cli autorun` locally or re-run the CI job with a `main` ref.
+2. Copy the generated `.lighthouseci/manifest.json` to `.lighthouseci/baseline/manifest.json` and commit it with the change log.
+3. Reference the new baseline in the PR summary so reviewers understand the context for future comparisons.
+
 ## Interpreting lab reports
 
 When you open a Lighthouse report generated in CI:
@@ -80,5 +102,8 @@ Document the affected route, suspected cause, and mitigation plan in the issue. 
 - [ ] Cross-check the observability dashboard after deployment to ensure field metrics track the expected direction.
 - [ ] Log any discrepancies with hypotheses (cache warm-up, CDN purge timing, feature flags) in the release notes.
 - [ ] Coordinate with DevOps for load tests when performance work ships alongside infrastructure changes.
+
+The CI summary reiterates the hypotheses and load-test reminders to keep the team aligned whenever thresholds are close to
+failing. Use it as a prompt to document unknowns immediately instead of waiting until post-merge triage.
 
 Keeping both lab and field metrics healthy ensures Theo Engine delivers responsive study experiences across devices and networks.

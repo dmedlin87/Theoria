@@ -230,7 +230,7 @@ Both variants default to a local SQLite database. Provide `--database-url`/`-Dat
 
 ### Performance Monitoring
 
-Continuous integration runs Lighthouse to guard against client-side regressions. Review the [performance monitoring policy](docs/performance.md) for guidance on interpreting lab scores, comparing them with Core Web Vitals, and understanding thresholds that require follow-up.
+Continuous integration runs Lighthouse to guard against client-side regressions. Review the [performance monitoring policy](docs/performance.md) for guidance on interpreting lab scores, comparing them with Core Web Vitals, and understanding thresholds that require follow-up. The GitHub Action summarizes deltas against the committed baseline so authors can capture the numbers, note hypotheses for any discrepancies, and coordinate load-test requests in the pull request template before requesting review.
 
 ---
 
