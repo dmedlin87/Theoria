@@ -1,9 +1,9 @@
-"""Compatibility shim forwarding to :mod:`theo.domain.research.variants`."""
+"""Compatibility re-export for textual variant helpers."""
 from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.variants import *  # noqa: F401,F403
+from theo.domain.research.variants import VariantEntry, variants_apparatus
 
 warn(
     "Importing from 'theo.services.api.app.research.variants' is deprecated; "

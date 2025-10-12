@@ -104,3 +104,14 @@ def test_cli_commands_use_platform_bootstrap() -> None:
         assert "theo.services.bootstrap" in imports, (
             f"CLI module {path} must resolve adapters via theo.services.bootstrap"
         )
+
+
+def test_async_workers_do_not_depend_on_domain_layer() -> None:
+    workers_path = REPO_ROOT / "theo/services/api/app/workers"
+    for path in workers_path.rglob("*.py"):
+        if path.name == "__init__.py":
+            continue
+        for module in _gather_imports(path):
+            assert not module.startswith("theo.domain"), (
+                f"Async worker module {path} must not import domain layer module '{module}'"
+            )

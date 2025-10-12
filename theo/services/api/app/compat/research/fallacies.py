@@ -1,9 +1,9 @@
-"""Compatibility shim forwarding to :mod:`theo.domain.research.fallacies`."""
+"""Compatibility re-export for fallacy detection helpers."""
 from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.fallacies import *  # noqa: F401,F403
+from theo.domain.research.fallacies import FallacyHit, fallacy_detect
 
 warn(
     "Importing from 'theo.services.api.app.research.fallacies' is deprecated; "

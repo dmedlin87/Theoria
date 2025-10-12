@@ -45,7 +45,7 @@ Include the following:
 
 - **Dependency Monitoring:** Dependabot weekly groups + security-only immediate updates.
 - **SAST:** GitHub CodeQL (Python + JavaScript) on pull requests and default branch.
-- **DAST:** Automated OWASP ZAP baseline scan of `https://staging.api.theoengine.com` each Monday (`.github/workflows/security-zap.yml`) with SARIF results surfaced in the repository security dashboard.
+- **DAST:** Automated OWASP ZAP baseline scan of the staging API captured in the `STAGING_API_BASE_URL` secret (`.github/workflows/security-zap.yml`). Results publish to the repository security dashboard and block merges whenever a High-severity alert is detected.
 - **Secrets Management:** Long-lived credentials stored in managed secret store (Vault/Azure Key Vault) – never committed.
 - **Secrets Scanning:** TruffleHog executes on every push/pull request via the CI workflow to block new credential leaks and archive findings for triage.
 - **Incident Response:** Centralized contact via security mailing list; create follow-up advisory in `docs/advisories/` when needed.
@@ -62,3 +62,37 @@ Include the following:
 1. ZAP alerts appear in the GitHub Security tab once the SARIF upload from `security-zap.yml` completes.
 2. Classify the alert severity (High/Medium -> 24h fix SLA, Low -> next sprint backlog) and assign ownership based on the impacted API surface.
 3. Validate the issue against staging using ZAP or manual reproduction, then land fixes with regression tests. Dismiss false positives in the security dashboard with justification referencing ZAP rule IDs.
+
+### Running the ZAP Baseline Scan Locally
+
+Reproduce the CI scan locally when investigating a finding:
+
+1. Ensure the target environment is reachable (staging via VPN or a local `docker-compose` stack).
+2. Execute the baseline scan from the repository root:
+
+   ```bash
+   docker run --rm \
+     -v "$(pwd)/.zap:/zap/wrk" \
+     -w /zap/wrk \
+     owasp/zap2docker-stable \
+     zap-baseline.py \
+     -t "${TARGET_URL:-https://staging.api.theoengine.com}" \
+     -J zap-baseline-report.json \
+     -r zap-baseline-report.html \
+     -w zap-baseline-warn.md
+   ```
+
+   Replace `TARGET_URL` with a local endpoint when debugging changes that are not yet deployed.
+3. Convert the JSON output into SARIF if you need parity with the CI dashboards:
+
+   ```bash
+   python scripts/security/zap_to_sarif.py .zap/zap-baseline-report.json .zap/zap-baseline-report.sarif
+   ```
+
+4. Apply the same severity gate the CI job enforces to confirm whether a finding would fail the pipeline:
+
+   ```bash
+   python scripts/security/zap_severity_gate.py .zap/zap-baseline-report.json --fail-on high
+   ```
+
+Artifacts are written to `.zap/` by the Docker invocation above so they do not pollute the working tree. Clean up the directory once triage is complete.
