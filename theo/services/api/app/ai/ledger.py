@@ -133,6 +133,16 @@ class LedgerTransaction:
         ).fetchone()
         return float(row[0]) if row is not None else None
 
+    def get_all_spend(self) -> dict[str, float]:
+        """Get spending for all models."""
+        rows = self._connection.execute("SELECT model, amount FROM spend").fetchall()
+        return {row[0]: float(row[1]) for row in rows}
+
+    def get_all_latency(self) -> dict[str, float]:
+        """Get latency for all models."""
+        rows = self._connection.execute("SELECT model, value FROM latency").fetchall()
+        return {row[0]: float(row[1]) for row in rows}
+
     def set_latency(self, model_name: str, latency_ms: float) -> None:
         self._connection.execute(
             """
@@ -362,8 +372,12 @@ class SharedLedger:
     def _initialize(self) -> None:
         connection = self._connect()
         try:
+            # Enable WAL mode for better concurrency
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute("PRAGMA synchronous=NORMAL")
+            # Optimize for concurrent reads/writes
+            connection.execute("PRAGMA cache_size=-64000")  # 64MB cache
+            connection.execute("PRAGMA temp_store=MEMORY")
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS spend (
@@ -405,6 +419,7 @@ class SharedLedger:
                 """
             )
             self._ensure_inflight_schema(connection)
+            self._create_indexes(connection)
         finally:
             connection.close()
 
@@ -414,6 +429,16 @@ class SharedLedger:
         }
         if "completed_at" not in columns:
             connection.execute("ALTER TABLE inflight_entries ADD COLUMN completed_at REAL")
+
+    def _create_indexes(self, connection: sqlite3.Connection) -> None:
+        """Create indexes for frequently queried columns."""
+        connection.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_cache_created_at ON cache_entries(created_at);
+            CREATE INDEX IF NOT EXISTS idx_inflight_status ON inflight_entries(status);
+            CREATE INDEX IF NOT EXISTS idx_inflight_updated_at ON inflight_entries(updated_at);
+            """
+        )
 
     # ------------------------------------------------------------------
     # Transaction handling
@@ -489,7 +514,20 @@ class SharedLedger:
         timeout: float | None = None,
         observed_updated_at: float | None = None,
     ) -> CacheRecord:
-        """Block until the inflight entry completes or raises."""
+        """Block until the inflight entry completes or raises.
+        
+        Args:
+            cache_key: Unique identifier for the generation request
+            poll_interval: How often to check status (seconds)
+            timeout: Maximum wait time before raising (seconds)
+            observed_updated_at: Initial timestamp to detect stale entries
+            
+        Returns:
+            CacheRecord containing the completed generation
+            
+        Raises:
+            GenerationError: If timeout occurs or generation fails
+        """
 
         start = time.time()
         comparison_floor = observed_updated_at if observed_updated_at is not None else start
@@ -530,9 +568,13 @@ class SharedLedger:
                 )
                 with self.transaction() as txn:
                     txn.clear_single_inflight(cache_key)
-                raise GenerationError(
-                    last_error_message or "Timed out waiting for inflight generation"
+                error_msg = (
+                    f"Timed out waiting for inflight generation (key: {cache_key[:8]}..., "
+                    f"status: {last_status}, elapsed: {now - start:.1f}s)"
                 )
+                if last_error_message:
+                    error_msg = f"{error_msg}: {last_error_message}"
+                raise GenerationError(error_msg)
             row = self._read_inflight(cache_key)
             if row is None:
                 # No inflight record – attempt to resolve from cache.

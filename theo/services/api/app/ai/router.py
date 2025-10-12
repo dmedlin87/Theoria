@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import logging
 import time
 from typing import Any, Iterator
@@ -28,6 +29,9 @@ class RoutedGeneration:
     output: str
     latency_ms: float
     cost: float
+    cache_hit: bool = False
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 
 @dataclass
@@ -37,6 +41,16 @@ class _CacheSettings:
     enabled: bool
     ttl_seconds: float
     max_entries: int
+
+
+@dataclass
+class _ModelHealth:
+    """Tracks model health metrics for circuit breaker logic."""
+
+    failure_count: int = 0
+    last_failure_time: float | None = None
+    last_success_time: float | None = None
+    consecutive_failures: int = 0
 
 
 _LEDGER = SharedLedger()
@@ -82,10 +96,14 @@ class LLMRouterService:
 
     DEFAULT_CACHE_TTL = 300.0
     DEFAULT_CACHE_MAX_ENTRIES = 128
+    DEFAULT_CIRCUIT_BREAKER_THRESHOLD = 3
+    DEFAULT_CIRCUIT_BREAKER_TIMEOUT = 60.0
 
     def __init__(self, registry: LLMRegistry, ledger: SharedLedger | None = None) -> None:
         self.registry = registry
         self._ledger = ledger or _LEDGER
+        self._model_health: dict[str, _ModelHealth] = {}
+        self._tokenizer_cache: dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # Candidate selection
@@ -129,7 +147,7 @@ class LLMRouterService:
     ) -> RoutedGeneration:
         """Generate content using ``model`` if it meets routing constraints."""
 
-        prompt_tokens = max(len(prompt) // 4, 0)
+        prompt_tokens = self._estimate_tokens(prompt, model.model)
         with _TRACER.start_as_current_span("router.execute_generation") as span:
             span.set_attribute("llm.workflow", workflow)
             span.set_attribute("llm.model_name", model.name)
@@ -141,8 +159,10 @@ class LLMRouterService:
             config = self._workflow_config(model, workflow)
             ceiling = self._as_float(config.get("spend_ceiling"))
             # Estimate cost with expected output tokens for more accurate budget projection
-            estimated_completion = " " * (max_output_tokens * 4)  # Rough approximation
-            estimated_cost = self._estimate_cost(model, prompt, estimated_completion)
+            estimated_completion_tokens = max_output_tokens
+            estimated_cost = self._estimate_cost_from_tokens(
+                model, prompt_tokens, estimated_completion_tokens
+            )
             span.set_attribute("llm.estimated_cost", estimated_cost)
             if ceiling is not None:
                 span.set_attribute("llm.budget_ceiling", ceiling)
@@ -152,8 +172,9 @@ class LLMRouterService:
             warning_ratio = self._warning_ratio(config)
 
             cache_settings = self._cache_settings(config)
-            cache_key = self._ledger.encode_cache_key(
-                (model.name, workflow, prompt, float(temperature), int(max_output_tokens))
+            # Use content-based hashing for better cache key collision handling
+            cache_key = self._generate_cache_key(
+                model.name, workflow, prompt, temperature, max_output_tokens
             )
             cache_status = "bypass"
             now = time.monotonic()
@@ -210,7 +231,9 @@ class LLMRouterService:
                     cached_record = txn.get_cache_entry(cache_key)
                     if cached_record:
                         span.set_attribute("llm.cache_status", "hit")
-                        return self._record_to_generation(cached_record)
+                        result = self._record_to_generation(cached_record)
+                        result.cache_hit = True
+                        return result
 
                 inflight = txn.get_inflight(cache_key)
                 if inflight is None:
@@ -386,10 +409,8 @@ class LLMRouterService:
                         txn.mark_inflight_error(cache_key, str(error))
                     raise error
 
-                completion_tokens = (
-                    max(len(output) // 4, 0) if isinstance(output, str) else 0
-                )
-                cost = self._estimate_cost(model, prompt, output)
+                completion_tokens = self._estimate_tokens(output, model.model) if isinstance(output, str) else 0
+                cost = self._estimate_cost_from_tokens(model, prompt_tokens, completion_tokens)
                 with self._ledger.transaction() as txn:
                     spent = txn.get_spend(model.name)
                     total_spend = spent + cost
@@ -436,9 +457,18 @@ class LLMRouterService:
                 span.set_attribute("llm.completion_tokens", completion_tokens)
                 span.set_attribute("llm.cost", cost)
                 span.set_attribute("llm.budget_status", "accepted")
+                
+                # Record success for circuit breaker
+                self._record_model_success(model.name)
 
                 generation = RoutedGeneration(
-                    model=model, output=output, latency_ms=latency_ms, cost=cost
+                    model=model,
+                    output=output,
+                    latency_ms=latency_ms,
+                    cost=cost,
+                    cache_hit=False,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
                 )
 
                 with self._ledger.transaction() as txn:
@@ -471,7 +501,15 @@ class LLMRouterService:
                         )
 
                 return generation
+            except GenerationError as exc:
+                # Record failure for circuit breaker
+                self._record_model_failure(model.name)
+                with self._ledger.transaction() as txn:
+                    txn.mark_inflight_error(cache_key, str(exc))
+                raise
             except Exception as exc:
+                # Record failure for circuit breaker on unexpected errors
+                self._record_model_failure(model.name)
                 with self._ledger.transaction() as txn:
                     txn.mark_inflight_error(cache_key, str(exc))
                 raise
@@ -505,6 +543,11 @@ class LLMRouterService:
         config = self._workflow_config(model, workflow)
         ceiling = self._as_float(config.get("spend_ceiling"))
         latency_threshold = self._as_float(config.get("latency_threshold_ms"))
+        
+        # Check circuit breaker
+        if not self._check_circuit_breaker(model.name, config):
+            return False
+        
         with self._ledger.transaction() as txn:
             if ceiling is not None and txn.get_spend(model.name) >= ceiling:
                 return False
@@ -529,6 +572,84 @@ class LLMRouterService:
             if ratio is not None:
                 return max(0.0, ratio)
         return _DEFAULT_WARNING_RATIO
+
+    def _check_circuit_breaker(self, model_name: str, config: dict[str, Any]) -> bool:
+        """Check if model is available based on circuit breaker state."""
+        health = self._model_health.get(model_name)
+        if health is None:
+            return True
+        
+        threshold = self._as_float(config.get("circuit_breaker_threshold")) or self.DEFAULT_CIRCUIT_BREAKER_THRESHOLD
+        timeout = self._as_float(config.get("circuit_breaker_timeout_s")) or self.DEFAULT_CIRCUIT_BREAKER_TIMEOUT
+        
+        if health.consecutive_failures >= threshold:
+            if health.last_failure_time is not None:
+                elapsed = time.time() - health.last_failure_time
+                if elapsed < timeout:
+                    LOGGER.warning(
+                        "Model %s circuit breaker open (failures: %d, elapsed: %.1fs)",
+                        model_name,
+                        health.consecutive_failures,
+                        elapsed,
+                    )
+                    return False
+                # Reset after timeout
+                health.consecutive_failures = 0
+        return True
+
+    def _record_model_success(self, model_name: str) -> None:
+        """Record successful model generation."""
+        if model_name not in self._model_health:
+            self._model_health[model_name] = _ModelHealth()
+        health = self._model_health[model_name]
+        health.last_success_time = time.time()
+        health.consecutive_failures = 0
+
+    def _record_model_failure(self, model_name: str) -> None:
+        """Record failed model generation."""
+        if model_name not in self._model_health:
+            self._model_health[model_name] = _ModelHealth()
+        health = self._model_health[model_name]
+        health.failure_count += 1
+        health.consecutive_failures += 1
+        health.last_failure_time = time.time()
+        LOGGER.warning(
+            "Model %s failure recorded (consecutive: %d, total: %d)",
+            model_name,
+            health.consecutive_failures,
+            health.failure_count,
+        )
+
+    def _estimate_tokens(self, text: str, model_name: str | None = None) -> int:
+        """Estimate token count for text using tiktoken or fallback."""
+        if not text:
+            return 0
+        
+        try:
+            import tiktoken
+            
+            # Determine encoding based on model
+            encoding_name = "cl100k_base"  # default for gpt-4, gpt-3.5-turbo
+            if model_name:
+                if "gpt-4" in model_name.lower():
+                    encoding_name = "cl100k_base"
+                elif "gpt-3.5" in model_name.lower():
+                    encoding_name = "cl100k_base"
+                elif "davinci" in model_name.lower() or "curie" in model_name.lower():
+                    encoding_name = "p50k_base"
+            
+            if encoding_name not in self._tokenizer_cache:
+                try:
+                    self._tokenizer_cache[encoding_name] = tiktoken.get_encoding(encoding_name)
+                except Exception:
+                    # Fall back to cl100k_base if specific encoding fails
+                    self._tokenizer_cache[encoding_name] = tiktoken.get_encoding("cl100k_base")
+            
+            encoder = self._tokenizer_cache[encoding_name]
+            return len(encoder.encode(text, disallowed_special=()))
+        except Exception:
+            # Fallback to character-based estimation
+            return max(len(text) // 4, 0)
     @staticmethod
     def _as_bool(value: Any) -> bool | None:
         if isinstance(value, bool):
@@ -544,18 +665,33 @@ class LLMRouterService:
     def _estimate_cost(
         self, model: LLMModel, prompt: str, completion: str | None
     ) -> float:
+        """Legacy cost estimation method - prefer _estimate_cost_from_tokens."""
+        prompt_tokens = self._estimate_tokens(prompt, model.model)
+        completion_tokens = self._estimate_tokens(completion, model.model) if completion else 0
+        return self._estimate_cost_from_tokens(model, prompt_tokens, completion_tokens)
+
+    def _estimate_cost_from_tokens(
+        self, model: LLMModel, prompt_tokens: int, completion_tokens: int
+    ) -> float:
+        """Calculate cost from token counts using model pricing."""
         pricing = getattr(model, "pricing", {}) or {}
         per_call = self._as_float(pricing.get("per_call"))
         cost = per_call or 0.0
         prompt_rate = self._as_float(pricing.get("prompt_tokens"))
         completion_rate = self._as_float(pricing.get("completion_tokens"))
         if prompt_rate:
-            prompt_tokens = max(len(prompt) // 4, 0)
             cost += (prompt_tokens / 1000.0) * prompt_rate
-        if completion is not None and completion_rate:
-            completion_tokens = max(len(completion) // 4, 0)
+        if completion_rate:
             cost += (completion_tokens / 1000.0) * completion_rate
         return cost
+
+    def _generate_cache_key(
+        self, model_name: str, workflow: str, prompt: str, temperature: float, max_tokens: int
+    ) -> str:
+        """Generate a stable cache key using content hashing."""
+        # Use SHA256 for content-based hashing to avoid collisions
+        content = f"{model_name}:{workflow}:{temperature}:{max_tokens}:{prompt}"
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()[:32]
 
     def _cache_settings(self, config: dict[str, Any]) -> _CacheSettings:
         ttl_raw = self._as_float(config.get("cache_ttl_seconds"))
