@@ -49,8 +49,12 @@ def _ingestion_service_with_overrides(
 ) -> IngestionService:
     """Ensure ingestion dependencies respect route-level monkeypatches."""
 
-    ingestion_service.run_file_pipeline = run_pipeline_for_file
-    ingestion_service.run_transcript_pipeline = run_pipeline_for_transcript
+    if run_pipeline_for_file is not _run_pipeline_for_file:
+        ingestion_service.run_file_pipeline = run_pipeline_for_file
+    if run_pipeline_for_transcript is not _run_pipeline_for_transcript:
+        ingestion_service.run_transcript_pipeline = run_pipeline_for_transcript
+    if run_pipeline_for_url is not _run_pipeline_for_url:
+        ingestion_service.run_url_pipeline = run_pipeline_for_url
     return ingestion_service
 
 

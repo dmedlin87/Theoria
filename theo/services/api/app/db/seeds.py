@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Iterable
-from collections.abc import Callable
 from uuid import NAMESPACE_URL, uuid5
 
 import yaml
@@ -148,6 +148,50 @@ def _table_has_column(session: Session, table_name: str, column_name: str, *, sc
     return any(column.get("name") == column_name for column in columns)
 
 
+def _add_sqlite_columns(
+    session: Session, table: Table, columns: Iterable[tuple[str, str]]
+) -> bool:
+    """Attempt to add *columns* with their SQL types to *table* when using SQLite."""
+
+    bind = session.get_bind()
+    if bind is None:
+        return False
+
+    engine: Engine | None = None
+    connection: Connection | None = None
+    should_close = False
+
+    if isinstance(bind, Engine):
+        engine = bind
+        connection = engine.connect()
+        should_close = True
+    else:
+        connection = bind  # type: ignore[assignment]
+
+    if connection is None:
+        return False
+
+    try:
+        for column, column_type in columns:
+            try:
+                connection.exec_driver_sql(
+                    f"ALTER TABLE {table.name} ADD COLUMN {column} {column_type}"
+                )
+            except OperationalError as exc:
+                message = str(getattr(exc, "orig", exc)).lower()
+                duplicate_indicators = (
+                    "duplicate column name",
+                    "already exists",
+                )
+                if any(indicator in message for indicator in duplicate_indicators):
+                    continue
+                return False
+        return True
+    finally:
+        if should_close and connection is not None:
+            connection.close()
+
+
 def _ensure_perspective_column(
     session: Session, table: Table, dataset_label: str
 ) -> bool:
@@ -155,6 +199,13 @@ def _ensure_perspective_column(
 
     if _table_has_column(session, table.name, "perspective", schema=table.schema):
         return True
+
+    bind = session.get_bind()
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+    if dialect_name == "sqlite":
+        if _add_sqlite_columns(session, table, [("perspective", "TEXT")]):
+            if _table_has_column(session, table.name, "perspective", schema=table.schema):
+                return True
 
     session.rollback()
     logger.warning(
@@ -173,6 +224,25 @@ def _ensure_range_columns(
     ]
     if not missing:
         return True
+
+    bind = session.get_bind()
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+    if dialect_name == "sqlite":
+        if _add_sqlite_columns(
+            session,
+            table,
+            ((column, "INTEGER") for column in missing),
+        ):
+            remaining = [
+                column
+                for column in columns
+                if not _table_has_column(
+                    session, table.name, column, schema=table.schema
+                )
+            ]
+            if not remaining:
+                return True
+            missing = remaining
 
     session.rollback()
     formatted = ", ".join(sorted(missing))
@@ -210,6 +280,60 @@ def _handle_missing_perspective_error(
     return True
 
 
+def _run_with_sqlite_lock_retry(
+    session: Session,
+    dataset_label: str,
+    action: Callable[[Session], None],
+    *,
+    max_attempts: int = 10,
+    backoff: float = 0.5,
+) -> bool:
+    """Execute ``action`` and commit, retrying when SQLite reports a lock."""
+
+    bind = session.get_bind()
+
+    for attempt in range(max_attempts):
+        working_session = session if attempt == 0 else Session(bind=bind)
+        try:
+            action(working_session)
+            working_session.commit()
+            if working_session is not session:
+                working_session.close()
+            return True
+        except OperationalError as exc:
+            if _handle_missing_perspective_error(working_session, dataset_label, exc):
+                if working_session is not session:
+                    working_session.close()
+                return False
+
+            message = str(getattr(exc, "orig", exc)).lower()
+            if "database is locked" in message or "database is busy" in message:
+                logger.warning(
+                    "Retrying %s seed commit due to SQLite lock (attempt %d/%d)",
+                    dataset_label,
+                    attempt + 1,
+                    max_attempts,
+                )
+                working_session.rollback()
+                if working_session is not session:
+                    working_session.close()
+                time.sleep(backoff * (attempt + 1))
+                continue
+            working_session.rollback()
+            if working_session is not session:
+                working_session.close()
+            raise
+        except Exception:
+            working_session.rollback()
+            if working_session is not session:
+                working_session.close()
+            raise
+    logger.warning(
+        "Aborting %s seed commit after repeated SQLite lock retries", dataset_label
+    )
+    return False
+
+
 def _run_seed_with_perspective_guard(
     session: Session,
     seed_fn: Callable[[Session], None],
@@ -235,7 +359,14 @@ def seed_contradiction_claims(session: Session) -> None:
         session,
         table,
         "contradiction",
-        ("start_verse_id", "end_verse_id", "start_verse_id_b", "end_verse_id_b"),
+        (
+            "start_verse_id_a",
+            "end_verse_id_a",
+            "start_verse_id",
+            "end_verse_id",
+            "start_verse_id_b",
+            "end_verse_id_b",
+        ),
     ):
         return
 
@@ -244,22 +375,159 @@ def seed_contradiction_claims(session: Session) -> None:
         SEED_ROOT / "contradictions_additional.json",
         SEED_ROOT / "contradictions_catalog.yaml",
     )
-    seen_ids: set[str] = set()
-    try:
+
+    def _load(target_session: Session) -> None:
+        seen_ids: set[str] = set()
+        try:
+            for entry in payload:
+                osis_a = entry.get("osis_a")
+                osis_b = entry.get("osis_b")
+                if not osis_a or not osis_b:
+                    continue
+                osis_a_value = str(osis_a)
+                osis_b_value = str(osis_b)
+                start_a, end_a = _verse_bounds(osis_a_value)
+                start_b, end_b = _verse_bounds(osis_b_value)
+                source = entry.get("source") or "community"
+                perspective = (entry.get("perspective") or "skeptical").strip().lower()
+                identifier = str(
+                    uuid5(
+                        CONTRADICTION_NAMESPACE,
+                        "|".join(
+                            [
+                                str(osis_a).lower(),
+                                str(osis_b).lower(),
+                                source.lower(),
+                                perspective,
+                            ]
+                        ),
+                    )
+                )
+                seen_ids.add(identifier)
+                record = target_session.get(ContradictionSeed, identifier)
+                tags = _coerce_list(entry.get("tags"))
+                weight = float(entry.get("weight", 1.0))
+                summary = entry.get("summary")
+                range_a = _verse_range(str(osis_a))
+                range_b = _verse_range(str(osis_b))
+                start_a = range_a[0] if range_a else None
+                end_a = range_a[1] if range_a else None
+                start_b = range_b[0] if range_b else None
+                end_b = range_b[1] if range_b else None
+
+                if record is None:
+                    record = ContradictionSeed(
+                        id=identifier,
+                        osis_a=osis_a_value,
+                        osis_b=osis_b_value,
+                        summary=summary,
+                        source=source,
+                        tags=tags,
+                        weight=weight,
+                        perspective=perspective,
+                        start_verse_id_a=start_a,
+                        end_verse_id_a=end_a,
+                        start_verse_id=start_a,
+                        end_verse_id=end_a,
+                        start_verse_id_b=start_b,
+                        end_verse_id_b=end_b,
+                    )
+                    target_session.add(record)
+                else:
+                    if record.osis_a != osis_a_value:
+                        record.osis_a = osis_a_value
+                    if record.osis_b != osis_b_value:
+                        record.osis_b = osis_b_value
+                    if record.summary != summary:
+                        record.summary = summary
+                    if record.source != source:
+                        record.source = source
+                    if record.tags != tags:
+                        record.tags = tags
+                    if record.weight != weight:
+                        record.weight = weight
+                    if record.perspective != perspective:
+                        record.perspective = perspective
+                    if record.start_verse_id_a != start_a:
+                        record.start_verse_id_a = start_a
+                    if record.end_verse_id_a != end_a:
+                        record.end_verse_id_a = end_a
+                    if record.start_verse_id_b != start_b:
+                        record.start_verse_id_b = start_b
+                    if record.end_verse_id_b != end_b:
+                        record.end_verse_id_b = end_b
+                    _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a))
+                    _assign_range(
+                        record,
+                        "start_verse_id_b",
+                        "end_verse_id_b",
+                        str(osis_b),
+                    )
+        except OperationalError as exc:
+            message = str(exc).lower()
+            if "no such column" in message and "perspective" in message:
+                target_session.rollback()
+                logger.warning(
+                    "Skipping contradiction seeds because 'perspective' column is unavailable: %s",
+                    exc,
+                )
+                raise
+            raise
+
+        if seen_ids:
+            target_session.execute(
+                delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
+            )
+
+    _run_with_sqlite_lock_retry(session, "contradiction", _load)
+
+
+def seed_harmony_claims(session: Session) -> None:
+    """Load harmony seeds from bundled YAML/JSON files."""
+
+    table = HarmonySeed.__table__
+    if not _ensure_perspective_column(session, table, "harmony"):
+        return
+    if not _ensure_range_columns(
+        session,
+        table,
+        "harmony",
+        (
+            "start_verse_id_a",
+            "end_verse_id_a",
+            "start_verse_id",
+            "end_verse_id",
+            "start_verse_id_b",
+            "end_verse_id_b",
+        ),
+    ):
+        return
+
+    payload = _iter_seed_entries(
+        SEED_ROOT / "harmonies.yaml",
+        SEED_ROOT / "harmonies.json",
+        SEED_ROOT / "harmonies_additional.yaml",
+    )
+    if not payload:
+        return
+
+    def _load(target_session: Session) -> None:
+        seen_ids: set[str] = set()
         for entry in payload:
             osis_a = entry.get("osis_a")
             osis_b = entry.get("osis_b")
-            if not osis_a or not osis_b:
+            summary = entry.get("summary")
+            if not osis_a or not osis_b or not summary:
                 continue
             osis_a_value = str(osis_a)
             osis_b_value = str(osis_b)
             start_a, end_a = _verse_bounds(osis_a_value)
             start_b, end_b = _verse_bounds(osis_b_value)
             source = entry.get("source") or "community"
-            perspective = (entry.get("perspective") or "skeptical").strip().lower()
+            perspective = (entry.get("perspective") or "apologetic").strip().lower()
             identifier = str(
                 uuid5(
-                    CONTRADICTION_NAMESPACE,
+                    HARMONY_NAMESPACE,
                     "|".join(
                         [
                             str(osis_a).lower(),
@@ -271,10 +539,9 @@ def seed_contradiction_claims(session: Session) -> None:
                 )
             )
             seen_ids.add(identifier)
-            record = session.get(ContradictionSeed, identifier)
+            record = target_session.get(HarmonySeed, identifier)
             tags = _coerce_list(entry.get("tags"))
             weight = float(entry.get("weight", 1.0))
-            summary = entry.get("summary")
             range_a = _verse_range(str(osis_a))
             range_b = _verse_range(str(osis_b))
             start_a = range_a[0] if range_a else None
@@ -283,7 +550,7 @@ def seed_contradiction_claims(session: Session) -> None:
             end_b = range_b[1] if range_b else None
 
             if record is None:
-                record = ContradictionSeed(
+                record = HarmonySeed(
                     id=identifier,
                     osis_a=osis_a_value,
                     osis_b=osis_b_value,
@@ -299,201 +566,57 @@ def seed_contradiction_claims(session: Session) -> None:
                     start_verse_id_b=start_b,
                     end_verse_id_b=end_b,
                 )
-                session.add(record)
+                target_session.add(record)
             else:
+                updated = False
                 if record.osis_a != osis_a_value:
                     record.osis_a = osis_a_value
+                    updated = True
                 if record.osis_b != osis_b_value:
                     record.osis_b = osis_b_value
+                    updated = True
                 if record.summary != summary:
                     record.summary = summary
+                    updated = True
                 if record.source != source:
                     record.source = source
+                    updated = True
                 if record.tags != tags:
                     record.tags = tags
+                    updated = True
                 if record.weight != weight:
                     record.weight = weight
+                    updated = True
                 if record.perspective != perspective:
                     record.perspective = perspective
+                    updated = True
                 if record.start_verse_id_a != start_a:
                     record.start_verse_id_a = start_a
+                    updated = True
                 if record.end_verse_id_a != end_a:
                     record.end_verse_id_a = end_a
+                    updated = True
                 if record.start_verse_id_b != start_b:
                     record.start_verse_id_b = start_b
+                    updated = True
                 if record.end_verse_id_b != end_b:
                     record.end_verse_id_b = end_b
-                _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a))
-                _assign_range(
+                if _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a)):
+                    updated = True
+                if _assign_range(
                     record,
                     "start_verse_id_b",
                     "end_verse_id_b",
                     str(osis_b),
-                )
-    except OperationalError as exc:
-        session.rollback()
-        message = str(exc).lower()
-        if "no such column" in message and "perspective" in message:
-            logger.warning(
-                "Skipping contradiction seeds because 'perspective' column is unavailable: %s",
-                exc,
-            )
-            return
-        raise
+                ):
+                    updated = True
+                if updated:
+                    record.updated_at = datetime.now(UTC)
 
-    if seen_ids:
-        try:
-            session.execute(
-                delete(ContradictionSeed).where(~ContradictionSeed.id.in_(seen_ids))
-            )
-        except OperationalError as exc:
-            if _handle_missing_perspective_error(session, "contradiction", exc):
-                return
-            raise
-    try:
-        session.commit()
-    except OperationalError as exc:
-        if _handle_missing_perspective_error(session, "contradiction", exc):
-            return
-        raise
+        if seen_ids:
+            target_session.execute(delete(HarmonySeed).where(~HarmonySeed.id.in_(seen_ids)))
 
-
-def seed_harmony_claims(session: Session) -> None:
-    """Load harmony seeds from bundled YAML/JSON files."""
-
-    table = HarmonySeed.__table__
-    if not _ensure_perspective_column(session, table, "harmony"):
-        return
-    if not _ensure_range_columns(
-        session,
-        table,
-        "harmony",
-        ("start_verse_id", "end_verse_id", "start_verse_id_b", "end_verse_id_b"),
-    ):
-        return
-
-    payload = _iter_seed_entries(
-        SEED_ROOT / "harmonies.yaml",
-        SEED_ROOT / "harmonies.json",
-        SEED_ROOT / "harmonies_additional.yaml",
-    )
-    if not payload:
-        return
-
-    seen_ids: set[str] = set()
-    for entry in payload:
-        osis_a = entry.get("osis_a")
-        osis_b = entry.get("osis_b")
-        summary = entry.get("summary")
-        if not osis_a or not osis_b or not summary:
-            continue
-        osis_a_value = str(osis_a)
-        osis_b_value = str(osis_b)
-        start_a, end_a = _verse_bounds(osis_a_value)
-        start_b, end_b = _verse_bounds(osis_b_value)
-        source = entry.get("source") or "community"
-        perspective = (entry.get("perspective") or "apologetic").strip().lower()
-        identifier = str(
-            uuid5(
-                HARMONY_NAMESPACE,
-                "|".join(
-                    [
-                        str(osis_a).lower(),
-                        str(osis_b).lower(),
-                        source.lower(),
-                        perspective,
-                    ]
-                ),
-            )
-        )
-        seen_ids.add(identifier)
-        record = session.get(HarmonySeed, identifier)
-        tags = _coerce_list(entry.get("tags"))
-        weight = float(entry.get("weight", 1.0))
-        range_a = _verse_range(str(osis_a))
-        range_b = _verse_range(str(osis_b))
-        start_a = range_a[0] if range_a else None
-        end_a = range_a[1] if range_a else None
-        start_b = range_b[0] if range_b else None
-        end_b = range_b[1] if range_b else None
-
-        if record is None:
-            record = HarmonySeed(
-                id=identifier,
-                osis_a=osis_a_value,
-                osis_b=osis_b_value,
-                summary=summary,
-                source=source,
-                tags=tags,
-                weight=weight,
-                perspective=perspective,
-                start_verse_id_a=start_a,
-                end_verse_id_a=end_a,
-                start_verse_id=start_a,
-                end_verse_id=end_a,
-                start_verse_id_b=start_b,
-                end_verse_id_b=end_b,
-            )
-            session.add(record)
-        else:
-            updated = False
-            if record.osis_a != osis_a_value:
-                record.osis_a = osis_a_value
-                updated = True
-            if record.osis_b != osis_b_value:
-                record.osis_b = osis_b_value
-                updated = True
-            if record.summary != summary:
-                record.summary = summary
-                updated = True
-            if record.source != source:
-                record.source = source
-                updated = True
-            if record.tags != tags:
-                record.tags = tags
-                updated = True
-            if record.weight != weight:
-                record.weight = weight
-                updated = True
-            if record.perspective != perspective:
-                record.perspective = perspective
-                updated = True
-            if record.start_verse_id_a != start_a:
-                record.start_verse_id_a = start_a
-                updated = True
-            if record.end_verse_id_a != end_a:
-                record.end_verse_id_a = end_a
-                updated = True
-            if record.start_verse_id_b != start_b:
-                record.start_verse_id_b = start_b
-                updated = True
-            if record.end_verse_id_b != end_b:
-                record.end_verse_id_b = end_b
-            if _assign_range(record, "start_verse_id", "end_verse_id", str(osis_a)):
-                updated = True
-            if _assign_range(
-                record,
-                "start_verse_id_b",
-                "end_verse_id_b",
-                str(osis_b),
-            ):
-                updated = True
-            if updated:
-                record.updated_at = datetime.now(UTC)
-
-    if seen_ids:
-        try:
-            session.execute(delete(HarmonySeed).where(~HarmonySeed.id.in_(seen_ids)))
-        except OperationalError as exc:
-            if _handle_missing_perspective_error(session, "harmony", exc):
-                return
-            raise
-    try:
-        session.commit()
-    except OperationalError as exc:
-        if _handle_missing_perspective_error(session, "harmony", exc):
-            return
-        raise
+    _run_with_sqlite_lock_retry(session, "harmony", _load)
 
 
 def seed_commentary_excerpts(session: Session) -> None:
@@ -518,78 +641,80 @@ def seed_commentary_excerpts(session: Session) -> None:
     if not payload:
         return
 
-    seen_ids: set[str] = set()
-    for entry in payload:
-        osis = entry.get("osis")
-        excerpt = entry.get("excerpt")
-        if not osis or not excerpt:
-            continue
-        osis_value = str(osis)
-        start_verse_id, end_verse_id = _verse_bounds(osis_value)
-        source = entry.get("source") or "community"
-        perspective = (entry.get("perspective") or "neutral").strip().lower()
-        identifier = str(
-            uuid5(
-                COMMENTARY_NAMESPACE,
-                "|".join([str(osis).lower(), source.lower(), perspective, excerpt[:64].lower()]),
+    def _load(target_session: Session) -> None:
+        seen_ids: set[str] = set()
+        for entry in payload:
+            osis = entry.get("osis")
+            excerpt = entry.get("excerpt")
+            if not osis or not excerpt:
+                continue
+            osis_value = str(osis)
+            start_verse_id, end_verse_id = _verse_bounds(osis_value)
+            source = entry.get("source") or "community"
+            perspective = (entry.get("perspective") or "neutral").strip().lower()
+            identifier = str(
+                uuid5(
+                    COMMENTARY_NAMESPACE,
+                    "|".join([str(osis).lower(), source.lower(), perspective, excerpt[:64].lower()]),
+                )
             )
-        )
-        seen_ids.add(identifier)
-        record = session.get(CommentaryExcerptSeed, identifier)
-        tags = _coerce_list(entry.get("tags"))
-        title = entry.get("title")
-        verse_range = _verse_range(str(osis))
-        start_value = verse_range[0] if verse_range else None
-        end_value = verse_range[1] if verse_range else None
+            seen_ids.add(identifier)
+            record = target_session.get(CommentaryExcerptSeed, identifier)
+            tags = _coerce_list(entry.get("tags"))
+            title = entry.get("title")
+            verse_range = _verse_range(str(osis))
+            start_value = verse_range[0] if verse_range else None
+            end_value = verse_range[1] if verse_range else None
 
-        if record is None:
-            record = CommentaryExcerptSeed(
-                id=identifier,
-                osis=osis_value,
-                title=title,
-                excerpt=excerpt,
-                source=source,
-                perspective=perspective,
-                tags=tags,
-                start_verse_id=start_value,
-                end_verse_id=end_value,
+            if record is None:
+                record = CommentaryExcerptSeed(
+                    id=identifier,
+                    osis=osis_value,
+                    title=title,
+                    excerpt=excerpt,
+                    source=source,
+                    perspective=perspective,
+                    tags=tags,
+                    start_verse_id=start_value,
+                    end_verse_id=end_value,
+                )
+                target_session.add(record)
+            else:
+                updated = False
+                if record.osis != osis_value:
+                    record.osis = osis_value
+                    updated = True
+                if record.title != title:
+                    record.title = title
+                    updated = True
+                if record.excerpt != excerpt:
+                    record.excerpt = excerpt
+                    updated = True
+                if record.source != source:
+                    record.source = source
+                    updated = True
+                if record.perspective != perspective:
+                    record.perspective = perspective
+                    updated = True
+                if record.tags != tags:
+                    record.tags = tags
+                    updated = True
+                if record.start_verse_id != start_verse_id:
+                    record.start_verse_id = start_verse_id
+                    updated = True
+                if record.end_verse_id != end_verse_id:
+                    record.end_verse_id = end_verse_id
+                if _assign_range(record, "start_verse_id", "end_verse_id", str(osis)):
+                    updated = True
+                if updated:
+                    record.updated_at = datetime.now(UTC)
+
+        if seen_ids:
+            target_session.execute(
+                delete(CommentaryExcerptSeed).where(~CommentaryExcerptSeed.id.in_(seen_ids))
             )
-            session.add(record)
-        else:
-            updated = False
-            if record.osis != osis_value:
-                record.osis = osis_value
-                updated = True
-            if record.title != title:
-                record.title = title
-                updated = True
-            if record.excerpt != excerpt:
-                record.excerpt = excerpt
-                updated = True
-            if record.source != source:
-                record.source = source
-                updated = True
-            if record.perspective != perspective:
-                record.perspective = perspective
-                updated = True
-            if record.tags != tags:
-                record.tags = tags
-                updated = True
-            if record.start_verse_id != start_verse_id:
-                record.start_verse_id = start_verse_id
-                updated = True
-            if record.end_verse_id != end_verse_id:
-                record.end_verse_id = end_verse_id
-            if _assign_range(record, "start_verse_id", "end_verse_id", str(osis)):
-                updated = True
-            if updated:
-                record.updated_at = datetime.now(UTC)
 
-    if seen_ids:
-        session.execute(
-            delete(CommentaryExcerptSeed).where(~CommentaryExcerptSeed.id.in_(seen_ids))
-        )
-    session.commit()
+    _run_with_sqlite_lock_retry(session, "commentary excerpt", _load)
 
 
 def seed_geo_places(session: Session) -> None:
@@ -600,83 +725,72 @@ def seed_geo_places(session: Session) -> None:
         return
 
     payload = _load_structured(seed_path)
-    seen_slugs: set[str] = set()
-    for entry in payload:
-        slug = entry.get("slug")
-        name = entry.get("name")
-        if not slug or not name:
-            continue
-        aliases = _coerce_list(entry.get("aliases"))
-        sources = entry.get("sources")
-        confidence = entry.get("confidence")
-        lat = entry.get("lat")
-        lng = entry.get("lng")
+    if not payload:
+        return
 
-        seen_slugs.add(str(slug))
-        record = session.get(GeoPlace, slug)
-        if record is None:
-            record = GeoPlace(
-                slug=str(slug),
-                name=str(name),
-                lat=float(lat) if lat is not None else None,
-                lng=float(lng) if lng is not None else None,
-                confidence=float(confidence) if confidence is not None else None,
-                aliases=aliases,
-                sources=sources,
-            )
-            session.add(record)
-        else:
-            new_lat = float(lat) if lat is not None else None
-            new_lng = float(lng) if lng is not None else None
-            new_confidence = float(confidence) if confidence is not None else None
+    def _load(target_session: Session) -> None:
+        seen_slugs: set[str] = set()
+        for entry in payload:
+            slug = entry.get("slug")
+            name = entry.get("name")
+            if not slug or not name:
+                continue
+            aliases = _coerce_list(entry.get("aliases"))
+            sources = entry.get("sources")
+            confidence = entry.get("confidence")
+            lat = entry.get("lat")
+            lng = entry.get("lng")
 
-            changed = False
-            if record.name != name:
-                record.name = str(name)
-                changed = True
-            if record.lat != new_lat:
-                record.lat = new_lat
-                changed = True
-            if record.lng != new_lng:
-                record.lng = new_lng
-                changed = True
-            if record.confidence != new_confidence:
-                record.confidence = new_confidence
-                changed = True
-            if record.aliases != aliases:
-                record.aliases = aliases
-                changed = True
-            if record.sources != sources:
-                record.sources = sources
-                changed = True
-            if changed:
-                record.updated_at = datetime.now(UTC)
+            seen_slugs.add(str(slug))
+            record = target_session.get(GeoPlace, slug)
+            if record is None:
+                record = GeoPlace(
+                    slug=str(slug),
+                    name=str(name),
+                    lat=float(lat) if lat is not None else None,
+                    lng=float(lng) if lng is not None else None,
+                    confidence=float(confidence) if confidence is not None else None,
+                    aliases=aliases,
+                    sources=sources,
+                )
+                target_session.add(record)
+            else:
+                new_lat = float(lat) if lat is not None else None
+                new_lng = float(lng) if lng is not None else None
+                new_confidence = float(confidence) if confidence is not None else None
 
-    session.execute(delete(GeoPlace).where(~GeoPlace.slug.in_(seen_slugs)))
-    session.commit()
+                changed = False
+                if record.name != name:
+                    record.name = str(name)
+                    changed = True
+                if record.lat != new_lat:
+                    record.lat = new_lat
+                    changed = True
+                if record.lng != new_lng:
+                    record.lng = new_lng
+                    changed = True
+                if record.confidence != new_confidence:
+                    record.confidence = new_confidence
+                    changed = True
+                if record.aliases != aliases:
+                    record.aliases = aliases
+                    changed = True
+                if record.sources != sources:
+                    record.sources = sources
+                    changed = True
+                if changed:
+                    record.updated_at = datetime.now(UTC)
 
+        target_session.execute(
+            delete(GeoPlace).where(~GeoPlace.slug.in_(seen_slugs))
+        )
 
-def _safe_seed(
-    session: Session,
-    loader: Callable[[Session], None],
-    dataset_label: str,
-) -> None:
-    """Execute ``loader`` while downgrading missing perspective columns to warnings."""
-
-    try:
-        loader(session)
-    except OperationalError as exc:
-        if _handle_missing_perspective_error(session, dataset_label, exc):
-            return
-        raise
+    _run_with_sqlite_lock_retry(session, "geo place", _load)
 
 
 def seed_reference_data(session: Session) -> None:
     """Entry point for loading all bundled reference datasets."""
 
-    _safe_seed(session, seed_contradiction_claims, "contradiction")
-    _safe_seed(session, seed_harmony_claims, "harmony")
-    _safe_seed(session, seed_commentary_excerpts, "commentary excerpt")
     _run_seed_with_perspective_guard(session, seed_contradiction_claims, "contradiction")
     _run_seed_with_perspective_guard(session, seed_harmony_claims, "harmony")
     _run_seed_with_perspective_guard(session, seed_commentary_excerpts, "commentary excerpt")

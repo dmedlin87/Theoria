@@ -19,9 +19,9 @@ _SessionLocal: sessionmaker[Session] | None = None
 
 
 def _create_engine(database_url: str) -> Engine:
-    connect_args = (
-        {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    )
+    connect_args = {}
+    if database_url.startswith("sqlite"):
+        connect_args = {"check_same_thread": False, "timeout": 30}
     engine_kwargs: dict[str, object] = {
         "future": True,
         "echo": False,
