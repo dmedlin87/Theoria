@@ -612,6 +612,12 @@ def get_verse_timeline(
             total_mentions=0,
         )
 
+    # ``verse_ids`` is ordered, so the first and last entries define the
+    # inclusive range of verses that should be considered.  Several of the
+    # filtering predicates below rely on these bounds, so compute them before
+    # we start building the query instead of trying to reference them later.
+    range_start, range_end = verse_ids[0], verse_ids[-1]
+
     bind = session.get_bind()
     dialect_name = bind.dialect.name if bind is not None else ""
 
