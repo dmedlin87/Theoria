@@ -1,11 +1,5 @@
 # Potential Maintenance Tasks
 
-## Fix typo in product vision doc
-- **Issue**: `docs/more_features.md` describes "citable evidence-on tap" in the goal statement, which includes a stray hyphen that breaks the phrase.
-- **Why it matters**: Cleaning up the typo improves readability in a public-facing proposal.
-- **Proposed task**: Replace "evidence-on" with "evidence on" in the goal sentence.
-- **Context**: [`docs/more_features.md`](more_features.md) line 3. 【F:docs/more_features.md†L3-L4】
-
 ## Allow reranker to recover after transient load failures
 - **Issue**: `_resolve_reranker` in the search route caches a failed load by setting `_RERANKER_FAILED = True`. Subsequent calls short-circuit whenever the model path/digest stay the same, so the reranker never retries even if the artifact becomes available later (for example after a delayed download or redeploy).
 - **Why it matters**: A temporary filesystem or checksum issue can permanently disable reranking until the API process restarts, degrading search quality.
