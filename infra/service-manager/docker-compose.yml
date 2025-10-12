@@ -14,4 +14,4 @@ services:
     volumes:
       - ../..:/workspace
     working_dir: /workspace
-    command: ["pwsh", "-NoLogo", "-NoProfile", "-File", "start-theoria.ps1", "-ActiveDeploymentColor", "blue"]
+    command: ["-ActiveDeploymentColor", "blue"]
