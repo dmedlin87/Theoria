@@ -639,7 +639,7 @@ Creates sermon/lesson/Q&A deliverables backed by AI syntheses and deterministic 
   "type": "sermon",
   "source_ids": ["doc-1", "doc-2"],
   "model_preset": "gpt-4o-mini@openai",
-  "formats": ["md", "ndjson", "csv"],
+  "formats": ["markdown", "ndjson", "csv"],
   "filters": {
     "osis": "Romans.8",
     "collection": "romans-series"
@@ -668,7 +668,8 @@ The API immediately returns a job descriptor:
       "storage_path": "/exports/01J2Y3A7Z8X4C6V0B7N9P/sermon.ndjson",
       "signed_url": "/exports/01J2Y3A7Z8X4C6V0B7N9P/sermon.ndjson"
     }
-  ]
+  ],
+  "message": "Queued sermon deliverable"
 }
 ```
 
