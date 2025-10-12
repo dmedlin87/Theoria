@@ -2,10 +2,12 @@
 
 import "@testing-library/jest-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 
 import SearchPageClient from "../../../app/search/components/SearchPageClient";
 import type { SearchFilters } from "../../../app/search/searchParams";
 import { submitFeedback } from "../../../app/lib/telemetry";
+import { ToastProvider } from "../../../app/components/Toast";
 
 jest.mock("next/navigation", () => {
   let params = new URLSearchParams("q=logos");
@@ -38,6 +40,8 @@ const { __setSearchParams } = require("next/navigation") as {
 };
 
 const setSearchParams = __setSearchParams;
+
+const renderWithToast = (ui: ReactElement) => render(<ToastProvider>{ui}</ToastProvider>);
 
 describe("SearchPageClient feedback", () => {
   const originalFetch = global.fetch;
@@ -78,7 +82,7 @@ describe("SearchPageClient feedback", () => {
       preset: "",
     };
 
-    render(
+    renderWithToast(
       <SearchPageClient
         initialFilters={initialFilters}
         initialResults={{
@@ -153,7 +157,7 @@ describe("SearchPageClient feedback", () => {
         }),
     );
 
-    render(
+    renderWithToast(
       <SearchPageClient
         initialFilters={initialFilters}
         initialResults={null}
@@ -166,11 +170,15 @@ describe("SearchPageClient feedback", () => {
     const queryInput = screen.getByLabelText("Query");
     fireEvent.change(queryInput, { target: { value: "logos" } });
 
-    const submitButton = screen.getByRole("button", { name: /^Search(?:ing\.)?$/ });
+    const submitButton = screen.getByRole("button", { name: /Search(?:ing)? corpus/ });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByRole("status")).toHaveTextContent("Searching.");
+      expect(
+        screen
+          .getAllByRole("status")
+          .some((element) => element.textContent?.trim() === "Searching..."),
+      ).toBe(true);
     });
 
     resolveFetch?.(
@@ -181,7 +189,44 @@ describe("SearchPageClient feedback", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.queryByText("Searching...")).not.toBeInTheDocument();
+    });
+  });
+
+  it("renders trace details in a toast when requested", async () => {
+    const initialFilters: SearchFilters = {
+      query: "logos",
+      osis: "",
+      collection: "",
+      author: "",
+      sourceType: "",
+      theologicalTradition: "",
+      topicDomain: "",
+      collectionFacets: [],
+      datasetFacets: [],
+      variantFacets: [],
+      dateStart: "",
+      dateEnd: "",
+      includeVariants: false,
+      includeDisputed: false,
+      preset: "",
+    };
+
+    renderWithToast(
+      <SearchPageClient
+        initialFilters={initialFilters}
+        initialResults={null}
+        initialError={{ message: "Search failed", traceId: "trace-1234" }}
+        initialRerankerName={null}
+        initialHasSearched
+      />,
+    );
+
+    const showDetailsButton = await screen.findByRole("button", { name: "Show details" });
+    fireEvent.click(showDetailsButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Trace ID: trace-1234")).toBeInTheDocument();
     });
   });
 });
