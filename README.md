@@ -5,6 +5,7 @@
 See the following references for the complete system architecture and latest case builder specifications:
 
 - [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md)
+- [`docs/theoria_instruction_prompt.md`](docs/theoria_instruction_prompt.md)
 - [`case builder v4.md`](case%20builder%20v4.md)
 
 ## Features
