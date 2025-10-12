@@ -2,14 +2,21 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Tuple
+from typing import TYPE_CHECKING, Callable, Tuple
 
 from theo.adapters import AdapterRegistry
 from theo.application import ApplicationContainer
 from theo.application.facades.database import get_engine
 from theo.application.facades.settings import get_settings
+from theo.application.research import ResearchService
 from theo.platform import bootstrap_application
 from theo.adapters.research.sqlalchemy import SqlAlchemyResearchNoteRepositoryFactory
+
+
+if TYPE_CHECKING:  # pragma: no cover - typing helper
+    from sqlalchemy.orm import Session
+else:  # pragma: no cover - runtime fallback
+    Session = object
 
 
 def _noop_command(*_args, **_kwargs):  # pragma: no cover - transitional shim
@@ -39,6 +46,12 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
         "research_notes_repository_factory",
         lambda: SqlAlchemyResearchNoteRepositoryFactory(),
     )
+    registry.register(
+        "research_service_factory",
+        lambda: _build_research_service_factory(
+            registry.resolve("research_notes_repository_factory")
+        ),
+    )
 
     container = bootstrap_application(
         registry=registry,
@@ -46,6 +59,18 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
         retire_factory=lambda: _noop_retire,
         get_factory=lambda: _noop_get,
         list_factory=lambda: _noop_list,
-        research_factory=lambda: registry.resolve("research_notes_repository_factory"),
+        research_factory=lambda: registry.resolve("research_service_factory"),
     )
     return container, registry
+
+
+def _build_research_service_factory(
+    repository_factory: SqlAlchemyResearchNoteRepositoryFactory,
+) -> Callable[[Session], ResearchService]:
+    """Compose a research service factory from the repository adapter."""
+
+    def _factory(session: Session) -> ResearchService:
+        repository = repository_factory(session)
+        return ResearchService(repository)
+
+    return _factory
