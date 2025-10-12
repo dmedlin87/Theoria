@@ -80,19 +80,40 @@ class Reranker:
     def rerank(self, results: Sequence[HybridSearchResult]) -> list[HybridSearchResult]:
         """Return a new ordering of the supplied results sorted by the reranker."""
 
-        scores = self.score(results)
+        results_list = list(results)
+        scores = self.score(results_list)
         if not scores:
-            return list(results)
-        paired = sorted(
-            ((result, score) for result, score in zip(results, scores)),
-            key=lambda item: item[1],
-            reverse=True,
-        )
+            return [item.model_copy(deep=True) for item in results_list]
+
+        scored_indices = [
+            (index, score) for index, score in enumerate(scores) if index < len(results_list)
+        ]
+
+        if not scored_indices:
+            return [item.model_copy(deep=True) for item in results_list]
+
+        ordered_indices = [
+            index
+            for index, _ in sorted(
+                scored_indices,
+                key=lambda item: item[1],
+                reverse=True,
+            )
+        ]
+
+        if len(ordered_indices) < len(results_list):
+            covered = {index for index, _ in scored_indices}
+            ordered_indices.extend(
+                index for index in range(len(results_list)) if index not in covered
+            )
+
         reranked: list[HybridSearchResult] = []
-        for index, (result, score) in enumerate(paired, start=1):
-            result.rank = index
-            result.score = score
-            reranked.append(result)
+        for new_rank, index in enumerate(ordered_indices, start=1):
+            source = results_list[index]
+            clone = source.model_copy(deep=True)
+            clone.rank = new_rank
+            clone.score = scores[index] if index < len(scores) else source.score
+            reranked.append(clone)
         return reranked
 
 

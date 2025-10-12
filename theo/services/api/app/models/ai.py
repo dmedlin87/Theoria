@@ -85,6 +85,7 @@ class ChatMemoryEntry(APIModel):
     question: str
     answer: str
     prompt: str | None = None
+    intent_tags: list[IntentTagPayload] | None = None
     answer_summary: str | None = None
     citations: list[RAGCitation] = Field(default_factory=list)
     document_ids: list[str] = Field(default_factory=list)

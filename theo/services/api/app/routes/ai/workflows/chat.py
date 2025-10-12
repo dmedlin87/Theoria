@@ -128,16 +128,24 @@ def _persist_chat_session(
     stance: str | None,
     question: str,
     prompt: str | None,
+    intent_tags: Sequence[IntentTagPayload] | None,
     message: ChatSessionMessage,
     answer: RAGAnswer,
     preferences: ChatSessionPreferences,
 ) -> ChatSession:
     now = datetime.now(UTC)
     entries = _load_memory_entries(existing)
+    normalized_intent_tags: list[IntentTagPayload] | None = None
+    if intent_tags:
+        normalized_intent_tags = [
+            tag if isinstance(tag, IntentTagPayload) else IntentTagPayload.model_validate(tag)
+            for tag in intent_tags
+        ]
     new_entry = ChatMemoryEntry(
         question=_truncate_text(question, _MEMORY_TEXT_LIMIT),
         answer=_truncate_text(message.content, _MEMORY_TEXT_LIMIT),
         prompt=_truncate_text(prompt, _MEMORY_TEXT_LIMIT) if prompt else None,
+        intent_tags=normalized_intent_tags,
         answer_summary=(
             _truncate_text(answer.summary, _MEMORY_SUMMARY_LIMIT)
             if answer.summary
@@ -326,6 +334,7 @@ def chat_turn(
                 stance=payload.stance or payload.mode_id,
                 question=question,
                 prompt=payload.prompt,
+                intent_tags=intent_tags,
                 message=message,
                 answer=answer,
                 preferences=preferences,

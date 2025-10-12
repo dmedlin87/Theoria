@@ -450,6 +450,17 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
     call_lock = threading.Lock()
     first_started = threading.Event()
     allow_first_to_finish = threading.Event()
+    error_observed = threading.Event()
+
+    original_read_inflight = router._ledger._read_inflight
+
+    def _instrumented_read(cache_key_arg: str, *, _orig=original_read_inflight):
+        row = _orig(cache_key_arg)
+        if row is not None and row.status == "error":
+            error_observed.set()
+        return row
+
+    monkeypatch.setattr(router._ledger, "_read_inflight", _instrumented_read)
 
     class _SlowClient:
         def generate(self, **_: object) -> str:
@@ -494,6 +505,7 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
         ledger_wait_record = ledger_wait_future.result()
 
     assert call_count == 1
+    assert error_observed.wait(timeout=1.0)
     outputs = {result.output for result in results}
     outputs.add(ledger_wait_record.output)
     assert outputs == {"shared-output"}

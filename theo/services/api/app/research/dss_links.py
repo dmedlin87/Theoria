@@ -7,7 +7,14 @@ from .datasets import dss_links_dataset
 
 
 def _expand_osis(osis: str) -> list[str]:
-    """Expand a verse or simple range into individual OSIS keys."""
+    """Expand a verse or simple range into individual OSIS keys.
+
+    This helper intentionally keeps the logic lightweight – it is primarily
+    designed to cope with the single-chapter ranges used in the bundled
+    Dead Sea Scrolls dataset.  When an unexpected format is received we fall
+    back to returning the original reference instead of raising an error so
+    the API can still respond gracefully.
+    """
 
     if "-" not in osis:
         return [osis]
@@ -16,9 +23,16 @@ def _expand_osis(osis: str) -> list[str]:
     if "." not in end:
         end = f"{start.rsplit('.', 1)[0]}.{end}"
 
-    book_chapter = start.rsplit(".", 1)[0]
-    start_idx = int(start.split(".")[-1])
-    end_idx = int(end.split(".")[-1])
+    try:
+        book_chapter = start.rsplit(".", 1)[0]
+        start_idx = int(start.split(".")[-1])
+        end_idx = int(end.split(".")[-1])
+    except (IndexError, ValueError):
+        return [start, end]
+
+    if start_idx > end_idx:
+        start_idx, end_idx = end_idx, start_idx
+
     return [f"{book_chapter}.{idx}" for idx in range(start_idx, end_idx + 1)]
 
 
@@ -42,12 +56,20 @@ def fetch_dss_links(osis: str) -> list[DssLinkEntry]:
     entries: list[DssLinkEntry] = []
     for key in osis_keys:
         for raw in dataset.get(key, []):
+            url = raw.get("url")
+            if not url:
+                # Skip malformed records instead of crashing the endpoint.
+                continue
+
+            identifier = raw.get("id") or f"{key}:{len(entries)}"
+            osis_value = raw.get("osis") or key
+
             entries.append(
                 DssLinkEntry(
-                    id=raw["id"],
-                    osis=key,
+                    id=identifier,
+                    osis=osis_value,
                     title=raw.get("title") or raw.get("fragment") or "Dead Sea Scrolls link",
-                    url=raw["url"],
+                    url=url,
                     fragment=raw.get("fragment"),
                     summary=raw.get("summary"),
                     dataset=raw.get("dataset"),

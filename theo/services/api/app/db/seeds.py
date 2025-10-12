@@ -202,10 +202,41 @@ def _ensure_perspective_column(
 
     bind = session.get_bind()
     dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
-    if dialect_name == "sqlite":
-        if _add_sqlite_columns(session, table, [("perspective", "TEXT")]):
-            if _table_has_column(session, table.name, "perspective", schema=table.schema):
-                return True
+    if dialect_name == "sqlite" and bind is not None:
+        connection: Connection | None = None
+        should_close = False
+        try:
+            if isinstance(bind, Engine):
+                connection = bind.connect()
+                should_close = True
+            else:
+                connection = bind  # type: ignore[assignment]
+
+            if connection is not None:
+                statement = f'ALTER TABLE "{table.name}" ADD COLUMN perspective TEXT'
+                try:
+                    connection.exec_driver_sql(statement)
+                except OperationalError as exc:  # pragma: no cover - duplicate column
+                    message = str(getattr(exc, "orig", exc)).lower()
+                    duplicate_indicators = ("duplicate column", "already exists")
+                    if not any(indicator in message for indicator in duplicate_indicators):
+                        logger.debug(
+                            "Failed to backfill perspective column for %s seeds: %s",
+                            dataset_label,
+                            exc,
+                        )
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug(
+                        "Unexpected error while backfilling perspective column for %s seeds: %s",
+                        dataset_label,
+                        exc,
+                    )
+        finally:
+            if should_close and connection is not None:
+                connection.close()
+
+        if _table_has_column(session, table.name, "perspective", schema=table.schema):
+            return True
 
     session.rollback()
     logger.warning(
