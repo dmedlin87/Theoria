@@ -87,3 +87,28 @@ jobs:
             sbom-python.json
             sbom-node.json
           if-no-files-found: error
+
+  secrets-scan:
+    name: Secrets scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9bb56186c5da571f2b78bb0f1e0ed4f49845d2a1
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@ba4e712752d434a624f012d9d9f4f11892ca6c8e
+        with:
+          scan: git
+          extra_args: "--fail --only-verified --json --results-file trufflehog-results.json"
+
+      - name: Upload TruffleHog findings
+        if: always()
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: trufflehog-report
+          path: trufflehog-results.json
+          if-no-files-found: warn

@@ -45,6 +45,20 @@ Include the following:
 
 - **Dependency Monitoring:** Dependabot weekly groups + security-only immediate updates.
 - **SAST:** GitHub CodeQL (Python + JavaScript) on pull requests and default branch.
-- **DAST:** Planned OWASP ZAP baseline run on staging (tracked in `Repo-Health.md`).
+- **DAST:** Automated OWASP ZAP baseline scan of `https://staging.api.theoengine.com` each Monday (`.github/workflows/security-zap.yml`) with SARIF results surfaced in the repository security dashboard.
 - **Secrets Management:** Long-lived credentials stored in managed secret store (Vault/Azure Key Vault) – never committed.
+- **Secrets Scanning:** TruffleHog executes on every push/pull request via the CI workflow to block new credential leaks and archive findings for triage.
 - **Incident Response:** Centralized contact via security mailing list; create follow-up advisory in `docs/advisories/` when needed.
+
+## Secrets Exposure Response
+
+1. CI surfaces TruffleHog findings in the `trufflehog-report` artifact. Security engineering receives automatic notifications for failures on `main`.
+2. Page the on-call engineer, rotate the exposed credential in its upstream system, and revoke any associated refresh tokens or API keys.
+3. Purge the secret from Git history using BFG or `git filter-repo`; ensure rewritten branches are force-pushed and communicate the rewrite to collaborators.
+4. File an incident ticket documenting scope, blast radius, and remediation steps; close only after rotation and history purge are verified.
+
+## DAST Finding Triage
+
+1. ZAP alerts appear in the GitHub Security tab once the SARIF upload from `security-zap.yml` completes.
+2. Classify the alert severity (High/Medium -> 24h fix SLA, Low -> next sprint backlog) and assign ownership based on the impacted API surface.
+3. Validate the issue against staging using ZAP or manual reproduction, then land fixes with regression tests. Dismiss false positives in the security dashboard with justification referencing ZAP rule IDs.
