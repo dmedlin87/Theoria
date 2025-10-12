@@ -9,6 +9,8 @@ import promisePlugin from 'eslint-plugin-promise';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
+import theoriaPlugin from './eslint-rules/index.js';
+import qualityBaseline from './config/ui-quality-baseline.json' with { type: 'json' };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -48,6 +50,7 @@ export default [
       react: reactPlugin,
       'react-hooks': reactHooksPlugin,
       'jsx-a11y': jsxA11yPlugin,
+      theoria: theoriaPlugin,
     },
     settings: {
       react: {
@@ -83,6 +86,22 @@ export default [
       'jsx-a11y/no-noninteractive-tabindex': 'off',
       'no-redeclare': 'off',
       'no-useless-escape': 'off',
+      'theoria/no-inline-styles': [
+        'error',
+        {
+          rootDir: __dirname,
+          allowances: qualityBaseline.inlineStyleAllowance,
+          default: 0,
+        },
+      ],
+      'theoria/component-max-lines': [
+        'error',
+        {
+          rootDir: __dirname,
+          allowances: qualityBaseline.componentLineAllowance,
+          defaultMax: qualityBaseline.componentDefaultMax,
+        },
+      ],
     },
   },
 ];

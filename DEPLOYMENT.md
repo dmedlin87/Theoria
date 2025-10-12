@@ -12,30 +12,57 @@
 | Step | Tooling | Notes |
 | --- | --- | --- |
 | SBOM | `cyclonedx-bom`, `@cyclonedx/cyclonedx-npm` | Generated automatically in CI; review before release. |
-| Provenance | `cosign attest --predicate sbom.json` | Attach SBOM as in-toto predicate for each image. |
-| Image Signing | `cosign sign --key $COSIGN_KEY` | Store key material in HSM/KMS; enforce key rotation annually. |
-| Verification | `cosign verify` in CD pipeline | Fail deployment if signature missing or invalid. |
+| Provenance | `cosign attest --predicate build-attestation.json --type https://theoria.dev/attestations/container-build` | Predicate bundles build metadata plus SBOM digest for downstream verification. |
+| Image Signing | `cosign sign --keyless` | GitHub OIDC identity is recorded in the Sigstore transparency log; no long-lived keys required. |
+| Verification | `cosign verify` & `cosign verify-attestation` in CD pipeline | Fail deployment if signature or attestation missing/invalid. |
 
 ### Automated signing workflow
 
 - The `Release Containers` GitHub Actions workflow (`.github/workflows/deployment-sign.yml`) builds the API container from
   `theo/services/api/Dockerfile`, pushes it to GHCR, and publishes the digest that downstream deployments must consume.
-- The job uses GitHub OIDC for **keyless** Sigstore signing (`cosign sign --keyless`) and emits matching CycloneDX SBOM
-  attestations (`cosign attest --type cyclonedx`).
-- `anchore/sbom-action` generates the image SBOM that is attached as the predicate to the attestation artifact so the registry
-  always holds a verifiable provenance chain.
-- Workflow artifacts (`sbom-image.cdx.json` and `image-metadata.json`) are uploaded for release managers to review and archive
-  alongside the promotion checklist.
-- Consumers should verify signatures with `cosign verify --certificate-identity https://github.com/<org>/<repo> --certificate-oidc-issuer https://token.actions.githubusercontent.com <image@digest>` before rollout.
+- The job uses GitHub OIDC for **keyless** Sigstore signing (`cosign sign --keyless`) and records the signature in the
+  transparency log. Any tampering or re-build without the workflow identity is rejected during verification.
+- `anchore/sbom-action` generates the image SBOM and the workflow constructs a `build-attestation.json` predicate that bundles
+  the SBOM hash together with Git reference, workflow metadata, and run identifiers. This predicate is signed with
+  `cosign attest --type https://theoria.dev/attestations/container-build` so both provenance and bill-of-materials are
+  traceable.
+- Workflow artifacts (`sbom-image.cdx.json`, `build-attestation.json`, `image-metadata.json`, `image-signature.sig`, and
+  `image-provenance.intoto.jsonl`) are uploaded as run artifacts and published to the matching GitHub release tag to satisfy
+  archival requirements.
+- Consumers should verify signatures and attestations before rollout:
+  ```bash
+  IMAGE="ghcr.io/<org>/theoria-api@sha256:<digest>"
+  cosign verify \
+    --certificate-identity "https://github.com/<org>/<repo>/.github/workflows/deployment-sign.yml@refs/tags/<tag>" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    "${IMAGE}"
+
+  cosign verify-attestation \
+    --type https://theoria.dev/attestations/container-build \
+    --certificate-identity "https://github.com/<org>/<repo>/.github/workflows/deployment-sign.yml@refs/tags/<tag>" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    "${IMAGE}"
+  ```
+  The verification command will fail if the signed identity does not match the repository workflow, if the signature is
+  missing, or if the attestation has been revoked.
+
+### Trusting the signing identity
+
+- Cosign keyless signing relies on GitHub's OIDC issuer (`https://token.actions.githubusercontent.com`). The Sigstore
+  certificate embeds the workflow identity (`https://github.com/<org>/<repo>/.github/workflows/deployment-sign.yml@<ref>`),
+  which must be pinned during verification.
+- To audit the transparency log entry for a given digest use `cosign triangulate <image@digest>` which returns the canonical
+  bundle references stored in the registry.
+- If a compromise requires revoking trust, disable the workflow, rotate the repository environment protection rules, and
+  republish using a new tag so downstream automation can mark the previous digest as quarantined.
 
 ## Release Process
 
 1. Tag release (`git tag vX.Y.Z`).
-2. Run GitHub Release workflow (future) that:
-   - Builds containers for API, worker, CLI images.
-   - Uploads SBOM and provenance attestation as release assets.
-   - Signs artifacts with cosign key stored in secrets manager.
-3. Deploy via infrastructure-as-code (Terraform/Kubernetes) referencing immutable image digests.
+2. Push the tag to trigger `Release Containers`. The workflow will build, sign, and attest the API image, then attach the
+   SBOM, predicate, signature, and metadata files to the GitHub release associated with the tag.
+3. Review the generated assets on the release page. Confirm the attestation references the expected git SHA and SBOM hash.
+4. Deploy via infrastructure-as-code (Terraform/Kubernetes) referencing immutable image digests from the release metadata.
 
 ## Environment Hardening
 

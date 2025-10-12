@@ -1,0 +1,66 @@
+{
+  "services": [
+    {
+      "key": "Api",
+      "name": "Theoria API",
+      "processName": "python",
+      "healthEndpoint": "http://127.0.0.1:{Port}/health",
+      "healthIntervalSeconds": 10,
+      "dependencies": [],
+      "metricsLabel": "api",
+      "deployment": {
+        "slots": {
+          "blue": {
+            "port": 8000,
+            "healthEndpoint": "http://127.0.0.1:8000/health"
+          },
+          "green": {
+            "port": 8100,
+            "healthEndpoint": "http://127.0.0.1:8100/health"
+          }
+        }
+      }
+    },
+    {
+      "key": "Web",
+      "name": "Theoria Web",
+      "processName": "node",
+      "healthEndpoint": "http://127.0.0.1:{Port}",
+      "healthIntervalSeconds": 15,
+      "dependencies": ["Api"],
+      "metricsLabel": "web",
+      "deployment": {
+        "slots": {
+          "blue": {
+            "port": 3000,
+            "healthEndpoint": "http://127.0.0.1:3000"
+          },
+          "green": {
+            "port": 3300,
+            "healthEndpoint": "http://127.0.0.1:3300"
+          }
+        }
+      }
+    }
+  ],
+  "alerts": {
+    "email": {
+      "enabled": false,
+      "from": "theoria@localhost",
+      "recipients": [],
+      "smtpServer": "localhost",
+      "port": 25
+    },
+    "slack": {
+      "enabled": false,
+      "webhookUrl": ""
+    }
+  },
+  "metrics": {
+    "port": 9101,
+    "exportFile": "metrics/service_metrics.prom"
+  },
+  "profiling": {
+    "enabled": false
+  }
+}

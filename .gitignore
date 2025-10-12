@@ -27,6 +27,8 @@ env/
 .env.*
 !.env.example
 .envrc
+infra/certs/*.pem
+logs/*.jsonl
 
 # Python caches and tooling
 .pytest_cache/
@@ -51,5 +53,9 @@ build/
 **/playwright-report/
 **/blob-report/
 
+# Metrics artifacts
+metrics/*.prom
+
 # OS-specific
 Thumbs.db
+trufflehog-findings.json

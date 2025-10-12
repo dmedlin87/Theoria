@@ -66,6 +66,52 @@ jobs:
           format: cyclonedx-json
           output-file: sbom-image.cdx.json
 
+      - name: Prepare build attestation predicate
+        id: predicate
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          VERSION_TAG: ${{ steps.meta.outputs.version_tag }}
+        run: |
+          SBOM_SHA256="$(sha256sum sbom-image.cdx.json | cut -d ' ' -f1)"
+          BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          SOURCE_SHA1="$(git rev-parse HEAD)"
+          cat <<JSON > build-attestation.json
+          {
+            "builder": {
+              "id": "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/deployment-sign.yml"
+            },
+            "buildType": "https://theoria.dev/attestations/container-build",
+            "buildConfig": {
+              "workflow": "${{ github.workflow }}",
+              "run_id": "${{ github.run_id }}",
+              "run_attempt": "${{ github.run_attempt }}",
+              "runner": "${{ runner.name }}"
+            },
+            "metadata": {
+              "image": "${IMAGE}",
+              "version_tag": "${VERSION_TAG}",
+              "git_ref": "${GITHUB_REF}",
+              "git_sha": "${GITHUB_SHA}",
+              "repository": "${GITHUB_REPOSITORY}",
+              "build_timestamp": "${BUILD_TIMESTAMP}"
+            },
+            "materials": [
+              {
+                "uri": "git+https://github.com/${GITHUB_REPOSITORY}@${GITHUB_SHA}",
+                "digest": {
+                  "sha1": "${SOURCE_SHA1}"
+                }
+              }
+            ],
+            "sbom": {
+              "file": "sbom-image.cdx.json",
+              "sha256": "${SBOM_SHA256}",
+              "format": "cyclonedx-json"
+            }
+          }
+          JSON
+          echo "sbom_sha256=${SBOM_SHA256}" >> "$GITHUB_OUTPUT"
+
       - name: Sign container image with Sigstore
         env:
           COSIGN_YES: 'true'
@@ -76,7 +122,31 @@ jobs:
         env:
           COSIGN_YES: 'true'
         run: |
-          cosign attest --predicate sbom-image.cdx.json --type cyclonedx ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          cosign attest \
+            --predicate build-attestation.json \
+            --type https://theoria.dev/attestations/container-build \
+            ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+
+      - name: Verify image signature
+        env:
+          COSIGN_YES: 'true'
+          EXPECTED_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/deployment-sign.yml@${{ github.ref }}
+        run: |
+          cosign verify \
+            --certificate-identity "${EXPECTED_IDENTITY}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+
+      - name: Verify build attestation presence
+        env:
+          COSIGN_YES: 'true'
+          EXPECTED_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/deployment-sign.yml@${{ github.ref }}
+        run: |
+          cosign verify-attestation \
+            --type https://theoria.dev/attestations/container-build \
+            --certificate-identity "${EXPECTED_IDENTITY}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
 
       - name: Write image metadata summary
         run: |
@@ -91,6 +161,13 @@ jobs:
           }
           JSON
 
+      - name: Download signature and attestation
+        env:
+          COSIGN_YES: 'true'
+        run: |
+          cosign download signature ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }} > image-signature.sig
+          cosign download attestation ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }} > image-provenance.intoto.jsonl
+
       - name: Upload signing artifacts
         uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
         with:
@@ -98,4 +175,23 @@ jobs:
           path: |
             sbom-image.cdx.json
             image-metadata.json
+            build-attestation.json
+            image-signature.sig
+            image-provenance.intoto.jsonl
           if-no-files-found: error
+
+      - name: Publish signing assets to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release create "${GITHUB_REF_NAME}" --notes "Automated container release for ${GITHUB_REF_NAME}"
+          fi
+          gh release upload "${GITHUB_REF_NAME}" \
+            sbom-image.cdx.json \
+            image-metadata.json \
+            build-attestation.json \
+            image-signature.sig \
+            image-provenance.intoto.jsonl \
+            --clobber

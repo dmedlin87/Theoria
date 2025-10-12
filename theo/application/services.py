@@ -2,9 +2,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Callable, Protocol
 
 from theo.domain import Document, DocumentId
+
+from .research import ResearchService
+
+if TYPE_CHECKING:  # pragma: no cover - typing helper
+    from sqlalchemy.orm import Session
+else:  # pragma: no cover - runtime fallback
+    Session = object
 
 
 class _CommandCallable(Protocol):
@@ -37,6 +45,8 @@ class ApplicationContainer:
     get_document: _GetCallable
     list_documents: _ListCallable
 
+    research_service_factory: Callable[[Session], ResearchService]
+
     def bind_command(self) -> Callable[[Document], DocumentId]:
         """Return a command adapter for ingestion workflows."""
 
@@ -59,3 +69,8 @@ class ApplicationContainer:
             return self.list_documents(limit=limit)
 
         return _runner
+
+    def get_research_service(self, session: Session) -> ResearchService:
+        """Return a research service bound to the provided session."""
+
+        return self.research_service_factory(session)
