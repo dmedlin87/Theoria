@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Sequence, cast
+from typing import Any, Callable, Iterable, Iterator, Sequence, TYPE_CHECKING, cast
 from uuid import uuid4
 
 import click
@@ -22,12 +22,23 @@ from ..api.app.ingest.pipeline import (
     run_pipeline_for_file,
     run_pipeline_for_url,
 )
-from ..api.app.workers import tasks as worker_tasks
 from ..api.app.telemetry import log_workflow_event
 from theo.services.bootstrap import resolve_application
 
 
 APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checking only
+    from ..api.app.workers import tasks as worker_tasks
+
+
+def _get_worker_tasks():
+    """Import worker tasks lazily to avoid circular imports during bootstrap."""
+
+    from ..api.app.workers import tasks as worker_tasks
+
+    return worker_tasks
 
 
 def get_settings():  # pragma: no cover - transitional wiring helper
@@ -249,7 +260,8 @@ def _post_batch_tags(session: Session, document_ids: Iterable[str]) -> None:
 
 def _post_batch_biblio(_: Session, document_ids: Iterable[str]) -> None:
     click.echo("   Running post-batch step: biblio")
-    enrich_document_task = cast(Any, worker_tasks.enrich_document)
+    tasks_module = _get_worker_tasks()
+    enrich_document_task = cast(Any, tasks_module.enrich_document)
     for doc_id in document_ids:
         try:
             async_result = enrich_document_task.delay(doc_id)
@@ -348,8 +360,9 @@ def _queue_batch_via_worker(
     batch: list[IngestItem], overrides: dict[str, object]
 ) -> list[str]:
     task_ids: list[str] = []
-    process_file_task = cast(Any, worker_tasks.process_file)
-    process_url_task = cast(Any, worker_tasks.process_url)
+    tasks_module = _get_worker_tasks()
+    process_file_task = cast(Any, tasks_module.process_file)
+    process_url_task = cast(Any, tasks_module.process_url)
     for item in batch:
         frontmatter = dict(overrides)
         if item.is_remote:
