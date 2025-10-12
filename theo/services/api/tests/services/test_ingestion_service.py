@@ -7,6 +7,7 @@ import pytest
 
 from theo.services.api.app.models.documents import SimpleIngestRequest
 from theo.services.api.app.services.ingestion_service import IngestionService
+from theo.services.api.app.ingest.pipeline import PipelineDependencies
 
 
 class _StubItem:
@@ -193,3 +194,34 @@ def test_simple_ingest_worker_mode_warns_on_post_batch(_settings: SimpleNamespac
 
     assert workflow_events[-1][1]["queued"] == 1
     assert cli.queue_calls
+
+
+def test_simple_ingest_propagates_post_batch_steps(_settings: SimpleNamespace) -> None:
+    """CLI post-batch selections are forwarded through the service layer."""
+
+    items = [_StubItem("doc", "markdown")]
+    cli = _StubCLI(items)
+
+    service = IngestionService(
+        settings=_settings,
+        run_file_pipeline=lambda *a, **k: SimpleNamespace(id="doc-1"),
+        run_url_pipeline=lambda *a, **k: SimpleNamespace(id="doc-1"),
+        run_transcript_pipeline=lambda *a, **k: SimpleNamespace(id="doc-1"),
+        cli_module=cli,
+        log_workflow=lambda *a, **k: None,
+    )
+
+    payload = SimpleIngestRequest(
+        sources=["/tmp"],
+        mode="api",
+        post_batch=["tags", "summaries"],
+        batch_size=1,
+    )
+
+    events = list(service.stream_simple_ingest(payload))
+
+    assert any(event["event"] == "complete" for event in events)
+    assert cli.ingest_calls, "expected API ingestion to run"
+    batch = cli.ingest_calls[0]
+    assert batch[2] == {"tags", "summaries"}
+    assert isinstance(batch[3], PipelineDependencies)
