@@ -15,11 +15,6 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
-from ..ingest.pipeline import (
-    run_pipeline_for_file as _run_pipeline_for_file,
-    run_pipeline_for_transcript as _run_pipeline_for_transcript,
-    run_pipeline_for_url as _run_pipeline_for_url,
-)
 from ..ingest.exceptions import UnsupportedSourceError
 from ..ingest.pipeline import (
     run_pipeline_for_file as _run_pipeline_for_file,
@@ -47,10 +42,6 @@ _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
     status.HTTP_413_REQUEST_ENTITY_TOO_LARGE: {"description": "Upload too large"},
 }
-
-
-run_pipeline_for_file = _default_run_pipeline_for_file
-run_pipeline_for_transcript = _default_run_pipeline_for_transcript
 
 
 def _ingestion_service_with_overrides(
