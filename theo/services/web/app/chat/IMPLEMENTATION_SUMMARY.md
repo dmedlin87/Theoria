@@ -46,7 +46,7 @@
 
 **Retry Logic**:
 
-```
+```text
 Attempt 1: Immediate
 Attempt 2: After 1000ms
 Attempt 3: After 2000ms

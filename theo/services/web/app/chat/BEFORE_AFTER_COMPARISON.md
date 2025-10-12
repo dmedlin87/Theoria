@@ -47,7 +47,7 @@ state.guardrail
 
 ## Scenario 2: Session Restoration
 
-### Before (Old Approach)
+### Before (Session Restoration)
 
 ```typescript
 useEffect(() => {
@@ -118,7 +118,7 @@ useEffect(() => {
 }, [activeClient]);
 ```
 
-### After (New Approach)
+### After (Session Restoration)
 
 ```typescript
 // Simple hook call with automatic retry logic
@@ -146,7 +146,7 @@ useSessionPersistence(state.sessionId);
 
 ## Scenario 3: Starting a Chat Message
 
-### Before (Old Approach)
+### Before (Starting Chat)
 
 ```typescript
 const executeChat = useCallback(async (question: string) => {
@@ -184,7 +184,7 @@ const executeChat = useCallback(async (question: string) => {
 }, [/* many dependencies */]);
 ```
 
-### After (New Approach)
+### After (Starting Chat)
 
 ```typescript
 const { executeChat } = useChatExecution(
@@ -219,7 +219,7 @@ await executeChat(question);
 
 ## Scenario 4: Handling Stream Events
 
-### Before (Old Approach)
+### Before (Stream Events)
 
 ```typescript
 const applyStreamEvent = useCallback(
@@ -278,7 +278,7 @@ const applyStreamEvent = useCallback(
 );
 ```
 
-### After (New Approach)
+### After (Stream Events)
 
 ```typescript
 // Centralized in useChatExecution hook
@@ -332,7 +332,7 @@ const applyStreamEvent = useCallback(
 
 ## Scenario 5: Submitting Feedback
 
-### Before (Old Approach)
+### Before (Submitting Feedback)
 
 ```typescript
 const handleAssistantFeedback = useCallback(
@@ -370,7 +370,7 @@ const handleAssistantFeedback = useCallback(
 );
 ```
 
-### After (New Approach)
+### After (Submitting Feedback)
 
 ```typescript
 const handleAssistantFeedback = useCallback(
@@ -406,7 +406,7 @@ const handleAssistantFeedback = useCallback(
 
 ## Scenario 6: Resetting Session
 
-### Before (Old Approach)
+### Before (Resetting Session)
 
 ```typescript
 const handleResetSession = useCallback(() => {
@@ -431,7 +431,7 @@ const handleResetSession = useCallback(() => {
 }, []);
 ```
 
-### After (New Approach)
+### After (Resetting Session)
 
 ```typescript
 const handleResetSession = useCallback(() => {
@@ -455,7 +455,7 @@ const handleResetSession = useCallback(() => {
 
 ## Scenario 7: Error Handling
 
-### Before (Old Approach)
+### Before (Error Handling)
 
 ```typescript
 try {
@@ -498,7 +498,7 @@ try {
 }
 ```
 
-### After (New Approach)
+### After (Error Handling)
 
 ```typescript
 // Handled inside useChatExecution hook with clean dispatch calls

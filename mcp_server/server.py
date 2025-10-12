@@ -1,15 +1,28 @@
-"""Theo Engine MCP server exposing tool metadata and stub handlers."""
+"""Theo Engine MCP server exposing tool metadata and handlers."""
 
 from __future__ import annotations
 
 import logging
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Annotated, Any, Awaitable, Callable, Dict, Generic, Iterable, Mapping, TypeVar, cast
 from uuid import uuid4
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, Request
+from fastapi.responses import JSONResponse
+
 from . import schemas
+from .config import ServerConfig
+from .errors import MCPError, mcp_error_handler, generic_error_handler
+from .metrics import get_metrics_collector
+from .middleware import (
+    CORSHeaderMiddleware,
+    RequestIDMiddleware,
+    RequestLimitMiddleware,
+    RequestTimingMiddleware,
+    SecurityHeadersMiddleware,
+)
 from .tools import read, write
 
 LOGGER = logging.getLogger(__name__)
@@ -145,11 +158,42 @@ def _tools_enabled() -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+# Load configuration
+CONFIG = ServerConfig.from_env()
+
 TOOLS: tuple[ToolDefinition[Any, Any], ...] = (
-    _build_tools() if _tools_enabled() else tuple()
+    _build_tools() if CONFIG.tools_enabled else tuple()
 )
 
-app = FastAPI(title="Theo Engine MCP Server", version="0.1.0")
+# Initialize FastAPI application
+app = FastAPI(
+    title=CONFIG.name,
+    version=CONFIG.version,
+    description="Model Context Protocol server for Theo theological research engine",
+    docs_url="/docs" if CONFIG.debug else None,
+    redoc_url="/redoc" if CONFIG.debug else None,
+)
+
+# Register error handlers
+app.add_exception_handler(MCPError, mcp_error_handler)
+app.add_exception_handler(Exception, generic_error_handler)
+
+# Register middleware (order matters - later middleware wraps earlier)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestTimingMiddleware)
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(
+    RequestLimitMiddleware,
+    max_body_size=CONFIG.max_request_body_size,
+)
+
+# Add CORS if origins configured
+if CONFIG.cors_allow_origins:
+    app.add_middleware(
+        CORSHeaderMiddleware,
+        allow_origins=CONFIG.cors_allow_origins,
+        allow_credentials=CONFIG.cors_allow_credentials,
+    )
 
 
 def _register_tool_routes(application: FastAPI, tools: Iterable[ToolDefinition]) -> None:
@@ -214,11 +258,59 @@ def metadata() -> Dict[str, Any]:
     }
 
 
-def healthcheck() -> Dict[str, str]:
-    """Simple healthcheck endpoint for deployments."""
+def healthcheck() -> Dict[str, Any]:
+    """Enhanced healthcheck endpoint with service status."""
+    from .security import get_read_security_policy, get_write_security_policy
 
-    return {"status": "ok"}
+    status_info: Dict[str, Any] = {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": CONFIG.version,
+        "environment": CONFIG.environment,
+    }
+
+    # Include service checks in debug mode
+    if CONFIG.debug:
+        status_info["services"] = {
+            "tools_enabled": CONFIG.tools_enabled,
+            "tools_count": len(TOOLS),
+            "metrics_enabled": CONFIG.metrics_enabled,
+        }
+
+        # Security policy status
+        read_policy = get_read_security_policy()
+        write_policy = get_write_security_policy()
+        status_info["security"] = {
+            "read_rate_limits": len(read_policy.rate_limits),
+            "write_rate_limits": len(write_policy.rate_limits),
+            "write_allowlists": len(write_policy.allowlists),
+        }
+
+    return status_info
+
+
+def metrics() -> Dict[str, Any]:
+    """Expose operational metrics for monitoring."""
+    if not CONFIG.metrics_enabled:
+        return {"error": "Metrics collection is disabled"}
+
+    collector = get_metrics_collector()
+    metrics_data = collector.get_metrics_summary()
+
+    # Include security metrics
+    from .security import get_read_security_policy, get_write_security_policy
+
+    read_policy = get_read_security_policy()
+    write_policy = get_write_security_policy()
+
+    metrics_data["security"] = {
+        "read_events": read_policy.get_security_metrics(),
+        "write_events": write_policy.get_security_metrics(),
+    }
+
+    return metrics_data
 
 
 app.get("/metadata", response_model=dict[str, Any])(metadata)
-app.post("/health", response_model=dict[str, str])(healthcheck)
+app.get("/health", response_model=dict[str, Any])(healthcheck)
+app.get("/metrics", response_model=dict[str, Any])(metrics)

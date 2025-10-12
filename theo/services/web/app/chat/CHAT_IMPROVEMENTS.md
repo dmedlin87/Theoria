@@ -39,7 +39,7 @@ This document outlines the improvements made to the chat workspace state managem
 
 ### Before
 
-```
+```text
 ChatWorkspace.tsx (796 lines)
 ├── 18+ useState hooks
 ├── Multiple useEffect hooks with complex dependencies
@@ -49,7 +49,7 @@ ChatWorkspace.tsx (796 lines)
 
 ### After
 
-```
+```text
 ChatWorkspace.tsx (refactored)
 ├── useChatWorkspaceState() - centralized state
 ├── useSessionRestoration() - restoration logic

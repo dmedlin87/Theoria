@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from fastapi import HTTPException, status
+from fastapi import status
+
+from .errors import ValidationError as MCPValidationError
 
 # Security constraints for MCP inputs
 MAX_QUERY_LENGTH = 2000
@@ -32,15 +34,11 @@ INJECTION_PATTERNS = [
 ]
 
 
-class ValidationError(HTTPException):
+class ValidationError(MCPValidationError):
     """Raised when request validation fails."""
 
     def __init__(self, message: str, field: str | None = None) -> None:
-        detail = f"Validation failed: {message}"
-        if field:
-            detail = f"Validation failed for field '{field}': {message}"
-        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
-        self.field = field
+        super().__init__(message=message, field=field)
 
 
 def validate_header(
@@ -108,8 +106,8 @@ def check_injection_patterns(text: str, field_name: str) -> None:
     for pattern, description in INJECTION_PATTERNS:
         if pattern.search(text):
             raise ValidationError(
-                f"Detected potential security risk: {description}",
-                field_name,
+                message=f"Detected potential security risk: {description}",
+                field=field_name,
             )
 
 

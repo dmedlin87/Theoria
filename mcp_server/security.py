@@ -13,12 +13,13 @@ from typing import Deque, Dict, Iterable, Literal, MutableMapping, Tuple
 from fastapi import status
 
 from . import schemas
+from .errors import AuthorizationError, RateLimitError
 
 LOGGER = logging.getLogger(__name__)
 
 
 class WriteSecurityError(RuntimeError):
-    """Raised when a write request violates policy."""
+    """Raised when a write request violates policy (legacy compatibility)."""
 
     def __init__(self, message: str, *, status_code: int = status.HTTP_403_FORBIDDEN) -> None:
         super().__init__(message)
@@ -97,9 +98,8 @@ class WriteSecurityPolicy:
                 return
         actor_id = next(iter(self._actors(tenant_id, end_user_id)), "unknown")
         self._log_security_event("access_denied", tool, actor=actor_id)
-        raise WriteSecurityError(
-            f"Writes to {tool} are not allowed for the supplied identity",
-            status_code=status.HTTP_403_FORBIDDEN,
+        raise AuthorizationError(
+            f"Writes to {tool} are not allowed for the supplied identity"
         )
 
     def enforce_rate_limit(
@@ -125,9 +125,9 @@ class WriteSecurityPolicy:
                 bucket.popleft()
             if len(bucket) >= limit:
                 self._log_security_event("rate_limit_exceeded", tool, actor=actor)
-                raise WriteSecurityError(
-                    "Rate limit exceeded for tool write",
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                raise RateLimitError(
+                    f"Rate limit exceeded for {tool}",
+                    retry_after=self.window_seconds,
                 )
             bucket.append(now)
 
@@ -220,9 +220,9 @@ class ReadSecurityPolicy:
                 bucket.popleft()
             if len(bucket) >= limit:
                 self._log_security_event("rate_limit_exceeded", tool, actor=end_user_id)
-                raise WriteSecurityError(
+                raise RateLimitError(
                     f"Rate limit exceeded for {tool}",
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    retry_after=self.window_seconds,
                 )
             bucket.append(now)
 

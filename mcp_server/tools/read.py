@@ -58,26 +58,40 @@ def _session_scope() -> Iterator[Session]:
 def _tool_instrumentation(
     tool: str, request: schemas.ToolRequestBase, end_user_id: str
 ) -> Iterator[tuple[str, Any]]:
-    """Context manager adding span attributes and structured logging."""
+    """Context manager adding span attributes, logging, and metrics."""
+    import time
+    from ..metrics import get_metrics_collector
 
     run_id = str(uuid4())
-    with _TRACER.start_as_current_span(f"mcp.{tool}") as span:
-        span.set_attribute("tool.name", tool)
-        span.set_attribute("tool.request_id", request.request_id)
-        span.set_attribute("tool.end_user_id", end_user_id)
-        span.set_attribute("tool.commit", request.commit)
-        LOGGER.info(
-            "mcp.tool.invoked",
-            extra={
-                "event": f"mcp.{tool}",
-                "tool": tool,
-                "request_id": request.request_id,
-                "end_user_id": end_user_id,
-                "commit": request.commit,
-                "run_id": run_id,
-            },
-        )
-        yield run_id, span
+    start_time = time.perf_counter()
+    success = True
+
+    try:
+        with _TRACER.start_as_current_span(f"mcp.{tool}") as span:
+            span.set_attribute("tool.name", tool)
+            span.set_attribute("tool.request_id", request.request_id)
+            span.set_attribute("tool.end_user_id", end_user_id)
+            span.set_attribute("tool.commit", request.commit)
+            LOGGER.info(
+                "mcp.tool.invoked",
+                extra={
+                    "event": f"mcp.{tool}",
+                    "tool": tool,
+                    "request_id": request.request_id,
+                    "end_user_id": end_user_id,
+                    "commit": request.commit,
+                    "run_id": run_id,
+                },
+            )
+            yield run_id, span
+    except Exception:
+        success = False
+        raise
+    finally:
+        # Record metrics
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        collector = get_metrics_collector()
+        collector.record_tool_invocation(tool, duration_ms, success)
 
 
 def _render_snippet_html(

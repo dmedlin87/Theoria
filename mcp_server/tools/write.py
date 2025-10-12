@@ -55,30 +55,46 @@ def _write_instrumentation(
     tenant_id: str | None,
     idempotency_key: str | None,
 ) -> Iterator[tuple[str, Any]]:
+    """Context manager for write tool instrumentation with metrics."""
+    import time
+    from ..metrics import get_metrics_collector
+
     run_id = str(uuid4())
-    with _TRACER.start_as_current_span(f"mcp.{tool}") as span:
-        span.set_attribute("tool.name", tool)
-        span.set_attribute("tool.request_id", request.request_id)
-        span.set_attribute("tool.end_user_id", end_user_id)
-        span.set_attribute("tool.commit", request.commit)
-        if tenant_id:
-            span.set_attribute("tool.tenant_id", tenant_id)
-        if idempotency_key:
-            span.set_attribute("tool.idempotency_key", idempotency_key)
-        LOGGER.info(
-            "mcp.tool.invoked",
-            extra={
-                "event": f"mcp.{tool}",
-                "tool": tool,
-                "request_id": request.request_id,
-                "end_user_id": end_user_id,
-                "tenant_id": tenant_id,
-                "commit": request.commit,
-                "idempotency_key": idempotency_key,
-                "run_id": run_id,
-            },
-        )
-        yield run_id, span
+    start_time = time.perf_counter()
+    success = True
+
+    try:
+        with _TRACER.start_as_current_span(f"mcp.{tool}") as span:
+            span.set_attribute("tool.name", tool)
+            span.set_attribute("tool.request_id", request.request_id)
+            span.set_attribute("tool.end_user_id", end_user_id)
+            span.set_attribute("tool.commit", request.commit)
+            if tenant_id:
+                span.set_attribute("tool.tenant_id", tenant_id)
+            if idempotency_key:
+                span.set_attribute("tool.idempotency_key", idempotency_key)
+            LOGGER.info(
+                "mcp.tool.invoked",
+                extra={
+                    "event": f"mcp.{tool}",
+                    "tool": tool,
+                    "request_id": request.request_id,
+                    "end_user_id": end_user_id,
+                    "tenant_id": tenant_id,
+                    "commit": request.commit,
+                    "idempotency_key": idempotency_key,
+                    "run_id": run_id,
+                },
+            )
+            yield run_id, span
+    except Exception:
+        success = False
+        raise
+    finally:
+        # Record metrics
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        collector = get_metrics_collector()
+        collector.record_tool_invocation(tool, duration_ms, success)
 
 
 def _note_preview_payload(preview: Any) -> Dict[str, Any]:
