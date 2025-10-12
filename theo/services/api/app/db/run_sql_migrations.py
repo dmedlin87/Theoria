@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from inspect import signature
 import importlib.util
 import logging
+import re
 from pathlib import Path
 from typing import Iterable
 import runpy
@@ -34,7 +35,6 @@ def _iter_migration_files(migrations_path: Path) -> Iterable[Path]:
         path
         for path in migrations_path.iterdir()
         if path.is_file() and path.suffix.lower() in _SUPPORTED_EXTENSIONS
-        if path.is_file() and path.suffix.lower() in {".sql", ".py"}
     )
 
 
@@ -199,6 +199,47 @@ def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
             # SQLite pragma rows expose column name at index 1
             if len(row) > 1 and row[1] == column:
                 return True
+    return False
+
+
+_SQLITE_ADD_COLUMN_RE = re.compile(
+    r"^\s*ALTER\s+TABLE\s+(?P<table>[^\s]+)\s+ADD\s+COLUMN\s+(?P<column>[^\s]+)",
+    re.IGNORECASE,
+)
+
+
+def _normalize_identifier(identifier: str) -> str:
+    """Strip SQLite identifier quoting and schema prefixes."""
+
+    normalized = identifier.strip().strip("`\"[]")
+    if "." in normalized:
+        normalized = normalized.split(".")[-1]
+    return normalized
+
+
+def _sqlite_should_skip_statement(statement: str, *, engine: Engine) -> bool:
+    """Return ``True`` when a SQLite statement should be skipped.
+
+    SQLite raises ``OperationalError`` if ``ALTER TABLE ... ADD COLUMN`` is
+    executed for a column that already exists.  Test fixtures often call
+    ``Base.metadata.create_all`` before running migrations, which means schema
+    additions may already be present.  Detect these idempotent column additions
+    and silently skip them so the migration runner remains resilient.
+    """
+
+    match = _SQLITE_ADD_COLUMN_RE.match(statement)
+    if not match:
+        return False
+
+    table = _normalize_identifier(match.group("table"))
+    column = _normalize_identifier(match.group("column"))
+    if _sqlite_has_column(engine, table, column):
+        logger.debug(
+            "Skipping SQLite column addition for %s.%s; column already exists",
+            table,
+            column,
+        )
+        return True
     return False
 
 
@@ -370,6 +411,8 @@ def run_sql_migrations(
                     connection = session.connection()
                     if dialect_name == "sqlite":
                         for statement in _split_sql_statements(sql):
+                            if _sqlite_should_skip_statement(statement, engine=engine):
+                                continue
                             connection.exec_driver_sql(statement)
                     else:
                         connection.exec_driver_sql(sql)

@@ -68,21 +68,20 @@ def apply(session: Session) -> None:
     last_id: str | None = None
 
     while True:
-        query = (
-            session.query(Passage)
-            .filter(
-                or_(
-                    Passage.osis_start_verse_id.is_(None),
-                    Passage.osis_end_verse_id.is_(None),
-                )
+        query = session.query(Passage).filter(
+            or_(
+                Passage.osis_start_verse_id.is_(None),
+                Passage.osis_end_verse_id.is_(None),
             )
-            .order_by(Passage.id)
-            .limit(BATCH_SIZE)
         )
         if last_id is not None:
             query = query.filter(Passage.id > last_id)
 
-        batch = query.all()
+        batch = (
+            query.order_by(Passage.id)
+            .limit(BATCH_SIZE)
+            .all()
+        )
         if not batch:
             break
 
