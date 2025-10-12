@@ -146,6 +146,13 @@ def test_chat_turn_attaches_intent_tags(
         {"intent": "sermon_prep", "stance": "supportive", "confidence": pytest.approx(0.87)}
     ]
 
+    persist_call = context.last_persist_call()
+    persisted_tags = persist_call["kwargs"].get("intent_tags")
+    assert persisted_tags is not None
+    assert [tag.model_dump(exclude_none=True) for tag in persisted_tags] == [
+        {"intent": "sermon_prep", "stance": "supportive", "confidence": pytest.approx(0.87)}
+    ]
+
     recorder = context.last_trail_service().recorder
     assert recorder.finalized is not None
     assert recorder.finalized["output_payload"]["intent_tags"] == [
