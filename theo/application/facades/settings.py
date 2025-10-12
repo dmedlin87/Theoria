@@ -391,11 +391,11 @@ class Settings(BaseSettings):
         default=16 * 1024 * 1024,
         description="Maximum allowed size for synchronous ingest uploads in bytes",
     )
-    simple_ingest_allowed_roots: list[Path] | None = Field(
-        default=None,
+    simple_ingest_allowed_roots: list[Path] = Field(
+        default_factory=list,
         description=(
-            "Optional list of filesystem roots permitted for simple ingest requests. "
-            "When unset, local sources are unrestricted."
+            "Filesystem roots permitted for simple ingest requests. Local ingest is "
+            "disabled until explicit roots are configured."
         ),
     )
     ingest_url_allowed_schemes: list[str] = Field(

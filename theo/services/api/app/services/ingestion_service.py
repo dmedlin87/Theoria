@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterator, Sequence
 
-from fastapi import Depends
+from fastapi import Depends, status
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import Settings, get_settings
@@ -19,6 +19,7 @@ from ..ingest.pipeline import (
 )
 from ..models.documents import SimpleIngestRequest
 from ..telemetry import log_workflow_event
+from ..errors import IngestionError, Severity
 from theo.services.cli import ingest_folder as cli_ingest
 
 DocumentLike = Any
@@ -99,9 +100,32 @@ class IngestionService:
     ) -> Iterator[dict[str, Any]]:
         """Yield ingestion events for the CLI-compatible simple ingest endpoint."""
 
-        allowlist: Sequence[str] | None = getattr(
+        allowlist: Sequence[Path] | Sequence[str] | None = getattr(
             self.settings, "simple_ingest_allowed_roots", None
         )
+
+        if not allowlist:
+            finder = getattr(self.cli_module, "find_local_sources", None)
+            if finder is not None:
+                local_sources = finder(payload.sources)
+            else:  # pragma: no cover - compatibility shim for older CLI modules
+                local_sources = [
+                    source.strip()
+                    for source in payload.sources
+                    if source.strip()
+                    and not self.cli_module._looks_like_url(source.strip())
+                ]
+
+            if local_sources:
+                raise IngestionError(
+                    "Local ingestion is disabled until allowlisted roots are configured.",
+                    code="INGESTION_LOCAL_SOURCES_DISABLED",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    severity=Severity.USER,
+                    hint="Set simple_ingest_allowed_roots to permit filesystem ingestion.",
+                    data={"sources": local_sources},
+                )
+
         items = self.cli_module._discover_items(payload.sources, allowlist)
         overrides = self.cli_module._apply_default_metadata(payload.metadata or {})
         post_batch_steps = self.cli_module._parse_post_batch_steps(

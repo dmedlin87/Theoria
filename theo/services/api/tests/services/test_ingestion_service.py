@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from theo.services.api.app.errors import IngestionError
 from theo.services.api.app.models.documents import SimpleIngestRequest
 from theo.services.api.app.services.ingestion_service import IngestionService
 from theo.services.api.app.ingest.pipeline import PipelineDependencies
@@ -33,6 +35,9 @@ class _StubCLI:
     def _discover_items(self, sources, allowlist):  # noqa: D401 - matches CLI signature
         self.discovered_sources = list(sources)
         return list(self.items)
+
+    def find_local_sources(self, sources: Sequence[str]) -> list[str]:
+        return [value for value in sources if not value.startswith("http")]
 
     def _apply_default_metadata(self, metadata: dict[str, object]) -> dict[str, object]:
         enriched = dict(metadata)
@@ -66,7 +71,7 @@ class _StubCLI:
 
 @pytest.fixture()
 def _settings() -> SimpleNamespace:
-    return SimpleNamespace(simple_ingest_allowed_roots=None)
+    return SimpleNamespace(simple_ingest_allowed_roots=[Path("/allowed")])
 
 
 def test_ingestion_service_ingest_file_invokes_pipeline(_settings: SimpleNamespace) -> None:
@@ -225,3 +230,25 @@ def test_simple_ingest_propagates_post_batch_steps(_settings: SimpleNamespace) -
     batch = cli.ingest_calls[0]
     assert batch[2] == {"tags", "summaries"}
     assert isinstance(batch[3], PipelineDependencies)
+
+
+def test_simple_ingest_rejects_local_sources_when_allowlist_missing() -> None:
+    settings = SimpleNamespace(simple_ingest_allowed_roots=[])
+    cli = _StubCLI([_StubItem("local", "markdown")])
+
+    service = IngestionService(
+        settings=settings,
+        run_file_pipeline=lambda *a, **k: SimpleNamespace(id="doc"),
+        run_url_pipeline=lambda *a, **k: SimpleNamespace(id="doc"),
+        run_transcript_pipeline=lambda *a, **k: SimpleNamespace(id="doc"),
+        cli_module=cli,
+        log_workflow=lambda *a, **k: None,
+    )
+
+    payload = SimpleIngestRequest(sources=["/data"], mode="api")
+    iterator = service.stream_simple_ingest(payload)
+
+    with pytest.raises(IngestionError) as exc:
+        next(iterator)
+
+    assert "Local ingestion is disabled" in str(exc.value)

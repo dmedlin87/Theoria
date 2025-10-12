@@ -94,6 +94,19 @@ def _looks_like_url(value: str) -> bool:
     return bool(parsed.scheme and parsed.netloc)
 
 
+def find_local_sources(sources: Sequence[str]) -> list[str]:
+    """Return a list of non-URL sources after normalisation."""
+
+    local_sources: list[str] = []
+    for raw in sources:
+        candidate = raw.strip()
+        if not candidate:
+            continue
+        if not _looks_like_url(candidate):
+            local_sources.append(candidate)
+    return local_sources
+
+
 def _is_supported(path: Path) -> bool:
     if not path.is_file():
         return False
