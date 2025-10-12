@@ -53,7 +53,9 @@ curl -H "Authorization: Bearer $THEO_API_TOKEN" \
 
 Authorization is evaluated before the connection is accepted, and notebook
 access controls (ownership, team membership, collaborators, or public
-visibility) are enforced consistently across realtime and REST requests.
+visibility) are enforced consistently across realtime and REST requests. Calls
+from authenticated principals without permission receive **403 Forbidden**
+responses, and WebSocket handshakes are rejected before acceptance.
 
 ## Ingestion
 
