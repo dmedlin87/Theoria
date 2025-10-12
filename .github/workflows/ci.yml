@@ -46,6 +46,10 @@ jobs:
         working-directory: theo/services/web
         run: npm ci
 
+      - name: Install Playwright browsers
+        working-directory: theo/services/web
+        run: npx playwright install --with-deps
+
       - name: Run Ruff
         run: ruff check
 
@@ -59,6 +63,14 @@ jobs:
       - name: Run Jest unit tests
         working-directory: theo/services/web
         run: npm test
+
+      - name: Run Vitest unit tests with coverage
+        working-directory: theo/services/web
+        run: npm run test:vitest
+
+      - name: Run Playwright smoke suite
+        working-directory: theo/services/web
+        run: npm run test:e2e:smoke
 
       - name: Run pytest suite
         run: pytest
@@ -88,6 +100,22 @@ jobs:
             sbom-node.json
           if-no-files-found: error
 
+      - name: Upload Vitest coverage report
+        if: always()
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: vitest-coverage
+          path: theo/services/web/coverage
+          if-no-files-found: warn
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: playwright-artifacts
+          path: |
+            theo/services/web/playwright-report
+            theo/services/web/playwright-artifacts
   secrets-scan:
     name: Secrets scanning
     runs-on: ubuntu-latest

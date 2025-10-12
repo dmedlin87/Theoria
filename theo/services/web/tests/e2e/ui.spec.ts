@@ -62,7 +62,7 @@ test.beforeAll(async ({ request }) => {
 });
 
 test.describe("Theo Engine UI", () => {
-  test("allows searching for ingested passages", async ({ page }) => {
+  test("@smoke allows searching for ingested passages", async ({ page }) => {
     await page.goto("/search");
 
     await page.fill("input[name='q']", "Word");
@@ -71,7 +71,7 @@ test.describe("Theo Engine UI", () => {
     await expect(firstResultLink).toBeVisible();
   });
 
-  test("primary navigation links load", async ({ page }) => {
+  test("@full primary navigation links load", async ({ page }) => {
     const navLinks: Array<{
       href: string;
       label: string;
@@ -132,7 +132,7 @@ test.describe("Theo Engine UI", () => {
     }
   });
 
-  test("runs copilot workflows", async ({ page }) => {
+  test("@full runs copilot workflows", async ({ page }) => {
     const observedWorkflows = new Set<string>();
     const observedExportPresets = new Set<string>();
     const baseCitation = {

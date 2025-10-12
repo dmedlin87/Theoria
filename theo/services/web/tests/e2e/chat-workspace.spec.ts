@@ -29,7 +29,7 @@ const STREAMING_BODY =
   });
 
 test.describe("Chat workspace", () => {
-  test("shows a loading state before the response resolves", async ({ page }) => {
+  test("@smoke shows a loading state before the response resolves", async ({ page }) => {
     await page.route("**/ai/workflows/chat", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 600));
       await route.fulfill({
@@ -50,7 +50,7 @@ test.describe("Chat workspace", () => {
     await expect(page.getByText("Patience rewarded.")).toBeVisible();
   });
 
-  test("streams chat answers with citations", async ({ page }) => {
+  test("@full streams chat answers with citations", async ({ page }) => {
     await page.route("**/ai/workflows/chat", async (route) => {
       await route.fulfill({
         status: 200,
@@ -68,7 +68,7 @@ test.describe("Chat workspace", () => {
     await expect(page.getByRole("link", { name: "Search references" })).toBeVisible();
   });
 
-  test("renders guardrail violations", async ({ page }) => {
+  test("@full renders guardrail violations", async ({ page }) => {
     await page.route("**/ai/workflows/chat", async (route) => {
       await route.fulfill({
         status: 409,
@@ -106,7 +106,7 @@ test.describe("Chat workspace", () => {
     await expect(page.getByRole("button", { name: "Search related passages" })).toBeVisible();
   });
 
-  test("suggests recovery actions for invalid chat requests", async ({ page }) => {
+  test("@full suggests recovery actions for invalid chat requests", async ({ page }) => {
     await page.route("**/ai/workflows/chat", async (route) => {
       await route.fulfill({
         status: 400,

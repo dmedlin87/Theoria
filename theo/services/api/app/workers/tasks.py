@@ -97,6 +97,14 @@ _CITATION_VALIDATION_TOP_K = 8
 _DEFAULT_CITATION_SESSION_LIMIT = 25
 
 
+def _compute_retry_delay(retry_count: int | None) -> int:
+    """Compute an exponential backoff window capped at one minute."""
+
+    if not retry_count or retry_count <= 0:
+        return 1
+    return min(2**retry_count, 60)
+
+
 def _load_chat_entries(record: ChatSession) -> list[ChatMemoryEntry]:
     entries: list[ChatMemoryEntry] = []
     raw_entries = record.memory_snippets or []
@@ -485,7 +493,7 @@ def process_url(
             with Session(engine) as session:
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
-        retry_delay = min(2**self.request.retries, 60) if self.request.retries else 1
+        retry_delay = _compute_retry_delay(getattr(self.request, "retries", 0))
         raise self.retry(exc=exc, countdown=retry_delay)
 
 
