@@ -76,13 +76,13 @@ def main() -> int:
     args = parse_args()
     result = run_trufflehog()
 
-    if result.returncode != 0:
-        print("Trufflehog CLI failed. Aborting without parsing findings.")
+    findings = load_findings(result.stdout)
+
+    if result.returncode not in (0, 1) or (result.returncode != 0 and not findings):
+        print(f"Trufflehog CLI failed (exit code {result.returncode}).")
         if result.stderr:
             print(result.stderr)
         return result.returncode
-
-    findings = load_findings(result.stdout)
 
     if args.output:
         args.output.write_text(json.dumps(findings, indent=2))
