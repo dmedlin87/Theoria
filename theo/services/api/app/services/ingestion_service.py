@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterator, Sequence
@@ -21,6 +22,10 @@ from ..telemetry import log_workflow_event
 from theo.services.cli import ingest_folder as cli_ingest
 
 DocumentLike = Any
+
+_BASE_RUN_PIPELINE_FOR_FILE = run_pipeline_for_file
+_BASE_RUN_PIPELINE_FOR_URL = run_pipeline_for_url
+_BASE_RUN_PIPELINE_FOR_TRANSCRIPT = run_pipeline_for_transcript
 
 
 @dataclass
@@ -225,11 +230,33 @@ def get_ingestion_service(
 ) -> IngestionService:
     """Dependency factory for :class:`IngestionService`."""
 
+    ingest_module = sys.modules.get("theo.services.api.app.routes.ingest")
+
+    def _resolve_hook(name: str, base_default):
+        module_value = getattr(sys.modules[__name__], name, None)
+        route_value = getattr(ingest_module, name, None) if ingest_module else None
+
+        if module_value is not None and module_value is not base_default:
+            return module_value
+        if route_value is not None and route_value is not base_default:
+            return route_value
+        if module_value is not None:
+            return module_value
+        if route_value is not None:
+            return route_value
+        return base_default
+
+    run_file = _resolve_hook("run_pipeline_for_file", _BASE_RUN_PIPELINE_FOR_FILE)
+    run_url = _resolve_hook("run_pipeline_for_url", _BASE_RUN_PIPELINE_FOR_URL)
+    run_transcript = _resolve_hook(
+        "run_pipeline_for_transcript", _BASE_RUN_PIPELINE_FOR_TRANSCRIPT
+    )
+
     return IngestionService(
         settings=settings,
-        run_file_pipeline=run_pipeline_for_file,
-        run_url_pipeline=run_pipeline_for_url,
-        run_transcript_pipeline=run_pipeline_for_transcript,
+        run_file_pipeline=run_file,
+        run_url_pipeline=run_url,
+        run_transcript_pipeline=run_transcript,
         cli_module=cli_ingest,
         log_workflow=log_workflow_event,
     )
