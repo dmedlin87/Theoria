@@ -1,6 +1,6 @@
-# Theo Engine
+# Theoria Engine
 
-**A research engine for theology** that indexes your library (papers, notes, YouTube transcripts, audio), normalizes Scripture references (OSIS), and provides deterministic, verse-anchored search with a Verse Aggregator across your entire corpus.
+**Theoria is a research engine for theology** that indexes your library (papers, notes, YouTube transcripts, audio), normalizes Scripture references (OSIS), and provides deterministic, verse-anchored search with a Verse Aggregator across your entire corpus.
 
 See the following references for the complete system architecture and latest case builder specifications:
 
@@ -19,7 +19,7 @@ See the following references for the complete system architecture and latest cas
 
 ### Generative AI Workflows
 
-Theo Engine layers grounded generative capabilities on top of the deterministic retrieval core:
+Theoria layers grounded generative capabilities on top of the deterministic retrieval core:
 
 - **Multi-Provider Support** – Securely store credentials for OpenAI, Anthropic, Azure, and local adapters; register custom model presets via the admin API
 - **Verse-Linked Research** – Run sermon prep, comparative analysis, multimedia insight extraction, devotional guides, and collaboration flows with strict OSIS-anchored citations
