@@ -202,7 +202,7 @@ start_api() {
     cd "$PROJECT_ROOT"
     source "$VENV_PATH/bin/activate"
     
-    python -m uvicorn theo.services.api.main:app \
+    python -m uvicorn theo.services.api.app.main:app \
         --host 127.0.0.1 \
         --port "$PORT" \
         --reload &

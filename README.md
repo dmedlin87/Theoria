@@ -121,6 +121,12 @@ Launch both API and Web services with a single command:
 ./scripts/dev.ps1 -ApiPort 8010 -WebPort 3100 -BindHost 0.0.0.0
 ```
 
+For Bash environments, the companion script launches both services with sensible defaults:
+
+```bash
+./scripts/run.sh
+```
+
 Stop with Ctrl+C (automatically cleans up background jobs).
 
 ### Docker Compose
