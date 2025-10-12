@@ -1359,6 +1359,83 @@ details[open] .search-advanced-summary::before {
   color: var(--text);
 }
 
+.search-saved-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+
+.search-saved-input {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.search-saved-empty {
+  margin-top: var(--space-1-5);
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.search-saved-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-1-5) 0 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.search-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.search-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.search-card__info {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.search-card__description {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.search-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.search-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.search-chip {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 0.2rem 0.55rem;
+}
+
 .search-filter-chips {
   display: flex;
   gap: var(--space-2);
@@ -1475,6 +1552,55 @@ details[open] .search-advanced-summary::before {
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-base);
+}
+
+.diff-panel {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-muted);
+}
+
+.diff-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.diff-panel__title {
+  margin: 0;
+}
+
+.diff-panel__body {
+  margin-top: var(--space-2);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.diff-panel__summary {
+  margin: 0;
+}
+
+.diff-panel__stats {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.diff-panel__unique {
+  display: grid;
+  gap: var(--space-1-5);
+}
+
+.diff-panel__text,
+.diff-panel__empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.diff-panel__empty {
+  margin-top: var(--space-2);
 }
 
 .search-result-action-btn:hover,

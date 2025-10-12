@@ -10,27 +10,19 @@ type DiffWorkspaceProps = {
 
 export function DiffWorkspace({ diffSelection, diffSummary, onClear }: DiffWorkspaceProps): JSX.Element {
   return (
-    <aside
-      style={{
-        margin: "1.5rem 0",
-        padding: "1rem",
-        border: "1px solid #cbd5f5",
-        borderRadius: "0.75rem",
-        background: "#f4f7ff",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
-        <h3 style={{ margin: 0 }}>Diff workspace</h3>
+    <aside className="diff-panel">
+      <div className="diff-panel__header">
+        <h3 className="diff-panel__title">Diff workspace</h3>
         <button type="button" onClick={onClear}>
           Clear selection
         </button>
       </div>
       {diffSummary ? (
-        <div style={{ marginTop: "0.75rem" }}>
-          <p style={{ margin: "0 0 0.5rem" }}>
+        <div className="diff-panel__body">
+          <p className="diff-panel__summary">
             Comparing <strong>{diffSummary.first.title}</strong> and <strong>{diffSummary.second.title}</strong>
           </p>
-          <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
+          <ul className="diff-panel__stats">
             <li>
               {diffSummary.first.passages.length} passages in first group ({diffSummary.uniqueToFirst.length} unique)
             </li>
@@ -40,14 +32,14 @@ export function DiffWorkspace({ diffSelection, diffSummary, onClear }: DiffWorks
             <li>{diffSummary.shared} overlapping passages across both groups</li>
           </ul>
           {(diffSummary.uniqueToFirst.length > 0 || diffSummary.uniqueToSecond.length > 0) && (
-            <div style={{ marginTop: "0.75rem", display: "grid", gap: "0.5rem" }}>
+            <div className="diff-panel__unique">
               {diffSummary.uniqueToFirst.length > 0 && (
-                <p style={{ margin: 0 }}>
+                <p className="diff-panel__text">
                   Unique to {diffSummary.first.title}: {diffSummary.uniqueToFirst.join(", ")}
                 </p>
               )}
               {diffSummary.uniqueToSecond.length > 0 && (
-                <p style={{ margin: 0 }}>
+                <p className="diff-panel__text">
                   Unique to {diffSummary.second.title}: {diffSummary.uniqueToSecond.join(", ")}
                 </p>
               )}
@@ -55,7 +47,7 @@ export function DiffWorkspace({ diffSelection, diffSummary, onClear }: DiffWorks
           )}
         </div>
       ) : (
-        <p style={{ marginTop: "0.75rem" }}>
+        <p className="diff-panel__empty">
           {diffSelection.length < 2
             ? "Select another group to compare. Up to two result groups can be diffed at once."
             : "Select another group to compare. Up to two result groups can be diffed at once."}
