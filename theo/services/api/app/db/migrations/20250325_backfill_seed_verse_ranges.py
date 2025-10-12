@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Iterable
 
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ingest.osis import expand_osis_reference
@@ -44,41 +45,67 @@ def _update_pair_seed(seed, references: Iterable[tuple[str | None, str, str]]) -
     return changed
 
 
+def _is_missing_column_error(exc: OperationalError) -> bool:
+    """Return ``True`` when ``exc`` indicates a missing column."""
+
+    message = str(getattr(exc, "orig", exc)).lower()
+    indicators = (
+        "no such column",
+        "has no column named",
+        "unknown column",
+        "missing column",
+        "column not found",
+    )
+    return any(indicator in message for indicator in indicators)
+
+
 def apply(session: Session) -> None:
     """Backfill verse range metadata for seed tables."""
 
     updated = False
 
-    for seed in session.query(ContradictionSeed):
-        if _update_pair_seed(
-            seed,
-            (
-                (seed.osis_a, "start_verse_id", "end_verse_id"),
-                (seed.osis_b, "start_verse_id_b", "end_verse_id_b"),
-            ),
-        ):
-            updated = True
+    try:
+        for seed in session.query(ContradictionSeed):
+            if _update_pair_seed(
+                seed,
+                (
+                    (seed.osis_a, "start_verse_id", "end_verse_id"),
+                    (seed.osis_b, "start_verse_id_b", "end_verse_id_b"),
+                ),
+            ):
+                updated = True
+    except OperationalError as exc:
+        if not _is_missing_column_error(exc):
+            raise
 
-    for seed in session.query(HarmonySeed):
-        if _update_pair_seed(
-            seed,
-            (
-                (seed.osis_a, "start_verse_id", "end_verse_id"),
-                (seed.osis_b, "start_verse_id_b", "end_verse_id_b"),
-            ),
-        ):
-            updated = True
+    try:
+        for seed in session.query(HarmonySeed):
+            if _update_pair_seed(
+                seed,
+                (
+                    (seed.osis_a, "start_verse_id", "end_verse_id"),
+                    (seed.osis_b, "start_verse_id_b", "end_verse_id_b"),
+                ),
+            ):
+                updated = True
+    except OperationalError as exc:
+        if not _is_missing_column_error(exc):
+            raise
 
-    for seed in session.query(CommentaryExcerptSeed):
-        verse_range = _compute_range(seed.osis)
-        start_value = verse_range[0] if verse_range else None
-        end_value = verse_range[1] if verse_range else None
-        if seed.start_verse_id != start_value:
-            seed.start_verse_id = start_value
-            updated = True
-        if seed.end_verse_id != end_value:
-            seed.end_verse_id = end_value
-            updated = True
+    try:
+        for seed in session.query(CommentaryExcerptSeed):
+            verse_range = _compute_range(seed.osis)
+            start_value = verse_range[0] if verse_range else None
+            end_value = verse_range[1] if verse_range else None
+            if seed.start_verse_id != start_value:
+                seed.start_verse_id = start_value
+                updated = True
+            if seed.end_verse_id != end_value:
+                seed.end_verse_id = end_value
+                updated = True
+    except OperationalError as exc:
+        if not _is_missing_column_error(exc):
+            raise
 
     if updated:
         session.flush()
