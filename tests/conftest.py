@@ -6,6 +6,7 @@ from pathlib import Path
 
 import contextlib
 from collections.abc import Generator
+from typing import Iterator
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -138,3 +139,58 @@ def pgvector_migrated_database_url(pgvector_database_url: str) -> Generator[str,
         yield pgvector_database_url
     finally:
         engine.dispose()
+
+
+def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
+    database_dir = tmp_path_factory.mktemp("sqlite")
+    path = database_dir / "test.db"
+    yield f"sqlite:///{path}"
+
+
+@pytest.fixture(scope="session")
+def integration_database_url(
+    request: pytest.FixtureRequest,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[str]:
+    """Return a database URL backed by Postgres+pgvector when requested.
+
+    Tests can opt in to a full pgvector-backed database via ``--use-pgvector``.
+    Otherwise a throwaway SQLite database is created under the session's
+    temporary directory. The fixture yields SQLAlchemy-compatible URLs so test
+    suites can ``create_engine`` with minimal boilerplate.
+    """
+
+    if request.config.getoption("use_pgvector"):
+        pgvector_url = request.getfixturevalue("pgvector_migrated_database_url")
+        yield pgvector_url
+        return
+
+    yield from _sqlite_database_url(tmp_path_factory)
+
+
+@pytest.fixture(scope="session")
+def integration_engine(
+    integration_database_url: str,
+) -> Iterator[Engine]:
+    """Provide a SQLAlchemy engine bound to the integration database."""
+
+    engine = create_engine(integration_database_url, future=True)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _ensure_database_url_env(
+    monkeypatch: pytest.MonkeyPatch,
+    integration_database_url: str,
+) -> None:
+    """Expose the integration database URL via ``DATABASE_URL``.
+
+    Several subsystems rely on the ``DATABASE_URL`` environment variable during
+    initialisation. Setting it for all tests keeps configuration consistent,
+    regardless of whether SQLite or pgvector has been requested.
+    """
+
+    monkeypatch.setenv("DATABASE_URL", integration_database_url)

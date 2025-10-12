@@ -1,79 +1,15 @@
+"""Compatibility shim forwarding to :mod:`theo.domain.research.dss_links`."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable
+from warnings import warn
 
-from .datasets import dss_links_dataset
+from ..compat.research.dss_links import *  # noqa: F401,F403
 
+warn(
+    "Importing from 'theo.services.api.app.research.dss_links' is deprecated; "
+    "use 'theo.domain.research.dss_links' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-def _expand_osis(osis: str) -> list[str]:
-    """Expand a verse or simple range into individual OSIS keys.
-
-    This helper intentionally keeps the logic lightweight – it is primarily
-    designed to cope with the single-chapter ranges used in the bundled
-    Dead Sea Scrolls dataset.  When an unexpected format is received we fall
-    back to returning the original reference instead of raising an error so
-    the API can still respond gracefully.
-    """
-
-    if "-" not in osis:
-        return [osis]
-
-    start, end = osis.split("-", 1)
-    if "." not in end:
-        end = f"{start.rsplit('.', 1)[0]}.{end}"
-
-    try:
-        book_chapter = start.rsplit(".", 1)[0]
-        start_idx = int(start.split(".")[-1])
-        end_idx = int(end.split(".")[-1])
-    except (IndexError, ValueError):
-        return [start, end]
-
-    if start_idx > end_idx:
-        start_idx, end_idx = end_idx, start_idx
-
-    return [f"{book_chapter}.{idx}" for idx in range(start_idx, end_idx + 1)]
-
-
-@dataclass(slots=True)
-class DssLinkEntry:
-    id: str
-    osis: str
-    title: str
-    url: str
-    fragment: str | None = None
-    summary: str | None = None
-    dataset: str | None = None
-
-
-def fetch_dss_links(osis: str) -> list[DssLinkEntry]:
-    """Return Dead Sea Scrolls linkage entries for an OSIS reference."""
-
-    dataset = dss_links_dataset()
-    osis_keys: Iterable[str] = _expand_osis(osis)
-
-    entries: list[DssLinkEntry] = []
-    for key in osis_keys:
-        for raw in dataset.get(key, []):
-            url = raw.get("url")
-            if not url:
-                # Skip malformed records instead of crashing the endpoint.
-                continue
-
-            identifier = raw.get("id") or f"{key}:{len(entries)}"
-            osis_value = raw.get("osis") or key
-
-            entries.append(
-                DssLinkEntry(
-                    id=identifier,
-                    osis=osis_value,
-                    title=raw.get("title") or raw.get("fragment") or "Dead Sea Scrolls link",
-                    url=url,
-                    fragment=raw.get("fragment"),
-                    summary=raw.get("summary"),
-                    dataset=raw.get("dataset"),
-                )
-            )
-
-    return entries
+__all__ = ["DssLinkEntry", "fetch_dss_links"]

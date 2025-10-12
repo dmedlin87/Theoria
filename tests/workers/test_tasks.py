@@ -6,9 +6,31 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
+
+import httpx
+import pytest
+from celery.exceptions import Retry
 from sqlalchemy.orm import Session
 
 from celery.app.task import Task
+
+pytest_plugins = ("celery.contrib.pytest",)
+
+
+@pytest.fixture
+def celery_app():  # type: ignore[override]
+    """Run Celery tasks eagerly against the application task registry."""
+
+    app = tasks.celery
+    original_always_eager = app.conf.task_always_eager
+    original_propagates = app.conf.task_eager_propagates
+    app.conf.task_always_eager = True
+    app.conf.task_eager_propagates = True
+    try:
+        yield app
+    finally:
+        app.conf.task_always_eager = original_always_eager
+        app.conf.task_eager_propagates = original_propagates
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -187,6 +209,116 @@ def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
     assert document is not None
     assert document.title == "Job Status Theo Title"
     assert retry_calls == []
+
+
+def test_process_url_retries_with_backoff(
+    monkeypatch: pytest.MonkeyPatch, tmp_path, celery_app
+) -> None:
+    """Transient failures should trigger Celery retry with exponential backoff."""
+
+    db_path = tmp_path / "retry.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        job = IngestionJob(job_type="url_ingest", status="queued")
+        session.add(job)
+        session.commit()
+        job_id = job.id
+
+    retry_counts: list[int | None] = []
+
+    def fake_compute_delay(retry_count: int | None) -> int:
+        retry_counts.append(retry_count)
+        return 42
+
+    request = httpx.Request("GET", "https://example.com/fixture")
+    response = httpx.Response(status_code=503, request=request)
+
+    def failing_pipeline(*_: Any, **__: Any) -> None:
+        raise httpx.HTTPStatusError("boom", request=request, response=response)
+
+    monkeypatch.setattr(tasks, "_compute_retry_delay", fake_compute_delay)
+    monkeypatch.setattr(tasks, "run_pipeline_for_url", failing_pipeline)
+
+    process_task = _task(tasks.process_url)
+    with pytest.raises(Retry) as excinfo:
+        process_task.apply(
+            args=("doc-retry", "https://example.com/fixture"),
+            kwargs={"job_id": job_id},
+        )
+
+    retry_exc = excinfo.value
+    assert retry_exc.when == 42
+    assert retry_counts == [0]
+    assert retry_exc.sig.kwargs["job_id"] == job_id
+
+    with Session(engine) as session:
+        job_record = session.get(IngestionJob, job_id)
+
+    assert job_record is not None
+    assert job_record.status == "failed"
+    assert "boom" in (job_record.error or "")
+
+
+def test_process_url_idempotent_completion(
+    monkeypatch: pytest.MonkeyPatch, tmp_path, celery_app
+) -> None:
+    """Successful retries should keep job metadata stable."""
+
+    db_path = tmp_path / "idempotent.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        job = IngestionJob(job_type="url_ingest", status="queued")
+        session.add(job)
+        session.commit()
+        job_id = job.id
+
+    call_counter = 0
+
+    def stable_pipeline(session: Session, *_: Any, **__: Any) -> Document:
+        nonlocal call_counter
+        call_counter += 1
+        document = session.get(Document, "doc-stable")
+        if document is None:
+            document = Document(
+                id="doc-stable",
+                title="Stable Replay Document",
+                collection="Retry Harness",
+            )
+            session.add(document)
+            session.flush()
+        return document
+
+    monkeypatch.setattr(tasks, "run_pipeline_for_url", stable_pipeline)
+
+    process_task = _task(tasks.process_url)
+    first = process_task.apply(
+        args=("doc-stable", "https://example.com/replay"),
+        kwargs={"job_id": job_id},
+    )
+    second = process_task.apply(
+        args=("doc-stable", "https://example.com/replay"),
+        kwargs={"job_id": job_id},
+    )
+
+    assert first.result is None
+    assert second.result is None
+    assert call_counter == 2
+
+    with Session(engine) as session:
+        job_record = session.get(IngestionJob, job_id)
+        document = session.get(Document, "doc-stable")
+
+    assert job_record is not None
+    assert job_record.status == "completed"
+    assert job_record.document_id == "doc-stable"
+    assert document is not None
+    assert document.title == "Stable Replay Document"
 
 
 def test_build_deliverable_task_writes_assets(monkeypatch, tmp_path) -> None:

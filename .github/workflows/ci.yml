@@ -60,6 +60,10 @@ jobs:
         working-directory: theo/services/web
         run: npm run lint
 
+      - name: Enforce UI quality gates
+        working-directory: theo/services/web
+        run: npm run quality:gates
+
       - name: Run Jest unit tests
         working-directory: theo/services/web
         run: npm test
@@ -72,8 +76,20 @@ jobs:
         working-directory: theo/services/web
         run: npm run test:e2e:smoke
 
+      - name: Run Playwright full suite
+        working-directory: theo/services/web
+        run: npm run test:e2e:full
+
       - name: Run pytest suite
-        run: pytest
+        run: pytest --cov=theo --cov=tests --cov-report=xml --cov-report=term --cov-fail-under=80
+
+      - name: Upload pytest coverage report
+        if: always()
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: pytest-coverage
+          path: coverage.xml
+          if-no-files-found: error
 
       - name: Enforce critical coverage thresholds
         run: python scripts/security/verify_critical_coverage.py
@@ -116,6 +132,100 @@ jobs:
           path: |
             theo/services/web/playwright-report
             theo/services/web/playwright-artifacts
+
+  web_accessibility:
+    name: Web axe accessibility scans
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SETTINGS_SECRET_KEY: geo-ci-secret
+      FIXTURES_ROOT: ${{ github.workspace }}/fixtures
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9bb56186c5da571f2b78bb0f1e0ed4f49845d2a1
+
+      - name: Set up Python
+        uses: actions/setup-python@14e5d8d0cc76a3b4e5a962d648a3976db0f62d48
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@0d8d6c353e9846fae10c9f4b8cc2f48ba5f3d580
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: theo/services/web/package-lock.json
+
+      - name: Install Node.js dependencies
+        working-directory: theo/services/web
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: theo/services/web
+        run: npx playwright install --with-deps
+
+      - name: Run axe accessibility scans
+        working-directory: theo/services/web
+        env:
+          NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:8000"
+          THEO_ALLOW_INSECURE_STARTUP: "1"
+          THEO_AUTH_ALLOW_ANONYMOUS: "1"
+        run: npm run test:a11y
+
+      - name: Upload accessibility artifacts
+        if: always()
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: axe-playwright-artifacts
+          path: |
+            theo/services/web/playwright-report
+            theo/services/web/playwright-artifacts
+          if-no-files-found: warn
+
+  web_lighthouse:
+    name: Web Lighthouse smoke tests
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9bb56186c5da571f2b78bb0f1e0ed4f49845d2a1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@0d8d6c353e9846fae10c9f4b8cc2f48ba5f3d580
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: theo/services/web/package-lock.json
+
+      - name: Install Node.js dependencies
+        working-directory: theo/services/web
+        run: npm ci
+
+      - name: Run Lighthouse smoke tests
+        working-directory: theo/services/web
+        env:
+          APP_ORIGIN: http://127.0.0.1:3000
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run test:lighthouse:smoke
+
+      - name: Upload Lighthouse artifacts
+        if: always()
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: lighthouse-smoke
+          path: |
+            theo/services/web/.lighthouseci
   secrets-scan:
     name: Secrets scanning
     runs-on: ubuntu-latest

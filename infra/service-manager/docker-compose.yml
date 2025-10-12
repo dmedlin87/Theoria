@@ -1,0 +1,17 @@
+version: '3.9'
+services:
+  theoria-manager:
+    build: .
+    image: theoria/service-manager:latest
+    ports:
+      - "8000:8000"
+      - "8100:8100"
+      - "3000:3000"
+      - "3300:3300"
+      - "9101:9101"
+    environment:
+      - THEORIA_ENV=docker
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    command: ["pwsh", "-NoLogo", "-NoProfile", "-File", "start-theoria.ps1", "-ActiveDeploymentColor", "blue"]

@@ -1,6 +1,9 @@
 name: OWASP ZAP Baseline
 
 on:
+  pull_request_target:
+    branches:
+      - main
   schedule:
     - cron: '30 3 * * 1'
   workflow_dispatch:
@@ -15,16 +18,30 @@ jobs:
     name: Scan staging API
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      STAGING_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@9bb56186c5da571f2b78bb0f1e0ed4f49845d2a1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+
+      - name: Verify staging URL secret
+        run: |
+          if [ -z "${STAGING_API_BASE_URL}" ]; then
+            echo "::error::STAGING_API_BASE_URL secret is not configured."
+            exit 1
+          fi
 
       - name: Run ZAP baseline scan
         id: zap
         uses: zaproxy/action-baseline@a9a2caf103181f67a06fad3f0d4f5fe8562016b2
         with:
-          target: https://staging.api.theoengine.com
+          target: ${{ env.STAGING_API_BASE_URL }}
           cmd_options: '-J zap-baseline-report.json -r zap-baseline-report.html -w zap-baseline-warn.md'
+
+      - name: Fail on high severity alerts
+        run: python scripts/security/zap_severity_gate.py zap-baseline-report.json --fail-on high
 
       - name: Convert ZAP report to SARIF
         run: python scripts/security/zap_to_sarif.py zap-baseline-report.json zap-baseline-report.sarif

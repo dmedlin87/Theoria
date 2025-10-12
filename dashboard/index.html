@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Theoria Service Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        background: #111827;
+        color: #f9fafb;
+      }
+      header {
+        padding: 24px;
+        background: #1f2937;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      }
+      main {
+        padding: 24px;
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      .card {
+        background: #1f2937;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.25);
+      }
+      .card h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+      }
+      .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+      }
+      th, td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      th {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .muted {
+        color: #94a3b8;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .event-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .event-item {
+        background: rgba(30, 64, 175, 0.25);
+        border-radius: 8px;
+        padding: 12px 16px;
+        border-left: 4px solid #3b82f6;
+      }
+      .critical {
+        border-left-color: #ef4444;
+        background: rgba(239, 68, 68, 0.16);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script type="module">
+      const { useEffect, useState } = React;
+
+      function parseMetrics(text) {
+        const lines = text.split('\n').filter(Boolean);
+        const metrics = {};
+        for (const line of lines) {
+          if (line.startsWith('#')) continue;
+          const match = line.match(/^(\w+){([^}]*)}\s+([0-9eE+\-.]+)/);
+          let metricName, labels, value;
+          if (match) {
+            [, metricName, labelString, value] = match;
+            labels = Object.fromEntries(
+              labelString.split(',').map((kv) => kv.split('=').map((v) => v.replace(/"/g, '')))
+            );
+          } else {
+            const fallback = line.match(/^(\w+)\s+([0-9eE+\-.]+)/);
+            if (!fallback) continue;
+            [, metricName, value] = fallback;
+            labels = { service: 'manager' };
+          }
+          const key = labels.service || 'default';
+          metrics[key] = metrics[key] || {};
+          metrics[key][metricName] = Number(value);
+        }
+        return metrics;
+      }
+
+      function Dashboard() {
+        const [metrics, setMetrics] = useState({});
+        const [error, setError] = useState(null);
+        const metricsUrl = window.METRICS_URL || 'http://localhost:9101/metrics';
+
+        useEffect(() => {
+          const fetchMetrics = async () => {
+            try {
+              const response = await fetch(metricsUrl);
+              if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+              const text = await response.text();
+              setMetrics(parseMetrics(text));
+              setError(null);
+            } catch (err) {
+              setError(err.message);
+            }
+          };
+
+          fetchMetrics();
+          const interval = setInterval(fetchMetrics, 5000);
+          return () => clearInterval(interval);
+        }, [metricsUrl]);
+
+        const services = Object.keys(metrics);
+
+        return (
+          React.createElement('div', null,
+            React.createElement('header', null,
+              React.createElement('h1', null, 'Theoria Service Health'),
+              React.createElement('p', { className: 'muted' }, 'Live metrics sourced from the PowerShell manager')
+            ),
+            React.createElement('main', null,
+              error && React.createElement('div', { className: 'card critical' }, `Metrics unavailable: ${error}`),
+              React.createElement('section', { className: 'grid' },
+                services.map((service) => {
+                  const data = metrics[service];
+                  const status = data.theoria_service_status === 1 ? 'Healthy' : 'Degraded';
+                  const indicatorColor = status === 'Healthy' ? '#22c55e' : '#ef4444';
+                  return React.createElement('div', { key: service, className: 'card' },
+                    React.createElement('h2', null, service.toUpperCase()),
+                    React.createElement('div', { className: 'status' },
+                      React.createElement('span', { className: 'status-indicator', style: { background: indicatorColor } }),
+                      status
+                    ),
+                    React.createElement('table', null,
+                      React.createElement('tbody', null,
+                        React.createElement('tr', null,
+                          React.createElement('th', null, 'Uptime (s)'),
+                          React.createElement('td', null, data.theoria_service_uptime_seconds?.toFixed?.(0) ?? '0')
+                        ),
+                        React.createElement('tr', null,
+                          React.createElement('th', null, 'Avg Response (ms)'),
+                          React.createElement('td', null, data.theoria_service_average_response_ms?.toFixed?.(2) ?? '0')
+                        ),
+                        React.createElement('tr', null,
+                          React.createElement('th', null, 'Last Response (ms)'),
+                          React.createElement('td', null, data.theoria_service_last_response_ms?.toFixed?.(2) ?? '0')
+                        ),
+                        React.createElement('tr', null,
+                          React.createElement('th', null, 'Restarts'),
+                          React.createElement('td', null, data.theoria_service_restarts ?? 0)
+                        ),
+                        React.createElement('tr', null,
+                          React.createElement('th', null, 'CPU (s)'),
+                          React.createElement('td', null, data.theoria_service_cpu_seconds_total?.toFixed?.(2) ?? 'N/A')
+                        ),
+                        React.createElement('tr', null,
+                          React.createElement('th', null, 'Memory (MB)'),
+                          React.createElement('td', null,
+                            data.theoria_service_working_set_bytes
+                              ? (data.theoria_service_working_set_bytes / (1024 * 1024)).toFixed(2)
+                              : 'N/A'
+                          )
+                        )
+                      )
+                    )
+                  );
+                })
+              )
+            )
+          )
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Dashboard));
+    </script>
+  </body>
+</html>
