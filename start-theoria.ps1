@@ -81,6 +81,16 @@ $script:RestartCooldown = 5  # seconds
 $script:HealthCheckTimeout = 5  # seconds
 $script:StartTime = Get-Date
 $script:LogBuffer = [System.Collections.Generic.List[string]]::new()
+$script:AlertConfig = $null
+$script:ProfilingEnabled = $EnableProfiling.IsPresent
+
+# Load service management helpers
+$serviceModulePath = Join-Path $ProjectRoot "scripts/SERVICE_MANAGEMENT.psm1"
+if (Test-Path $serviceModulePath) {
+    Import-Module $serviceModulePath -Force
+} else {
+    throw "SERVICE_MANAGEMENT.psm1 module not found at $serviceModulePath"
+}
 
 $hasCustomApiPort = $PSBoundParameters.ContainsKey('ApiPort')
 $hasCustomWebPort = $PSBoundParameters.ContainsKey('WebPort')
@@ -166,6 +176,49 @@ $script:Services = @{
         AverageResponseTime = 0
         LastError = $null
     }
+}
+
+$portOverrides = @{
+    Api = $ApiPort
+    Web = $WebPort
+}
+
+$configuration = Import-ServiceConfiguration -Path $ConfigPath -PortOverrides $portOverrides -ActiveColor $ActiveDeploymentColor
+$script:Services = Initialize-ServiceState -Configuration $configuration
+
+$script:AlertConfig = $configuration.alerts
+$script:AlertsEnabled = $EnableAlerts.IsPresent -or (
+    ($configuration.alerts.email.enabled -and $configuration.alerts.email.recipients.Count -gt 0) -or
+    ($configuration.alerts.slack.enabled -and $configuration.alerts.slack.webhookUrl)
+)
+
+$configMetricsPort = if ($MetricsPort -gt 0) { $MetricsPort } elseif ($configuration.metrics.port) { [int]$configuration.metrics.port } else { 0 }
+$configMetricsFile = if ($MetricsFile) { $MetricsFile } else { $configuration.metrics.exportFile }
+
+if ($configMetricsFile -and -not [System.IO.Path]::IsPathRooted($configMetricsFile)) {
+    $configMetricsFile = Join-Path $script:ProjectRoot $configMetricsFile
+}
+
+if (-not $script:ProfilingEnabled) {
+    $script:ProfilingEnabled = $configuration.profiling.enabled
+}
+
+if ($script:Services.ContainsKey('Api')) {
+    $ApiPort = $script:Services.Api.Port
+    $script:ApiHealthEndpoint = $script:Services.Api.HealthEndpoint
+}
+
+if ($script:Services.ContainsKey('Web')) {
+    $WebPort = $script:Services.Web.Port
+    $script:WebHealthEndpoint = $script:Services.Web.HealthEndpoint
+}
+
+Register-MetricsEndpoint -Port $configMetricsPort -FilePath $configMetricsFile | Out-Null
+if ($configMetricsPort -gt 0) {
+    Write-TheoriaLog "Metrics endpoint available at http://localhost:$configMetricsPort/metrics" -Level Info
+}
+if ($configMetricsFile) {
+    Write-TheoriaLog "Metrics snapshot file: $configMetricsFile" -Level Debug
 }
 
 # ============================================================================
@@ -610,6 +663,9 @@ function Stop-TheoriaService {
     } catch {
         Write-TheoriaLog "Error stopping $($service.Name): $_" -Level Error -Metadata @{ error = $_.Exception.Message }
     }
+
+    Update-ServiceMetricsEntry -ServiceState $service -Diagnostics $null -Profiling $null
+    Get-PrometheusMetrics | Out-Null
 }
 
 function Wait-ServiceReady {
@@ -670,8 +726,8 @@ function Start-TheoriaApi {
     Write-TheoriaLog "Starting Theoria API on port $ApiPort..." -Level Info
 
     # Check port availability
-    if (-not (Test-PortAvailable -Port $ApiPort)) {
-        Write-TheoriaLog "Port $ApiPort is already in use" -Level Error
+    if (-not (Test-PortAvailable -Port $servicePort)) {
+        Write-TheoriaLog "Port $servicePort is already in use" -Level Error
         return $false
     }
 
@@ -748,8 +804,8 @@ function Start-TheoriaWeb {
     Write-TheoriaLog "Starting Theoria Web UI on port $WebPort..." -Level Info
 
     # Check port availability
-    if (-not (Test-PortAvailable -Port $WebPort)) {
-        Write-TheoriaLog "Port $WebPort is already in use" -Level Error
+    if (-not (Test-PortAvailable -Port $servicePort)) {
+        Write-TheoriaLog "Port $servicePort is already in use" -Level Error
         return $false
     }
 
@@ -892,6 +948,16 @@ function Show-ServiceStatus {
             Write-Host (" " * (59 - $restartLine.Length)) -NoNewline
             Write-Host "║" -ForegroundColor Cyan
         }
+
+        if ($script:ProfilingEnabled -and $script:Services[$serviceKey].LastProfilingSnapshot) {
+            $snapshot = $script:Services[$serviceKey].LastProfilingSnapshot
+            $cpuSeconds = if ($snapshot.ContainsKey('CpuSecondsTotal')) { [math]::Round($snapshot.CpuSecondsTotal, 2) } else { 0 }
+            $memoryMb = if ($snapshot.ContainsKey('WorkingSetBytes')) { [math]::Round($snapshot.WorkingSetBytes / 1MB, 2) } else { 0 }
+            $profileLine = "  CPU(s): $cpuSeconds | Memory: ${memoryMb}MB"
+            Write-Host "║$profileLine" -ForegroundColor Magenta -NoNewline
+            Write-Host (" " * (59 - $profileLine.Length)) -NoNewline
+            Write-Host "║" -ForegroundColor Cyan
+        }
     }
     
     $totalUptime = ((Get-Date) - $script:StartTime).ToString('hh\:mm\:ss')
@@ -922,6 +988,7 @@ function Invoke-ServiceRestart {
     if ($success) {
         $service.RestartCount++
         $service.LastRestartTime = Get-Date
+        $service.NextHealthCheck = Get-Date
         Write-TheoriaLog "$($service.Name) restarted successfully" -Level Success -Metadata @{ restart_count = $service.RestartCount }
     } else {
         Write-TheoriaLog "$($service.Name) restart failed" -Level Error
@@ -935,69 +1002,77 @@ function Start-HealthMonitor {
         Write-TheoriaLog "Health monitoring disabled" -Level Warning
         return
     }
-    
-    Write-TheoriaLog "Starting health monitor (checking every ${script:HealthCheckInterval}s)..." -Level Info
-    $checkCount = 0
-    
+
+    $intervalSummary = ($script:Services.Keys | ForEach-Object { "$($_): $($script:Services[$_].HealthCheckInterval)s" }) -join ", "
+    Write-TheoriaLog "Starting health monitor (per-service intervals: $intervalSummary)" -Level Info
+
+    $secondsElapsed = 0
+
     while ($true) {
-        Start-Sleep -Seconds $script:HealthCheckInterval
-        $checkCount++
-        
-        # Show status dashboard every 6 checks (1 minute with 10s intervals)
-        if ($ShowMetrics -and $checkCount % 6 -eq 0) {
+        Start-Sleep -Seconds 1
+        $secondsElapsed++
+
+        if ($ShowMetrics -and $secondsElapsed % 60 -eq 0) {
             Show-ServiceStatus
         }
-        
+
         foreach ($serviceKey in $script:Services.Keys) {
             $service = $script:Services[$serviceKey]
-            
+
             if ($service.Status -ne "Running") { continue }
-            
-            # Check health with diagnostics
+            if (-not $service.HealthEndpoint) { continue }
+            if ($service.NextHealthCheck -and (Get-Date) -lt $service.NextHealthCheck) { continue }
+
+            $service.NextHealthCheck = (Get-Date).AddSeconds($service.HealthCheckInterval)
+
             $diagnostics = $null
             $isHealthy = Test-ServiceHealth -Endpoint $service.HealthEndpoint -Diagnostics ([ref]$diagnostics)
-            
-            # Update metrics
             $service.TotalHealthChecks++
             $service.LastHealthCheckDuration = $diagnostics.ResponseTime
-            
-            # Calculate rolling average response time (exponential moving average)
+
             if ($service.AverageResponseTime -eq 0) {
                 $service.AverageResponseTime = $diagnostics.ResponseTime
             } else {
                 $service.AverageResponseTime = ($service.AverageResponseTime * 0.8) + ($diagnostics.ResponseTime * 0.2)
             }
-            
+
+            $profiling = $null
+            if ($script:ProfilingEnabled) {
+                $profiling = Get-ProfilingSnapshot -ProcessName $service.ProcessName
+            }
+
             if (-not $isHealthy) {
                 $service.HealthCheckFailures++
                 $service.LastError = $diagnostics.Error
-                
+
                 Write-TheoriaLog "$($service.Name) health check failed: $($diagnostics.Error)" -Level Warning -Metadata @{
                     service = $serviceKey
                     status_code = $diagnostics.StatusCode
                     error = $diagnostics.Error
                     response_time_ms = $diagnostics.ResponseTime
                 }
-                
-                # Calculate exponential backoff cooldown
+
+                if ($script:AlertsEnabled -and $service.HealthCheckFailures -eq 1) {
+                    Send-ServiceAlert -AlertConfig $script:AlertConfig -ServiceName $service.Name -Message "Health check failed with status $($diagnostics.StatusCode). $($diagnostics.Error)" -Severity "critical"
+                }
+
                 $backoffMultiplier = [math]::Pow(2, [math]::Min($service.RestartCount, 4))
                 $currentCooldown = $script:RestartCooldown * $backoffMultiplier
-                
-                # Check if we should restart
+
                 if ($service.RestartCount -lt $script:MaxRestartAttempts) {
                     $timeSinceLastRestart = if ($service.LastRestartTime) {
                         (Get-Date) - $service.LastRestartTime
                     } else {
                         New-TimeSpan -Seconds 999
                     }
-                    
+
                     if ($timeSinceLastRestart.TotalSeconds -gt $currentCooldown) {
                         Write-TheoriaLog "Attempting to restart $($service.Name) (attempt $($service.RestartCount + 1)/$script:MaxRestartAttempts, cooldown: ${currentCooldown}s)..." -Level Warning -Metadata @{
                             restart_attempt = $service.RestartCount + 1
                             max_attempts = $script:MaxRestartAttempts
                             cooldown_seconds = $currentCooldown
                         }
-                        
+
                         Invoke-ServiceRestart -ServiceKey $serviceKey
                     } else {
                         $remainingCooldown = [int]($currentCooldown - $timeSinceLastRestart.TotalSeconds)
@@ -1008,16 +1083,23 @@ function Start-HealthMonitor {
                     Write-TheoriaLog "Manual intervention required - check logs for details" -Level Error
                 }
             } else {
-                # Reset failure counter on successful health check
                 if ($service.HealthCheckFailures -gt 0) {
                     Write-TheoriaLog "$($service.Name) recovered (response: $($diagnostics.ResponseTime)ms)" -Level Success
+                    if ($script:AlertsEnabled) {
+                        Send-ServiceAlert -AlertConfig $script:AlertConfig -ServiceName $service.Name -Message "Service recovered" -Severity "info"
+                    }
                 }
-                
+
+                $service.HealthCheckFailures = 0
                 Write-TheoriaLog "$($service.Name) health check passed" -Level Debug -Metadata @{
                     response_time_ms = $diagnostics.ResponseTime
                     avg_response_time_ms = $service.AverageResponseTime
                 }
             }
+
+            Update-ServiceMetricsEntry -ServiceState $service -Diagnostics $diagnostics -Profiling $profiling
+            $service.LastProfilingSnapshot = $profiling
+            Get-PrometheusMetrics | Out-Null
         }
     }
 }
@@ -1252,7 +1334,8 @@ public class TheoriaBypassCerts {
     Write-Host "║                                                          ║" -ForegroundColor Green
     Write-Host "║  Features:                                               ║" -ForegroundColor Green
     Write-Host "║    ✓ Auto-recovery with exponential backoff             ║" -ForegroundColor Green
-    Write-Host "║    ✓ Health monitoring every ${script:HealthCheckInterval}s                           ║" -ForegroundColor Green
+    $intervalSummary = ($script:Services.Keys | ForEach-Object { "$($script:Services[$_].Name): $($script:Services[$_].HealthCheckInterval)s" }) -join ", "
+    Write-Host "║    ✓ Health monitoring (intervals: $intervalSummary)            ║" -ForegroundColor Green
     if ($ShowMetrics) {
         Write-Host "║    ✓ Real-time metrics dashboard                        ║" -ForegroundColor Green
     }
@@ -1290,7 +1373,9 @@ public class TheoriaBypassCerts {
                 $script:LogBuffer.Clear()
             } catch {}
         }
-        
+
+        Stop-MetricsEndpoint
+
         # Graceful shutdown with timeout
         Stop-TheoriaService -ServiceKey "Web"
         Stop-TheoriaService -ServiceKey "Api"
