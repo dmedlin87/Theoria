@@ -228,12 +228,7 @@ def _ensure_perspective_column(
                 connection.close()
 
         if _table_has_column(session, table.name, "perspective", schema=table.schema):
-            session.rollback()
-            logger.warning(
-                "Skipping %s seeds because 'perspective' column is missing",
-                dataset_label,
-            )
-            return False
+            return True
 
     session.rollback()
     logger.warning(

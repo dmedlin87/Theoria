@@ -7,7 +7,7 @@ import sys
 import logging
 from pathlib import Path
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -17,7 +17,12 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.core.database import Base
 from theo.services.api.app.db import seeds
 from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
-from theo.services.api.app.db.models import ContradictionSeed, GeoPlace
+from theo.services.api.app.db.models import (
+    CommentaryExcerptSeed,
+    ContradictionSeed,
+    GeoPlace,
+    HarmonySeed,
+)
 
 
 def _write_seed(path: Path, payload: list[dict]) -> None:
@@ -94,7 +99,7 @@ def test_seeders_remove_stale_records(tmp_path, monkeypatch) -> None:
         assert session.get(GeoPlace, "jerusalem") is not None
 
 
-def test_seeders_skip_when_perspective_missing(caplog) -> None:
+def test_seeders_backfill_missing_perspective_column() -> None:
     engine = create_engine("sqlite:///:memory:", future=True)
 
     with engine.begin() as connection:
@@ -107,7 +112,14 @@ def test_seeders_skip_when_perspective_missing(caplog) -> None:
                 summary TEXT,
                 source VARCHAR,
                 tags TEXT,
-                weight FLOAT NOT NULL
+                weight FLOAT NOT NULL,
+                start_verse_id_a INTEGER,
+                end_verse_id_a INTEGER,
+                start_verse_id INTEGER,
+                end_verse_id INTEGER,
+                start_verse_id_b INTEGER,
+                end_verse_id_b INTEGER,
+                created_at TIMESTAMP NOT NULL
             )
             """
         )
@@ -120,7 +132,15 @@ def test_seeders_skip_when_perspective_missing(caplog) -> None:
                 summary TEXT,
                 source VARCHAR,
                 tags TEXT,
-                weight FLOAT NOT NULL
+                weight FLOAT NOT NULL,
+                start_verse_id_a INTEGER,
+                end_verse_id_a INTEGER,
+                start_verse_id INTEGER,
+                end_verse_id INTEGER,
+                start_verse_id_b INTEGER,
+                end_verse_id_b INTEGER,
+                created_at TIMESTAMP NOT NULL,
+                updated_at TIMESTAMP NOT NULL
             )
             """
         )
@@ -132,22 +152,37 @@ def test_seeders_skip_when_perspective_missing(caplog) -> None:
                 title VARCHAR,
                 excerpt TEXT NOT NULL,
                 source VARCHAR,
-                tags TEXT
+                tags TEXT,
+                start_verse_id INTEGER,
+                end_verse_id INTEGER,
+                created_at TIMESTAMP NOT NULL,
+                updated_at TIMESTAMP NOT NULL
             )
             """
         )
 
-    caplog.clear()
-    with Session(engine) as session, caplog.at_level(logging.WARNING):
+    with Session(engine) as session:
         seeds.seed_contradiction_claims(session)
         seeds.seed_harmony_claims(session)
         seeds.seed_commentary_excerpts(session)
         assert not session.in_transaction()
 
-    messages = [record.getMessage() for record in caplog.records]
-    assert "Skipping contradiction seeds because 'perspective' column is missing" in messages
-    assert "Skipping harmony seeds because 'perspective' column is missing" in messages
-    assert "Skipping commentary excerpt seeds because 'perspective' column is missing" in messages
+        assert session.query(ContradictionSeed).count() > 0
+        assert session.query(HarmonySeed).count() > 0
+        assert session.query(CommentaryExcerptSeed).count() > 0
+
+        for table_name in (
+            "contradiction_seeds",
+            "harmony_seeds",
+            "commentary_excerpt_seeds",
+        ):
+            columns = [
+                row[1]
+                for row in session.execute(
+                    text(f"PRAGMA table_info('{table_name}')")
+                )
+            ]
+            assert "perspective" in columns
 
 
 def test_seed_reference_data_provides_perspective_column(tmp_path, monkeypatch) -> None:

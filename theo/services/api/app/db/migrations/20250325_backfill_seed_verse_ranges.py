@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import Iterable
 
@@ -14,6 +15,9 @@ from theo.services.api.app.db.models import (
     ContradictionSeed,
     HarmonySeed,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=512)
@@ -77,6 +81,11 @@ def apply(session: Session) -> None:
     except OperationalError as exc:
         if not _is_missing_column_error(exc):
             raise
+        session.rollback()
+        logger.warning(
+            "Skipping verse range backfill for ContradictionSeed because required columns are missing"
+        )
+        return
 
     try:
         for seed in session.query(HarmonySeed):
@@ -91,6 +100,11 @@ def apply(session: Session) -> None:
     except OperationalError as exc:
         if not _is_missing_column_error(exc):
             raise
+        session.rollback()
+        logger.warning(
+            "Skipping verse range backfill for HarmonySeed because required columns are missing"
+        )
+        return
 
     try:
         for seed in session.query(CommentaryExcerptSeed):
@@ -106,6 +120,11 @@ def apply(session: Session) -> None:
     except OperationalError as exc:
         if not _is_missing_column_error(exc):
             raise
+        session.rollback()
+        logger.warning(
+            "Skipping verse range backfill for CommentaryExcerptSeed because required columns are missing"
+        )
+        return
 
     if updated:
         session.flush()
