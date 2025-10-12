@@ -1,4 +1,4 @@
-# TheoEngine: Deep-Research Bible Reader & Critical Analysis Agent
+# Theoria: Deep-Research Bible Reader & Critical Analysis Agent
 
 **Goal.** A verse-first Bible reader that turns every passage into a research workspace: textual variants, cross-references, morphology, historical context, contradiction/harmony checks, apologetic vs. skeptical notes, and citable evidence on tap while you read.
 
@@ -364,7 +364,7 @@ Result: [{ "video_id":"...", "segment_id":"...", "t_start":123.4, "text":"...", 
 ## 8) NEW: YouTube & Creator Transcript Ingestion ("What does Wes think about X?")
 
 ### 8.1 Goals
-- Ingest YouTube (or any) transcripts that **you provide** into TheoEngine's resource DB.
+- Ingest YouTube (or any) transcripts that **you provide** into Theoria's resource DB.
 - Build **Creator Knowledge Profiles** (e.g., "Wes Huff") that summarize stances by topic and attach time-coded quotes with citations.
 - Link transcript content to **OSIS verses** (when verses are mentioned) and to **Claim/Evidence** nodes so it strengthens over time.
 - Enable natural queries: "What does Wes think about baptism?" → concise stance summary + quotes + timestamps + video links; optionally compare with other creators.
@@ -515,7 +515,7 @@ salience real                   -- for ranking in UI
 
 ### 8.7 Legal, ethical, and quality notes
 
-- **Provenance**: only ingest transcripts you own or have rights to use; or that you, the user, explicitly provide to TheoEngine.
+- **Provenance**: only ingest transcripts you own or have rights to use; or that you, the user, explicitly provide to Theoria.
 - **Licensing**: Store user-declared license/terms with each video; respect takedown/opt-out.
 - **Quoting**: Keep quotes short; provide timestamped links; prefer paraphrase + cite (fair-use friendly).
 - **Attribution**: Always show creator name, video title, and URL with quotes.

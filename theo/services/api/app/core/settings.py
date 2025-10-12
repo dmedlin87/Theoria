@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     fixtures_root: Path | None = Field(
         default=None, description="Optional fixtures path for offline resources"
     )
-    user_agent: str = Field(default="TheoEngine/1.0")
+    user_agent: str = Field(default="Theoria/1.0")
     llm_default_model: str | None = Field(
         default=None, description="Default model identifier for generative features"
     )

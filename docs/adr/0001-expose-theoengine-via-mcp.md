@@ -1,17 +1,17 @@
-# ADR 0001: Expose TheoEngine via the Model Context Protocol
+# ADR 0001: Expose Theoria via the Model Context Protocol
 
 ## Status
 Accepted
 
 ## Context
-TheoEngine powers a variety of research workflows that benefit from structured tool
+Theoria powers a variety of research workflows that benefit from structured tool
 access inside LLM-driven experiences. The Model Context Protocol (MCP) provides a
 standard way to surface back-end capabilities such as document search, note taking,
 and evidence retrieval. Prior experiments exposed these capabilities ad-hoc, which
 made it difficult to evolve payload schemas or keep parity with the public REST API.
 
 ## Decision
-We will expose TheoEngine functionality through an MCP server. The initial
+We will expose Theoria functionality through an MCP server. The initial
 capabilities focus on scripture-centric research primitives:
 
 - `search`: retrieve passages, documents, and cross references.

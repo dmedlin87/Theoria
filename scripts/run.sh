@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TheoEngine Intelligent Runner (Bash version)
+# Theoria Intelligent Runner (Bash version)
 # Cross-platform script for Linux/macOS
 
 set -euo pipefail
@@ -118,7 +118,7 @@ setup_env_files() {
         else
             print_warn "Creating minimal .env file"
             cat > "$ENV_FILE" <<EOF
-# TheoEngine Configuration
+# Theoria Configuration
 database_url=sqlite:///./theo.db
 storage_root=./storage
 redis_url=redis://localhost:6379/0
@@ -134,7 +134,7 @@ EOF
     
     if [ ! -f "$WEB_ENV_FILE" ]; then
         cat > "$WEB_ENV_FILE" <<EOF
-# TheoEngine Web - Local Development
+# Theoria Web - Local Development
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:$PORT
 API_BASE_URL=http://127.0.0.1:$PORT
 EOF

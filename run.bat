@@ -1,5 +1,5 @@
 @echo off
-REM TheoEngine Quick Launcher (Windows Batch)
+REM Theoria Quick Launcher (Windows Batch)
 REM This is a simple wrapper that calls the PowerShell script
 
 setlocal
@@ -12,7 +12,7 @@ set "MODE=%~1"
 if "%MODE%"=="" set "MODE=full"
 
 REM Call PowerShell script
-echo Starting TheoEngine in %MODE% mode...
+echo Starting Theoria in %MODE% mode...
 echo.
 
 powershell -ExecutionPolicy Bypass -File "%SCRIPT_DIR%scripts\run.ps1" -Mode %MODE%

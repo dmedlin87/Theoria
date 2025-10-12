@@ -1,6 +1,6 @@
-# TheoEngine Run Scripts
+# Theoria Run Scripts
 
-Intelligent all-in-one scripts for running TheoEngine services with automatic environment setup, dependency management, and error handling.
+Intelligent all-in-one scripts for running Theoria services with automatic environment setup, dependency management, and error handling.
 
 ---
 
@@ -10,7 +10,7 @@ Intelligent all-in-one scripts for running TheoEngine services with automatic en
 
 ```powershell
 # Navigate to project root
-cd C:\Users\dmedl\Projects\TheoEngine
+cd C:\Users\dmedl\Projects\Theoria
 
 # Run full stack (API + Web)
 .\scripts\run.ps1
@@ -23,7 +23,7 @@ cd C:\Users\dmedl\Projects\TheoEngine
 
 ```bash
 # Navigate to project root
-cd ~/Projects/TheoEngine
+cd ~/Projects/Theoria
 
 # Make script executable (first time only)
 chmod +x scripts/run.sh
@@ -196,7 +196,7 @@ Runs all test suites (Python, Node.js, E2E)
 The scripts automatically create these files if they don't exist:
 
 ```text
-TheoEngine/
+Theoria/
 ├── .env                    # Main environment variables
 ├── .venv/                  # Python virtual environment
 └── theo/services/web/
@@ -314,8 +314,8 @@ Remove-Item -Recurse -Force .venv, theo\services\web\node_modules
 
 ```powershell
 # 1. Clone repository
-git clone https://github.com/yourorg/TheoEngine.git
-cd TheoEngine
+git clone https://github.com/yourorg/Theoria.git
+cd Theoria
 
 # 2. Run environment check
 .\scripts\run.ps1 -Mode check
@@ -344,7 +344,7 @@ cd TheoEngine
 .\scripts\run.ps1 -Mode api -Verbose
 
 # Terminal 2: Run API tests
-cd TheoEngine
+cd Theoria
 .venv\Scripts\Activate.ps1
 pytest tests/ -v
 ```
@@ -370,7 +370,7 @@ npm run test:e2e
 .\scripts\run.ps1 -Mode test
 
 # Or individually
-cd TheoEngine
+cd Theoria
 .venv\Scripts\Activate.ps1
 pytest tests/ -v                    # Python tests
 

@@ -22,7 +22,7 @@ Result: ✅ 13 passed (1 third-party deprecation warning from `schemathesis`).
 ```bash
 mypy theo/services/geo
 ```
-Result: ❌ Blocked by 65 errors upstream in shared TheoEngine API modules and two Geo-specific typing violations (`seed_openbible_geo.py` lines 78 and 256). Recommend coordinating a staged type-hint cleanup, starting with replacing `Any`-typed SQLAlchemy base exports and tightening CLI entry-point annotations.
+Result: ❌ Blocked by 65 errors upstream in shared Theoria API modules and two Geo-specific typing violations (`seed_openbible_geo.py` lines 78 and 256). Recommend coordinating a staged type-hint cleanup, starting with replacing `Any`-typed SQLAlchemy base exports and tightening CLI entry-point annotations.
 
 ## Follow-Up Recommendations
 - Introduce a narrowed `mypy` config or stub package that isolates Geo from the broader API surface until the shared SQLAlchemy models expose typed base classes.

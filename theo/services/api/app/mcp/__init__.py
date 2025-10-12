@@ -1,4 +1,4 @@
-"""Model Context Protocol tooling exposed by TheoEngine."""
+"""Model Context Protocol tooling exposed by Theoria."""
 
 from .tools import MCPToolError, handle_note_write
 

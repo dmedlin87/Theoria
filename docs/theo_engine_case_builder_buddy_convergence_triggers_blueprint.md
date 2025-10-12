@@ -1,4 +1,4 @@
-# TheoEngine – Case Builder Buddy: Convergence Triggers Blueprint
+# Theoria – Case Builder Buddy: Convergence Triggers Blueprint
 
 ## Goal
 Detect “data convergence” moments—when independent items (Evidence Cards, citations, verses, transcripts, notes) begin to align in meaning or implication—and surface them as actionable insights with traceable rationale.

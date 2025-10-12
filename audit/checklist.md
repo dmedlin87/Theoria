@@ -1,4 +1,4 @@
-# TheoEngine Audit Checklist
+# Theoria Audit Checklist
 
 ## Frontend
 

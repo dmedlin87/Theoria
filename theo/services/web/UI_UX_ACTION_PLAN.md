@@ -1,4 +1,4 @@
-# UI/UX Action Plan - TheoEngine
+# UI/UX Action Plan - Theoria
 
 **Sprint Planning Guide | Priority-Based Roadmap**
 

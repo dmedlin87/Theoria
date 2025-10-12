@@ -1,8 +1,8 @@
 ============================= test session starts =============================
-platform win32 -- Python 3.12.6, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\dmedl\Projects\TheoEngine\.venv\Scripts\python.exe
+platform win32 -- Python 3.12.6, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\dmedl\Projects\Theoria\.venv\Scripts\python.exe
 cachedir: .pytest_cache
 hypothesis profile 'default'
-rootdir: C:\Users\dmedl\Projects\TheoEngine
+rootdir: C:\Users\dmedl\Projects\Theoria
 configfile: pyproject.toml
 plugins: anyio-4.11.0, hypothesis-6.140.2, cov-7.0.0, subtests-0.14.2, schemathesis-3.39.16
 collecting ... collected 1 item
@@ -58,12 +58,12 @@ E        +  and   400 = status.HTTP_400_BAD_REQUEST
 
 tests\api\test_ingest.py:332: AssertionError
 ----------------------------- Captured log setup ------------------------------
-WARNING  theo.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\TheoEngine\theo\data\providers\openbible-geo\data
+WARNING  theo.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
 ------------------------------ Captured log call ------------------------------
 ERROR    theo.api.errors:reporting.py:189 api.debug_report
 ============================== warnings summary ===============================
 .venv\Lib\site-packages\schemathesis\generation\coverage.py:305
-  c:\Users\dmedl\Projects\TheoEngine\.venv\Lib\site-packages\schemathesis\generation\coverage.py:305: DeprecationWarning: jsonschema.exceptions.RefResolutionError is deprecated as of version 4.18.0. If you wish to catch potential reference resolution errors, directly catch referencing.exceptions.Unresolvable.
+  c:\Users\dmedl\Projects\Theoria\.venv\Lib\site-packages\schemathesis\generation\coverage.py:305: DeprecationWarning: jsonschema.exceptions.RefResolutionError is deprecated as of version 4.18.0. If you wish to catch potential reference resolution errors, directly catch referencing.exceptions.Unresolvable.
     ref_error: type[Exception] = jsonschema.RefResolutionError,
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html

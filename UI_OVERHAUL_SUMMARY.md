@@ -1,7 +1,7 @@
 # UI Overhaul Summary
 
 ## Overview
-Completed a comprehensive UI overhaul to make the TheoEngine interface sleek, modern, and significantly improve the overall UX.
+Completed a comprehensive UI overhaul to make the Theoria interface sleek, modern, and significantly improve the overall UX.
 
 ## Major Changes
 
