@@ -1,4 +1,4 @@
-# Theoria Engine
+# Theoria
 
 **Theoria is a research engine for theology** that indexes your library (papers, notes, YouTube transcripts, audio), normalizes Scripture references (OSIS), and provides deterministic, verse-anchored search with a Verse Aggregator across your entire corpus.
 
