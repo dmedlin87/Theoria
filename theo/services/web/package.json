@@ -13,7 +13,12 @@
     "lint:types": "tsc --noEmit",
     "test:e2e": "playwright test --reporter=line,html",
     "test:e2e:smoke": "playwright test --grep @smoke --reporter=line,html",
-    "test:e2e:full": "playwright test --grep @full --reporter=line,html"
+    "test:e2e:full": "playwright test --reporter=line,html",
+    "test:a11y": "playwright test --grep @a11y --reporter=line",
+    "test:lighthouse:smoke": "node scripts/quality/run-lighthouse-smoke.mjs",
+    "quality:gates": "node scripts/quality/check-quality-gates.mjs",
+    "quality:baseline": "node scripts/quality/update-baseline.mjs",
+    "quality:dashboard": "node scripts/quality/generate-dashboard.mjs"
   },
   "dependencies": {
     "d3": "^7.9.0",
@@ -22,6 +27,8 @@
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.0",
+    "@lhci/cli": "0.14.0",
     "@next/bundle-analyzer": "15.5.4",
     "@playwright/test": "1.56.0",
     "@testing-library/jest-dom": "6.9.1",

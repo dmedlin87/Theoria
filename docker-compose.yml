@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: theo/services/api/Dockerfile
+    ports:
+      - "${THEORIA_API_PORT:-8000}:8000"
+    environment:
+      PYTHONPATH: /app
+      THEO_AUTH_ALLOW_ANONYMOUS: "1"
+      THEO_ALLOW_INSECURE_STARTUP: "1"
+      THEORIA_PROFILE: "${THEORIA_PROFILE:-dev}"
+      THEORIA_API_PORT: "${THEORIA_API_PORT:-8000}"
+    volumes:
+      - .:/app
+    command: ["uvicorn", "theo.services.api.app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+
+  web:
+    image: node:20-alpine
+    working_dir: /workspace/theo/services/web
+    volumes:
+      - .:/workspace
+    ports:
+      - "${THEORIA_WEB_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: "http://localhost:${THEORIA_API_PORT:-8000}"
+      THEORIA_PROFILE: "${THEORIA_PROFILE:-dev}"
+      NODE_ENV: development
+      THEORIA_WEB_PORT: "${THEORIA_WEB_PORT:-3000}"
+      THEORIA_API_PORT: "${THEORIA_API_PORT:-8000}"
+    command: ["sh", "-c", "npm install && npm run dev -- --hostname 0.0.0.0 --port ${THEORIA_WEB_PORT:-3000}"]
+    depends_on:
+      - api
