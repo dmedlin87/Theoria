@@ -48,6 +48,7 @@
 - Maintain last two signed releases in registry.
 - Automated rollback script validates cosign signatures before redeploying previous version.
 - Run smoke tests post-rollback to confirm ingestion/search functionality.
+- Escalate any performance anomalies using the [Performance Discrepancy Runbook](docs/runbooks/performance_discrepancy_runbook.md) to ensure DevOps is looped in for load testing and mitigation decisions.
 
 ## Change Management
 
