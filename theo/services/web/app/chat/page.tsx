@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import ChatWorkspace from "./ChatWorkspace";
 
 export const metadata: Metadata = {
-  title: "Theo Engine — Chat",
+  title: "Theoria — Chat",
   description: "Research chat with grounded theological citations.",
 };
 

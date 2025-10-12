@@ -8,7 +8,7 @@ import Link from "next/link";
 import { AppShell, type AppShellNavSection } from "./components/AppShell";
 
 export const metadata = {
-  title: "Theo Engine",
+  title: "Theoria",
   description: "Research engine for theology",
 };
 
@@ -62,7 +62,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     });
   }
 
-  const footerMeta = `© ${new Date().getFullYear()} Theo Engine • UI v2 preview`;
+  const footerMeta = `© ${new Date().getFullYear()} Theoria • UI v2 preview`;
 
   return (
     <html lang="en">
@@ -84,13 +84,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <header className="site-header">
                 <div className="container site-header__content">
                   <Link href="/" className="brand">
-                    Theo Engine
+                    Theoria
                   </Link>
                   <nav className="site-nav" aria-label="Primary">
                     {[...NAV_LINKS, ...adminLinks].map((item) => (
                       <Link
                         key={item.href}
                         href={item.href}
+                        prefetch={true}
                         className={
                           item.variant === "primary" ? "nav-link nav-link--primary" : "nav-link"
                         }

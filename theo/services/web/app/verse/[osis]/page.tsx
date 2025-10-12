@@ -60,23 +60,28 @@ async function fetchGraph(
   osis: string,
   searchParams: VersePageProps["searchParams"],
 ): Promise<VerseGraphResponse> {
-  const params = buildMentionFilterQuery(searchParams);
-  const query = params.toString();
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-  const response = await fetch(
-    `${baseUrl}/verses/${encodeURIComponent(osis)}/graph${
-      query ? `?${query}` : ""
-    }`,
-    {
-      cache: "no-store",
-    },
-  );
+  try {
+    const params = buildMentionFilterQuery(searchParams);
+    const query = params.toString();
+    const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+    const response = await fetch(
+      `${baseUrl}/verses/${encodeURIComponent(osis)}/graph${
+        query ? `?${query}` : ""
+      }`,
+      {
+        cache: "no-store",
+      },
+    );
 
-  if (!response.ok) {
-    throw new Error(`Unable to load graph: ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Unable to load graph: ${response.statusText}`);
+    }
+
+    return (await response.json()) as VerseGraphResponse;
+  } catch (error) {
+    console.error("Failed to load verse graph", error);
+    throw error;
   }
-
-  return (await response.json()) as VerseGraphResponse;
 }
 
 function getParamValue(
@@ -123,21 +128,26 @@ async function fetchMentions(
   osis: string,
   searchParams: VersePageProps["searchParams"],
 ): Promise<VerseMentionsResponse> {
-  const params = buildMentionFilterQuery(searchParams);
-  const query = params.toString();
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-  const response = await fetch(
-    `${baseUrl}/verses/${encodeURIComponent(osis)}/mentions${query ? `?${query}` : ""}`,
-    {
-      cache: "no-store",
-    },
-  );
+  try {
+    const params = buildMentionFilterQuery(searchParams);
+    const query = params.toString();
+    const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+    const response = await fetch(
+      `${baseUrl}/verses/${encodeURIComponent(osis)}/mentions${query ? `?${query}` : ""}`,
+      {
+        cache: "no-store",
+      },
+    );
 
-  if (!response.ok) {
-    throw new Error(`Unable to load mentions: ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Unable to load mentions: ${response.statusText}`);
+    }
+
+    return (await response.json()) as VerseMentionsResponse;
+  } catch (error) {
+    console.error("Failed to load verse mentions", error);
+    throw error;
   }
-
-  return (await response.json()) as VerseMentionsResponse;
 }
 
 async function fetchTimeline(
@@ -145,26 +155,31 @@ async function fetchTimeline(
   searchParams: VersePageProps["searchParams"],
   window: TimelineWindow,
 ): Promise<VerseTimelineResponse | null> {
-  const params = buildMentionFilterQuery(searchParams);
-  params.set("window", window);
-  const query = params.toString();
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
-  const response = await fetch(
-    `${baseUrl}/verses/${encodeURIComponent(osis)}/timeline${query ? `?${query}` : ""}`,
-    {
-      cache: "no-store",
-    },
-  );
+  try {
+    const params = buildMentionFilterQuery(searchParams);
+    params.set("window", window);
+    const query = params.toString();
+    const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+    const response = await fetch(
+      `${baseUrl}/verses/${encodeURIComponent(osis)}/timeline${query ? `?${query}` : ""}`,
+      {
+        cache: "no-store",
+      },
+    );
 
-  if (response.status === 404) {
-    return null;
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Unable to load timeline: ${response.statusText}`);
+    }
+
+    return (await response.json()) as VerseTimelineResponse;
+  } catch (error) {
+    console.error("Failed to load verse timeline", error);
+    throw error;
   }
-
-  if (!response.ok) {
-    throw new Error(`Unable to load timeline: ${response.statusText}`);
-  }
-
-  return (await response.json()) as VerseTimelineResponse;
 }
 
 const STUDY_MODES = ["apologetic", "skeptical"] as const;

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { type ReactNode, useState, useTransition } from "react";
 
 export type AppShellNavItem = {
   href: string;
@@ -41,12 +41,28 @@ export function AppShell({
   footerMeta,
 }: AppShellProps) {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [clickedHref, setClickedHref] = useState<string | null>(null);
+
+  const handleLinkClick = (href: string, e: React.MouseEvent<HTMLAnchorElement>) => {
+    // Allow default Link behavior for cmd/ctrl clicks
+    if (e.metaKey || e.ctrlKey) return;
+
+    e.preventDefault();
+    setClickedHref(href);
+    startTransition(() => {
+      router.push(href);
+      // Clear after navigation
+      setTimeout(() => setClickedHref(null), 300);
+    });
+  };
 
   return (
     <div className="app-shell-v2">
       <aside className="app-shell-v2__nav">
         <Link href="/" className="app-shell-v2__brand">
-          <span className="app-shell-v2__brand-name">Theo Engine</span>
+          <span className="app-shell-v2__brand-name">Theoria</span>
           <span className="app-shell-v2__brand-tagline">Research workspace</span>
         </Link>
         <nav className="app-shell-v2__nav-groups" aria-label="Primary">
@@ -58,18 +74,32 @@ export function AppShell({
                   const isActive = item.match
                     ? pathname.startsWith(item.match)
                     : pathname === item.href;
+                  const isLoading = clickedHref === item.href && isPending;
                   return (
                     <li key={item.href}>
                       <Link
                         href={item.href}
+                        prefetch={true}
                         className={
                           isActive
                             ? "app-shell-v2__nav-link is-active"
                             : "app-shell-v2__nav-link"
                         }
                         aria-current={isActive ? "page" : undefined}
+                        onClick={(e) => handleLinkClick(item.href, e)}
+                        style={{
+                          opacity: isLoading ? 0.6 : 1,
+                          pointerEvents: isLoading ? "none" : "auto",
+                        }}
                       >
-                        {item.label}
+                        {isLoading ? (
+                          <>
+                            <span className="nav-loading-spinner" />
+                            {item.label}
+                          </>
+                        ) : (
+                          item.label
+                        )}
                       </Link>
                     </li>
                   );
@@ -99,11 +129,26 @@ export function AppShell({
             aria-label="Quick actions"
             role="group"
           >
-            <button type="button" className="app-shell-v2__action" disabled title="Coming soon">
-              New research notebook
-            </button>
-            <button type="button" className="app-shell-v2__action" disabled title="Coming soon">
-              Upload sources
+            <button
+              type="button"
+              className="app-shell-v2__action"
+              onClick={() => {
+                setClickedHref("/upload");
+                startTransition(() => {
+                  router.push("/upload");
+                  setTimeout(() => setClickedHref(null), 300);
+                });
+              }}
+              disabled={isPending && clickedHref === "/upload"}
+            >
+              {isPending && clickedHref === "/upload" ? (
+                <>
+                  <span className="action-loading-spinner" />
+                  Navigating…
+                </>
+              ) : (
+                "Upload sources"
+              )}
             </button>
           </div>
         </div>

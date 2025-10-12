@@ -275,7 +275,7 @@ export default function ChatWorkspace({
       const uploadSuggestion: GuardrailSuggestion = {
         action: "upload",
         label: "Upload supporting documents",
-        description: "Add material covering this topic so Theo Engine has grounded sources next time.",
+        description: "Add material covering this topic so Theoria has grounded sources next time.",
         collection: defaultFilters?.collection ?? null,
       };
       return [searchSuggestion, uploadSuggestion];
@@ -570,7 +570,7 @@ export default function ChatWorkspace({
     <div className="chat-workspace" aria-live="polite">
       <section className="chat-hero" aria-label="Chat overview">
         <div className="chat-hero__content">
-          <p className="chat-hero__eyebrow">Theo Engine Copilot</p>
+          <p className="chat-hero__eyebrow">Theoria Copilot</p>
           <h2>Ask with {mode.label} stance</h2>
           <p>
             We’ll keep the conversation aligned to <strong>{mode.label.toLowerCase()}</strong> emphasis while grounding
@@ -771,7 +771,7 @@ export default function ChatWorkspace({
       {errorMessage ? <ErrorCallout message={errorMessage} /> : null}
 
       <form className="chat-form" onSubmit={handleSubmit} aria-label="Chat input">
-        <label htmlFor="chat-question">Ask Theo Engine</label>
+        <label htmlFor="chat-question">Ask Theoria</label>
         <textarea
           id="chat-question"
           name="question"

@@ -206,18 +206,18 @@ function Install-PythonDependencies {
     $pipList = & $PythonExe -m pip list --format=json 2>&1 | ConvertFrom-Json
     $installedPackages = $pipList.name
     
-    $requiresInstall = $false
-    Get-Content $requirementsFile | ForEach-Object {
+    # Check each requirement against installed packages
+    $missingPackages = Get-Content $requirementsFile | ForEach-Object {
         $line = $_.Trim()
         if ($line -and -not $line.StartsWith('#')) {
             $packageName = ($line -split '[>=<]')[0].Trim()
             if ($packageName -notin $installedPackages) {
-                $requiresInstall = $true
+                $packageName
             }
         }
     }
     
-    if ($requiresInstall) {
+    if ($missingPackages) {
         Write-Step "Installing Python dependencies..."
         & $PythonExe -m pip install -q --upgrade pip
         & $PythonExe -m pip install -q -r $requirementsFile
@@ -391,9 +391,9 @@ function Start-ApiService {
     Push-Location $Script:ProjectRoot
     try {
         $apiJob = Start-Job -ScriptBlock {
-            param($Python, $Args, $ProjectRoot)
+            param($Python, $UvicornArgs, $ProjectRoot)
             Set-Location $ProjectRoot
-            & $Python @Args
+            & $Python @UvicornArgs
         } -ArgumentList $python, $uvicornArgs, $Script:ProjectRoot
         
         # Wait for API to be ready

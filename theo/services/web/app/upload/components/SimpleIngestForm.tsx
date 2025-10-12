@@ -3,7 +3,7 @@
 import { FormEvent, useRef, useState } from "react";
 
 const DEFAULT_COLLECTION = "uploads";
-const DEFAULT_AUTHOR = "Theo Engine";
+const DEFAULT_AUTHOR = "Theoria";
 
 export type SimpleIngestEvent = {
   event: string;

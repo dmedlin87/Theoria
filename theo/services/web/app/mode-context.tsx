@@ -128,76 +128,81 @@ export function useMode(): ModeContextValue {
   return context;
 }
 
+function getModeSummary(mode: ResearchMode): string {
+  const summaries: Record<ResearchModeId, string> = {
+    balanced: "Blends critical & devotional perspectives",
+    investigative: "Surfaces variants, tensions & critical questions",
+    devotional: "Emphasizes pastoral insights & application",
+  };
+  return summaries[mode.id];
+}
+
 export function ModeSwitcher(): JSX.Element {
   const { mode, modes, setMode } = useMode();
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  if (!showAdvanced) {
-    return (
-      <div className="mode-panel mode-panel--compact" aria-live="polite">
-        <p className="mode-panel__summary">{formatEmphasisSummary(mode)}</p>
-        <p className="mode-panel__help">
-          Switch modes when you need results to lean more scholarly or devotional—changing the
-          mode refreshes search and chat responses to match.
-        </p>
-        <button
-          type="button"
-          className="mode-panel__button"
-          onClick={() => setShowAdvanced(true)}
-        >
-          Change mode
-        </button>
-      </div>
-    );
-  }
+  const [showTooltip, setShowTooltip] = useState(false);
 
   return (
-    <div className="mode-panel" aria-live="polite">
-      <div className="mode-panel__header">
-        <label htmlFor="mode-selector" className="mode-panel__title">
-          Research mode
+    <div className="mode-switcher-compact" aria-live="polite">
+      <div className="mode-switcher-compact__control">
+        <label htmlFor="mode-selector" className="mode-switcher-compact__label">
+          Mode
         </label>
-        <div className="mode-panel__control">
-          <select
-            id="mode-selector"
-            value={mode.id}
-            onChange={(event) => setMode(event.target.value as ResearchModeId)}
-            className="mode-panel__select"
-          >
-            {modes.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <select
+          id="mode-selector"
+          value={mode.id}
+          onChange={(event) => setMode(event.target.value as ResearchModeId)}
+          className="mode-switcher-compact__select"
+          title={mode.description}
+        >
+          {modes.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="mode-switcher-compact__info"
+          onClick={() => setShowTooltip(!showTooltip)}
+          onBlur={() => setTimeout(() => setShowTooltip(false), 150)}
+          aria-label="Show mode information"
+          title="Learn about research modes"
+        >
+          ?
+        </button>
       </div>
-      <p className="mode-panel__description">{mode.description}</p>
-      <p className="mode-panel__help">
-        Choose the mode that best fits your task. Investigative mode surfaces critical variants,
-        while Devotional centres pastoral insight; switching updates future answers accordingly.
+      <p className="mode-switcher-compact__summary">
+        {mode.label} — {getModeSummary(mode)}
       </p>
-      <details className="mode-panel__details">
-        <summary className="mode-panel__details-summary">See emphasis and softening details</summary>
-        <dl className="mode-panel__meta">
-          <div className="mode-panel__row">
-            <dt className="mode-panel__label">Emphasises</dt>
-            <dd className="mode-panel__value">{mode.emphasis.join(", ")}</dd>
+      {showTooltip && (
+        <div className="mode-switcher-compact__tooltip" role="tooltip">
+          <div className="mode-switcher-compact__tooltip-header">
+            <h4 className="mode-switcher-compact__tooltip-title">{mode.label} mode</h4>
+            <button
+              type="button"
+              className="mode-switcher-compact__tooltip-close"
+              onClick={() => setShowTooltip(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
           </div>
-          <div className="mode-panel__row">
-            <dt className="mode-panel__label">Softens</dt>
-            <dd className="mode-panel__value">{mode.suppressions.join(", ")}</dd>
-          </div>
-        </dl>
-      </details>
-      <p className="mode-panel__summary">{formatEmphasisSummary(mode)}</p>
-      <button
-        type="button"
-        className="mode-panel__button mode-panel__button--secondary"
-        onClick={() => setShowAdvanced(false)}
-      >
-        Done
-      </button>
+          <p className="mode-switcher-compact__tooltip-desc">{mode.description}</p>
+          <dl className="mode-switcher-compact__tooltip-meta">
+            <div className="mode-switcher-compact__tooltip-row">
+              <dt>Emphasises</dt>
+              <dd>{mode.emphasis.join(", ")}</dd>
+            </div>
+            <div className="mode-switcher-compact__tooltip-row">
+              <dt>Softens</dt>
+              <dd>{mode.suppressions.join(", ")}</dd>
+            </div>
+          </dl>
+          <p className="mode-switcher-compact__tooltip-note">
+            Choose the mode that best fits your task. Switching updates future answers accordingly.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
