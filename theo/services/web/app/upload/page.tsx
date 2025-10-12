@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout from "../components/ErrorCallout";
+import { useToast } from "../components/Toast";
 import { getApiBaseUrl } from "../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../lib/errorUtils";
 import FileUploadForm from "./components/FileUploadForm";
@@ -47,6 +48,7 @@ export default function UploadPage(): JSX.Element {
   const fetchJobsRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
+  const { addToast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -93,12 +95,15 @@ export default function UploadPage(): JSX.Element {
     };
   }, [baseUrl]);
 
-  const handleShowTraceDetails = useCallback((traceId: string | null) => {
-    const detailMessage = traceId
-      ? `Trace ID: ${traceId}`
-      : "No additional trace information is available.";
-    window.alert(detailMessage);
-  }, []);
+  const handleShowTraceDetails = useCallback(
+    (traceId: string | null) => {
+      const detailMessage = traceId
+        ? `Trace ID: ${traceId}`
+        : "No additional trace information is available.";
+      addToast({ type: "info", title: "Trace details", message: detailMessage });
+    },
+    [addToast],
+  );
 
   const handleRetryJobs = useCallback(() => {
     if (fetchJobsRef.current) {
@@ -393,6 +398,7 @@ export default function UploadPage(): JSX.Element {
               message={status.message}
               traceId={status.traceId}
               onShowDetails={handleShowTraceDetails}
+              detailsLabel="Show details"
             />
           ) : (
             status && (
@@ -413,6 +419,7 @@ export default function UploadPage(): JSX.Element {
               traceId={jobError.traceId}
               onRetry={handleRetryJobs}
               onShowDetails={handleShowTraceDetails}
+              detailsLabel="Show details"
             />
           </div>
         )}
