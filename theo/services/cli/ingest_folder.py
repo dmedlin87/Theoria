@@ -95,7 +95,13 @@ def _looks_like_url(value: str) -> bool:
 
 
 def find_local_sources(sources: Sequence[str]) -> list[str]:
-    """Return a list of non-URL sources after normalisation."""
+    """Return normalised local paths extracted from *sources*.
+
+    The API simple ingest service reuses this helper when deciding whether a
+    request mixes in any filesystem targets while no allowlisted roots are
+    configured. Keeping the filtering logic centralised here ensures the
+    service and CLI stay aligned on what counts as a "local" source.
+    """
 
     local_sources: list[str] = []
     for raw in sources:
