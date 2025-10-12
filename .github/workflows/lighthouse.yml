@@ -125,6 +125,25 @@ jobs:
         run: |
           npx --yes @lhci/cli@0.14.0 autorun --config ../../../lighthouserc.json
 
+      - name: Summarize Lighthouse delta
+        if: ${{ github.event.inputs.target != 'staging' || steps.ping.outputs.reachable == 'true' }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          mkdir -p .lighthouseci/current
+          if [ -f .lighthouseci/manifest.json ]; then
+            cp .lighthouseci/manifest.json .lighthouseci/current/manifest.json
+          fi
+          node ../../../scripts/compare-lighthouse-baseline.mjs \
+            ../../../.lighthouseci/baseline/manifest.json \
+            .lighthouseci/current/manifest.json | tee -a "$GITHUB_STEP_SUMMARY"
+          {
+            echo "";
+            echo "**Action items**";
+            echo "- Document Lighthouse score deltas in your PR summary and capture hypotheses for any regressions.";
+            echo "- Coordinate required load tests with infrastructure changes per [Performance Monitoring Policy](docs/performance.md).";
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Lighthouse artifacts
         if: always()
         uses: actions/upload-artifact@v4

@@ -12,7 +12,26 @@
       }
     },
     "assert": {
-      "preset": "lighthouse:recommended"
+      "preset": "lighthouse:recommended",
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.9 }],
+        "largest-contentful-paint": [
+          "error",
+          { "maxNumericValue": 2200, "aggregationMethod": "median" }
+        ],
+        "cumulative-layout-shift": [
+          "error",
+          { "maxNumericValue": 0.08, "aggregationMethod": "median" }
+        ],
+        "total-blocking-time": [
+          "error",
+          { "maxNumericValue": 150, "aggregationMethod": "median" }
+        ],
+        "speed-index": [
+          "error",
+          { "maxNumericValue": 3500, "aggregationMethod": "median" }
+        ]
+      }
     },
     "upload": {
       "target": "filesystem",
