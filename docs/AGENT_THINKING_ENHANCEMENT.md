@@ -153,7 +153,7 @@ class AutonomousExplorer:
 
 Prompt augmentation:
 
-```
+```text
 After reviewing the evidence, what critical information is missing?
 - Which perspectives are underrepresented?
 - Which time periods lack sources?
@@ -300,7 +300,7 @@ def detect_insights(reasoning_trace: dict, passages: list) -> list[Insight]:
 
 **Prompt injection:**
 
-```
+```text
 As you reason, explicitly mark insights:
 <insight type="cross_ref">
 Matthew 5:17 and Romans 10:4 create a tension about Torah's end...

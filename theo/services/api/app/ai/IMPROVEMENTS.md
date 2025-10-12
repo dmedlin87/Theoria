@@ -151,7 +151,7 @@ Added `_ModelHealth` dataclass tracking:
 - Last success/failure timestamps
 - Automatic recording on each generation
 
-### Usage
+### Usage: Router Introspection
 
 Access via router introspection:
 
@@ -209,7 +209,7 @@ def get_all_spend(self) -> dict[str, float]
 def get_all_latency(self) -> dict[str, float]
 ```
 
-### Usage
+### Usage: Transaction Methods
 
 ```python
 with ledger.transaction() as txn:
