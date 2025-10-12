@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from ..core.database import get_session
+from theo.application.facades.database import get_session
 from ..models.documents import (
     DocumentAnnotationCreate,
     DocumentAnnotationResponse,

@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
-from ..core.settings import get_settings
+from theo.application.facades.settings import get_settings
 
 from .base import APIModel, Passage
 

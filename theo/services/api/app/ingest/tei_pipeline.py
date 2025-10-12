@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 
 from sqlalchemy.orm import Session
 
-from ..core.settings import get_settings
+from theo.application.facades.settings import get_settings
 from ..db.models import Document, Passage
 from .chunking import Chunk, chunk_text
 from .embeddings import get_embedding_service, lexical_representation

@@ -20,8 +20,8 @@ from sqlalchemy import inspect as sa_inspect
 
 from theo.services.api.app.main import app
 from theo.services.api.app.db import run_sql_migrations as migrations_module
-from theo.services.api.app.core import database as database_module
-from theo.services.api.app.core.database import Base, configure_engine, get_engine
+from theo.application.facades import database as database_module
+from theo.application.facades.database import Base, configure_engine, get_engine
 from theo.services.api.app.security import require_principal
 
 @pytest.fixture(autouse=True)
@@ -179,7 +179,7 @@ def _disable_migrations(
 
     monkeypatch.setattr(database_module, "configure_engine", _configure_engine_with_perspective)
     monkeypatch.setattr(
-        "theo.services.api.app.core.database.configure_engine",
+        "theo.application.facades.database.configure_engine",
         _configure_engine_with_perspective,
     )
     globals()["configure_engine"] = _configure_engine_with_perspective

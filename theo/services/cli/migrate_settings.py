@@ -5,9 +5,16 @@ from __future__ import annotations
 import click
 from sqlalchemy.orm import Session
 
-from ..api.app.core.database import get_engine
-from ..api.app.core.secret_migration import migrate_secret_settings
-from ..api.app.core.settings import get_settings_cipher
+from theo.application.facades.secret_migration import migrate_secret_settings
+from theo.application.facades.settings import get_settings_cipher
+from theo.services.bootstrap import resolve_application
+
+
+APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+
+
+def get_engine():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("engine")
 
 
 @click.command()

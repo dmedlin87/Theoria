@@ -12,8 +12,8 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from ..core.database import get_session
-from ..core.settings import get_settings
+from theo.application.facades.database import get_session
+from theo.application.facades.settings import get_settings
 from ..errors import IngestionError, Severity
 from ..ingest.exceptions import UnsupportedSourceError
 from ..ingest.pipeline import (

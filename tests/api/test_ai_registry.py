@@ -34,21 +34,21 @@ from theo.services.api.app.ai.registry import (  # noqa: E402
 )
 from sqlalchemy.engine import Engine
 
-from theo.services.api.app.core import database as database_module  # noqa: E402
-from theo.services.api.app.core.database import (  # noqa: E402
+from theo.application.facades import database as database_module  # noqa: E402
+from theo.application.facades.database import (  # noqa: E402
     Base,
     configure_engine,
     get_engine,
     get_session,
 )
-from theo.services.api.app.core.secret_migration import (  # noqa: E402
+from theo.application.facades.secret_migration import (  # noqa: E402
     migrate_secret_settings,
 )
-from theo.services.api.app.core.settings import (  # noqa: E402
+from theo.application.facades.settings import (  # noqa: E402
     get_settings,
     get_settings_cipher,
 )
-from theo.services.api.app.core.settings_store import (  # noqa: E402
+from theo.application.facades.settings_store import (  # noqa: E402
     load_setting,
     save_setting,
 )

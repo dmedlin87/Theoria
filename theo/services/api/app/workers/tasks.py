@@ -30,8 +30,6 @@ from ..analytics.watchlists import (
     iter_due_watchlists,
     run_watchlist,
 )
-from ..core.database import get_engine
-from ..core.settings import get_settings
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import ChatSession, Document, IngestionJob, Passage
 from ..db.types import VectorType
@@ -49,10 +47,17 @@ from ..retriever.hybrid import hybrid_search
 from ..telemetry import CITATION_DRIFT_EVENTS, log_workflow_event
 from ..ai import rag
 from ..ai.rag import GuardrailError, RAGCitation
+from theo.services.bootstrap import resolve_application
+
+
+APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+settings = _ADAPTER_REGISTRY.resolve("settings")
+
+
+def get_engine():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("engine")
 
 logger = get_task_logger(__name__)
-
-settings = get_settings()
 
 celery = Celery(
     "theo-workers",

@@ -11,8 +11,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.core import database as database_module
-from theo.services.api.app.core.database import Base, configure_engine, get_engine
+from theo.application.facades import database as database_module
+from theo.application.facades.database import Base, configure_engine, get_engine
 from theo.services.api.app.db.models import Document, Passage
 from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.models.verses import VerseMentionsFilters

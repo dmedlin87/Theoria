@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ...ai.watchlists_service import WatchlistNotFoundError, WatchlistsService
-from ...core.database import get_session
+from theo.application.facades.database import get_session
 from ...models.watchlists import (
     WatchlistCreateRequest,
     WatchlistResponse,

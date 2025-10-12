@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
-from ..core.settings_store import load_setting
+from theo.application.facades.settings_store import load_setting
 from ..db.models import (
     GeoAncientPlace,
     GeoGeometry,

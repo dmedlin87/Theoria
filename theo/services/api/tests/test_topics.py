@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from theo.services.api.app.analytics.openalex import OpenAlexClient
 from theo.services.api.app.analytics.topics import generate_topic_digest
-from theo.services.api.app.core.database import get_engine
+from theo.application.facades.database import get_engine
 from theo.services.api.app.db.models import Document
 
 

@@ -23,7 +23,7 @@ def _configure_environment(database_url: str | None) -> None:
 
 
 def _load_settings():
-    from theo.services.api.app.core.settings import get_settings
+    from theo.application.facades.settings import get_settings
 
     return get_settings()
 
@@ -142,7 +142,7 @@ def main() -> None:
     _configure_environment(args.database_url)
     settings = _load_settings()
 
-    from theo.services.api.app.core.database import configure_engine
+    from theo.application.facades.database import configure_engine
 
     engine = configure_engine(settings.database_url)
     _ensure_models_loaded()

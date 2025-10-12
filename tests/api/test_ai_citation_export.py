@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.core.database import get_session
+from theo.application.facades.database import get_session
 from theo.services.api.app.db.models import Document, Passage, PassageVerse
 from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.main import app
@@ -222,8 +222,8 @@ def test_sqlite_migration_backfills_contradiction_perspective(
     database_url = f"sqlite:///{tmp_path / 'pre-migration.db'}"
     monkeypatch.setenv("DATABASE_URL", database_url)
 
-    from theo.services.api.app.core import database as database_module
-    from theo.services.api.app.core import settings as settings_module
+    from theo.application.facades import database as database_module
+    from theo.application.facades import settings as settings_module
     from theo.services.api.app.db import run_sql_migrations as migrations_module
 
     migrations_dir = tmp_path / "migrations"

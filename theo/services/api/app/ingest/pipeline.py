@@ -9,7 +9,7 @@ from urllib.request import build_opener as _urllib_build_opener
 
 from sqlalchemy.orm import Session
 
-from ..core.settings import Settings, get_settings
+from theo.application.facades.settings import Settings, get_settings
 from ..db.models import Document, TranscriptSegment
 from ..telemetry import instrument_workflow, set_span_attribute
 from .embeddings import get_embedding_service

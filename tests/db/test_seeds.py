@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.core.database import Base
+from theo.application.facades.database import Base
 from theo.services.api.app.db import seeds
 from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 from theo.services.api.app.db.models import ContradictionSeed, GeoPlace

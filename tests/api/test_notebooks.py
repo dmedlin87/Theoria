@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from fastapi import Request
-from theo.services.api.app.core.database import get_session
+from theo.application.facades.database import get_session
 from theo.services.api.app.db.models import Document, Notebook
 from theo.services.api.app.main import app
 from theo.services.api.app.security import require_principal
@@ -165,7 +165,7 @@ def test_list_notebooks_anonymous_only_public(
 ) -> None:
     client, session_factory = notebook_client
 
-    from theo.services.api.app.core import settings as settings_module
+    from theo.application.facades import settings as settings_module
 
     monkeypatch.setenv("THEO_AUTH_ALLOW_ANONYMOUS", "true")
     monkeypatch.setenv("THEO_API_KEYS", "[]")

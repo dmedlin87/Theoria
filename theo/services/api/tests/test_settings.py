@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from theo.services.api.app.core.settings import Settings
+from theo.application.facades.settings import Settings
 
 
 @pytest.fixture(autouse=True)

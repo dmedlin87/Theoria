@@ -18,9 +18,16 @@ except ImportError:  # pragma: no cover - allows stubbing in tests
 from sqlalchemy.orm import Session
 
 from ..api.app.ai import rag as rag_service
-from ..api.app.core.database import get_engine
 from ..api.app.models.search import HybridSearchFilters, HybridSearchRequest
 from ..api.app.retriever.hybrid import hybrid_search
+from theo.services.bootstrap import resolve_application
+
+
+APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+
+
+def get_engine():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("engine")
 
 try:  # pragma: no cover - optional dependency guard for tests
     from ragas import evaluate as ragas_evaluate

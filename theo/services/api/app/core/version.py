@@ -1,30 +1,15 @@
-"""Utilities for reporting application version details."""
-
+"""Legacy shim forwarding to :mod:`theo.application.facades.version`."""
 from __future__ import annotations
 
-import shutil
-import subprocess
-from functools import lru_cache
+from warnings import warn
 
+from theo.application.facades.version import *  # noqa: F401,F403
 
-@lru_cache(maxsize=1)
-def get_git_sha() -> str | None:
-    """Return the current Git SHA if available."""
-
-    git_binary = shutil.which("git")
-    if not git_binary:
-        return None
-
-    try:
-        result = subprocess.run(  # noqa: S603
-            [git_binary, "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
-    return result.stdout.strip() or None
-
+warn(
+    "Importing from 'theo.services.api.app.core.version' is deprecated; "
+    "use 'theo.application.facades.version' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = ["get_git_sha"]

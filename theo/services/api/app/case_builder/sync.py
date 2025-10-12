@@ -10,7 +10,7 @@ from typing import Iterable, Sequence
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from ..core.settings import get_settings
+from theo.application.facades.settings import get_settings
 from ..db.models import (
     CaseObject,
     CaseSource,

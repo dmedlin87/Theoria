@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from theo.services.api.app.core.database import Base
+from theo.application.facades.database import Base
 from theo.services.api.app.db.models import (
     Creator,
     CreatorClaim,

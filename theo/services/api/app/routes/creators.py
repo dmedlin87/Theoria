@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ..core.database import get_session
-from ..core.settings import get_settings
+from theo.application.facades.database import get_session
+from theo.application.facades.settings import get_settings
 from ..creators.service import (
     CreatorTopicProfileData,
     fetch_creator_topic_profile,

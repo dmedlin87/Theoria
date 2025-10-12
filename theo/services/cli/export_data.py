@@ -13,7 +13,6 @@ import click
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..api.app.core.database import get_engine
 from ..api.app.db.models import Document
 from ..api.app.export.citations import build_citation_export, render_citation_markdown
 from ..api.app.export.formatters import (
@@ -31,6 +30,14 @@ from ..api.app.models.search import HybridSearchFilters, HybridSearchRequest
 from ..api.app.retriever.export import export_documents, export_search_results
 from ..api.app.retriever.verses import get_mentions_for_osis
 from ..api.app.models.verses import VerseMentionsFilters
+from theo.services.bootstrap import resolve_application
+
+
+APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+
+
+def get_engine():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("engine")
 
 STATE_DIR = Path(".export_state")
 

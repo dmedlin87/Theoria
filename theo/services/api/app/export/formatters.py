@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal, Mapping, Sequence
 from uuid import uuid4
 
-from ..core.version import get_git_sha
+from theo.application.facades.version import get_git_sha
 from ..models.base import Passage
 from ..models.documents import DocumentDetailResponse
 from ..models.export import DocumentExportResponse, ExportManifest, SearchExportResponse
