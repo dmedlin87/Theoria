@@ -6,11 +6,11 @@ from datetime import UTC, datetime
 from inspect import signature
 import importlib.util
 import logging
+import re
 from pathlib import Path
-from typing import Iterable
 import runpy
 from types import ModuleType
-from typing import Callable, Iterable
+from typing import Iterable
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -188,18 +188,54 @@ def _split_sql_statements(sql: str) -> list[str]:
 
 
 _SQLITE_PERSPECTIVE_MIGRATION = "20250129_add_perspective_to_contradiction_seeds.sql"
+_SQLITE_ADD_COLUMN_RE = re.compile(
+    r"^ALTER\s+TABLE\s+(?P<table>[^\s]+)\s+ADD\s+COLUMN\s+(?P<column>[^\s]+)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _sqlite_normalize_identifier(identifier: str) -> str:
+    """Return the bare identifier name without surrounding quotes."""
+
+    identifier = identifier.strip()
+    if not identifier:
+        return identifier
+    if identifier[0] in {'"', "'", "`"} and identifier[-1] == identifier[0]:
+        return identifier[1:-1]
+    if identifier[0] == "[" and identifier[-1] == "]":
+        return identifier[1:-1]
+    return identifier
+
+
+def _sqlite_table_has_column(connection, table: str, column: str) -> bool:
+    """Return True if the SQLite table already defines the column."""
+
+    table = _sqlite_normalize_identifier(table)
+    column = _sqlite_normalize_identifier(column)
+    escaped_table = table.replace('"', '""')
+    result = connection.exec_driver_sql(f'PRAGMA table_info("{escaped_table}")')
+    for row in result:
+        if len(row) > 1 and row[1] == column:
+            return True
+    return False
+
+
+def _sqlite_add_column_exists(connection, statement: str) -> bool:
+    """Detect if an ALTER TABLE ADD COLUMN statement targets an existing column."""
+
+    match = _SQLITE_ADD_COLUMN_RE.match(statement.strip())
+    if not match:
+        return False
+    table = match.group("table")
+    column = match.group("column")
+    return _sqlite_table_has_column(connection, table, column)
 
 
 def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
     """Return True when the provided SQLite table already defines the column."""
 
     with engine.connect() as connection:
-        result = connection.exec_driver_sql(f"PRAGMA table_info('{table}')")
-        for row in result:
-            # SQLite pragma rows expose column name at index 1
-            if len(row) > 1 and row[1] == column:
-                return True
-    return False
+        return _sqlite_table_has_column(connection, table, column)
 
 
 def _execute_python_migration(path: Path, *, session: Session, engine: Engine) -> None:
@@ -370,6 +406,12 @@ def run_sql_migrations(
                     connection = session.connection()
                     if dialect_name == "sqlite":
                         for statement in _split_sql_statements(sql):
+                            if _sqlite_add_column_exists(connection, statement):
+                                logger.debug(
+                                    "Skipping SQLite migration statement; column already exists: %s",
+                                    statement.strip(),
+                                )
+                                continue
                             connection.exec_driver_sql(statement)
                     else:
                         connection.exec_driver_sql(sql)
