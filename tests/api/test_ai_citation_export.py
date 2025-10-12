@@ -258,6 +258,12 @@ def test_sqlite_migration_backfills_contradiction_perspective(
                 source TEXT,
                 tags JSON,
                 weight FLOAT NOT NULL DEFAULT 1.0,
+                start_verse_id_a INTEGER,
+                end_verse_id_a INTEGER,
+                start_verse_id INTEGER,
+                end_verse_id INTEGER,
+                start_verse_id_b INTEGER,
+                end_verse_id_b INTEGER,
                 created_at TIMESTAMP NOT NULL
             )
             """

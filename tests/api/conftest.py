@@ -56,32 +56,6 @@ def _disable_migrations(
     original_run_sql_migrations = migrations_module.run_sql_migrations
     original_configure_engine = database_module.configure_engine
 
-    def _ensure_sqlite_perspective(engine) -> None:
-        if not _needs_sqlite_perspective(engine):
-            return
-        try:
-            try:
-                Base.metadata.create_all(bind=engine)
-            except Exception:
-                # If table creation fails we still attempt the targeted migration
-                # below; the most important aspect is ensuring the ``perspective``
-                # column becomes available for the seed loaders.
-                pass
-            original_run_sql_migrations(engine)
-        except Exception:
-            # Defensive: the perspective backfill should never raise in tests, but
-            # the sandboxed SQLite databases that back these fixtures occasionally
-            # produce driver-level errors (for example when multiple connections
-            # race to initialise pragmas). Falling back to the legacy behaviour
-            # keeps the fixture resilient while still exercising the migration
-            # path when possible.
-            pass
-
-    def _configure_engine_with_perspective(*args, **kwargs):
-        engine = original_configure_engine(*args, **kwargs)
-        _ensure_sqlite_perspective(engine)
-        return engine
-
     def _needs_sqlite_perspective(engine) -> bool:
         if engine is None:
             return False
@@ -99,6 +73,41 @@ def _disable_migrations(
             except Exception:
                 return False
             return not any(column.get("name") == "perspective" for column in columns)
+
+    def _ensure_sqlite_perspective(
+        engine,
+        *,
+        migrations_path=None,
+        force: bool = False,
+    ) -> list[str]:
+        if not _needs_sqlite_perspective(engine):
+            return []
+        try:
+            try:
+                Base.metadata.create_all(bind=engine)
+            except Exception:
+                # If table creation fails we still attempt the targeted migration
+                # below; the most important aspect is ensuring the ``perspective``
+                # column becomes available for the seed loaders.
+                pass
+            return original_run_sql_migrations(
+                engine=engine,
+                migrations_path=migrations_path,
+                force=force,
+            )
+        except Exception:
+            # Defensive: the perspective backfill should never raise in tests, but
+            # the sandboxed SQLite databases that back these fixtures occasionally
+            # produce driver-level errors (for example when multiple connections
+            # race to initialise pragmas). Falling back to the legacy behaviour
+            # keeps the fixture resilient while still exercising the migration
+            # path when possible.
+            return []
+
+    def _configure_engine_with_perspective(*args, **kwargs):
+        engine = original_configure_engine(*args, **kwargs)
+        _ensure_sqlite_perspective(engine)
+        return engine
 
     existing_engine = getattr(database_module, "_engine", None)
     if existing_engine is not None:
@@ -120,9 +129,32 @@ def _disable_migrations(
     if engine is not None:
         _ensure_sqlite_perspective(engine)
 
-    monkeypatch.setattr(migrations_module, "run_sql_migrations", lambda *_: [])
+    def _guarded_run_sql_migrations(
+        engine=None,
+        migrations_path=None,
+        *,
+        force: bool = False,
+    ) -> list[str]:
+        target_engine = engine or get_engine()
+        if target_engine is None:
+            return []
+        applied = _ensure_sqlite_perspective(
+            target_engine,
+            migrations_path=migrations_path,
+            force=force,
+        )
+        if applied:
+            return applied
+        return []
+
     monkeypatch.setattr(
-        "theo.services.api.app.main.run_sql_migrations", lambda *_: []
+        migrations_module,
+        "run_sql_migrations",
+        _guarded_run_sql_migrations,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.main.run_sql_migrations",
+        _guarded_run_sql_migrations,
     )
 
     yield

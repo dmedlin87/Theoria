@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 import shutil
+import sqlite3
 
 import importlib
 
@@ -14,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from theo.services.api.app.core import database as database_module
 from theo.services.api.app.core.database import Base, configure_engine, get_engine
+from theo.services.api.app.core.settings import get_settings
+from theo.services.api.app.db import seeds as seeds_module
 from theo.services.api.app.db.models import AppSetting
 from theo.services.api.app.main import app
 from theo.services.api.app.db.run_sql_migrations import (
@@ -50,6 +53,7 @@ def test_sql_migrations_run_on_startup(tmp_path: Path, monkeypatch: pytest.Monke
 
         monkeypatch.setattr(migrations_module, "MIGRATIONS_PATH", migrations_dir)
         monkeypatch.setattr(engine.dialect, "name", "postgresql", raising=False)
+        monkeypatch.setattr(seeds_module, "seed_openbible_geo", lambda *_, **__: None)
 
         executed_statements: list[str] = []
 
@@ -182,6 +186,55 @@ def test_sqlite_reapplies_missing_perspective_migration(tmp_path: Path) -> None:
                 pytest.fail(f"seed_contradiction_claims raised OperationalError: {exc}")
     finally:
         engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
+        for residual in db_path.parent.glob(f"{db_path.name}*"):
+            residual.unlink(missing_ok=True)
+
+
+def test_sqlite_startup_restores_missing_perspective_column(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "startup.db"
+
+    with sqlite3.connect(db_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE contradiction_seeds (
+                id TEXT PRIMARY KEY,
+                osis_a TEXT NOT NULL,
+                osis_b TEXT NOT NULL,
+                summary TEXT,
+                source TEXT,
+                tags TEXT,
+                weight REAL,
+                created_at TEXT
+            );
+            """
+        )
+
+    with sqlite3.connect(db_path) as connection:
+        cursor = connection.execute("PRAGMA table_info('contradiction_seeds')")
+        assert all(row[1] != "perspective" for row in cursor.fetchall())
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+    get_settings.cache_clear()
+    database_module._engine = None  # type: ignore[attr-defined]
+    database_module._SessionLocal = None  # type: ignore[attr-defined]
+
+    try:
+        with TestClient(app):
+            pass
+
+        engine = get_engine()
+        with engine.connect() as connection:
+            result = connection.exec_driver_sql("PRAGMA table_info('contradiction_seeds')")
+            assert any(row[1] == "perspective" for row in result)
+    finally:
+        get_settings.cache_clear()
+        engine = database_module._engine
+        if engine is not None:
+            engine.dispose()
         database_module._engine = None  # type: ignore[attr-defined]
         database_module._SessionLocal = None  # type: ignore[attr-defined]
         for residual in db_path.parent.glob(f"{db_path.name}*"):
