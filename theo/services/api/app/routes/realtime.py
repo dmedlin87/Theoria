@@ -5,11 +5,19 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 from datetime import UTC, datetime
-from typing import Any, DefaultDict
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, DefaultDict
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
+from starlette.datastructures import State
 
 from ..models.notebooks import NotebookRealtimeSnapshot
+from ..security import Principal, require_principal
+from theo.application.facades.database import get_session
+
+if TYPE_CHECKING:  # pragma: no cover - used only for type hints
+    from ..notebooks.service import NotebookService
 
 
 router = APIRouter()
@@ -62,6 +70,31 @@ class NotebookEventBroker:
 _BROKER = NotebookEventBroker()
 
 
+def _service(session: Session, principal: Principal | None) -> "NotebookService":
+    from ..notebooks.service import NotebookService
+
+    return NotebookService(session, principal)
+
+
+def require_websocket_principal(websocket: WebSocket) -> Principal:
+    """Authenticate websocket connections using the standard principal helper."""
+
+    state = websocket.scope.get("state")
+    if not isinstance(state, State):
+        state = State()
+        websocket.scope["state"] = state
+    request = SimpleNamespace(state=state)
+    authorization = websocket.headers.get("authorization")
+    api_key_header = websocket.headers.get("x-api-key")
+    principal = require_principal(
+        request,
+        authorization=authorization,
+        api_key_header=api_key_header,
+    )
+    websocket.state.principal = principal
+    return principal
+
+
 def publish_notebook_update(notebook_id: str, payload: dict[str, Any]) -> None:
     """Schedule a broadcast to connected notebook collaborators."""
 
@@ -74,7 +107,14 @@ def publish_notebook_update(notebook_id: str, payload: dict[str, Any]) -> None:
 
 
 @router.websocket("/notebooks/{notebook_id}")
-async def notebook_updates(websocket: WebSocket, notebook_id: str) -> None:
+async def notebook_updates(
+    websocket: WebSocket,
+    notebook_id: str,
+    session: Session = Depends(get_session),
+    principal: Principal = Depends(require_websocket_principal),
+) -> None:
+    service = _service(session, principal)
+    service.ensure_accessible(notebook_id)
     await _BROKER.connect(notebook_id, websocket)
     try:
         await websocket.send_json(
@@ -91,7 +131,13 @@ async def notebook_updates(websocket: WebSocket, notebook_id: str) -> None:
 
 
 @router.get("/notebooks/{notebook_id}/poll", response_model=NotebookRealtimeSnapshot)
-async def poll_notebook_events(notebook_id: str) -> NotebookRealtimeSnapshot:
+async def poll_notebook_events(
+    notebook_id: str,
+    session: Session = Depends(get_session),
+    principal: Principal = Depends(require_principal),
+) -> NotebookRealtimeSnapshot:
+    service = _service(session, principal)
+    service.ensure_accessible(notebook_id)
     return _BROKER.snapshot(notebook_id)
 
 
