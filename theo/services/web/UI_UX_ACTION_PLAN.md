@@ -1,6 +1,6 @@
 # UI/UX Action Plan - Theoria
 
-**Sprint Planning Guide | Priority-Based Roadmap**
+## Sprint Planning Guide | Priority-Based Roadmap
 
 ---
 
@@ -17,6 +17,7 @@ Based on the comprehensive UI/UX review, this document provides an actionable, s
 ### Week 1: Visual & Accessibility Quick Fixes
 
 #### 1. Replace Emoji Icons with Lucide React (1 day)
+
 **Impact:** High | **Effort:** Low | **Priority:** P0
 
 ```bash
@@ -24,17 +25,20 @@ npm install lucide-react
 ```
 
 **Files to update:**
+
 - `app/chat/ChatWorkspace.tsx` (🔍 📖 📤 → Search, Book, Upload)
 - `app/chat/ChatWorkspace.tsx` (✅ 🌐 📝 → Check, Globe, FileText)
 - All other emoji usage across app
 
 **PR Checklist:**
+
 - [ ] Replace all emoji icons (search codebase for emoji regex)
 - [ ] Update ARIA labels to match icon semantics
 - [ ] Ensure consistent icon sizing (20px default)
 - [ ] Add icon color theming
 
 #### 2. Hide Disabled Command Palette (30 minutes)
+
 **Impact:** Medium | **Effort:** Low | **Priority:** P0
 
 ```tsx
@@ -48,9 +52,11 @@ npm install lucide-react
 **Alternative:** Show "Coming soon" only on hover, not prominently displayed.
 
 #### 3. Standardize Form Error Display (1 day)
+
 **Impact:** Medium | **Effort:** Low | **Priority:** P1
 
 Create `FormError` component:
+
 ```tsx
 // app/components/FormError.tsx
 export function FormError({ message }: { message?: string }) {
@@ -68,6 +74,7 @@ Apply to all forms with validation.
 ### Week 2: Toast Integration & Loading States
 
 #### 4. Integrate Toast Provider Globally (1 day)
+
 **Impact:** High | **Effort:** Low | **Priority:** P0
 
 ```tsx
@@ -90,14 +97,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 ```
 
 #### 5. Migrate alert() to Toast (2 days)
+
 **Impact:** Medium | **Effort:** Medium | **Priority:** P1
 
 **Files to update:**
+
 - `app/upload/page.tsx` (success/error feedback)
 - `app/copilot/page.tsx` (workflow completion)
 - `app/search/components/SearchPageClient.tsx` (saved searches)
 
 **Pattern:**
+
 ```tsx
 // Before
 alert("Search saved!");
@@ -108,9 +118,11 @@ addToast({ type: "success", message: "Search saved!" });
 ```
 
 #### 6. Add Loading Skeletons to Top 3 Pages (2 days)
+
 **Impact:** High | **Effort:** Medium | **Priority:** P1
 
 **Target pages:**
+
 1. `/search` - Add `<SkeletonCard />` while results load
 2. `/verse/[osis]` - Add skeleton for mentions list
 3. `/copilot` - Add skeleton for workflow results
@@ -132,6 +144,7 @@ addToast({ type: "success", message: "Search saved!" });
 ### Week 3: SearchPageClient Refactoring
 
 #### 7. Refactor SearchPageClient.tsx (1785 → ~400 lines) (5 days)
+
 **Impact:** Very High | **Effort:** High | **Priority:** P0
 
 **Components already exist!** Just integrate:
@@ -173,6 +186,7 @@ export default function SearchPageClient({ initialFilters, ... }) {
 ```
 
 **Acceptance criteria:**
+
 - [ ] File reduced to < 500 lines
 - [ ] All filters functional
 - [ ] All existing features preserved
@@ -182,17 +196,21 @@ export default function SearchPageClient({ initialFilters, ... }) {
 ### Week 4: Upload & Copilot Refactoring
 
 #### 8. Refactor UploadPage.tsx (846 → ~250 lines) (2 days)
+
 **Impact:** High | **Effort:** Medium | **Priority:** P1
 
 Use existing components:
+
 - `FileUploadForm` ✅
 - `UrlIngestForm` ✅
 - `JobsTable` ✅
 
 #### 9. Refactor CopilotPage.tsx (837 → ~350 lines) (3 days)
+
 **Impact:** High | **Effort:** High | **Priority:** P1
 
 Use existing components:
+
 - `VerseWorkflowForm` ✅
 - `WorkflowTabs` ✅
 - `WorkflowFormFields` ✅
@@ -206,9 +224,11 @@ Use existing components:
 ### Week 5: Top Offenders
 
 #### 10. Eliminate Inline Styles - Phase 1 (5 days)
+
 **Impact:** High | **Effort:** High | **Priority:** P1
 
 **Target files (288 inline styles):**
+
 1. `SearchPageClient.tsx`: 84 → 0 ✓ (already done in Sprint 3)
 2. `upload/page.tsx`: 63 → 0 ✓ (already done in Sprint 4)
 3. `TextualVariantsPanel.tsx`: 56 inline styles
@@ -216,6 +236,7 @@ Use existing components:
 5. `notebooks/[id]/page.tsx`: 36 inline styles
 
 **Pattern:**
+
 ```tsx
 // Before
 <div style={{ display: "flex", gap: "1rem", padding: "1rem" }}>
@@ -225,6 +246,7 @@ Use existing components:
 ```
 
 **Automation tool:**
+
 ```bash
 # Find all inline styles
 grep -r "style={{" app/ --include="*.tsx" | wc -l
@@ -239,9 +261,11 @@ grep -r "style={{" app/ --include="*.tsx" | wc -l
 ### Week 6: Research Panels & Remaining Files
 
 #### 11. Eliminate Inline Styles - Phase 2 (5 days)
+
 **Impact:** Medium | **Effort:** Medium | **Priority:** P1
 
 **Target files (354 inline styles):**
+
 - `GeoPanel.tsx`: 28
 - `CommentariesPanel.tsx`: 22
 - `WorkflowFormFields.tsx`: 22
@@ -258,15 +282,18 @@ grep -r "style={{" app/ --include="*.tsx" | wc -l
 ### Week 7: Accessibility Improvements
 
 #### 12. Fix Heading Hierarchy (1 day)
+
 **Impact:** Medium | **Effort:** Low | **Priority:** P2
 
 Ensure logical heading order (h1 → h2 → h3, no skips).
 
 **Files to audit:**
+
 - All page.tsx files
 - Main layout components
 
 #### 13. Add ARIA Live Regions (1 day)
+
 **Impact:** Medium | **Effort:** Low | **Priority:** P2
 
 ```tsx
@@ -281,9 +308,11 @@ Ensure logical heading order (h1 → h2 → h3, no skips).
 ```
 
 #### 14. Implement Focus Trap for Modals (2 days)
+
 **Impact:** Medium | **Effort:** Medium | **Priority:** P2
 
 If/when modals are added, use `focus-trap-react`:
+
 ```tsx
 import FocusTrap from 'focus-trap-react';
 
@@ -295,6 +324,7 @@ import FocusTrap from 'focus-trap-react';
 ```
 
 #### 15. Add Axe-Core to E2E Tests (1 day)
+
 **Impact:** High | **Effort:** Low | **Priority:** P1
 
 ```bash
@@ -319,9 +349,10 @@ test('search page accessibility', async ({ page }) => {
 ### Week 8: Component Testing
 
 #### 16. Add Unit Tests for Shared Components (3 days)
+
 **Impact:** High | **Effort:** Medium | **Priority:** P1
 
-**Target coverage: 80%**
+##### Target coverage: 80%
 
 ```tsx
 // tests/components/Toast.test.tsx
@@ -358,6 +389,7 @@ describe('Toast', () => {
 ```
 
 **Test files to create:**
+
 - `tests/components/Toast.test.tsx`
 - `tests/components/LoadingStates.test.tsx`
 - `tests/components/Pagination.test.tsx`
@@ -365,6 +397,7 @@ describe('Toast', () => {
 - `tests/search/hooks/useSearchFilters.test.ts`
 
 #### 17. Add Visual Regression Tests (2 days)
+
 **Impact:** Medium | **Effort:** Medium | **Priority:** P2
 
 ```bash
@@ -396,6 +429,7 @@ test('search page visual regression', async ({ page }) => {
 ### Week 9: Performance Optimization
 
 #### 18. Implement List Virtualization (3 days)
+
 **Impact:** High | **Effort:** Medium | **Priority:** P1
 
 ```bash
@@ -403,6 +437,7 @@ npm install @tanstack/react-virtual
 ```
 
 **Target components:**
+
 - Search results (100+ items)
 - Verse mentions list
 - Document list on upload page
@@ -444,6 +479,7 @@ export function VirtualizedResults({ items }) {
 ```
 
 #### 19. Add Dynamic Imports for Heavy Components (1 day)
+
 **Impact:** Medium | **Effort:** Low | **Priority:** P2
 
 ```tsx
@@ -457,14 +493,17 @@ const VerseGraph = dynamic(() => import('./VerseGraphSection'), {
 ```
 
 **Target components:**
+
 - `VerseGraphSection` (D3.js heavy)
 - `GeoPanel` (map rendering)
 - Any chart/visualization components
 
 #### 20. Optimize Bundle with Tree Shaking (1 day)
+
 **Impact:** Medium | **Effort:** Low | **Priority:** P2
 
 Audit and optimize imports:
+
 ```tsx
 // Before
 import * as d3 from 'd3';
@@ -476,6 +515,7 @@ import { select, scaleLinear } from 'd3';
 ### Week 10: Final Polish
 
 #### 21. Add Breadcrumb Navigation (2 days)
+
 **Impact:** Medium | **Effort:** Medium | **Priority:** P2
 
 ```tsx
@@ -500,11 +540,13 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
 ```
 
 Use on:
+
 - `/verse/[osis]` page
 - `/doc/[id]` page
 - `/notebooks/[id]` page
 
 #### 22. Implement Command Palette (Optional) (3 days)
+
 **Impact:** High | **Effort:** High | **Priority:** P3
 
 ```bash
@@ -546,15 +588,18 @@ export function CommandPalette() {
 ```
 
 #### 23. Run Final Lighthouse Audit (1 day)
+
 **Impact:** High | **Effort:** Low | **Priority:** P1
 
 **Target scores:**
+
 - Performance: 90+
 - Accessibility: 95+
 - Best Practices: 100
 - SEO: 100
 
 **Common fixes:**
+
 - Add meta descriptions
 - Optimize image formats (WebP)
 - Add `rel="noopener"` to external links
@@ -604,6 +649,7 @@ export function CommandPalette() {
 ## Resource Requirements
 
 ### Developer Time
+
 - **Sprints 1-2:** 1 developer full-time
 - **Sprints 3-4:** 1 developer full-time
 - **Sprints 5-6:** 1 developer full-time
@@ -613,6 +659,7 @@ export function CommandPalette() {
 **Total:** ~10 weeks (1 developer)
 
 ### External Dependencies
+
 ```json
 {
   "new-dependencies": [
@@ -626,6 +673,7 @@ export function CommandPalette() {
 ```
 
 ### Budget Estimate
+
 - Developer time: 400 hours @ $[rate]
 - Axe/Percy licenses: ~$100/month
 - Total: ~$[amount]
@@ -653,6 +701,7 @@ export function CommandPalette() {
 ## Success Criteria
 
 ### Definition of Done
+
 - [ ] 0 inline styles remaining
 - [ ] All components < 600 lines
 - [ ] 80%+ test coverage
@@ -662,7 +711,9 @@ export function CommandPalette() {
 - [ ] Code reviewed and approved
 
 ### Sprint Acceptance Criteria
+
 Each sprint must include:
+
 - [ ] All tasks completed
 - [ ] E2E tests passing
 - [ ] No new accessibility violations
@@ -675,7 +726,9 @@ Each sprint must include:
 ## Communication Plan
 
 ### Weekly Updates
+
 Send progress report every Friday:
+
 ```markdown
 ## Week [N] Progress Report
 
@@ -732,6 +785,7 @@ style={{ border: "1px solid ..." }}   → className="border"
 ### Component Checklist
 
 Before marking component refactor as complete:
+
 - [ ] No inline styles
 - [ ] Uses utility classes
 - [ ] Proper TypeScript types
@@ -744,9 +798,10 @@ Before marking component refactor as complete:
 
 ---
 
-**END OF ACTION PLAN**
+## End of Action Plan
 
 Next Steps:
+
 1. Review with team
 2. Assign sprints to developers
 3. Create GitHub issues/tickets

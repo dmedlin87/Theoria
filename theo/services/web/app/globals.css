@@ -2969,6 +2969,7 @@ section + section {
   box-shadow: var(--shadow-xl);
   animation: toast-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: auto;
+  width: min(420px, calc(100vw - var(--space-4) * 2));
 }
 
 .toast-item__content {
@@ -2976,6 +2977,13 @@ section + section {
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-2);
+  max-width: 100%;
+}
+
+.toast-item__content .alert__title,
+.toast-item__content .alert__message {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .toast-item__close {

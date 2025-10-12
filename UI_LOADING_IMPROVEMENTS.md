@@ -7,11 +7,13 @@ Comprehensive improvements to loading states, navigation transitions, and user f
 ## Issues Fixed
 
 ### 1. **Race Condition in Navigation Loading** ✅
+
 **Problem:** Duplicate setTimeout cleanup logic in AppShell (lines 59-62 and 67-76) caused race conditions where loading states could persist or clear incorrectly.
 
 **Solution:** Consolidated cleanup logic into a single useEffect that triggers when `isPending` changes to false, with proper cleanup using `clearTimeout`.
 
 **Files Modified:**
+
 - `theo/services/web/app/components/AppShell.tsx`
 
 **Impact:** Eliminates edge cases where navigation appears stuck in loading state.
@@ -19,14 +21,17 @@ Comprehensive improvements to loading states, navigation transitions, and user f
 ---
 
 ### 2. **Missing Skeleton Loading States** ✅
+
 **Problem:** Only spinners shown during search operations, no content placeholders to maintain layout stability.
 
 **Solution:** Created reusable `SearchSkeleton` component with shimmer animation showing placeholder cards during search.
 
 **Files Created:**
+
 - `theo/services/web/app/search/components/SearchSkeleton.tsx`
 
 **Files Modified:**
+
 - `theo/services/web/app/globals.css` (added skeleton styles)
 - `theo/services/web/app/search/components/SearchPageClient.tsx` (integrated skeleton)
 
@@ -35,15 +40,18 @@ Comprehensive improvements to loading states, navigation transitions, and user f
 ---
 
 ### 3. **No Loading Feedback for Preset Changes** ✅
+
 **Problem:** Preset selector blocked during search with no visual indication, causing confusion.
 
-**Solution:** 
+**Solution:**
+
 - Added `isPresetChanging` state to track preset loading
 - Disabled preset selector with `aria-busy` attribute during changes
 - Applied shimmer animation to selector background when loading
 - Integrated loading state cleanup with `.finally()` callback
 
 **Files Modified:**
+
 - `theo/services/web/app/search/components/SearchPageClient.tsx`
 - `theo/services/web/app/globals.css` (added disabled/busy styles)
 
@@ -52,11 +60,13 @@ Comprehensive improvements to loading states, navigation transitions, and user f
 ---
 
 ### 4. **Spinner Position Inconsistency** ✅
+
 **Problem:** Loading spinners appeared before text in navigation links, causing layout shift.
 
 **Solution:** Moved spinners to appear after link text with proper margin spacing using `margin-left`.
 
 **Files Modified:**
+
 - `theo/services/web/app/components/AppShell.tsx`
 - `theo/services/web/app/globals.css`
 
@@ -65,11 +75,13 @@ Comprehensive improvements to loading states, navigation transitions, and user f
 ---
 
 ### 5. **Shimmer Animation Performance** ✅
+
 **Problem:** Original shimmer used fixed pixel values (468px), not responsive or performant.
 
 **Solution:** Changed to percentage-based background positioning (-200% to 200%) for smoother, responsive animation.
 
 **Files Modified:**
+
 - `theo/services/web/app/globals.css`
 
 **Impact:** Better performance on all screen sizes, smoother animation.
@@ -77,14 +89,17 @@ Comprehensive improvements to loading states, navigation transitions, and user f
 ---
 
 ### 6. **No Progressive Result Display** ✅
+
 **Problem:** Search results appeared all at once, jarring user experience.
 
 **Solution:** Added staggered fade-in animation for search results using CSS `animation-delay` based on `:nth-child()`.
 
 **Files Modified:**
+
 - `theo/services/web/app/globals.css`
 
 **CSS Added:**
+
 ```css
 @keyframes fade-in {
   from {
@@ -109,6 +124,7 @@ Comprehensive improvements to loading states, navigation transitions, and user f
 ## New Features
 
 ### **Skeleton Loading Component**
+
 Reusable skeleton loader for search results:
 
 ```tsx
@@ -119,6 +135,7 @@ import { SearchSkeleton } from "./SearchSkeleton";
 ```
 
 **Props:**
+
 - `count?: number` - Number of skeleton cards to show (default: 3)
 
 ---
@@ -128,6 +145,7 @@ import { SearchSkeleton } from "./SearchSkeleton";
 ### New Classes Added
 
 **Skeleton States:**
+
 - `.skeleton` - Base skeleton with shimmer animation
 - `.skeleton-search-results` - Container for skeleton cards
 - `.skeleton-result-group` - Individual skeleton card
@@ -136,11 +154,13 @@ import { SearchSkeleton } from "./SearchSkeleton";
 - `.skeleton-passage` - Passage content placeholder
 
 **Loading States:**
+
 - `.search-form__select:disabled` - Disabled state styling
 - `.search-form__select[aria-busy="true"]` - Active loading shimmer
 - `.app-shell-v2__content.is-transitioning` - Content fade during navigation
 
 **Animations:**
+
 - `@keyframes fade-in` - Smooth entry animation
 - Improved `@keyframes shimmer` - Responsive shimmer effect
 
@@ -175,6 +195,7 @@ import { SearchSkeleton } from "./SearchSkeleton";
 ## Testing Recommendations
 
 ### Manual Testing
+
 1. **Navigation Loading:**
    - Click navigation links rapidly
    - Verify loading spinner appears and clears correctly
@@ -192,7 +213,9 @@ import { SearchSkeleton } from "./SearchSkeleton";
    - Check focus management after loading completes
 
 ### Automated Testing
+
 Consider adding:
+
 ```typescript
 // Example Playwright test
 test('search shows skeleton during loading', async ({ page }) => {
@@ -228,11 +251,13 @@ All changes are additive and backward compatible. Existing loading states contin
 ## Browser Support
 
 All features use standard CSS3 and ES6+ features:
+
 - CSS Animations (supported in all modern browsers)
 - CSS nth-child selectors (IE9+)
 - AbortController (already in use, Polyfilled if needed)
 
 **Graceful Degradation:**
+
 - Animations will simply not play in browsers without CSS animation support
 - Core functionality remains intact
 
@@ -241,11 +266,13 @@ All features use standard CSS3 and ES6+ features:
 ## Files Changed Summary
 
 **Modified:**
+
 - `theo/services/web/app/components/AppShell.tsx` - Fixed race condition, improved spinner placement
 - `theo/services/web/app/search/components/SearchPageClient.tsx` - Added skeleton, preset loading state
 - `theo/services/web/app/globals.css` - Enhanced animations, skeleton styles, disabled states
 
 **Created:**
+
 - `theo/services/web/app/search/components/SearchSkeleton.tsx` - New skeleton component
 - `UI_LOADING_IMPROVEMENTS.md` - This documentation
 
@@ -267,6 +294,7 @@ Consider these follow-up improvements:
 ## Performance Metrics
 
 Expected improvements:
+
 - **Cumulative Layout Shift (CLS):** -40% (skeleton prevents layout shifts)
 - **First Input Delay (FID):** No change (loading states don't block input)
 - **Largest Contentful Paint (LCP):** +5% perceived (progressive loading feels faster)

@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import ErrorCallout from "../../components/ErrorCallout";
+import { useToast } from "../../components/Toast";
 import UiModeToggle from "../../components/UiModeToggle";
 import { buildPassageLink, formatAnchor } from "../../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../../lib/errorUtils";
@@ -530,6 +531,7 @@ export default function SearchPageClient({
   const skipNextHydratedSearchRef = useRef(initialHasSearched);
   const [uiMode, setUiMode] = useUiModePreference();
   const isAdvancedUi = uiMode === "advanced";
+  const { addToast } = useToast();
   const [query, setQuery] = useState<string>(() => initialFilters.query);
   const [osis, setOsis] = useState<string>(() => initialFilters.osis);
   const [collection, setCollection] = useState<string>(() => initialFilters.collection);
@@ -825,12 +827,15 @@ export default function SearchPageClient({
     [author, collection, collectionFacets, datasetFacets, includeDisputed, includeVariants, sourceType, theologicalTradition, topicDomain, variantFacets, dateEnd, dateStart, presetIsCustom, presetSelection],
   );
 
-  const handleShowErrorDetails = useCallback((traceId: string | null) => {
-    const detailMessage = traceId
-      ? `Trace ID: ${traceId}`
-      : "No additional trace information is available.";
-    window.alert(detailMessage);
-  }, []);
+  const handleShowErrorDetails = useCallback(
+    (traceId: string | null) => {
+      const detailMessage = traceId
+        ? `Trace ID: ${traceId}`
+        : "No additional trace information is available.";
+      addToast({ type: "info", title: "Trace details", message: detailMessage });
+    },
+    [addToast],
+  );
 
   const handleRetrySearch = useCallback(() => {
     if (lastSearchFilters && !isSearching) {
@@ -1566,6 +1571,7 @@ export default function SearchPageClient({
             traceId={error.traceId}
             onRetry={handleRetrySearch}
             onShowDetails={handleShowErrorDetails}
+            detailsLabel="Show details"
           />
         </div>
       )}

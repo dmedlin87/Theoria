@@ -160,6 +160,11 @@ def create_app() -> FastAPI:
         extra_context={"service": "api"},
     )
 
+    @app.get("/health", tags=["diagnostics"], include_in_schema=False)
+    async def healthcheck() -> dict[str, str]:
+        """Return a simple readiness indicator for infrastructure monitors."""
+        return {"status": "ok"}
+
     def _attach_trace_headers(
         response: Response, trace_headers: dict[str, str] | None = None
     ) -> Response:

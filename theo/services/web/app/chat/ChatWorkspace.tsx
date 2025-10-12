@@ -4,49 +4,25 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout";
-import type { ChatSessionPreferencesPayload, ChatSessionState } from "../lib/api-normalizers";
-import type { ChatWorkflowClient, ChatWorkflowMessage, ChatWorkflowStreamEvent } from "../lib/chat-client";
-import { createTheoApiClient } from "../lib/api-client";
-import { TheoApiError } from "../lib/http";
-import type { HybridSearchFilters } from "../lib/guardrails";
+import type { ChatWorkflowClient } from "../lib/chat-client";
+import { createTheoApiClient, TheoApiError } from "../lib/api-client";
+import type {
+  HybridSearchFilters,
+  ChatSessionState,
+  ChatWorkflowStreamEvent,
+  ChatWorkflowMessage,
+  ChatSessionPreferencesPayload,
+} from "../lib/api-client";
 import {
-  type GuardrailFailureMetadata,
   type GuardrailSuggestion,
   useGuardrailActions,
 } from "../lib/guardrails";
-import type { RAGCitation } from "../copilot/components/types";
 import { useMode } from "../mode-context";
 import { emitTelemetry, submitFeedback, type FeedbackAction } from "../lib/telemetry";
-
-function createMessageId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).slice(2, 10);
-}
-
-type ConversationEntry =
-  | { id: string; role: "user"; content: string }
-  | {
-      id: string;
-      role: "assistant";
-      content: string;
-      citations: RAGCitation[];
-      prompt?: string;
-    };
-
-type AssistantConversationEntry = Extract<ConversationEntry, { role: "assistant" }>;
-
-type Reaction = Extract<FeedbackAction, "like" | "dislike">;
-
-type GuardrailState =
-  | {
-      message: string;
-      traceId: string | null;
-      suggestions: GuardrailSuggestion[];
-      metadata: GuardrailFailureMetadata | null;
-    }
-  | null;
+import { useChatWorkspaceState, type Reaction, type ConversationEntry, type AssistantConversationEntry, type GuardrailState } from "./useChatWorkspaceState";
+import { useSessionRestoration, useSessionPersistence } from "./useSessionRestoration";
+import { useChatExecution } from "./useChatExecution";
+import type { ChatSessionMemoryEntry } from "../lib/api-client";
 
 type ChatWorkspaceProps = {
   client?: ChatWorkflowClient;
@@ -55,6 +31,13 @@ type ChatWorkspaceProps = {
 };
 
 const CHAT_SESSION_STORAGE_KEY = "theo.chat.lastSessionId";
+
+function createMessageId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
 
 export default function ChatWorkspace({
   client,
@@ -175,7 +158,7 @@ export default function ChatWorkspace({
           setDefaultFilters(null);
         }
         const restoredConversation: ConversationEntry[] = [];
-        state.memory.forEach((entry) => {
+        state.memory.forEach((entry: ChatSessionMemoryEntry) => {
           restoredConversation.push({
             id: createMessageId(),
             role: "user",
@@ -396,7 +379,7 @@ export default function ChatWorkspace({
             metadata: result.metadata ?? null,
           });
         }
-      } catch (error) {
+      } catch (error: unknown) {
         removeEntryById(assistantId);
         if (error instanceof TheoApiError && error.status === 400) {
           const suggestions = buildFallbackSuggestions(trimmed);
@@ -525,7 +508,7 @@ export default function ChatWorkspace({
   if (guardrail && guardrail.suggestions.length) {
     guardrailActions.actions = (
       <div className="guardrail-actions">
-        {guardrail.suggestions.map((suggestion, index) => (
+        {guardrail.suggestions.map((suggestion: GuardrailSuggestion, index: number) => (
           <button
             key={`${suggestion.action}-${index}-${suggestion.label}`}
             type="button"

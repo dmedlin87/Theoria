@@ -72,6 +72,7 @@ $script:MaxRestartAttempts = 3
 $script:RestartCooldown = 5  # seconds
 $script:HealthCheckTimeout = 5  # seconds
 $script:StartTime = Get-Date
+$script:LogBuffer = [System.Collections.Generic.List[string]]::new()
 
 # Service state tracking
 $script:Services = @{
@@ -148,7 +149,7 @@ function Write-TheoriaLog {
     Write-Host "[$displayTime] $icon " -ForegroundColor $color -NoNewline
     Write-Host $Message
     
-    # File output (structured JSON)
+    # File output (structured JSON) - buffered for performance
     if ($LogToFile) {
         try {
             if (-not (Test-Path $script:LogsDir)) {
@@ -162,7 +163,13 @@ function Write-TheoriaLog {
                 metadata = $Metadata
             } | ConvertTo-Json -Compress
             
-            Add-Content -Path $script:LogFile -Value $logEntry -ErrorAction SilentlyContinue
+            $script:LogBuffer.Add($logEntry)
+            
+            # Flush buffer every 10 entries to reduce I/O
+            if ($script:LogBuffer.Count -ge 10) {
+                Add-Content -Path $script:LogFile -Value ($script:LogBuffer -join "`n") -ErrorAction SilentlyContinue
+                $script:LogBuffer.Clear()
+            }
         } catch {
             # Silently fail if logging fails to avoid disrupting main flow
         }
@@ -194,9 +201,9 @@ function Test-Prerequisite {
     Write-TheoriaLog "Checking $Name..." -Level Debug
     
     try {
-        $result = & $Command $VersionArg 2>&1 | Out-String
+        $result = & $Command $VersionArg 2>&1
         if ($LASTEXITCODE -eq 0) {
-            $version = ($result -split "`n")[0].Trim()
+            $version = if ($result -is [array]) { $result[0].ToString().Trim() } else { $result.ToString().Trim() }
             Write-TheoriaLog "$Name detected: $version" -Level Success
             return $true
         }
@@ -228,7 +235,7 @@ function Test-ServiceHealth {
         [ref]$Diagnostics
     )
     
-    $startTime = Get-Date
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $result = @{
         Healthy = $false
         StatusCode = $null
@@ -237,14 +244,15 @@ function Test-ServiceHealth {
     }
     
     try {
-        $response = Invoke-WebRequest -Uri $Endpoint -TimeoutSec $script:HealthCheckTimeout -UseBasicParsing -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri $Endpoint -TimeoutSec $script:HealthCheckTimeout -UseBasicParsing -ErrorAction Stop -MaximumRedirection 0
         $result.Healthy = $response.StatusCode -eq 200
         $result.StatusCode = $response.StatusCode
     } catch {
         $result.Error = $_.Exception.Message
         $result.StatusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode.value__ } else { 0 }
     } finally {
-        $result.ResponseTime = ((Get-Date) - $startTime).TotalMilliseconds
+        $stopwatch.Stop()
+        $result.ResponseTime = $stopwatch.Elapsed.TotalMilliseconds
     }
     
     if ($Diagnostics) {
@@ -298,6 +306,60 @@ function Stop-TheoriaService {
     }
 }
 
+function Wait-ServiceReady {
+    param(
+        [string]$ServiceKey,
+        [System.Management.Automation.Job]$Job,
+        [string]$HealthEndpoint,
+        [int]$MaxWaitSeconds,
+        [string]$DisplayUrl
+    )
+    
+    Write-TheoriaLog "Waiting for $($script:Services[$ServiceKey].Name) to become ready..." -Level Debug
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $checkInterval = 500  # milliseconds
+    
+    while ($stopwatch.Elapsed.TotalSeconds -lt $MaxWaitSeconds) {
+        # Check if job failed early
+        if ($Job.State -eq "Failed" -or $Job.State -eq "Stopped") {
+            $stopwatch.Stop()
+            $errorOutput = Receive-Job $Job 2>&1 | Out-String
+            $script:Services[$ServiceKey].LastError = $errorOutput
+            Write-TheoriaLog "$($script:Services[$ServiceKey].Name) failed to start:" -Level Error -Metadata @{ error = $errorOutput }
+            Write-TheoriaLog $errorOutput -Level Error
+            $script:Services[$ServiceKey].StartTime = $null
+            return $false
+        }
+        
+        # Test health
+        $diagnostics = $null
+        if (Test-ServiceHealth -Endpoint $HealthEndpoint -Diagnostics ([ref]$diagnostics)) {
+            $stopwatch.Stop()
+            $startupTime = [math]::Round($stopwatch.Elapsed.TotalSeconds, 1)
+            $script:Services[$ServiceKey].Status = "Running"
+            Write-TheoriaLog "$($script:Services[$ServiceKey].Name) is ready at $DisplayUrl (startup time: ${startupTime}s)" -Level Success -Metadata @{ startup_time_seconds = $startupTime; response_time_ms = $diagnostics.ResponseTime }
+            return $true
+        }
+        
+        Start-Sleep -Milliseconds $checkInterval
+    }
+    
+    $stopwatch.Stop()
+    
+    # Capture job output on timeout for diagnostics
+    $jobOutput = Receive-Job $Job -Keep 2>&1 | Out-String
+    if ($jobOutput.Trim()) {
+        Write-TheoriaLog "$($script:Services[$ServiceKey].Name) output during timeout:" -Level Warning
+        Write-TheoriaLog $jobOutput -Level Error
+    }
+    
+    $script:Services[$ServiceKey].LastError = "Timeout after ${MaxWaitSeconds}s"
+    Write-TheoriaLog "$($script:Services[$ServiceKey].Name) did not become healthy within ${MaxWaitSeconds}s" -Level Warning -Metadata @{ timeout_seconds = $MaxWaitSeconds; job_state = $Job.State }
+    Write-TheoriaLog "Job state: $($Job.State) - Check output above for errors" -Level Error
+    $script:Services[$ServiceKey].StartTime = $null
+    return $false
+}
+
 function Start-TheoriaApi {
     Write-TheoriaLog "Starting Theoria API on port $ApiPort..." -Level Info
     
@@ -307,56 +369,39 @@ function Start-TheoriaApi {
         return $false
     }
     
+    # Verify virtual environment exists
+    $venvPython = Join-Path $script:ProjectRoot ".venv\Scripts\python.exe"
+    if (-not (Test-Path $venvPython)) {
+        Write-TheoriaLog "Virtual environment not found at $venvPython" -Level Error
+        Write-TheoriaLog "Please create a virtual environment first: python -m venv .venv" -Level Error
+        return $false
+    }
+    
     # Set environment variables and start API
     $scriptBlock = {
-        param($Port, $ProjectRoot)
+        param($Port, $ProjectRoot, $PythonExe)
         
         $env:THEO_AUTH_ALLOW_ANONYMOUS = "1"
         $env:THEO_ALLOW_INSECURE_STARTUP = "1"
         $env:PYTHONUNBUFFERED = "1"
         
         Set-Location $ProjectRoot
-        python -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port $Port 2>&1
+        & $PythonExe -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port $Port 2>&1
     }
     
     try {
-        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $ApiPort, $script:ProjectRoot
+        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $ApiPort, $script:ProjectRoot, $venvPython
         $script:Services.Api.Job = $job
         $script:Services.Api.Status = "Starting"
         $script:Services.Api.StartTime = Get-Date
         
-        # Wait for API to become healthy
-        Write-TheoriaLog "Waiting for API to become ready..." -Level Debug
-        $maxWait = 30
-        $waited = 0
+        $success = Wait-ServiceReady -ServiceKey "Api" -Job $job -HealthEndpoint $script:ApiHealthEndpoint -MaxWaitSeconds 30 -DisplayUrl "http://127.0.0.1:$ApiPort"
         
-        while ($waited -lt $maxWait) {
-            Start-Sleep -Seconds 1
-            $waited++
-            
-            $diagnostics = $null
-            if (Test-ServiceHealth -Endpoint $script:ApiHealthEndpoint -Diagnostics ([ref]$diagnostics)) {
-                $script:Services.Api.Status = "Running"
-                Write-TheoriaLog "Theoria API is ready at http://127.0.0.1:$ApiPort (startup time: ${waited}s)" -Level Success -Metadata @{ startup_time_seconds = $waited; response_time_ms = $diagnostics.ResponseTime }
-                Write-TheoriaLog "API Docs: http://127.0.0.1:$ApiPort/docs" -Level Info
-                return $true
-            }
-            
-            # Check if job failed
-            if ($job.State -eq "Failed" -or $job.State -eq "Stopped") {
-                $apiError = Receive-Job $job 2>&1 | Out-String
-                $script:Services.Api.LastError = $apiError
-                Write-TheoriaLog "API failed to start:" -Level Error -Metadata @{ error = $apiError }
-                Write-TheoriaLog $apiError -Level Error
-                $script:Services.Api.StartTime = $null
-                return $false
-            }
+        if ($success) {
+            Write-TheoriaLog "API Docs: http://127.0.0.1:$ApiPort/docs" -Level Info
         }
         
-        $script:Services.Api.LastError = "Timeout after ${maxWait}s"
-        Write-TheoriaLog "API did not become healthy within ${maxWait}s" -Level Warning -Metadata @{ timeout_seconds = $maxWait }
-        $script:Services.Api.StartTime = $null
-        return $false
+        return $success
         
     } catch {
         $script:Services.Api.LastError = $_.Exception.Message
@@ -382,7 +427,11 @@ function Start-TheoriaWeb {
         Push-Location $script:WebRoot
         try {
             npm install 2>&1 | Out-Null
-            Write-TheoriaLog "Dependencies installed successfully" -Level Success
+            if ($LASTEXITCODE -eq 0) {
+                Write-TheoriaLog "Dependencies installed successfully" -Level Success
+            } else {
+                Write-TheoriaLog "npm install completed with warnings" -Level Warning
+            }
         } catch {
             Write-TheoriaLog "Failed to install dependencies: $_" -Level Error
             Pop-Location
@@ -408,37 +457,7 @@ function Start-TheoriaWeb {
         $script:Services.Web.Status = "Starting"
         $script:Services.Web.StartTime = Get-Date
         
-        # Wait for Web to become healthy
-        Write-TheoriaLog "Waiting for Web UI to become ready..." -Level Debug
-        $maxWait = 45
-        $waited = 0
-        
-        while ($waited -lt $maxWait) {
-            Start-Sleep -Seconds 1
-            $waited++
-            
-            $diagnostics = $null
-            if (Test-ServiceHealth -Endpoint $script:WebHealthEndpoint -Diagnostics ([ref]$diagnostics)) {
-                $script:Services.Web.Status = "Running"
-                Write-TheoriaLog "Theoria Web UI is ready at http://localhost:$WebPort (startup time: ${waited}s)" -Level Success -Metadata @{ startup_time_seconds = $waited; response_time_ms = $diagnostics.ResponseTime }
-                return $true
-            }
-            
-            # Check if job failed
-            if ($job.State -eq "Failed" -or $job.State -eq "Stopped") {
-                $webError = Receive-Job $job 2>&1 | Out-String
-                $script:Services.Web.LastError = $webError
-                Write-TheoriaLog "Web UI failed to start:" -Level Error -Metadata @{ error = $webError }
-                Write-TheoriaLog $webError -Level Error
-                $script:Services.Web.StartTime = $null
-                return $false
-            }
-        }
-        
-        $script:Services.Web.LastError = "Timeout after ${maxWait}s"
-        Write-TheoriaLog "Web UI did not become healthy within ${maxWait}s" -Level Warning -Metadata @{ timeout_seconds = $maxWait }
-        $script:Services.Web.StartTime = $null
-        return $false
+        return Wait-ServiceReady -ServiceKey "Web" -Job $job -HealthEndpoint $script:WebHealthEndpoint -MaxWaitSeconds 45 -DisplayUrl "http://localhost:$WebPort"
         
     } catch {
         $script:Services.Web.LastError = $_.Exception.Message
@@ -454,17 +473,17 @@ function Get-ServiceMetrics {
     $service = $script:Services[$ServiceKey]
     $uptime = if ($service.StartTime) { (Get-Date) - $service.StartTime } else { $null }
     $healthRate = if ($service.TotalHealthChecks -gt 0) {
-        [math]::Round((($service.TotalHealthChecks - $service.HealthCheckFailures) / $service.TotalHealthChecks) * 100, 2)
+        [math]::Round((($service.TotalHealthChecks - $service.HealthCheckFailures) / $service.TotalHealthChecks) * 100, 1)
     } else { 0 }
     
-    return @{
+    return [PSCustomObject]@{
         Name = $service.Name
         Status = $service.Status
         Uptime = if ($uptime) { $uptime.ToString('hh\:mm\:ss') } else { "N/A" }
         UptimeSeconds = if ($uptime) { [int]$uptime.TotalSeconds } else { 0 }
         HealthRate = "${healthRate}%"
-        AvgResponseTime = "$([math]::Round($service.AverageResponseTime, 2))ms"
-        LastResponseTime = "$([math]::Round($service.LastHealthCheckDuration, 2))ms"
+        AvgResponseTime = "$([math]::Round($service.AverageResponseTime, 1))ms"
+        LastResponseTime = "$([math]::Round($service.LastHealthCheckDuration, 1))ms"
         RestartCount = $service.RestartCount
         TotalChecks = $service.TotalHealthChecks
         Failures = $service.HealthCheckFailures
@@ -472,9 +491,13 @@ function Get-ServiceMetrics {
 }
 
 function Show-ServiceStatus {
-    Write-Host "`n╔══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║               SERVICE STATUS DASHBOARD                  ║" -ForegroundColor Cyan
-    Write-Host "╠══════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
+    $sb = [System.Text.StringBuilder]::new()
+    [void]$sb.AppendLine("`n╔══════════════════════════════════════════════════════════╗")
+    [void]$sb.AppendLine("║               SERVICE STATUS DASHBOARD                  ║")
+    [void]$sb.AppendLine("╠══════════════════════════════════════════════════════════╣")
+    
+    Write-Host $sb.ToString() -ForegroundColor Cyan -NoNewline
+    $sb.Clear()
     
     foreach ($serviceKey in $script:Services.Keys) {
         $metrics = Get-ServiceMetrics -ServiceKey $serviceKey
@@ -490,26 +513,58 @@ function Show-ServiceStatus {
         Write-Host " [" -NoNewline
         Write-Host "$($metrics.Status)" -ForegroundColor $statusColor -NoNewline
         Write-Host "]" -NoNewline
-        Write-Host " " * (55 - $metrics.Name.Length - $metrics.Status.Length - 4) -NoNewline
+        $padding1 = 55 - $metrics.Name.Length - $metrics.Status.Length - 4
+        Write-Host (" " * $padding1) -NoNewline
         Write-Host "║" -ForegroundColor Cyan
-        Write-Host "║   Uptime: $($metrics.Uptime) | Health: $($metrics.HealthRate) | Avg Response: $($metrics.AvgResponseTime)" -NoNewline
-        $padding = 59 - "  Uptime: $($metrics.Uptime) | Health: $($metrics.HealthRate) | Avg Response: $($metrics.AvgResponseTime)".Length
-        Write-Host " " * $padding -NoNewline
+        
+        $metricsLine = "  Uptime: $($metrics.Uptime) | Health: $($metrics.HealthRate) | Avg Response: $($metrics.AvgResponseTime)"
+        Write-Host "║$metricsLine" -NoNewline
+        $padding2 = 59 - $metricsLine.Length
+        Write-Host (" " * $padding2) -NoNewline
         Write-Host "║" -ForegroundColor Cyan
         
         if ($metrics.RestartCount -gt 0) {
-            Write-Host "║   Restarts: $($metrics.RestartCount)" -ForegroundColor Yellow -NoNewline
-            Write-Host " " * (45 - "  Restarts: $($metrics.RestartCount)".Length) -NoNewline
+            $restartLine = "  Restarts: $($metrics.RestartCount)"
+            Write-Host "║$restartLine" -ForegroundColor Yellow -NoNewline
+            Write-Host (" " * (59 - $restartLine.Length)) -NoNewline
             Write-Host "║" -ForegroundColor Cyan
         }
     }
     
     $totalUptime = ((Get-Date) - $script:StartTime).ToString('hh\:mm\:ss')
+    $runtimeLine = "Total Runtime: $totalUptime"
     Write-Host "╠══════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
-    Write-Host "║ Total Runtime: $totalUptime" -NoNewline
-    Write-Host " " * (45 - "Total Runtime: $totalUptime".Length) -NoNewline
+    Write-Host "║ $runtimeLine" -NoNewline
+    Write-Host (" " * (59 - $runtimeLine.Length - 1)) -NoNewline
     Write-Host "║" -ForegroundColor Cyan
     Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+}
+
+function Invoke-ServiceRestart {
+    param(
+        [string]$ServiceKey
+    )
+    
+    $service = $script:Services[$ServiceKey]
+    
+    Stop-TheoriaService -ServiceKey $ServiceKey
+    Start-Sleep -Seconds 2
+    
+    $success = switch ($ServiceKey) {
+        "Api" { Start-TheoriaApi }
+        "Web" { Start-TheoriaWeb }
+        default { $false }
+    }
+    
+    if ($success) {
+        $service.RestartCount++
+        $service.LastRestartTime = Get-Date
+        Write-TheoriaLog "$($service.Name) restarted successfully" -Level Success -Metadata @{ restart_count = $service.RestartCount }
+    } else {
+        Write-TheoriaLog "$($service.Name) restart failed" -Level Error
+    }
+    
+    return $success
 }
 
 function Start-HealthMonitor {
@@ -543,7 +598,7 @@ function Start-HealthMonitor {
             $service.TotalHealthChecks++
             $service.LastHealthCheckDuration = $diagnostics.ResponseTime
             
-            # Calculate rolling average response time
+            # Calculate rolling average response time (exponential moving average)
             if ($service.AverageResponseTime -eq 0) {
                 $service.AverageResponseTime = $diagnostics.ResponseTime
             } else {
@@ -580,22 +635,7 @@ function Start-HealthMonitor {
                             cooldown_seconds = $currentCooldown
                         }
                         
-                        Stop-TheoriaService -ServiceKey $serviceKey
-                        Start-Sleep -Seconds 2
-                        
-                        $success = if ($serviceKey -eq "Api") {
-                            Start-TheoriaApi
-                        } else {
-                            Start-TheoriaWeb
-                        }
-                        
-                        if ($success) {
-                            $service.RestartCount++
-                            $service.LastRestartTime = Get-Date
-                            Write-TheoriaLog "$($service.Name) restarted successfully" -Level Success -Metadata @{ restart_count = $service.RestartCount }
-                        } else {
-                            Write-TheoriaLog "$($service.Name) restart failed" -Level Error
-                        }
+                        Invoke-ServiceRestart -ServiceKey $serviceKey
                     } else {
                         $remainingCooldown = [int]($currentCooldown - $timeSinceLastRestart.TotalSeconds)
                         Write-TheoriaLog "$($service.Name) in cooldown period (${remainingCooldown}s remaining)" -Level Debug
@@ -726,6 +766,14 @@ function Start-Theoria {
         Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Yellow
         Write-Host ""
         
+        # Flush any remaining logs
+        if ($LogToFile -and $script:LogBuffer.Count -gt 0) {
+            try {
+                Add-Content -Path $script:LogFile -Value ($script:LogBuffer -join "`n") -ErrorAction SilentlyContinue
+                $script:LogBuffer.Clear()
+            } catch {}
+        }
+        
         # Graceful shutdown with timeout
         Stop-TheoriaService -ServiceKey "Web"
         Stop-TheoriaService -ServiceKey "Api"
@@ -735,24 +783,33 @@ function Start-Theoria {
         Write-Host "`n╔══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
         Write-Host "║                   SESSION SUMMARY                        ║" -ForegroundColor Cyan
         Write-Host "╠══════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
-        Write-Host "║ Total Runtime: $($totalRuntime.ToString('hh\:mm\:ss'))" -NoNewline
-        Write-Host " " * (42 - "Total Runtime: $($totalRuntime.ToString('hh\:mm\:ss'))".Length) -NoNewline
+        $runtimeStr = $totalRuntime.ToString('hh\:mm\:ss')
+        $runtimeLine = "Total Runtime: $runtimeStr"
+        Write-Host "║ $runtimeLine" -NoNewline
+        Write-Host (" " * (59 - $runtimeLine.Length - 1)) -NoNewline
         Write-Host "║" -ForegroundColor Cyan
         
         foreach ($serviceKey in $script:Services.Keys) {
             $metrics = Get-ServiceMetrics -ServiceKey $serviceKey
-            Write-Host "║ $($metrics.Name):" -NoNewline
-            Write-Host " " * (57 - $metrics.Name.Length - 1) -NoNewline
+            $nameLine = "$($metrics.Name):"
+            Write-Host "║ $nameLine" -NoNewline
+            Write-Host (" " * (59 - $nameLine.Length - 1)) -NoNewline
             Write-Host "║" -ForegroundColor Cyan
-            Write-Host "║   Uptime: $($metrics.Uptime)" -NoNewline
-            Write-Host " " * (50 - "  Uptime: $($metrics.Uptime)".Length) -NoNewline
+            
+            $uptimeLine = "  Uptime: $($metrics.Uptime)"
+            Write-Host "║$uptimeLine" -NoNewline
+            Write-Host (" " * (59 - $uptimeLine.Length)) -NoNewline
             Write-Host "║" -ForegroundColor Cyan
-            Write-Host "║   Health Checks: $($metrics.TotalChecks) ($($metrics.HealthRate) success)" -NoNewline
-            Write-Host " " * (50 - "  Health Checks: $($metrics.TotalChecks) ($($metrics.HealthRate) success)".Length) -NoNewline
+            
+            $healthLine = "  Health Checks: $($metrics.TotalChecks) ($($metrics.HealthRate) success)"
+            Write-Host "║$healthLine" -NoNewline
+            Write-Host (" " * (59 - $healthLine.Length)) -NoNewline
             Write-Host "║" -ForegroundColor Cyan
+            
             if ($metrics.RestartCount -gt 0) {
-                Write-Host "║   Restarts: $($metrics.RestartCount)" -ForegroundColor Yellow -NoNewline
-                Write-Host " " * (50 - "  Restarts: $($metrics.RestartCount)".Length) -NoNewline
+                $restartLine = "  Restarts: $($metrics.RestartCount)"
+                Write-Host "║$restartLine" -ForegroundColor Yellow -NoNewline
+                Write-Host (" " * (59 - $restartLine.Length)) -NoNewline
                 Write-Host "║" -ForegroundColor Cyan
             }
         }

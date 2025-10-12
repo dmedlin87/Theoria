@@ -19,6 +19,12 @@ import httpx
 class GenerationError(RuntimeError):
     """Raised when a provider fails to generate content."""
 
+    def __init__(self, message: str, *, provider: str | None = None, status_code: int | None = None, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.provider = provider
+        self.status_code = status_code
+        self.retryable = retryable
+
 
 class LanguageModelClient(Protocol):
     """Common protocol implemented by provider-specific clients."""
@@ -139,6 +145,7 @@ class BaseAIClient:
         start = settings.clock()
         budget = settings.total_timeout
         last_exception: Exception | None = None
+        last_status_code: int | None = None
 
         for attempt in range(1, settings.max_attempts + 1):
             elapsed = settings.clock() - start
@@ -184,11 +191,19 @@ class BaseAIClient:
                 return response
 
             if response.status_code not in retry_statuses or attempt >= settings.max_attempts:
+                last_status_code = response.status_code
                 try:
                     response.raise_for_status()
                 except httpx.HTTPStatusError as exc:
-                    raise GenerationError(str(exc)) from exc
-                raise GenerationError(f"Unexpected response status: {response.status_code}")
+                    raise GenerationError(
+                        f"HTTP {response.status_code}: {exc}",
+                        status_code=response.status_code,
+                        retryable=response.status_code in retry_statuses,
+                    ) from exc
+                raise GenerationError(
+                    f"Unexpected response status: {response.status_code}",
+                    status_code=response.status_code,
+                )
 
             delay = self._compute_backoff(attempt, response)
             elapsed = settings.clock() - start
@@ -198,8 +213,15 @@ class BaseAIClient:
                 settings.sleep(delay)
 
         if last_exception is not None:
-            raise GenerationError("Request failed") from last_exception
-        raise GenerationError("Request failed without response")
+            raise GenerationError(
+                f"Request failed after {settings.max_attempts} attempts",
+                status_code=last_status_code,
+                retryable=True,
+            ) from last_exception
+        raise GenerationError(
+            f"Request failed without response after {settings.max_attempts} attempts",
+            retryable=False,
+        )
 
     @staticmethod
     def _create_http_client(
@@ -288,7 +310,10 @@ class OpenAIClient(BaseAIClient):
                 if cache_key:
                     self._cache[cache_key] = result
                 return result
-        raise GenerationError("Unexpected OpenAI response payload")
+        raise GenerationError(
+            "Unexpected OpenAI response payload - missing expected fields",
+            provider="openai",
+        )
 
 
 @dataclass
@@ -350,7 +375,10 @@ class AzureOpenAIClient(BaseAIClient):
                 if cache_key:
                     self._cache[cache_key] = result
                 return result
-        raise GenerationError("Unexpected Azure OpenAI response payload")
+        raise GenerationError(
+            "Unexpected Azure OpenAI response payload - missing expected fields",
+            provider="azure_openai",
+        )
 
 
 @dataclass
@@ -411,7 +439,10 @@ class AnthropicClient(BaseAIClient):
                 if cache_key:
                     self._cache[cache_key] = result
                 return result
-        raise GenerationError("Unexpected Anthropic response payload")
+        raise GenerationError(
+            "Unexpected Anthropic response payload - missing expected fields",
+            provider="anthropic",
+        )
 
 
 @dataclass
@@ -488,7 +519,10 @@ class VertexAIClient(BaseAIClient):
                 if cache_key:
                     self._cache[cache_key] = result
                 return result
-        raise GenerationError("Unexpected Vertex AI response payload")
+        raise GenerationError(
+            "Unexpected Vertex AI response payload - missing expected fields",
+            provider="vertex_ai",
+        )
 
 
 @dataclass
@@ -545,7 +579,10 @@ class LocalVLLMClient(BaseAIClient):
             if cache_key:
                 self._cache[cache_key] = result
             return result
-        raise GenerationError("Unexpected vLLM response payload")
+        raise GenerationError(
+            "Unexpected vLLM response payload - missing expected fields",
+            provider="vllm",
+        )
 
 
 class EchoClient:
