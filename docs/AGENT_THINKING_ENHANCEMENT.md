@@ -7,6 +7,7 @@ Transform the TheoEngine agent from a reactive RAG system into an autonomous the
 ## Current State Analysis
 
 ### Existing Capabilities
+
 - **Contradiction Detection** (`contradictions.py`) - surfaces theological tensions with perspective filtering
 - **RAG Guardrails** (`guardrails.py`) - validates citations, detects 23 safety patterns
 - **Prompt Construction** (`prompts.py`) - basic system with adversarial scrubbing
@@ -14,6 +15,7 @@ Transform the TheoEngine agent from a reactive RAG system into an autonomous the
 - **Workflow Pipeline** (`workflow.py`) - retrieve → compose → validate
 
 ### Critical Gaps
+
 1. **No logical fallacy detection** - agent can't critique its own reasoning
 2. **No chain-of-thought scaffolding** - thinking is opaque, not stepwise
 3. **No hypothesis generation** - agent doesn't form/test theories
@@ -30,23 +32,28 @@ Transform the TheoEngine agent from a reactive RAG system into an autonomous the
 ### Layer 1: Reasoning Primitives
 
 #### 1.1 Logical Fallacy Detector
+
 **Location:** `theo/services/api/app/ai/reasoning/fallacies.py`
 
 Detect 20+ common fallacies in theological arguments:
+
 - **Formal fallacies:** affirming consequent, denying antecedent, equivocation
 - **Informal fallacies:** ad hominem, straw man, appeal to authority, circular reasoning
 - **Theological-specific:** proof-texting, verse isolation, eisegesis markers, chronological snobbery
 
 **Integration points:**
+
 - Run on model completions before validation
 - Run on retrieved passage claims during synthesis
 - Expose via `/research/fallacies?claim={text}` endpoint
 - Add `fallacy_warnings` to RAGAnswer model
 
 #### 1.2 Chain-of-Thought Prompting
+
 **Location:** `theo/services/api/app/ai/reasoning/chain_of_thought.py`
 
 Force explicit reasoning steps:
+
 ```python
 CHAIN_OF_THOUGHT_TEMPLATE = """
 You are a theological researcher. Think step-by-step:
@@ -68,15 +75,18 @@ Let's reason through this:
 ```
 
 **Enhancements:**
+
 - Parse structured reasoning from `<thinking>` tags
 - Store reasoning trace in `AgentStep.reasoning_trace` JSONB field
 - Expose reasoning in UI with collapsible sections
 - Allow users to challenge specific reasoning steps
 
 #### 1.3 Hypothesis Generation & Testing
+
 **Location:** `theo/services/api/app/ai/reasoning/hypotheses.py`
 
 Enable agent to form/test theories:
+
 ```python
 @dataclass
 class Hypothesis:
@@ -96,6 +106,7 @@ def test_hypothesis(hyp: Hypothesis, session: Session) -> HypothesisTest:
 ```
 
 **Workflow:**
+
 1. User asks question → agent generates 2-4 hypotheses
 2. For each hypothesis, agent autonomously searches for supporting/contradicting evidence
 3. Agent scores confidence using Bayesian updating
@@ -106,9 +117,11 @@ def test_hypothesis(hyp: Hypothesis, session: Session) -> HypothesisTest:
 ### Layer 2: Autonomous Research Loop
 
 #### 2.1 Self-Directed Exploration
+
 **Location:** `theo/services/api/app/ai/agents/explorer.py`
 
 Agent autonomously chases leads:
+
 ```python
 class AutonomousExplorer:
     def explore(self, initial_question: str, max_iterations: int = 5):
@@ -123,19 +136,23 @@ class AutonomousExplorer:
 ```
 
 **Stopping conditions:**
+
 - Confidence threshold reached (>0.85)
 - No new passages found
 - Contradiction count stabilizes
 - Max iterations hit
 
 **Safety guardrails:**
+
 - Log every retrieval step in AgentTrail
 - Enforce retrieval budget (max 50 passages per session)
 - User can interrupt/redirect at any step
 - All reasoning traces visible in real-time
 
 #### 2.2 Knowledge Gap Detection
+
 Prompt augmentation:
+
 ```
 After reviewing the evidence, what critical information is missing?
 - Which perspectives are underrepresented?
@@ -151,9 +168,11 @@ Generate 2-3 follow-up search queries to fill these gaps.
 ### Layer 3: Meta-Cognitive Reflection
 
 #### 3.1 Self-Critique Module
+
 **Location:** `theo/services/api/app/ai/reasoning/metacognition.py`
 
 Agent critiques its own reasoning:
+
 ```python
 def critique_reasoning(reasoning_trace: dict, answer: str) -> Critique:
     """
@@ -167,7 +186,8 @@ def critique_reasoning(reasoning_trace: dict, answer: str) -> Critique:
 ```
 
 **Prompt pattern:**
-```
+
+```text
 You are a theological skeptic reviewing this reasoning:
 
 {reasoning_trace}
@@ -181,7 +201,9 @@ Critique:
 ```
 
 #### 3.2 Revision Loop
+
 After critique, agent can revise:
+
 1. Re-retrieve with different filters
 2. Regenerate answer addressing critique
 3. Compare original vs. revised
@@ -192,6 +214,7 @@ After critique, agent can revise:
 ### Layer 4: Multi-Perspective Synthesis
 
 #### 4.1 Perspective Orchestrator
+
 **Location:** `theo/services/api/app/ai/reasoning/perspectives.py`
 
 Current system filters by perspective - enhancement synthesizes across them:
@@ -220,12 +243,14 @@ class PerspectiveSynthesizer:
 ```
 
 **UI Enhancement:**
+
 - Tabbed interface showing each perspective
 - Venn diagram of consensus vs. unique claims
 - Highlight where perspectives diverge
 - "Synthesis" tab with meta-analysis
 
 #### 4.2 Contradiction Integration
+
 Connect existing contradiction seeds into reasoning:
 
 ```python
@@ -248,6 +273,7 @@ def enrich_with_contradictions(osis: str, session: Session) -> dict:
 ### Layer 5: Insight Detection
 
 #### 5.1 "Aha!" Moment Detector
+
 **Location:** `theo/services/api/app/ai/reasoning/insights.py`
 
 Detect when agent makes novel connections:
@@ -273,6 +299,7 @@ def detect_insights(reasoning_trace: dict, passages: list) -> list[Insight]:
 ```
 
 **Prompt injection:**
+
 ```
 As you reason, explicitly mark insights:
 <insight type="cross_ref">
@@ -281,13 +308,16 @@ Matthew 5:17 and Romans 10:4 create a tension about Torah's end...
 ```
 
 **UI:**
+
 - Highlight insights with 💡 icon
 - "Insights" panel summarizing discoveries
 - Allow users to save insights as notes
 - Track insight patterns over time
 
 #### 5.2 Pattern Recognition
+
 Detect recurring themes across corpus:
+
 - Same verse cited by 10+ authors → flag as "theological anchor"
 - Contradiction pair appears 5+ times → "hotly debated"
 - Author consistently opposes specific tradition → "contrarian signal"
@@ -298,10 +328,12 @@ Detect recurring themes across corpus:
 ### Layer 6: Enhanced Prompting Strategies
 
 #### 6.1 Role-Based Personas
+
 Define detective personas with specialized prompts:
 
 **Detective Mode:**
-```
+
+```text
 You are a theological detective investigating: {question}
 
 Method:
@@ -314,7 +346,8 @@ Method:
 ```
 
 **Critic Mode:**
-```
+
+```text
 You are a skeptical peer reviewer. Your job is to poke holes:
 - Question every claim
 - Demand stronger evidence
@@ -324,7 +357,8 @@ You are a skeptical peer reviewer. Your job is to poke holes:
 ```
 
 **Apologist Mode:**
-```
+
+```text
 You are seeking coherence and harmony:
 - Find ways passages complement each other
 - Surface background context that resolves tensions
@@ -333,7 +367,8 @@ You are seeking coherence and harmony:
 ```
 
 **Synthesizer Mode:**
-```
+
+```text
 You are a neutral academic surveying the field:
 - Map full spectrum of scholarly positions
 - Identify consensus vs. disputed claims
@@ -342,8 +377,10 @@ You are a neutral academic surveying the field:
 ```
 
 #### 6.2 Socratic Questioning
+
 Agent asks clarifying questions before diving in:
-```
+
+```text
 Before I research this, let me clarify:
 1. Are you asking about [interpretation A] or [interpretation B]?
 2. Should I focus on [time period] or survey all eras?
@@ -356,6 +393,7 @@ Before I research this, let me clarify:
 ### Layer 7: Integration Architecture
 
 #### 7.1 Enhanced Workflow Pipeline
+
 **Location:** `theo/services/api/app/ai/rag/workflow_v2.py`
 
 ```python
@@ -423,6 +461,7 @@ class ReasoningPipeline(GuardedAnswerPipeline):
 ```
 
 #### 7.2 Database Extensions
+
 Add tables to track reasoning:
 
 ```sql
@@ -466,7 +505,9 @@ CREATE TABLE hypotheses (
 ### Layer 8: UI Enhancements
 
 #### 8.1 Reasoning Viewer
+
 New UI component: `ReasoningTrace.tsx`
+
 - Expandable tree view of reasoning steps
 - Each node shows: claim → evidence → warrant
 - Color-coded by confidence (red=low, yellow=medium, green=high)
@@ -474,6 +515,7 @@ New UI component: `ReasoningTrace.tsx`
 - Highlight fallacy warnings in orange
 
 #### 8.2 Hypothesis Dashboard
+
 - Card view of competing hypotheses
 - Confidence bars showing relative strength
 - Supporting vs. contradicting evidence counts
@@ -481,6 +523,7 @@ New UI component: `ReasoningTrace.tsx`
 - Live updates as agent gathers evidence
 
 #### 8.3 Insight Feed
+
 - Timeline of insights discovered
 - Filter by type (cross_ref, pattern, synthesis, etc.)
 - "Save to Notes" quick action
@@ -492,6 +535,7 @@ New UI component: `ReasoningTrace.tsx`
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (Weeks 1-2)
+
 1. Create `reasoning` module structure
 2. Implement logical fallacy detector
 3. Build chain-of-thought prompt templates
@@ -500,6 +544,7 @@ New UI component: `ReasoningTrace.tsx`
 6. Add tests for fallacy detection
 
 ### Phase 2: Autonomous Exploration (Weeks 3-4)
+
 1. Implement hypothesis generation
 2. Build autonomous explorer loop
 3. Add knowledge gap detection
@@ -508,6 +553,7 @@ New UI component: `ReasoningTrace.tsx`
 6. Create exploration UI
 
 ### Phase 3: Meta-Cognition (Weeks 5-6)
+
 1. Implement self-critique module
 2. Build revision loop
 3. Add perspective synthesizer
@@ -515,6 +561,7 @@ New UI component: `ReasoningTrace.tsx`
 5. Add multi-perspective UI tabs
 
 ### Phase 4: Insight Detection (Weeks 7-8)
+
 1. Implement insight detector
 2. Add pattern recognition
 3. Build novelty scoring
@@ -522,6 +569,7 @@ New UI component: `ReasoningTrace.tsx`
 5. Add user feedback mechanisms
 
 ### Phase 5: Polish & Evaluation (Weeks 9-10)
+
 1. Build reasoning trace viewer
 2. Add hypothesis dashboard
 3. Implement role-based personas
@@ -534,6 +582,7 @@ New UI component: `ReasoningTrace.tsx`
 ## Evaluation Framework
 
 ### Reasoning Quality Metrics
+
 - **Logical coherence:** % of reasoning chains free of fallacies
 - **Evidence grounding:** % of claims backed by citations
 - **Perspective balance:** Distribution across skeptical/apologetic/neutral
@@ -542,6 +591,7 @@ New UI component: `ReasoningTrace.tsx`
 - **Critique quality:** Inter-rater reliability with human theologians
 
 ### User Experience Metrics
+
 - **Time to insight:** How quickly users find "aha!" moments
 - **Exploration depth:** Avg autonomous iterations before convergence
 - **Reasoning clarity:** User ratings of trace understandability
@@ -549,6 +599,7 @@ New UI component: `ReasoningTrace.tsx`
 - **Revision impact:** Quality improvement from critique loop
 
 ### Safety Metrics
+
 - **Retrieval budget adherence:** % of sessions staying under limits
 - **Guardrail pass rate:** % of autonomous generations passing validation
 - **Fallacy detection recall:** % of planted fallacies caught
@@ -559,7 +610,8 @@ New UI component: `ReasoningTrace.tsx`
 ## Example Workflows
 
 ### Workflow 1: Autonomous Theological Detective
-```
+
+```text
 User: "Did the early church believe Jesus was divine?"
 
 Agent:
@@ -610,7 +662,8 @@ by apostolic fathers, and crystallized through Arian controversy.
 ```
 
 ### Workflow 2: Socratic Clarification
-```
+
+```text
 User: "What does Paul say about the law?"
 
 Agent: Before I research this, let me clarify:
@@ -628,17 +681,20 @@ Agent: [Proceeds with focused research...]
 ## Technical Considerations
 
 ### Performance
+
 - **Streaming responses:** Yield reasoning steps as generated, don't wait for completion
 - **Caching:** Cache hypothesis tests, reasoning traces, critique results
 - **Batching:** Group fallacy detection across all claims in single pass
 - **Async:** Run perspective synthesis in parallel (3 concurrent generations)
 
 ### Costs
+
 - **Token multiplication:** Chain-of-thought uses 2-3x tokens vs. direct answer
 - **Autonomous loops:** Each iteration adds retrieval + generation cost
 - **Mitigation:** User opt-in for autonomous mode; budget controls; cache aggressively
 
 ### Safety
+
 - **Runaway prevention:** Hard limits on iterations (max 10)
 - **Retrieval bounds:** Max 50 passages per session
 - **User control:** Interrupt button visible during autonomous exploration

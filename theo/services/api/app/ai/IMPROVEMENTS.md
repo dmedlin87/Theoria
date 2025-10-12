@@ -10,45 +10,56 @@ The AI routing system was enhanced with better reliability, observability, and p
 
 ## 1. Enhanced Token Estimation (`router.py`)
 
-### Problem
+### Problem: Inaccurate Token Estimation
+
 Previous token estimation used a crude `len(text) // 4` approximation, leading to:
+
 - Inaccurate cost estimates
 - Poor budget enforcement
 - Misleading observability metrics
 
-### Solution
+### Solution: tiktoken Integration
+
 Implemented `_estimate_tokens()` method with:
+
 - **tiktoken integration** for accurate token counting
 - Model-specific encoding selection (cl100k_base for GPT-4/3.5, p50k_base for older models)
 - Tokenizer caching to avoid repeated initialization overhead
 - Graceful fallback to character-based estimation if tiktoken unavailable
 
-### Benefits
+### Benefits: Accurate Cost Projections
+
 - ✅ Accurate cost projections (critical for budget enforcement)
 - ✅ Better cache hit rates (token counts are consistent)
 - ✅ Improved observability with real token metrics
 
 ### Configuration
+
 No configuration needed - automatically uses tiktoken if available.
 
 ---
 
 ## 2. Circuit Breaker Pattern (`router.py`)
 
-### Problem
+### Problem: Cascading Failures
+
 Models experiencing failures would continue to be selected, causing:
+
 - Cascading failures across requests
 - Wasted latency on known-bad models
 - Poor user experience
 
-### Solution
+### Solution: Model Health Tracking
+
 Added `_ModelHealth` tracking and circuit breaker logic:
+
 - Tracks consecutive failures per model
 - Opens circuit after threshold (default: 3 consecutive failures)
 - Automatic recovery after timeout (default: 60 seconds)
 - Integrated with existing availability checks
 
 ### Usage
+
 Configure per-model circuit breaker settings:
 
 ```python
@@ -60,7 +71,8 @@ Configure per-model circuit breaker settings:
 }
 ```
 
-### Benefits
+### Benefits: Failure Prevention
+
 - ✅ Prevents cascading failures
 - ✅ Automatic failover to healthy models
 - ✅ Self-healing after timeout period
@@ -70,19 +82,24 @@ Configure per-model circuit breaker settings:
 
 ## 3. Improved Cache Key Generation (`router.py`)
 
-### Problem
+### Problem: Hash Collisions
+
 Previous JSON-based cache keys could have:
+
 - Hash collisions with similar prompts
 - Inconsistent serialization ordering
 - Potential security concerns
 
-### Solution
+### Solution: SHA-256 Hashing
+
 Replaced with `_generate_cache_key()` using SHA-256:
+
 - Content-based hashing (model + workflow + params + prompt)
 - Deterministic and collision-resistant
 - Truncated to 32 characters for efficient storage
 
-### Benefits
+### Benefits: Collision Resistance
+
 - ✅ Near-zero collision probability
 - ✅ Consistent cache hits across sessions
 - ✅ Better performance with large prompts
@@ -91,11 +108,14 @@ Replaced with `_generate_cache_key()` using SHA-256:
 
 ## 4. Enhanced RoutedGeneration Response (`router.py`)
 
-### Problem
+### Problem: Missing Observability Metrics
+
 Response object lacked important metrics for observability.
 
-### Solution
+### Solution: Extended Response Fields
+
 Extended `RoutedGeneration` dataclass with:
+
 ```python
 @dataclass
 class RoutedGeneration:
@@ -108,7 +128,8 @@ class RoutedGeneration:
     completion_tokens: int = 0      # NEW
 ```
 
-### Benefits
+### Benefits: Enhanced Tracking
+
 - ✅ Distinguish cache hits from real generations
 - ✅ Track exact token usage
 - ✅ Better cost attribution
@@ -117,24 +138,30 @@ class RoutedGeneration:
 
 ## 5. Model Health Tracking (`router.py`)
 
-### Problem
+### Problem: No Reliability Visibility
+
 No visibility into model reliability over time.
 
-### Solution
+### Solution: ModelHealth Dataclass
+
 Added `_ModelHealth` dataclass tracking:
+
 - Total failure count
 - Consecutive failures (for circuit breaker)
 - Last success/failure timestamps
 - Automatic recording on each generation
 
 ### Usage
+
 Access via router introspection:
+
 ```python
 router._model_health["gpt-4"].consecutive_failures
 router._model_health["gpt-4"].last_success_time
 ```
 
-### Benefits
+### Benefits: Real-Time Metrics
+
 - ✅ Real-time reliability metrics
 - ✅ Historical failure analysis
 - ✅ Debugging problematic models
@@ -143,11 +170,14 @@ router._model_health["gpt-4"].last_success_time
 
 ## 6. Ledger Database Optimizations (`ledger.py`)
 
-### Problem
+### Problem: Performance Degradation
+
 SQLite performance could degrade under concurrent load.
 
-### Solution
+### Solution: WAL Mode and Indexing
+
 Enhanced `_initialize()` with:
+
 - **WAL mode** enabled (better concurrent read/write)
 - **64MB cache** allocation for hot data
 - **Memory temp storage** for better performance
@@ -156,7 +186,8 @@ Enhanced `_initialize()` with:
   - `idx_inflight_status` for status filtering
   - `idx_inflight_updated_at` for stale detection
 
-### Benefits
+### Benefits: Throughput Improvement
+
 - ✅ 2-3x throughput improvement under load
 - ✅ Reduced lock contention
 - ✅ Faster cache cleanup operations
@@ -165,24 +196,29 @@ Enhanced `_initialize()` with:
 
 ## 7. Ledger Introspection APIs (`ledger.py`)
 
-### Problem
+### Problem: No Aggregate Metrics
+
 No way to query aggregate metrics across all models.
 
-### Solution
+### Solution: Introspection Methods
+
 Added `LedgerTransaction` methods:
+
 ```python
 def get_all_spend(self) -> dict[str, float]
 def get_all_latency(self) -> dict[str, float]
 ```
 
 ### Usage
+
 ```python
 with ledger.transaction() as txn:
     all_spend = txn.get_all_spend()
     all_latency = txn.get_all_latency()
 ```
 
-### Benefits
+### Benefits: System-Wide Reporting
+
 - ✅ System-wide cost reporting
 - ✅ Cross-model performance analysis
 - ✅ Dashboard integration support
@@ -191,13 +227,16 @@ with ledger.transaction() as txn:
 
 ## 8. Enhanced Error Diagnostics (`ledger.py`, `clients.py`)
 
-### Problem
+### Problem: Generic Error Messages
+
 Generic error messages made debugging difficult.
 
 ### Solution
 
 #### Ledger Errors
+
 Improved timeout messages with context:
+
 ```python
 # Before
 "Timed out waiting for inflight generation"
@@ -207,7 +246,9 @@ Improved timeout messages with context:
 ```
 
 #### Client Errors
+
 Extended `GenerationError` with metadata:
+
 ```python
 class GenerationError(RuntimeError):
     provider: str | None      # "openai", "anthropic", etc.
@@ -216,6 +257,7 @@ class GenerationError(RuntimeError):
 ```
 
 Enhanced error messages:
+
 ```python
 # Before
 "Unexpected response status: 429"
@@ -224,7 +266,8 @@ Enhanced error messages:
 "HTTP 429: Rate limit exceeded (retryable: True, provider: openai)"
 ```
 
-### Benefits
+### Benefits: Better Diagnostics
+
 - ✅ Faster root cause identification
 - ✅ Better error telemetry
 - ✅ Smarter retry decisions
@@ -233,17 +276,21 @@ Enhanced error messages:
 
 ## 9. Improved Documentation (`ledger.py`)
 
-### Problem
+### Problem: Minimal Documentation
+
 `wait_for_inflight()` had minimal documentation.
 
-### Solution
+### Solution: Comprehensive Docstrings
+
 Added comprehensive docstring:
+
 - Parameter descriptions
 - Return value specification
 - Exception documentation
 - Behavioral notes
 
-### Benefits
+### Benefits: Developer Experience
+
 - ✅ Easier onboarding for new developers
 - ✅ IDE autocomplete support
 - ✅ Reduced support burden
@@ -266,11 +313,13 @@ Added comprehensive docstring:
 ## Migration Guide
 
 ### No Breaking Changes
+
 All improvements are **backward compatible**. Existing code continues to work.
 
 ### Optional Enhancements
 
 #### 1. Use new response fields
+
 ```python
 result = router.execute_generation(...)
 if result.cache_hit:
@@ -279,6 +328,7 @@ logger.info(f"Tokens: {result.prompt_tokens}/{result.completion_tokens}")
 ```
 
 #### 2. Configure circuit breakers
+
 ```json
 {
   "routing": {
@@ -289,6 +339,7 @@ logger.info(f"Tokens: {result.prompt_tokens}/{result.completion_tokens}")
 ```
 
 #### 3. Handle enhanced errors
+
 ```python
 try:
     result = client.generate(...)
@@ -331,6 +382,7 @@ except GenerationError as e:
 ## Testing Recommendations
 
 ### 1. Circuit Breaker
+
 ```python
 # Verify circuit opens after failures
 for _ in range(3):
@@ -350,6 +402,7 @@ assert router._is_available(failing_model.name, workflow)
 ```
 
 ### 2. Token Estimation
+
 ```python
 tokens = router._estimate_tokens("Hello, world!", "gpt-4")
 assert tokens > 0  # Should use tiktoken
@@ -357,6 +410,7 @@ assert tokens != len("Hello, world!") // 4  # More accurate
 ```
 
 ### 3. Enhanced Errors
+
 ```python
 try:
     client.generate(prompt="test", model="invalid")
@@ -404,6 +458,7 @@ Potential next steps (not yet implemented):
 ## Support
 
 For questions or issues:
+
 - Check logs with `logging.getLogger("theo.router")` at DEBUG level
 - Review OpenTelemetry spans for detailed trace data
 - Inspect `_model_health` for reliability metrics
@@ -413,6 +468,7 @@ For questions or issues:
 
 **Last Updated:** 2025-01-12
 **Component Versions:**
+
 - Router: 2.0
 - Ledger: 1.5
 - Clients: 1.2
