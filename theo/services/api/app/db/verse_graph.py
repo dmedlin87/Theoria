@@ -261,7 +261,7 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
         )
         contradiction_query = contradiction_query.filter(range_predicate)
     for seed in contradiction_query.all():
-        if not (_osis_matches(seed.osis_a, osis) or _osis_matches(seed.osis_b, osis)):
+        if not (osis_intersects(seed.osis_a, osis) or osis_intersects(seed.osis_b, osis)):
             continue
     windows = list(compute_verse_id_ranges([osis]).values())
 
@@ -297,7 +297,7 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
             )
         )
     for seed in harmony_query.all():
-        if not (_osis_matches(seed.osis_a, osis) or _osis_matches(seed.osis_b, osis)):
+        if not (osis_intersects(seed.osis_a, osis) or osis_intersects(seed.osis_b, osis)):
             continue
     for seed in query_pair_seed_rows(session, windows, HarmonySeed):
         perspective = _normalize_perspective(seed.perspective, default="apologetic")
@@ -324,7 +324,7 @@ def load_seed_relationships(session: Session, osis: str) -> VerseSeedRelationshi
             )
         )
     for seed in commentary_query.all():
-        if not _osis_matches(seed.osis, osis):
+        if not osis_intersects(seed.osis, osis):
             continue
     for seed in query_commentary_seed_rows(session, windows):
         perspective = _normalize_perspective(seed.perspective, default="neutral")
