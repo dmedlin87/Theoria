@@ -409,6 +409,41 @@ def test_export_deliverable_sermon_bundle(monkeypatch) -> None:
     assert recorded["osis"] == "John.1.1"
 
 
+def test_export_deliverable_normalises_format_aliases(monkeypatch) -> None:
+    _seed_corpus()
+    recorded: dict[str, object] = {}
+
+    class FakeAsyncResult:
+        id = "celery-alias"
+
+    def fake_apply_async(*, kwargs):
+        recorded.update(kwargs)
+        return FakeAsyncResult()
+
+    monkeypatch.setattr(
+        worker_tasks.build_deliverable,
+        "apply_async",
+        fake_apply_async,
+    )
+
+    with _api_client() as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/export/deliverable",
+            json={
+                "type": "sermon",
+                "topic": "Logos",
+                "osis": "John.1.1",
+                "formats": ["md", "PDF", "markdown"],
+            },
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["message"] == "Queued sermon deliverable"
+    assert recorded["formats"] == ["markdown", "pdf"]
+
+
 def test_sermon_prep_outline_returns_key_points_and_trail_user() -> None:
     _seed_corpus()
     with _api_client() as client:

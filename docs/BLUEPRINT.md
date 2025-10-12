@@ -554,7 +554,7 @@ Sermon/lesson prep and Q&A transcripts now surface export pipelines.
 
 - **Formats:** Markdown (teaching outline + citations), NDJSON (one item per segment with provenance), CSV (tabular Q&A with OSIS refs).
 - **Manifest:** Each export includes `manifest.json` with `export_id` (ULID), `schema_version`, `filters`, `git_sha`, `generated_at`, and `model_preset` when AI content is present.
-- **API:** `POST /export/deliverable` accepts `{ "type": "sermon" | "qa", "source_ids": [], "model_preset": "...", "format": ["md","ndjson","csv"] }` and returns signed URLs. Jobs run via Celery, writing assets under `STORAGE_ROOT/exports/{export_id}/`.
+- **API:** `POST /export/deliverable` accepts `{ "type": "sermon" | "qa", "source_ids": [], "model_preset": "...", "format": ["markdown","ndjson","csv"] }` and returns signed URLs. Jobs run via Celery, writing assets under `STORAGE_ROOT/exports/{export_id}/`.
 - **UI Hooks:** Verse Aggregator and document detail pages expose “Export sermon packet” and “Export Q&A digest” buttons that queue the Celery job and notify the user when ready.
 
 ## 20) CLI Batch Intelligence
