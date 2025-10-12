@@ -52,7 +52,7 @@ export default function Pagination({
       aria-label="Pagination"
       className={`pagination ${className}`.trim()}
     >
-      <div className="cluster-sm" style={{ justifyContent: "center" }}>
+      <div className="pagination-controls">
         <button
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
@@ -70,12 +70,6 @@ export default function Pagination({
                 key={`ellipsis-${index}`}
                 className="pagination-ellipsis"
                 aria-hidden="true"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "0 0.5rem",
-                  color: "var(--color-text-muted)",
-                }}
               >
                 …
               </span>
@@ -89,10 +83,9 @@ export default function Pagination({
               type="button"
               onClick={() => onPageChange(page)}
               disabled={isActive}
-              className={isActive ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
+              className={isActive ? "btn btn-primary btn-sm pagination-page" : "btn btn-secondary btn-sm pagination-page"}
               aria-label={`Page ${page}`}
               aria-current={isActive ? "page" : undefined}
-              style={{ minWidth: "2.5rem" }}
             >
               {page}
             </button>
