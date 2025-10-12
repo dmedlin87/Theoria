@@ -8,6 +8,7 @@ import sys
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -225,6 +226,7 @@ def test_sqlite_migration_backfills_contradiction_perspective(
     from theo.application.facades import database as database_module
     from theo.application.facades import settings as settings_module
     from theo.services.api.app.db import run_sql_migrations as migrations_module
+    from theo.services.api.app.db import seeds as seeds_module
 
     migrations_dir = tmp_path / "migrations"
     migrations_dir.mkdir()
@@ -246,6 +248,19 @@ def test_sqlite_migration_backfills_contradiction_perspective(
 
     settings_module.get_settings.cache_clear()
     engine = database_module.configure_engine()
+
+    def _fail_on_missing_perspective(
+        session: Session, dataset_label: str, exc: OperationalError
+    ) -> bool:
+        raise AssertionError(
+            "OperationalError encountered while seeding contradiction data"
+        ) from exc
+
+    monkeypatch.setattr(
+        seeds_module,
+        "_handle_missing_perspective_error",
+        _fail_on_missing_perspective,
+    )
 
     with engine.begin() as connection:
         connection.exec_driver_sql(

@@ -217,18 +217,27 @@ def _ensure_perspective_column(
                             dataset_label,
                             exc,
                         )
+                        session.rollback()
+                        return False
                 except Exception as exc:  # pragma: no cover - defensive
                     logger.debug(
                         "Unexpected error while backfilling perspective column for %s seeds: %s",
                         dataset_label,
                         exc,
                     )
+                    session.rollback()
+                    return False
         finally:
             if should_close and connection is not None:
                 connection.close()
 
         if _table_has_column(session, table.name, "perspective", schema=table.schema):
-            session.rollback()
+            if initially_missing:
+                try:
+                    session.commit()
+                except Exception:  # pragma: no cover - defensive
+                    session.rollback()
+                    raise
             return True
 
     session.rollback()
