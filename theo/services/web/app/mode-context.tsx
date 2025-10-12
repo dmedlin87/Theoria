@@ -10,6 +10,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -140,9 +141,52 @@ function getModeSummary(mode: ResearchMode): string {
 export function ModeSwitcher(): JSX.Element {
   const { mode, modes, setMode } = useMode();
   const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipWrapperRef = useRef<HTMLDivElement>(null);
+  const tooltipId = useId();
+
+  const handleFocusOut = useCallback(
+    (event: React.FocusEvent<HTMLDivElement>) => {
+      const nextFocused = event.relatedTarget as Node | null;
+      if (!tooltipWrapperRef.current?.contains(nextFocused)) {
+        setShowTooltip(false);
+      }
+    },
+    [],
+  );
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      setShowTooltip(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showTooltip) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!tooltipWrapperRef.current?.contains(event.target as Node)) {
+        setShowTooltip(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [showTooltip]);
 
   return (
-    <div className="mode-switcher-compact" aria-live="polite">
+    <div
+      className="mode-switcher-compact"
+      aria-live="polite"
+      ref={tooltipWrapperRef}
+      onBlurCapture={handleFocusOut}
+      onKeyDown={handleKeyDown}
+    >
       <div className="mode-switcher-compact__control">
         <label htmlFor="mode-selector" className="mode-switcher-compact__label">
           Mode
@@ -164,8 +208,10 @@ export function ModeSwitcher(): JSX.Element {
           type="button"
           className="mode-switcher-compact__info"
           onClick={() => setShowTooltip(!showTooltip)}
-          onBlur={() => setTimeout(() => setShowTooltip(false), 150)}
           aria-label="Show mode information"
+          aria-expanded={showTooltip}
+          aria-controls={tooltipId}
+          aria-describedby={showTooltip ? tooltipId : undefined}
           title="Learn about research modes"
         >
           ?
@@ -175,7 +221,11 @@ export function ModeSwitcher(): JSX.Element {
         {mode.label} — {getModeSummary(mode)}
       </p>
       {showTooltip && (
-        <div className="mode-switcher-compact__tooltip" role="tooltip">
+        <div
+          className="mode-switcher-compact__tooltip"
+          role="tooltip"
+          id={tooltipId}
+        >
           <div className="mode-switcher-compact__tooltip-header">
             <h4 className="mode-switcher-compact__tooltip-title">{mode.label} mode</h4>
             <button
