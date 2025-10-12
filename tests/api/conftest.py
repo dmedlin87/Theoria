@@ -75,6 +75,62 @@ def _disable_migrations(
                 return False
             return not any(column.get("name") == "perspective" for column in columns)
 
+    def _apply_sqlite_perspective_sql(engine, migrations_path) -> list[str]:
+        migration_dir = (
+            Path(migrations_path)
+            if migrations_path is not None
+            else migrations_module.MIGRATIONS_PATH
+        )
+        migration_name = getattr(
+            migrations_module,
+            "_SQLITE_PERSPECTIVE_MIGRATION",
+            "20250129_add_perspective_to_contradiction_seeds.sql",
+        )
+        migration_path = Path(migration_dir) / migration_name
+        if not migration_path.exists():
+            return []
+
+        try:
+            sql = migration_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+
+        try:
+            statements = migrations_module._split_sql_statements(sql)
+        except Exception:
+            return []
+
+        applied = False
+        try:
+            with engine.begin() as connection:
+                for statement in statements:
+                    try:
+                        if migrations_module._sqlite_add_column_exists(
+                            connection, statement
+                        ):
+                            continue
+                        connection.exec_driver_sql(statement)
+                        applied = True
+                    except Exception:
+                        # If the targeted migration fails we fall back to the
+                        # legacy behaviour and let the caller retry via the full
+                        # migration runner.
+                        return []
+        except Exception:
+            return []
+
+        if not applied:
+            return []
+
+        try:
+            recreated = migrations_module._sqlite_has_column(
+                engine, "contradiction_seeds", "perspective"
+            )
+        except Exception:
+            return []
+
+        return [migration_path.name] if recreated else []
+
     def _ensure_sqlite_perspective(
         engine,
         *,
@@ -83,14 +139,21 @@ def _disable_migrations(
     ) -> list[str]:
         if not _needs_sqlite_perspective(engine):
             return []
+
         try:
-            try:
-                Base.metadata.create_all(bind=engine)
-            except Exception:
-                # If table creation fails we still attempt the targeted migration
-                # below; the most important aspect is ensuring the ``perspective``
-                # column becomes available for the seed loaders.
-                pass
+            Base.metadata.create_all(bind=engine)
+        except Exception:
+            # ``create_all`` may fail on partially initialised databases. We only
+            # care about ensuring the contradiction seeds table exposes the
+            # ``perspective`` column, so failures here are ignored and handled by
+            # the migration attempts below.
+            pass
+
+        applied = _apply_sqlite_perspective_sql(engine, migrations_path)
+        if applied:
+            return applied
+
+        try:
             return original_run_sql_migrations(
                 engine=engine,
                 migrations_path=migrations_path,
