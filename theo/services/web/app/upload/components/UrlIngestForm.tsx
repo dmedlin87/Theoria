@@ -33,7 +33,7 @@ export default function UrlIngestForm({
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="card">
       <h3 className="panel__title mb-3">Ingest URL</h3>
-      <fieldset disabled={isSubmitting} className="stack-md" style={{ border: "none", padding: 0 }}>
+      <fieldset disabled={isSubmitting} className="stack-md form-fieldset">
         <div className="form-field">
           <label htmlFor="url-input" className="form-label">
             URL

@@ -1622,6 +1622,12 @@ section + section {
   margin: 0;
 }
 
+.form-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
 /* Button Utilities */
 .btn {
   display: inline-flex;
@@ -2113,6 +2119,238 @@ section + section {
   }
 }
 
+/* Upload Page Components */
+.upload-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+  color: var(--color-text-primary);
+}
+
+.page-description {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+  line-height: 1.6;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+  color: var(--color-text-primary);
+}
+
+/* Simple Ingest Form */
+.simple-ingest-section {
+  margin-bottom: var(--space-4);
+}
+
+.simple-ingest-fieldset {
+  border: 1.5px solid var(--color-border-default);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.simple-ingest-fieldset:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.simple-ingest-legend {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  padding: 0 var(--space-2);
+}
+
+.simple-ingest-details {
+  margin-top: var(--space-3);
+}
+
+.simple-ingest-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-accent);
+  padding: var(--space-2) 0;
+  user-select: none;
+}
+
+.simple-ingest-summary:hover {
+  text-decoration: underline;
+}
+
+.simple-ingest-summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.post-batch-fieldset {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+}
+
+.post-batch-fieldset legend {
+  padding: 0 var(--space-1);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+}
+
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--color-accent);
+}
+
+.checkbox-label:hover {
+  color: var(--color-text-primary);
+}
+
+.simple-ingest-progress {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.progress-list {
+  padding-left: var(--space-4);
+  margin-top: var(--space-2);
+  display: grid;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+/* Manual Upload Section */
+.upload-manual-section {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  background: var(--color-surface);
+}
+
+.upload-manual-summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: var(--color-text-primary);
+  padding: var(--space-2);
+  user-select: none;
+}
+
+.upload-manual-summary:hover {
+  color: var(--color-accent);
+}
+
+.upload-manual-summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.upload-manual-forms {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Jobs Section */
+.upload-jobs-section {
+  margin-top: var(--space-5);
+}
+
+.jobs-table-wrapper {
+  overflow-x: auto;
+}
+
+.jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.jobs-table th {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: 1.5px solid var(--color-border-subtle);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  background: var(--color-surface-muted);
+}
+
+.jobs-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.jobs-table tbody tr:hover {
+  background: var(--color-surface-muted);
+}
+
+/* Badge components for job status */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  text-transform: capitalize;
+}
+
+.badge-success {
+  background: var(--color-positive-soft);
+  color: var(--color-positive);
+}
+
+.badge-danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.badge-secondary {
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+/* Spinner for loading states */
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--color-border-subtle);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spinner-spin 0.6s linear infinite;
+  margin-right: var(--space-1);
+  vertical-align: middle;
+}
+
+@keyframes spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 720px) {
   .chat-workspace {
     padding: 1.25rem;
@@ -2120,5 +2358,22 @@ section + section {
 
   .chat-form-actions {
     justify-content: flex-start;
+  }
+
+  .upload-page {
+    padding: var(--space-3);
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
+  }
+
+  .simple-ingest-fieldset,
+  .upload-manual-section {
+    padding: var(--space-3);
   }
 }

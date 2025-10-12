@@ -31,7 +31,7 @@ export default function FileUploadForm({
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="card">
       <h3 className="panel__title mb-3">Upload File</h3>
-      <fieldset disabled={isUploading} className="stack-md" style={{ border: "none", padding: 0 }}>
+      <fieldset disabled={isUploading} className="stack-md form-fieldset">
         <div className="form-field">
           <label htmlFor="file-upload" className="form-label">
             Source file

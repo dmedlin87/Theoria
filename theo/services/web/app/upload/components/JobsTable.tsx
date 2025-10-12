@@ -33,7 +33,7 @@ export default function JobsTable({ jobs }: JobsTableProps): JSX.Element {
   }
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div className="jobs-table-wrapper">
       <table className="jobs-table">
         <thead>
           <tr>
@@ -55,39 +55,13 @@ export default function JobsTable({ jobs }: JobsTableProps): JSX.Element {
               </td>
               <td className="text-sm text-muted">{job.document_id ?? "—"}</td>
               <td className="text-sm text-muted">{formatTimestamp(job.updated_at)}</td>
-              <td className="text-sm" style={{ color: job.error ? "var(--color-danger)" : "var(--color-text-muted)" }}>
+              <td className={`text-sm ${job.error ? "text-danger" : "text-muted"}`}>
                 {job.error || ""}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-
-      <style jsx>{`
-        .jobs-table {
-          width: 100%;
-          border-collapse: collapse;
-          min-width: 640px;
-        }
-
-        .jobs-table th {
-          text-align: left;
-          padding: var(--space-2);
-          border-bottom: 1.5px solid var(--color-border-subtle);
-          font-weight: 600;
-          color: var(--color-text-primary);
-          background: var(--color-surface-muted);
-        }
-
-        .jobs-table td {
-          padding: var(--space-2);
-          border-bottom: 1px solid var(--color-border-subtle);
-        }
-
-        .jobs-table tbody tr:hover {
-          background: var(--color-surface-muted);
-        }
-      `}</style>
     </div>
   );
 }
