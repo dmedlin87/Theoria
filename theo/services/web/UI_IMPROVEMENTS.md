@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the comprehensive UI improvements made to TheoEngine's web application, including new utility classes, shared components, refactored pages, and enhanced responsive design.
+This document describes the comprehensive UI improvements made to Theoria's web application, including new utility classes, shared components, refactored pages, and enhanced responsive design.
 
 ---
 

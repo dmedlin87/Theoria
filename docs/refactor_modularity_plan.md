@@ -1,6 +1,6 @@
 # Refactor Roadmap for Modularity and Resilience
 
-This document consolidates the previously proposed refactor tasks with the most impactful follow-up recommendations. The focus is on maximising modularity and ensuring robust error handling throughout the TheoEngine codebase.
+This document consolidates the previously proposed refactor tasks with the most impactful follow-up recommendations. The focus is on maximising modularity and ensuring robust error handling throughout the Theoria codebase.
 
 ## 1. Establish an Application Composition Root
 - Replace the hard-coded router tuple in `theo/app/main.py` with a discovery-driven registry so each feature self-registers its HTTP, worker, and scheduled jobs surfaces.

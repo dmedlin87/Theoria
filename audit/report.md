@@ -1,4 +1,4 @@
-# TheoEngine Code Audit Report
+# Theoria Code Audit Report
 
 ## Executive Summary
 

@@ -1,4 +1,4 @@
-# UI/UX Review: TheoEngine Web Application
+# UI/UX Review: Theoria Web Application
 
 **Review Date:** January 2025  
 **Reviewer:** Comprehensive Analysis  
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-TheoEngine demonstrates **strong foundational UI/UX architecture** with a well-designed design system, comprehensive documentation, and modern component patterns. However, the application suffers from **inconsistent adoption** of its own design system, resulting in technical debt across 45+ files with inline styling and incomplete refactoring.
+Theoria demonstrates **strong foundational UI/UX architecture** with a well-designed design system, comprehensive documentation, and modern component patterns. However, the application suffers from **inconsistent adoption** of its own design system, resulting in technical debt across 45+ files with inline styling and incomplete refactoring.
 
 ### Overall Score: 7.2/10
 
@@ -682,7 +682,7 @@ npm install -D @percy/cli
 
 ### Against Modern Web Apps
 
-| Criteria | TheoEngine | Industry Standard | Gap |
+| Criteria | Theoria | Industry Standard | Gap |
 |----------|-----------|-------------------|-----|
 | Design System | 9/10 | 9/10 | ✅ Equal |
 | Component Library | 6/10 | 9/10 | ❌ -3 |
@@ -696,7 +696,7 @@ npm install -D @percy/cli
 
 ## 12. Conclusion
 
-TheoEngine has **excellent bones** with a well-architected design system and thoughtful component patterns. The primary challenge is **following through on the refactoring plan** already documented.
+Theoria has **excellent bones** with a well-architected design system and thoughtful component patterns. The primary challenge is **following through on the refactoring plan** already documented.
 
 ### The Good News
 Your team has already:

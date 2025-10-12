@@ -1,6 +1,6 @@
-# Contributing to TheoEngine
+# Contributing to Theoria
 
-Thank you for investing time into TheoEngine! This guide captures the current development workflow and the near-term testing plan captured in [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md).
+Thank you for investing time into Theoria! This guide captures the current development workflow and the near-term testing plan captured in [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md).
 
 ## Prerequisites
 - Python 3.11 with `pipx` or virtualenv management.

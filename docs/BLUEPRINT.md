@@ -133,7 +133,7 @@ EMBEDDING_MODEL=BAAI/bge-m3
 EMBEDDING_DIM=1024
 MAX_CHUNK_TOKENS=900
 DOC_MAX_PAGES=5000
-USER_AGENT="TheoEngine/1.0"
+USER_AGENT="Theoria/1.0"
 
 services/api/requirements.txt
 fastapi[all]==0.115.*

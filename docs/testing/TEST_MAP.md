@@ -1,4 +1,4 @@
-# TheoEngine Test Map
+# Theoria Test Map
 
 ## Inventory Overview
 

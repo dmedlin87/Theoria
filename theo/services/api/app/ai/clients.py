@@ -49,7 +49,7 @@ class AIClientSettings:
     backoff_max: float = 30.0
     jitter: float = 0.0
     retryable_statuses: tuple[int, ...] = (408, 425, 429, 500, 502, 503, 504)
-    user_agent: str = "TheoEngine-AIClient/1.0"
+    user_agent: str = "Theoria-AIClient/1.0"
     log_metadata: dict[str, Any] = field(default_factory=lambda: {"component": "ai-client"})
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("theo.services.api.ai.clients")

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Intelligent all-in-one runner for TheoEngine (API + Web)
+    Intelligent all-in-one runner for Theoria (API + Web)
 
 .DESCRIPTION
     Automatically detects environment, checks prerequisites, and starts services.
@@ -269,7 +269,7 @@ function Initialize-EnvironmentFiles {
         } else {
             Write-Warn ".env.example not found, creating minimal .env"
             @"
-# TheoEngine Configuration
+# Theoria Configuration
 database_url=sqlite:///./theo.db
 storage_root=./storage
 redis_url=redis://localhost:6379/0
@@ -289,7 +289,7 @@ API_BASE_URL=http://127.0.0.1:$Port
     if (-not (Test-Path $Script:WebEnvFile)) {
         Write-Step "Creating web/.env.local..."
         @"
-# TheoEngine Web - Local Development
+# Theoria Web - Local Development
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:$Port
 API_BASE_URL=http://127.0.0.1:$Port
 "@ | Out-File -FilePath $Script:WebEnvFile -Encoding UTF8

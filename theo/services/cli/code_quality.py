@@ -1,4 +1,4 @@
-"""CLI helper for running TheoEngine code quality checks."""
+"""CLI helper for running Theoria code quality checks."""
 
 from __future__ import annotations
 
@@ -227,7 +227,7 @@ def code_quality(
     mypy_config: Path | None,
     strict: bool,
 ) -> None:
-    """Run TheoEngine code quality checks from the command line."""
+    """Run Theoria code quality checks from the command line."""
 
     checks = _build_checks(
         ruff_paths,
