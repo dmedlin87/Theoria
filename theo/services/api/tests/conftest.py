@@ -11,6 +11,11 @@ from pathlib import Path
 import pytest
 from fastapi import Request as FastAPIRequest
 
+pytest_plugins = (
+    "theo.tests.coverage_stub",
+    "theo.tests.pgvector_harness",
+)
+
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("THEO_API_KEYS", "[\"pytest-default-key\"]")
 os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
@@ -25,10 +30,13 @@ from theo.services.api.app.security import require_principal
 
 
 def _use_pgvector_backend(request: pytest.FixtureRequest) -> bool:
-    return bool(
-        request.config.getoption("use_pgvector")
-        or os.environ.get("PYTEST_USE_PGVECTOR")
-    )
+    try:
+        cli_flag = bool(request.config.getoption("use_pgvector"))
+    except (ValueError, AttributeError):
+        cli_flag = False
+
+    env_flag = os.environ.get("PYTEST_USE_PGVECTOR")
+    return bool(cli_flag or env_flag)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -104,8 +112,3 @@ def bypass_authentication(request: pytest.FixtureRequest) -> Generator[None, Non
         yield
     finally:
         app.dependency_overrides.pop(require_principal, None)
-
-
-
-
-
