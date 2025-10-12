@@ -98,10 +98,20 @@ export function SavedSearchControls({
                     )}
                   </div>
                   <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <button type="button" onClick={() => { void onApplySavedSearch(saved); }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void onApplySavedSearch(saved);
+                      }}
+                      aria-label={`Load “${saved.name}” saved search`}
+                    >
                       Load preset
                     </button>
-                    <button type="button" onClick={() => onDeleteSavedSearch(saved.id)}>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteSavedSearch(saved.id)}
+                      aria-label={`Delete “${saved.name}” saved search`}
+                    >
                       Delete
                     </button>
                   </div>
