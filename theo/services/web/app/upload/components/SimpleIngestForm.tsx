@@ -88,6 +88,7 @@ export default function SimpleIngestForm({
   const [collection, setCollection] = useState(DEFAULT_COLLECTION);
   const [author, setAuthor] = useState(DEFAULT_AUTHOR);
   const [metadata, setMetadata] = useState("");
+  const [metadataError, setMetadataError] = useState<string | null>(null);
   const [dryRun, setDryRun] = useState(false);
   const [postBatch, setPostBatch] = useState<string[]>([]);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -123,9 +124,13 @@ export default function SimpleIngestForm({
         if (parsed && typeof parsed === "object") {
           Object.assign(parsedMetadata, parsed as Record<string, unknown>);
         }
+        setMetadataError(null);
       } catch {
+        setMetadataError("Additional metadata must be valid JSON.");
         return;
       }
+    } else {
+      setMetadataError(null);
     }
 
     const payload: {
@@ -257,6 +262,7 @@ export default function SimpleIngestForm({
                   placeholder='{"tags":["Advent"],"year":2024}'
                   className="form-textarea"
                 />
+                {metadataError && <p className="form-error mt-1">{metadataError}</p>}
               </div>
 
               <fieldset className="post-batch-fieldset">
