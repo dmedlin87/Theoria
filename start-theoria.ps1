@@ -56,7 +56,14 @@ param(
     [string]$Profile = 'dev',
     [switch]$UseHttps = $false,
     [switch]$TelemetryOptIn = $false,
-    [switch]$TelemetryOptOut = $false
+    [switch]$TelemetryOptOut = $false,
+    [ValidateSet('blue','green')]
+    [string]$ActiveDeploymentColor = 'blue',
+    [string]$ConfigPath = (Join-Path $PSScriptRoot 'scripts/service-config.json'),
+    [switch]$EnableAlerts = $false,
+    [switch]$EnableProfiling = $false,
+    [int]$MetricsPort = 0,
+    [string]$MetricsFile = $null
 )
 
 $ErrorActionPreference = 'Stop'
