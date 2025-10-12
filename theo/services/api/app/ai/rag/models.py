@@ -29,6 +29,8 @@ class RAGAnswer(APIModel):
     model_name: str | None = None
     model_output: str | None = None
     guardrail_profile: dict[str, str] | None = None
+    critique: "ReasoningCritique | None" = None
+    revision: "RevisionDetails | None" = None
 
     @model_serializer(mode="wrap")
     def _include_guardrail_profile(self, handler):
@@ -38,6 +40,32 @@ class RAGAnswer(APIModel):
         if isinstance(data, MutableMapping) and "guardrail_profile" not in data:
             data["guardrail_profile"] = None
         return data
+
+
+class FallacyWarningModel(APIModel):
+    fallacy_type: str
+    severity: str
+    description: str
+    matched_text: str
+    suggestion: str | None = None
+
+
+class ReasoningCritique(APIModel):
+    reasoning_quality: int
+    fallacies_found: list[FallacyWarningModel]
+    weak_citations: list[str]
+    alternative_interpretations: list[str]
+    bias_warnings: list[str]
+    recommendations: list[str]
+
+
+class RevisionDetails(APIModel):
+    original_answer: str
+    revised_answer: str
+    critique_addressed: list[str]
+    improvements: str
+    quality_delta: int
+    revised_critique: ReasoningCritique
 
 
 class VerseCopilotResponse(APIModel):
@@ -93,9 +121,12 @@ __all__ = [
     "ComparativeAnalysisResponse",
     "CorpusCurationReport",
     "DevotionalResponse",
+    "FallacyWarningModel",
     "MultimediaDigestResponse",
     "RAGAnswer",
     "RAGCitation",
+    "ReasoningCritique",
+    "RevisionDetails",
     "SermonPrepResponse",
     "VerseCopilotResponse",
 ]

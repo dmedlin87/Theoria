@@ -29,12 +29,14 @@ class FallacyDetector:
 
     # Informal fallacies
     AD_HOMINEM = re.compile(
-        r"\b(?:he|she|they|author|scholar)\s+(?:is|are|was)\s+(?:biased|liberal|conservative|unqualified|ignorant)",
+        r"\b(?:he|she|they|author|scholar|critic(?:s)?|skeptic(?:s)?|opponent(?:s)?)\s+"
+        r"(?:is|are|was)\s+(?:biased|liberal|conservative|unqualified|ignorant)",
         re.IGNORECASE,
     )
 
     APPEAL_TO_AUTHORITY = re.compile(
-        r"\b(?:famous|renowned|expert|scholar|professor)\s+\w+\s+(?:says|claims|argues|teaches)\s+(?:that|this)",
+        r"\b(?:famous|renowned|expert|scholar|professor)(?:\s+\w+){1,3}\s+"
+        r"(?:says|claims|argues|teaches)\s+(?:that|this)",
         re.IGNORECASE,
     )
 
@@ -55,7 +57,7 @@ class FallacyDetector:
 
     # Theological-specific fallacies
     PROOF_TEXTING = re.compile(
-        r"(?:[A-Z][a-z]+\.?\s*\d+:\d+)(?:\s*,\s*[A-Z][a-z]+\.?\s*\d+:\d+){4,}",  # 5+ rapid-fire citations
+        r"(?:[A-Z][a-z]+\.?\s*\d+(?::\d+|\.\d+))(?:\s*,\s*[A-Z][a-z]+\.?\s*\d+(?::\d+|\.\d+)){4,}",
     )
 
     VERSE_ISOLATION = re.compile(

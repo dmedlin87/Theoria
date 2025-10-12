@@ -13,7 +13,10 @@ from theo.services.api.app.ai.reasoning.chain_of_thought import (
     parse_chain_of_thought,
 )
 from theo.services.api.app.ai.reasoning.insights import InsightDetector
-from theo.services.api.app.ai.reasoning.metacognition import critique_reasoning
+from theo.services.api.app.ai.reasoning.metacognition import (
+    critique_reasoning,
+    revise_with_critique,
+)
 from theo.services.api.app.ai.rag.models import RAGCitation
 
 
@@ -270,6 +273,111 @@ class TestMetacognition:
 
         assert critique.reasoning_quality >= 65
         assert len(critique.fallacies_found) == 0
+
+
+class DummyRevisionClient:
+    """Simple stand-in for the language model client during tests."""
+
+    def __init__(self, completion: str) -> None:
+        self._completion = completion
+        self.calls = 0
+        self.last_prompt: str | None = None
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        temperature: float = 0.2,
+        max_output_tokens: int = 800,
+        cache_key: str | None = None,
+    ) -> str:
+        self.calls += 1
+        self.last_prompt = prompt
+        return self._completion
+
+
+class TestRevision:
+    """Tests for critique-driven revision."""
+
+    def test_revise_with_critique_resolves_fallacy(self):
+        """LLM revision should address detected fallacies."""
+
+        original_answer = (
+            "Skeptics are ignorant, so their objections fail; Paul plainly proves the point. "
+            "Sources: [1]"
+        )
+        citations = [
+            {
+                "index": 1,
+                "snippet": "Romans 3:23 emphasises that all people depend on grace.",
+                "passage_id": "p1",
+                "osis": "Rom.3.23",
+                "anchor": "context",
+            }
+        ]
+
+        critique = critique_reasoning(original_answer, original_answer, citations)
+        assert any(f.fallacy_type == "ad_hominem" for f in critique.fallacies_found)
+
+        client = DummyRevisionClient(
+            """
+<revised_answer>Paul's argument should focus on the shared need for grace that Romans 3:23 highlights, addressing objections with evidence rather than personal attacks. Sources: [1]</revised_answer>
+            """.strip()
+        )
+
+        result = revise_with_critique(
+            original_answer=original_answer,
+            critique=critique,
+            client=client,
+            model="test-model",
+            reasoning_trace=original_answer,
+            citations=citations,
+        )
+
+        assert result.revised_answer != original_answer
+        assert any("Resolved fallacy" in item for item in result.critique_addressed)
+        assert result.quality_delta >= 0
+        assert result.revised_critique.reasoning_quality >= critique.reasoning_quality
+        assert client.calls == 1
+        assert client.last_prompt is not None and "ad_hominem" in client.last_prompt
+
+    def test_revise_with_critique_handles_plain_completion(self):
+        """Revision should handle completions without XML tags."""
+
+        original_answer = (
+            "The passage clearly proves the doctrine without nuance or counterpoint. Sources: [1]"
+        )
+        citations = [
+            {
+                "index": 1,
+                "snippet": "The text calls the community to humility and repentance.",
+                "passage_id": "p2",
+                "osis": "Mic.6.8",
+                "anchor": "context",
+            }
+        ]
+
+        critique = critique_reasoning(original_answer, original_answer, citations)
+        assert critique.bias_warnings, "Expected overconfidence bias to be flagged"
+
+        client = DummyRevisionClient(
+            "The passage invites humility and justice, reminding readers to walk with God in grace. Sources: [1]"
+        )
+
+        result = revise_with_critique(
+            original_answer=original_answer,
+            critique=critique,
+            client=client,
+            model="test-model",
+            reasoning_trace=original_answer,
+            citations=citations,
+        )
+
+        assert result.revised_answer.startswith("The passage invites humility")
+        assert "Mitigated bias" in " ".join(result.critique_addressed)
+        assert result.improvements
+        assert result.revised_critique.reasoning_quality >= critique.reasoning_quality
 
 
 @pytest.fixture
