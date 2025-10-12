@@ -84,10 +84,48 @@ def _determine_export_id(payload: DeliverableRequest) -> str:
     return generate_export_id()
 
 
+_DELIVERABLE_FORMAT_ALIASES = {
+    "md": "markdown",
+}
+_DELIVERABLE_FORMATS = {"markdown", "ndjson", "csv", "pdf"}
+
+
 def _normalise_formats(formats: Sequence[str] | None) -> list[str]:
     if not formats:
         return ["markdown"]
-    return [fmt.lower() for fmt in formats]
+
+    normalised: list[str] = []
+    seen: set[str] = set()
+    for raw in formats:
+        if raw is None:
+            continue
+        fmt = raw.strip().lower()
+        if not fmt:
+            continue
+        fmt = _DELIVERABLE_FORMAT_ALIASES.get(fmt, fmt)
+        if fmt not in _DELIVERABLE_FORMATS:
+            allowed = ", ".join(sorted(_DELIVERABLE_FORMATS))
+            raise ExportError(
+                f"Unsupported deliverable format: {raw}",
+                code="EXPORT_UNSUPPORTED_FORMAT",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                severity=Severity.USER,
+                hint=f"Choose one of: {allowed}.",
+            )
+        if fmt not in seen:
+            normalised.append(fmt)
+            seen.add(fmt)
+
+    if not normalised:
+        raise ExportError(
+            "At least one deliverable format is required",
+            code="EXPORT_MISSING_FORMAT",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Provide a supported format when exporting a deliverable.",
+        )
+
+    return normalised
 
 
 @router.post("/citations", responses=_BAD_REQUEST_RESPONSE)
