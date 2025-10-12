@@ -156,6 +156,44 @@ def _ensure_perspective_column(
     if _table_has_column(session, table.name, "perspective", schema=table.schema):
         return True
 
+    bind = session.get_bind()
+    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+    if dialect_name == "sqlite" and bind is not None:
+        connection: Connection | None = None
+        should_close = False
+        try:
+            if isinstance(bind, Engine):
+                connection = bind.connect()
+                should_close = True
+            else:
+                connection = bind  # type: ignore[assignment]
+
+            if connection is not None:
+                statement = f'ALTER TABLE "{table.name}" ADD COLUMN perspective TEXT'
+                try:
+                    connection.exec_driver_sql(statement)
+                except OperationalError as exc:  # pragma: no cover - duplicate column
+                    message = str(getattr(exc, "orig", exc)).lower()
+                    duplicate_indicators = ("duplicate column", "already exists")
+                    if not any(indicator in message for indicator in duplicate_indicators):
+                        logger.debug(
+                            "Failed to backfill perspective column for %s seeds: %s",
+                            dataset_label,
+                            exc,
+                        )
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug(
+                        "Unexpected error while backfilling perspective column for %s seeds: %s",
+                        dataset_label,
+                        exc,
+                    )
+        finally:
+            if should_close and connection is not None:
+                connection.close()
+
+        if _table_has_column(session, table.name, "perspective", schema=table.schema):
+            return True
+
     session.rollback()
     logger.warning(
         "Skipping %s seeds because 'perspective' column is missing", dataset_label
@@ -674,11 +712,20 @@ def _safe_seed(
 def seed_reference_data(session: Session) -> None:
     """Entry point for loading all bundled reference datasets."""
 
-    _safe_seed(session, seed_contradiction_claims, "contradiction")
-    _safe_seed(session, seed_harmony_claims, "harmony")
-    _safe_seed(session, seed_commentary_excerpts, "commentary excerpt")
-    _run_seed_with_perspective_guard(session, seed_contradiction_claims, "contradiction")
-    _run_seed_with_perspective_guard(session, seed_harmony_claims, "harmony")
-    _run_seed_with_perspective_guard(session, seed_commentary_excerpts, "commentary excerpt")
+    perspective_guarded_seeders = (
+        (ContradictionSeed.__table__, seed_contradiction_claims, "contradiction"),
+        (HarmonySeed.__table__, seed_harmony_claims, "harmony"),
+        (
+            CommentaryExcerptSeed.__table__,
+            seed_commentary_excerpts,
+            "commentary excerpt",
+        ),
+    )
+
+    for table, loader, label in perspective_guarded_seeders:
+        if not _ensure_perspective_column(session, table, label):
+            continue
+        _safe_seed(session, loader, label)
+        _run_seed_with_perspective_guard(session, loader, label)
     seed_geo_places(session)
     seed_openbible_geo(session)
