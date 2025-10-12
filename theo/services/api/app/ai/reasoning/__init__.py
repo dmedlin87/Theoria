@@ -10,7 +10,7 @@ from .hypotheses import (
     update_hypothesis_confidence,
 )
 from .insights import Insight, InsightDetector, detect_insights
-from .metacognition import Critique, critique_reasoning, revise_with_critique
+from .metacognition import Critique, RevisionResult, critique_reasoning, revise_with_critique
 from .perspectives import PerspectiveSynthesis, synthesize_perspectives
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     "InsightDetector",
     "detect_insights",
     "Critique",
+    "RevisionResult",
     "critique_reasoning",
     "revise_with_critique",
     "PerspectiveSynthesis",

@@ -53,11 +53,20 @@ from .models import (
     ComparativeAnalysisResponse,
     CorpusCurationReport,
     DevotionalResponse,
+    FallacyWarningModel,
     MultimediaDigestResponse,
     RAGAnswer,
     RAGCitation,
+    ReasoningCritique,
+    RevisionDetails,
     SermonPrepResponse,
     VerseCopilotResponse,
+)
+from ..reasoning.metacognition import (
+    Critique,
+    RevisionResult,
+    critique_reasoning,
+    revise_with_critique,
 )
 from .retrieval import record_used_citation_feedback, search_passages
 
@@ -400,12 +409,86 @@ class GuardedAnswerPipeline:
                     output_digest=f"status={validation_result.get('status', 'passed')}",
                 )
 
+        critique_schema: ReasoningCritique | None = None
+        revision_schema: RevisionDetails | None = None
+        original_model_output = model_output
+
+        if model_output:
+            citation_payloads = [
+                citation.model_dump(exclude_none=True)
+                for citation in citations
+            ]
+            try:
+                critique_obj = critique_reasoning(
+                    reasoning_trace=model_output,
+                    answer=model_output,
+                    citations=citation_payloads,
+                )
+            except Exception as exc:  # pragma: no cover - defensive guard
+                LOGGER.warning("Failed to critique model output", exc_info=exc)
+            else:
+                critique_schema = _critique_to_schema(critique_obj)
+                if _should_attempt_revision(critique_obj) and selected_model is not None:
+                    try:
+                        revision_client = selected_model.build_client()
+                        revision_result = revise_with_critique(
+                            original_answer=model_output,
+                            critique=critique_obj,
+                            client=revision_client,
+                            model=selected_model.model,
+                            reasoning_trace=model_output,
+                            citations=citation_payloads,
+                        )
+                    except GenerationError as exc:
+                        LOGGER.warning("Revision attempt failed: %s", exc)
+                        if self.recorder:
+                            self.recorder.log_step(
+                                tool="rag.revise",
+                                action="revise_with_critique",
+                                status="failed",
+                                input_payload={
+                                    "original_quality": critique_obj.reasoning_quality,
+                                },
+                                output_digest=str(exc),
+                                error_message=str(exc),
+                            )
+                    else:
+                        revision_schema = _revision_to_schema(revision_result)
+                        if revision_result.revised_answer.strip():
+                            model_output = revision_result.revised_answer
+                        log_workflow_event(
+                            "workflow.reasoning_revision",
+                            workflow="rag",
+                            status="applied",
+                            quality_delta=revision_result.quality_delta,
+                            addressed=len(revision_result.critique_addressed),
+                        )
+                        if self.recorder:
+                            self.recorder.log_step(
+                                tool="rag.revise",
+                                action="revise_with_critique",
+                                input_payload={
+                                    "original_quality": critique_obj.reasoning_quality,
+                                },
+                                output_payload={
+                                    "quality_delta": revision_result.quality_delta,
+                                    "addressed": revision_result.critique_addressed,
+                                    "revised_quality": revision_result.revised_critique.reasoning_quality,
+                                },
+                                output_digest=(
+                                    f"delta={revision_result.quality_delta}, "
+                                    f"addressed={len(revision_result.critique_addressed)}"
+                                ),
+                            )
+
         answer = RAGAnswer(
             summary=summary_text,
             citations=citations,
             model_name=model_name,
             model_output=model_output,
             guardrail_profile=guardrail_profile,
+            critique=critique_schema,
+            revision=revision_schema,
         )
 
         if cache_key and model_output and validation_result and cache_status in {
@@ -448,6 +531,13 @@ class GuardedAnswerPipeline:
                     "summary": summary_text,
                     "model_name": model_name,
                     "model_output": model_output,
+                    "original_model_output": original_model_output,
+                    "critique": critique_schema.model_dump(exclude_none=True)
+                    if critique_schema
+                    else None,
+                    "revision": revision_schema.model_dump(exclude_none=True)
+                    if revision_schema
+                    else None,
                     "cache_status": cache_status,
                     "validation": validation_result,
                 },
@@ -1363,6 +1453,57 @@ def build_sermon_prep_package(
     asset = package.get_asset(normalised)
     return asset.content, asset.media_type
 
+
+def _should_attempt_revision(critique: Critique) -> bool:
+    """Determine whether a revision pass is warranted for a critique."""
+
+    if critique.fallacies_found or critique.weak_citations or critique.bias_warnings:
+        return True
+    if critique.reasoning_quality < 80:
+        return True
+    actionable_recommendations = [
+        recommendation
+        for recommendation in critique.recommendations
+        if "acceptable" not in recommendation.lower()
+    ]
+    return bool(actionable_recommendations)
+
+
+def _critique_to_schema(critique: Critique) -> ReasoningCritique:
+    """Convert a dataclass critique into the API schema."""
+
+    fallacies = [
+        FallacyWarningModel(
+            fallacy_type=fallacy.fallacy_type,
+            severity=fallacy.severity,
+            description=fallacy.description,
+            matched_text=fallacy.matched_text,
+            suggestion=fallacy.suggestion,
+        )
+        for fallacy in critique.fallacies_found
+    ]
+
+    return ReasoningCritique(
+        reasoning_quality=critique.reasoning_quality,
+        fallacies_found=fallacies,
+        weak_citations=list(critique.weak_citations),
+        alternative_interpretations=list(critique.alternative_interpretations),
+        bias_warnings=list(critique.bias_warnings),
+        recommendations=list(critique.recommendations),
+    )
+
+
+def _revision_to_schema(result: RevisionResult) -> RevisionDetails:
+    """Convert a revision result into the API schema."""
+
+    return RevisionDetails(
+        original_answer=result.original_answer,
+        revised_answer=result.revised_answer,
+        critique_addressed=list(result.critique_addressed),
+        improvements=result.improvements,
+        quality_delta=result.quality_delta,
+        revised_critique=_critique_to_schema(result.revised_critique),
+    )
 
 
 __all__ = [
