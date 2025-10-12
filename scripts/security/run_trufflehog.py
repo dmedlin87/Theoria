@@ -75,6 +75,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     result = run_trufflehog()
+
+    if result.returncode != 0:
+        print("Trufflehog CLI failed. Aborting without parsing findings.")
+        if result.stderr:
+            print(result.stderr)
+        return result.returncode
+
     findings = load_findings(result.stdout)
 
     if args.output:
