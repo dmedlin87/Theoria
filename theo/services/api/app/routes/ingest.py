@@ -15,7 +15,11 @@ from sqlalchemy.orm import Session
 from ..core.database import get_session
 from ..core.settings import get_settings
 from ..errors import IngestionError, Severity
-from theo.services.api.app.ingest.exceptions import UnsupportedSourceError
+from ..ingest.pipeline import (
+    run_pipeline_for_file as _run_pipeline_for_file,
+    run_pipeline_for_transcript as _run_pipeline_for_transcript,
+    run_pipeline_for_url as _run_pipeline_for_url,
+)
 from ..ingest.exceptions import UnsupportedSourceError
 from ..models.documents import (
     DocumentIngestResponse,
@@ -25,6 +29,21 @@ from ..models.documents import (
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
 from theo.services.cli import ingest_folder as cli_ingest
 from ..services.ingestion_service import IngestionService, get_ingestion_service
+
+# ---------------------------------------------------------------------------
+# Compatibility exports
+# ---------------------------------------------------------------------------
+#
+# Older tests patch ``theo.services.api.app.routes.ingest.run_pipeline_for_file``
+# (and the transcript / URL variants) directly so they can intercept the raw
+# pipeline invocation.  The ingestion router now delegates work to
+# ``IngestionService`` which, in turn, calls the helpers from
+# ``theo.services.api.app.ingest.pipeline``.  Re-exporting the helpers here keeps
+# the public surface stable for the tests without having to reintroduce the
+# legacy code paths.
+run_pipeline_for_file = _run_pipeline_for_file
+run_pipeline_for_transcript = _run_pipeline_for_transcript
+run_pipeline_for_url = _run_pipeline_for_url
 
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
