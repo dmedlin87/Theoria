@@ -1,9 +1,21 @@
 "use client";
 
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 
 import type { SavedSearch } from "./SearchPageClient";
 import type { SearchFilters } from "../searchParams";
+
+const visuallyHiddenStyle: CSSProperties = {
+  border: 0,
+  clip: "rect(0 0 0 0)",
+  height: "1px",
+  margin: "-1px",
+  overflow: "hidden",
+  padding: 0,
+  position: "absolute",
+  width: "1px",
+  whiteSpace: "nowrap",
+};
 
 type SavedSearchControlsProps = {
   savedSearchName: string;
@@ -32,8 +44,12 @@ export function SavedSearchControls({
   return (
     <>
       <form onSubmit={onSubmit} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+        <label htmlFor="saved-search-name" style={visuallyHiddenStyle}>
+          Saved search name
+        </label>
         <input
           type="text"
+          id="saved-search-name"
           value={savedSearchName}
           onChange={(event) => onSavedSearchNameChange(event.target.value)}
           placeholder="Name this search"
@@ -82,10 +98,20 @@ export function SavedSearchControls({
                     )}
                   </div>
                   <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <button type="button" onClick={() => { void onApplySavedSearch(saved); }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void onApplySavedSearch(saved);
+                      }}
+                      aria-label={`Load “${saved.name}” saved search`}
+                    >
                       Load preset
                     </button>
-                    <button type="button" onClick={() => onDeleteSavedSearch(saved.id)}>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteSavedSearch(saved.id)}
+                      aria-label={`Delete “${saved.name}” saved search`}
+                    >
                       Delete
                     </button>
                   </div>
