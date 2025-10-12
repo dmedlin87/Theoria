@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiBaseUrl } from "../../../lib/api";
 import { forwardTraceHeaders } from "../../trace";
 import { createProxyErrorResponse } from "../../utils/proxyError";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   });
   forwardTraceHeaders(request.headers, outboundHeaders);
   try {
-    const response = await fetch(target, {
+    const response = await fetchWithTimeout(target, {
       method: "POST",
       headers: outboundHeaders,
       body,

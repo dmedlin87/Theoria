@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiBaseUrl } from "../../lib/api";
 import { forwardTraceHeaders } from "../trace";
 import { createProxyErrorResponse } from "../utils/proxyError";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 function buildTargetUrl(request: NextRequest): URL {
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
   forwardTraceHeaders(request.headers, requestHeaders);
   try {
-    const response = await fetch(target, {
+    const response = await fetchWithTimeout(target, {
       headers: requestHeaders,
       cache: "no-store",
     });

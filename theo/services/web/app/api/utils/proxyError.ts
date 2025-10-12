@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { TRACE_HEADER_NAMES } from "../trace";
+import { NetworkError, TimeoutError } from "./fetchWithTimeout";
 
 type ProxyErrorOptions = {
   message: string;
@@ -38,12 +39,25 @@ export function createProxyErrorResponse({
     }
   }
 
+  // Enhance message based on error type
+  let finalMessage = message;
+  let finalStatus = status;
+  
+  if (error instanceof TimeoutError) {
+    finalMessage = `${message} The request took too long to complete.`;
+    finalStatus = 504; // Gateway Timeout
+  } else if (error instanceof NetworkError) {
+    finalMessage = `${message} Unable to connect to the backend service.`;
+    finalStatus = 502; // Bad Gateway
+  }
+
   const response = NextResponse.json(
     {
-      message,
+      message: finalMessage,
       traceId,
+      errorType: error instanceof Error ? error.name : "UnknownError",
     },
-    { status, headers },
+    { status: finalStatus, headers },
   );
 
   if (error) {
