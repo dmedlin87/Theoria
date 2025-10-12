@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Callable
 
+from ...core.runtime import allow_insecure_startup
 from ...core.settings import get_settings
 from ...core.version import get_git_sha
 
@@ -45,7 +46,17 @@ class RAGCache:
     # Redis initialisation -------------------------------------------------
     def _initialise_client(self) -> Any | None:
         if self._redis_module is None:  # pragma: no cover - optional dependency
-            return None
+            if allow_insecure_startup():
+                LOGGER.warning(
+                    "Redis client library not available; guardrailed caching is"
+                    " disabled because THEO_ALLOW_INSECURE_STARTUP is enabled."
+                )
+                return None
+            raise RuntimeError(
+                "Redis support is required for RAG caching. Install the redis"
+                " dependency or set THEO_ALLOW_INSECURE_STARTUP=1 for local"
+                " testing."
+            )
         if self._client is not None:
             return self._client
         try:
@@ -55,9 +66,21 @@ class RAGCache:
                 encoding="utf-8",
                 decode_responses=True,
             )
-        except Exception:  # pragma: no cover - network/config errors
+        except Exception as exc:  # pragma: no cover - network/config errors
             LOGGER.debug("failed to initialise redis client", exc_info=True)
-            self._client = None
+            if allow_insecure_startup():
+                LOGGER.warning(
+                    "Redis initialisation failed (%s); guardrailed caching is"
+                    " disabled because THEO_ALLOW_INSECURE_STARTUP is enabled.",
+                    exc,
+                )
+                self._client = None
+            else:
+                raise RuntimeError(
+                    "Failed to connect to Redis for RAG caching. Verify redis_url"
+                    " and credentials or enable THEO_ALLOW_INSECURE_STARTUP=1 for"
+                    " local testing."
+                ) from exc
         return self._client
 
     def _execute(self, callback: Callable[[Any], Any]) -> Any | None:
