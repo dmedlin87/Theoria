@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -342,4 +342,237 @@ class EvidenceCardCreateResponse(ToolResponseBase):
     preview: Dict[str, Any] | None = Field(
         default=None,
         description="Preview payload describing the evidence card when commit=false.",
+    )
+
+
+class ResearchRunMeta(BaseModel):
+    """Metadata describing an orchestrated research run."""
+
+    app: str = Field(..., description="Canonical application name (e.g. 'Theoria').")
+    app_alias: List[str] = Field(
+        default_factory=list,
+        description="Alternate names used by clients when referring to the application.",
+    )
+    rubric_version: str = Field(..., description="Version identifier for the applied rubric.")
+    schema_version: str = Field(..., description="Version identifier for the response schema.")
+    model_final: str = Field(..., description="Model responsible for the final artifact synthesis.")
+    models_used: List[str] = Field(
+        default_factory=list,
+        description="Ordered list of all models consulted during the run.",
+    )
+    file_ids_used: List[str] = Field(
+        default_factory=list,
+        description="Identifiers for uploaded files consulted during the run.",
+    )
+    web_used: bool = Field(..., description="Flag noting whether web search was used.")
+    started_at: str = Field(..., description="ISO-8601 timestamp for when the run began.")
+    completed_at: str = Field(..., description="ISO-8601 timestamp for when the run completed.")
+
+
+class RunLogs(BaseModel):
+    """Operational notes collected while orchestrating a run."""
+
+    tools: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Structured logs for each tool invocation executed during the run.",
+    )
+    compromises: List[str] = Field(
+        default_factory=list,
+        description="Recorded deviations from the ideal execution path.",
+    )
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="Non-fatal issues surfaced during orchestration.",
+    )
+    notes: List[str] = Field(default_factory=list, description="Free-form run annotations.")
+
+
+class EvidenceCardCitation(BaseModel):
+    """Citation associated with an evidence card claim."""
+
+    title: str = Field(..., description="Title of the cited work.")
+    url: str = Field(..., description="Canonical URL for the citation.")
+    source_type: Literal["primary", "secondary", "tertiary"] = Field(
+        ...,
+        description="Classification of the cited work.",
+    )
+    accessed: str = Field(..., description="ISO formatted date indicating when the source was accessed.")
+    excerpt: str = Field(..., description="Excerpt copied from the cited work.")
+
+
+class EvidenceCardStabilityComponents(BaseModel):
+    """Breakdown of stability inputs for an evidence card."""
+
+    attestation: float | None = Field(
+        default=None,
+        description="Attestation strength score contributing to stability.",
+    )
+    consensus: float | None = Field(
+        default=None,
+        description="Scholarly consensus score contributing to stability.",
+    )
+    recency_risk: float | None = Field(
+        default=None,
+        description="Risk introduced by relying on recent sources.",
+    )
+    textual_variants: float | None = Field(
+        default=None,
+        description="Instability introduced by textual variants or manuscript issues.",
+    )
+
+
+class EvidenceCardStability(BaseModel):
+    """Aggregated stability information for an evidence card."""
+
+    score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Composite stability score for the claim (0–1).",
+    )
+    components: EvidenceCardStabilityComponents = Field(
+        default_factory=EvidenceCardStabilityComponents,
+        description="Component-level breakdown underpinning the stability score.",
+    )
+
+
+class EvidenceCardArtifact(BaseModel):
+    """Structured claim analysis captured as an evidence card."""
+
+    id: str = Field(..., description="Unique identifier for the evidence card.")
+    claim: str = Field(..., description="Precise articulation of the claim under evaluation.")
+    mode: Literal["Apologetic", "Neutral", "Skeptical"] = Field(
+        default="Neutral",
+        description="Perspective adopted while summarising the evidence.",
+    )
+    citations: List[EvidenceCardCitation] = Field(
+        default_factory=list,
+        description="Ordered list of citations supporting the claim.",
+    )
+    evidence_points: List[str] = Field(
+        default_factory=list,
+        description="Key evidence statements derived from the cited sources.",
+    )
+    counter_evidence: List[str] = Field(
+        default_factory=list,
+        description="Evidence challenging or complicating the claim.",
+    )
+    stability: EvidenceCardStability = Field(
+        ...,
+        description="Overall stability assessment for the claim.",
+    )
+    confidence: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Model confidence in the presented synthesis (0–1).",
+    )
+    open_questions: List[str] = Field(
+        default_factory=list,
+        description="Outstanding research questions surfaced during synthesis.",
+    )
+    rubric_version: str = Field(..., description="Rubric version applied while producing the card.")
+    schema_version: str = Field(..., description="Schema version describing the evidence card payload.")
+
+
+class ContradictionGraphEdge(BaseModel):
+    """Edge describing relationships within a contradiction graph."""
+
+    from_: str = Field(
+        alias="from",
+        description="Origin node identifier for the graph edge.",
+    )
+    to: str = Field(..., description="Destination node identifier for the graph edge.")
+    weight: float | None = Field(
+        default=None,
+        description="Optional weighting for the edge signalling conflict strength.",
+    )
+
+    model_config = {
+        "populate_by_name": True,
+    }
+
+
+class ContradictionArtifact(BaseModel):
+    """Description of an identified textual contradiction."""
+
+    id: str = Field(..., description="Unique identifier for the contradiction artifact.")
+    passage_a: str = Field(..., description="First passage involved in the contradiction.")
+    passage_b: str = Field(..., description="Second passage involved in the contradiction.")
+    conflict_type: Literal[
+        "chronology",
+        "genealogy",
+        "event",
+        "speech",
+        "law",
+        "number",
+        "title",
+    ] = Field(..., description="Type of conflict represented by the contradiction.")
+    notes: str = Field(..., description="Narrative explanation describing the contradiction.")
+    graph_edges: List[ContradictionGraphEdge] = Field(
+        default_factory=list,
+        description="Edges connecting passages or claims implicated in the contradiction graph.",
+    )
+
+
+class ScholarDigestArtifact(BaseModel):
+    """Summary of scholarly viewpoints for a research topic."""
+
+    id: str = Field(..., description="Unique identifier for the scholar digest artifact.")
+    topic: str = Field(..., description="Topic addressed by the digest.")
+    thesis: str = Field(..., description="High-level thesis articulated for the topic.")
+    sources: List[str] = Field(
+        default_factory=list,
+        description="List of key sources underpinning the digest.",
+    )
+    summary: str = Field(..., description="Synthesis of scholarly perspectives.")
+    gaps: List[str] = Field(
+        default_factory=list,
+        description="Known gaps or uncertainties within the scholarly coverage.",
+    )
+    next_actions: List[str] = Field(
+        default_factory=list,
+        description="Suggested follow-up actions to progress the research topic.",
+    )
+
+
+class IngestionRecordArtifact(BaseModel):
+    """Operational record capturing the state of an ingested source."""
+
+    id: str = Field(..., description="Unique identifier for the ingestion record artifact.")
+    file_id: str = Field(..., description="Identifier of the ingested file within Theo storage.")
+    source_url: str = Field(..., description="Source URL for the ingested document.")
+    status: Literal["acquired", "parsed", "indexed", "failed"] = Field(
+        ...,
+        description="Current processing status of the ingested document.",
+    )
+    notes: str = Field(..., description="Additional context or error information for the ingestion run.")
+
+
+ResearchArtifact = Union[
+    EvidenceCardArtifact,
+    ContradictionArtifact,
+    ScholarDigestArtifact,
+    IngestionRecordArtifact,
+]
+
+
+class ResearchRunEnvelope(BaseModel):
+    """Top-level response contract for orchestrated research runs."""
+
+    run_meta: ResearchRunMeta = Field(
+        ...,
+        description="Metadata describing the research run context and configuration.",
+    )
+    artifacts: List[ResearchArtifact] = Field(
+        default_factory=list,
+        description="Artifacts generated during the research run.",
+    )
+    run_logs: RunLogs = Field(
+        default_factory=RunLogs,
+        description="Operational logs recorded while running the research workflow.",
+    )
+    validation_errors: List[str] = Field(
+        default_factory=list,
+        description="Schema validation errors encountered while assembling the response.",
     )
