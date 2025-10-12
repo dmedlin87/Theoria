@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import ErrorCallout from "../components/ErrorCallout";
 import ModeChangeBanner from "../components/ModeChangeBanner";
 import UiModeToggle from "../components/UiModeToggle";
+import { useToast } from "../components/Toast";
 import { ADVANCED_TOOLS, type AdvancedToolId } from "../chat/tools";
 import ResearchPanels from "../research/ResearchPanels";
 import { fetchResearchFeatures } from "../research/features";
@@ -23,6 +24,7 @@ import QuickStartPresets from "./components/QuickStartPresets";
 import WorkflowFormFields from "./components/WorkflowFormFields";
 import WorkflowResultPanel from "./components/WorkflowResultPanel";
 import WorkflowSelector from "./components/WorkflowSelector";
+import { CopilotSkeleton } from "./components/CopilotSkeleton";
 import type {
   CopilotResult,
   FeatureFlags,
@@ -169,6 +171,19 @@ export default function CopilotPage(): JSX.Element {
   const [researchFeaturesError, setResearchFeaturesError] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<ActiveToolState | null>(null);
   const [drawerOsis, setDrawerOsis] = useState<string>("");
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    if (error) {
+      addToast({ type: "error", title: "Copilot error", message: error.message });
+    }
+  }, [error, addToast]);
+
+  useEffect(() => {
+    if (result) {
+      addToast({ type: "success", title: "Workflow complete", message: "Results are ready below." });
+    }
+  }, [result, addToast]);
 
   const verseWorkflow = useVerseWorkflow(apiClient);
   const sermonWorkflow = useSermonWorkflow(apiClient);
@@ -818,6 +833,12 @@ export default function CopilotPage(): JSX.Element {
               ) : undefined
             }
           />
+        </div>
+      )}
+
+      {isRunning && (
+        <div style={{ marginTop: "1rem" }}>
+          <CopilotSkeleton />
         </div>
       )}
 

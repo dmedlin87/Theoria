@@ -963,9 +963,11 @@ export default function SearchPageClient({
         filters: filtersToPersist,
         createdAt: Date.now(),
       };
+      let didUpdate = false;
       setSavedSearches((current) => {
         const existingIndex = current.findIndex((item) => item.name === trimmedName);
         if (existingIndex >= 0) {
+          didUpdate = true;
           const updated = [...current];
           updated[existingIndex] = nextSearch;
           return updated;
@@ -973,24 +975,41 @@ export default function SearchPageClient({
         return [...current, nextSearch].sort((a, b) => b.createdAt - a.createdAt);
       });
       setSavedSearchName("");
+      addToast({
+        type: "success",
+        title: didUpdate ? "Saved search updated" : "Saved search created",
+        message: didUpdate
+          ? `Updated saved search “${trimmedName}”.`
+          : `Saved search “${trimmedName}” is ready to reuse.`,
+      });
     },
-    [currentFilters, savedSearchName],
+    [currentFilters, savedSearchName, addToast],
   );
 
   const handleApplySavedSearch = useCallback(
     async (saved: SavedSearch) => {
       if (!isSearching) {
+        addToast({ type: "info", title: "Saved search applied", message: `Running “${saved.name}”.` });
         applyFilters(saved.filters);
         updateUrlForFilters(saved.filters);
         await runSearch(saved.filters);
       }
     },
-    [applyFilters, runSearch, updateUrlForFilters, isSearching],
+    [addToast, applyFilters, runSearch, updateUrlForFilters, isSearching],
   );
 
-  const handleDeleteSavedSearch = useCallback((id: string) => {
-    setSavedSearches((current) => current.filter((saved) => saved.id !== id));
-  }, []);
+  const handleDeleteSavedSearch = useCallback(
+    (id: string) => {
+      setSavedSearches((current) => {
+        const target = current.find((saved) => saved.id === id);
+        if (target) {
+          addToast({ type: "info", title: "Saved search removed", message: `Deleted “${target.name}”.` });
+        }
+        return current.filter((saved) => saved.id !== id);
+      });
+    },
+    [addToast],
+  );
 
   const handleExportGroup = useCallback(
     (group: DocumentGroup) => {

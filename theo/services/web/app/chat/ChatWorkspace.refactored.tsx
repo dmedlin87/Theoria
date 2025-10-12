@@ -1,9 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import {
+  ArrowRight,
+  BookOpen,
+  CheckCircle,
+  FileText,
+  Globe,
+  Search,
+  ThumbsDown,
+  ThumbsUp,
+  Upload as UploadIcon,
+} from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout";
+import { Icon } from "../components/Icon";
 import type { ChatWorkflowClient } from "../lib/chat-client";
 import { createTheoApiClient } from "../lib/api-client";
 import type { HybridSearchFilters } from "../lib/guardrails";
@@ -266,49 +278,49 @@ export default function ChatWorkspace({
             We'll keep the conversation aligned to <strong>{mode.label.toLowerCase()}</strong> emphasis while grounding
             every answer with citations you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
           </p>
-          <div className="chat-hero__actions" aria-label="Quick navigation">
-            <Link href="/search" className="chat-hero__action">
-              <span className="chat-hero__action-icon" aria-hidden="true">
-                🔍
-              </span>
-              <span className="chat-hero__action-copy">
-                <strong>Search the library</strong>
-                <span>Jump into cross-references</span>
-              </span>
-              <span className="chat-hero__action-arrow" aria-hidden="true">
-                →
-              </span>
-            </Link>
-            <Link href="/verse" className="chat-hero__action">
-              <span className="chat-hero__action-icon" aria-hidden="true">
-                📖
-              </span>
-              <span className="chat-hero__action-copy">
-                <strong>Trace a passage</strong>
-                <span>Explore every verse connection</span>
-              </span>
-              <span className="chat-hero__action-arrow" aria-hidden="true">
-                →
-              </span>
-            </Link>
-            <Link href="/upload" className="chat-hero__action">
-              <span className="chat-hero__action-icon" aria-hidden="true">
-                📤
-              </span>
-              <span className="chat-hero__action-copy">
-                <strong>Enrich your corpus</strong>
-                <span>Upload documents for future chats</span>
-              </span>
-              <span className="chat-hero__action-arrow" aria-hidden="true">
-                →
-              </span>
-            </Link>
-          </div>
+        <div className="chat-hero__actions" aria-label="Quick navigation">
+          <Link href="/search" className="chat-hero__action">
+            <span className="chat-hero__action-icon">
+              <Icon icon={Search} size="lg" />
+            </span>
+            <span className="chat-hero__action-copy">
+              <strong>Search the library</strong>
+              <span>Jump into cross-references</span>
+            </span>
+            <span className="chat-hero__action-arrow">
+              <Icon icon={ArrowRight} size="md" />
+            </span>
+          </Link>
+          <Link href="/verse" className="chat-hero__action">
+            <span className="chat-hero__action-icon">
+              <Icon icon={BookOpen} size="lg" />
+            </span>
+            <span className="chat-hero__action-copy">
+              <strong>Trace a passage</strong>
+              <span>Explore every verse connection</span>
+            </span>
+            <span className="chat-hero__action-arrow">
+              <Icon icon={ArrowRight} size="md" />
+            </span>
+          </Link>
+          <Link href="/upload" className="chat-hero__action">
+            <span className="chat-hero__action-icon">
+              <Icon icon={UploadIcon} size="lg" />
+            </span>
+            <span className="chat-hero__action-copy">
+              <strong>Enrich your corpus</strong>
+              <span>Upload documents for future chats</span>
+            </span>
+            <span className="chat-hero__action-arrow">
+              <Icon icon={ArrowRight} size="md" />
+            </span>
+          </Link>
+        </div>
         </div>
         <ul className="chat-hero__highlights" aria-label="What this workspace offers">
           <li className="chat-hero__highlight">
-            <span className="chat-hero__highlight-icon" aria-hidden="true">
-              ✅
+            <span className="chat-hero__highlight-icon">
+              <Icon icon={CheckCircle} size="lg" />
             </span>
             <div>
               <p className="chat-hero__highlight-title">Grounded answers</p>
@@ -316,8 +328,8 @@ export default function ChatWorkspace({
             </div>
           </li>
           <li className="chat-hero__highlight">
-            <span className="chat-hero__highlight-icon" aria-hidden="true">
-              🌐
+            <span className="chat-hero__highlight-icon">
+              <Icon icon={Globe} size="lg" />
             </span>
             <div>
               <p className="chat-hero__highlight-title">Perspective aware</p>
@@ -325,8 +337,8 @@ export default function ChatWorkspace({
             </div>
           </li>
           <li className="chat-hero__highlight">
-            <span className="chat-hero__highlight-icon" aria-hidden="true">
-              📝
+            <span className="chat-hero__highlight-icon">
+              <Icon icon={FileText} size="lg" />
             </span>
             <div>
               <p className="chat-hero__highlight-title">Export ready</p>
@@ -389,27 +401,27 @@ export default function ChatWorkspace({
                       className={`chat-feedback-button chat-feedback-button--positive${
                         selection === "like" ? " chat-feedback-button--active" : ""
                       }`}
-                      onClick={() => handleAssistantFeedback(entry.id, "like")}
-                      disabled={feedbackDisabled}
-                      aria-pressed={selection === "like"}
-                      aria-label="Mark response helpful"
-                    >
-                      <span aria-hidden="true">👍</span>
-                      <span className="visually-hidden">Helpful response</span>
-                    </button>
+                    onClick={() => handleAssistantFeedback(entry.id, "like")}
+                    disabled={feedbackDisabled}
+                    aria-pressed={selection === "like"}
+                    aria-label="Mark response helpful"
+                  >
+                    <Icon icon={ThumbsUp} size="md" />
+                    <span className="visually-hidden">Helpful response</span>
+                  </button>
                     <button
                       type="button"
                       className={`chat-feedback-button chat-feedback-button--negative${
                         selection === "dislike" ? " chat-feedback-button--active" : ""
                       }`}
-                      onClick={() => handleAssistantFeedback(entry.id, "dislike")}
-                      disabled={feedbackDisabled}
-                      aria-pressed={selection === "dislike"}
-                      aria-label="Mark response unhelpful"
-                    >
-                      <span aria-hidden="true">👎</span>
-                      <span className="visually-hidden">Unhelpful response</span>
-                    </button>
+                    onClick={() => handleAssistantFeedback(entry.id, "dislike")}
+                    disabled={feedbackDisabled}
+                    aria-pressed={selection === "dislike"}
+                    aria-label="Mark response unhelpful"
+                  >
+                    <Icon icon={ThumbsDown} size="md" />
+                    <span className="visually-hidden">Unhelpful response</span>
+                  </button>
                   </div>
                 )}
               </article>

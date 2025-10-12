@@ -2,6 +2,8 @@
 
 import { FormEvent, useRef, useState } from "react";
 
+import FormError from "../../components/FormError";
+
 const DEFAULT_COLLECTION = "uploads";
 const DEFAULT_AUTHOR = "Theoria";
 
@@ -262,7 +264,7 @@ export default function SimpleIngestForm({
                   placeholder='{"tags":["Advent"],"year":2024}'
                   className="form-textarea"
                 />
-                {metadataError && <p className="form-error mt-1">{metadataError}</p>}
+                <FormError message={metadataError} className="mt-1" />
               </div>
 
               <fieldset className="post-batch-fieldset">

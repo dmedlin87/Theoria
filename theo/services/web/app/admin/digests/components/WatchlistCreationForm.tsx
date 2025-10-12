@@ -1,3 +1,5 @@
+import FormError from "../../components/FormError";
+
 type WatchlistCreationFormProps = {
   name: string;
   cadence: string;
@@ -83,11 +85,7 @@ export default function WatchlistCreationForm({
         OSIS references (comma separated)
         <input value={osis} onChange={(event) => onOsisChange(event.target.value)} />
       </label>
-      {error ? (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      ) : null}
+      <FormError message={error} />
       <button type="submit" className="button" disabled={isCreating}>
         {isCreating ? "Creating…" : "Create watchlist"}
       </button>

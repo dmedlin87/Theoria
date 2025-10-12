@@ -11,6 +11,7 @@ import type { ResearchFeatureFlags } from "../../research/types";
 import ReliabilityOverviewCard from "./ReliabilityOverviewCard";
 import VerseGraphSection from "./VerseGraphSection";
 import type { VerseGraphResponse } from "./graphTypes";
+import { VerseReliabilitySkeleton, VerseResearchSkeleton } from "./VerseSkeletons";
 
 const TIMELINE_WINDOWS = ["week", "month", "quarter", "year"] as const;
 type TimelineWindow = (typeof TIMELINE_WINDOWS)[number];
@@ -364,7 +365,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
             Aggregated references for <strong>{osis}</strong>
           </p>
 
-          <Suspense fallback={<p>Loading reliability snapshot…</p>}>
+          <Suspense fallback={<VerseReliabilitySkeleton />}>
             <ReliabilityOverviewCard osis={osis} mode={activeMode} />
           </Suspense>
 
@@ -509,7 +510,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
         </div>
         {features.research ? (
           <aside aria-label="Research panels" className="panel">
-            <Suspense fallback={<p>Loading research tools…</p>}>
+            <Suspense fallback={<VerseResearchSkeleton />}>
               <ResearchPanels osis={osis} features={features} />
             </Suspense>
           </aside>
