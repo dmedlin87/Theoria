@@ -1,0 +1,101 @@
+name: Release Containers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-sign-attest:
+    name: Build, sign, and attest API image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9bb56186c5da571f2b78bb0f1e0ed4f49845d2a1
+
+      - name: Prepare image metadata
+        id: meta
+        run: |
+          OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_REF="${REGISTRY}/${OWNER}/theoria-api"
+          VERSION_TAG="${GITHUB_REF_NAME:-manual-${GITHUB_RUN_ID}}"
+          VERSION_TAG=$(echo "${VERSION_TAG}" | tr '[:upper:]' '[:lower:]' | tr '/' '-')
+          echo "image=${IMAGE_REF}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@0d103c3126aa41d772a8362f6aa67afac040f80c
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        id: build
+        uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56
+        with:
+          context: .
+          file: theo/services/api/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version_tag }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4
+        with:
+          cosign-release: 'v2.2.3'
+
+      - name: Generate CycloneDX image SBOM
+        uses: anchore/sbom-action@c7f031d9249a826a082ea14c79d3b686a51d485a
+        with:
+          image: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: sbom-image.cdx.json
+
+      - name: Sign container image with Sigstore
+        env:
+          COSIGN_YES: 'true'
+        run: |
+          cosign sign --keyless ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+
+      - name: Create provenance attestation
+        env:
+          COSIGN_YES: 'true'
+        run: |
+          cosign attest --predicate sbom-image.cdx.json --type cyclonedx ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+
+      - name: Write image metadata summary
+        run: |
+          cat <<'JSON' > image-metadata.json
+          {
+            "image": "${{ steps.meta.outputs.image }}",
+            "digest": "${{ steps.build.outputs.digest }}",
+            "tags": [
+              "${{ steps.meta.outputs.image }}:${{ github.sha }}",
+              "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version_tag }}"
+            ]
+          }
+          JSON
+
+      - name: Upload signing artifacts
+        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        with:
+          name: signed-image-metadata
+          path: |
+            sbom-image.cdx.json
+            image-metadata.json
+          if-no-files-found: error
