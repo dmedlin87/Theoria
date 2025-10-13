@@ -5,7 +5,8 @@
 // legacy exports that previously lived under app/context/ModeContext.
 
 import {
-  ReactNode,
+  type ReactNode,
+  type FocusEvent,
   createContext,
   useCallback,
   useContext,
@@ -24,7 +25,6 @@ import {
   RESEARCH_MODES,
   ResearchMode,
   ResearchModeId,
-  formatEmphasisSummary,
   isResearchModeId,
 } from "./mode-config";
 
@@ -43,51 +43,46 @@ interface ModeProviderProps {
 
 export function ModeProvider({ initialMode, children }: ModeProviderProps) {
   const router = useRouter();
-  const [modeId, setModeId] = useState<ResearchModeId>(
-    initialMode && isResearchModeId(initialMode) ? initialMode : DEFAULT_MODE_ID,
-  );
-  const hasUserInteracted = useRef(false);
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    if (typeof document === "undefined") {
-      return;
+  const [modeId, setModeId] = useState<ResearchModeId>(() => {
+    if (initialMode && isResearchModeId(initialMode)) {
+      return initialMode;
     }
-
-    let persisted: ResearchModeId | undefined;
-
+    if (typeof document === "undefined") {
+      return DEFAULT_MODE_ID;
+    }
     try {
       const stored =
         typeof window !== "undefined"
           ? window.localStorage.getItem(MODE_STORAGE_KEY)
           : null;
-
       if (stored && isResearchModeId(stored)) {
-        persisted = stored;
-      } else {
-        const cookiePrefix = `${MODE_COOKIE_KEY}=`;
-        const cookieValue = document.cookie
-          .split("; ")
-          .find((entry) => entry.startsWith(cookiePrefix))
-          ?.slice(cookiePrefix.length);
-
-        if (cookieValue && isResearchModeId(cookieValue)) {
-          persisted = cookieValue;
-        }
+        return stored;
+      }
+      const cookiePrefix = `${MODE_COOKIE_KEY}=`;
+      const cookieValue = document.cookie
+        .split("; ")
+        .find((entry) => entry.startsWith(cookiePrefix))
+        ?.slice(cookiePrefix.length);
+      if (cookieValue && isResearchModeId(cookieValue)) {
+        return cookieValue;
       }
     } catch {
-      persisted = undefined;
+      // Ignore persistence errors
     }
+    return DEFAULT_MODE_ID;
+  });
+  const hasUserInteracted = useRef(false);
+  const hasHydratedRef = useRef(typeof window === "undefined");
 
-    if (persisted) {
-      setModeId((current) => (current === persisted ? current : persisted));
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
     }
-
-    setHasHydrated(true);
+    hasHydratedRef.current = true;
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !hasHydrated) {
+    if (typeof window === "undefined" || !hasHydratedRef.current) {
       return;
     }
     try {
@@ -100,7 +95,7 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
     if (hasUserInteracted.current) {
       router.refresh();
     }
-  }, [hasHydrated, modeId, router]);
+  }, [modeId, router]);
 
   const setMode = useCallback(
     (next: ResearchModeId) => {
@@ -145,7 +140,7 @@ export function ModeSwitcher(): JSX.Element {
   const tooltipId = useId();
 
   const handleFocusOut = useCallback(
-    (event: React.FocusEvent<HTMLDivElement>) => {
+    (event: FocusEvent<HTMLDivElement>) => {
       const nextFocused = event.relatedTarget as Node | null;
       if (!tooltipWrapperRef.current?.contains(nextFocused)) {
         setShowTooltip(false);
@@ -153,13 +148,6 @@ export function ModeSwitcher(): JSX.Element {
     },
     [],
   );
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      setShowTooltip(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (!showTooltip) {
@@ -172,10 +160,18 @@ export function ModeSwitcher(): JSX.Element {
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowTooltip(false);
+      }
+    };
+
     document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [showTooltip]);
 
@@ -185,7 +181,6 @@ export function ModeSwitcher(): JSX.Element {
       aria-live="polite"
       ref={tooltipWrapperRef}
       onBlurCapture={handleFocusOut}
-      onKeyDown={handleKeyDown}
     >
       <div className="mode-switcher-compact__control">
         <label htmlFor="mode-selector" className="mode-switcher-compact__label">

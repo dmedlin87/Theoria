@@ -37,7 +37,7 @@ export default function VerseWorkflowForm({
             required
           />
           <p className="form-hint">
-            Enter a readable passage reference. We'll convert it to OSIS for you.
+            Enter a readable passage reference. We&rsquo;ll convert it to OSIS for you.
           </p>
         </div>
       ) : (

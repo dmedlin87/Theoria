@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   type ReactNode,
+  type MouseEvent,
   useState,
   useTransition,
   useEffect,
@@ -52,15 +53,18 @@ export function AppShell({
   const [clickedHref, setClickedHref] = useState<string | null>(null);
   const [navigationStatus, setNavigationStatus] = useState<string>("");
   const [isMobileNav, setIsMobileNav] = useState(false);
-  const [isNavOpen, setIsNavOpen] = useState(true);
+  const [navPanelOpen, setNavPanelOpen] = useState(true);
   const navContentRef = useRef<HTMLDivElement | null>(null);
   const navToggleRef = useRef<HTMLButtonElement | null>(null);
+  const isNavOpen = !isMobileNav || navPanelOpen;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1024px)");
 
     const updateMatches = () => {
-      setIsMobileNav(mediaQuery.matches);
+      const mobile = mediaQuery.matches;
+      setIsMobileNav(mobile);
+      setNavPanelOpen(mobile ? false : true);
     };
 
     updateMatches();
@@ -71,14 +75,6 @@ export function AppShell({
       mediaQuery.removeEventListener("change", updateMatches);
     };
   }, []);
-
-  useEffect(() => {
-    if (isMobileNav) {
-      setIsNavOpen(false);
-    } else {
-      setIsNavOpen(true);
-    }
-  }, [isMobileNav]);
 
   useEffect(() => {
     if (!isMobileNav) return;
@@ -99,7 +95,7 @@ export function AppShell({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        setIsNavOpen(false);
+        setNavPanelOpen(false);
       }
     };
 
@@ -110,7 +106,7 @@ export function AppShell({
     };
   }, [isMobileNav, isNavOpen]);
 
-  const handleLinkClick = (href: string, e: React.MouseEvent<HTMLAnchorElement>, label: string) => {
+  const handleLinkClick = (href: string, e: MouseEvent<HTMLAnchorElement>, label: string) => {
     // Allow default Link behavior for cmd/ctrl clicks
     if (e.metaKey || e.ctrlKey) return;
 
@@ -118,7 +114,7 @@ export function AppShell({
     setClickedHref(href);
     setNavigationStatus(`Navigating to ${label}`);
     if (isMobileNav) {
-      setIsNavOpen(false);
+      setNavPanelOpen(false);
       navToggleRef.current?.focus();
     }
     startTransition(() => {
@@ -154,7 +150,11 @@ export function AppShell({
           className="app-shell-v2__nav-toggle"
           aria-expanded={!isMobileNav || isNavOpen}
           aria-controls="app-shell-v2-nav-content"
-          onClick={() => setIsNavOpen((open) => !open)}
+          onClick={() => {
+            if (isMobileNav) {
+              setNavPanelOpen((open) => !open);
+            }
+          }}
           ref={navToggleRef}
         >
           <span className="app-shell-v2__nav-toggle-icon" aria-hidden="true">

@@ -2,6 +2,12 @@ import "@testing-library/jest-dom";
 import { ReadableStream } from "stream/web";
 import { MessageChannel, MessagePort } from "worker_threads";
 import { TextDecoder, TextEncoder } from "util";
+import {
+  fetch as undiciFetch,
+  Headers as UndiciHeaders,
+  Request as UndiciRequest,
+  Response as UndiciResponse,
+} from "undici";
 
 if (!globalThis.TextEncoder) {
   globalThis.TextEncoder = TextEncoder as typeof globalThis.TextEncoder;
@@ -19,18 +25,14 @@ if (!globalThis.MessagePort) {
   globalThis.MessagePort = MessagePort as unknown as typeof globalThis.MessagePort;
 }
 if (!globalThis.fetch) {
-  const { fetch } = require("undici");
-  globalThis.fetch = fetch as typeof globalThis.fetch;
+  globalThis.fetch = undiciFetch as typeof globalThis.fetch;
 }
 if (!globalThis.Headers) {
-  const { Headers } = require("undici");
-  globalThis.Headers = Headers as typeof globalThis.Headers;
+  globalThis.Headers = UndiciHeaders as typeof globalThis.Headers;
 }
 if (!globalThis.Request) {
-  const { Request } = require("undici");
-  globalThis.Request = Request as unknown as typeof globalThis.Request;
+  globalThis.Request = UndiciRequest as unknown as typeof globalThis.Request;
 }
 if (!globalThis.Response) {
-  const { Response } = require("undici");
-  globalThis.Response = Response as unknown as typeof globalThis.Response;
+  globalThis.Response = UndiciResponse as unknown as typeof globalThis.Response;
 }

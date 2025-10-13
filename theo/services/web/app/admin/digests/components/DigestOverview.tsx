@@ -1,4 +1,4 @@
-import FormError from "../../components/FormError";
+import FormError from "../../../components/FormError";
 import type { TopicDigest } from "../types";
 
 type DigestOverviewProps = {

@@ -1,4 +1,4 @@
-import FormError from "../../components/FormError";
+import FormError from "../../../components/FormError";
 
 type WatchlistCreationFormProps = {
   name: string;

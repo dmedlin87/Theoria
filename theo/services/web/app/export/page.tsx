@@ -131,7 +131,7 @@ export default function CitationExportPage(): JSX.Element {
       const data = await response.json();
       const records = Array.isArray(data.records) ? data.records : [];
       setPreview(
-        records.map((record) => {
+        records.map((record: unknown) => {
           if (record && typeof record === 'object' && 'citation' in record && typeof record.citation === 'string') {
             return record.citation;
           }
@@ -148,14 +148,10 @@ export default function CitationExportPage(): JSX.Element {
       setPreview([]);
       setManifest(null);
     } finally {
-      if (!controller) {
-        setLoading(false);
-        return;
-      }
-      if (requestController.current === controller) {
+      if (controller && requestController.current === controller) {
         requestController.current = null;
-        setLoading(false);
       }
+      setLoading(false);
     }
   }, [buildPayload]);
 
@@ -200,14 +196,10 @@ export default function CitationExportPage(): JSX.Element {
       const message = downloadError instanceof Error ? downloadError.message : 'Unable to download citation bundle.';
       setError(message);
     } finally {
-      if (!controller) {
-        setLoading(false);
-        return;
-      }
-      if (requestController.current === controller) {
+      if (controller && requestController.current === controller) {
         requestController.current = null;
-        setLoading(false);
       }
+      setLoading(false);
     }
   }, [buildPayload, downloadFormat, formatExtension]);
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import type { ChatWorkflowClient } from "../lib/chat-client";
 import type { ChatWorkspaceDispatch, ConversationEntry } from "./useChatWorkspaceState";
 
@@ -13,7 +13,7 @@ function createMessageId(): string {
 }
 
 export function useSessionRestoration(
-  clientRef: React.RefObject<ChatWorkflowClient>,
+  clientRef: RefObject<ChatWorkflowClient>,
   dispatch: ChatWorkspaceDispatch,
   restorationAttempts: number,
   canRetry: boolean

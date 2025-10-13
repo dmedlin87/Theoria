@@ -48,7 +48,7 @@ describe("SavedSearchControls", () => {
     render(
       <SavedSearchControls
         savedSearchName=""
-        onSavedSearchNameChange={() => {}}
+        onSavedSearchNameChange={jest.fn()}
         onSubmit={jest.fn()}
         savedSearches={savedSearches}
         onApplySavedSearch={handleApply}
@@ -74,7 +74,7 @@ describe("SavedSearchControls", () => {
     render(
       <SavedSearchControls
         savedSearchName=""
-        onSavedSearchNameChange={() => {}}
+        onSavedSearchNameChange={jest.fn()}
         onSubmit={jest.fn()}
         savedSearches={[]}
         onApplySavedSearch={jest.fn()}

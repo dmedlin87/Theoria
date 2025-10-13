@@ -9,6 +9,8 @@ import type { SearchFilters } from "../../../app/search/searchParams";
 import { submitFeedback } from "../../../app/lib/telemetry";
 import { ToastProvider } from "../../../app/components/Toast";
 
+let updateSearchParams: (value: string) => void;
+
 jest.mock("next/navigation", () => {
   let params = new URLSearchParams("q=logos");
   const createSearchParams = () => ({
@@ -21,12 +23,14 @@ jest.mock("next/navigation", () => {
     forEach: (callback: (value: string, key: string) => void) => params.forEach(callback),
     [Symbol.iterator]: () => params[Symbol.iterator](),
   });
+  updateSearchParams = (value: string) => {
+    params = new URLSearchParams(value);
+  };
+
   return {
     useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
     useSearchParams: () => createSearchParams(),
-    __setSearchParams: (value: string) => {
-      params = new URLSearchParams(value);
-    },
+    __setSearchParams: updateSearchParams,
   };
 });
 
@@ -35,11 +39,7 @@ jest.mock("../../../app/lib/telemetry", () => ({
   submitFeedback: jest.fn(),
 }));
 
-const { __setSearchParams } = require("next/navigation") as {
-  __setSearchParams: (value: string) => void;
-};
-
-const setSearchParams = __setSearchParams;
+const setSearchParams = (value: string) => updateSearchParams(value);
 
 const renderWithToast = (ui: ReactElement) => render(<ToastProvider>{ui}</ToastProvider>);
 

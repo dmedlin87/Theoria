@@ -225,10 +225,6 @@ export default function TextualVariantsPanel({
   osis: string;
   features: ResearchFeatureFlags;
 }): JSX.Element | null {
-  if (!features?.textual_variants) {
-    return null;
-  }
-
   const { mode } = useMode();
   const baseUrl = useMemo(normalizeBaseUrl, []);
   const [readings, setReadings] = useState<VariantReading[]>([]);
@@ -242,6 +238,9 @@ export default function TextualVariantsPanel({
   const [dssLoading, setDssLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    if (!features?.textual_variants) {
+      return;
+    }
     const controller = new AbortController();
 
     async function loadData() {
@@ -306,7 +305,7 @@ export default function TextualVariantsPanel({
     return () => {
       controller.abort();
     };
-  }, [baseUrl, osis]);
+  }, [baseUrl, features?.textual_variants, osis]);
 
   useEffect(() => {
     setSelectedWitnesses((current) =>
@@ -472,6 +471,10 @@ export default function TextualVariantsPanel({
   const maxYear = lastChronology ? lastChronology.year : null;
   const span = minYear !== null && maxYear !== null ? Math.max(maxYear - minYear, 1) : 1;
 
+  if (!features?.textual_variants) {
+    return null;
+  }
+
   return (
     <section
       aria-labelledby="textual-variants-heading"
@@ -488,11 +491,9 @@ export default function TextualVariantsPanel({
       <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
         Compare witness readings for <strong>{osis}</strong> with timeline and commentary cues.
       </p>
-
       <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.875rem" }}>
         {formatEmphasisSummary(mode)}
       </p>
-
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
         {dssLoading ? (
           <span
@@ -686,7 +687,6 @@ export default function TextualVariantsPanel({
           </div>
         </aside>
       ) : null}
-
       <div
         style={{
           marginTop: "1.25rem",

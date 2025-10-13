@@ -9,7 +9,6 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       reportsDirectory: "coverage",
-      include: ["app/chat/useSessionRestoration.ts"],
       thresholds: {
         lines: 80,
         functions: 80,
@@ -17,7 +16,11 @@ export default defineConfig({
         branches: 80,
       },
       all: true,
-      include: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
+      include: [
+        "app/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+      ],
       exclude: ["tests/**"],
     },
   },

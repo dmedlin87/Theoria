@@ -205,7 +205,8 @@ function chatWorkspaceReducer(
       const filteredConversation = state.conversation.filter(
         (entry) => entry.id !== action.entryId
       );
-      const { [action.entryId]: _, ...remainingFeedback } = state.feedbackSelections;
+      const remainingFeedback = { ...state.feedbackSelections };
+      delete remainingFeedback[action.entryId];
       const newPendingIds = new Set(state.pendingFeedbackIds);
       newPendingIds.delete(action.entryId);
 

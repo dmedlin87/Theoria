@@ -8,7 +8,7 @@ import {
   forceSimulation,
 } from "d3";
 import type { SimulationLinkDatum, SimulationNodeDatum } from "d3";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { buildPassageLink, formatAnchor } from "../../lib/api";
 import type {
@@ -116,16 +116,21 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
   );
   const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([]);
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<string[]>([]);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     if (!graph) {
-      setSelectedPerspectives([]);
-      setSelectedSourceTypes([]);
-      setLayout(null);
+      startTransition(() => {
+        setSelectedPerspectives([]);
+        setSelectedSourceTypes([]);
+        setLayout(null);
+      });
       return;
     }
-    setSelectedPerspectives(graph.filters.perspectives.slice());
-    setSelectedSourceTypes(graph.filters.source_types.slice());
+    startTransition(() => {
+      setSelectedPerspectives(graph.filters.perspectives.slice());
+      setSelectedSourceTypes(graph.filters.source_types.slice());
+    });
 
     const nodes: LayoutNode[] = graph.nodes.map((node) => ({
       id: node.id,
@@ -140,7 +145,9 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
     })) as unknown as LayoutLink[];
 
     if (nodes.length === 0) {
-      setLayout({ nodes: [], links: [] });
+      startTransition(() => {
+        setLayout({ nodes: [], links: [] });
+      });
       return;
     }
 
@@ -164,12 +171,14 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
       simulation.tick();
     }
 
-    setLayout({ nodes, links });
+    startTransition(() => {
+      setLayout({ nodes, links });
+    });
 
     return () => {
       simulation.stop();
     };
-  }, [graph]);
+  }, [graph, startTransition]);
 
   const perspectiveSet = useMemo(
     () => new Set(selectedPerspectives),

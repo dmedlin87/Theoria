@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { useMode } from "../mode-context";
 
@@ -12,6 +12,7 @@ export default function ModeChangeBanner({ area }: ModeChangeBannerProps) {
   const { mode } = useMode();
   const previousMode = useRef(mode.id);
   const [message, setMessage] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     if (previousMode.current !== mode.id) {
@@ -21,12 +22,14 @@ export default function ModeChangeBanner({ area }: ModeChangeBannerProps) {
       const suppressions = mode.suppressions.length
         ? mode.suppressions.join(", ")
         : "no major suppressions";
-      setMessage(
-        `Switched to ${mode.label} mode for ${area}. Highlighting ${emphasis} while softening ${suppressions}.`,
-      );
+      startTransition(() => {
+        setMessage(
+          `Switched to ${mode.label} mode for ${area}. Highlighting ${emphasis} while softening ${suppressions}.`,
+        );
+      });
       previousMode.current = mode.id;
     }
-  }, [mode, area]);
+  }, [mode, area, startTransition]);
 
   useEffect(() => {
     if (!message) {

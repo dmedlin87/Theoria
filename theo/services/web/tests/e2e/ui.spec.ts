@@ -72,11 +72,11 @@ test.describe("Theo Engine UI", () => {
   });
 
   test("@full primary navigation links load", async ({ page }) => {
-    const navLinks: Array<{
+    const navLinks: {
       href: string;
       label: string;
       assertion: (page: Page) => Promise<void>;
-    }> = [
+    }[] = [
       {
         href: "/chat",
         label: "Chat",

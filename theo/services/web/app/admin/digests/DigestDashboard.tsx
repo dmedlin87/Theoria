@@ -56,7 +56,7 @@ export default function DigestDashboard(): JSX.Element {
 
   useEffect(() => {
     void topicDigest.loadDigest();
-  }, [topicDigest.loadDigest]);
+  }, [topicDigest]);
 
   const handleRefreshDigest = async () => {
     const hours = Number.parseInt(refreshHours, 10);

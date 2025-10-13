@@ -1,4 +1,4 @@
-import FormError from "../../components/FormError";
+import FormError from "../../../components/FormError";
 import type { WatchlistRunResponse } from "../types";
 
 type WatchlistEventsPanelProps = {

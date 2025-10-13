@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, type RefObject } from "react";
 import type { ChatWorkflowClient, ChatWorkflowMessage, ChatWorkflowStreamEvent } from "../lib/chat-client";
 import type { ChatSessionPreferencesPayload } from "../lib/api-normalizers";
 import type { HybridSearchFilters, GuardrailSuggestion } from "../lib/guardrails";
@@ -7,7 +7,6 @@ import type {
   ChatWorkspaceDispatch,
   ConversationEntry,
   AssistantConversationEntry,
-  GuardrailState,
 } from "./useChatWorkspaceState";
 
 type ResearchModeId = import("../mode-config").ResearchModeId;
@@ -20,7 +19,7 @@ function createMessageId(): string {
 }
 
 export function useChatExecution(
-  clientRef: React.RefObject<ChatWorkflowClient>,
+  clientRef: RefObject<ChatWorkflowClient>,
   dispatch: ChatWorkspaceDispatch,
   conversation: ConversationEntry[],
   sessionId: string | null,

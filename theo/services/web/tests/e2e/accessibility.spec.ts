@@ -1,3 +1,5 @@
+import { Buffer } from "node:buffer";
+
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
 
@@ -17,7 +19,7 @@ test.describe("@a11y axe smoke", () => {
       if (criticalViolations.length > 0) {
         test.info().attachments.push({
           name: `axe-${route}-critical.json`,
-          body: JSON.stringify(criticalViolations, null, 2),
+          body: Buffer.from(JSON.stringify(criticalViolations, null, 2), "utf-8"),
           contentType: "application/json",
         });
       }
