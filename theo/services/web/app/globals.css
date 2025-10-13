@@ -1,3 +1,6 @@
+/* Animation utilities */
+@import '../styles/animations.css';
+
 * {
   box-sizing: border-box;
 }

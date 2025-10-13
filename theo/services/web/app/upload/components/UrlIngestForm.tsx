@@ -31,7 +31,7 @@ export default function UrlIngestForm({
   };
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="card">
+    <form ref={formRef} onSubmit={handleSubmit} className="card fade-in">
       <h3 className="panel__title mb-3">Ingest URL</h3>
       <fieldset disabled={isSubmitting} className="stack-md form-fieldset">
         <div className="form-field">
@@ -85,8 +85,8 @@ export default function UrlIngestForm({
           </p>
         </div>
 
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-          {isSubmitting ? <><span className="spinner" /> Submitting…</> : "Submit URL"}
+        <button type="submit" className="btn btn-primary scale-in" disabled={isSubmitting}>
+          {isSubmitting ? <><span className="spinner spin" /> Submitting…</> : "Submit URL"}
         </button>
       </fieldset>
     </form>

@@ -14,7 +14,7 @@ export function Skeleton({ width, height, className = "", style = {} }: Skeleton
     ...style,
   };
 
-  return <div className={`skeleton ${className}`.trim()} style={combinedStyle} />;
+  return <div className={`skeleton shimmer ${className}`.trim()} style={combinedStyle} />;
 }
 
 export function SkeletonText({ lines = 3, className = "" }: { lines?: number; className?: string }): JSX.Element {
@@ -60,7 +60,7 @@ export function Spinner({ size = "md", className = "" }: SpinnerProps): JSX.Elem
   
   return (
     <div
-      className={`spinner ${sizeClass} ${className}`.trim()}
+      className={`spinner spin ${sizeClass} ${className}`.trim()}
       role="status"
       aria-label="Loading"
     >
@@ -72,13 +72,13 @@ export function Spinner({ size = "md", className = "" }: SpinnerProps): JSX.Elem
 export function LoadingOverlay({ message = "Loading..." }: { message?: string }): JSX.Element {
   return (
     <div
-      className="loading-overlay"
+      className="loading-overlay fade-in"
       role="alert"
       aria-busy="true"
       aria-live="polite"
     >
       <Spinner size="lg" />
-      <p className="text-muted font-medium">{message}</p>
+      <p className="text-muted font-medium fade-in">{message}</p>
     </div>
   );
 }

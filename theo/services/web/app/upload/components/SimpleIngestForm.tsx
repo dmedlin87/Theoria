@@ -304,30 +304,30 @@ export default function SimpleIngestForm({
             </div>
           </details>
 
-          <button type="submit" className="btn btn-primary mt-3">
-            {isRunning ? <><span className="spinner" /> Running ingest…</> : "Start ingest"}
+          <button type="submit" className="btn btn-primary mt-3 scale-in">
+            {isRunning ? <><span className="spinner spin" /> Running ingest…</> : "Start ingest"}
           </button>
         </fieldset>
       </form>
 
       {error && (
-        <div className="alert alert-danger mb-3">
+        <div className="alert alert-danger mb-3 shake">
           <div className="alert__message">{error}</div>
         </div>
       )}
 
       {success && !error && (
-        <div className="alert alert-success mb-3" role="status">
+        <div className="alert alert-success mb-3 bounce" role="status">
           <div className="alert__message">{success}</div>
         </div>
       )}
 
       {progress.length > 0 && (
-        <div className="simple-ingest-progress">
+        <div className="simple-ingest-progress fade-in">
           <h3 className="text-lg font-semibold mb-2">Ingest progress</h3>
           <ol className="progress-list">
             {progress.map((event, index) => (
-              <li key={`${event.event}-${index}`}>{describeSimpleEvent(event)}</li>
+              <li key={`${event.event}-${index}`} className="stagger-item">{describeSimpleEvent(event)}</li>
             ))}
           </ol>
         </div>

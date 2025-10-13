@@ -29,7 +29,7 @@ export default function FileUploadForm({
   };
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="card">
+    <form ref={formRef} onSubmit={handleSubmit} className="card fade-in">
       <h3 className="panel__title mb-3">Upload File</h3>
       <fieldset disabled={isUploading} className="stack-md form-fieldset">
         <div className="form-field">
@@ -63,8 +63,8 @@ export default function FileUploadForm({
           </p>
         </div>
 
-        <button type="submit" className="btn btn-primary" disabled={isUploading}>
-          {isUploading ? <><span className="spinner" /> Uploading…</> : "Upload file"}
+        <button type="submit" className="btn btn-primary scale-in" disabled={isUploading}>
+          {isUploading ? <><span className="spinner spin" /> Uploading…</> : "Upload file"}
         </button>
       </fieldset>
     </form>

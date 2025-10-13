@@ -49,7 +49,10 @@ export default function JobsTable({ jobs }: JobsTableProps): JSX.Element {
             <tr key={job.id}>
               <td>{job.job_type}</td>
               <td>
-                <span className={`badge badge-${job.status === "completed" ? "success" : job.status === "failed" ? "danger" : "secondary"}`}>
+                <span className={`badge badge-${job.status === "completed" ? "success" : job.status === "failed" ? "danger" : "secondary"} ${
+                  job.status === "completed" ? "bounce" : 
+                  job.status === "pending" || job.status === "running" ? "pulse" : ""
+                }`}>
                   {job.status}
                 </span>
               </td>
