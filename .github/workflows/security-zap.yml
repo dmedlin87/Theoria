@@ -22,7 +22,7 @@ jobs:
       STAGING_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9bb56186c5da571f2b78bb0f1e0ed4f49845d2a1
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha || github.sha }}
 
@@ -35,7 +35,7 @@ jobs:
 
       - name: Run ZAP baseline scan
         id: zap
-        uses: zaproxy/action-baseline@a9a2caf103181f67a06fad3f0d4f5fe8562016b2
+        uses: zaproxy/action-baseline@v0.13.0
         with:
           target: ${{ env.STAGING_API_BASE_URL }}
           cmd_options: '-J zap-baseline-report.json -r zap-baseline-report.html -w zap-baseline-warn.md'
@@ -47,14 +47,14 @@ jobs:
         run: python scripts/security/zap_to_sarif.py zap-baseline-report.json zap-baseline-report.sarif
 
       - name: Upload SARIF to security dashboard
-        uses: github/codeql-action/upload-sarif@dafdd0a215b77395467a765b26d982dfc030f847
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: zap-baseline-report.sarif
           category: zap-baseline
 
       - name: Upload ZAP artifacts
         if: always()
-        uses: actions/upload-artifact@5d5e935c1fdc8b229b1f4d02bbf9f74413c9f1a4
+        uses: actions/upload-artifact@v4
         with:
           name: zap-baseline-artifacts
           path: |
