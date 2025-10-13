@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ...ai.watchlists_service import WatchlistNotFoundError, WatchlistsService
@@ -16,6 +16,7 @@ from ...models.watchlists import (
     WatchlistUpdateRequest,
 )
 from ...security import Principal, require_principal
+from ...errors import AIWorkflowError
 
 
 _WATCHLIST_NOT_FOUND_RESPONSE = {
@@ -33,7 +34,11 @@ def _service(session: Session) -> WatchlistsService:
 def _require_user_subject(principal: Principal) -> str:
     subject = principal.get("subject")
     if not subject:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+        raise AIWorkflowError(
+            "Forbidden",
+            code="AI_WATCHLIST_FORBIDDEN",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
     return subject
 
 
@@ -71,7 +76,12 @@ def update_user_watchlist(
         user_id = _require_user_subject(principal)
         return _service(session).update(watchlist_id, payload, user_id)
     except WatchlistNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Watchlist not found") from exc
+        raise AIWorkflowError(
+            "Watchlist not found",
+            code="AI_WATCHLIST_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"watchlist_id": watchlist_id},
+        ) from exc
 
 
 @router.delete(
@@ -89,7 +99,12 @@ def delete_user_watchlist(
         user_id = _require_user_subject(principal)
         _service(session).delete(watchlist_id, user_id)
     except WatchlistNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Watchlist not found") from exc
+        raise AIWorkflowError(
+            "Watchlist not found",
+            code="AI_WATCHLIST_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"watchlist_id": watchlist_id},
+        ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -110,7 +125,12 @@ def list_user_watchlist_events(
         user_id = _require_user_subject(principal)
         return _service(session).list_events(watchlist_id, user_id, since=since)
     except WatchlistNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Watchlist not found") from exc
+        raise AIWorkflowError(
+            "Watchlist not found",
+            code="AI_WATCHLIST_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"watchlist_id": watchlist_id},
+        ) from exc
 
 
 @router.get(
@@ -127,7 +147,12 @@ def preview_user_watchlist(
         user_id = _require_user_subject(principal)
         return _service(session).preview(watchlist_id, user_id)
     except WatchlistNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Watchlist not found") from exc
+        raise AIWorkflowError(
+            "Watchlist not found",
+            code="AI_WATCHLIST_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"watchlist_id": watchlist_id},
+        ) from exc
 
 
 @router.post(
@@ -144,5 +169,10 @@ def run_user_watchlist(
         user_id = _require_user_subject(principal)
         return _service(session).run(watchlist_id, user_id)
     except WatchlistNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Watchlist not found") from exc
+        raise AIWorkflowError(
+            "Watchlist not found",
+            code="AI_WATCHLIST_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"watchlist_id": watchlist_id},
+        ) from exc
 

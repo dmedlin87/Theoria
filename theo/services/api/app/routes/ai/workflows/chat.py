@@ -6,10 +6,10 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence, TypeAlias
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ai import run_guarded_chat
@@ -41,6 +41,15 @@ from theo.services.api.app.models.ai import (
 )
 from .guardrails import extract_refusal_text, guardrail_http_exception
 from .utils import has_filters
+
+from ....errors import AIWorkflowError, Severity
+
+if TYPE_CHECKING:  # pragma: no cover - runtime import for FastAPI annotations
+    from fastapi.responses import JSONResponse
+
+    ChatTurnReturn: TypeAlias = ChatSessionResponse | JSONResponse
+else:  # pragma: no cover - hinting only
+    ChatTurnReturn: TypeAlias = ChatSessionResponse
 
 router = APIRouter()
 
@@ -544,24 +553,37 @@ def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
 )
 def chat_turn(
     payload: ChatSessionRequest, session: Session = Depends(get_session)
-) -> ChatSessionResponse:
+) -> ChatTurnReturn:
     if not payload.messages:
-        raise HTTPException(status_code=400, detail="messages cannot be empty")
+        raise AIWorkflowError(
+            "messages cannot be empty",
+            code="AI_CHAT_EMPTY_MESSAGES",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     total_message_chars = sum(len(message.content) for message in payload.messages)
     if total_message_chars > CHAT_SESSION_TOTAL_CHAR_BUDGET:
-        raise HTTPException(
+        raise AIWorkflowError(
+            "chat payload exceeds size limit",
+            code="AI_CHAT_PAYLOAD_TOO_LARGE",
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="chat payload exceeds size limit",
         )
     last_user = next(
         (message for message in reversed(payload.messages) if message.role == "user"),
         None,
     )
     if last_user is None:
-        raise HTTPException(status_code=400, detail="missing user message")
+        raise AIWorkflowError(
+            "missing user message",
+            code="AI_CHAT_MISSING_USER_MESSAGE",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     question = last_user.content.strip()
     if not question:
-        raise HTTPException(status_code=400, detail="user message cannot be blank")
+        raise AIWorkflowError(
+            "user message cannot be blank",
+            code="AI_CHAT_EMPTY_USER_MESSAGE",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
     settings = get_settings()
     intent_tags: list[IntentTagPayload] | None = None
@@ -748,7 +770,12 @@ def chat_turn(
         )
 
     if message is None or answer is None:
-        raise HTTPException(status_code=500, detail="failed to compose chat response")
+        raise AIWorkflowError(
+            "failed to compose chat response",
+            code="AI_CHAT_COMPOSITION_FAILED",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            severity=Severity.CRITICAL,
+        )
 
     return ChatSessionResponse(
         session_id=session_id,
@@ -767,7 +794,11 @@ def chat_turn(
 def get_chat_session(session_id: str, session: Session = Depends(get_session)) -> ChatSessionState:
     record = session.get(ChatSession, session_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="chat session not found")
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
     return _serialise_chat_session(record)
 
 
@@ -782,7 +813,11 @@ def list_chat_goals(
 ) -> ChatGoalProgress:
     record = session.get(ChatSession, session_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="chat session not found")
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
     goals = _load_goal_entries(record)
     return ChatGoalProgress(goals=goals)
 
@@ -801,11 +836,19 @@ def close_chat_goal(
 ) -> ChatGoalState:
     record = session.get(ChatSession, session_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="chat session not found")
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
     goals = _load_goal_entries(record)
     goal = next((item for item in goals if item.id == goal_id), None)
     if goal is None:
-        raise HTTPException(status_code=404, detail="goal not found")
+        raise AIWorkflowError(
+            "goal not found",
+            code="AI_CHAT_GOAL_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
     if goal.status != "closed":
         now = datetime.now(UTC)
         goal.status = "closed"
@@ -843,11 +886,19 @@ def update_goal_priority(
 ) -> ChatGoalProgress:
     record = session.get(ChatSession, session_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="chat session not found")
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
     goals = _load_goal_entries(record)
     goal = next((item for item in goals if item.id == goal_id), None)
     if goal is None:
-        raise HTTPException(status_code=404, detail="goal not found")
+        raise AIWorkflowError(
+            "goal not found",
+            code="AI_CHAT_GOAL_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
     _reprioritise_goal(goals, goal, payload.priority)
     goal.updated_at = datetime.now(UTC)
     record.goals = _dump_goal_entries(goals)

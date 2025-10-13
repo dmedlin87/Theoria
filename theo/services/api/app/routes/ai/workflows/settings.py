@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 from theo.application.facades.settings_store import load_setting, save_setting
 from theo.services.api.app.models.ai import ProviderSettingsRequest, ProviderSettingsResponse
+from ....errors import AIWorkflowError
 
 router = APIRouter(prefix="/settings/ai", tags=["ai-settings"])
 
@@ -97,7 +98,12 @@ def get_provider_settings(
     providers = _load_provider_settings(session)
     payload = providers.get(provider)
     if payload is None:
-        raise HTTPException(status_code=404, detail="Provider not configured")
+        raise AIWorkflowError(
+            "Provider not configured",
+            code="AI_PROVIDER_NOT_CONFIGURED",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"provider": provider},
+        )
     return _provider_response(provider, payload)
 
 

@@ -1,5 +1,8 @@
 import pytest
 
+import json
+from unittest.mock import MagicMock
+
 from theo.services.api.app.ai.rag.guardrails import GuardrailError
 from theo.services.api.app.ai.rag.models import RAGAnswer
 from theo.services.api.app.models.search import HybridSearchFilters
@@ -7,6 +10,7 @@ from theo.services.api.app.routes.ai.workflows.guardrails import (
     build_guardrail_metadata,
     extract_refusal_text,
     guardrail_advisory,
+    guardrail_http_exception,
 )
 
 
@@ -48,4 +52,42 @@ def test_guardrail_advisory_generates_search_suggestion() -> None:
     assert advisory.message == "Refusal"
     assert advisory.suggestions
     assert advisory.suggestions[0].action == "search"
+
+
+def test_guardrail_http_exception_embeds_error_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = MagicMock()
+    fake_answer = RAGAnswer(summary="Refused", citations=[])
+
+    monkeypatch.setattr(
+        "theo.services.api.app.routes.ai.workflows.guardrails.build_guardrail_refusal",
+        lambda _session, reason=None: fake_answer,
+    )
+
+    error = GuardrailError(
+        "Blocked",
+        metadata={
+            "code": "guardrail_profile_no_match",
+            "guardrail": "retrieval",
+            "suggested_action": "upload",
+            "reason": "No passages matched",
+            "filters": {"collection": "Alpha"},
+        },
+    )
+
+    filters = HybridSearchFilters(collection="Alpha")
+    response = guardrail_http_exception(
+        error,
+        session=session,
+        question="What is hope?",
+        osis="John.1.1",
+        filters=filters,
+    )
+
+    payload = json.loads(response.body)
+    assert payload["error"]["code"] == "AI_GUARDRAIL_PROFILE_NO_MATCH"
+    assert payload["detail"]["type"] == "guardrail_refusal"
+    assert payload["error"]["data"]["guardrail"] == "retrieval"
+    assert payload["error"]["data"]["filters"]["collection"] == "Alpha"
 

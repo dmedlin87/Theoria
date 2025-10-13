@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ai.registry import (
@@ -12,6 +12,7 @@ from theo.services.api.app.ai.registry import (
     save_llm_registry,
 )
 from theo.application.facades.database import get_session
+from ....errors import AIWorkflowError
 from theo.services.api.app.models.ai import (
     LLMDefaultRequest,
     LLMModelRequest,
@@ -66,7 +67,12 @@ def set_default_llm_model(
 ) -> LLMSettingsResponse:
     registry = get_llm_registry(session)
     if payload.name not in registry.models:
-        raise HTTPException(status_code=404, detail="Unknown model")
+        raise AIWorkflowError(
+            "Unknown model",
+            code="AI_MODEL_UNKNOWN",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"model": payload.name},
+        )
     registry.default_model = payload.name
     return _persist_and_respond(session, registry)
 
@@ -82,7 +88,12 @@ def update_llm_model(
 ) -> LLMSettingsResponse:
     registry = get_llm_registry(session)
     if name not in registry.models:
-        raise HTTPException(status_code=404, detail="Unknown model")
+        raise AIWorkflowError(
+            "Unknown model",
+            code="AI_MODEL_UNKNOWN",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"model": name},
+        )
     model = registry.models[name]
     if payload.provider:
         model.provider = payload.provider
@@ -126,7 +137,12 @@ def update_llm_model(
 def remove_llm_model(name: str, session: Session = Depends(get_session)) -> LLMSettingsResponse:
     registry = get_llm_registry(session)
     if name not in registry.models:
-        raise HTTPException(status_code=404, detail="Unknown model")
+        raise AIWorkflowError(
+            "Unknown model",
+            code="AI_MODEL_UNKNOWN",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"model": name},
+        )
     registry.remove_model(name)
     return _persist_and_respond(session, registry)
 

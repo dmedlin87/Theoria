@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Mapping
 
+from fastapi import status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ai import build_guardrail_refusal
 from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer
+from theo.services.api.app.errors import AIWorkflowError, Severity
 from theo.services.api.app.models.ai import (
     GuardrailAdvisory,
     GuardrailFailureMetadata,
@@ -165,6 +168,17 @@ def guardrail_advisory(
     )
 
 
+def _normalise_error_code(code: str | None) -> str:
+    slug = (code or "guardrail_violation").strip()
+    if not slug:
+        slug = "guardrail_violation"
+    slug = re.sub(r"[^0-9a-zA-Z]+", "_", slug).strip("_") or "GUARDRAIL_VIOLATION"
+    formatted = slug.upper()
+    if not formatted.startswith("AI_"):
+        formatted = f"AI_{formatted}"
+    return formatted
+
+
 def guardrail_http_exception(
     exc: GuardrailError,
     *,
@@ -192,20 +206,46 @@ def guardrail_http_exception(
         "metadata": advisory_payload.get("metadata"),
         "suggestions": advisory_payload.get("suggestions") or [],
     }
+    filters_payload = (
+        failure_metadata.filters.model_dump(exclude_none=True)
+        if failure_metadata.filters
+        else None
+    )
+    error_data: dict[str, Any] = {
+        "guardrail": failure_metadata.guardrail,
+        "suggested_action": failure_metadata.suggested_action,
+        "safe_refusal": failure_metadata.safe_refusal,
+        "summary": summary,
+    }
+    if filters_payload:
+        error_data["filters"] = filters_payload
+    if failure_metadata.reason:
+        error_data["reason"] = failure_metadata.reason
+    raw_metadata = getattr(exc, "metadata", None)
+    if isinstance(raw_metadata, Mapping):
+        error_data["metadata"] = dict(raw_metadata)
+
+    error = AIWorkflowError(
+        detail_text,
+        code=_normalise_error_code(failure_metadata.code),
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        severity=Severity.USER,
+        hint=failure_metadata.reason,
+        data=error_data,
+    )
     answer = build_guardrail_refusal(session, reason=summary)
     headers = {
         "X-Guardrail-Advisory": json.dumps(
             advisory_payload, separators=(",", ":")
         )
     }
-    content = {
-        "detail": detail_payload,
-        "message": {"role": "assistant", "content": DEFAULT_REFUSAL_MESSAGE},
-        "answer": answer.model_dump(mode="json"),
-        "guardrail_advisory": advisory_payload,
-        "detail_text": detail_text,
-    }
-    return JSONResponse(status_code=422, content=content, headers=headers)
+    payload = error.to_payload()
+    payload["detail"] = detail_payload
+    payload["message"] = {"role": "assistant", "content": DEFAULT_REFUSAL_MESSAGE}
+    payload["answer"] = answer.model_dump(mode="json")
+    payload["guardrail_advisory"] = advisory_payload
+    payload["detail_text"] = detail_text
+    return JSONResponse(status_code=error.status_code, content=payload, headers=headers)
 
 
 def extract_refusal_text(answer: RAGAnswer) -> str:

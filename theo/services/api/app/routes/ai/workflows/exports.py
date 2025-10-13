@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -30,6 +30,7 @@ from theo.services.api.app.models.base import Passage as PassageSchema
 from theo.services.api.app.models.documents import DocumentDetailResponse
 from theo.services.api.app.models.export import serialise_asset_content
 from .guardrails import guardrail_http_exception
+from ....errors import AIWorkflowError
 
 router = APIRouter()
 
@@ -176,7 +177,11 @@ def export_citations(
     """Return CSL-JSON and manager payloads for the supplied citations."""
 
     if not payload.citations:
-        raise HTTPException(status_code=400, detail="citations cannot be empty")
+        raise AIWorkflowError(
+            "citations cannot be empty",
+            code="AI_EXPORT_EMPTY_CITATIONS",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
     ordered_citations = sorted(payload.citations, key=lambda citation: citation.index)
     citation_map: dict[str, list[RAGCitation]] = {}
@@ -184,8 +189,10 @@ def export_citations(
     for citation in ordered_citations:
         document_id = citation.document_id
         if not document_id:
-            raise HTTPException(
-                status_code=400, detail="citations must include a document_id"
+            raise AIWorkflowError(
+                "citations must include a document_id",
+                code="AI_EXPORT_MISSING_DOCUMENT_ID",
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
         bucket = citation_map.setdefault(document_id, [])
         bucket.append(citation)
@@ -199,9 +206,11 @@ def export_citations(
     document_index = {row.id: row for row in rows}
     missing_documents = [doc_id for doc_id in document_ids if doc_id not in document_index]
     if missing_documents:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Unknown document(s): {', '.join(sorted(missing_documents))}",
+        raise AIWorkflowError(
+            f"Unknown document(s): {', '.join(sorted(missing_documents))}",
+            code="AI_EXPORT_DOCUMENT_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"document_ids": sorted(missing_documents)},
         )
 
     passage_ids = {
@@ -355,7 +364,12 @@ def sermon_prep_export(
     try:
         preset = _SERMON_PRESET_MAP[normalized]
     except KeyError as exc:
-        raise HTTPException(status_code=400, detail="unsupported sermon export format") from exc
+        raise AIWorkflowError(
+            "unsupported sermon export format",
+            code="AI_EXPORT_UNSUPPORTED_SERMON_FORMAT",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            data={"format": normalized},
+        ) from exc
     asset = package.get_asset(normalized)
     return ExportDeliverableResponse(
         preset=preset,
@@ -377,13 +391,28 @@ def transcript_export(
             session, payload.document_id, formats=[normalized]
         )
     except GuardrailError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_EXPORT_GUARDRAIL_BLOCKED",
+            status_code=status.HTTP_404_NOT_FOUND,
+            data={"document_id": payload.document_id, "format": normalized},
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_EXPORT_INVALID_REQUEST",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            data={"document_id": payload.document_id, "format": normalized},
+        ) from exc
     try:
         preset = _TRANSCRIPT_PRESET_MAP[normalized]
     except KeyError as exc:
-        raise HTTPException(status_code=400, detail="unsupported transcript export format") from exc
+        raise AIWorkflowError(
+            "unsupported transcript export format",
+            code="AI_EXPORT_UNSUPPORTED_TRANSCRIPT_FORMAT",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            data={"format": normalized},
+        ) from exc
     asset = package.get_asset(normalized)
     return ExportDeliverableResponse(
         preset=preset,
