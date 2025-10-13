@@ -25,7 +25,7 @@ export class NetworkError extends Error {
 export async function fetchWithTimeout(
   url: string | URL,
   options?: RequestInit,
-  timeoutMs: number = 30000,
+  timeoutMs = 30000,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

@@ -184,8 +184,8 @@ export default function SimpleIngestForm({
               required
             />
             <p className="form-hint">
-              The CLI defaults will tag new documents with the "{DEFAULT_COLLECTION}" collection and "
-              {DEFAULT_AUTHOR}" author unless you override them below.
+              The CLI defaults will tag new documents with the “{DEFAULT_COLLECTION}” collection and “
+              {DEFAULT_AUTHOR}” author unless you override them below.
             </p>
           </div>
 

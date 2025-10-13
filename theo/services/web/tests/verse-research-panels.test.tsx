@@ -7,7 +7,9 @@ import ResearchPanels from "../app/research/ResearchPanels";
 import type { ResearchFeatureFlags } from "../app/research/types";
 
 jest.mock("../app/mode-context", () => {
-  const { RESEARCH_MODES, DEFAULT_MODE_ID } = require("../app/mode-config");
+  const { RESEARCH_MODES, DEFAULT_MODE_ID } = jest.requireActual<
+    typeof import("../app/mode-config")
+  >("../app/mode-config");
   return {
     useMode: () => ({
       mode: RESEARCH_MODES[DEFAULT_MODE_ID],

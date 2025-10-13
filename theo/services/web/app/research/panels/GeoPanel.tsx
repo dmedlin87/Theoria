@@ -88,11 +88,10 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const modeSummary = useMemo(() => formatEmphasisSummary(mode), [mode]);
 
-  if (!features?.geo) {
-    return null;
-  }
-
   useEffect(() => {
+    if (!features?.geo) {
+      return;
+    }
     let cancelled = false;
     const run = async () => {
       setVerseLoading(true);
@@ -126,7 +125,11 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, osis]);
+  }, [baseUrl, features?.geo, osis]);
+
+  if (!features?.geo) {
+    return null;
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

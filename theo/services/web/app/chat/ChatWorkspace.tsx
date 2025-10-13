@@ -28,15 +28,13 @@ import {
   useGuardrailActions,
 } from "../lib/guardrails";
 import { useMode } from "../mode-context";
-import { emitTelemetry, submitFeedback, type FeedbackAction } from "../lib/telemetry";
-import type {
-  Reaction,
-  ConversationEntry,
-  AssistantConversationEntry,
-  GuardrailState,
+import { emitTelemetry, submitFeedback } from "../lib/telemetry";
+import {
+  type Reaction,
+  type ConversationEntry,
+  type AssistantConversationEntry,
+  type GuardrailState,
 } from "./useChatWorkspaceState";
-import { useSessionRestoration, useSessionPersistence } from "./useSessionRestoration";
-import { useChatExecution } from "./useChatExecution";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
 import { SessionControls } from "./components/SessionControls";
 import { ChatTranscript, type TranscriptEntry } from "./components/transcript/ChatTranscript";

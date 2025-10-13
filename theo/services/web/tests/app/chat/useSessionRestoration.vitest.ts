@@ -30,8 +30,14 @@ describe("useSessionRestoration", () => {
             question: "What does John 1 teach?",
             answer: "The prologue declares Jesus as the eternal Logos.",
             citations: [],
+            documentIds: [],
+            createdAt: "2024-01-01T00:00:00.000Z",
           },
         ],
+        documentIds: [],
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        lastInteractionAt: "2024-01-01T00:00:00.000Z",
         preferences: {
           frequentlyOpenedPanels: ["citations"],
           defaultFilters: { collection: "sermons" },
@@ -76,6 +82,10 @@ describe("useSessionRestoration", () => {
       fetchChatSession: vi.fn(async () => ({
         sessionId: "session-empty",
         memory: [],
+        documentIds: [],
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        lastInteractionAt: "2024-01-01T00:00:00.000Z",
         preferences: null,
       })),
     };
@@ -250,9 +260,9 @@ describe("useSessionPersistence", () => {
   });
 
   it("writes and clears the persisted session id", async () => {
-    const { rerender, unmount } = renderHook(({ sessionId }: { sessionId: string | null }) =>
-      useSessionPersistence(sessionId),
-      { initialProps: { sessionId: null } }
+    const { rerender, unmount } = renderHook<void, { sessionId: string | null }>(
+      ({ sessionId }) => useSessionPersistence(sessionId),
+      { initialProps: { sessionId: null } },
     );
 
     rerender({ sessionId: "session-abc" });

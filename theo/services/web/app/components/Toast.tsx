@@ -43,23 +43,26 @@ export function useToast(): ToastContextValue {
 export function ToastProvider({ children }: { children: ReactNode }): JSX.Element {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = useCallback((toast: Omit<Toast, "id">) => {
-    const id = crypto.randomUUID?.() ?? `toast-${Date.now()}`;
-    const newToast: Toast = { ...toast, id };
-    
-    setToasts((prev) => [...prev, newToast]);
-
-    const duration = toast.duration ?? 5000;
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
-    }
-  }, []);
-
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const addToast = useCallback(
+    (toast: Omit<Toast, "id">) => {
+      const id = crypto.randomUUID?.() ?? `toast-${Date.now()}`;
+      const newToast: Toast = { ...toast, id };
+
+      setToasts((prev) => [...prev, newToast]);
+
+      const duration = toast.duration ?? 5000;
+      if (duration > 0) {
+        setTimeout(() => {
+          removeToast(id);
+        }, duration);
+      }
+    },
+    [removeToast],
+  );
 
   const value: ToastContextValue = {
     toasts,

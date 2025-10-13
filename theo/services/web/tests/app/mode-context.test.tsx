@@ -3,24 +3,27 @@
 import "@testing-library/jest-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Fragment } from "react";
+import { useRouter } from "next/navigation";
 
 import { ModeProvider, useMode } from "../../app/mode-context";
-import type { ResearchModeId } from "../../app/mode-config";
-import { DEFAULT_MODE_ID } from "../../app/mode-config";
-
-const refreshMock = jest.fn();
+import {
+  DEFAULT_MODE_ID,
+  MODE_COOKIE_KEY,
+  type ResearchModeId,
+} from "../../app/mode-config";
 
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({
-    refresh: refreshMock,
-  }),
+  useRouter: jest.fn(),
 }));
 
-type ModeConsumerProps = {
+const useRouterMock = useRouter as unknown as jest.Mock;
+const refreshMock = jest.fn();
+
+type OptionalModeConsumerProps = {
   nextMode?: ResearchModeId;
 };
 
-function ModeConsumer({ nextMode }: ModeConsumerProps) {
+function OptionalModeConsumer({ nextMode }: OptionalModeConsumerProps) {
   const { mode, setMode } = useMode();
 
   return (
@@ -35,9 +38,23 @@ function ModeConsumer({ nextMode }: ModeConsumerProps) {
   );
 }
 
+function ModeConsumer({ nextMode }: { nextMode: ResearchModeId }) {
+  const { mode, setMode } = useMode();
+
+  return (
+    <div>
+      <span data-testid="mode-id">{mode.id}</span>
+      <button type="button" onClick={() => setMode(nextMode)}>
+        Change mode
+      </button>
+    </div>
+  );
+}
+
 describe("ModeProvider storage resilience", () => {
   beforeEach(() => {
-    refreshMock.mockClear();
+    refreshMock.mockReset();
+    useRouterMock.mockReturnValue({ refresh: refreshMock });
   });
 
   afterEach(() => {
@@ -55,7 +72,7 @@ describe("ModeProvider storage resilience", () => {
 
     render(
       <ModeProvider>
-        <ModeConsumer />
+        <OptionalModeConsumer />
       </ModeProvider>,
     );
 
@@ -75,39 +92,30 @@ describe("ModeProvider storage resilience", () => {
 
     render(
       <ModeProvider>
-        <ModeConsumer nextMode="investigative" />
+        <OptionalModeConsumer nextMode="investigative" />
       </ModeProvider>,
     );
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useRouter } from "next/navigation";
 
-import { ModeProvider, useMode } from "../../app/mode-context";
-import { DEFAULT_MODE_ID, MODE_COOKIE_KEY } from "../../app/mode-config";
-import type { ResearchModeId } from "../../app/mode-config";
+    fireEvent.click(screen.getByRole("button", { name: "Change mode" }));
 
-jest.mock("next/navigation", () => ({
-  useRouter: jest.fn(),
-}));
+    await waitFor(() => {
+      expect(screen.getByText("mode:investigative")).toBeInTheDocument();
+    });
+
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+});
 
 describe("ModeProvider", () => {
-  const useRouterMock = useRouter as unknown as jest.Mock;
+  beforeEach(() => {
+    useRouterMock.mockReturnValue({ refresh: jest.fn() });
+    localStorage.clear();
+    document.cookie = `${MODE_COOKIE_KEY}=; Max-Age=0`;
+  });
 
-  function ModeConsumer({ nextMode }: { nextMode: ResearchModeId }) {
-    const { mode, setMode } = useMode();
-
-    return (
-      <div>
-        <span data-testid="mode-id">{mode.id}</span>
-        <button type="button" onClick={() => setMode(nextMode)}>
-          Change mode
-        </button>
-      </div>
-    );
-  }
-
-  function renderWithProvider(initialMode?: string) {
+  function renderWithProvider(initialMode?: ResearchModeId) {
     const providerProps: { initialMode?: ResearchModeId } = initialMode
-      ? { initialMode: initialMode as ResearchModeId }
+      ? { initialMode }
       : {};
 
     return render(
@@ -117,14 +125,8 @@ describe("ModeProvider", () => {
     );
   }
 
-  beforeEach(() => {
-    useRouterMock.mockReturnValue({ refresh: jest.fn() });
-    localStorage.clear();
-    document.cookie = `${MODE_COOKIE_KEY}=; Max-Age=0`;
-  });
-
   it("falls back to the default mode when the provided mode id is invalid", async () => {
-    renderWithProvider("toString");
+    renderWithProvider("toString" as ResearchModeId);
 
     await waitFor(() => {
       expect(screen.getByTestId("mode-id")).toHaveTextContent(DEFAULT_MODE_ID);
@@ -153,11 +155,10 @@ describe("ModeProvider", () => {
     });
 
     await waitFor(() => {
-      expect(refreshMock).not.toHaveBeenCalled();
-    });
       expect(screen.getByTestId("mode-id")).toHaveTextContent("investigative");
     });
 
     expect(refresh).toHaveBeenCalled();
   });
 });
+

@@ -11,6 +11,7 @@ import { getApiBaseUrl } from "../../lib/api";
 import ResearchPanels from "../../research/ResearchPanels";
 import { fetchResearchFeatures } from "../../research/features";
 import type { ResearchFeatureFlags } from "../../research/types";
+import styles from "./page.module.css";
 
 interface NotebookCollaborator {
   id: string;
@@ -106,39 +107,27 @@ function collectOsis(notebook: NotebookResponse): string[] {
 function renderEntry(entry: NotebookEntry) {
   const mentions = entry.mentions ?? [];
   return (
-    <article
-      key={entry.id}
-      style={{
-        border: "1px solid var(--border, #e5e7eb)",
-        borderRadius: "0.75rem",
-        padding: "1rem",
-        background: "var(--background, #ffffff)",
-        display: "grid",
-        gap: "0.75rem",
-      }}
-    >
-      <header style={{ display: "flex", justifyContent: "space-between", gap: "1rem" }}>
+    <article key={entry.id} className={styles.entry}>
+      <header className={styles.entryHeader}>
         <div>
-          <h3 style={{ margin: 0 }}>Entry</h3>
-          <p style={{ margin: "0.25rem 0", color: "var(--muted-foreground, #4b5563)", fontSize: "0.85rem" }}>
+          <h3 className={styles.entryHeading}>Entry</h3>
+          <p className={styles.entryMeta}>
             Authored by <strong>{entry.created_by}</strong> on {new Date(entry.created_at).toLocaleString()}
           </p>
         </div>
         {entry.osis_ref ? (
-          <span style={{ fontSize: "0.9rem", color: "var(--muted-foreground, #4b5563)" }}>
+          <span className={styles.entryLink}>
             Linked to <strong>{entry.osis_ref}</strong>
           </span>
         ) : null}
       </header>
 
-      <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{entry.content}</p>
+      <p className={styles.entryBody}>{entry.content}</p>
 
       {entry.document_id ? (
-        <footer style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground, #4b5563)" }}>
-            Source document:
-          </span>
-          <Link href={`/doc/${entry.document_id}`} style={{ fontWeight: 500 }}>
+        <footer className={styles.entryFooter}>
+          <span className={styles.entryFooterLabel}>Source document:</span>
+          <Link href={`/doc/${entry.document_id}`} className={styles.entryFooterLink}>
             View document {entry.document_id}
           </Link>
         </footer>
@@ -146,11 +135,11 @@ function renderEntry(entry: NotebookEntry) {
 
       {mentions.length > 0 ? (
         <section>
-          <h4 style={{ margin: "0 0 0.5rem" }}>Mentions</h4>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.5rem" }}>
+          <h4 className={styles.mentionsHeading}>Mentions</h4>
+          <ul className={styles.mentionsList}>
             {mentions.map((mention) => (
               <li key={mention.id}>
-                <div style={{ fontSize: "0.9rem", color: "var(--muted-foreground, #4b5563)" }}>
+                <div className={styles.mentionText}>
                   <strong>{mention.osis_ref}</strong>
                   {mention.context ? ` — ${mention.context}` : ""}
                 </div>
@@ -170,17 +159,9 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
     ? await fetchResearchFeatures()
     : { features: null, error: null };
   const features: ResearchFeatureFlags | null = fetchedFeatures;
-
-  let features: ResearchFeatureFlags | null = null;
-  let featureDiscoveryFailed = false;
-  if (osisRefs.length) {
-    try {
-      features = await fetchResearchFeatures();
-    } catch (error) {
-      featureDiscoveryFailed = true;
-      console.error("Failed to fetch research features", error);
-      features = null;
-    }
+  const featureDiscoveryFailed = Boolean(researchFeaturesError);
+  if (researchFeaturesError) {
+    console.error("Failed to fetch research features", researchFeaturesError);
   }
   const version = await fetchRealtimeVersion(notebook.id);
 
@@ -192,31 +173,23 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
       }
     : null;
 
+  const hasReferencedVerses = osisRefs.length > 0;
+  const showResearchSection = hasReferencedVerses || featureDiscoveryFailed;
+
   return (
-    <div style={{ display: "grid", gap: "2rem", padding: "1.5rem" }}>
-      <Breadcrumbs
-        items={[
-          { label: "Home", href: "/" },
-          { label: "Notebooks" },
-          { label: notebook.title ?? "Notebook" },
-        ]}
-      />
-      <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+    <div className={styles.container}>
+      <header className={styles.header}>
+        <div className={styles.headerSummary}>
           <div>
-            <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted-foreground, #6b7280)" }}>
-              Notebook ID: {notebook.id}
-            </p>
-            <h1 style={{ margin: "0.25rem 0" }}>{notebook.title}</h1>
-            <p style={{ margin: 0, color: "var(--muted-foreground, #4b5563)" }}>
+            <p className={styles.meta}>Notebook ID: {notebook.id}</p>
+            <h1 className={styles.title}>{notebook.title}</h1>
+            <p className={styles.subtitle}>
               Created by {notebook.created_by} on {new Date(notebook.created_at).toLocaleString()}
             </p>
           </div>
           <NotebookRealtimeListener notebookId={notebook.id} initialVersion={version} />
         </div>
-        {notebook.description ? (
-          <p style={{ margin: 0, fontSize: "1rem", lineHeight: 1.5 }}>{notebook.description}</p>
-        ) : null}
+        {notebook.description ? <p className={styles.description}>{notebook.description}</p> : null}
         {exportPayload ? (
           <DeliverableExportAction
             label="Export sermon outline"
@@ -226,61 +199,45 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
         ) : null}
       </header>
 
-      <section style={{ display: "grid", gap: "1rem" }}>
-        <h2 style={{ margin: 0 }}>Entries ({notebook.entry_count})</h2>
+      <section className={styles.section}>
+        <h2 className={styles.sectionHeading}>Entries ({notebook.entry_count})</h2>
         {notebook.entries.length === 0 ? (
-          <p style={{ color: "var(--muted-foreground, #4b5563)" }}>
+          <p className={styles.emptyState}>
             No entries have been added yet. Start collaborating by creating the first note.
           </p>
         ) : (
-          <div style={{ display: "grid", gap: "1.25rem" }}>
-            {notebook.entries.map((entry) => renderEntry(entry))}
-          </div>
+          <div className={styles.entriesList}>{notebook.entries.map((entry) => renderEntry(entry))}</div>
         )}
       </section>
 
-      {osisRefs.length > 0 ? (
-      {featureDiscoveryFailed ? (
-        <p
-          role="alert"
-          style={{
-            background: "var(--muted, #fef2f2)",
-            color: "var(--muted-foreground, #b91c1c)",
-            borderRadius: "0.5rem",
-            padding: "0.75rem 1rem",
-          }}
-        >
-          Research features are temporarily unavailable. Notebook entries remain accessible.
-        </p>
-      ) : null}
+      {showResearchSection ? (
+        <section className={styles.section}>
+          {hasReferencedVerses ? (
+            <header className={styles.sectionHeader}>
+              <h2 className={styles.sectionHeading}>Verse Aggregator</h2>
+              <p className={styles.sectionDescription}>
+                Collating insights for {osisRefs.join(", ")}
+              </p>
+            </header>
+          ) : null}
 
-      {osisRefs.length > 0 && features ? (
-        <section style={{ display: "grid", gap: "1.5rem" }}>
-          <header>
-            <h2 style={{ margin: 0 }}>Verse Aggregator</h2>
-            <p style={{ margin: "0.25rem 0", color: "var(--muted-foreground, #4b5563)" }}>
-              Collating insights for {osisRefs.join(", ")}
-            </p>
-          </header>
-          {researchFeaturesError ? (
-            <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+          {featureDiscoveryFailed ? (
+            <p role="alert" className={styles.researchAlert}>
               Unable to load research capabilities. {researchFeaturesError}
             </p>
           ) : null}
+
           {features
             ? osisRefs.map((osis) => (
-                <div
-                  key={osis}
-                  style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: "1rem" }}
-                >
-                  <h3 style={{ marginTop: 0 }}>{osis}</h3>
+                <div key={osis} className={styles.featureGroup}>
+                  <h3 className={styles.featureHeading}>{osis}</h3>
                   <Suspense fallback={<p>Loading research panels…</p>}>
                     <ResearchPanels osis={osis} features={features} />
                   </Suspense>
                 </div>
               ))
-            : !researchFeaturesError ? (
-                <p style={{ margin: 0, color: "var(--muted-foreground, #4b5563)" }}>
+            : !researchFeaturesError && hasReferencedVerses ? (
+                <p className={styles.researchFallback}>
                   Research capabilities are unavailable for this notebook.
                 </p>
               ) : null}
@@ -288,25 +245,14 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
       ) : null}
 
       {notebook.collaborators.length > 0 ? (
-        <section style={{ display: "grid", gap: "0.75rem" }}>
-          <h2 style={{ margin: 0 }}>Collaborators</h2>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.5rem" }}>
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>Collaborators</h2>
+          <ul className={styles.collaboratorList}>
             {notebook.collaborators.map((collaborator) => (
-              <li
-                key={collaborator.id}
-                style={{
-                  background: "var(--muted, #f1f5f9)",
-                  padding: "0.75rem",
-                  borderRadius: "0.75rem",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                  alignItems: "center",
-                }}
-              >
+              <li key={collaborator.id} className={styles.collaboratorItem}>
                 <div>
                   <strong>{collaborator.subject}</strong>
-                  <p style={{ margin: 0, color: "var(--muted-foreground, #4b5563)", fontSize: "0.85rem" }}>
+                  <p className={styles.collaboratorMeta}>
                     {collaborator.role} · Joined {new Date(collaborator.created_at).toLocaleDateString()}
                   </p>
                 </div>

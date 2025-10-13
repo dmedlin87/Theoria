@@ -44,7 +44,7 @@ export default function SearchResults({
       <div className="alert alert-info">
         <div className="alert__title">No results found</div>
         <div className="alert__message">
-          Try adjusting your search query or filters to find what you&apos;re looking for.
+          Try adjusting your search query or filters to find what you&rsquo;re looking for.
         </div>
       </div>
     );

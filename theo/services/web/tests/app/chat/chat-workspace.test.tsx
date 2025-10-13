@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
 import "@testing-library/jest-dom";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import type {
   ChatWorkflowClient,
@@ -44,7 +44,10 @@ const sampleAnswer = {
 } satisfies import("../../../app/copilot/components/types").RAGAnswer;
 
 jest.mock("../../../app/mode-context", () => {
-  const { RESEARCH_MODES, DEFAULT_MODE_ID } = require("../../../app/mode-config");
+  const { RESEARCH_MODES, DEFAULT_MODE_ID } =
+    jest.requireActual<typeof import("../../../app/mode-config")>(
+      "../../../app/mode-config",
+    );
   return {
     useMode: () => ({
       mode: RESEARCH_MODES[DEFAULT_MODE_ID],
@@ -424,7 +427,7 @@ describe("ChatWorkspace", () => {
   it("auto-submits new prompts when initialPrompt changes", async () => {
     const client: ChatWorkflowClient = {
       runChatWorkflow: jest.fn(async () => ({
-        kind: "success",
+        kind: "success" as const,
         sessionId: "session-1",
         answer: sampleAnswer,
       })),

@@ -4,9 +4,9 @@ const SEARCH_API_ROUTE = "**/api/search**";
 
 test.describe("Search page interactions", () => {
   test("@smoke shows a loading status while awaiting results", async ({ page }) => {
-    let releaseSearch: () => void = () => {};
+    let releaseSearchResolve!: (value?: void) => void;
     const pending = new Promise<void>((resolve) => {
-      releaseSearch = resolve;
+      releaseSearchResolve = resolve;
     });
 
     await page.route(SEARCH_API_ROUTE, async (route) => {
@@ -24,7 +24,7 @@ test.describe("Search page interactions", () => {
 
     await expect(page.getByRole("status")).toHaveText("Searching.");
 
-    releaseSearch();
+    releaseSearchResolve();
 
     await expect(page.getByRole("status")).not.toBeVisible();
     await page.unroute(SEARCH_API_ROUTE);

@@ -2,15 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout from "../../components/ErrorCallout";
 import { useToast } from "../../components/Toast";
@@ -141,17 +133,6 @@ const FILTER_FIELD_KEYS: Array<keyof SearchFilters> = [
   "includeDisputed",
   "preset",
 ];
-const VISUALLY_HIDDEN_STYLES: CSSProperties = {
-  border: 0,
-  clip: "rect(0 0 0 0)",
-  height: "1px",
-  margin: "-1px",
-  overflow: "hidden",
-  padding: 0,
-  position: "absolute",
-  width: "1px",
-  whiteSpace: "nowrap",
-};
 const EMPTY_FILTERS: SearchFilters = {
   query: "",
   osis: "",
@@ -540,7 +521,6 @@ export default function SearchPageClient({
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [savedSearchName, setSavedSearchName] = useState("");
   const [diffSelection, setDiffSelection] = useState<string[]>([]);
-  const [activeActionsGroupId, setActiveActionsGroupId] = useState<string | null>(null);
   const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(
     initialHasSearched ? { ...initialFilters } : null,
   );
@@ -677,6 +657,24 @@ export default function SearchPageClient({
     updateUrlForFilters(filters);
     await runSearch(filters);
   };
+
+  const applyFilters = useCallback((filters: SearchFilters) => {
+    setQuery(filters.query);
+    setOsis(filters.osis);
+    setCollection(filters.collection);
+    setAuthor(filters.author);
+    setSourceType(filters.sourceType);
+    setTheologicalTradition(filters.theologicalTradition);
+    setTopicDomain(filters.topicDomain);
+    setCollectionFacets([...filters.collectionFacets]);
+    setDatasetFacets([...filters.datasetFacets]);
+    setVariantFacets([...filters.variantFacets]);
+    setDateStart(filters.dateStart);
+    setDateEnd(filters.dateEnd);
+    setIncludeVariants(filters.includeVariants);
+    setIncludeDisputed(filters.includeDisputed);
+    setPresetSelection(filters.preset ? filters.preset : CUSTOM_PRESET_VALUE);
+  }, []);
 
   const handleShowErrorDetails = useCallback(
     (traceId: string | null) => {
@@ -1421,7 +1419,6 @@ export default function SearchPageClient({
             : diffSelection.length >= 2
             ? "Replace in diff"
             : "Add to diff";
-          const showGroupActions = isAdvancedUi || activeActionsGroupId === group.documentId;
           return (
             <article
               key={group.documentId}
@@ -1430,18 +1427,6 @@ export default function SearchPageClient({
                 isSelectedForDiff && styles["search-result-group--selected"],
               )}
               tabIndex={0}
-              onFocus={() => setActiveActionsGroupId(group.documentId)}
-              onBlur={() =>
-                setActiveActionsGroupId((current) =>
-                  current === group.documentId ? null : current,
-                )
-              }
-              onMouseEnter={() => setActiveActionsGroupId(group.documentId)}
-              onMouseLeave={() =>
-                setActiveActionsGroupId((current) =>
-                  current === group.documentId ? null : current,
-                )
-              }
             >
               <header className={styles["search-result-header"]}>
                 <div>

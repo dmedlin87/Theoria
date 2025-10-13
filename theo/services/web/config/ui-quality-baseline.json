@@ -22,7 +22,7 @@
     "app/copilot/components/WorkflowFormFields.tsx": 22,
     "app/copilot/components/WorkflowResultPanel.tsx": 6,
     "app/copilot/components/WorkflowSelector.tsx": 1,
-    "app/copilot/page.tsx": 23,
+    "app/copilot/page.tsx": 24,
     "app/doc/[id]/DocumentClient.tsx": 45,
     "app/export/page.tsx": 32,
     "app/notebooks/[id]/page.tsx": 35,
@@ -46,9 +46,10 @@
     "app/chat/ChatWorkspace.refactored.tsx": 469,
     "app/chat/ChatWorkspace.tsx": 737,
     "app/copilot/components/CitationList.tsx": 430,
-    "app/copilot/page.tsx": 683,
+    "app/copilot/page.tsx": 705,
     "app/doc/[id]/DocumentClient.tsx": 527,
     "app/research/panels/TextualVariantsPanel.tsx": 746,
-    "app/search/components/SearchPageClient.tsx": 1190
+    "app/search/components/SearchPageClient.tsx": 1210,
+    "app/upload/page.tsx": 421
   }
 }

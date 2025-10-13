@@ -65,6 +65,6 @@ export const EXPORT_PRESET_LOOKUP = EXPORT_PRESETS.reduce(
   {} as Record<ExportPresetId, ExportPreset>,
 );
 
-const _assertAllExportPresetsCovered: MissingExportPresetIds extends never
+export type EnsureAllExportPresetsCoveredCheck = MissingExportPresetIds extends never
   ? true
-  : MissingExportPresetIds = true;
+  : MissingExportPresetIds;

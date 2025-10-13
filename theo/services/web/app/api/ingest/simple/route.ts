@@ -10,7 +10,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let payload: unknown;
   try {
     payload = await request.json();
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { detail: "Invalid request payload" },
       { status: 400 },

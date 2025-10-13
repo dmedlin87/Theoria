@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 export type UiMode = "simple" | "advanced";
 
@@ -12,20 +12,20 @@ function isUiMode(value: string | null): value is UiMode {
 
 export function useUiModePreference(
   defaultMode: UiMode = "simple",
-): [UiMode, (mode: UiMode) => void, boolean] {
-  const [mode, setMode] = useState<UiMode>(defaultMode);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
+): [UiMode, (mode: UiMode) => void] {
+  const [mode, setMode] = useState<UiMode>(() => {
     if (typeof window === "undefined") {
-      return;
+      return defaultMode;
     }
     const stored = window.localStorage.getItem(UI_MODE_STORAGE_KEY);
     if (isUiMode(stored)) {
-      setMode(stored);
+      return stored;
     }
-    setHydrated(true);
-  }, []);
+    if (stored) {
+      window.localStorage.removeItem(UI_MODE_STORAGE_KEY);
+    }
+    return defaultMode;
+  });
 
   const updateMode = useCallback((next: UiMode) => {
     setMode(next);
@@ -34,5 +34,5 @@ export function useUiModePreference(
     }
   }, []);
 
-  return [mode, updateMode, hydrated];
+  return [mode, updateMode];
 }

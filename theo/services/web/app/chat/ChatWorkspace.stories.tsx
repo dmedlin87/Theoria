@@ -41,6 +41,7 @@ function createStoryClient(
 ): ChatWorkflowClient {
   return {
     async runChatWorkflow(_payload, options) {
+      void _payload;
       events.forEach((event) => options?.onEvent?.(event));
       return result;
     },
@@ -53,6 +54,8 @@ function createStoryClient(
 export function Loading(): JSX.Element {
   const client: ChatWorkflowClient = {
     async runChatWorkflow(_payload, _options) {
+      void _payload;
+      void _options;
       return new Promise(() => {
         // Intentionally unresolved to showcase loading state.
       });

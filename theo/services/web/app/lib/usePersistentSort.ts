@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { GroupSortKey, isGroupSortKey } from "../search/groupSorting";
 
@@ -10,20 +10,19 @@ export function usePersistentSort(defaultValue: GroupSortKey = "rank"): [
   GroupSortKey,
   (nextKey: GroupSortKey) => void,
 ] {
-  const [value, setValue] = useState<GroupSortKey>(defaultValue);
-
-  useEffect(() => {
+  const [value, setValue] = useState<GroupSortKey>(() => {
     if (typeof window === "undefined") {
-      return;
+      return defaultValue;
     }
-
     const storedValue = window.localStorage.getItem(STORAGE_KEY);
     if (storedValue && isGroupSortKey(storedValue)) {
-      setValue(storedValue);
-    } else if (storedValue && !isGroupSortKey(storedValue)) {
+      return storedValue;
+    }
+    if (storedValue && !isGroupSortKey(storedValue)) {
       window.localStorage.removeItem(STORAGE_KEY);
     }
-  }, []);
+    return defaultValue;
+  });
 
   const updateValue = useCallback((nextKey: GroupSortKey) => {
     setValue(nextKey);

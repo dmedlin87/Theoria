@@ -18,13 +18,12 @@ import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout
 import { Icon } from "../components/Icon";
 import type { ChatWorkflowClient } from "../lib/chat-client";
 import { createTheoApiClient } from "../lib/api-client";
-import type { HybridSearchFilters } from "../lib/guardrails";
 import {
   type GuardrailSuggestion,
   useGuardrailActions,
 } from "../lib/guardrails";
 import { useMode } from "../mode-context";
-import { emitTelemetry, submitFeedback, type FeedbackAction } from "../lib/telemetry";
+import { emitTelemetry, submitFeedback } from "../lib/telemetry";
 import { useChatWorkspaceState, type Reaction, type AssistantConversationEntry } from "./useChatWorkspaceState";
 import { useSessionRestoration, useSessionPersistence, CHAT_SESSION_STORAGE_KEY } from "./useSessionRestoration";
 import { useChatExecution } from "./useChatExecution";
@@ -276,7 +275,7 @@ export default function ChatWorkspace({
           <p className="chat-hero__eyebrow">Theoria Copilot</p>
           <h2>Ask with {mode.label} stance</h2>
           <p>
-            We'll keep the conversation aligned to <strong>{mode.label.toLowerCase()}</strong> emphasis while grounding
+            We&rsquo;ll keep the conversation aligned to <strong>{mode.label.toLowerCase()}</strong> emphasis while grounding
             every answer with citations you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
           </p>
         <div className="chat-hero__actions" aria-label="Quick navigation">
@@ -380,7 +379,7 @@ export default function ChatWorkspace({
                         <li key={`${entry.id}-${citation.index}`} className="chat-citation-item">
                           <div>
                             <p className="chat-citation-heading">{citation.osis}</p>
-                            <p className="chat-citation-snippet">"{citation.snippet}"</p>
+                            <p className="chat-citation-snippet">“{citation.snippet}”</p>
                             {citation.document_title && (
                               <p className="chat-citation-source">{citation.document_title}</p>
                             )}
@@ -431,7 +430,7 @@ export default function ChatWorkspace({
         ) : (
           <div className="chat-empty-state">
             <h3>Start the conversation</h3>
-            <p>Ask about a passage, doctrine, or theme and we'll respond with cited insights.</p>
+            <p>Ask about a passage, doctrine, or theme and we&rsquo;ll respond with cited insights.</p>
             <ul className="chat-empty-state-actions">
               {sampleQuestions.map((question, index) => (
                 <li key={question}>

@@ -36,7 +36,7 @@ function safeRandomId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     try {
       return crypto.randomUUID();
-    } catch (error) {
+    } catch {
       // ignore and fall through to fallback id
     }
   }
@@ -51,10 +51,6 @@ export default function CitationList({
   exporting,
   status,
 }: CitationListProps): JSX.Element | null {
-  if (!citations.length) {
-    return null;
-  }
-
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const hasSummary = useMemo(() => Boolean((summaryText ?? "").trim()), [summaryText]);
   const documentChoices = useMemo(() => {
@@ -283,6 +279,10 @@ export default function CitationList({
       setIsSavingBundle(false);
     }
   };
+
+  if (citations.length === 0) {
+    return null;
+  }
 
   return (
     <div style={{ marginTop: "1rem", display: "grid", gap: "1rem" }}>
