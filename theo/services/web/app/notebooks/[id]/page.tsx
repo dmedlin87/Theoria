@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import Breadcrumbs from "../../components/Breadcrumbs";
 import DeliverableExportAction, {
   type DeliverableRequestPayload,
 } from "../../components/DeliverableExportAction";
@@ -193,6 +194,13 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
 
   return (
     <div style={{ display: "grid", gap: "2rem", padding: "1.5rem" }}>
+      <Breadcrumbs
+        items={[
+          { label: "Home", href: "/" },
+          { label: "Notebooks" },
+          { label: notebook.title ?? "Notebook" },
+        ]}
+      />
       <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
           <div>

@@ -1,5 +1,8 @@
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Suspense } from "react";
+import Breadcrumbs from "../../components/Breadcrumbs";
+import VirtualList from "../../components/VirtualList";
 
 import DeliverableExportAction, {
   type DeliverableRequestPayload,
@@ -9,12 +12,26 @@ import ResearchPanels from "../../research/ResearchPanels";
 import { fetchResearchFeatures } from "../../research/features";
 import type { ResearchFeatureFlags } from "../../research/types";
 import ReliabilityOverviewCard from "./ReliabilityOverviewCard";
-import VerseGraphSection from "./VerseGraphSection";
 import type { VerseGraphResponse } from "./graphTypes";
 import { VerseReliabilitySkeleton, VerseResearchSkeleton } from "./VerseSkeletons";
 
+const VerseGraphSection = dynamic(() => import("./VerseGraphSection"), {
+  loading: () => <GraphSectionSkeleton />,
+  ssr: false,
+});
+
 const TIMELINE_WINDOWS = ["week", "month", "quarter", "year"] as const;
 type TimelineWindow = (typeof TIMELINE_WINDOWS)[number];
+
+function GraphSectionSkeleton(): JSX.Element {
+  return (
+    <div className="card graph-section-skeleton" aria-busy="true">
+      <div className="skeleton graph-section-skeleton__title" />
+      <div className="skeleton graph-section-skeleton__subtitle" />
+      <div className="skeleton graph-section-skeleton__canvas" />
+    </div>
+  );
+}
 
 interface VersePageProps {
   params: { osis: string };
@@ -360,12 +377,17 @@ export default async function VersePage({ params, searchParams }: VersePageProps
     <section aria-labelledby="verse-mentions-heading">
       <div className={features.research ? "sidebar-layout" : ""}>
         <div>
-          <header className="page-header" style={{ marginBottom: "1rem" }}>
-            <h1 id="verse-mentions-heading">Verse mentions</h1>
-            <p>
-              Aggregated references for <strong>{osis}</strong>
-            </p>
-          </header>
+          <Breadcrumbs
+            items={[
+              { label: "Home", href: "/" },
+              { label: "Verse mentions" },
+              { label: osis },
+            ]}
+          />
+          <h2>Verse Mentions</h2>
+          <p>
+            Aggregated references for <strong>{osis}</strong>
+          </p>
 
           <Suspense fallback={<VerseReliabilitySkeleton />}>
             <ReliabilityOverviewCard osis={osis} mode={activeMode} />
@@ -474,8 +496,16 @@ export default async function VersePage({ params, searchParams }: VersePageProps
               <div className="alert__message">No mentions found for the selected filters.</div>
             </div>
           ) : (
-            <ul className="stack-md" style={{ listStyle: "none", padding: 0 }}>
-              {mentions.map((mention) => {
+            <VirtualList
+              items={mentions}
+              itemKey={(mention) => mention.passage.id}
+              estimateSize={() => 200}
+              containerProps={{
+                className: "verse-mentions__scroller",
+                role: "list",
+                "aria-label": "Verse mentions",
+              }}
+              renderItem={(mention, index) => {
                 const anchor = formatAnchor({
                   page_no: mention.passage.page_no ?? null,
                   t_start: mention.passage.t_start ?? null,
@@ -484,7 +514,11 @@ export default async function VersePage({ params, searchParams }: VersePageProps
                 const documentTitle =
                   (mention.passage.meta?.document_title as string | undefined) ?? "Untitled document";
                 return (
-                  <li key={mention.passage.id} className="card">
+                  <div
+                    role="listitem"
+                    className="card verse-mentions__item"
+                    data-last={index === mentions.length - 1}
+                  >
                     <article className="stack-sm">
                       <header className="stack-xs">
                         <h3 className="text-lg font-semibold mb-0">{documentTitle}</h3>
@@ -504,10 +538,10 @@ export default async function VersePage({ params, searchParams }: VersePageProps
                         </Link>
                       </footer>
                     </article>
-                  </li>
+                  </div>
                 );
-              })}
-            </ul>
+              }}
+            />
           )}
         </div>
         {features.research ? (

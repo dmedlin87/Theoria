@@ -19,6 +19,9 @@ function classNames(
   return classes.filter(Boolean).join(" ");
 }
 
+import CommandPalette from "./CommandPalette";
+import OfflineIndicator from "./OfflineIndicator";
+
 export type AppShellNavItem = {
   href: string;
   label: string;

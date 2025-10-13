@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import Breadcrumbs from "../../components/Breadcrumbs";
+import VirtualList from "../../components/VirtualList";
+
 import DeliverableExportAction from "../../components/DeliverableExportAction";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
 import type {
@@ -292,8 +295,15 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
   };
 
   return (
-    <section aria-labelledby="document-title">
-      <h1 id="document-title">{document.title ?? "Document"}</h1>
+    <section>
+      <Breadcrumbs
+        items={[
+          { label: "Home", href: "/" },
+          { label: "Documents" },
+          { label: document.title ?? "Document" },
+        ]}
+      />
+      <h2>{document.title ?? "Document"}</h2>
       <p>Document ID: {document.id}</p>
 
       <details open style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>
@@ -458,34 +468,43 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
             {document.passages.length === 0 ? (
               <p style={{ marginTop: "1rem" }}>No passages available for this document.</p>
             ) : (
-              <ol style={{ padding: 0, listStyle: "none", display: "grid", gap: "1rem", marginTop: "1rem" }}>
-                {document.passages.map((passage) => {
+              <VirtualList
+                items={document.passages}
+                itemKey={(passage) => passage.id}
+                estimateSize={() => 260}
+                containerProps={{
+                  className: "document-passages__list",
+                  role: "list",
+                  "aria-label": "Document passages",
+                }}
+                renderItem={(passage, index) => {
                   const anchor = formatAnchor({
                     page_no: passage.page_no ?? null,
                     t_start: passage.t_start ?? null,
                     t_end: passage.t_end ?? null,
                   });
-              return (
-                <li
-                  key={passage.id}
-                  id={`passage-${passage.id}`}
-                  style={{ background: "#fff", padding: "1rem", borderRadius: "0.5rem" }}
-                >
-                  <article>
-                    <header>
-                      {anchor && <p style={{ margin: "0 0 0.5rem" }}>{anchor}</p>}
-                      {passage.osis_ref && (
-                        <p style={{ margin: 0 }}>
-                          Verse reference: <Link href={`/verse/${passage.osis_ref}`}>{passage.osis_ref}</Link>
-                        </p>
-                      )}
-                    </header>
-                    <p style={{ marginTop: "0.75rem", whiteSpace: "pre-wrap" }}>{passage.text}</p>
-                  </article>
-                </li>
-              );
-            })}
-              </ol>
+                  return (
+                    <div
+                      id={`passage-${passage.id}`}
+                      role="listitem"
+                      className="document-passages__item"
+                      data-last={index === document.passages.length - 1}
+                    >
+                      <article>
+                        <header>
+                          {anchor && <p style={{ margin: "0 0 0.5rem" }}>{anchor}</p>}
+                          {passage.osis_ref && (
+                            <p style={{ margin: 0 }}>
+                              Verse reference: <Link href={`/verse/${passage.osis_ref}`}>{passage.osis_ref}</Link>
+                            </p>
+                          )}
+                        </header>
+                        <p style={{ marginTop: "0.75rem", whiteSpace: "pre-wrap" }}>{passage.text}</p>
+                      </article>
+                    </div>
+                  );
+                }}
+              />
             )}
           </section>
         </div>
