@@ -7,7 +7,7 @@ import os
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from threading import Lock
+from threading import RLock
 from typing import Deque, Dict, Iterable, Literal, MutableMapping, Tuple
 
 from fastapi import status
@@ -78,7 +78,7 @@ class WriteSecurityPolicy:
         default_factory=dict
     )
     _rate_tracking: MutableMapping[Tuple[str, str], Deque[float]] = field(default_factory=dict)
-    _lock: Lock = field(default_factory=Lock)
+    _lock: RLock = field(default_factory=RLock)
     _security_events: MutableMapping[str, int] = field(default_factory=dict)
 
     def _actors(self, tenant_id: str | None, end_user_id: str | None) -> Iterable[str]:
@@ -198,7 +198,7 @@ class ReadSecurityPolicy:
     rate_limits: Dict[str, int] = field(default_factory=dict)
     window_seconds: int = 60
     _rate_tracking: MutableMapping[Tuple[str, str], Deque[float]] = field(default_factory=dict)
-    _lock: Lock = field(default_factory=Lock)
+    _lock: RLock = field(default_factory=RLock)
     _security_events: MutableMapping[str, int] = field(default_factory=dict)
 
     def enforce_rate_limit(self, tool: str, end_user_id: str) -> None:
