@@ -76,9 +76,22 @@ def main() -> int:
     args = parse_args()
     result = run_trufflehog()
 
-    findings = load_findings(result.stdout)
+    if result.returncode not in (0, 1):
+        print(f"Trufflehog CLI failed (exit code {result.returncode}).")
+        if result.stderr:
+            print(result.stderr)
+        return result.returncode
 
-    if result.returncode not in (0, 1) or (result.returncode != 0 and not findings):
+    try:
+        findings = load_findings(result.stdout)
+    except RuntimeError as exc:
+        print("Trufflehog CLI produced invalid JSON output.")
+        print(str(exc))
+        if result.stderr:
+            print(result.stderr)
+        return 1
+
+    if result.returncode != 0 and not findings:
         print(f"Trufflehog CLI failed (exit code {result.returncode}).")
         if result.stderr:
             print(result.stderr)
