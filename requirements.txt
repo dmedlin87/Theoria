@@ -9,7 +9,7 @@ pypdf==5.1.0
 webvtt-py==0.5.1
 PyYAML>=6.0,<7
 httpx>=0.28.1,<0.29
-cachetools>=5.3,<6
+cachetools>=5.3,<7
 python-multipart==0.0.12
 pytest>=8.3,<9
 pytest-cov>=5.0,<6
