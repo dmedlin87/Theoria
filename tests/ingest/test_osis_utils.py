@@ -126,6 +126,8 @@ def test_osis_to_readable_covers_varied_inputs() -> None:
     assert _osis_to_readable("John.3.16") == "John 3:16"
     assert _osis_to_readable("John.3.16-18") == "John 3:16-18"
     assert _osis_to_readable("John.3.16-John.4.2") == "John 3:16-4:2"
+    assert _osis_to_readable("Gen.1.1-Exod.2.3") == "Gen 1:1-Exod 2:3"
+    assert _osis_to_readable("Gen.1-Exod.2.3") == "Gen 1-Exod 2:3"
 
 
 def test_expand_osis_reference_matches_pythonbible_conversion() -> None:

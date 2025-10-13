@@ -222,10 +222,16 @@ def _osis_to_readable(reference: str) -> str:
             if chapter is not None and end_parts[0] == chapter:
                 return f"{text_value}-{end_parts[1]}"
             return f"{text_value}-{end_parts[0]}:{end_parts[1]}"
-        end_book = end_parts[0] if end_parts[0] in KNOWN_BOOK_CODES else book
-        offset = 1 if end_book == book else 0
-        end_chapter = end_parts[offset] if len(end_parts) > offset else None
-        end_verse = end_parts[offset + 1] if len(end_parts) > offset + 1 else None
+
+        if end_parts and end_parts[0] in KNOWN_BOOK_CODES:
+            end_book = end_parts[0]
+            remaining = end_parts[1:]
+        else:
+            end_book = book
+            remaining = end_parts
+
+        end_chapter = remaining[0] if remaining else None
+        end_verse = remaining[1] if len(remaining) > 1 else None
         return _format_range_end(end_book, end_chapter, end_verse)
 
     if len(end_parts) == 1:
@@ -235,10 +241,15 @@ def _osis_to_readable(reference: str) -> str:
             return _format_range_end(end_parts[0], end_parts[1], None)
         return _format_range_end(None, end_parts[0], end_parts[1])
 
-    end_book = end_parts[0] if end_parts[0] in KNOWN_BOOK_CODES else book
-    offset = 1 if end_book == book else 0
-    end_chapter = end_parts[offset] if len(end_parts) > offset else None
-    end_verse = end_parts[offset + 1] if len(end_parts) > offset + 1 else None
+    if end_parts and end_parts[0] in KNOWN_BOOK_CODES:
+        end_book = end_parts[0]
+        remaining = end_parts[1:]
+    else:
+        end_book = book
+        remaining = end_parts
+
+    end_chapter = remaining[0] if remaining else None
+    end_verse = remaining[1] if len(remaining) > 1 else None
     return _format_range_end(end_book, end_chapter, end_verse)
 
 
