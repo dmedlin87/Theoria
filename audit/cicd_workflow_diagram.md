@@ -95,6 +95,7 @@ graph TB
 ```
 
 ### Job Dependencies
+
 ```
 secrets-scan     (no deps)
 test             (no deps)
@@ -104,6 +105,7 @@ test             (no deps)
 ```
 
 ### Estimated Runtime
+
 ```
 Setup:           ~3 min
 Linting:         ~2 min
@@ -363,6 +365,7 @@ concurrency:
 ```
 
 **Effect:**
+
 - ✅ Prevents staging test collisions (single queue)
 - ✅ Allows parallel localhost runs per branch
 - ⚠️ Other workflows have no concurrency control
@@ -419,6 +422,7 @@ concurrency:
 ```
 
 **Retention Policy:**
+
 - Default: 90 days (GitHub free/pro)
 - Recommended: 14 days for most artifacts (save storage)
 - Exception: Release artifacts (indefinite)
@@ -439,6 +443,7 @@ concurrency:
 | lighthouse.yml | read | - | - | - | - | - | - |
 
 **Security Grade: A+**
+
 - ✅ All workflows follow least-privilege
 - ✅ No unnecessary `write` permissions
 - ✅ Security workflows properly scoped
@@ -499,6 +504,7 @@ concurrency:
 ## Optimization Opportunities
 
 ### 1. Job Parallelization
+
 **Current:** Sequential linting/testing within single `test` job  
 **Proposed:** Split into parallel jobs
 
@@ -517,6 +523,7 @@ concurrency:
 **Savings:** ~5 minutes (parallel linting while tests run)
 
 ### 2. Cache Strategy
+
 ```
 ┌─────────────────────────────────────────┐
 │           Cache Hierarchy               │
@@ -535,13 +542,16 @@ concurrency:
 **Potential Savings:** 5-7 minutes per run
 
 ### 3. Conditional Execution
+
 **Already Implemented:**
+
 - ✅ Lighthouse (path filter)
 - ✅ RAG eval (path filter)
 - ✅ Percy (token check)
 - ✅ ZAP (secret check)
 
 **Could Add:**
+
 - Path filters for Python-only changes (skip Node tests)
 - Path filters for Node-only changes (skip Python tests)
 

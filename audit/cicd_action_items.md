@@ -10,21 +10,25 @@ This document provides actionable tasks derived from the CI/CD pipeline review, 
 ## Priority 1: Critical (Implement This Week)
 
 ### 1. Standardize TruffleHog Configuration
+
 **Impact:** Security consistency  
 **Effort:** 15 minutes  
 **Risk:** Low
 
 **Current Issue:**
+
 - `ci.yml` uses `--only-verified --fail`
 - `secret-scanning.yml` uses default (all findings, no fail)
 
 **Action:**
+
 ```yaml
 # Update .github/workflows/secret-scanning.yml line 28
 extra_args: "--only-verified --fail --json --results-file trufflehog-findings.json"
 ```
 
 **Verification:**
+
 ```bash
 # After change, trigger both workflows and ensure behavior matches
 gh workflow run secret-scanning.yml
@@ -33,17 +37,20 @@ gh workflow run secret-scanning.yml
 ---
 
 ### 2. Add Missing Job Timeouts
+
 **Impact:** Prevents hung workflows consuming minutes  
 **Effort:** 10 minutes  
 **Risk:** None
 
 **Files to Update:**
+
 - `.github/workflows/ci.yml` - test job (line 13)
 - `.github/workflows/ci.yml` - web_lighthouse job (line 276)
 - `.github/workflows/security-codeql.yml` - analyze job (line 16)
 - `.github/workflows/security-scorecard.yml` - analysis job (line 16)
 
 **Template:**
+
 ```yaml
 jobs:
   test:
@@ -61,6 +68,7 @@ jobs:
 ```
 
 **Verification:**
+
 ```bash
 # Check all workflows have timeouts
 grep -r "timeout-minutes" .github/workflows/
@@ -69,6 +77,7 @@ grep -r "timeout-minutes" .github/workflows/
 ---
 
 ### 3. Add Container Vulnerability Scanning
+
 **Impact:** Prevents shipping vulnerable images  
 **Effort:** 30 minutes  
 **Risk:** Medium (may detect existing vulnerabilities)
@@ -76,6 +85,7 @@ grep -r "timeout-minutes" .github/workflows/
 **Location:** `.github/workflows/deployment-sign.yml` after line 67 (after SBOM generation)
 
 **Implementation:**
+
 ```yaml
 - name: Scan image for vulnerabilities
   id: scan
@@ -109,6 +119,7 @@ grep -r "timeout-minutes" .github/workflows/
 ## Priority 2: High (Implement This Month)
 
 ### 4. Create Composite Action for Python Setup
+
 **Impact:** Reduces duplication, easier maintenance  
 **Effort:** 1 hour  
 **Risk:** Low
@@ -159,18 +170,21 @@ runs:
 ```
 
 **Update workflows to use:**
+
 ```yaml
 # Replace setup-python steps in ci.yml with:
 - uses: ./.github/actions/setup-python-theo
 ```
 
 **Files to update:**
+
 - `.github/workflows/ci.yml` (4 locations)
 - `.github/workflows/rag-eval.yml` (1 location)
 
 ---
 
 ### 5. Add Playwright Browser Caching
+
 **Impact:** Saves ~5 minutes per workflow run  
 **Effort:** 30 minutes  
 **Risk:** Low (cache invalidation might need tuning)
@@ -178,6 +192,7 @@ runs:
 **Location:** `.github/workflows/ci.yml` before line 49
 
 **Implementation:**
+
 ```yaml
 - name: Get Playwright version
   id: playwright-version
@@ -200,6 +215,7 @@ runs:
 ```
 
 **Apply to:**
+
 - `test` job (line 49)
 - `web_accessibility` job (line 174)
 - `web_visual_regression` job (line 251)
@@ -207,6 +223,7 @@ runs:
 ---
 
 ### 6. Configure Dependabot
+
 **Impact:** Automated security updates  
 **Effort:** 20 minutes  
 **Risk:** Creates PR noise (can configure labels/reviewers)
@@ -272,6 +289,7 @@ updates:
 ```
 
 **Post-implementation:**
+
 - Monitor first week of PRs
 - Adjust grouping if too many PRs
 - Consider auto-merge for patch updates (with strong test coverage)
@@ -279,6 +297,7 @@ updates:
 ---
 
 ### 7. Create Deployment Workflow
+
 **Impact:** Complete CI/CD cycle  
 **Effort:** 2-4 hours  
 **Risk:** Medium (requires staging/production infrastructure)
@@ -394,6 +413,7 @@ jobs:
 ```
 
 **Prerequisites:**
+
 - Configure GitHub environments (Settings → Environments)
   - `staging` (no protection)
   - `production` (required reviewers)
@@ -405,6 +425,7 @@ jobs:
 ## Priority 3: Medium (Implement This Quarter)
 
 ### 8. Add Performance Regression Gates
+
 **Impact:** Prevent performance regressions  
 **Effort:** 2 hours  
 **Risk:** Low (may need threshold tuning)
@@ -465,6 +486,7 @@ if (failures.length > 0) {
 ---
 
 ### 9. Document Security Architecture
+
 **Impact:** Team understanding, compliance  
 **Effort:** 1 hour  
 **Risk:** None
@@ -544,6 +566,7 @@ if (failures.length > 0) {
 ---
 
 ### 10. Add RAG Metric Regression Detection
+
 **Impact:** Catch AI quality regressions  
 **Effort:** 2 hours  
 **Risk:** Low
@@ -626,17 +649,20 @@ if __name__ == "__main__":
 ## Implementation Roadmap
 
 ### Week 1 (Critical)
+
 - [ ] Standardize TruffleHog config (15 min)
 - [ ] Add job timeouts (10 min)
 - [ ] Add container scanning (30 min)
 
 ### Week 2-4 (High Priority)
+
 - [ ] Create Python composite action (1 hour)
 - [ ] Add Playwright caching (30 min)
 - [ ] Configure Dependabot (20 min)
 - [ ] Create deployment workflow (2-4 hours)
 
 ### Month 2-3 (Medium Priority)
+
 - [ ] Add performance budgets (2 hours)
 - [ ] Document security architecture (1 hour)
 - [ ] Add RAG regression detection (2 hours)
