@@ -189,15 +189,36 @@ def _add_sqlite_columns(
 
 
 def _ensure_perspective_column(
-    session: Session, table: Table, dataset_label: str
+    session: Session,
+    table: Table,
+    dataset_label: str,
+    *,
+    required_columns: Iterable[str] | None = None,
 ) -> bool:
     """Verify the ``perspective`` column exists before reading from ``table``."""
 
+    dependencies = tuple(required_columns or ())
     initially_missing = not _table_has_column(
         session, table.name, "perspective", schema=table.schema
     )
     if not initially_missing:
         return True
+
+    if dependencies:
+        missing_dependencies = [
+            column
+            for column in dependencies
+            if not _table_has_column(
+                session, table.name, column, schema=table.schema
+            )
+        ]
+        if missing_dependencies:
+            session.rollback()
+            logger.warning(
+                "Skipping %s seeds because 'perspective' column is missing",
+                dataset_label,
+            )
+            return False
 
     bind = session.get_bind()
     dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
@@ -386,7 +407,12 @@ def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
 
     table = ContradictionSeed.__table__
-    if not _ensure_perspective_column(session, table, "contradiction"):
+    if not _ensure_perspective_column(
+        session,
+        table,
+        "contradiction",
+        required_columns=("created_at",) if hasattr(ContradictionSeed, "created_at") else None,
+    ):
         return
 
     range_columns = [
@@ -531,7 +557,12 @@ def seed_harmony_claims(session: Session) -> None:
     """Load harmony seeds from bundled YAML/JSON files."""
 
     table = HarmonySeed.__table__
-    if not _ensure_perspective_column(session, table, "harmony"):
+    if not _ensure_perspective_column(
+        session,
+        table,
+        "harmony",
+        required_columns=("created_at",) if hasattr(HarmonySeed, "created_at") else None,
+    ):
         return
 
     harmony_range_columns = [
@@ -684,7 +715,14 @@ def seed_commentary_excerpts(session: Session) -> None:
     """Seed curated commentary excerpts into the catalogue."""
 
     table = CommentaryExcerptSeed.__table__
-    if not _ensure_perspective_column(session, table, "commentary excerpt"):
+    if not _ensure_perspective_column(
+        session,
+        table,
+        "commentary excerpt",
+        required_columns=("created_at",)
+        if hasattr(CommentaryExcerptSeed, "created_at")
+        else None,
+    ):
         return
     if not _ensure_range_columns(
         session,
