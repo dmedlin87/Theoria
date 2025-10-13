@@ -16,6 +16,7 @@
 ## 📚 Quick Links
 
 - **[System Architecture](docs/BLUEPRINT.md)** – Complete design and architecture
+- **[Codebase Review](docs/CODEBASE_REVIEW.md)** – Current implementation overview and documentation index
 - **[Getting Started](#quick-start)** – Run locally in minutes
 - **[UI Demo](http://localhost:3000/demo-animations)** – See animations live (after starting dev server)
 - **[API Documentation](http://localhost:8000/docs)** – Interactive API explorer
