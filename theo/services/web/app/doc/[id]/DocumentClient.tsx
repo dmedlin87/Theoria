@@ -292,8 +292,8 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
   };
 
   return (
-    <section>
-      <h2>{document.title ?? "Document"}</h2>
+    <section aria-labelledby="document-title">
+      <h1 id="document-title">{document.title ?? "Document"}</h1>
       <p>Document ID: {document.id}</p>
 
       <details open style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>
@@ -314,8 +314,8 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
             {document.channel && <p>Channel: {document.channel}</p>}
           </div>
 
-          <section>
-            <h3>Annotations</h3>
+          <section aria-labelledby="document-annotations-heading">
+            <h2 id="document-annotations-heading">Annotations</h2>
             <form onSubmit={handleAnnotationSubmit} style={{ display: "grid", gap: "0.5rem", maxWidth: 520 }}>
               <textarea
                 name="annotation"
@@ -446,7 +446,7 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
 
           <section>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-              <h3 style={{ margin: 0 }}>Passages</h3>
+              <h2 style={{ margin: 0 }}>Passages</h2>
               <button
                 type="button"
                 onClick={handleAddAnnotationShortcut}

@@ -72,6 +72,8 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
     <div
       role="region"
       aria-label="Notifications"
+      aria-live="polite"
+      aria-atomic="false"
       className="toast-container"
     >
       {toasts.map((toast) => (

@@ -1,12 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import ErrorCallout from "../components/ErrorCallout";
 import ModeChangeBanner from "../components/ModeChangeBanner";
 import UiModeToggle from "../components/UiModeToggle";
 import { useToast } from "../components/Toast";
+import { FocusTrapRegion } from "../components/a11y/FocusTrapRegion";
 import { ADVANCED_TOOLS, type AdvancedToolId } from "../chat/tools";
 import ResearchPanels from "../research/ResearchPanels";
 import { fetchResearchFeatures } from "../research/features";
@@ -190,6 +191,8 @@ export default function CopilotPage(): JSX.Element {
     },
   } = useCopilotWorkflowState();
   const { addToast } = useToast();
+  const copilotHeadingId = "copilot-title";
+  const verseResearchDescriptionId = "verse-research-description";
 
   useEffect(() => {
     if (error) {
@@ -539,8 +542,8 @@ export default function CopilotPage(): JSX.Element {
 
   if (enabled === false) {
     return (
-      <section>
-        <h2>Copilot</h2>
+      <section aria-labelledby={copilotHeadingId}>
+        <h1 id={copilotHeadingId}>Copilot</h1>
         <p>The AI copilot is not enabled for this deployment.</p>
         {error && <p role="alert">{error.message}</p>}
       </section>
@@ -549,18 +552,20 @@ export default function CopilotPage(): JSX.Element {
 
   if (enabled === null) {
     return (
-      <section>
-        <h2>Copilot</h2>
+      <section aria-labelledby={copilotHeadingId}>
+        <h1 id={copilotHeadingId}>Copilot</h1>
         <p>Loading feature flags…</p>
       </section>
     );
   }
 
   return (
-    <section>
-      <h2>Copilot</h2>
-      <p>Run grounded workflows that stay anchored to your corpus.</p>
-      <p style={{ marginTop: "0.5rem", color: "#4b5563" }}>{formatEmphasisSummary(mode)}</p>
+    <section aria-labelledby={copilotHeadingId}>
+      <header className="page-header" style={{ marginBottom: "1rem" }}>
+        <h1 id={copilotHeadingId}>Copilot</h1>
+        <p>Run grounded workflows that stay anchored to your corpus.</p>
+        <p style={{ marginTop: "0.5rem", color: "#4b5563" }}>{formatEmphasisSummary(mode)}</p>
+      </header>
       <ModeChangeBanner area="Copilot workspace" />
 
       <div style={{ margin: "1.5rem 0" }}>
@@ -596,7 +601,7 @@ export default function CopilotPage(): JSX.Element {
       )}
 
       <section
-        aria-label="Advanced tools"
+        aria-labelledby="advanced-tools-heading"
         style={{
           marginTop: "1.5rem",
           padding: "1.25rem",
@@ -609,7 +614,7 @@ export default function CopilotPage(): JSX.Element {
       >
         <header style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", justifyContent: "space-between" }}>
           <div style={{ maxWidth: "48ch" }}>
-            <h3 style={{ margin: 0 }}>Advanced tools</h3>
+            <h2 id="advanced-tools-heading" style={{ margin: 0 }}>Advanced tools</h2>
             <p style={{ margin: "0.25rem 0 0", color: "#475569", fontSize: "0.9rem" }}>
               Launch research modules inline or trigger them with slash commands like <code>/research</code> from the
               question box.
@@ -775,59 +780,78 @@ export default function CopilotPage(): JSX.Element {
       `}</style>
 
       {activeTool?.id === "verse-research" && (
-        <aside className="advanced-tool-drawer" aria-label="Verse research panels drawer">
-          <div className="drawer-header">
-            <div>
-              <h3 style={{ margin: 0 }}>Verse research panels</h3>
-              <p style={{ margin: "0.25rem 0 0", color: "#475569" }}>
-                Inspect contradictions, cross-references, morphology, and commentaries inline while you chat.
-              </p>
+        <FocusTrapRegion
+          active={true}
+          initialFocus={() =>
+            drawerContainerRef.current?.querySelector<HTMLInputElement>("input") ??
+            drawerCloseButtonRef.current ??
+            drawerContainerRef.current ??
+            document.body
+          }
+          fallbackFocus={() => drawerCloseButtonRef.current ?? drawerContainerRef.current ?? document.body}
+        >
+          <aside
+            ref={drawerContainerRef}
+            className="advanced-tool-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="verse-research-title"
+            aria-describedby={verseResearchDescriptionId}
+          >
+            <div className="drawer-header">
+              <div>
+                <h3 id="verse-research-title" style={{ margin: 0 }}>Verse research panels</h3>
+                <p id={verseResearchDescriptionId} style={{ margin: "0.25rem 0 0", color: "#475569" }}>
+                  Inspect contradictions, cross-references, morphology, and commentaries inline while you chat.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeActiveTool}
+                ref={drawerCloseButtonRef}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#1d4ed8",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Close
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={closeActiveTool}
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "#1d4ed8",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Close
-            </button>
-          </div>
-          <div className="drawer-content">
-            <label className="drawer-input">
-              <span>OSIS reference</span>
-              <input
-                type="text"
-                value={drawerOsis}
-                onChange={(event) => setDrawerOsis(event.target.value)}
-                placeholder="John.1.1-5"
-              />
-            </label>
+            <div className="drawer-content">
+              <label className="drawer-input">
+                <span>OSIS reference</span>
+                <input
+                  type="text"
+                  value={drawerOsis}
+                  onChange={(event) => setDrawerOsis(event.target.value)}
+                  placeholder="John.1.1-5"
+                />
+              </label>
 
-            {researchFeaturesError ? (
-              <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
-                {researchFeaturesError}
-              </p>
-            ) : null}
+              {researchFeaturesError ? (
+                <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+                  {researchFeaturesError}
+                </p>
+              ) : null}
 
-            {researchLoading ? (
-              <p>Loading research capabilities…</p>
-            ) : !researchEnabled ? (
-              <p>
-                Research panels are disabled for this deployment. Visit the verse explorer for the full dashboard, or
-                contact an admin to enable research features.
-              </p>
-            ) : drawerOsis.trim() ? (
-              <ResearchPanels osis={drawerOsis.trim()} features={researchFeatures ?? {}} />
-            ) : (
-              <p>Enter an OSIS reference above to load the verse research stack.</p>
-            )}
-          </div>
-        </aside>
+              {researchLoading ? (
+                <p>Loading research capabilities…</p>
+              ) : !researchEnabled ? (
+                <p>
+                  Research panels are disabled for this deployment. Visit the verse explorer for the full dashboard, or
+                  contact an admin to enable research features.
+                </p>
+              ) : drawerOsis.trim() ? (
+                <ResearchPanels osis={drawerOsis.trim()} features={researchFeatures ?? {}} />
+              ) : (
+                <p>Enter an OSIS reference above to load the verse research stack.</p>
+              )}
+            </div>
+          </aside>
+        </FocusTrapRegion>
       )}
 
       {error && (

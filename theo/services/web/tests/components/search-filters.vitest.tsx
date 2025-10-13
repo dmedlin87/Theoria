@@ -1,10 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import SearchFilters from "../../app/search/components/SearchFilters";
 
 describe("SearchFilters", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   const baseProps = {
     query: "",
     osis: "",
@@ -40,22 +44,13 @@ describe("SearchFilters", () => {
       />
     );
 
-    await user.type(screen.getByLabelText(/search query/i), "lexical");
-    await user.type(screen.getByLabelText(/osis reference/i), "John.1.1");
-    await user.type(screen.getByLabelText(/collection/i), "Sermons");
-    await user.type(screen.getByLabelText(/author/i), "Augustine");
-    await user.selectOptions(
-      screen.getByLabelText(/source type/i),
-      screen.getByRole("option", { name: "PDF" })
-    );
-    await user.selectOptions(
-      screen.getByLabelText(/theological tradition/i),
-      screen.getByRole("option", { name: "Baptist" })
-    );
-    await user.selectOptions(
-      screen.getByLabelText(/topic domain/i),
-      screen.getByRole("option", { name: "Christology" })
-    );
+    fireEvent.change(screen.getByLabelText(/search query/i), { target: { value: "lexical" } });
+    fireEvent.change(screen.getByLabelText(/osis reference/i), { target: { value: "John.1.1" } });
+    fireEvent.change(screen.getByLabelText(/collection/i), { target: { value: "Sermons" } });
+    fireEvent.change(screen.getByLabelText(/author/i), { target: { value: "Augustine" } });
+    fireEvent.change(screen.getByLabelText(/source type/i), { target: { value: "pdf" } });
+    fireEvent.change(screen.getByLabelText(/theological tradition/i), { target: { value: "baptist" } });
+    fireEvent.change(screen.getByLabelText(/topic domain/i), { target: { value: "christology" } });
 
     await user.click(screen.getByRole("button", { name: /clear all/i }));
 
