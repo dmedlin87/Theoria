@@ -112,7 +112,31 @@ def _invoke_rag_eval(
 
     env = os.environ.copy()
     env.setdefault("PYTHONUNBUFFERED", "1")
-    subprocess.run(command, check=True, env=env)
+    
+    # Print command for debugging
+    print(f"Running command: {' '.join(command)}")
+    
+    try:
+        # Capture output so we can emit it on failure
+        result = subprocess.run(
+            command,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        print(result.stdout)
+        if result.stderr:
+            print(f"rag_eval stderr: {result.stderr}", file=sys.stderr)
+    except subprocess.CalledProcessError as e:
+        # Emit command, return code, stdout/stderr for CI logs
+        print(f"Command failed: {' '.join(e.cmd)}", file=sys.stderr)
+        print(f"Return code: {e.returncode}", file=sys.stderr)
+        if e.stdout:
+            print(f"STDOUT:\n{e.stdout}", file=sys.stderr)
+        if e.stderr:
+            print(f"STDERR:\n{e.stderr}", file=sys.stderr)
+        raise
 
     marker_path = output_dir / f"{module}_run.txt"
     marker_path.write_text(
@@ -183,6 +207,19 @@ def _write_comparison(module: str, output_path: Path, output_dir: Path) -> None:
 def main() -> None:
     args = _parse_args()
     modules = _ensure_modules(args.modules)
+    
+    # Validate required input files exist
+    for file_path in [args.dev_path, args.trace_path, args.baseline]:
+        if not file_path.exists():
+            print(f"Required file not found: {file_path}", file=sys.stderr)
+            sys.exit(2)
+    
+    # Check if modules were detected
+    if not modules:
+        print("No RAG modules detected (modules list empty). Skipping rag_eval.", file=sys.stderr)
+        sys.exit(0)
+    
+    print(f"Running rag_eval for modules: {', '.join(modules)}")
 
     for module in modules:
         output_path = _invoke_rag_eval(
