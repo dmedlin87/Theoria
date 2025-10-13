@@ -373,35 +373,73 @@ def _persist_chat_session(
         answer=answer,
         intent_tags=normalized_intent_tags,
     )
-    new_entry = ChatMemoryEntry(
-        question=_truncate_text(question, _MEMORY_TEXT_LIMIT),
-        answer=_truncate_text(message.content, _MEMORY_TEXT_LIMIT),
-        prompt=_truncate_text(prompt, _MEMORY_TEXT_LIMIT) if prompt else None,
-        intent_tags=normalized_intent_tags,
-        answer_summary=(
-            _truncate_text(answer.summary, _MEMORY_SUMMARY_LIMIT)
-            if answer.summary
+
+    if memory_entry is None:
+        new_entry = ChatMemoryEntry(
+            question=_truncate_text(question, _MEMORY_TEXT_LIMIT),
+            answer=_truncate_text(message.content, _MEMORY_TEXT_LIMIT),
+            prompt=_truncate_text(prompt, _MEMORY_TEXT_LIMIT) if prompt else None,
+            intent_tags=normalized_intent_tags,
+            answer_summary=(
+                _truncate_text(answer.summary, _MEMORY_SUMMARY_LIMIT)
+                if answer.summary
+                else None
+            ),
+            citations=list(answer.citations or []),
+            document_ids=_collect_document_ids(answer),
+            topics=metadata.topics,
+            entities=metadata.entities,
+            goal_ids=metadata.goal_ids,
+            source_types=metadata.source_types,
+            sentiment=metadata.sentiment,
+            created_at=now,
+        )
+    else:
+        new_entry = memory_entry
+        new_entry.question = _truncate_text(new_entry.question, _MEMORY_TEXT_LIMIT)
+        new_entry.answer = _truncate_text(new_entry.answer, _MEMORY_TEXT_LIMIT)
+        new_entry.prompt = (
+            _truncate_text(new_entry.prompt, _MEMORY_TEXT_LIMIT)
+            if new_entry.prompt
             else None
-        ),
-        citations=list(answer.citations or []),
-        document_ids=_collect_document_ids(answer),
-        topics=metadata.topics,
-        entities=metadata.entities,
-        goal_ids=metadata.goal_ids,
-        source_types=metadata.source_types,
-        sentiment=metadata.sentiment,
-        created_at=now,
-    )
+        )
+        new_entry.intent_tags = normalized_intent_tags
+        if new_entry.answer_summary:
+            new_entry.answer_summary = _truncate_text(
+                new_entry.answer_summary, _MEMORY_SUMMARY_LIMIT
+            )
+        elif answer.summary:
+            new_entry.answer_summary = _truncate_text(
+                answer.summary, _MEMORY_SUMMARY_LIMIT
+            )
+        if not new_entry.citations:
+            new_entry.citations = list(answer.citations or [])
+        if not new_entry.document_ids:
+            new_entry.document_ids = _collect_document_ids(answer)
+        if not new_entry.topics:
+            new_entry.topics = metadata.topics
+        if not new_entry.entities:
+            new_entry.entities = metadata.entities
+        if not new_entry.goal_ids:
+            new_entry.goal_ids = metadata.goal_ids
+        if not new_entry.source_types:
+            new_entry.source_types = metadata.source_types
+        if new_entry.sentiment is None:
+            new_entry.sentiment = metadata.sentiment
+        if new_entry.created_at is None:
+            new_entry.created_at = now
+
     if active_goal is not None:
-        new_entry.goal_id = active_goal.id
-        new_entry.trail_id = active_goal.trail_id
+        if new_entry.goal_id is None:
+            new_entry.goal_id = active_goal.id
+        if new_entry.trail_id is None:
+            new_entry.trail_id = active_goal.trail_id
     try:
         memory_index = memory_index_module.get_memory_index()
-        embedding = memory_index.embed_snippet(
-            question=new_entry.question,
-            answer=new_entry.answer,
-            answer_summary=new_entry.answer_summary,
-        )
+        if memory_entry is None or new_entry.embedding is None:
+            embedding = memory_index.embed_entry(new_entry)
+        else:
+            embedding = None
         if embedding:
             new_entry.embedding = embedding
             new_entry.embedding_model = memory_index.model_name
