@@ -89,6 +89,11 @@ class ChatMemoryEntry(APIModel):
     answer_summary: str | None = None
     citations: list[RAGCitation] = Field(default_factory=list)
     document_ids: list[str] = Field(default_factory=list)
+    topics: list[str] | None = None
+    entities: list[str] | None = None
+    goal_ids: list[str] | None = None
+    source_types: list[str] | None = None
+    sentiment: str | None = None
     created_at: datetime
     trail_id: str | None = None
     digest_hash: str | None = None
