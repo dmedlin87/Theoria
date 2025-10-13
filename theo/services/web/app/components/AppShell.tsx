@@ -22,6 +22,7 @@ function classNames(
 
 import CommandPalette from "./CommandPalette";
 import OfflineIndicator from "./OfflineIndicator";
+import { ThemeToggle } from "./ThemeToggle";
 
 export type AppShellNavItem = {
   href: string;
@@ -235,10 +236,26 @@ export function AppShell({
         </FocusTrapRegion>
       </aside>
       <div className={styles.workspace}>
+        <CommandPalette />
         <div className={styles.commandBar} role="banner">
-          <div className={styles.commandPlaceholder} aria-hidden="true">
-            Command palette coming soon
-          </div>
+          <button
+            type="button"
+            className={styles.commandTrigger}
+            onClick={() => {
+              window.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'k',
+                metaKey: true,
+                ctrlKey: true,
+                bubbles: true
+              }));
+            }}
+            aria-label="Open command palette"
+            title="Open command palette (⌘K or Ctrl+K)"
+          >
+            <span className={styles.commandTriggerIcon}>⌘</span>
+            <span className={styles.commandTriggerText}>Quick actions...</span>
+            <kbd className={styles.commandTriggerKbd}>⌘K</kbd>
+          </button>
           <div
             className={styles.commandActions}
             aria-label="Quick actions"
@@ -275,7 +292,10 @@ export function AppShell({
           {children}
         </main>
         <footer className={styles.footer}>
-          <div>{footerMeta}</div>
+          <div className={styles.footerMeta}>
+            <span>{footerMeta}</span>
+            <ThemeToggle />
+          </div>
           {footerLinks.length > 0 ? (
             <div className={styles.footerLinks}>
               {footerLinks.map((link) =>

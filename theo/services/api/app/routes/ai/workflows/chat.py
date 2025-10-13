@@ -263,6 +263,15 @@ def _prepare_memory_context(
     if focus:
         matched = [entry for entry in ordered if focus.matches(entry)]
         remainder = [entry for entry in ordered if not focus.matches(entry)]
+    ordered = sorted(entries, key=lambda entry: entry.created_at, reverse=True)
+    if focus:
+        matched: list[ChatMemoryEntry] = []
+        remainder: list[ChatMemoryEntry] = []
+        for entry in ordered:
+            if focus.matches(entry):
+                matched.append(entry)
+            else:
+                remainder.append(entry)
         candidates = matched + remainder
     else:
         candidates = ordered
@@ -284,6 +293,12 @@ def _prepare_memory_context(
             entry.answer,
             answer_summary=entry.answer_summary,
         )
+    remaining = CHAT_SESSION_MEMORY_CHAR_BUDGET
+    selected: list[tuple[ChatMemoryEntry, str]] = []
+    for entry in candidates:
+        answer_text = (entry.answer_summary or entry.answer or "").strip()
+        question_text = entry.question.strip()
+        base = f"Q: {question_text} | A: {answer_text}"
         extras: list[str] = []
         key_entities = getattr(entry, "key_entities", None) or []
         if key_entities:
