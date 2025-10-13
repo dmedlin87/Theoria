@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -126,9 +127,10 @@ class InsightDetector:
         # If 3+ different books, flag as cross-reference insight
         if len(books) >= 3:
             book_list = ", ".join(sorted(books))
+            book_hash = hashlib.sha1(book_list.encode("utf-8")).hexdigest()[:10]
             insights.append(
                 Insight(
-                    id=f"cross-ref-{hash(book_list) % 10000}",
+                    id=f"cross-ref-{book_hash}",
                     insight_type="cross_ref",
                     description=f"Connection spans {len(books)} books: {book_list}",
                     supporting_passages=[p.get("id", "") for p in passages],

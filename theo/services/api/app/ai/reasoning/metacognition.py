@@ -103,6 +103,14 @@ def critique_reasoning(
     if bias_warnings:
         critique.reasoning_quality -= len(bias_warnings) * 10
 
+    # Surface alternative interpretations explicitly mentioned in the reasoning
+    critique.alternative_interpretations = _extract_alternative_interpretations(
+        reasoning_trace, answer
+    )
+
+    # Clamp reasoning quality after all adjustments to the documented 0-100 range
+    critique.reasoning_quality = max(0, min(critique.reasoning_quality, 100))
+
     # Generate recommendations
     critique.recommendations = _generate_recommendations(critique)
 
@@ -204,6 +212,100 @@ def _detect_bias(reasoning_trace: str, answer: str) -> list[str]:
         warnings.append("Overconfident language detected - claims may need more support")
 
     return warnings
+
+
+def _extract_alternative_interpretations(reasoning_trace: str, answer: str) -> list[str]:
+    """Extract alternative interpretations explicitly called out in the text."""
+
+    combined_text = f"{reasoning_trace}\n{answer}"
+    interpretations: list[str] = []
+    seen: set[str] = set()
+
+    def _add_candidate(raw: str) -> None:
+        candidate = _normalise_interpretation_text(raw)
+        if candidate and candidate.lower() not in seen:
+            seen.add(candidate.lower())
+            interpretations.append(candidate)
+
+    for raw_line in combined_text.splitlines():
+        cleaned_line = raw_line.strip()
+        if not cleaned_line:
+            continue
+
+        stripped = cleaned_line.lstrip("-•").strip()
+        lowered = stripped.lower()
+
+        if "alternative interpretation" in lowered:
+            if ":" in stripped:
+                _, after = stripped.split(":", 1)
+            else:
+                after = stripped.split("interpretation", 1)[-1]
+            _add_candidate(after)
+            continue
+
+        if lowered.startswith("alternatively"):
+            after = stripped[len("alternatively") :]
+            _add_candidate(after)
+            continue
+
+        if lowered.startswith("another interpretation"):
+            if ":" in stripped:
+                after = stripped.split(":", 1)[1]
+            else:
+                after = stripped[len("another interpretation") :]
+            _add_candidate(after)
+            continue
+
+        if lowered.startswith("another possibility"):
+            if ":" in stripped:
+                after = stripped.split(":", 1)[1]
+            else:
+                after = stripped[len("another possibility") :]
+            _add_candidate(after)
+
+    # Capture inline sentences such as "Alternatively, ..." that may not be line-separated
+    inline_patterns = [
+        re.compile(r"\balternatively[,\s]+(?P<clause>[^.?!\n]+)", re.IGNORECASE),
+        re.compile(
+            r"\banother interpretation is that\s+(?P<clause>[^.?!\n]+)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\banother possibility is\s+(?P<clause>[^.?!\n]+)",
+            re.IGNORECASE,
+        ),
+    ]
+
+    for pattern in inline_patterns:
+        for match in pattern.finditer(combined_text):
+            clause = match.group("clause")
+            _add_candidate(clause)
+
+    return interpretations
+
+
+def _normalise_interpretation_text(text: str) -> str:
+    """Normalise extracted interpretation snippets for presentation."""
+
+    cleaned = text.strip().lstrip("-•:;").strip()
+    if not cleaned:
+        return ""
+
+    # Remove leading commas or conjunctions introduced by regex captures
+    cleaned = re.sub(r"^,\s*", "", cleaned)
+    cleaned = re.sub(r"^(that|it|this)\s+", "", cleaned, count=1, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"^(?:is that|is|would be|might be|could be)\s+",
+        "",
+        cleaned,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+
+    # Trim trailing punctuation to keep concise bullet-style entries
+    cleaned = cleaned.rstrip(" .!?")
+
+    return cleaned
 
 
 def _generate_recommendations(critique: Critique) -> list[str]:

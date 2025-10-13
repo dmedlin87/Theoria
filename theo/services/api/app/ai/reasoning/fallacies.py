@@ -77,6 +77,12 @@ class FallacyDetector:
 
     # Composition patterns
     FALLACY_PATTERNS: list[tuple[Pattern[str], str, str, str]] = [
+        (
+            AFFIRMING_CONSEQUENT,
+            "affirming_consequent",
+            "medium",
+            "Treats 'if P then Q' and Q as proof of P",
+        ),
         (AD_HOMINEM, "ad_hominem", "high", "Attack on person rather than argument"),
         (
             APPEAL_TO_AUTHORITY,
@@ -153,6 +159,7 @@ class FallacyDetector:
     def _get_suggestion(self, fallacy_type: str) -> str | None:
         """Get remediation suggestion for a fallacy type."""
         suggestions = {
+            "affirming_consequent": "Check whether the consequent could hold without the proposed cause.",
             "ad_hominem": "Focus on evaluating the argument's logic, not the person's character.",
             "appeal_to_authority": "Provide the underlying reasoning or evidence, not just the authority's name.",
             "circular_reasoning": "Establish premises independently before drawing conclusions.",
