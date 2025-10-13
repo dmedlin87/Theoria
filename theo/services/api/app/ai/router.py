@@ -630,6 +630,8 @@ class LLMRouterService:
         if not text:
             return 0
         
+        fallback_estimate = max(len(text) // 4, 0)
+
         try:
             import tiktoken
             
@@ -651,10 +653,11 @@ class LLMRouterService:
                     self._tokenizer_cache[encoding_name] = tiktoken.get_encoding("cl100k_base")
             
             encoder = self._tokenizer_cache[encoding_name]
-            return len(encoder.encode(text, disallowed_special=()))
+            token_count = len(encoder.encode(text, disallowed_special=()))
+            return max(token_count, fallback_estimate)
         except Exception:
             # Fallback to character-based estimation
-            return max(len(text) // 4, 0)
+            return fallback_estimate
     @staticmethod
     def _as_bool(value: Any) -> bool | None:
         if isinstance(value, bool):
