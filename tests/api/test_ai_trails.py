@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 
 import pytest
@@ -14,9 +15,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.ai.trails import TrailService
+from theo.services.api.app.ai.trails import TrailService, TrailStepDigest
 from theo.application.facades.database import Base
-from theo.services.api.app.db.models import AgentTrail
+from theo.services.api.app.db.models import AgentTrail, ChatSession
+from theo.services.api.app.models.ai import ChatMemoryEntry
 
 
 @pytest.fixture()
@@ -117,3 +119,124 @@ def test_trail_replay_retains_retrieval_snapshots(
     session.refresh(trail)
     assert len(trail.retrieval_snapshots) == 1
     assert trail.retrieval_snapshots[0].retrieval_hash == "digest-1"
+
+
+def test_trail_digest_persists_chat_memory(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = TrailService(session)
+    recorded_tasks: list[tuple[str, dict[str, str]]] = []
+    monkeypatch.setattr(
+        "theo.services.api.app.ai.trails_memory_bridge.celery",
+        SimpleNamespace(
+            send_task=lambda name, kwargs=None, args=None: recorded_tasks.append(
+                (name, kwargs or {})
+            )
+        ),
+    )
+
+    with service.start_trail(
+        workflow="chat",
+        plan_md="Plan",
+        mode="chat",
+        input_payload={
+            "session_id": "chat-session-1",
+            "messages": [{"role": "user", "content": "What does John 1 teach?"}],
+            "filters": {},
+        },
+        user_id="tester",
+    ) as recorder:
+        digest = TrailStepDigest(
+            summary="The prologue affirms Christ's divinity.",
+            key_entities=["John 1:1 - Logos"],
+            recommended_actions=["Review commentary on John 1"],
+        )
+        recorder.log_step(
+            tool="rag.compose",
+            output_payload={"answer": {"summary": digest.summary}},
+            digest=digest,
+            significant=True,
+        )
+        trail_id = recorder.trail.id
+        recorder.finalize(final_md=digest.summary, output_payload={"answer": {"summary": digest.summary}})
+
+    session.expire_all()
+    chat_session = session.get(ChatSession, "chat-session-1")
+    assert chat_session is not None
+    assert chat_session.summary.startswith("The prologue")
+    assert len(chat_session.memory_snippets) == 1
+    entry = ChatMemoryEntry.model_validate(chat_session.memory_snippets[0])
+    assert entry.trail_id == trail_id
+    assert entry.digest_hash is not None
+    assert entry.key_entities == ["John 1:1 - Logos"]
+    assert entry.recommended_actions == ["Review commentary on John 1"]
+
+    assert recorded_tasks == [
+        (
+            "tasks.enqueue_follow_up_retrieval",
+            {"session_id": "chat-session-1", "trail_id": trail_id, "action": "Review commentary on John 1"},
+        )
+    ]
+
+
+def test_trail_digest_deduplicates_entries(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = TrailService(session)
+    recorded_tasks: list[tuple[str, dict[str, str]]] = []
+    monkeypatch.setattr(
+        "theo.services.api.app.ai.trails_memory_bridge.celery",
+        SimpleNamespace(
+            send_task=lambda name, kwargs=None, args=None: recorded_tasks.append(
+                (name, kwargs or {})
+            )
+        ),
+    )
+
+    with service.start_trail(
+        workflow="chat",
+        plan_md="Plan",
+        mode="chat",
+        input_payload={
+            "session_id": "chat-session-2",
+            "messages": [{"role": "user", "content": "Summarise Romans 8"}],
+            "filters": {},
+        },
+        user_id="tester",
+    ) as recorder:
+        digest = TrailStepDigest(
+            summary="Romans 8 celebrates life in the Spirit.",
+            key_entities=["Romans 8:1"],
+            recommended_actions=["Explore cross references"],
+        )
+        recorder.log_step(
+            tool="rag.compose",
+            output_payload={"answer": {"summary": digest.summary}},
+            digest=digest,
+            significant=True,
+        )
+        recorder.log_step(
+            tool="rag.compose",
+            output_payload={"answer": {"summary": digest.summary}},
+            digest=digest,
+            significant=True,
+        )
+        recorder.finalize(final_md=digest.summary, output_payload={"answer": {"summary": digest.summary}})
+
+    session.expire_all()
+    chat_session = session.get(ChatSession, "chat-session-2")
+    assert chat_session is not None
+    assert len(chat_session.memory_snippets) == 1
+    entry = ChatMemoryEntry.model_validate(chat_session.memory_snippets[0])
+    assert entry.answer_summary == "Romans 8 celebrates life in the Spirit."
+    assert entry.recommended_actions == ["Explore cross references"]
+    assert recorded_tasks == [
+        (
+            "tasks.enqueue_follow_up_retrieval",
+            {
+                "session_id": "chat-session-2",
+                "trail_id": entry.trail_id,
+                "action": "Explore cross references",
+            },
+        )
+    ]
