@@ -130,7 +130,7 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
     passageIndexLookupRef.current = passageIndexLookup;
 
     const pendingHash = pendingHashRef.current;
-    if (!pendingHash || pendingHash === lastHandledHashRef.current) {
+    if (!pendingHash) {
       return;
     }
     const passageId = parsePassageHash(pendingHash);
@@ -155,9 +155,6 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
       if (!passageId) {
         return;
       }
-      if (normalizedHash === lastHandledHashRef.current) {
-        return;
-      }
       pendingHashRef.current = normalizedHash;
       const index = passageIndexLookupRef.current.get(passageId);
       if (typeof index === "number") {
@@ -170,6 +167,57 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
     window.addEventListener("hashchange", syncWithHash);
     return () => {
       window.removeEventListener("hashchange", syncWithHash);
+    };
+  }, [parsePassageHash]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleAnchorClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const anchor = target.closest<HTMLAnchorElement>("a[href]");
+      if (!anchor) {
+        return;
+      }
+
+      const url = new URL(anchor.href, window.location.href);
+      if (url.pathname !== window.location.pathname) {
+        return;
+      }
+
+      const normalizedHash = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
+      if (!normalizedHash) {
+        return;
+      }
+
+      const currentHash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      if (normalizedHash !== currentHash) {
+        return;
+      }
+
+      const passageId = parsePassageHash(normalizedHash);
+      if (!passageId) {
+        return;
+      }
+
+      pendingHashRef.current = normalizedHash;
+      const index = passageIndexLookupRef.current.get(passageId);
+      if (typeof index === "number") {
+        setScrollRequest({ id: passageId, index, hash: normalizedHash });
+      }
+    };
+
+    window.addEventListener("click", handleAnchorClick);
+    return () => {
+      window.removeEventListener("click", handleAnchorClick);
     };
   }, [parsePassageHash]);
 
