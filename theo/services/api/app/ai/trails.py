@@ -305,12 +305,12 @@ class TrailRecorder:
         self.trail.final_md = final_md
         self.trail.output_payload = _normalize_payload(output_payload)
         self.trail.error_message = None
-        self.trail.completed_at = datetime.now(UTC)
-        self.trail.updated_at = datetime.now(UTC)
-        if status == "completed":
-            self._dispatch_digests()
+        now = datetime.now(UTC)
+        if status in {"completed", "failed"}:
+            self.trail.completed_at = now
         else:
-            self._pending_digests.clear()
+            self.trail.completed_at = None
+        self.trail.updated_at = now
         self._session.add(self.trail)
         self._session.commit()
         self._finalized = True
@@ -355,6 +355,24 @@ class TrailService:
         self._session.add(trail)
         self._session.flush()
         return TrailRecorder(self._session, trail)
+
+    def resume_trail(
+        self, trail: AgentTrail | str, *, user_id: str | None = None
+    ) -> TrailRecorder:
+        if isinstance(trail, AgentTrail):
+            record = trail
+        else:
+            record = self.get_trail(trail)
+        if record is None:
+            raise ValueError("trail not found")
+        if user_id and not record.user_id:
+            record.user_id = user_id
+        record.status = "running"
+        record.completed_at = None
+        record.updated_at = datetime.now(UTC)
+        self._session.add(record)
+        self._session.flush()
+        return TrailRecorder(self._session, record)
 
     def get_trail(self, trail_id: str) -> AgentTrail | None:
         return self._session.get(AgentTrail, trail_id)
