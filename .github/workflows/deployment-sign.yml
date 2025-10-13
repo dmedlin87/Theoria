@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Prepare image metadata
         id: meta
@@ -45,7 +45,7 @@ jobs:
 
       - name: Build and push API image
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: theo/services/api/Dockerfile
@@ -55,12 +55,12 @@ jobs:
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version_tag }}
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.7.0
+        uses: sigstore/cosign-installer@v3.10.0
         with:
           cosign-release: 'v2.2.3'
 
       - name: Generate CycloneDX image SBOM
-        uses: anchore/sbom-action@v0.17.7
+        uses: anchore/sbom-action@v0.20.6
         with:
           image: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
