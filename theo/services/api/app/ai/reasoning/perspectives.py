@@ -203,15 +203,15 @@ def synthesize_perspectives(
 
     Runs the same question through skeptical, apologetic, and neutral lenses,
     then compares to find consensus and tensions.
-    
+
     The workflow normalises perspective-specific filters, runs guarded
     retrieval, extracts headline claims, and then compares the results to map
     consensus and disagreement across stances.
-    
+
     Args:
         question: The theological question
         session: Database session
-        
+
     Returns:
         Multi-perspective synthesis
     """
@@ -261,10 +261,10 @@ def synthesize_perspectives(
 
 def _find_common_ground(views: list[PerspectiveView]) -> list[str]:
     """Find claims that appear across all perspectives.
-    
+
     Args:
         views: List of perspective views
-        
+
     Returns:
         Consensus claims
     """
@@ -282,10 +282,10 @@ def _find_common_ground(views: list[PerspectiveView]) -> list[str]:
 
 def _map_disagreements(views: list[PerspectiveView]) -> dict[str, list[str]]:
     """Map unique claims per perspective.
-    
+
     Args:
         views: List of perspective views
-        
+
     Returns:
         Dict mapping perspective name to unique claims
     """

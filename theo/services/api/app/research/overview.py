@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.overview import *  # noqa: F401,F403
+from ..compat.research.overview import (
+    OverviewBullet,
+    ReliabilityOverview,
+    build_reliability_overview,
+)
 
 warn(
     "Importing from 'theo.services.api.app.research.overview' is deprecated; "

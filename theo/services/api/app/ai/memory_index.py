@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Protocol, Sequence, runtime_checkable
 
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.stages.base import EmbeddingServiceProtocol
 
 if TYPE_CHECKING:
     from ..models.ai import ChatMemoryEntry
+
+
+@runtime_checkable
+class _ModelNamed(Protocol):
+    model_name: str | None
 
 
 LOGGER = logging.getLogger(__name__)
@@ -56,14 +61,16 @@ class MemoryIndex:
     @property
     def model_name(self) -> str | None:
         service = self._embedding_service
-        if service is not None and hasattr(service, "model_name"):
-            return getattr(service, "model_name")
+        if isinstance(service, _ModelNamed):
+            return service.model_name
         if service is None:
             try:
                 service = self._ensure_service()
             except Exception:  # pragma: no cover - defensive guard
                 return None
-        return getattr(service, "model_name", None)
+        if isinstance(service, _ModelNamed):
+            return service.model_name
+        return None
 
     def embed_snippet(
         self,

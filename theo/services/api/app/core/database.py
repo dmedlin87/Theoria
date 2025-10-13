@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from warnings import warn
 
-from theo.application.facades.database import *  # noqa: F401,F403
+from theo.application.facades.database import (
+    Base,
+    configure_engine,
+    get_engine,
+    get_session,
+)
 
 warn(
     "Importing from 'theo.services.api.app.core.database' is deprecated; "

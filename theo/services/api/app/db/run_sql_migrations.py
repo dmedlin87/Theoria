@@ -399,7 +399,7 @@ def run_sql_migrations(
                 continue
 
             should_execute = True
-            if ( 
+            if (
                 is_sqlite_perspective_migration
                 and has_perspective_column
                 and existing_entry is None

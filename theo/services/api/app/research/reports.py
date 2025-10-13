@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.reports import *  # noqa: F401,F403
+from ..compat.research.reports import (
+    ReportSection,
+    ResearchReport,
+    report_build,
+)
 
 warn(
     "Importing from 'theo.services.api.app.research.reports' is deprecated; "

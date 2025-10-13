@@ -545,16 +545,16 @@ class SharedLedger:
         observed_updated_at: float | None = None,
     ) -> CacheRecord:
         """Block until the inflight entry completes or raises.
-        
+
         Args:
             cache_key: Unique identifier for the generation request
             poll_interval: How often to check status (seconds)
             timeout: Maximum wait time before raising (seconds)
             observed_updated_at: Initial timestamp to detect stale entries
-            
+
         Returns:
             CacheRecord containing the completed generation
-            
+
         Raises:
             GenerationError: If timeout occurs or generation fails
         """

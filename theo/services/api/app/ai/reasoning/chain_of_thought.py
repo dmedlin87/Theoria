@@ -35,13 +35,13 @@ def build_cot_prompt(
     contradictions: list[dict] | None = None,
 ) -> str:
     """Build a chain-of-thought prompt for theological reasoning.
-    
+
     Args:
         question: The theological question to reason about
         citations: Retrieved passage citations
         mode: Reasoning mode (detective, critic, apologist, synthesizer)
         contradictions: Optional list of known contradictions to consider
-        
+
     Returns:
         Formatted prompt with chain-of-thought scaffolding
     """
@@ -216,12 +216,12 @@ Sources: [Citations]
 
 def parse_chain_of_thought(completion: str) -> ChainOfThought:
     """Parse chain-of-thought reasoning from model completion.
-    
+
     Extracts <thinking> tags and structures into reasoning steps.
-    
+
     Args:
         completion: The model's generated text
-        
+
     Returns:
         Parsed chain-of-thought with structured steps
     """
