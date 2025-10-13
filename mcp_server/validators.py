@@ -22,6 +22,7 @@ VALID_TENANT_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.]{1,128}$")
 VALID_IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]{1,128}$")
 OSIS_BASE_PATTERN = re.compile(r"^[A-Za-z0-9\.]+(\.[0-9]+)*$")
 OSIS_RANGE_SUFFIX_PATTERN = re.compile(r"^[0-9]+(\.[0-9]+)*$")
+OSIS_MIN_RANGE_START_PATTERN = re.compile(r"\.[0-9]+")
 
 # Dangerous patterns that should never appear in user input
 INJECTION_PATTERNS = [
@@ -209,6 +210,11 @@ def validate_osis_reference(osis: str | None) -> None:
 
     if len(range_parts) == 2:
         end = range_parts[1]
+        if not OSIS_MIN_RANGE_START_PATTERN.search(start):
+            raise ValidationError(
+                "OSIS range start must include chapter or verse when specifying a range",
+                "osis",
+            )
         if not (
             OSIS_BASE_PATTERN.fullmatch(end)
             or OSIS_RANGE_SUFFIX_PATTERN.fullmatch(end)
