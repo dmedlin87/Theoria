@@ -237,18 +237,54 @@
   -webkit-backdrop-filter: blur(var(--blur-md));
 }
 
-.commandPlaceholder {
+.commandTrigger {
   flex: 1;
   display: flex;
   align-items: center;
+  gap: var(--space-2);
   min-height: 3rem;
   padding: 0 var(--space-3);
   border-radius: var(--radius-full);
-  border: 1.5px dashed var(--color-border-subtle);
+  border: 1.5px solid var(--color-border-subtle);
+  background: var(--color-surface);
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.commandTrigger:hover,
+.commandTrigger:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-sm), 0 0 0 3px var(--color-accent-glow);
+}
+
+.commandTrigger:focus-visible {
+  outline: none;
+}
+
+.commandTriggerIcon {
+  font-size: 1.125rem;
+  opacity: 0.7;
+}
+
+.commandTriggerText {
+  flex: 1;
+  text-align: left;
+}
+
+.commandTriggerKbd {
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
 .commandActions {
@@ -324,12 +360,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-border-subtle);
   background: var(--color-surface-raised);
   color: var(--color-text-muted);
   font-size: 0.85rem;
+}
+
+.footerMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .footerLinks {

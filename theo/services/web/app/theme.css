@@ -200,6 +200,17 @@
   --shadow: var(--shadow-md);
 }
 
+/* Smooth transitions for theme changes */
+:root {
+  transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Explicit light theme */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;

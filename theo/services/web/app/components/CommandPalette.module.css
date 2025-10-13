@@ -1,0 +1,167 @@
+/* Command Palette Styles */
+:global(.cmdk-dialog) {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: overlay-fade-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:global(.cmdk-dialog) [cmdk-root] {
+  width: min(640px, calc(100vw - 2rem));
+  max-height: min(480px, calc(100vh - 30vh));
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl), 0 0 0 1px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  animation: dialog-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-slide-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+:global(.cmdk-input) {
+  width: 100%;
+  padding: var(--space-4) var(--space-4);
+  border: none;
+  border-bottom: 1.5px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+}
+
+:global(.cmdk-input)::placeholder {
+  color: var(--color-text-muted);
+}
+
+:global(.cmdk-dialog) [cmdk-list] {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-2);
+}
+
+:global(.cmdk-dialog) [cmdk-group] {
+  padding: var(--space-1) 0;
+}
+
+:global(.cmdk-dialog) [cmdk-group-heading] {
+  padding: var(--space-1-5) var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+:global(.cmdk-dialog) [cmdk-item] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 var(--space-1);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+:global(.cmdk-dialog) [cmdk-item][data-selected="true"] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent-glow);
+}
+
+:global(.cmdk-dialog) [cmdk-item][aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:global(.cmdk-item__label) {
+  flex: 1;
+  font-weight: 500;
+}
+
+:global(.cmdk-item__shortcut) {
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+:global(.cmdk-dialog) [cmdk-empty] {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+}
+
+/* Scrollbar styling */
+:global(.cmdk-dialog) [cmdk-list]::-webkit-scrollbar {
+  width: 8px;
+}
+
+:global(.cmdk-dialog) [cmdk-list]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:global(.cmdk-dialog) [cmdk-list]::-webkit-scrollbar-thumb {
+  background: var(--color-border-default);
+  border-radius: 999px;
+}
+
+:global(.cmdk-dialog) [cmdk-list]::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  :global(.cmdk-dialog) {
+    animation: none;
+  }
+  
+  :global(.cmdk-dialog) [cmdk-root] {
+    animation: none;
+  }
+  
+  :global(.cmdk-dialog) [cmdk-item] {
+    transition: none;
+  }
+}

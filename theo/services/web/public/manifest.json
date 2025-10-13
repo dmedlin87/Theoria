@@ -1,0 +1,82 @@
+{
+  "name": "Theoria Research Engine",
+  "short_name": "Theoria",
+  "description": "Research engine for theology - Index, search, and analyze Scripture-anchored content",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#6366f1",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity", "reference"],
+  "shortcuts": [
+    {
+      "name": "Chat Studio",
+      "short_name": "Chat",
+      "description": "Open chat workspace",
+      "url": "/chat",
+      "icons": [
+        {
+          "src": "/icon-chat.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "short_name": "Search",
+      "description": "Search your corpus",
+      "url": "/search",
+      "icons": [
+        {
+          "src": "/icon-search.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Copilot",
+      "short_name": "Copilot",
+      "description": "AI-powered research workflows",
+      "url": "/copilot",
+      "icons": [
+        {
+          "src": "/icon-copilot.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Theoria research workspace"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Theoria mobile interface"
+    }
+  ]
+}
