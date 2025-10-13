@@ -40,7 +40,7 @@ run_pipeline_for_url = _run_pipeline_for_url
 
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
-    status.HTTP_413_CONTENT_TOO_LARGE: {"description": "Upload too large"},
+    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE: {"description": "Upload too large"},
 }
 
 
@@ -136,7 +136,7 @@ async def _stream_upload_to_path(
                     raise IngestionError(
                         "Upload exceeds maximum allowed size",
                         code="INGESTION_UPLOAD_TOO_LARGE",
-                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                         severity=Severity.USER,
                         hint="Reduce the file size or configure a larger quota before retrying.",
                     )
