@@ -8,6 +8,7 @@ import textwrap
 from typing import Iterable
 
 from ..clients import LanguageModelClient
+from ..rag.guardrail_helpers import scrub_adversarial_language
 from .fallacies import FallacyWarning, detect_fallacies
 
 
@@ -396,7 +397,9 @@ def _format_weak_citations(critique: Critique, citations: list[dict]) -> str:
     for passage_id in critique.weak_citations:
         citation = citation_by_id.get(passage_id)
         if citation:
-            snippet = (citation.get("snippet") or "").strip()
+            snippet = scrub_adversarial_language(
+                (citation.get("snippet") or "").strip()
+            ) or ""
             index = citation.get("index")
             osis = citation.get("osis") or citation.get("document_id") or "?"
             anchor = citation.get("anchor") or "context"
@@ -417,7 +420,9 @@ def _format_citations(citations: list[dict]) -> str:
     lines = []
     for citation in citations:
         index = citation.get("index")
-        snippet = (citation.get("snippet") or "").strip()
+        snippet = scrub_adversarial_language(
+            (citation.get("snippet") or "").strip()
+        ) or ""
         osis = citation.get("osis") or citation.get("document_title") or citation.get("document_id") or "?"
         anchor = citation.get("anchor") or "context"
         lines.append(
