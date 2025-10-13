@@ -1,3 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "theoria"
+version = "0.0.0"
+description = "Theo application"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["theo*", "mcp_server*"]
+exclude = ["tests*", "fixtures*", "data*", "infra*", "metrics*", "ranking*", "contracts*", "dashboard*"]
+
 [tool.black]
 line-length = 88
 target-version = ["py311"]
