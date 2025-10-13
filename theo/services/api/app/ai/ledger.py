@@ -347,12 +347,15 @@ class LedgerTransaction:
 
     def clear_inflight(self) -> None:
         self._connection.execute("DELETE FROM inflight_entries")
+        with self._ledger._preserved_lock:
+            self._ledger._preserved_records.clear()
 
     def clear_single_inflight(self, cache_key: str) -> None:
         self._connection.execute(
             "DELETE FROM inflight_entries WHERE cache_key = ?",
             (cache_key,),
         )
+        self._ledger._clear_preserved(cache_key)
 
 
 class SharedLedger:
@@ -602,6 +605,7 @@ class SharedLedger:
                         source="preserved",
                         status=last_status,
                     )
+                    self._clear_preserved(cache_key)
                     return preserved_record
                 # Only purge stale inflight entries once we know the owning
                 # router can no longer update them.
@@ -648,6 +652,7 @@ class SharedLedger:
                         source="preserved",
                         status=last_status,
                     )
+                    self._clear_preserved(cache_key)
                     return preserved_record
                 time.sleep(poll_interval)
                 continue
@@ -678,6 +683,7 @@ class SharedLedger:
                             source="preserved",
                             status=row.status,
                         )
+                        self._clear_preserved(cache_key)
                         return preserved_record
                 if row.updated_at < comparison_floor:
                     _record_event(
@@ -719,6 +725,7 @@ class SharedLedger:
                     source="ledger",
                     status=row.status,
                 )
+                self._clear_preserved(cache_key)
                 return _row_to_record(row)
             if row.status == "waiting":
                 if (
@@ -745,6 +752,7 @@ class SharedLedger:
                         source="ledger",
                         status=row.status,
                     )
+                    self._clear_preserved(cache_key)
                     return _row_to_record(row)
                 with self.transaction() as txn:
                     cached = txn.get_cache_entry(cache_key)
