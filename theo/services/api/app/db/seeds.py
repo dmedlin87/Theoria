@@ -201,8 +201,6 @@ def _ensure_perspective_column(
     initially_missing = not _table_has_column(
         session, table.name, "perspective", schema=table.schema
     )
-    if not initially_missing:
-        return True
 
     if dependencies:
         missing_dependencies = [
@@ -214,11 +212,21 @@ def _ensure_perspective_column(
         ]
         if missing_dependencies:
             session.rollback()
-            logger.warning(
-                "Skipping %s seeds because 'perspective' column is missing",
-                dataset_label,
-            )
+            if initially_missing:
+                logger.warning(
+                    "Skipping %s seeds because 'perspective' column is missing",
+                    dataset_label,
+                )
+            else:
+                logger.warning(
+                    "Skipping %s seeds because required columns are missing: %s",
+                    dataset_label,
+                    ", ".join(missing_dependencies),
+                )
             return False
+
+    if not initially_missing:
+        return True
 
     bind = session.get_bind()
     dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
