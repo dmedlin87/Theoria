@@ -12,6 +12,7 @@ interface VirtualListProps<T> {
   itemKey?: (item: T, index: number) => string | number;
   emptyState?: ReactNode;
   containerProps?: Omit<HTMLAttributes<HTMLDivElement>, "children">;
+  scrollToIndex?: number | null;
 }
 
 const DEFAULT_ESTIMATE = 180;
@@ -24,6 +25,7 @@ export default function VirtualList<T>({
   itemKey,
   emptyState,
   containerProps,
+  scrollToIndex,
 }: VirtualListProps<T>): JSX.Element {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -58,6 +60,13 @@ export default function VirtualList<T>({
     }
     viewport.style.height = `${totalSize}px`;
   }, [totalSize]);
+
+  useEffect(() => {
+    if (scrollToIndex == null) {
+      return;
+    }
+    virtualizer.scrollToIndex(scrollToIndex, { align: "start" });
+  }, [scrollToIndex, virtualizer]);
 
   const { className, style: _ignoredStyle, ...restContainerProps } = containerProps ?? {};
   const combinedClassName = className ? `virtual-list ${className}` : "virtual-list";

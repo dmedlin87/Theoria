@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Breadcrumbs from "../../components/Breadcrumbs";
 import VirtualList from "../../components/VirtualList";
@@ -33,6 +33,12 @@ interface MetadataSnapshot {
   authors: string[];
   source_type: string | null;
   abstract: string | null;
+}
+
+interface PassageScrollRequest {
+  id: string;
+  index: number;
+  hash: string;
 }
 
 const SAFE_SOURCE_URL_PROTOCOLS = new Set(["http", "https"]);
@@ -94,6 +100,109 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
     }
     return lookup;
   }, [document.passages]);
+
+  const passageIndexLookup = useMemo(() => {
+    const lookup = new Map<string, number>();
+    document.passages.forEach((passage, index) => {
+      lookup.set(passage.id, index);
+    });
+    return lookup;
+  }, [document.passages]);
+
+  const passageIndexLookupRef = useRef(passageIndexLookup);
+  const pendingHashRef = useRef<string | null>(null);
+  const lastHandledHashRef = useRef<string | null>(null);
+  const [scrollRequest, setScrollRequest] = useState<PassageScrollRequest | null>(null);
+
+  const parsePassageHash = useCallback((hash: string): string | null => {
+    if (!hash.startsWith("passage-")) {
+      return null;
+    }
+    const rawId = hash.slice("passage-".length);
+    try {
+      return decodeURIComponent(rawId);
+    } catch {
+      return rawId;
+    }
+  }, []);
+
+  useEffect(() => {
+    passageIndexLookupRef.current = passageIndexLookup;
+
+    const pendingHash = pendingHashRef.current;
+    if (!pendingHash || pendingHash === lastHandledHashRef.current) {
+      return;
+    }
+    const passageId = parsePassageHash(pendingHash);
+    if (!passageId) {
+      return;
+    }
+    const index = passageIndexLookup.get(passageId);
+    if (typeof index === "number") {
+      setScrollRequest({ id: passageId, index, hash: pendingHash });
+    }
+  }, [parsePassageHash, passageIndexLookup]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncWithHash = () => {
+      const rawHash = window.location.hash ?? "";
+      const normalizedHash = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
+      const passageId = parsePassageHash(normalizedHash);
+      if (!passageId) {
+        return;
+      }
+      if (normalizedHash === lastHandledHashRef.current) {
+        return;
+      }
+      pendingHashRef.current = normalizedHash;
+      const index = passageIndexLookupRef.current.get(passageId);
+      if (typeof index === "number") {
+        setScrollRequest({ id: passageId, index, hash: normalizedHash });
+      }
+    };
+
+    syncWithHash();
+
+    window.addEventListener("hashchange", syncWithHash);
+    return () => {
+      window.removeEventListener("hashchange", syncWithHash);
+    };
+  }, [parsePassageHash]);
+
+  useEffect(() => {
+    if (!scrollRequest) {
+      return;
+    }
+
+    let attempts = 0;
+    let rafId = 0;
+
+    const attemptScroll = () => {
+      const element = window.document.getElementById(`passage-${scrollRequest.id}`);
+      if (element) {
+        element.scrollIntoView({ block: "start", behavior: "auto" });
+        lastHandledHashRef.current = scrollRequest.hash;
+        pendingHashRef.current = null;
+        setScrollRequest(null);
+        return;
+      }
+      attempts += 1;
+      if (attempts >= 12) {
+        return;
+      }
+      rafId = window.requestAnimationFrame(attemptScroll);
+    };
+
+    rafId = window.requestAnimationFrame(attemptScroll);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [scrollRequest]);
 
   const typeLabels: Record<DocumentAnnotationType, string> = {
     claim: "Claim",
@@ -477,6 +586,7 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
                   role: "list",
                   "aria-label": "Document passages",
                 }}
+                scrollToIndex={scrollRequest?.index ?? null}
                 renderItem={(passage, index) => {
                   const anchor = formatAnchor({
                     page_no: passage.page_no ?? null,
