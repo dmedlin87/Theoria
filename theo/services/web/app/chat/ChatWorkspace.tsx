@@ -38,6 +38,7 @@ import type {
 import { useSessionRestoration, useSessionPersistence } from "./useSessionRestoration";
 import { useChatExecution } from "./useChatExecution";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
+import { SessionControls } from "./components/SessionControls";
 import { ChatTranscript, type TranscriptEntry } from "./components/transcript/ChatTranscript";
 import { useChatSessionState } from "./hooks/useChatSessionState";
 
@@ -772,6 +773,11 @@ export default function ChatWorkspace({
         )}
       </div>
 
+      <SessionControls
+        disabled={!hasTranscript || isStreaming || isRestoring}
+        onReset={handleResetSession}
+        onFork={handleForkSession}
+      />
       <div className={styles.sessionControls} aria-label="Session history controls">
         <button
           type="button"

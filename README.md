@@ -103,6 +103,10 @@ Open <http://localhost:3000> in your browser.
 
 **Note**: The web proxy that backs `/api/search` reads `THEO_SEARCH_API_KEY` on every request. If the value starts with `Bearer`, it's forwarded as an `Authorization` header; otherwise it's sent via `X-API-Key`.
 
+### UI Component Toolkit
+
+The React application standardizes accessible overlays, menus, and notifications with Radix UI primitives (`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-tooltip`, and `@radix-ui/react-toast`). Shared wrappers live under [`app/components/ui`](theo/services/web/app/components/ui) so feature components can consume consistent tokens, keyboard behaviour, and screen-reader semantics without re-implementing focus management.
+
 #### Research modes in the web UI
 
 The Next.js frontend exposes a `ModeProvider`/`useMode` pair that keeps the selected research mode in sync with storage and refreshes queries when users switch contexts. All components should import these helpers from [`theo/services/web/app/mode-context.tsx`](theo/services/web/app/mode-context.tsx), which is the canonical context implementation.

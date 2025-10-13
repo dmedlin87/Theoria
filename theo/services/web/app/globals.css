@@ -1059,6 +1059,15 @@ section + section {
 
 
 
+.chat-message {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
 
 
 
@@ -1881,57 +1890,7 @@ section + section {
   font-size: 0.9375rem;
 }
 
-/* Toast Notifications */
-.toast-container {
-  position: fixed;
-  bottom: var(--space-4);
-  right: var(--space-4);
-  z-index: 9999;
-  display: grid;
-  gap: var(--space-2);
-  max-width: min(420px, calc(100vw - var(--space-4) * 2));
-  pointer-events: none;
-}
-
-.toast-item {
-  box-shadow: var(--shadow-xl);
-  animation: toast-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: auto;
-  width: min(420px, calc(100vw - var(--space-4) * 2));
-}
-
-.toast-item__content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-2);
-  max-width: 100%;
-}
-
-.toast-item__content .alert__title,
-.toast-item__content .alert__message {
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.toast-item__close {
-  padding: 0.25rem;
-  min-width: auto;
-  width: 1.75rem;
-  height: 1.75rem;
-  flex-shrink: 0;
-}
-
-@keyframes toast-slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
+/* Toast notifications handled by UI toast module */
 
 /* Loading States */
 .loading-overlay {

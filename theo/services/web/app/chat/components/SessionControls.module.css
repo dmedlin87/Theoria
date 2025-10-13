@@ -1,0 +1,79 @@
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin: 1.5rem 0 0;
+  align-items: center;
+}
+
+.trigger {
+  appearance: none;
+  border-radius: 999px;
+  border: 1.5px solid var(--ui-color-border-strong);
+  background: var(--ui-color-surface-subtle);
+  color: var(--ui-color-border-strong);
+  cursor: pointer;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.trigger:hover:enabled,
+.trigger:focus-visible {
+  background: var(--ui-color-border-strong);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(29, 78, 216, 0.22);
+  outline: none;
+}
+
+.trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.menuDescription {
+  font-size: 0.8rem;
+  color: var(--ui-color-text-muted);
+  margin: 0;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.dialogPrimary {
+  border: none;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-color-error);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dialogPrimary:hover,
+.dialogPrimary:focus-visible {
+  background: #991b1b;
+  outline: none;
+}
+
+.dialogSecondary {
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-md);
+  padding: 0.5rem 1rem;
+  background: var(--ui-color-surface);
+  color: var(--ui-color-text-strong);
+  cursor: pointer;
+}
+
+.dialogSecondary:hover,
+.dialogSecondary:focus-visible {
+  border-color: var(--ui-color-border-strong);
+  outline: none;
+}

@@ -27,6 +27,7 @@ import {
   formatEmphasisSummary,
   isResearchModeId,
 } from "./mode-config";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
 
 type ModeContextValue = {
   mode: ResearchMode;
@@ -140,119 +141,80 @@ function getModeSummary(mode: ResearchMode): string {
 
 export function ModeSwitcher(): JSX.Element {
   const { mode, modes, setMode } = useMode();
-  const [showTooltip, setShowTooltip] = useState(false);
-  const tooltipWrapperRef = useRef<HTMLDivElement>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
   const tooltipId = useId();
 
-  const handleFocusOut = useCallback(
-    (event: React.FocusEvent<HTMLDivElement>) => {
-      const nextFocused = event.relatedTarget as Node | null;
-      if (!tooltipWrapperRef.current?.contains(nextFocused)) {
-        setShowTooltip(false);
-      }
-    },
-    [],
-  );
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      setShowTooltip(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!showTooltip) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!tooltipWrapperRef.current?.contains(event.target as Node)) {
-        setShowTooltip(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [showTooltip]);
-
   return (
-    <div
-      className="mode-switcher-compact"
-      aria-live="polite"
-      ref={tooltipWrapperRef}
-      onBlurCapture={handleFocusOut}
-      onKeyDown={handleKeyDown}
-    >
-      <div className="mode-switcher-compact__control">
-        <label htmlFor="mode-selector" className="mode-switcher-compact__label">
-          Mode
-        </label>
-        <select
-          id="mode-selector"
-          value={mode.id}
-          onChange={(event) => setMode(event.target.value as ResearchModeId)}
-          className="mode-switcher-compact__select"
-          title={mode.description}
-        >
-          {modes.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="mode-switcher-compact__info"
-          onClick={() => setShowTooltip(!showTooltip)}
-          aria-label="Show mode information"
-          aria-expanded={showTooltip}
-          aria-controls={tooltipId}
-          aria-describedby={showTooltip ? tooltipId : undefined}
-          title="Learn about research modes"
-        >
-          ?
-        </button>
-      </div>
-      <p className="mode-switcher-compact__summary">
-        {mode.label} — {getModeSummary(mode)}
-      </p>
-      {showTooltip && (
-        <div
-          className="mode-switcher-compact__tooltip"
-          role="tooltip"
-          id={tooltipId}
-        >
-          <div className="mode-switcher-compact__tooltip-header">
-            <h4 className="mode-switcher-compact__tooltip-title">{mode.label} mode</h4>
-            <button
-              type="button"
-              className="mode-switcher-compact__tooltip-close"
-              onClick={() => setShowTooltip(false)}
-              aria-label="Close"
+    <TooltipProvider>
+      <div className="mode-switcher-compact" aria-live="polite">
+        <div className="mode-switcher-compact__control">
+          <label htmlFor="mode-selector" className="mode-switcher-compact__label">
+            Mode
+          </label>
+          <select
+            id="mode-selector"
+            value={mode.id}
+            onChange={(event) => setMode(event.target.value as ResearchModeId)}
+            className="mode-switcher-compact__select"
+            title={mode.description}
+          >
+            {modes.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <Tooltip open={tooltipOpen} onOpenChange={setTooltipOpen} delayDuration={100}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="mode-switcher-compact__info"
+                aria-label="Show mode information"
+                aria-expanded={tooltipOpen}
+                aria-controls={tooltipId}
+                aria-describedby={tooltipOpen ? tooltipId : undefined}
+                title="Learn about research modes"
+              >
+                ?
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              id={tooltipId}
+              className="mode-switcher-compact__tooltip"
+              align="end"
             >
-              ×
-            </button>
-          </div>
-          <p className="mode-switcher-compact__tooltip-desc">{mode.description}</p>
-          <dl className="mode-switcher-compact__tooltip-meta">
-            <div className="mode-switcher-compact__tooltip-row">
-              <dt>Emphasises</dt>
-              <dd>{mode.emphasis.join(", ")}</dd>
-            </div>
-            <div className="mode-switcher-compact__tooltip-row">
-              <dt>Softens</dt>
-              <dd>{mode.suppressions.join(", ")}</dd>
-            </div>
-          </dl>
-          <p className="mode-switcher-compact__tooltip-note">
-            Choose the mode that best fits your task. Switching updates future answers accordingly.
-          </p>
+              <div className="mode-switcher-compact__tooltip-header">
+                <h4 className="mode-switcher-compact__tooltip-title">{mode.label} mode</h4>
+                <button
+                  type="button"
+                  className="mode-switcher-compact__tooltip-close"
+                  onClick={() => setTooltipOpen(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <p className="mode-switcher-compact__tooltip-desc">{mode.description}</p>
+              <dl className="mode-switcher-compact__tooltip-meta">
+                <div className="mode-switcher-compact__tooltip-row">
+                  <dt>Emphasises</dt>
+                  <dd>{mode.emphasis.join(", ")}</dd>
+                </div>
+                <div className="mode-switcher-compact__tooltip-row">
+                  <dt>Softens</dt>
+                  <dd>{mode.suppressions.join(", ")}</dd>
+                </div>
+              </dl>
+              <p className="mode-switcher-compact__tooltip-note">
+                Choose the mode that best fits your task. Switching updates future answers accordingly.
+              </p>
+            </TooltipContent>
+          </Tooltip>
         </div>
-      )}
-    </div>
+        <p className="mode-switcher-compact__summary">
+          {mode.label} — {getModeSummary(mode)}
+        </p>
+      </div>
+    </TooltipProvider>
   );
 }
