@@ -114,10 +114,15 @@ def _prepare_memory_context(
     for entry in candidates:
         answer_text = (entry.answer_summary or entry.answer or "").strip()
         question_text = entry.question.strip()
-        snippet = _truncate_text(
-            f"Q: {question_text} | A: {answer_text}",
-            min(_MEMORY_TEXT_LIMIT * 2, remaining),
-        )
+        base = f"Q: {question_text} | A: {answer_text}"
+        extras: list[str] = []
+        if entry.key_entities:
+            extras.append(f"Key: {', '.join(entry.key_entities[:3])}")
+        if entry.recommended_actions:
+            extras.append(f"Next: {entry.recommended_actions[0]}")
+        if extras:
+            base = f"{base} | {' | '.join(extras)}"
+        snippet = _truncate_text(base, min(_MEMORY_TEXT_LIMIT * 2, remaining))
         if not snippet:
             continue
         if len(snippet) > remaining and selected:
@@ -162,6 +167,7 @@ def _persist_chat_session(
     message: ChatSessionMessage,
     answer: RAGAnswer,
     preferences: ChatSessionPreferences,
+    memory_entry: ChatMemoryEntry | None = None,
 ) -> ChatSession:
     now = datetime.now(UTC)
     entries = _load_memory_entries(existing)

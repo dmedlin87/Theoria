@@ -95,6 +95,10 @@ class ChatMemoryEntry(APIModel):
     source_types: list[str] | None = None
     sentiment: str | None = None
     created_at: datetime
+    trail_id: str | None = None
+    digest_hash: str | None = None
+    key_entities: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
 
 
 class ModeAliasMixin:

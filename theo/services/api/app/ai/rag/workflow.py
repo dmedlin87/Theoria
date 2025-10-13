@@ -22,6 +22,7 @@ from ...telemetry import (
 from ..clients import GenerationError
 from ..registry import LLMModel, LLMRegistry, get_llm_registry
 from ..router import get_router
+from ..trails import TrailStepDigest
 from .cache_ops import (
     DEFAULT_CACHE,
     RAGCache,
@@ -511,6 +512,29 @@ class GuardedAnswerPipeline:
                 )
 
         if self.recorder:
+            key_entities: list[str] = []
+            for citation in citations:
+                label_parts = [citation.osis]
+                anchor = getattr(citation, "anchor", None)
+                document_title = getattr(citation, "document_title", None)
+                if anchor:
+                    label_parts.append(anchor)
+                elif document_title:
+                    label_parts.append(document_title)
+                label = " - ".join(part for part in label_parts if part)
+                if label:
+                    key_entities.append(label)
+            recommended_actions: list[str] = []
+            if critique_schema and critique_schema.recommendations:
+                recommended_actions.extend(critique_schema.recommendations)
+            if revision_schema and revision_schema.improvements:
+                recommended_actions.append(revision_schema.improvements)
+            digest_payload = TrailStepDigest(
+                summary=summary_text,
+                key_entities=key_entities,
+                recommended_actions=recommended_actions,
+            )
+
             compose_step = self.recorder.log_step(
                 tool="rag.compose",
                 action="compose_answer",
@@ -542,6 +566,8 @@ class GuardedAnswerPipeline:
                     "validation": validation_result,
                 },
                 output_digest=f"{len(summary_lines)} summary lines",
+                digest=digest_payload,
+                significant=True,
             )
 
             passage_ids = [
