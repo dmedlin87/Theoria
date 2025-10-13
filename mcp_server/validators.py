@@ -20,6 +20,8 @@ MAX_HEADER_LENGTH = 256
 VALID_USER_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.@]{1,256}$")
 VALID_TENANT_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.]{1,128}$")
 VALID_IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]{1,128}$")
+OSIS_BASE_PATTERN = re.compile(r"^[A-Za-z0-9\.]+(\.[0-9]+)*$")
+OSIS_RANGE_SUFFIX_PATTERN = re.compile(r"^[0-9]+(\.[0-9]+)*$")
 
 # Dangerous patterns that should never appear in user input
 INJECTION_PATTERNS = [
@@ -191,11 +193,30 @@ def validate_osis_reference(osis: str | None) -> None:
     # Basic OSIS format validation
     if len(osis) > 100:
         raise ValidationError("OSIS reference too long", "osis")
-    if not re.match(r"^[A-Za-z0-9\.]+(\.[0-9]+)*$", osis):
+    range_parts = osis.split("-")
+    if len(range_parts) > 2 or any(part == "" for part in range_parts):
         raise ValidationError(
             "OSIS reference format invalid (expected Book.Chapter.Verse)",
             "osis",
         )
+
+    start = range_parts[0]
+    if not OSIS_BASE_PATTERN.fullmatch(start):
+        raise ValidationError(
+            "OSIS reference format invalid (expected Book.Chapter.Verse)",
+            "osis",
+        )
+
+    if len(range_parts) == 2:
+        end = range_parts[1]
+        if not (
+            OSIS_BASE_PATTERN.fullmatch(end)
+            or OSIS_RANGE_SUFFIX_PATTERN.fullmatch(end)
+        ):
+            raise ValidationError(
+                "OSIS reference format invalid (expected Book.Chapter.Verse)",
+                "osis",
+            )
 
 
 __all__ = [
