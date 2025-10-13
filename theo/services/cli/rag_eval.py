@@ -322,24 +322,19 @@ def rag_eval(
         raise click.ClickException("No evaluation records were found.")
 
     needs_refresh = any(not record.contexts for record in records)
-    session: Session | None = None
-    try:
-        if needs_refresh:
-            engine = get_engine()
-            session = Session(engine)
+    if needs_refresh:
+        engine = get_engine()
+        with Session(engine) as session:
             for record in records:
                 if not record.contexts:
                     _refresh_contexts(record, session)
-        dataset = _build_dataset(records)
-        metrics = _build_metrics()
-        if ragas_evaluate is None:
-            raise click.ClickException(
-                "ragas is not installed; cannot run evaluation."
-            )
-        result = ragas_evaluate(dataset, metrics=metrics, in_ci=True)
-    finally:
-        if session is not None:
-            session.close()
+    dataset = _build_dataset(records)
+    metrics = _build_metrics()
+    if ragas_evaluate is None:
+        raise click.ClickException(
+            "ragas is not installed; cannot run evaluation."
+        )
+    result = ragas_evaluate(dataset, metrics=metrics, in_ci=True)
 
     metric_names = list(DEFAULT_THRESHOLDS.keys())
     overall_scores = _compute_overall_scores(result, metric_names)

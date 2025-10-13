@@ -14,6 +14,7 @@ from typing import Any, Protocol
 import uuid
 
 import httpx
+from cachetools import LRUCache
 
 
 class GenerationError(RuntimeError):
@@ -162,6 +163,7 @@ class AIClientSettings:
     )
     clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
     sleep: Callable[[float], None] = field(default_factory=lambda: time.sleep)
+    cache_size: int = 256
 
 
 DEFAULT_AI_CLIENT_SETTINGS = AIClientSettings()
@@ -173,7 +175,18 @@ class BaseAIClient:
     def __init__(self, http_client: httpx.Client, settings: AIClientSettings | None = None) -> None:
         self._settings = settings or DEFAULT_AI_CLIENT_SETTINGS
         self._client = http_client
-        self._cache: dict[str, str] = {}
+        self._cache: LRUCache[str, str] = LRUCache(maxsize=self._settings.cache_size)
+
+    def close(self) -> None:
+        """Release HTTP resources held by the underlying client."""
+
+        self._client.close()
+
+    def __enter__(self) -> "BaseAIClient":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
 
     def _build_timeout(self, remaining_budget: float) -> httpx.Timeout:
         connect_timeout = min(self._settings.request_timeout, remaining_budget)
