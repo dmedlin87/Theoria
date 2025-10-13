@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 
 import { DEFAULT_MODE_ID } from "./mode-config";
 import { ModeProvider, ModeSwitcher } from "./mode-context";
+import "../styles/tokens.css";
 import "./theme.css";
+import "../styles/utilities.css";
 import "./globals.css";
 import Link from "next/link";
 import { AppShell, type AppShellNavSection } from "./components/AppShell";
@@ -67,7 +69,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
   return (
     <html lang="en">
-      <body className="app-shell">
+      <body>
         <a className="skip-link" href="#main-content">
           Skip to main content
         </a>

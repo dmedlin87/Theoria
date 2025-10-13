@@ -27,11 +27,16 @@ import { SortControls } from "./SortControls";
 import { SavedSearchControls } from "./SavedSearchControls";
 import { DiffWorkspace } from "./DiffWorkspace";
 import { SearchSkeleton } from "./SearchSkeleton";
+import styles from "./SearchPageClient.module.css";
 import {
   parseSearchParams,
   serializeSearchParams,
   type SearchFilters,
 } from "../searchParams";
+
+const classNames = (
+  ...classes: Array<string | false | null | undefined>
+) => classes.filter(Boolean).join(" ");
 
 const SOURCE_OPTIONS = [
   { label: "Any source", value: "" },
@@ -1099,15 +1104,15 @@ export default function SearchPageClient({
   }, [presetIsCustom, presetSelection]);
 
   const advancedFilterControls = (
-    <div className="search-advanced-controls">
+    <div className={styles["search-advanced-controls"]}>
       <div>
-        <label className="search-form__label">
-          <span className="search-form__label-text">Mode preset</span>
+        <label className={styles["search-form__label"]}>
+          <span className={styles["search-form__label-text"]}>Mode preset</span>
           <select
             name="preset"
             value={presetIsCustom ? CUSTOM_PRESET_VALUE : presetSelection}
             onChange={(event) => handlePresetChange(event.target.value)}
-            className="search-form__select"
+            className={styles["search-form__select"]}
             disabled={isSearching || isPresetChanging}
             aria-busy={isPresetChanging}
           >
@@ -1119,13 +1124,13 @@ export default function SearchPageClient({
           </select>
         </label>
         {activePreset?.description && (
-          <p className="search-advanced-help" style={{ marginTop: "0.35rem" }}>
+          <p className={styles["search-advanced-help"]} style={{ marginTop: "0.35rem" }}>
             {activePreset.description}
           </p>
         )}
       </div>
-      <label className="search-form__label">
-        <span className="search-form__label-text">Collection</span>
+      <label className={styles["search-form__label"]}>
+        <span className={styles["search-form__label-text"]}>Collection</span>
         <input
           name="collection"
           type="text"
@@ -1135,11 +1140,11 @@ export default function SearchPageClient({
             markPresetAsCustom();
           }}
           placeholder="Gospels"
-          className="search-form__input"
+          className={styles["search-form__input"]}
         />
       </label>
-      <label className="search-form__label">
-        <span className="search-form__label-text">Author</span>
+      <label className={styles["search-form__label"]}>
+        <span className={styles["search-form__label-text"]}>Author</span>
         <input
           name="author"
           type="text"
@@ -1149,11 +1154,11 @@ export default function SearchPageClient({
             markPresetAsCustom();
           }}
           placeholder="Jane Doe"
-          className="search-form__input"
+          className={styles["search-form__input"]}
         />
       </label>
-      <label className="search-form__label">
-        <span className="search-form__label-text">Source type</span>
+      <label className={styles["search-form__label"]}>
+        <span className={styles["search-form__label-text"]}>Source type</span>
         <select
           name="source_type"
           value={sourceType}
@@ -1161,7 +1166,7 @@ export default function SearchPageClient({
             setSourceType(event.target.value);
             markPresetAsCustom();
           }}
-          className="search-form__select"
+          className={styles["search-form__select"]}
         >
           {SOURCE_OPTIONS.map((option) => (
             <option key={option.value || "any"} value={option.value}>
@@ -1170,8 +1175,8 @@ export default function SearchPageClient({
           ))}
         </select>
       </label>
-      <label className="search-form__label">
-        <span className="search-form__label-text">Theological tradition</span>
+      <label className={styles["search-form__label"]}>
+        <span className={styles["search-form__label-text"]}>Theological tradition</span>
         <select
           name="theological_tradition"
           value={theologicalTradition}
@@ -1179,7 +1184,7 @@ export default function SearchPageClient({
             setTheologicalTradition(event.target.value);
             markPresetAsCustom();
           }}
-          className="search-form__select"
+          className={styles["search-form__select"]}
         >
           {TRADITION_OPTIONS.map((option) => (
             <option key={option.value || "any"} value={option.value}>
@@ -1188,8 +1193,8 @@ export default function SearchPageClient({
           ))}
         </select>
       </label>
-      <label className="search-form__label">
-        <span className="search-form__label-text">Topic domain</span>
+      <label className={styles["search-form__label"]}>
+        <span className={styles["search-form__label-text"]}>Topic domain</span>
         <select
           name="topic_domain"
           value={topicDomain}
@@ -1197,7 +1202,7 @@ export default function SearchPageClient({
             setTopicDomain(event.target.value);
             markPresetAsCustom();
           }}
-          className="search-form__select"
+          className={styles["search-form__select"]}
         >
           {DOMAIN_OPTIONS.map((option) => (
             <option key={option.value || "any"} value={option.value}>
@@ -1206,11 +1211,11 @@ export default function SearchPageClient({
           ))}
         </select>
       </label>
-      <fieldset className="search-fieldset">
-        <legend className="search-fieldset__legend">Collection facets</legend>
-        <div className="search-fieldset__grid">
+      <fieldset className={styles["search-fieldset"]}>
+        <legend className={styles["search-fieldset__legend"]}>Collection facets</legend>
+        <div className={styles["search-fieldset__grid"]}>
           {COLLECTION_FACETS.map((facet) => (
-            <label key={facet} className="search-fieldset__checkbox-label">
+            <label key={facet} className={styles["search-fieldset__checkbox-label"]}>
               <input
                 type="checkbox"
                 checked={collectionFacets.includes(facet)}
@@ -1221,14 +1226,14 @@ export default function SearchPageClient({
           ))}
         </div>
       </fieldset>
-      <fieldset className="search-fieldset">
-        <legend className="search-fieldset__legend">Dataset facets</legend>
-        <div className="search-fieldset__grid">
+      <fieldset className={styles["search-fieldset"]}>
+        <legend className={styles["search-fieldset__legend"]}>Dataset facets</legend>
+        <div className={styles["search-fieldset__grid"]}>
           {DATASET_FILTERS.map((dataset) => {
             const isActive = datasetFacets.includes(dataset.value);
             return (
-              <label key={dataset.value} className="search-dataset-item">
-                <span className="search-dataset-item__header">
+              <label key={dataset.value} className={styles["search-dataset-item"]}>
+                <span className={styles["search-dataset-item__header"]}>
                   <input
                     type="checkbox"
                     checked={isActive}
@@ -1236,7 +1241,7 @@ export default function SearchPageClient({
                   />
                   <strong>{dataset.label}</strong>
                 </span>
-                <span className="search-dataset-item__desc">
+                <span className={styles["search-dataset-item__desc"]}>
                   {dataset.description}
                 </span>
               </label>
@@ -1244,11 +1249,11 @@ export default function SearchPageClient({
           })}
         </div>
       </fieldset>
-      <fieldset className="search-fieldset">
-        <legend className="search-fieldset__legend">Variant focus</legend>
-        <div className="search-fieldset__grid">
+      <fieldset className={styles["search-fieldset"]}>
+        <legend className={styles["search-fieldset__legend"]}>Variant focus</legend>
+        <div className={styles["search-fieldset__grid"]}>
           {VARIANT_FILTERS.map((variant) => (
-            <label key={variant.value} className="search-fieldset__checkbox-label">
+            <label key={variant.value} className={styles["search-fieldset__checkbox-label"]}>
               <input
                 type="checkbox"
                 checked={variantFacets.includes(variant.value)}
@@ -1259,9 +1264,9 @@ export default function SearchPageClient({
           ))}
         </div>
       </fieldset>
-      <div className="search-date-fields">
-        <label className="search-form__label">
-          <span className="search-form__label-text">Date from</span>
+      <div className={styles["search-date-fields"]}>
+        <label className={styles["search-form__label"]}>
+          <span className={styles["search-form__label-text"]}>Date from</span>
           <input
             type="date"
             name="date_start"
@@ -1270,11 +1275,11 @@ export default function SearchPageClient({
               setDateStart(event.target.value);
               markPresetAsCustom();
             }}
-            className="search-form__input"
+            className={styles["search-form__input"]}
           />
         </label>
-        <label className="search-form__label">
-          <span className="search-form__label-text">Date to</span>
+        <label className={styles["search-form__label"]}>
+          <span className={styles["search-form__label-text"]}>Date to</span>
           <input
             type="date"
             name="date_end"
@@ -1283,12 +1288,12 @@ export default function SearchPageClient({
               setDateEnd(event.target.value);
               markPresetAsCustom();
             }}
-            className="search-form__input"
+            className={styles["search-form__input"]}
           />
         </label>
       </div>
-      <div className="search-fieldset__grid">
-        <label className="search-fieldset__checkbox-label">
+      <div className={styles["search-fieldset__grid"]}>
+        <label className={styles["search-fieldset__checkbox-label"]}>
           <input
             type="checkbox"
             name="variants"
@@ -1300,7 +1305,7 @@ export default function SearchPageClient({
           />
           Include textual variants
         </label>
-        <label className="search-fieldset__checkbox-label">
+        <label className={styles["search-fieldset__checkbox-label"]}>
           <input
             type="checkbox"
             name="disputed"
@@ -1443,80 +1448,80 @@ export default function SearchPageClient({
   );
 
   return (
-    <section className="search-page">
+    <section className={styles["search-page"]}>
       {/* Accessibility: Announce search status */}
       <div role="status" aria-live="polite" aria-atomic="true" className="visually-hidden">
         {isSearching ? "Searching corpus..." : hasSearched && !error && groups.length === 0 ? "No results found" : hasSearched && groups.length > 0 ? `Found ${groups.length} document${groups.length === 1 ? "" : "s"}` : ""}
       </div>
       <h2>Search</h2>
       <p>Hybrid search with lexical, vector, and OSIS-aware filtering.</p>
-      <div className="search-ui-mode-wrapper">
+      <div className={styles["search-ui-mode-wrapper"]}>
         <UiModeToggle mode={uiMode} onChange={setUiMode} />
       </div>
 
       <form
         onSubmit={handleSearch}
         aria-label="Search corpus"
-        className="search-form"
+        className={styles["search-form"]}
       >
-        <div className="search-form__fields">
+        <div className={styles["search-form__fields"]}>
           <div
             aria-label="Guided search suggestions"
-            className="search-guided-chips"
+            className={styles["search-guided-chips"]}
           >
             <button
               type="button"
               onClick={handleGuidedPassageChip}
-              className="search-guided-chip"
+              className={styles["search-guided-chip"]}
             >
               Search by passage
             </button>
             <button
               type="button"
               onClick={handleGuidedTopicChip}
-              className="search-guided-chip"
+              className={styles["search-guided-chip"]}
             >
               Search by topic
             </button>
           </div>
-          <label className="search-form__label">
-            <span className="search-form__label-text">Query</span>
+          <label className={styles["search-form__label"]}>
+            <span className={styles["search-form__label-text"]}>Query</span>
             <input
               name="q"
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search corpus"
-              className="search-form__input"
+              className={styles["search-form__input"]}
               ref={queryInputRef}
             />
           </label>
-          <label className="search-form__label">
-            <span className="search-form__label-text">OSIS reference</span>
+          <label className={styles["search-form__label"]}>
+            <span className={styles["search-form__label-text"]}>OSIS reference</span>
             <input
               name="osis"
               type="text"
               value={osis}
               onChange={(event) => setOsis(event.target.value)}
               placeholder="John.1.1-5"
-              className="search-form__input"
+              className={styles["search-form__input"]}
               ref={osisInputRef}
             />
           </label>
         </div>
 
         {isBeginnerMode && (
-          <p className="search-simple-mode-hint">
+          <p className={styles["search-simple-mode-hint"]}>
             Simple mode shows only the essentials. Use the advanced panel when you need presets, saved searches, or guardrail filters.
           </p>
         )}
 
         {isAdvancedUi ? (
-          <div className="search-advanced-controls">{advancedFilterControls}</div>
+          <div className={styles["search-advanced-controls"]}>{advancedFilterControls}</div>
         ) : (
-          <details className="search-advanced-details">
-            <summary className="search-advanced-summary">Advanced</summary>
-            <p className="search-advanced-help">
+          <details className={styles["search-advanced-details"]}>
+            <summary className={styles["search-advanced-summary"]}>Advanced</summary>
+            <p className={styles["search-advanced-help"]}>
               Expand to tune presets, guardrail filters, and dataset facets. Saved search tools live here too.
             </p>
             {advancedFilterControls}
@@ -1525,7 +1530,10 @@ export default function SearchPageClient({
 
         <button 
           type="submit" 
-          className={isSearching ? "search-form__button is-loading" : "search-form__button"}
+          className={classNames(
+            styles["search-form__button"],
+            isSearching && "is-loading",
+          )}
           disabled={isSearching}
           aria-label={isSearching ? "Searching corpus..." : "Search corpus"}
         >
@@ -1535,14 +1543,14 @@ export default function SearchPageClient({
       </form>
 
       {isAdvancedUi ? (
-        <section aria-label="Saved searches" className="search-saved-section">
+        <section aria-label="Saved searches" className={styles["search-saved-section"]}>
           <h3>Saved searches</h3>
           {savedSearchContent}
         </section>
       ) : (
-        <details className="search-advanced-details" style={{ margin: "2rem 0" }}>
-          <summary className="search-advanced-summary">Saved searches</summary>
-          <p className="search-advanced-help">
+        <details className={styles["search-advanced-details"]} style={{ margin: "2rem 0" }}>
+          <summary className={styles["search-advanced-summary"]}>Saved searches</summary>
+          <p className={styles["search-advanced-help"]}>
             Expand to store or recall presets. Saved searches remember every active filter.
           </p>
           {savedSearchContent}
@@ -1554,15 +1562,15 @@ export default function SearchPageClient({
       </div>
 
       {rerankerName && (
-        <span className="search-reranker-badge">
+        <span className={styles["search-reranker-badge"]}>
           Reranked by {rerankerName}
         </span>
       )}
 
       {filterChips.length > 0 && (
-        <div className="search-filter-chips">
+        <div className={styles["search-filter-chips"]}>
           {filterChips.map((chip) => (
-            <span key={`${chip.label}-${chip.value}`} className="search-filter-chip">
+            <span key={`${chip.label}-${chip.value}`} className={styles["search-filter-chip"]}>
               <strong>{chip.label}:</strong> {chip.value}
             </span>
           ))}
@@ -1579,7 +1587,7 @@ export default function SearchPageClient({
 
       {isSearching && (
         <>
-          <p role="status" className="search-status">Searching...</p>
+          <p role="status" className={styles["search-status"]}>Searching...</p>
           <SearchSkeleton count={3} />
         </>
       )}
@@ -1595,10 +1603,10 @@ export default function SearchPageClient({
         </div>
       )}
       {!isSearching && hasSearched && !error && groups.length === 0 && (
-        <p className="search-no-results">No results found for the current query.</p>
+        <p className={styles["search-no-results"]}>No results found for the current query.</p>
       )}
 
-      <div className="search-results">
+      <div className={styles["search-results"]}>
         {groups.map((group) => {
           const isSelectedForDiff = diffSelection.includes(group.documentId);
           const diffLabel = isSelectedForDiff
@@ -1610,7 +1618,10 @@ export default function SearchPageClient({
           return (
             <article
               key={group.documentId}
-              className={`search-result-group${isSelectedForDiff ? " search-result-group--selected" : ""}`}
+              className={classNames(
+                styles["search-result-group"],
+                isSelectedForDiff && styles["search-result-group--selected"],
+              )}
               tabIndex={0}
               onFocus={() => setActiveActionsGroupId(group.documentId)}
               onBlur={() =>
@@ -1625,15 +1636,15 @@ export default function SearchPageClient({
                 )
               }
             >
-              <header className="search-result-header">
+              <header className={styles["search-result-header"]}>
                 <div>
-                  <h3 className="search-result-title">{group.title}</h3>
+                  <h3 className={styles["search-result-title"]}>{group.title}</h3>
                   {typeof group.rank === "number" && (
-                    <p className="search-result-meta">
+                    <p className={styles["search-result-meta"]}>
                       Document rank #{group.rank}
                       {isAdvancedUi && (
                         <span
-                          className="search-result-meta__hint"
+                          className={styles["search-result-meta__hint"]}
                           title="Lower rank numbers indicate higher retrieval relevance."
                         >
                           (lower is better)
@@ -1642,11 +1653,11 @@ export default function SearchPageClient({
                     </p>
                   )}
                   {typeof group.score === "number" && (
-                    <p className="search-result-meta">
+                    <p className={styles["search-result-meta"]}>
                       Document score {group.score.toFixed(2)}
                       {isAdvancedUi && (
                         <span
-                          className="search-result-meta__hint"
+                          className={styles["search-result-meta__hint"]}
                           title="Combined retriever confidence; higher scores indicate stronger matches."
                         >
                           (higher is better)
@@ -1655,16 +1666,16 @@ export default function SearchPageClient({
                     </p>
                   )}
                 </div>
-                <div className="search-result-actions">
-                  <button type="button" className="search-result-action-btn" onClick={() => handleExportGroup(group)}>
+                <div className={styles["search-result-actions"]}>
+                  <button type="button" className={styles["search-result-action-btn"]} onClick={() => handleExportGroup(group)}>
                     Export JSON
                   </button>
-                  <button type="button" className="search-result-action-btn" onClick={() => handleToggleDiffGroup(group.documentId)}>
+                  <button type="button" className={styles["search-result-action-btn"]} onClick={() => handleToggleDiffGroup(group.documentId)}>
                     {diffLabel}
                   </button>
                 </div>
               </header>
-              <ul className="search-passages">
+              <ul className={styles["search-passages"]}>
                 {group.passages.map((result) => {
                   const anchorDescription = formatAnchor({
                     page_no: result.page_no ?? null,
@@ -1672,42 +1683,42 @@ export default function SearchPageClient({
                     t_end: result.t_end ?? null,
                   });
                   return (
-                    <li key={result.id} className="search-passage">
+                    <li key={result.id} className={styles["search-passage"]}>
                       <div>
-                        <div className="search-passage__content">
-                          <p className="search-passage__text">{result.snippet}</p>
+                        <div className={styles["search-passage__content"]}>
+                          <p className={styles["search-passage__text"]}>{result.snippet}</p>
                           <Link
                             href={buildPassageLink(result.document_id, result.id, {
                               pageNo: result.page_no ?? null,
                               tStart: result.t_start ?? null,
                             })}
                             onClick={() => handlePassageClick(result)}
-                            className="search-passage__link"
+                            className={styles["search-passage__link"]}
                           >
                             Open passage
                           </Link>
                         </div>
                         {(anchorDescription || result.osis_ref) && (
-                          <div className="search-passage__details">
+                          <div className={styles["search-passage__details"]}>
                             {anchorDescription && <p>{anchorDescription}</p>}
                             {result.osis_ref && <p>OSIS: {result.osis_ref}</p>}
                           </div>
                         )}
                         {Array.isArray(result.highlights) && result.highlights.length > 0 && (
-                          <div className="search-passage__highlights">
+                          <div className={styles["search-passage__highlights"]}>
                             {result.highlights.map((highlight) => (
-                              <p key={highlight} className="search-passage__highlight">
+                              <p key={highlight} className={styles["search-passage__highlight"]}>
                                 {highlightTokens(highlight, queryTokens)}
                               </p>
                             ))}
                           </div>
                         )}
                         {typeof result.score === "number" && (
-                          <p className="search-result-meta">
+                          <p className={styles["search-result-meta"]}>
                             Passage score {result.score.toFixed(2)}
                             {isAdvancedUi && (
                               <span
-                                className="search-result-meta__hint"
+                                className={styles["search-result-meta__hint"]}
                                 title="Reranker confidence for this passage; higher scores indicate stronger matches."
                               >
                                 (higher is better)

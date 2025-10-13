@@ -10,6 +10,14 @@ import {
   useRef,
 } from "react";
 
+import styles from "./AppShell.module.css";
+
+function classNames(
+  ...classes: Array<string | false | null | undefined>
+): string {
+  return classes.filter(Boolean).join(" ");
+}
+
 export type AppShellNavItem = {
   href: string;
   label: string;
@@ -139,25 +147,25 @@ export function AppShell({
   }, [isPending, clickedHref]);
 
   return (
-    <div className="app-shell-v2">
+    <div className={styles.shell}>
       {/* Accessibility: Announce navigation status */}
       <div role="status" aria-live="polite" aria-atomic="true" className="visually-hidden">
         {navigationStatus}
       </div>
-      <aside className="app-shell-v2__nav">
-        <Link href="/" className="app-shell-v2__brand">
-          <span className="app-shell-v2__brand-name">Theoria</span>
-          <span className="app-shell-v2__brand-tagline">Research workspace</span>
+      <aside className={styles.nav}>
+        <Link href="/" className={styles.brand}>
+          <span className={styles.brandName}>Theoria</span>
+          <span className={styles.brandTagline}>Research workspace</span>
         </Link>
         <button
           type="button"
-          className="app-shell-v2__nav-toggle"
+          className={styles.navToggle}
           aria-expanded={!isMobileNav || isNavOpen}
           aria-controls="app-shell-v2-nav-content"
           onClick={() => setIsNavOpen((open) => !open)}
           ref={navToggleRef}
         >
-          <span className="app-shell-v2__nav-toggle-icon" aria-hidden="true">
+          <span className={styles.navToggleIcon} aria-hidden="true">
             <span />
             <span />
             <span />
@@ -166,16 +174,16 @@ export function AppShell({
         </button>
         <div
           id="app-shell-v2-nav-content"
-          className="app-shell-v2__nav-content"
+          className={styles.navContent}
           data-open={!isMobileNav || isNavOpen}
           aria-hidden={isMobileNav && !isNavOpen}
           ref={navContentRef}
         >
-          <nav className="app-shell-v2__nav-groups" aria-label="Primary">
+          <nav className={styles.navGroups} aria-label="Primary">
             {navSections.map((section) => (
-              <div key={section.label} className="app-shell-v2__nav-group">
-                <p className="app-shell-v2__nav-label">{section.label}</p>
-                <ul className="app-shell-v2__nav-list">
+              <div key={section.label} className={styles.navGroup}>
+                <p className={styles.navLabel}>{section.label}</p>
+                <ul className={styles.navList}>
                   {section.items.map((item) => {
                     const isActive = item.match
                       ? pathname.startsWith(item.match)
@@ -186,20 +194,18 @@ export function AppShell({
                         <Link
                           href={item.href}
                           prefetch={true}
-                          className={
-                            isActive
-                              ? "app-shell-v2__nav-link is-active"
-                              : isLoading
-                              ? "app-shell-v2__nav-link is-loading"
-                              : "app-shell-v2__nav-link"
-                          }
+                          className={classNames(
+                            styles.navLink,
+                            isActive && styles.navLinkActive,
+                            isLoading && styles.navLinkLoading,
+                          )}
                           aria-current={isActive ? "page" : undefined}
                           aria-disabled={isLoading}
                           onClick={(e) => handleLinkClick(item.href, e, item.label)}
                         >
                           {item.label}
                           {isLoading && (
-                            <span className="nav-loading-spinner" aria-hidden="true" />
+                            <span className={styles.navSpinner} aria-hidden="true" />
                           )}
                         </Link>
                       </li>
@@ -209,26 +215,25 @@ export function AppShell({
               </div>
             ))}
           </nav>
-          <div className="app-shell-v2__mode">{modeSwitcher}</div>
+          <div className={styles.mode}>{modeSwitcher}</div>
         </div>
       </aside>
-      <div className="app-shell-v2__workspace">
-        <div className="app-shell-v2__command-bar" role="banner">
-          <div className="app-shell-v2__command-placeholder" aria-hidden="true">
+      <div className={styles.workspace}>
+        <div className={styles.commandBar} role="banner">
+          <div className={styles.commandPlaceholder} aria-hidden="true">
             Command palette coming soon
           </div>
           <div
-            className="app-shell-v2__command-actions"
+            className={styles.commandActions}
             aria-label="Quick actions"
             role="group"
           >
             <button
               type="button"
-              className={
-                isPending && clickedHref === "/upload"
-                  ? "app-shell-v2__action is-loading"
-                  : "app-shell-v2__action"
-              }
+              className={classNames(
+                styles.actionButton,
+                isPending && clickedHref === "/upload" && styles.actionLoading,
+              )}
               onClick={() => {
                 setClickedHref("/upload");
                 setNavigationStatus("Navigating to Upload sources");
@@ -244,19 +249,19 @@ export function AppShell({
               }
             >
               {isPending && clickedHref === "/upload" && (
-                <span className="action-loading-spinner" aria-hidden="true" />
+                <span className={styles.actionSpinner} aria-hidden="true" />
               )}
               {isPending && clickedHref === "/upload" ? "Navigating…" : "Upload sources"}
             </button>
           </div>
         </div>
-        <main className="app-shell-v2__content" id="main-content">
+        <main className={styles.content} id="main-content">
           {children}
         </main>
-        <footer className="app-shell-v2__footer">
+        <footer className={styles.footer}>
           <div>{footerMeta}</div>
           {footerLinks.length > 0 ? (
-            <div className="app-shell-v2__footer-links">
+            <div className={styles.footerLinks}>
               {footerLinks.map((link) =>
                 link.external ? (
                   <a
