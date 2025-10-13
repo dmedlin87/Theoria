@@ -33,14 +33,15 @@ jobs:
 
       - name: Checkout repository
         if: steps.verify-secret.outputs.skip != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          repository: ${{ github.event.pull_request.base.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
 
       - name: Run ZAP baseline scan
         if: steps.verify-secret.outputs.skip != 'true'
         id: zap
-        uses: zaproxy/action-baseline@v0.13.0
+        uses: zaproxy/action-baseline@0619037bb784a56e2e06b104f0ebe157e076f075 # v0.13.0
         with:
           target: ${{ env.STAGING_API_BASE_URL }}
           cmd_options: '-J zap-baseline-report.json -r zap-baseline-report.html -w zap-baseline-warn.md'
@@ -55,14 +56,14 @@ jobs:
 
       - name: Upload SARIF to security dashboard
         if: steps.verify-secret.outputs.skip != 'true'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@755f44910c12a3d7ca0d8c6e42c048b3362f7cec # v3
         with:
           sarif_file: zap-baseline-report.sarif
           category: zap-baseline
 
       - name: Upload ZAP artifacts
         if: steps.verify-secret.outputs.skip != 'true' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
           name: zap-baseline-artifacts
           path: |
