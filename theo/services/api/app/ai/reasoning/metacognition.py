@@ -3,15 +3,31 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
+import math
 import re
 import textwrap
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from ..clients import LanguageModelClient
 from ..rag.guardrail_helpers import scrub_adversarial_language
 from .fallacies import FallacyWarning, detect_fallacies
 
 
+LOGGER = logging.getLogger(__name__)
+
+
+DEFAULT_QUALITY_SCORE = 70
+MAX_QUALITY_SCORE = 100
+HIGH_FALLACY_PENALTY = 15
+MEDIUM_FALLACY_PENALTY = 8
+LOW_FALLACY_PENALTY = 4
+WEAK_CITATION_PENALTY = 6
+BIAS_WARNING_PENALTY = 10
+REVISION_QUALITY_THRESHOLD = 80
+LOW_QUALITY_THRESHOLD = 60
+REVISION_CITATION_LIMIT = 12
+REVISION_SNIPPET_TRIM = 180
 _STOPWORDS = {
     "the",
     "and",
@@ -29,6 +45,61 @@ _STOPWORDS = {
     "what",
     "when",
     "then",
+    "but",
+    "not",
+    "can",
+    "was",
+    "were",
+    "been",
+    "has",
+    "had",
+    "are",
+    "have",
+    "having",
+    "would",
+    "could",
+    "should",
+    "might",
+    "there",
+    "here",
+    "where",
+    "because",
+    "therefore",
+    "also",
+    "only",
+    "very",
+    "more",
+    "most",
+    "such",
+    "some",
+    "any",
+    "each",
+    "few",
+    "many",
+    "other",
+    "another",
+    "whose",
+    "which",
+    "who",
+    "whom",
+    "been",
+    "do",
+    "does",
+    "did",
+    "done",
+    "being",
+    "make",
+    "made",
+    "like",
+    "just",
+    "even",
+    "still",
+    "also",
+    "god",
+    "lord",
+    "jesus",
+    "christ",
+    "spirit",
 }
 
 
@@ -78,43 +149,106 @@ def critique_reasoning(
     Returns:
         Critique with quality assessment
     """
-    critique = Critique(reasoning_quality=70)  # Default mid-range
+    critique = Critique(reasoning_quality=DEFAULT_QUALITY_SCORE)
 
     # Detect logical fallacies
     fallacies = detect_fallacies(reasoning_trace + " " + answer)
     critique.fallacies_found = fallacies
 
-    # Penalize quality for fallacies
-    fallacy_penalty = len([f for f in fallacies if f.severity == "high"]) * 15
-    fallacy_penalty += len([f for f in fallacies if f.severity == "medium"]) * 8
-    critique.reasoning_quality = max(0, critique.reasoning_quality - fallacy_penalty)
+    fallacy_penalty = _calculate_fallacy_penalty(fallacies)
+    if fallacy_penalty:
+        LOGGER.info(
+            "metacognition.apply_fallacy_penalty",
+            extra={
+                "fallacy_count": len(fallacies),
+                "penalty": fallacy_penalty,
+            },
+        )
 
     # Check citation grounding
     weak_citations = _identify_weak_citations(answer, citations)
     critique.weak_citations = weak_citations
 
-    if weak_citations:
-        critique.reasoning_quality -= len(weak_citations) * 5
+    weak_citation_penalty = len(weak_citations) * WEAK_CITATION_PENALTY
+    if weak_citation_penalty:
+        LOGGER.info(
+            "metacognition.apply_citation_penalty",
+            extra={
+                "weak_citations": weak_citations,
+                "penalty": weak_citation_penalty,
+            },
+        )
 
     # Check for perspective bias
     bias_warnings = _detect_bias(reasoning_trace, answer)
     critique.bias_warnings = bias_warnings
 
-    if bias_warnings:
-        critique.reasoning_quality -= len(bias_warnings) * 10
+    bias_penalty = len(bias_warnings) * BIAS_WARNING_PENALTY
+    if bias_penalty:
+        LOGGER.info(
+            "metacognition.apply_bias_penalty",
+            extra={
+                "bias_warnings": bias_warnings,
+                "penalty": bias_penalty,
+            },
+        )
 
     # Surface alternative interpretations explicitly mentioned in the reasoning
     critique.alternative_interpretations = _extract_alternative_interpretations(
         reasoning_trace, answer
     )
 
-    # Clamp reasoning quality after all adjustments to the documented 0-100 range
-    critique.reasoning_quality = max(0, min(critique.reasoning_quality, 100))
+    total_penalty = fallacy_penalty + weak_citation_penalty + bias_penalty
+    critique.reasoning_quality = max(
+        0,
+        min(
+            DEFAULT_QUALITY_SCORE - total_penalty,
+            MAX_QUALITY_SCORE,
+        ),
+    )
+    LOGGER.debug(
+        "metacognition.quality_score",
+        extra={
+            "base": DEFAULT_QUALITY_SCORE,
+            "penalty": total_penalty,
+            "result": critique.reasoning_quality,
+        },
+    )
 
     # Generate recommendations
     critique.recommendations = _generate_recommendations(critique)
 
     return critique
+
+
+def _calculate_fallacy_penalty(fallacies: Sequence[FallacyWarning]) -> int:
+    """Calculate a calibrated penalty for detected fallacies.
+
+    We penalise per fallacy type, taking the highest severity for repeated
+    occurrences and adding a diminishing penalty for subsequent matches to
+    avoid runaway scoring.
+    """
+
+    if not fallacies:
+        return 0
+
+    severity_weights = {
+        "high": HIGH_FALLACY_PENALTY,
+        "medium": MEDIUM_FALLACY_PENALTY,
+        "low": LOW_FALLACY_PENALTY,
+    }
+
+    penalty = 0.0
+    fallacy_counts: dict[str, int] = {}
+    for fallacy in fallacies:
+        weight = severity_weights.get(fallacy.severity, MEDIUM_FALLACY_PENALTY)
+        count = fallacy_counts.get(fallacy.fallacy_type, 0)
+        # Apply diminishing returns (log base 2) for repeated instances
+        scaled_weight = weight / max(1.0, math.log2(count + 2))
+        penalty += scaled_weight
+        fallacy_counts[fallacy.fallacy_type] = count + 1
+
+    return int(round(penalty))
 
 
 def _identify_weak_citations(answer: str, citations: list[dict]) -> list[str]:
@@ -133,83 +267,176 @@ def _identify_weak_citations(answer: str, citations: list[dict]) -> list[str]:
         List of passage IDs with weak connections
     """
     weak: list[str] = []
+    seen: set[str] = set()
 
-    # Simple heuristic: if citation is mentioned but snippet doesn't appear, it's weak
-    answer_lower = answer.lower()
+    if not answer.strip() or not citations:
+        return weak
+
+    normalised_answer = " ".join(answer.split())
+    answer_lower = normalised_answer.lower()
 
     for citation in citations:
-        index = citation.get("index", 0)
-        snippet = citation.get("snippet", "")
+        normalised = _normalise_citation(citation)
+        if not normalised:
+            continue
 
-        citation_mentioned = f"[{index}]" in answer
+        index = normalised["index"]
+        marker = f"[{index}]"
+        snippet = normalised["snippet"]
+        passage_id = normalised["passage_id"]
+
+        marker_positions = [m.start() for m in re.finditer(re.escape(marker), normalised_answer)]
+        if not marker_positions:
+            continue
 
         cleaned_snippet = re.sub(r"[^a-z0-9\s]", " ", snippet.lower())
-        snippet_words = {
+        snippet_words = [
             word
-            for word in cleaned_snippet.split()[:10]
+            for word in cleaned_snippet.split()
             if len(word) > 3 and word not in _STOPWORDS
-        }
-        snippet_overlap = any(word in answer_lower for word in snippet_words)
+        ]
+        if not snippet_words:
+            weak.append(passage_id)
+            continue
 
-        if citation_mentioned and not snippet_overlap:
-            weak.append(citation.get("passage_id", ""))
+        snippet_set = set(snippet_words[:20])
+        proximity_ok = False
+        explanation_ok = False
+
+        max_overlap = 0
+        for position in marker_positions:
+            window_start = max(0, position - 220)
+            window_end = min(len(answer_lower), position + 220)
+            window = answer_lower[window_start:window_end]
+
+            overlap = sum(1 for word in snippet_set if word in window)
+            if overlap >= max(1, len(snippet_set) // 4):
+                proximity_ok = True
+            max_overlap = max(max_overlap, overlap)
+
+            if re.search(rf"\bexplains?\b|\bshows?\b|\bsupports?\b|\bindicates?\b", window):
+                explanation_ok = True
+
+        if not proximity_ok or (max_overlap < 2 and not explanation_ok):
+            if passage_id not in seen:
+                seen.add(passage_id)
+                weak.append(passage_id)
 
     return weak
 
 
+def _normalise_citation(citation: dict | None) -> dict | None:
+    """Validate and normalise citation dictionaries."""
+
+    if not citation:
+        return None
+
+    index = citation.get("index")
+    snippet = citation.get("snippet")
+    passage_id = citation.get("passage_id") or citation.get("document_id")
+
+    if index in (None, "") or not isinstance(index, int) or index <= 0:
+        LOGGER.debug("metacognition.skip_invalid_citation", extra={"reason": "invalid_index", "citation": citation})
+        return None
+    if not isinstance(snippet, str) or not snippet.strip():
+        LOGGER.debug("metacognition.skip_invalid_citation", extra={"reason": "missing_snippet", "citation": citation})
+        return None
+    if not passage_id:
+        LOGGER.debug("metacognition.skip_invalid_citation", extra={"reason": "missing_passage", "citation": citation})
+        return None
+
+    return {
+        "index": index,
+        "snippet": snippet.strip(),
+        "passage_id": str(passage_id),
+        "osis": citation.get("osis") or citation.get("document_title") or citation.get("document_id"),
+        "anchor": citation.get("anchor") or citation.get("context"),
+    }
+
+
 def _detect_bias(reasoning_trace: str, answer: str) -> list[str]:
-    """Detect perspective bias in reasoning.
+    """Detect perspective bias in reasoning."""
 
-    Looks for:
-    - Exclusively apologetic language
-    - Exclusively skeptical language
-    - Dismissing alternative views without engagement
+    combined_text = " ".join(f"{reasoning_trace} {answer}".split())
+    if not combined_text:
+        return []
 
-    Args:
-        reasoning_trace: Reasoning trace
-        answer: Final answer
+    sentences = re.split(r"(?<=[.?!])\s+", combined_text)
+    bias_scores = {
+        "apologetic": 0.0,
+        "skeptical": 0.0,
+    }
 
-    Returns:
-        Bias warnings
-    """
+    apologetic_markers = {
+        "harmonious": 1.0,
+        "coherent": 0.9,
+        "consistent": 0.8,
+        "resolve": 1.0,
+        "reconcile": 1.0,
+        "defend": 0.6,
+        "uphold": 0.5,
+    }
+    skeptical_markers = {
+        "contradiction": 1.0,
+        "inconsistent": 0.9,
+        "error": 0.5,
+        "fabricated": 0.8,
+        "doubt": 0.6,
+        "challenge": 0.6,
+        "tension": 0.4,
+    }
+
+    def _score_sentence(sentence: str, markers: dict[str, float]) -> float:
+        score = 0.0
+        lowered = sentence.lower()
+        for marker, weight in markers.items():
+            for match in re.finditer(rf"\b{re.escape(marker)}\w*\b", lowered):
+                preceding = lowered[max(0, match.start() - 8) : match.start()]
+                if re.search(r"\bno\b|\bnot\b|\black\b|\bwithout\b", preceding):
+                    continue
+                score += weight
+        return score
+
+    for sentence in sentences:
+        if not sentence.strip():
+            continue
+        bias_scores["apologetic"] += _score_sentence(sentence, apologetic_markers)
+        bias_scores["skeptical"] += _score_sentence(sentence, skeptical_markers)
+
     warnings: list[str] = []
+    apologetic_score = bias_scores["apologetic"]
+    skeptical_score = bias_scores["skeptical"]
 
-    combined_text = (reasoning_trace + " " + answer).lower()
+    if apologetic_score >= 2.5 and skeptical_score < 1.0:
+        warnings.append(
+            "Reasoning leans heavily toward apologetic defence; engage counter-arguments."
+        )
+    if skeptical_score >= 3.0 and apologetic_score < 1.0:
+        warnings.append(
+            "Reasoning is predominantly skeptical; acknowledge constructive harmonisations."
+        )
 
-    # Check for apologetic bias markers
-    apologetic_markers = [
-        "harmony",
-        "harmonious",
-        "coherent",
-        "consistent",
-        "resolves",
-        "complements",
-        "aligned",
-        "seamless",
+    dismissive_markers = [
+        r"\bobviously\b",
+        r"\bclearly\b",
+        r"\bplainly\b",
     ]
-    apologetic_count = sum(1 for marker in apologetic_markers if marker in combined_text)
+    for pattern in dismissive_markers:
+        if re.search(pattern, combined_text, re.IGNORECASE):
+            warnings.append(
+                "Overconfident language detected - provide evidential support for strong claims."
+            )
+            break
 
-    # Check for skeptical bias markers
-    skeptical_markers = [
-        "contradiction",
-        "inconsistent",
-        "incoherent",
-        "error",
-        "impossible",
-        "fabricated",
-    ]
-    skeptical_count = sum(1 for marker in skeptical_markers if marker in combined_text)
-
-    # If heavily skewed, flag bias
-    if apologetic_count >= 3 and skeptical_count <= 1:
-        warnings.append("Reasoning shows apologetic bias - consider skeptical objections")
-
-    if skeptical_count >= 4 and apologetic_count <= 1:
-        warnings.append("Reasoning shows skeptical bias - consider harmonization attempts")
-
-    # Check for dismissiveness
-    if "obviously" in combined_text or "clearly" in combined_text:
-        warnings.append("Overconfident language detected - claims may need more support")
+    if warnings:
+        LOGGER.info(
+            "metacognition.bias_detected",
+            extra={
+                "apologetic_score": round(apologetic_score, 2),
+                "skeptical_score": round(skeptical_score, 2),
+                "warnings": warnings,
+            },
+        )
 
     return warnings
 
@@ -334,7 +561,7 @@ def _generate_recommendations(critique: Critique) -> list[str]:
             "Re-generate answer considering alternative perspectives"
         )
 
-    if critique.reasoning_quality < 60:
+    if critique.reasoning_quality < LOW_QUALITY_THRESHOLD:
         recommendations.append(
             "Reasoning quality is low - consider starting over with different approach"
         )
@@ -424,7 +651,10 @@ def _build_revision_prompt(
         critique.recommendations,
         empty_message="- None provided.",
     )
-    citations_section = _format_citations(citations)
+    selected_citations = _select_revision_citations(
+        original_answer, critique, citations
+    )
+    citations_section = _format_citations(selected_citations)
 
     original_block = textwrap.indent(original_answer.strip(), "    ")
 
@@ -491,9 +721,11 @@ def _format_weak_citations(critique: Critique, citations: list[dict]) -> str:
     if not critique.weak_citations:
         return "- None flagged."
 
-    citation_by_id = {
-        citation.get("passage_id"): citation for citation in citations if citation
-    }
+    citation_by_id = {}
+    for citation in citations:
+        normalised = _normalise_citation(citation)
+        if normalised:
+            citation_by_id[normalised["passage_id"]] = citation
 
     lines: list[str] = []
     for passage_id in critique.weak_citations:
@@ -520,17 +752,58 @@ def _format_citations(citations: list[dict]) -> str:
     if not citations:
         return "None provided."
     lines = []
-    for citation in citations:
+    for citation in citations[:REVISION_CITATION_LIMIT]:
         index = citation.get("index")
         snippet = scrub_adversarial_language(
             (citation.get("snippet") or "").strip()
         ) or ""
         osis = citation.get("osis") or citation.get("document_title") or citation.get("document_id") or "?"
         anchor = citation.get("anchor") or "context"
-        lines.append(
-            f"[{index}] {osis} ({anchor}) — {snippet}"
+        if len(snippet) > REVISION_SNIPPET_TRIM:
+            snippet = snippet[:REVISION_SNIPPET_TRIM].rstrip() + "…"
+        lines.append(f"[{index}] {osis} ({anchor}) — {snippet}")
+    if len(citations) > REVISION_CITATION_LIMIT:
+        LOGGER.info(
+            "metacognition.citation_truncation",
+            extra={
+                "provided": len(citations),
+                "included": REVISION_CITATION_LIMIT,
+            },
         )
     return "\n".join(lines)
+
+
+def _select_revision_citations(
+    original_answer: str, critique: Critique, citations: list[dict]
+) -> list[dict]:
+    """Select a manageable citation subset for revision prompts."""
+
+    if not citations:
+        return []
+
+    answer_text = " ".join(original_answer.split())
+    weak_ids = set(filter(None, critique.weak_citations))
+
+    scored: list[tuple[int, int, int, dict]] = []
+    for position, citation in enumerate(citations):
+        normalised = _normalise_citation(citation)
+        if not normalised:
+            continue
+
+        mentioned = f"[{normalised['index']}]" in answer_text
+        priority = 0 if normalised["passage_id"] in weak_ids else 1 if mentioned else 2
+        score_tuple = (
+            priority,
+            0 if mentioned else 1,
+            position,
+            citation,
+        )
+        scored.append(score_tuple)
+
+    scored.sort(key=lambda item: (item[0], item[1], item[2]))
+    selected = [item[3] for item in scored[:REVISION_CITATION_LIMIT]]
+
+    return selected
 
 
 def _extract_revised_answer(completion: str) -> str:

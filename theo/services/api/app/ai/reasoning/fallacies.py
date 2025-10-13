@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Pattern
+from typing import Match, Pattern
 
 
 @dataclass(slots=True)
@@ -23,7 +23,7 @@ class FallacyDetector:
 
     # Formal fallacies
     AFFIRMING_CONSEQUENT = re.compile(
-        r"\b(?:if|when)\s+\w+.*then\s+\w+.*(?:therefore|thus|so)\s+\w+",
+        r"\bif\s+(?P<antecedent>[^.?!,:;]+?)\s*,?\s*then\s+(?P<consequent>[^.?!,:;]+?)\b",
         re.IGNORECASE,
     )
 
@@ -41,7 +41,7 @@ class FallacyDetector:
     )
 
     CIRCULAR_REASONING = re.compile(
-        r"\b(?:because|since)\s+(?:the\s+)?(?:bible|scripture|text)\s+(?:says|teaches|is\s+true)",
+        r"\b(?:because|since)\s+(?:the\s+)?(?:bible|scripture|text)\s+(?:explicitly\s+)?(?:says|teaches|declares)\b",
         re.IGNORECASE,
     )
 
@@ -51,13 +51,14 @@ class FallacyDetector:
     )
 
     FALSE_DICHOTOMY = re.compile(
-        r"\b(?:either|must\s+be)\s+\w+\s+(?:or|otherwise)\s+\w+",
+        r"\b(?:either\s+[^.?!]+?\s+or\s+[^.?!]+?|must\s+be\s+[^.?!]+?\s+or\s+[^.?!]+?)\b",
         re.IGNORECASE,
     )
 
     # Theological-specific fallacies
     PROOF_TEXTING = re.compile(
-        r"(?:[A-Z][a-z]+\.?\s*\d+(?::\d+|\.\d+))(?:\s*,\s*[A-Z][a-z]+\.?\s*\d+(?::\d+|\.\d+)){4,}",
+        r"(?:see\s+|cf\.\s+|compare\s+)?((?:[A-Z][a-z]+\.?\s*\d+(?::\d+|\.\d+))(?:\s*,\s*[A-Z][a-z]+\.?\s*\d+(?::\d+|\.\d+)){3,})",
+        re.IGNORECASE,
     )
 
     VERSE_ISOLATION = re.compile(
@@ -137,11 +138,19 @@ class FallacyDetector:
     def detect(self, text: str) -> list[FallacyWarning]:
         """Detect fallacies in the given text."""
         warnings: list[FallacyWarning] = []
+        seen: set[tuple[str, str]] = set()
 
         for pattern, fallacy_type, severity, description in self.FALLACY_PATTERNS:
             matches = pattern.finditer(text)
             for match in matches:
                 matched_text = match.group(0)
+                if not self._passes_context_checks(fallacy_type, match, text):
+                    continue
+                dedupe_key = (fallacy_type, matched_text.lower())
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+
                 suggestion = self._get_suggestion(fallacy_type)
 
                 warnings.append(
@@ -155,6 +164,53 @@ class FallacyDetector:
                 )
 
         return warnings
+
+    def _passes_context_checks(
+        self, fallacy_type: str, match: Match[str], text: str
+    ) -> bool:
+        """Apply context-sensitive guards to reduce false positives."""
+
+        snippet = text[max(0, match.start() - 120) : match.end() + 120]
+
+        if fallacy_type == "affirming_consequent":
+            antecedent = match.groupdict().get("antecedent", "").strip()
+            consequent = match.groupdict().get("consequent", "").strip()
+            if not antecedent or not consequent:
+                return False
+            conclusion_pattern = re.compile(
+                rf"\b(?:therefore|thus|so)\s+(?:{re.escape(consequent)}|it\s+must\s+be\s+that\s+{re.escape(antecedent)})",
+                re.IGNORECASE,
+            )
+            if not conclusion_pattern.search(snippet):
+                return False
+
+        if fallacy_type == "circular_reasoning":
+            conclusion_fragment = snippet[match.end() :]
+            if not re.search(
+                r"\b(?:therefore|thus|so)\b.{0,80}\b(?:true|reliable|correct|must\s+be)\b",
+                conclusion_fragment,
+                re.IGNORECASE | re.DOTALL,
+            ):
+                return False
+
+        if fallacy_type == "proof_texting":
+            segment = match.group(1) if match.lastindex else match.group(0)
+            citations = re.findall(r"[A-Z][a-z]+\.?\s*\d+(?::\d+|\.\d+)", segment)
+            if len(citations) < 4:
+                return False
+            # Require limited explanatory text between citations
+            if len(segment.split()) / max(1, len(citations)) > 8:
+                return False
+
+        if fallacy_type == "false_dichotomy":
+            if not re.search(
+                r"\b(?:only|just|no\s+other|nothing\s+else)\b",
+                snippet,
+                re.IGNORECASE,
+            ):
+                return False
+
+        return True
 
     def _get_suggestion(self, fallacy_type: str) -> str | None:
         """Get remediation suggestion for a fallacy type."""

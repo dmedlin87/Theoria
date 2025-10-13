@@ -14,6 +14,11 @@ from theo.services.api.app.ai.reasoning.chain_of_thought import (
 )
 from theo.services.api.app.ai.reasoning.insights import InsightDetector
 from theo.services.api.app.ai.reasoning.metacognition import (
+    Critique,
+    REVISION_CITATION_LIMIT,
+    _detect_bias,
+    _identify_weak_citations,
+    _select_revision_citations,
     critique_reasoning,
     revise_with_critique,
 )
@@ -41,7 +46,7 @@ class TestFallacyDetector:
 
     def test_detects_circular_reasoning(self):
         """Should detect circular reasoning."""
-        text = "The Bible is true because the Bible says so."
+        text = "The Bible is true because the Bible says so; therefore it must be true."
         warnings = detect_fallacies(text)
 
         assert any(w.fallacy_type == "circular_reasoning" for w in warnings)
@@ -52,6 +57,15 @@ class TestFallacyDetector:
         warnings = detect_fallacies(text)
 
         assert any(w.fallacy_type == "proof_texting" for w in warnings)
+
+    def test_deduplicates_repeated_fallacies(self):
+        """Should not report identical fallacy snippets repeatedly."""
+
+        text = "The author is biased. The author is biased. Therefore the author is biased."
+        warnings = detect_fallacies(text)
+
+        ad_hominem = [w for w in warnings if w.fallacy_type == "ad_hominem"]
+        assert len(ad_hominem) == 1
 
     def test_detects_verse_isolation(self):
         """Should detect verse isolation."""
@@ -154,6 +168,62 @@ Sources: [1] Rom.3.23 (page 42)
 
         assert cot.steps == []
         assert cot.raw_thinking == ""
+
+
+class TestMetacognitionUtilities:
+    """Unit tests for metacognition helper functions."""
+
+    def test_identifies_weak_citation_without_explanation(self):
+        """Flag citation when snippet words appear without explanation."""
+
+        answer = "Paul emphasises grace [1] but gives little context."
+        citations = [
+            {
+                "index": 1,
+                "snippet": "For by grace you have been saved through faith",
+                "passage_id": "eph2",
+            }
+        ]
+
+        weak = _identify_weak_citations(answer, citations)
+
+        assert weak == ["eph2"]
+
+    def test_detect_bias_ignores_negated_markers(self):
+        """Negative phrases like 'lack of harmony' should not trigger bias."""
+
+        reasoning = "Scholars note a lack of harmony and highlight tensions from both sides."
+        answer = "Therefore the view remains contested."
+
+        warnings = _detect_bias(reasoning, answer)
+
+        assert warnings == []
+
+    def test_revision_citation_selection_prioritises_weak(self):
+        """Weak citations should be prioritised and limited in count."""
+
+        critique = Critique(
+            reasoning_quality=40,
+            fallacies_found=[],
+            weak_citations=["p1"],
+            alternative_interpretations=[],
+            bias_warnings=[],
+            recommendations=[],
+        )
+
+        citations = [
+            {
+                "index": idx,
+                "snippet": f"Snippet {idx}",
+                "passage_id": f"p{idx}",
+            }
+            for idx in range(1, REVISION_CITATION_LIMIT + 5)
+        ]
+
+        selected = _select_revision_citations("Answer with [1] and [2]", critique, citations)
+
+        assert len(selected) == REVISION_CITATION_LIMIT
+        assert any(citation["passage_id"] == "p1" for citation in selected)
 
 
 class TestInsightDetector:
