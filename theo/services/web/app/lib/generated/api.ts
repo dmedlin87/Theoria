@@ -1077,6 +1077,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ai/chat/{session_id}/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Chat Goals */
+        get: operations["list_chat_goals_ai_chat__session_id__goals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/chat/{session_id}/goals/{goal_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close Chat Goal */
+        post: operations["close_chat_goal_ai_chat__session_id__goals__goal_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/chat/{session_id}/goals/{goal_id}/priority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Goal Priority */
+        post: operations["update_goal_priority_ai_chat__session_id__goals__goal_id__priority_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ai/verse": {
         parameters: {
             query?: never;
@@ -1512,12 +1563,18 @@ export interface components {
             answer: string;
             /** Prompt */
             prompt?: string | null;
+            /** Intent Tags */
+            intent_tags?: components["schemas"]["IntentTagPayload"][] | null;
             /** Answer Summary */
             answer_summary?: string | null;
             /** Citations */
             citations?: components["schemas"]["RAGCitation-Output"][];
             /** Document Ids */
             document_ids?: string[];
+            /** Goal Id */
+            goal_id?: string | null;
+            /** Trail Id */
+            trail_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1541,6 +1598,54 @@ export interface components {
             default_filters?: components["schemas"]["HybridSearchFilters"] | null;
             /** Frequently Opened Panels */
             frequently_opened_panels?: string[];
+        };
+        /** ChatGoalState */
+        ChatGoalState: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Trail Id */
+            trail_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "closed";
+            /** Priority */
+            priority: number;
+            /** Summary */
+            summary?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Last Interaction At
+             * Format: date-time
+             */
+            last_interaction_at: string;
+        };
+        /** ChatGoalProgress */
+        ChatGoalProgress: {
+            /** Goals */
+            goals?: components["schemas"]["ChatGoalState"][];
+        };
+        /** GoalPriorityUpdateRequest */
+        GoalPriorityUpdateRequest: {
+            /** Priority */
+            priority: number;
+        };
+        /** GoalCloseRequest */
+        GoalCloseRequest: {
+            /** Summary */
+            summary?: string | null;
         };
         /** ChatSessionRequest */
         ChatSessionRequest: {
@@ -1584,6 +1689,8 @@ export interface components {
             preferences?: components["schemas"]["ChatSessionPreferences"] | null;
             /** Memory */
             memory?: components["schemas"]["ChatMemoryEntry"][];
+            /** Goals */
+            goals?: components["schemas"]["ChatGoalState"][];
             /**
              * Created At
              * Format: date-time
@@ -6169,6 +6276,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChatSessionState"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_chat_goals_ai_chat__session_id__goals_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatGoalProgress"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_chat_goal_ai_chat__session_id__goals__goal_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+                goal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json"?: components["schemas"]["GoalCloseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatGoalState"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_goal_priority_ai_chat__session_id__goals__goal_id__priority_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+                goal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoalPriorityUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatGoalProgress"];
                 };
             };
             /** @description Resource not found */

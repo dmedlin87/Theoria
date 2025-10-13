@@ -10,7 +10,7 @@
 - Docker Compose codifies a full-stack topology (Postgres, Redis, API, MCP, Web) yet exposes default credentials and volumes without guidance on production hardening or cost controls.【F:infra/docker-compose.yml†L1-L88】
 - Frontend API proxies centralize auth header management and trace propagation, but environment defaults leak localhost URLs, suggesting gaps in deployment configuration management.【F:theo/services/web/app/api/search/route.ts†L1-L55】【F:theo/services/web/app/lib/api.ts†L1-L59】
 - Secrets persistence uses Fernet encryption but only if `SETTINGS_SECRET_KEY` is present; the lack of automated rotation or secret-source integration complicates compliance stories.【F:theo/application/facades/settings.py†L15-L488】【F:theo/application/facades/settings_store.py†L1-L104】
-- Documentation (README, BLUEPRINT, telemetry guide) is rich, yet no ADR/decision register exists for critical trade-offs (e.g., when to enable `allow_insecure_startup`), hindering future audits.【F:README.md†L1-L126】【F:docs/BLUEPRINT.md†L1-L120】【F:docs/telemetry.md†L1-L120】
+- Documentation (README, BLUEPRINT, telemetry guide) is rich, and an ADR register now captures foundational choices (architecture, CI, typing), yet gaps remain for operational guardrails (e.g., when to enable `allow_insecure_startup`).【F:README.md†L1-L126】【F:docs/BLUEPRINT.md†L1-L120】【F:docs/telemetry.md†L1-L120】【F:docs/adr/0001-hexagonal-architecture.md†L1-L19】【F:docs/adr/0002-ci-security-guardrails.md†L1-L16】【F:docs/adr/0003-testing-and-coverage.md†L1-L16】
 
 ## B) Quality Attribute Scorecard (0 = Poor, 3 = Excellent)
 | Attribute | Score | Rationale |
@@ -61,10 +61,11 @@
 - **Later (Roadmap)**
   - Integrate secrets storage with managed services (e.g., AWS KMS, HashiCorp Vault) and plan rotation workflows to meet compliance audits.【F:theo/application/facades/settings_store.py†L1-L104】
   - Expand cost-awareness in the LLM router (dynamic budgets, sustainability signals) and expose metrics for carbon/cost per workflow.【F:theo/services/api/app/ai/router.py†L1-L200】
-  - Capture decisions in ADRs covering security modes, ingestion resilience, and observability strategy to aid future audits.【F:docs/BLUEPRINT.md†L1-L120】
+  - Extend ADR coverage to include security modes (e.g., `allow_insecure_startup`), ingestion resilience, and observability strategy to aid future audits.【F:docs/BLUEPRINT.md†L1-L120】【F:docs/adr/0001-hexagonal-architecture.md†L1-L19】
 
 ## F) Appendices
 - **Service Topology**: Docker Compose defines Postgres, Redis, API, MCP, and Web containers with shared storage volumes and port mappings.【F:infra/docker-compose.yml†L1-L88】
 - **Configuration Sources**: Settings facade loads environment variables with defaults for database, Redis, embedding models, auth, and ingestion guardrails.【F:theo/application/facades/settings.py†L15-L488】
 - **Observability Signals**: `telemetry.py` emits Prometheus counters/histograms and optional OpenTelemetry spans; `/metrics` endpoint exposed when Prometheus available.【F:theo/services/api/app/telemetry.py†L200-L307】【F:theo/services/api/app/main.py†L240-L305】
 - **Security Controls**: `security.py` enforces API key/JWT validation and attaches principals to requests; ingestion network hardens against SSRF with scheme/host/IP checks.【F:theo/services/api/app/security.py†L1-L179】【F:theo/services/api/app/ingest/network.py†L26-L199】
+- **Decision Log**: ADRs document architectural layering, CI security guardrails, and testing standards; new entries are still needed for runtime safety toggles and resilience defaults.【F:docs/adr/0001-hexagonal-architecture.md†L1-L19】【F:docs/adr/0002-ci-security-guardrails.md†L1-L16】【F:docs/adr/0003-testing-and-coverage.md†L1-L22】

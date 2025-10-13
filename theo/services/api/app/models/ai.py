@@ -89,7 +89,44 @@ class ChatMemoryEntry(APIModel):
     answer_summary: str | None = None
     citations: list[RAGCitation] = Field(default_factory=list)
     document_ids: list[str] = Field(default_factory=list)
+    goal_id: str | None = None
+    trail_id: str | None = None
+    embedding: list[float] | None = None
+    embedding_model: str | None = None
+    topics: list[str] | None = None
+    entities: list[str] | None = None
+    goal_ids: list[str] | None = None
+    source_types: list[str] | None = None
+    sentiment: str | None = None
     created_at: datetime
+    trail_id: str | None = None
+    digest_hash: str | None = None
+    key_entities: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+
+
+class ChatGoalState(APIModel):
+    id: str
+    title: str
+    trail_id: str
+    status: Literal["active", "closed"] = "active"
+    priority: int = 0
+    summary: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    last_interaction_at: datetime
+
+
+class ChatGoalProgress(APIModel):
+    goals: list[ChatGoalState] = Field(default_factory=list)
+
+
+class GoalPriorityUpdateRequest(APIModel):
+    priority: int
+
+
+class GoalCloseRequest(APIModel):
+    summary: str | None = None
 
 
 class ModeAliasMixin:
@@ -144,6 +181,7 @@ class ChatSessionState(APIModel):
     document_ids: list[str] = Field(default_factory=list)
     preferences: ChatSessionPreferences | None = None
     memory: list[ChatMemoryEntry] = Field(default_factory=list)
+    goals: list[ChatGoalState] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     last_interaction_at: datetime
