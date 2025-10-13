@@ -1,6 +1,18 @@
 "use client";
 
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+
+import {
+  ToastProvider as RadixToastProvider,
+  ToastViewport,
+  ToastRoot,
+  ToastTitle,
+  ToastDescription,
+  ToastActions,
+  ToastCloseButton,
+  toastVariants,
+} from "./ui/toast";
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -67,47 +79,49 @@ export function ToastProvider({ children }: { children: ReactNode }): JSX.Elemen
 }
 
 function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: string) => void }): JSX.Element {
-  if (toasts.length === 0) {
-    return <></>;
-  }
-
   return (
+    <RadixToastProvider label="Notifications" swipeDirection="right">
+      <ToastViewport />
     <div
       role="region"
       aria-label="Notifications"
+      aria-live="polite"
+      aria-atomic="false"
       className="toast-container"
     >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
       ))}
-    </div>
+    </RadixToastProvider>
   );
 }
 
+function cx(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(" ");
+}
+
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }): JSX.Element {
-  const alertClass = `alert alert-${toast.type} toast-item`;
+  const variantClass = toastVariants[toast.type] ?? toastVariants.info;
 
   return (
-    <div
-      role="alert"
-      aria-live="polite"
-      aria-atomic="true"
-      className={alertClass}
+    <ToastRoot
+      open
+      duration={toast.duration ?? 5000}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          onRemove(toast.id);
+        }
+      }}
+      className={cx(variantClass)}
     >
-      <div className="toast-item__content">
-        <div className="stack-xs" style={{ flex: 1 }}>
-          {toast.title && <div className="alert__title">{toast.title}</div>}
-          <div className="alert__message">{toast.message}</div>
-        </div>
-        <button
-          type="button"
-          onClick={() => onRemove(toast.id)}
-          className="btn-ghost btn-sm toast-item__close"
-          aria-label="Dismiss notification"
-        >
-          ×
-        </button>
-      </div>
-    </div>
+      <VisuallyHidden role="status" aria-live="polite" aria-atomic="true">
+        {toast.message}
+      </VisuallyHidden>
+      {toast.title ? <ToastTitle>{toast.title}</ToastTitle> : null}
+      <ToastDescription>{toast.message}</ToastDescription>
+      <ToastActions>
+        <ToastCloseButton aria-label="Dismiss notification">×</ToastCloseButton>
+      </ToastActions>
+    </ToastRoot>
   );
 }

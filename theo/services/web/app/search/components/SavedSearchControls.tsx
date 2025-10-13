@@ -2,8 +2,11 @@
 
 import type { CSSProperties, FormEvent } from "react";
 
+import styles from "./SearchPageClient.module.css";
+
 import type { SavedSearch } from "./SearchPageClient";
 import type { SearchFilters } from "../searchParams";
+import type { SavedSearch } from "./filters/types";
 
 const visuallyHiddenStyle: CSSProperties = {
   border: 0,
@@ -53,27 +56,27 @@ export function SavedSearchControls({
           value={savedSearchName}
           onChange={(event) => onSavedSearchNameChange(event.target.value)}
           placeholder="Name this search"
-          className="search-saved-input"
+          className={styles["search-saved-input"]}
         />
         <button type="submit" disabled={!savedSearchName.trim()}>
           Save current filters
         </button>
       </form>
       {savedSearches.length === 0 ? (
-        <p className="search-saved-empty">
+        <p className={styles["search-saved-empty"]}>
           No saved searches yet. Configure filters and click save to store a preset.
         </p>
       ) : (
-        <ul className="search-saved-list">
+        <ul className={styles["search-saved-list"]}>
           {savedSearches.map((saved) => {
             const formatted = formatFilters(saved.filters);
             return (
-              <li key={saved.id} className="search-card">
-                <div className="search-card__header">
-                  <div className="search-card__info">
+              <li key={saved.id} className={styles["search-card"]}>
+                <div className={styles["search-card__header"]}>
+                  <div className={styles["search-card__info"]}>
                     <strong>{saved.name}</strong>
                     {formatted.description && (
-                      <span className="search-card__description">
+                      <span className={styles["search-card__description"]}>
                         {formatted.description}
                       </span>
                     )}
@@ -84,23 +87,21 @@ export function SavedSearchControls({
                       onClick={() => {
                         void onApplySavedSearch(saved);
                       }}
-                      aria-label={`Load “${saved.name}” saved search`}
                     >
                       Load preset
                     </button>
                     <button
                       type="button"
                       onClick={() => onDeleteSavedSearch(saved.id)}
-                      aria-label={`Delete “${saved.name}” saved search`}
                     >
                       Delete
                     </button>
                   </div>
                 </div>
                 {formatted.chips.length > 0 && (
-                  <div className="search-card__chips">
+                  <div className={styles["search-card__chips"]}>
                     {formatted.chips.map((chip) => (
-                      <span key={chip.id} className="search-chip">
+                      <span key={chip.id} className={styles["search-chip"]}>
                         {chip.text}
                       </span>
                     ))}

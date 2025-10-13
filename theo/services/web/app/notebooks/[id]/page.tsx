@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import Breadcrumbs from "../../components/Breadcrumbs";
 import DeliverableExportAction, {
   type DeliverableRequestPayload,
 } from "../../components/DeliverableExportAction";

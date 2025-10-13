@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import VirtualList from "../../components/VirtualList";
 import { buildPassageLink, formatAnchor } from "../../lib/api";
 import type { DocumentGroup } from "../components/SearchPageClient";
 
@@ -50,20 +51,29 @@ export default function SearchResults({
   }
 
   return (
-    <div className="stack-lg">
-      {groups.map((group) => (
-        <article key={group.documentId} className="card card--interactive">
-          <header className="stack-xs mb-3">
-            <h3 className="text-xl font-semibold mb-0">{group.title}</h3>
-            {group.score !== null && group.score !== undefined && (
-              <p className="text-sm text-muted mb-0">
-                Relevance: {Math.round(group.score * 100)}%
-              </p>
-            )}
-          </header>
+    <VirtualList
+      items={groups}
+      itemKey={(group) => group.documentId}
+      estimateSize={(group) => 220 + group.passages.length * 160}
+      containerProps={{
+        className: "search-results__scroller",
+        "aria-label": "Search results",
+      }}
+      renderItem={(group, index) => {
+        return (
+          <div className="search-results__row" data-last={index === groups.length - 1}>
+            <article className="card card--interactive">
+              <header className="stack-xs mb-3">
+                <h3 className="text-xl font-semibold mb-0">{group.title}</h3>
+                {group.score !== null && group.score !== undefined && (
+                  <p className="text-sm text-muted mb-0">
+                    Relevance: {Math.round(group.score * 100)}%
+                  </p>
+                )}
+              </header>
 
-          <div className="stack-md">
-            {group.passages.map((passage) => {
+              <div className="stack-md">
+                {group.passages.map((passage) => {
               const anchor = formatAnchor({
                 page_no: passage.page_no ?? null,
                 t_start: passage.t_start ?? null,
@@ -116,9 +126,11 @@ export default function SearchResults({
                 </div>
               );
             })}
+              </div>
+            </article>
           </div>
-        </article>
-      ))}
-    </div>
+        );
+      }}
+    />
   );
 }
