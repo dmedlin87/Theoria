@@ -1091,3 +1091,18 @@ def refresh_creator_verse_rollups(osis_refs: list[str]) -> None:
     with Session(engine) as session:
         service = CreatorVersePerspectiveService(session)
         service.refresh_many(osis_refs)
+
+
+@celery.task(name="tasks.enqueue_follow_up_retrieval")
+def enqueue_follow_up_retrieval(session_id: str, trail_id: str, action: str) -> None:
+    """Record queued follow-up retrieval requests triggered by trail digests."""
+
+    if not action:
+        logger.debug(
+            "Received empty follow-up action", extra={"session_id": session_id, "trail_id": trail_id}
+        )
+        return
+    logger.info(
+        "Queued follow-up retrieval",
+        extra={"session_id": session_id, "trail_id": trail_id, "action": action},
+    )

@@ -90,6 +90,10 @@ class ChatMemoryEntry(APIModel):
     citations: list[RAGCitation] = Field(default_factory=list)
     document_ids: list[str] = Field(default_factory=list)
     created_at: datetime
+    trail_id: str | None = None
+    digest_hash: str | None = None
+    key_entities: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
 
 
 class ModeAliasMixin:
