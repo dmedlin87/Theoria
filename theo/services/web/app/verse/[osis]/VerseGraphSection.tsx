@@ -6,8 +6,9 @@ import {
   forceLink,
   forceManyBody,
   forceSimulation,
-} from "d3";
-import type { SimulationLinkDatum, SimulationNodeDatum } from "d3";
+  type SimulationLinkDatum,
+  type SimulationNodeDatum,
+} from "d3-force";
 import { useEffect, useMemo, useState } from "react";
 
 import { buildPassageLink, formatAnchor } from "../../lib/api";

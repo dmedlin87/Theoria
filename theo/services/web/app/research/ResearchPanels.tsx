@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo } from "react";
 
 import ModeChangeBanner from "../components/ModeChangeBanner";
@@ -8,10 +9,24 @@ import { useMode } from "../mode-context";
 import ContradictionsPanel from "./panels/ContradictionsPanel";
 import CommentariesPanel from "./panels/CommentariesPanel";
 import CrossReferencesPanel from "./panels/CrossReferencesPanel";
-import GeoPanel from "./panels/GeoPanel";
 import MorphologyPanel from "./panels/MorphologyPanel";
 import TextualVariantsPanel from "./panels/TextualVariantsPanel";
 import type { ResearchFeatureFlags } from "./types";
+
+const GeoPanel = dynamic(() => import("./panels/GeoPanel"), {
+  loading: () => <GeoPanelSkeleton />,
+  ssr: false,
+});
+
+function GeoPanelSkeleton(): JSX.Element {
+  return (
+    <section aria-busy="true" className="geo-panel-skeleton">
+      <div className="skeleton geo-panel-skeleton__title" />
+      <div className="skeleton geo-panel-skeleton__subtitle" />
+      <div className="skeleton geo-panel-skeleton__map" />
+    </section>
+  );
+}
 
 interface ResearchPanelsProps {
   osis: string;

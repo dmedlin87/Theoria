@@ -10,6 +10,9 @@ import {
   useRef,
 } from "react";
 
+import CommandPalette from "./CommandPalette";
+import OfflineIndicator from "./OfflineIndicator";
+
 export type AppShellNavItem = {
   href: string;
   label: string;
@@ -140,6 +143,8 @@ export function AppShell({
 
   return (
     <div className="app-shell-v2">
+      <CommandPalette />
+      <OfflineIndicator />
       {/* Accessibility: Announce navigation status */}
       <div role="status" aria-live="polite" aria-atomic="true" className="visually-hidden">
         {navigationStatus}
@@ -251,7 +256,9 @@ export function AppShell({
           </div>
         </div>
         <main className="app-shell-v2__content" id="main-content">
-          {children}
+          <div key={pathname} className="page-transition">
+            {children}
+          </div>
         </main>
         <footer className="app-shell-v2__footer">
           <div>{footerMeta}</div>
