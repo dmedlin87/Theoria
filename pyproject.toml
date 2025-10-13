@@ -67,12 +67,11 @@ warn_unused_ignores = true
 follow_imports = "skip"
 
 [tool.pytest.ini_options]
+# Coverage disabled by default for faster test discovery
+# To run with coverage: pytest --cov=theo --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 addopts = [
-    "--cov=theo",
-    "--cov-report=term-missing",
-    "--cov-report=xml",
-    "--cov-fail-under=80",
 ]
+testpaths = ["tests"]
 markers = [
     "redteam: OWASP LLM red-team regression suite",
     "no_auth_override: disable authentication override fixture for security assertions",
