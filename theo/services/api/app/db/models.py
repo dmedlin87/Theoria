@@ -1092,6 +1092,7 @@ class ChatSession(Base):
         JSON, nullable=False, default=list
     )
     document_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    goals: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
     preferences: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False

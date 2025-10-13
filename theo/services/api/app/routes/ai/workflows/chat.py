@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Sequence
 from uuid import uuid4
@@ -18,6 +20,8 @@ from theo.application.facades.settings import get_settings
 from theo.services.api.app.db.models import ChatSession
 from theo.services.api.app.intent.tagger import get_intent_tagger
 from theo.services.api.app.models.ai import (
+    ChatGoalProgress,
+    ChatGoalState,
     ChatMemoryEntry,
     ChatSessionMessage,
     ChatSessionPreferences,
@@ -26,6 +30,8 @@ from theo.services.api.app.models.ai import (
     ChatSessionState,
     CHAT_SESSION_MEMORY_CHAR_BUDGET,
     CHAT_SESSION_TOTAL_CHAR_BUDGET,
+    GoalCloseRequest,
+    GoalPriorityUpdateRequest,
     IntentTagPayload,
 )
 from .guardrails import extract_refusal_text, guardrail_http_exception
@@ -49,12 +55,135 @@ CHAT_PLAN = "\n".join(
     ]
 )
 
+_GOAL_DECLARE_PATTERNS = [
+    re.compile(r"^\s*goal\s*[:\-]\s*(?P<title>.+)$", re.IGNORECASE),
+    re.compile(r"^\s*objective\s*[:\-]\s*(?P<title>.+)$", re.IGNORECASE),
+    re.compile(r"^\s*my\s+goal\s+is\s+(?P<title>.+)$", re.IGNORECASE),
+]
+_GOAL_RESUME_PATTERN = re.compile(
+    r"^\s*resume\s+(?:goal|objective)\s*(?::|\s)\s*(?P<identifier>.+)$",
+    re.IGNORECASE,
+)
+
+
+@dataclass
+class GoalDirective:
+    action: str
+    goal: ChatGoalState | None = None
+    title: str | None = None
+    identifier: str | None = None
+
 
 def _truncate_text(value: str, limit: int) -> str:
     if len(value) <= limit:
         return value.strip()
     truncated = value[: max(limit - 1, 0)].rstrip()
     return f"{truncated}…" if truncated else value[:limit]
+
+
+def _load_goal_entries(record: ChatSession | None) -> list[ChatGoalState]:
+    goals: list[ChatGoalState] = []
+    if record is None:
+        return goals
+    raw_goals = getattr(record, "goals", []) or []
+    for raw in raw_goals:
+        try:
+            goal = ChatGoalState.model_validate(raw)
+        except Exception:
+            LOGGER.debug(
+                "Skipping invalid chat goal payload for session %s",
+                record.id,
+                exc_info=True,
+            )
+            continue
+        goals.append(goal)
+    _normalise_goal_priorities(goals)
+    return goals
+
+
+def _dump_goal_entries(goals: Sequence[ChatGoalState]) -> list[dict[str, object]]:
+    return [goal.model_dump(mode="json", exclude_none=True) for goal in goals]
+
+
+def _normalise_goal_priorities(goals: list[ChatGoalState]) -> None:
+    active: list[ChatGoalState] = [goal for goal in goals if goal.status == "active"]
+    inactive: list[ChatGoalState] = [goal for goal in goals if goal.status != "active"]
+    active.sort(key=lambda goal: (goal.priority, goal.created_at))
+    inactive.sort(key=lambda goal: (goal.priority, goal.created_at))
+    for index, goal in enumerate(active):
+        goal.priority = index
+    offset = len(active)
+    for index, goal in enumerate(inactive, start=offset):
+        goal.priority = index
+    goals[:] = active + inactive
+
+
+def _select_primary_goal(goals: Sequence[ChatGoalState]) -> ChatGoalState | None:
+    active = [goal for goal in goals if goal.status == "active"]
+    if not active:
+        return None
+    active.sort(key=lambda goal: goal.last_interaction_at, reverse=True)
+    active.sort(key=lambda goal: goal.priority)
+    return active[0]
+
+
+def _find_goal_by_identifier(
+    identifier: str, goals: Sequence[ChatGoalState]
+) -> ChatGoalState | None:
+    normalised = identifier.strip().lower()
+    for goal in goals:
+        if goal.id.lower() == normalised:
+            return goal
+    for goal in goals:
+        if goal.title.strip().lower() == normalised:
+            return goal
+    return None
+
+
+def _resolve_goal_directive(
+    message: str, goals: Sequence[ChatGoalState]
+) -> GoalDirective:
+    cleaned = message.strip()
+    if cleaned:
+        for pattern in _GOAL_DECLARE_PATTERNS:
+            match = pattern.match(cleaned)
+            if match:
+                title = match.group("title").strip()
+                return GoalDirective(action="declare", title=title)
+        resume = _GOAL_RESUME_PATTERN.match(cleaned)
+        if resume:
+            identifier = resume.group("identifier").strip()
+            goal = _find_goal_by_identifier(identifier, goals)
+            if goal is not None:
+                return GoalDirective(
+                    action="resume", goal=goal, identifier=identifier
+                )
+            return GoalDirective(action="declare", title=identifier)
+    return GoalDirective(action="none", goal=_select_primary_goal(goals))
+
+
+def _reprioritise_goal(
+    goals: list[ChatGoalState], goal: ChatGoalState, desired_index: int
+) -> None:
+    desired_index = max(0, desired_index)
+    active = [item for item in goals if item.status == "active" and item.id != goal.id]
+    active.sort(key=lambda g: g.priority)
+    insert_at = min(desired_index, len(active))
+    active.insert(insert_at, goal)
+    for index, item in enumerate(active):
+        item.priority = index
+    inactive = [item for item in goals if item.status != "active"]
+    inactive.sort(key=lambda g: (g.priority, g.created_at))
+    offset = len(active)
+    for index, item in enumerate(inactive, start=offset):
+        item.priority = index
+    goals[:] = active + inactive
+
+
+def _touch_goal(goal: ChatGoalState, summary: str | None, now: datetime) -> None:
+    goal.summary = summary
+    goal.last_interaction_at = now
+    goal.updated_at = now
 
 
 def _resolve_preferences(payload: ChatSessionRequest) -> ChatSessionPreferences:
@@ -132,6 +261,8 @@ def _persist_chat_session(
     message: ChatSessionMessage,
     answer: RAGAnswer,
     preferences: ChatSessionPreferences,
+    goals: list[ChatGoalState],
+    active_goal: ChatGoalState | None,
 ) -> ChatSession:
     now = datetime.now(UTC)
     entries = _load_memory_entries(existing)
@@ -155,6 +286,9 @@ def _persist_chat_session(
         document_ids=_collect_document_ids(answer),
         created_at=now,
     )
+    if active_goal is not None:
+        new_entry.goal_id = active_goal.id
+        new_entry.trail_id = active_goal.trail_id
     entries.append(new_entry)
     if len(entries) > _MAX_STORED_MEMORY:
         entries = entries[-_MAX_STORED_MEMORY:]
@@ -167,6 +301,23 @@ def _persist_chat_session(
 
     pref_dict = preferences.model_dump(mode="json") if preferences else None
 
+    updated_goals = list(goals)
+    if active_goal is not None:
+        summary_text = new_entry.answer_summary or new_entry.answer
+        _touch_goal(active_goal, summary_text, now)
+        replaced = False
+        for index, goal in enumerate(updated_goals):
+            if goal.id == active_goal.id:
+                updated_goals[index] = active_goal
+                replaced = True
+                break
+        if not replaced:
+            updated_goals.append(active_goal)
+    _normalise_goal_priorities(updated_goals)
+    goals.clear()
+    goals.extend(updated_goals)
+    raw_goals = _dump_goal_entries(updated_goals)
+
     if existing is None:
         record = ChatSession(
             id=session_id,
@@ -175,6 +326,7 @@ def _persist_chat_session(
             summary=new_entry.answer_summary or new_entry.answer,
             memory_snippets=raw_entries,
             document_ids=aggregated_docs,
+            goals=raw_goals,
             preferences=pref_dict,
             created_at=now,
             updated_at=now,
@@ -188,6 +340,7 @@ def _persist_chat_session(
         record.summary = new_entry.answer_summary or new_entry.answer
         record.memory_snippets = raw_entries
         record.document_ids = aggregated_docs
+        record.goals = raw_goals
         record.preferences = pref_dict
         record.updated_at = now
         record.last_interaction_at = now
@@ -199,6 +352,7 @@ def _persist_chat_session(
 
 def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
     entries = _load_memory_entries(record)
+    goals = _load_goal_entries(record)
     preferences: ChatSessionPreferences | None = None
     if record.preferences:
         try:
@@ -216,6 +370,7 @@ def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
         document_ids=document_ids,
         preferences=preferences,
         memory=entries,
+        goals=goals,
         created_at=record.created_at,
         updated_at=record.updated_at,
         last_interaction_at=record.last_interaction_at,
@@ -277,6 +432,12 @@ def chat_turn(
     preferences = _resolve_preferences(payload)
     memory_entries = _load_memory_entries(existing_session)
     memory_context = _prepare_memory_context(memory_entries)
+    goals = _load_goal_entries(existing_session)
+    directive = _resolve_goal_directive(question, goals)
+    active_goal = directive.goal
+    recorder_user_id = (
+        payload.recorder_metadata.user_id if payload.recorder_metadata else None
+    )
 
     if memory_context:
         budget_remaining = CHAT_SESSION_TOTAL_CHAR_BUDGET - total_message_chars
@@ -298,17 +459,76 @@ def chat_turn(
             memory_context = list(reversed(trimmed)) if trimmed else []
 
     try:
-        with trail_service.start_trail(
-            workflow="chat",
-            plan_md=CHAT_PLAN,
-            mode="chat",
-            input_payload=payload.model_dump(mode="json"),
-            user_id=(
-                payload.recorder_metadata.user_id
-                if payload.recorder_metadata
-                else None
-            ),
-        ) as recorder:
+        recorder_context = None
+        if directive.action == "declare":
+            goal_title = directive.title or question
+            recorder_context = trail_service.start_trail(
+                workflow="chat_goal",
+                plan_md=_truncate_text(goal_title, _MEMORY_SUMMARY_LIMIT),
+                mode="chat_goal",
+                input_payload={
+                    "session_id": session_id,
+                    "goal_title": goal_title,
+                    "request": payload.model_dump(mode="json"),
+                },
+                user_id=recorder_user_id,
+            )
+            goal_timestamp = datetime.now(UTC)
+            active_goal = ChatGoalState(
+                id=str(uuid4()),
+                title=_truncate_text(goal_title, _MEMORY_TEXT_LIMIT),
+                trail_id=recorder_context.trail.id,
+                status="active",
+                priority=0,
+                summary=None,
+                created_at=goal_timestamp,
+                updated_at=goal_timestamp,
+                last_interaction_at=goal_timestamp,
+            )
+            goals.append(active_goal)
+            _reprioritise_goal(goals, active_goal, 0)
+        elif directive.action == "resume" and active_goal is not None:
+            recorder_context = trail_service.resume_trail(active_goal.trail_id)
+            _reprioritise_goal(goals, active_goal, 0)
+        elif directive.action == "resume":
+            goal_title = directive.title or question
+            recorder_context = trail_service.start_trail(
+                workflow="chat_goal",
+                plan_md=_truncate_text(goal_title, _MEMORY_SUMMARY_LIMIT),
+                mode="chat_goal",
+                input_payload={
+                    "session_id": session_id,
+                    "goal_title": goal_title,
+                    "request": payload.model_dump(mode="json"),
+                },
+                user_id=recorder_user_id,
+            )
+            goal_timestamp = datetime.now(UTC)
+            active_goal = ChatGoalState(
+                id=str(uuid4()),
+                title=_truncate_text(goal_title, _MEMORY_TEXT_LIMIT),
+                trail_id=recorder_context.trail.id,
+                status="active",
+                priority=0,
+                summary=None,
+                created_at=goal_timestamp,
+                updated_at=goal_timestamp,
+                last_interaction_at=goal_timestamp,
+            )
+            goals.append(active_goal)
+            _reprioritise_goal(goals, active_goal, 0)
+        elif active_goal is not None:
+            recorder_context = trail_service.resume_trail(active_goal.trail_id)
+        else:
+            recorder_context = trail_service.start_trail(
+                workflow="chat",
+                plan_md=CHAT_PLAN,
+                mode="chat",
+                input_payload=payload.model_dump(mode="json"),
+                user_id=recorder_user_id,
+            )
+
+        with recorder_context as recorder:
             answer = run_guarded_chat(
                 session,
                 question=question,
@@ -326,11 +546,7 @@ def chat_turn(
                 session,
                 existing=existing_session,
                 session_id=session_id,
-                user_id=(
-                    payload.recorder_metadata.user_id
-                    if payload.recorder_metadata
-                    else None
-                ),
+                user_id=recorder_user_id,
                 stance=payload.stance or payload.mode_id,
                 question=question,
                 prompt=payload.prompt,
@@ -338,17 +554,23 @@ def chat_turn(
                 message=message,
                 answer=answer,
                 preferences=preferences,
+                goals=goals,
+                active_goal=active_goal,
             )
             trail_output = {
                 "session_id": session_id,
                 "answer": answer,
                 "message": message,
             }
+            if active_goal is not None:
+                trail_output["goal_id"] = active_goal.id
+                trail_output["trail_id"] = active_goal.trail_id
             if serialized_intent_tags:
                 trail_output["intent_tags"] = serialized_intent_tags
             recorder.finalize(
                 final_md=answer.summary,
                 output_payload=trail_output,
+                status="running" if active_goal is not None else "completed",
             )
     except GuardrailError as exc:
         return guardrail_http_exception(
@@ -383,10 +605,98 @@ def get_chat_session(session_id: str, session: Session = Depends(get_session)) -
     return _serialise_chat_session(record)
 
 
+@router.get(
+    "/chat/{session_id}/goals",
+    response_model=ChatGoalProgress,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
+)
+def list_chat_goals(
+    session_id: str, session: Session = Depends(get_session)
+) -> ChatGoalProgress:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="chat session not found")
+    goals = _load_goal_entries(record)
+    return ChatGoalProgress(goals=goals)
+
+
+@router.post(
+    "/chat/{session_id}/goals/{goal_id}/close",
+    response_model=ChatGoalState,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
+)
+def close_chat_goal(
+    session_id: str,
+    goal_id: str,
+    payload: GoalCloseRequest | None = None,
+    session: Session = Depends(get_session),
+) -> ChatGoalState:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="chat session not found")
+    goals = _load_goal_entries(record)
+    goal = next((item for item in goals if item.id == goal_id), None)
+    if goal is None:
+        raise HTTPException(status_code=404, detail="goal not found")
+    if goal.status != "closed":
+        now = datetime.now(UTC)
+        goal.status = "closed"
+        goal.updated_at = now
+        goal.last_interaction_at = now
+        if payload and payload.summary:
+            goal.summary = payload.summary
+        _normalise_goal_priorities(goals)
+        record.goals = _dump_goal_entries(goals)
+        session.add(record)
+        trail_service = TrailService(session)
+        trail = trail_service.get_trail(goal.trail_id)
+        if trail is not None:
+            trail.status = "completed"
+            if payload and payload.summary:
+                trail.final_md = payload.summary
+            trail.completed_at = now
+            trail.updated_at = now
+            session.add(trail)
+        session.commit()
+    return goal
+
+
+@router.post(
+    "/chat/{session_id}/goals/{goal_id}/priority",
+    response_model=ChatGoalProgress,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
+)
+def update_goal_priority(
+    session_id: str,
+    goal_id: str,
+    payload: GoalPriorityUpdateRequest,
+    session: Session = Depends(get_session),
+) -> ChatGoalProgress:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="chat session not found")
+    goals = _load_goal_entries(record)
+    goal = next((item for item in goals if item.id == goal_id), None)
+    if goal is None:
+        raise HTTPException(status_code=404, detail="goal not found")
+    _reprioritise_goal(goals, goal, payload.priority)
+    goal.updated_at = datetime.now(UTC)
+    record.goals = _dump_goal_entries(goals)
+    session.add(record)
+    session.commit()
+    return ChatGoalProgress(goals=goals)
+
+
 __all__ = [
     "router",
     "chat_turn",
     "get_chat_session",
+    "list_chat_goals",
+    "close_chat_goal",
+    "update_goal_priority",
     "_prepare_memory_context",
     "_load_memory_entries",
 ]
