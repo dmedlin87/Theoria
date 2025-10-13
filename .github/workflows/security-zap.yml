@@ -18,17 +18,18 @@ jobs:
     name: Scan staging API
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      STAGING_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
     steps:
       - name: Verify staging URL secret
         id: verify-secret
+        env:
+          STAGING_URL: ${{ secrets.STAGING_API_BASE_URL || '' }}
         run: |
-          if [ -z "${STAGING_API_BASE_URL}" ]; then
+          if [ -z "${STAGING_URL}" ]; then
             echo "::warning::STAGING_API_BASE_URL secret is not configured. Skipping ZAP baseline scan."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "url=${STAGING_URL}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout repository
@@ -42,7 +43,7 @@ jobs:
         id: zap
         uses: zaproxy/action-baseline@v0.13.0
         with:
-          target: ${{ env.STAGING_API_BASE_URL }}
+          target: ${{ steps.verify-secret.outputs.url }}
           cmd_options: '-J zap-baseline-report.json -r zap-baseline-report.html -w zap-baseline-warn.md'
 
       - name: Fail on high severity alerts

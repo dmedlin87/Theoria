@@ -2,6 +2,7 @@ fastapi==0.119.0
 uvicorn[standard]==0.37.0
 sqlalchemy==2.0.44
 celery==5.5.3
+click>=8.1,<9
 pythonbible>=0.13.1,<0.14
 pydantic>=2.5,<3
 pydantic-settings>=2.1,<3
