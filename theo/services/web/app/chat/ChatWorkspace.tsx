@@ -8,8 +8,6 @@ import {
   FileText,
   Globe,
   Search,
-  ThumbsDown,
-  ThumbsUp,
   Upload as UploadIcon,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,10 +29,25 @@ import {
 } from "../lib/guardrails";
 import { useMode } from "../mode-context";
 import { emitTelemetry, submitFeedback, type FeedbackAction } from "../lib/telemetry";
-import { useChatWorkspaceState, type Reaction, type ConversationEntry, type AssistantConversationEntry, type GuardrailState } from "./useChatWorkspaceState";
+import type {
+  Reaction,
+  ConversationEntry,
+  AssistantConversationEntry,
+  GuardrailState,
+} from "./useChatWorkspaceState";
 import { useSessionRestoration, useSessionPersistence } from "./useSessionRestoration";
 import { useChatExecution } from "./useChatExecution";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
+import { ChatTranscript, type TranscriptEntry } from "./components/transcript/ChatTranscript";
+import { useChatSessionState } from "./hooks/useChatSessionState";
+
+import styles from "./ChatWorkspace.module.css";
+
+function classNames(
+  ...classes: Array<string | false | null | undefined>
+): string {
+  return classes.filter(Boolean).join(" ");
+}
 
 type ChatWorkspaceProps = {
   client?: ChatWorkflowClient;
@@ -65,15 +78,41 @@ export default function ChatWorkspace({
     clientRef.current = activeClient;
   }, [activeClient]);
 
-  const [conversation, setConversation] = useState<ConversationEntry[]>([]);
+  const {
+    state: {
+      conversation,
+      feedbackSelections,
+      pendingFeedbackIds,
+      sessionId,
+      isRestoring,
+      frequentlyOpenedPanels,
+      defaultFilters,
+      isStreaming,
+      activeAssistantId,
+      guardrail,
+      errorMessage,
+      lastQuestion,
+    },
+    setters: {
+      setConversation,
+      setFeedbackSelections,
+      setPendingFeedbackIds,
+      setSessionId,
+      setIsRestoring,
+      setFrequentlyOpenedPanels,
+      setDefaultFilters,
+      setIsStreaming,
+      setActiveAssistantId,
+      setGuardrail,
+      setErrorMessage,
+      setLastQuestion,
+    },
+    selectors: { hasTranscript },
+  } = useChatSessionState();
   const conversationRef = useRef<ConversationEntry[]>(conversation);
   useEffect(() => {
     conversationRef.current = conversation;
   }, [conversation]);
-  const [feedbackSelections, setFeedbackSelections] = useState<
-    Partial<Record<string, Reaction>>
-  >({});
-  const [pendingFeedbackIds, setPendingFeedbackIds] = useState<Set<string>>(new Set());
 
   const [inputValue, setInputValue] = useState(initialPrompt ?? "");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -82,16 +121,6 @@ export default function ChatWorkspace({
       setInputValue(initialPrompt);
     }
   }, [initialPrompt]);
-
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(true);
-  const [frequentlyOpenedPanels, setFrequentlyOpenedPanels] = useState<string[]>([]);
-  const [defaultFilters, setDefaultFilters] = useState<HybridSearchFilters | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
-  const [guardrail, setGuardrail] = useState<GuardrailState>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lastQuestion, setLastQuestion] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoSubmitRef = useRef(false);
 
@@ -450,9 +479,7 @@ export default function ChatWorkspace({
     void executeChat(initialPrompt);
   }, [autoSubmit, executeChat, initialPrompt, isRestoring]);
 
-  const hasTranscript = conversation.length > 0;
-
-  const transcript = useMemo(() => {
+  const transcript = useMemo<TranscriptEntry[]>(() => {
     return conversation.map((entry) => {
       if (entry.role === "assistant") {
         const isActive = entry.id === activeAssistantId && isStreaming;
@@ -562,97 +589,101 @@ export default function ChatWorkspace({
   }, []);
 
   return (
-    <div className="chat-workspace" aria-live="polite">
-      <section className="chat-hero" aria-label="Chat overview">
-        <div className="chat-hero__content">
-          <p className="chat-hero__eyebrow">Theoria Copilot</p>
+    <div className={styles.workspace} aria-live="polite">
+      <section className={styles.hero} aria-label="Chat overview">
+        <div className={styles.heroContent}>
+          <p className={styles.heroEyebrow}>Theoria Copilot</p>
           <h2>Ask with {mode.label} stance</h2>
           <p>
             We’ll keep the conversation aligned to <strong>{mode.label.toLowerCase()}</strong> emphasis while grounding
             every answer with citations you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
           </p>
-          <div className="chat-hero__actions" aria-label="Quick navigation">
-            <Link href="/search" className="chat-hero__action">
-              <span className="chat-hero__action-icon">
+          <div className={styles.heroActions} aria-label="Quick navigation">
+            <Link href="/search" className={styles.heroAction}>
+              <span className={styles.heroActionIcon}>
                 <Icon icon={Search} size="lg" />
               </span>
-              <span className="chat-hero__action-copy">
+              <span className={styles.heroActionCopy}>
                 <strong>Search the library</strong>
                 <span>Jump into cross-references</span>
               </span>
-              <span className="chat-hero__action-arrow">
+              <span className={styles.heroActionArrow}>
                 <Icon icon={ArrowRight} size="md" />
               </span>
             </Link>
-            <Link href="/verse" className="chat-hero__action">
-              <span className="chat-hero__action-icon">
+            <Link href="/verse" className={styles.heroAction}>
+              <span className={styles.heroActionIcon}>
                 <Icon icon={BookOpen} size="lg" />
               </span>
-              <span className="chat-hero__action-copy">
+              <span className={styles.heroActionCopy}>
                 <strong>Trace a passage</strong>
                 <span>Explore every verse connection</span>
               </span>
-              <span className="chat-hero__action-arrow">
+              <span className={styles.heroActionArrow}>
                 <Icon icon={ArrowRight} size="md" />
               </span>
             </Link>
-            <Link href="/upload" className="chat-hero__action">
-              <span className="chat-hero__action-icon">
+            <Link href="/upload" className={styles.heroAction}>
+              <span className={styles.heroActionIcon}>
                 <Icon icon={UploadIcon} size="lg" />
               </span>
-              <span className="chat-hero__action-copy">
+              <span className={styles.heroActionCopy}>
                 <strong>Enrich your corpus</strong>
                 <span>Upload documents for future chats</span>
               </span>
-              <span className="chat-hero__action-arrow">
+              <span className={styles.heroActionArrow}>
                 <Icon icon={ArrowRight} size="md" />
               </span>
             </Link>
           </div>
         </div>
-        <ul className="chat-hero__highlights" aria-label="What this workspace offers">
-          <li className="chat-hero__highlight">
-            <span className="chat-hero__highlight-icon">
+        <ul className={styles.heroHighlights} aria-label="What this workspace offers">
+          <li className={styles.heroHighlight}>
+            <span className={styles.heroHighlightIcon}>
               <Icon icon={CheckCircle} size="lg" />
             </span>
             <div>
-              <p className="chat-hero__highlight-title">Grounded answers</p>
-              <p className="chat-hero__highlight-text">Every response links back to trusted sources.</p>
+              <p className={styles.heroHighlightTitle}>Grounded answers</p>
+              <p className={styles.heroHighlightText}>Every response links back to trusted sources.</p>
             </div>
           </li>
-          <li className="chat-hero__highlight">
-            <span className="chat-hero__highlight-icon">
+          <li className={styles.heroHighlight}>
+            <span className={styles.heroHighlightIcon}>
               <Icon icon={Globe} size="lg" />
             </span>
             <div>
-              <p className="chat-hero__highlight-title">Perspective aware</p>
-              <p className="chat-hero__highlight-text">Tune the stance to match your research context.</p>
+              <p className={styles.heroHighlightTitle}>Perspective aware</p>
+              <p className={styles.heroHighlightText}>Tune the stance to match your research context.</p>
             </div>
           </li>
-          <li className="chat-hero__highlight">
-            <span className="chat-hero__highlight-icon">
+          <li className={styles.heroHighlight}>
+            <span className={styles.heroHighlightIcon}>
               <Icon icon={FileText} size="lg" />
             </span>
             <div>
-              <p className="chat-hero__highlight-title">Export ready</p>
-              <p className="chat-hero__highlight-text">Capture threads and build shareable briefs effortlessly.</p>
+              <p className={styles.heroHighlightTitle}>Export ready</p>
+              <p className={styles.heroHighlightText}>Capture threads and build shareable briefs effortlessly.</p>
             </div>
           </li>
         </ul>
       </section>
 
-      <div className="chat-transcript" role="log" aria-label="Chat transcript">
+      <div className={styles.transcript} role="log" aria-label="Chat transcript">
         {hasTranscript ? (
           transcript.map((entry) => {
             const selection = feedbackSelections[entry.id] ?? null;
             const feedbackPending = pendingFeedbackIds.has(entry.id);
             const feedbackDisabled = feedbackPending || entry.isActive;
+            const messageClass = classNames(
+              styles.message,
+              entry.role === "user" ? styles.messageUser : styles.messageAssistant,
+            );
             return (
-              <article key={entry.id} className={`chat-message chat-message--${entry.role}`}>
+              <article key={entry.id} className={messageClass}>
                 <header>{entry.role === "user" ? "You" : "Theo"}</header>
                 <p aria-live={entry.isActive ? "polite" : undefined}>{entry.displayContent || "Awaiting response."}</p>
                 {entry.role === "assistant" && entry.citations.length > 0 && (
-                  <aside className="chat-citations" aria-label="Citations">
+                  <aside className={styles.citations} aria-label="Citations">
                     <h4>Citations</h4>
                     <ol>
                       {entry.citations.map((citation) => {
@@ -660,15 +691,15 @@ export default function ChatWorkspace({
                       const searchParams = new URLSearchParams({ osis: citation.osis });
                       const searchHref = `/search?${searchParams.toString()}`;
                       return (
-                        <li key={`${entry.id}-${citation.index}`} className="chat-citation-item">
+                        <li key={`${entry.id}-${citation.index}`} className={styles.citationItem}>
                           <div>
-                            <p className="chat-citation-heading">{citation.osis}</p>
-                            <p className="chat-citation-snippet">“{citation.snippet}”</p>
+                            <p className={styles.citationHeading}>{citation.osis}</p>
+                            <p className={styles.citationSnippet}>“{citation.snippet}”</p>
                             {citation.document_title && (
-                              <p className="chat-citation-source">{citation.document_title}</p>
+                              <p className={styles.citationSource}>{citation.document_title}</p>
                             )}
                           </div>
-                          <div className="chat-citation-actions">
+                          <div className={styles.citationActions}>
                             <Link href={verseHref}>Open {citation.anchor}</Link>
                             <Link href={searchHref}>Search references</Link>
                           </div>
@@ -679,48 +710,52 @@ export default function ChatWorkspace({
                   </aside>
                 )}
                 {entry.role === "assistant" && (
-                  <div className="chat-feedback-controls">
+                  <div className={styles.feedbackControls}>
                     <button
                       type="button"
-                      className={`chat-feedback-button chat-feedback-button--positive${
-                        selection === "like" ? " chat-feedback-button--active" : ""
-                      }`}
-                    onClick={() => handleAssistantFeedback(entry.id, "like")}
-                    disabled={feedbackDisabled}
-                    aria-pressed={selection === "like"}
-                    aria-label="Mark response helpful"
-                  >
-                    <Icon icon={ThumbsUp} size="md" />
-                    <span className="visually-hidden">Helpful response</span>
-                  </button>
+                      className={classNames(
+                        styles.feedbackButton,
+                        styles.feedbackButtonPositive,
+                        selection === "like" && styles.feedbackButtonActive,
+                      )}
+                      onClick={() => handleAssistantFeedback(entry.id, "like")}
+                      disabled={feedbackDisabled}
+                      aria-pressed={selection === "like"}
+                      aria-label="Mark response helpful"
+                    >
+                      <Icon icon={ThumbsUp} size="md" />
+                      <span className="visually-hidden">Helpful response</span>
+                    </button>
                     <button
                       type="button"
-                      className={`chat-feedback-button chat-feedback-button--negative${
-                        selection === "dislike" ? " chat-feedback-button--active" : ""
-                      }`}
-                    onClick={() => handleAssistantFeedback(entry.id, "dislike")}
-                    disabled={feedbackDisabled}
-                    aria-pressed={selection === "dislike"}
-                    aria-label="Mark response unhelpful"
-                  >
-                    <Icon icon={ThumbsDown} size="md" />
-                    <span className="visually-hidden">Unhelpful response</span>
-                  </button>
+                      className={classNames(
+                        styles.feedbackButton,
+                        styles.feedbackButtonNegative,
+                        selection === "dislike" && styles.feedbackButtonActive,
+                      )}
+                      onClick={() => handleAssistantFeedback(entry.id, "dislike")}
+                      disabled={feedbackDisabled}
+                      aria-pressed={selection === "dislike"}
+                      aria-label="Mark response unhelpful"
+                    >
+                      <Icon icon={ThumbsDown} size="md" />
+                      <span className="visually-hidden">Unhelpful response</span>
+                    </button>
                   </div>
                 )}
               </article>
             );
           })
         ) : (
-          <div className="chat-empty-state">
+          <div className={styles.emptyState}>
             <h3>Start the conversation</h3>
             <p>Ask about a passage, doctrine, or theme and we’ll respond with cited insights.</p>
-            <ul className="chat-empty-state-actions">
+            <ul className={styles.emptyStateActions}>
               {sampleQuestions.map((question, index) => (
                 <li key={question}>
                   <button
                     type="button"
-                    className="chat-empty-state-chip"
+                    className={styles.emptyStateChip}
                     onClick={() => handleSampleQuestionClick(question, index)}
                   >
                     {question}
@@ -728,7 +763,7 @@ export default function ChatWorkspace({
                 </li>
               ))}
             </ul>
-            <p className="chat-empty-state-links">
+            <p className={styles.emptyStateLinks}>
               Prefer browsing? Explore the <Link href="/search">Search</Link> and
               {" "}
               <Link href="/verse">Verse explorer</Link>.
@@ -737,7 +772,7 @@ export default function ChatWorkspace({
         )}
       </div>
 
-      <div className="chat-session-controls" aria-label="Session history controls">
+      <div className={styles.sessionControls} aria-label="Session history controls">
         <button
           type="button"
           onClick={handleResetSession}
@@ -765,7 +800,7 @@ export default function ChatWorkspace({
 
       {errorMessage ? <ErrorCallout message={errorMessage} /> : null}
 
-      <form className="chat-form" onSubmit={handleSubmit} aria-label="Chat input">
+      <form className={styles.form} onSubmit={handleSubmit} aria-label="Chat input">
         <label htmlFor="chat-question">Ask Theoria</label>
         <textarea
           id="chat-question"
@@ -778,13 +813,13 @@ export default function ChatWorkspace({
           disabled={isStreaming || isRestoring}
           ref={textareaRef}
         />
-        <div className="chat-form-actions">
+        <div className={styles.formActions}>
           <button type="submit" disabled={!inputValue.trim() || isStreaming || isRestoring}>
             {isStreaming ? "Generating…" : "Send"}
           </button>
         </div>
       </form>
-      <p className="chat-footnote">Responses cite the passages and sources that shaped the answer.</p>
+      <p className={styles.footnote}>Responses cite the passages and sources that shaped the answer.</p>
     </div>
   );
 }

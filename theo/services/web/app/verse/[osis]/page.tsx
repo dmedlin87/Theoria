@@ -245,7 +245,7 @@ function TimelineSection({
   if (timeline.buckets.length === 0) {
     return (
       <div className="mt-3">
-        <h3 className="mb-2">Timeline</h3>
+        <h2 className="mb-2">Timeline</h2>
         <p className="text-muted">
           No mentions found for the selected {activeWindow} window.
         </p>
@@ -257,7 +257,7 @@ function TimelineSection({
 
   return (
     <div className="mt-3">
-      <h3 className="mb-2">Timeline</h3>
+      <h2 className="mb-2">Timeline</h2>
       <p className="text-muted mb-3">
         Showing {timeline.buckets.length} {activeWindow} buckets totaling {timeline.total_mentions} mentions.
       </p>
@@ -374,7 +374,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   }
 
   return (
-    <section>
+    <section aria-labelledby="verse-mentions-heading">
       <div className={features.research ? "sidebar-layout" : ""}>
         <div>
           <Breadcrumbs

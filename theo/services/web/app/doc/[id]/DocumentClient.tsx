@@ -324,8 +324,8 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
             {document.channel && <p>Channel: {document.channel}</p>}
           </div>
 
-          <section>
-            <h3>Annotations</h3>
+          <section aria-labelledby="document-annotations-heading">
+            <h2 id="document-annotations-heading">Annotations</h2>
             <form onSubmit={handleAnnotationSubmit} style={{ display: "grid", gap: "0.5rem", maxWidth: 520 }}>
               <textarea
                 name="annotation"
@@ -456,7 +456,7 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
 
           <section>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-              <h3 style={{ margin: 0 }}>Passages</h3>
+              <h2 style={{ margin: 0 }}>Passages</h2>
               <button
                 type="button"
                 onClick={handleAddAnnotationShortcut}

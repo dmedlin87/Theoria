@@ -12,7 +12,7 @@ export function DiffWorkspace({ diffSelection, diffSummary, onClear }: DiffWorks
   return (
     <aside className="diff-panel">
       <div className="diff-panel__header">
-        <h3 className="diff-panel__title">Diff workspace</h3>
+        <h2 className="diff-panel__title">Diff workspace</h2>
         <button type="button" onClick={onClear}>
           Clear selection
         </button>
