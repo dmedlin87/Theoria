@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
+import os
 import threading
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
@@ -29,7 +31,20 @@ from theo.application.facades.settings import get_settings
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 
+_LOGGER = logging.getLogger(__name__)
 _TRACER = trace.get_tracer("theo.embedding")
+
+
+def _flag_model_enabled() -> bool:
+    """Return True when the runtime embedding model should be used."""
+
+    if _RuntimeFlagModel is None:
+        return False
+    if os.environ.get("THEO_FORCE_EMBEDDING_FALLBACK"):
+        return False
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return False
+    return True
 
 
 def _normalise(vector: Sequence[float]) -> list[float]:
@@ -88,9 +103,20 @@ class EmbeddingService:
             return self._model
         with self._lock:
             if self._model is None:
-                if _RuntimeFlagModel is not None:
-                    self._model = _RuntimeFlagModel(self.model_name, use_fp16=False)
-                else:
+                if _flag_model_enabled():
+                    try:
+                        self._model = _RuntimeFlagModel(  # type: ignore[call-arg]
+                            self.model_name,
+                            use_fp16=False,
+                        )
+                    except Exception:  # pragma: no cover - defensive fallback
+                        _LOGGER.warning(
+                            "Falling back to deterministic embeddings after "
+                            "FlagModel initialisation failure",
+                            exc_info=True,
+                        )
+                        self._model = _FallbackEmbedder(self.dimension)
+                if self._model is None:
                     self._model = _FallbackEmbedder(self.dimension)
         assert self._model is not None
         return self._model
