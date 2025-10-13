@@ -228,6 +228,41 @@ def _prepare_memory_context(
 ) -> list[str]:
     if not entries:
         return []
+
+    ranked_entries: list[ChatMemoryEntry] = []
+    seen_ids: set[int] = set()
+
+    query_embedding: list[float] | None = None
+    if query:
+        memory_index = memory_index_module.get_memory_index()
+        try:
+            query_embedding = memory_index.embed_query(query)
+        except Exception:  # pragma: no cover - defensive guardrail
+            LOGGER.debug("Failed to embed chat query for memory ranking", exc_info=True)
+            query_embedding = None
+        if query_embedding:
+            scored: list[tuple[float, ChatMemoryEntry]] = []
+            for entry in entries:
+                if not entry.embedding:
+                    continue
+                score = memory_index.score_similarity(query_embedding, entry.embedding)
+                if score is None:
+                    continue
+                scored.append((score, entry))
+            scored.sort(key=lambda item: item[0], reverse=True)
+            for _, entry in scored:
+                if len(ranked_entries) >= _MAX_CONTEXT_SNIPPETS:
+                    break
+                entry_id = id(entry)
+                if entry_id in seen_ids:
+                    continue
+                ranked_entries.append(entry)
+                seen_ids.add(entry_id)
+
+    ordered = sorted(entries, key=lambda entry: entry.created_at, reverse=True)
+    if focus:
+        matched = [entry for entry in ordered if focus.matches(entry)]
+        remainder = [entry for entry in ordered if not focus.matches(entry)]
     ordered = sorted(entries, key=lambda entry: entry.created_at, reverse=True)
     if focus:
         matched: list[ChatMemoryEntry] = []
@@ -241,6 +276,23 @@ def _prepare_memory_context(
     else:
         candidates = ordered
 
+    for entry in candidates:
+        if len(ranked_entries) >= _MAX_CONTEXT_SNIPPETS:
+            break
+        entry_id = id(entry)
+        if entry_id in seen_ids:
+            continue
+        ranked_entries.append(entry)
+        seen_ids.add(entry_id)
+
+    remaining = CHAT_SESSION_MEMORY_CHAR_BUDGET
+    selected: list[tuple[ChatMemoryEntry, str]] = []
+    for entry in ranked_entries:
+        base = memory_index_module.render_memory_snippet(
+            entry.question,
+            entry.answer,
+            answer_summary=entry.answer_summary,
+        )
     remaining = CHAT_SESSION_MEMORY_CHAR_BUDGET
     selected: list[tuple[ChatMemoryEntry, str]] = []
     for entry in candidates:
@@ -248,10 +300,12 @@ def _prepare_memory_context(
         question_text = entry.question.strip()
         base = f"Q: {question_text} | A: {answer_text}"
         extras: list[str] = []
-        if entry.key_entities:
-            extras.append(f"Key: {', '.join(entry.key_entities[:3])}")
-        if entry.recommended_actions:
-            extras.append(f"Next: {entry.recommended_actions[0]}")
+        key_entities = getattr(entry, "key_entities", None) or []
+        if key_entities:
+            extras.append(f"Key: {', '.join(key_entities[:3])}")
+        recommended_actions = getattr(entry, "recommended_actions", None) or []
+        if recommended_actions:
+            extras.append(f"Next: {recommended_actions[0]}")
         if extras:
             base = f"{base} | {' | '.join(extras)}"
         snippet = _truncate_text(base, min(_MEMORY_TEXT_LIMIT * 2, remaining))
@@ -264,8 +318,10 @@ def _prepare_memory_context(
         remaining -= len(snippet)
         if remaining <= 0 or len(selected) >= _MAX_CONTEXT_SNIPPETS:
             break
+
     if not selected:
         return []
+
     if focus:
         matched_pairs = [pair for pair in selected if focus.matches(pair[0])]
         remainder_pairs = [pair for pair in selected if not focus.matches(pair[0])]
@@ -273,7 +329,8 @@ def _prepare_memory_context(
         remainder_pairs.sort(key=lambda pair: pair[0].created_at)
         ordered_pairs = matched_pairs + remainder_pairs
     else:
-        ordered_pairs = sorted(selected, key=lambda pair: pair[0].created_at)
+        ordered_pairs = selected
+
     return [snippet for _, snippet in ordered_pairs]
 
 
