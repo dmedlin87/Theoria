@@ -11,7 +11,7 @@ The service accepts either static API keys or JWT bearer tokens. Define at least
 
 If neither strategy is configured, the API rejects requests unless `THEO_AUTH_ALLOW_ANONYMOUS=1` is explicitly enabled for isolated local testing and `THEO_ALLOW_INSECURE_STARTUP=1` is set to acknowledge the risk.
 
-> **Important:** `THEO_ALLOW_INSECURE_STARTUP` only exists to keep developer workstations unblocked. Production and shared staging environments must supply API keys or JWT credentials and omit the override so the service refuses to boot when authentication is misconfigured.
+> **Important:** `THEO_ALLOW_INSECURE_STARTUP` only exists to keep developer workstations unblocked. Production and shared staging environments must supply API keys or JWT credentials and omit the override so the service refuses to boot when authentication is misconfigured. The override now fails fast unless `THEORIA_ENVIRONMENT` (or `ENVIRONMENT`) is set to `development` or `test`, preventing accidental enablement in production deployments.
 
 ## Choose the correct header
 
