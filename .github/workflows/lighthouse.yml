@@ -5,10 +5,18 @@ on:
     branches:
       - main
       - develop
+    paths:
+      - 'theo/services/web/**'
+      - 'lighthouserc.json'
+      - '.github/workflows/lighthouse.yml'
   pull_request:
     branches:
       - main
       - develop
+    paths:
+      - 'theo/services/web/**'
+      - 'lighthouserc.json'
+      - '.github/workflows/lighthouse.yml'
   schedule:
     - cron: '0 6 * * 1'
 

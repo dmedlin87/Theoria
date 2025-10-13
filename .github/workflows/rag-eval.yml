@@ -50,7 +50,7 @@ jobs:
         run: |
           python scripts/perf/collect_rag_eval_metrics.py --modules ${RAG_MODULES}
 
-      - name: Upload rag_eval artefacts
+      - name: Upload rag_eval artifacts
         uses: actions/upload-artifact@v4
         with:
           name: rag-eval-metrics
