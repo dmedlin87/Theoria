@@ -12,4 +12,4 @@ warn(
     stacklevel=2,
 )
 
-__all__ = ["DssLinkEntry", "fetch_dss_links"]
+__all__ = ["DssLinkEntry", "fetch_dss_links", "dss_links_dataset"]

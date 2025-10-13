@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 
 from theo.domain import (
     CrossReferenceEntry,
@@ -48,8 +48,14 @@ class ResearchReport:
 class ResearchService:
     """Facade aggregating research-focused application logic."""
 
-    def __init__(self, notes_repository: ResearchNoteRepository):
+    def __init__(
+        self,
+        notes_repository: ResearchNoteRepository,
+        *,
+        fetch_dss_links_func: Callable[[str], list[DssLinkEntry]] = fetch_dss_links,
+    ):
         self._notes_repository = notes_repository
+        self._fetch_dss_links = fetch_dss_links_func
 
     # Dataset backed lookups -------------------------------------------------
 
@@ -69,7 +75,7 @@ class ResearchService:
         return variants_apparatus(osis, categories=categories, limit=limit)
 
     def fetch_dss_links(self, osis: str) -> list[DssLinkEntry]:
-        return fetch_dss_links(osis)
+        return self._fetch_dss_links(osis)
 
     def fetch_morphology(self, osis: str) -> list[MorphToken]:
         return fetch_morphology(osis)
