@@ -2,6 +2,7 @@
 import os
 os.environ["THEO_AUTH_ALLOW_ANONYMOUS"] = "1"
 os.environ["THEO_ALLOW_INSECURE_STARTUP"] = "1"
+os.environ.setdefault("THEORIA_ENVIRONMENT", "development")
 
 from theo.services.api.app.main import app
 
