@@ -301,6 +301,12 @@ class TrailRecorder:
         output_payload: Any = None,
         status: str = "completed",
     ) -> AgentTrail:
+        # Ensure any accumulated digests are persisted before we commit the trail
+        # updates.  This allows downstream bridges (such as the chat session
+        # memory bridge) to write to the same session within the current
+        # transaction.
+        self._dispatch_digests()
+
         self.trail.status = status
         self.trail.final_md = final_md
         self.trail.output_payload = _normalize_payload(output_payload)

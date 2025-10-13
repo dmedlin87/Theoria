@@ -30,9 +30,10 @@ class TrailsMemoryBridge:
         self,
         *,
         trail: AgentTrail,
-        _step: Any,
+        step: Any,
         digest: TrailStepDigest,
     ) -> None:
+        _ = step  # Step metadata is currently unused but kept for API parity.
         session_id = self._extract_session_id(trail)
         if not session_id:
             return
@@ -93,6 +94,8 @@ class TrailsMemoryBridge:
 
         preferences = self._resolve_preferences(existing, trail)
 
+        goals = chat_workflow._load_goal_entries(existing)
+
         chat_workflow._persist_chat_session(
             self._session,
             existing=existing,
@@ -105,6 +108,8 @@ class TrailsMemoryBridge:
             message=message,
             answer=answer,
             preferences=preferences,
+            goals=goals,
+            active_goal=None,
             memory_entry=entry,
         )
 
