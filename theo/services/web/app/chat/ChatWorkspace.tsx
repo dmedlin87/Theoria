@@ -35,6 +35,7 @@ import { useChatWorkspaceState, type Reaction, type ConversationEntry, type Assi
 import { useSessionRestoration, useSessionPersistence } from "./useSessionRestoration";
 import { useChatExecution } from "./useChatExecution";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
+import { SessionControls } from "./components/SessionControls";
 
 type ChatWorkspaceProps = {
   client?: ChatWorkflowClient;
@@ -737,22 +738,11 @@ export default function ChatWorkspace({
         )}
       </div>
 
-      <div className="chat-session-controls" aria-label="Session history controls">
-        <button
-          type="button"
-          onClick={handleResetSession}
-          disabled={!hasTranscript || isStreaming || isRestoring}
-        >
-          Reset session
-        </button>
-        <button
-          type="button"
-          onClick={handleForkSession}
-          disabled={!hasTranscript || isStreaming || isRestoring}
-        >
-          Fork conversation
-        </button>
-      </div>
+      <SessionControls
+        disabled={!hasTranscript || isStreaming || isRestoring}
+        onReset={handleResetSession}
+        onFork={handleForkSession}
+      />
 
       {guardrail ? (
         <ErrorCallout

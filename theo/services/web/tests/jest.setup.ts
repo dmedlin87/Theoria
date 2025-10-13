@@ -34,3 +34,13 @@ if (!globalThis.Response) {
   const { Response } = require("undici");
   globalThis.Response = Response as unknown as typeof globalThis.Response;
 }
+
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class ResizeObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).ResizeObserver = ResizeObserver;
+}

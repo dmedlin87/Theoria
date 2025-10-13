@@ -24,6 +24,7 @@ import QuickStartPresets from "./components/QuickStartPresets";
 import WorkflowFormFields from "./components/WorkflowFormFields";
 import WorkflowResultPanel from "./components/WorkflowResultPanel";
 import WorkflowSelector from "./components/WorkflowSelector";
+import workflowStyles from "./components/workflow-selector.module.css";
 import { CopilotSkeleton } from "./components/CopilotSkeleton";
 import type {
   CopilotResult,
@@ -600,15 +601,14 @@ export default function CopilotPage(): JSX.Element {
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-start" }}>
             <button
               type="button"
-              className="workflow-button"
-              style={{ minWidth: "220px" }}
+              className={workflowStyles.button}
               disabled={!researchEnabled || researchLoading}
               onClick={() => openResearchPanels(currentFormOsis || null)}
             >
-              <span className="workflow-header">
+              <span className={workflowStyles.header}>
                 <span>{verseResearchTool?.label ?? "Verse research panels"}</span>
               </span>
-              <span className="workflow-description">
+              <span className={workflowStyles.description}>
                 {researchLoading
                   ? "Loading research capabilities…"
                   : verseResearchTool?.description ?? "Inspect contradictions and variants inline."}
@@ -654,58 +654,6 @@ export default function CopilotPage(): JSX.Element {
       </form>
 
       <style jsx>{`
-        .workflow-button {
-          flex: 1 1 240px;
-          min-width: 220px;
-          text-align: left;
-          border-radius: 0.75rem;
-          padding: 0.75rem 1rem;
-          border: 1px solid #cbd5f5;
-          background: #fff;
-          cursor: pointer;
-          transition: border-color 0.2s ease, background 0.2s ease;
-        }
-
-        .workflow-button:disabled {
-          cursor: not-allowed;
-          opacity: 0.6;
-        }
-
-        .workflow-button:focus-visible {
-          outline: 3px solid #1d4ed8;
-        }
-
-        .workflow-button.is-active {
-          border: 2px solid #1d4ed8;
-          background: #eff4ff;
-        }
-
-        .workflow-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 0.75rem;
-        }
-
-        .workflow-description {
-          font-size: 0.85rem;
-          color: #555;
-        }
-
-        .workflow-indicator {
-          font-size: 0.8rem;
-          font-weight: 600;
-          color: #1d4ed8;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.25rem;
-        }
-
-        .workflow-indicator::before {
-          content: "✓";
-          font-size: 0.85rem;
-        }
-
         .workflow-status {
           margin-bottom: 1rem;
         }

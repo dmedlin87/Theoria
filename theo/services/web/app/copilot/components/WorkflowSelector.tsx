@@ -1,3 +1,6 @@
+import styles from "./workflow-selector.module.css";
+import "../../components/ui/tokens.module.css";
+
 type WorkflowOption = {
   id: string;
   label: string;
@@ -12,25 +15,29 @@ type WorkflowSelectorProps = {
 
 export default function WorkflowSelector({ options, selected, onSelect }: WorkflowSelectorProps): JSX.Element {
   return (
-    <div style={{ display: "flex", gap: "0.75rem", margin: "1.5rem 0", flexWrap: "wrap" }}>
+    <div className={styles.list}>
       {options.map((item) => (
         <button
           key={item.id}
           type="button"
           onClick={() => onSelect(item.id)}
-          className={`workflow-button${selected === item.id ? " is-active" : ""}`}
+          className={
+            selected === item.id
+              ? `${styles.button} ${styles.buttonActive}`
+              : styles.button
+          }
           aria-pressed={selected === item.id}
         >
-          <span className="workflow-header">
+          <span className={styles.header}>
             <strong>{item.label}</strong>
             {selected === item.id && (
-              <span aria-hidden="true" className="workflow-indicator">
+              <span aria-hidden="true" className={styles.indicator}>
                 Selected
               </span>
             )}
           </span>
-          <span className="workflow-description">{item.description}</span>
-          <span className="sr-only">
+          <span className={styles.description}>{item.description}</span>
+          <span className={styles.srOnly}>
             {selected === item.id
               ? `${item.label} workflow currently selected.`
               : `Activate the ${item.label} workflow.`}

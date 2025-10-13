@@ -28,6 +28,7 @@ import { emitTelemetry, submitFeedback, type FeedbackAction } from "../lib/telem
 import { useChatWorkspaceState, type Reaction, type AssistantConversationEntry } from "./useChatWorkspaceState";
 import { useSessionRestoration, useSessionPersistence, CHAT_SESSION_STORAGE_KEY } from "./useSessionRestoration";
 import { useChatExecution } from "./useChatExecution";
+import { SessionControls } from "./components/SessionControls";
 
 type ChatWorkspaceProps = {
   client?: ChatWorkflowClient;
@@ -453,22 +454,11 @@ export default function ChatWorkspace({
         )}
       </div>
 
-      <div className="chat-session-controls" aria-label="Session history controls">
-        <button
-          type="button"
-          onClick={handleResetSession}
-          disabled={!computed.hasTranscript || state.isStreaming || state.isRestoring}
-        >
-          Reset session
-        </button>
-        <button
-          type="button"
-          onClick={handleForkSession}
-          disabled={!computed.hasTranscript || state.isStreaming || state.isRestoring}
-        >
-          Fork conversation
-        </button>
-      </div>
+      <SessionControls
+        disabled={!computed.hasTranscript || state.isStreaming || state.isRestoring}
+        onReset={handleResetSession}
+        onFork={handleForkSession}
+      />
 
       {state.guardrail ? (
         <ErrorCallout

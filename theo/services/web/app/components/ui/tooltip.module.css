@@ -1,0 +1,27 @@
+.content {
+  background: var(--ui-color-text-strong);
+  color: var(--ui-color-surface);
+  border-radius: var(--ui-radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  max-width: 20rem;
+  box-shadow: var(--ui-shadow-elevated);
+  border: 1px solid rgba(15, 23, 42, 0.35);
+  animation: fade-in 120ms ease;
+}
+
+.arrow {
+  fill: var(--ui-color-text-strong);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

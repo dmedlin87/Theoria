@@ -1,0 +1,46 @@
+.content {
+  min-width: 220px;
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border-muted);
+  border-radius: var(--ui-radius-md);
+  padding: 0.5rem;
+  box-shadow: var(--ui-shadow-elevated);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-color-text-strong);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.item[data-highlighted] {
+  outline: none;
+  background: var(--ui-color-surface-subtle);
+}
+
+.item[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.separator {
+  height: 1px;
+  background: var(--ui-color-border-muted);
+  margin: 0.25rem 0;
+}
+
+.label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ui-color-text-muted);
+  padding: 0.25rem 0.75rem;
+}
