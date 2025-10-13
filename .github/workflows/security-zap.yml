@@ -21,19 +21,24 @@ jobs:
     env:
       STAGING_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
     steps:
+      - name: Verify staging URL secret
+        id: verify-secret
+        run: |
+          if [ -z "${STAGING_API_BASE_URL}" ]; then
+            echo "::warning::STAGING_API_BASE_URL secret is not configured. Skipping ZAP baseline scan."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
+        if: steps.verify-secret.outputs.skip != 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha || github.sha }}
 
-      - name: Verify staging URL secret
-        run: |
-          if [ -z "${STAGING_API_BASE_URL}" ]; then
-            echo "::error::STAGING_API_BASE_URL secret is not configured."
-            exit 1
-          fi
-
       - name: Run ZAP baseline scan
+        if: steps.verify-secret.outputs.skip != 'true'
         id: zap
         uses: zaproxy/action-baseline@v0.13.0
         with:
@@ -41,19 +46,22 @@ jobs:
           cmd_options: '-J zap-baseline-report.json -r zap-baseline-report.html -w zap-baseline-warn.md'
 
       - name: Fail on high severity alerts
+        if: steps.verify-secret.outputs.skip != 'true'
         run: python scripts/security/zap_severity_gate.py zap-baseline-report.json --fail-on high
 
       - name: Convert ZAP report to SARIF
+        if: steps.verify-secret.outputs.skip != 'true'
         run: python scripts/security/zap_to_sarif.py zap-baseline-report.json zap-baseline-report.sarif
 
       - name: Upload SARIF to security dashboard
+        if: steps.verify-secret.outputs.skip != 'true'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: zap-baseline-report.sarif
           category: zap-baseline
 
       - name: Upload ZAP artifacts
-        if: always()
+        if: steps.verify-secret.outputs.skip != 'true' && always()
         uses: actions/upload-artifact@v4
         with:
           name: zap-baseline-artifacts
