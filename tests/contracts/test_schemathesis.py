@@ -6,8 +6,12 @@ import tomllib
 
 import pytest
 import schemathesis
-from schemathesis import experimental
 from schemathesis import openapi as schemathesis_openapi
+
+try:  # pragma: no cover - compatibility with Schemathesis <4
+    from schemathesis import experimental as schemathesis_experimental
+except ImportError:  # pragma: no cover - Schemathesis 4+ removed experimental module
+    schemathesis_experimental = None
 from fastapi import Request as FastAPIRequest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -99,7 +103,10 @@ def _override_authentication():
 
 @pytest.fixture(scope="session")
 def openapi_schema(contract_client: TestClient):
-    experimental.OPEN_API_3_1.enable()
+    if schemathesis_experimental is not None:
+        openapi_3_1 = getattr(schemathesis_experimental, "OPEN_API_3_1", None)
+        if openapi_3_1 is not None and hasattr(openapi_3_1, "enable"):
+            openapi_3_1.enable()
     return schemathesis_openapi.from_asgi("/openapi.json", app)
 
 
