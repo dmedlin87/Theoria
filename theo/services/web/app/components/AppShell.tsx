@@ -173,7 +173,9 @@ export function AppShell({
             document.body
           }
           fallbackFocus={() => navToggleRef.current ?? document.body}
-          allowOutsideClick
+          allowOutsideClick={(event) =>
+            navToggleRef.current?.contains(event.target as Node) ?? false
+          }
         >
           <div
             id="app-shell-v2-nav-content"

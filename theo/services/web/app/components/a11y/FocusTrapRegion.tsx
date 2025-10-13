@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import FocusTrap from "focus-trap-react";
-import type { FocusTarget } from "focus-trap";
+import type { FocusTarget, FocusTrapOptions } from "focus-trap";
 
 export interface FocusTrapRegionProps {
   /** Controls whether the focus trap is active. */
@@ -14,7 +14,7 @@ export interface FocusTrapRegionProps {
   /** Whether focus should return to the previously focused element when the trap deactivates. */
   restoreFocus?: boolean;
   /** Allows clicking outside the trap to dismiss. Defaults to false. */
-  allowOutsideClick?: boolean;
+  allowOutsideClick?: FocusTrapOptions["allowOutsideClick"];
   children: ReactElement;
 }
 
