@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ai import run_guarded_chat
+from theo.services.api.app.ai import memory_index as memory_index_module
 from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer, ensure_completion_safe
 from theo.services.api.app.ai.trails import TrailService
 from theo.application.facades.database import get_session
@@ -86,16 +87,61 @@ def _load_memory_entries(record: ChatSession | None) -> list[ChatMemoryEntry]:
     return entries
 
 
-def _prepare_memory_context(entries: Sequence[ChatMemoryEntry]) -> list[str]:
+def _prepare_memory_context(
+    entries: Sequence[ChatMemoryEntry],
+    *,
+    query: str | None = None,
+) -> list[str]:
     if not entries:
         return []
+
+    memory_index = memory_index_module.get_memory_index()
+    ranked_entries: list[ChatMemoryEntry] = []
+    seen_ids: set[int] = set()
+    query_embedding: list[float] | None = None
+
+    if query:
+        try:
+            query_embedding = memory_index.embed_query(query)
+        except Exception:  # pragma: no cover - defensive guardrail
+            LOGGER.debug("Failed to embed chat query for memory ranking", exc_info=True)
+            query_embedding = None
+
+    if query_embedding:
+        scored: list[tuple[float, ChatMemoryEntry]] = []
+        for entry in entries:
+            if not entry.embedding:
+                continue
+            score = memory_index.score_similarity(query_embedding, entry.embedding)
+            if score is None:
+                continue
+            scored.append((score, entry))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        for _, entry in scored:
+            if len(ranked_entries) >= _MAX_CONTEXT_SNIPPETS:
+                break
+            ranked_entries.append(entry)
+            seen_ids.add(id(entry))
+
+    for entry in reversed(entries):
+        if len(ranked_entries) >= _MAX_CONTEXT_SNIPPETS:
+            break
+        entry_id = id(entry)
+        if entry_id in seen_ids:
+            continue
+        ranked_entries.append(entry)
+        seen_ids.add(entry_id)
+
     remaining = CHAT_SESSION_MEMORY_CHAR_BUDGET
     selected: list[str] = []
-    for entry in reversed(entries):
-        answer_text = (entry.answer_summary or entry.answer or "").strip()
-        question_text = entry.question.strip()
+    for entry in ranked_entries:
+        snippet_text = memory_index_module.render_memory_snippet(
+            entry.question,
+            entry.answer,
+            answer_summary=entry.answer_summary,
+        )
         snippet = _truncate_text(
-            f"Q: {question_text} | A: {answer_text}",
+            snippet_text,
             min(_MEMORY_TEXT_LIMIT * 2, remaining),
         )
         if not snippet:
@@ -107,7 +153,7 @@ def _prepare_memory_context(entries: Sequence[ChatMemoryEntry]) -> list[str]:
         remaining -= len(snippet)
         if remaining <= 0 or len(selected) >= _MAX_CONTEXT_SNIPPETS:
             break
-    return list(reversed(selected))
+    return selected
 
 
 def _collect_document_ids(answer: RAGAnswer) -> list[str]:
@@ -155,6 +201,21 @@ def _persist_chat_session(
         document_ids=_collect_document_ids(answer),
         created_at=now,
     )
+    try:
+        memory_index = memory_index_module.get_memory_index()
+        embedding = memory_index.embed_snippet(
+            question=new_entry.question,
+            answer=new_entry.answer,
+            answer_summary=new_entry.answer_summary,
+        )
+        if embedding:
+            new_entry.embedding = embedding
+            new_entry.embedding_model = memory_index.model_name
+    except Exception:  # pragma: no cover - defensive guard
+        LOGGER.debug(
+            "Unable to persist chat memory embedding for session %s", session_id,
+            exc_info=True,
+        )
     entries.append(new_entry)
     if len(entries) > _MAX_STORED_MEMORY:
         entries = entries[-_MAX_STORED_MEMORY:]
@@ -276,7 +337,7 @@ def chat_turn(
     existing_session = session.get(ChatSession, session_id)
     preferences = _resolve_preferences(payload)
     memory_entries = _load_memory_entries(existing_session)
-    memory_context = _prepare_memory_context(memory_entries)
+    memory_context = _prepare_memory_context(memory_entries, query=question)
 
     if memory_context:
         budget_remaining = CHAT_SESSION_TOTAL_CHAR_BUDGET - total_message_chars

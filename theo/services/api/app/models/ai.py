@@ -89,6 +89,8 @@ class ChatMemoryEntry(APIModel):
     answer_summary: str | None = None
     citations: list[RAGCitation] = Field(default_factory=list)
     document_ids: list[str] = Field(default_factory=list)
+    embedding: list[float] | None = None
+    embedding_model: str | None = None
     created_at: datetime
 
 
