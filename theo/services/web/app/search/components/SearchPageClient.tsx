@@ -1443,13 +1443,15 @@ export default function SearchPageClient({
   );
 
   return (
-    <section className="search-page">
+    <section className="search-page" aria-labelledby="search-page-heading">
       {/* Accessibility: Announce search status */}
       <div role="status" aria-live="polite" aria-atomic="true" className="visually-hidden">
         {isSearching ? "Searching corpus..." : hasSearched && !error && groups.length === 0 ? "No results found" : hasSearched && groups.length > 0 ? `Found ${groups.length} document${groups.length === 1 ? "" : "s"}` : ""}
       </div>
-      <h2>Search</h2>
-      <p>Hybrid search with lexical, vector, and OSIS-aware filtering.</p>
+      <header className="page-header" style={{ marginBottom: "1rem" }}>
+        <h1 id="search-page-heading">Search</h1>
+        <p>Hybrid search with lexical, vector, and OSIS-aware filtering.</p>
+      </header>
       <div className="search-ui-mode-wrapper">
         <UiModeToggle mode={uiMode} onChange={setUiMode} />
       </div>
@@ -1535,8 +1537,8 @@ export default function SearchPageClient({
       </form>
 
       {isAdvancedUi ? (
-        <section aria-label="Saved searches" className="search-saved-section">
-          <h3>Saved searches</h3>
+        <section aria-labelledby="search-saved-heading" className="search-saved-section">
+          <h2 id="search-saved-heading">Saved searches</h2>
           {savedSearchContent}
         </section>
       ) : (

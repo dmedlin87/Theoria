@@ -66,7 +66,7 @@ export default function SearchFilters({
   return (
     <div className="card">
       <div className="panel__header">
-        <h3 className="panel__title">Search Filters</h3>
+        <h2 className="panel__title">Search filters</h2>
         {onReset && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={onReset}>
             Clear all
