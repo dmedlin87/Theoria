@@ -80,11 +80,19 @@ class ExportError(TheoError):
     severity: Severity = field(default=Severity.CRITICAL)
 
 
+@dataclass(slots=True)
+class AIWorkflowError(TheoError):
+    """Domain error raised by AI workflow and chat routes."""
+
+    severity: Severity = field(default=Severity.USER)
+
+
 __all__ = [
     "TheoError",
     "IngestionError",
     "RetrievalError",
     "ExportError",
+    "AIWorkflowError",
     "Severity",
 ]
 

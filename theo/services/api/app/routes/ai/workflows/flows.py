@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, TypeAlias
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ai import (
@@ -40,6 +40,7 @@ from theo.services.api.app.models.ai import (
     VerseCopilotRequest,
 )
 from .guardrails import guardrail_http_exception
+from ....errors import AIWorkflowError
 
 
 if TYPE_CHECKING:
@@ -129,9 +130,18 @@ def verse_copilot(
             resolve_passage_reference(passage_value) if passage_value else None
         )
     except PassageResolutionError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_VERSE_INVALID_REFERENCE",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            data={"passage": passage_value},
+        ) from exc
     if not resolved_osis:
-        raise HTTPException(status_code=422, detail="Provide an OSIS reference or passage.")
+        raise AIWorkflowError(
+            "Provide an OSIS reference or passage.",
+            code="AI_VERSE_REFERENCE_REQUIRED",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
     try:
         with trail_service.start_trail(
             workflow="verse_copilot",
@@ -263,7 +273,11 @@ def collaboration(
     session: Session = Depends(get_session),
 ) -> CollaborationReturn:
     if not payload.viewpoints:
-        raise HTTPException(status_code=400, detail="viewpoints cannot be empty")
+        raise AIWorkflowError(
+            "viewpoints cannot be empty",
+            code="AI_COLLABORATION_MISSING_VIEWPOINTS",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     trail_service = TrailService(session)
     result: CollaborationReturn
     try:
@@ -312,8 +326,11 @@ def corpus_curation(
         try:
             since_dt = datetime.fromisoformat(payload.since)
         except ValueError as exc:
-            raise HTTPException(
-                status_code=400, detail="since must be ISO formatted"
+            raise AIWorkflowError(
+                "since must be ISO formatted",
+                code="AI_CURATION_INVALID_SINCE",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                data={"since": payload.since},
             ) from exc
     trail_service = TrailService(session)
     with trail_service.start_trail(
@@ -339,7 +356,11 @@ def comparative_analysis(
     session: Session = Depends(get_session),
 ) -> ComparativeReturn:
     if not payload.participants:
-        raise HTTPException(status_code=400, detail="participants cannot be empty")
+        raise AIWorkflowError(
+            "participants cannot be empty",
+            code="AI_COMPARATIVE_MISSING_PARTICIPANTS",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     result: ComparativeReturn
     try:
         result = generate_comparative_analysis(
