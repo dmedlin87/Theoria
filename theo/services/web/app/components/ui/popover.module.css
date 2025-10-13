@@ -1,0 +1,25 @@
+.content {
+  background: var(--ui-color-surface);
+  color: var(--ui-color-text-strong);
+  border-radius: var(--ui-radius-md);
+  padding: 1rem;
+  box-shadow: var(--ui-shadow-elevated);
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  width: min(24rem, 90vw);
+  animation: popover-fade-in 120ms ease;
+}
+
+.arrow {
+  fill: var(--ui-color-surface);
+}
+
+@keyframes popover-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
