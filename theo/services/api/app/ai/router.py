@@ -228,7 +228,7 @@ class LLMRouterService:
                         warning_ratio * 100,
                         latency_threshold,
                     )
-                if ceiling is not None and projected_spend > ceiling:
+                if ceiling is not None and projected_spend >= ceiling:
                     txn.set_spend(model.name, ceiling)
 
                 if cache_settings.enabled:
@@ -345,7 +345,7 @@ class LLMRouterService:
                 with self._ledger.transaction() as txn:
                     spent = txn.get_spend(model.name)
                     span.set_attribute("llm.spent_before_call", spent)
-                    if ceiling is not None and spent + estimated_cost > ceiling:
+                    if ceiling is not None and spent + estimated_cost >= ceiling:
                         txn.set_spend(model.name, ceiling)
                         error = GenerationError(
                             "Budget exhausted for model "
@@ -436,11 +436,11 @@ class LLMRouterService:
                             warning_ratio * 100,
                             ceiling,
                         )
-                    if ceiling is not None and total_spend > ceiling:
+                    if ceiling is not None and total_spend >= ceiling:
                         txn.set_spend(model.name, ceiling)
                         error = GenerationError(
                             "Budget exhausted for model "
-                            f"{model.name} (spent {total_spend:.2f} > {ceiling:.2f})"
+                            f"{model.name} (spent {total_spend:.2f} >= {ceiling:.2f})"
                         )
                         txn.mark_inflight_error(cache_key, str(error))
                         span.set_attribute("llm.budget_status", "postcheck_blocked")
@@ -634,7 +634,7 @@ class LLMRouterService:
 
         try:
             import tiktoken
-            
+
             # Determine encoding based on model
             encoding_name = "cl100k_base"  # default for gpt-4, gpt-3.5-turbo
             if model_name:
