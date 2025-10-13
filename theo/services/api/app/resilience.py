@@ -59,10 +59,10 @@ _LOCK = threading.Lock()
 def _categorise_exception(exc: BaseException) -> str:
     if isinstance(exc, (TimeoutError, socket.timeout)):
         return "timeout"
+    if isinstance(exc, ConnectionError):
+        return "provider"
     if isinstance(exc, OSError):
         return "io"
-    if isinstance(exc, (ConnectionError,)):
-        return "provider"
     return "unknown"
 
 

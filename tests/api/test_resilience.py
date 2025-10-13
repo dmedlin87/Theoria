@@ -56,6 +56,25 @@ def test_resilient_operation_retries_then_succeeds():
     assert state.opened_at is None
 
 
+def test_resilient_operation_connection_error_classification():
+    policy = resilience.ResiliencePolicy(max_attempts=2, breaker_threshold=5)
+
+    def failing_operation() -> str:
+        raise ConnectionError("provider failure")
+
+    with pytest.raises(resilience.ResilienceError) as error:
+        resilience.resilient_operation(
+            failing_operation,
+            key="resilience-provider-category",
+            classification="unit-test",
+            policy=policy,
+        )
+
+    metadata = error.value.metadata
+    assert metadata.category == "provider"
+    assert metadata.classification == "unit-test"
+
+
 def test_resilient_operation_circuit_breaker(monkeypatch):
     policy = resilience.ResiliencePolicy(max_attempts=2, breaker_threshold=1, breaker_reset_seconds=60)
 
