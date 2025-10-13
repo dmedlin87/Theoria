@@ -201,12 +201,25 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}
       SETTINGS_SECRET_KEY: geo-ci-secret
       FIXTURES_ROOT: ${{ github.workspace }}/fixtures
-      PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
     steps:
+      - name: Verify Percy token
+        id: verify-token
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN || '' }}
+        run: |
+          if [ -z "${PERCY_TOKEN}" ]; then
+            echo "::warning::PERCY_TOKEN is not configured. Skipping visual regression tests."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
+        if: steps.verify-token.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: steps.verify-token.outputs.skip != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -216,12 +229,14 @@ jobs:
             requirements-dev.txt
 
       - name: Install Python dependencies
+        if: steps.verify-token.outputs.skip != 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
       - name: Set up Node.js
+        if: steps.verify-token.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -229,28 +244,27 @@ jobs:
           cache-dependency-path: theo/services/web/package-lock.json
 
       - name: Install Node.js dependencies
+        if: steps.verify-token.outputs.skip != 'true'
         working-directory: theo/services/web
         run: npm ci
 
       - name: Install Playwright browsers
+        if: steps.verify-token.outputs.skip != 'true'
         working-directory: theo/services/web
         run: npx playwright install --with-deps
 
-      - name: Skip visual regression when Percy token is missing
-        if: env.PERCY_TOKEN == ''
-        run: echo "Skipping Percy visual regression because PERCY_TOKEN is not set."
-
       - name: Run Percy visual regression suite
-        if: env.PERCY_TOKEN != ''
+        if: steps.verify-token.outputs.skip != 'true'
         working-directory: theo/services/web
         env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
           NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:8000"
           THEO_ALLOW_INSECURE_STARTUP: "1"
           THEO_AUTH_ALLOW_ANONYMOUS: "1"
         run: npm run test:e2e:visual
 
       - name: Upload Percy artifacts
-        if: always()
+        if: steps.verify-token.outputs.skip != 'true' && always()
         uses: actions/upload-artifact@v4
         with:
           name: percy-visual-artifacts
