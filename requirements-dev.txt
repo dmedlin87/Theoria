@@ -4,5 +4,5 @@ pytest-cov==5.0.0
 hypothesis==6.124.6
 testcontainers[postgresql]==4.9.1
 cyclonedx-bom==3.11.7
-mypy==1.11.1
+mypy==1.18.2
 ruff==0.14.0
