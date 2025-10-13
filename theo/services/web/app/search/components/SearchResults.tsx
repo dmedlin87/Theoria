@@ -61,8 +61,8 @@ export default function SearchResults({
       }}
       renderItem={(group, index) => {
         return (
-          <div className="search-results__row" data-last={index === groups.length - 1}>
-            <article className="card card--interactive">
+          <div className="search-results__row stagger-item" data-last={index === groups.length - 1}>
+            <article className="card card--interactive fade-in">
               <header className="stack-xs mb-3">
                 <h3 className="text-xl font-semibold mb-0">{group.title}</h3>
                 {group.score !== null && group.score !== undefined && (

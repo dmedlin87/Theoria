@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
 export type ErrorCalloutProps = {
   message: string;
@@ -22,9 +22,17 @@ export function ErrorCallout({
   actions,
 }: ErrorCalloutProps): JSX.Element {
   const normalizedTraceId = typeof traceId === "string" && traceId.trim() ? traceId.trim() : null;
+  const [shouldShake, setShouldShake] = useState(true);
+
+  useEffect(() => {
+    // Reset shake animation when message changes
+    setShouldShake(true);
+    const timer = setTimeout(() => setShouldShake(false), 500);
+    return () => clearTimeout(timer);
+  }, [message]);
 
   return (
-    <div role="alert" className="alert alert-danger">
+    <div role="alert" className={`alert alert-danger ${shouldShake ? 'shake' : ''}`.trim()}>
       <p className="alert__message">{message}</p>
       <div className="cluster-sm" style={{ alignItems: "center" }}>
         {onRetry && (

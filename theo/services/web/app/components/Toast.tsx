@@ -102,6 +102,11 @@ function cx(...classes: Array<string | false | null | undefined>): string {
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }): JSX.Element {
   const variantClass = toastVariants[toast.type] ?? toastVariants.info;
+  
+  // Add animation based on toast type
+  const animationClass = toast.type === 'success' ? 'slide-up bounce' : 
+                        toast.type === 'error' ? 'slide-up shake' : 
+                        'slide-up fade-in';
 
   return (
     <ToastRoot
@@ -112,7 +117,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
           onRemove(toast.id);
         }
       }}
-      className={cx(variantClass)}
+      className={cx(variantClass, animationClass)}
     >
       <VisuallyHidden role="status" aria-live="polite" aria-atomic="true">
         {toast.message}
