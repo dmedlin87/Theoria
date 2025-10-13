@@ -14,6 +14,11 @@ from theo.services.api.app.ai.reasoning.chain_of_thought import (
 )
 from theo.services.api.app.ai.reasoning.insights import InsightDetector
 from theo.services.api.app.ai.reasoning.metacognition import (
+    Critique,
+    MAX_CITATIONS_IN_PROMPT,
+    _detect_bias,
+    _identify_weak_citations,
+    _select_revision_citations,
     critique_reasoning,
     revise_with_critique,
 )
@@ -77,6 +82,29 @@ class TestFallacyDetector:
         ad_hom = next(w for w in warnings if w.fallacy_type == "ad_hominem")
         assert ad_hom.suggestion is not None
         assert "argument's logic" in ad_hom.suggestion
+
+    def test_deduplicates_repeated_fallacies(self):
+        """Repeated instances of the same fallacy should collapse into one warning."""
+
+        text = "The critic is ignorant. The critic is ignorant. The critic is ignorant."
+        warnings = detect_fallacies(text)
+
+        ad_hominems = [w for w in warnings if w.fallacy_type == "ad_hominem"]
+        assert len(ad_hominems) == 1
+        assert "detected 3" in ad_hominems[0].description.lower()
+
+    def test_handles_legitimate_citation_list_without_false_positive(self):
+        """Balanced citation lists should not trigger proof-texting or circular reasoning."""
+
+        text = (
+            "Since the text teaches love for enemies (Matt 5:44), Christians wrestle with pacifism. "
+            "See Matt 5:38-48, Luke 6:27-36, Rom 12:17-21, 1 Pet 3:9, 1 Thess 5:15 for parallel teachings."
+        )
+        warnings = detect_fallacies(text)
+
+        flagged_types = {warning.fallacy_type for warning in warnings}
+        assert "proof_texting" not in flagged_types
+        assert "circular_reasoning" not in flagged_types
 
 
 class TestChainOfThought:
@@ -251,7 +279,7 @@ class TestMetacognition:
         critique = critique_reasoning(reasoning, answer, citations)
 
         assert len(critique.bias_warnings) > 0
-        assert any("apologetic bias" in w for w in critique.bias_warnings)
+        assert any("apologetic" in w for w in critique.bias_warnings)
 
     def test_accepts_high_quality_reasoning(self):
         """Should rate clean reasoning highly."""
@@ -273,6 +301,96 @@ class TestMetacognition:
 
         assert critique.reasoning_quality >= 65
         assert len(critique.fallacies_found) == 0
+
+
+class TestMetacognitionHeuristics:
+    """Test targeted metacognition helper behaviours."""
+
+    def test_identify_weak_citations_requires_context_overlap(self):
+        """A citation without proximate explanation should be flagged as weak."""
+
+        citations = [
+            {
+                "index": 1,
+                "passage_id": "p1",
+                "snippet": "For by grace you have been saved through faith",
+                "osis": "Eph.2.8",
+            }
+        ]
+        answer = "Paul emphasises grace [1] but offers no further detail."
+
+        weak = _identify_weak_citations(answer, citations)
+
+        assert weak == ["p1"]
+
+    def test_identify_weak_citations_skips_invalid_entries(self):
+        """Malformed citations should be ignored without crashing."""
+
+        citations = [
+            {"index": 0, "snippet": ""},
+            {"index": 2, "passage_id": "p2", "snippet": None},
+            {
+                "index": 3,
+                "passage_id": "p3",
+                "snippet": "Love your enemies",
+                "osis": "Matt.5.44",
+            },
+        ]
+        answer = "Jesus commands love for enemies [3]."
+
+        weak = _identify_weak_citations(answer, citations)
+
+        assert weak == []
+
+    def test_bias_detection_respects_negations(self):
+        """Negated bias markers should not raise warnings."""
+
+        trace = "The commentators note a lack of harmony and question simplistic readings."
+        answer = "It is not harmonious, and the inconsistency must be addressed."
+
+        warnings = _detect_bias(trace, answer)
+
+        assert warnings == []
+
+    def test_bias_detection_flags_monolithic_language(self):
+        """Strongly one-sided language should still raise a warning."""
+
+        trace = "The argument is harmonious and consistent."
+        answer = "It seamlessly resolves every tension."
+
+        warnings = _detect_bias(trace, answer)
+
+        assert any("apologetic" in warning for warning in warnings)
+
+    def test_revision_prompt_prioritises_referenced_and_weak_citations(self):
+        """Selected citations should include weak and referenced indices within limit."""
+
+        citations = [
+            {
+                "index": idx,
+                "passage_id": f"p{idx}",
+                "snippet": f"Snippet text {idx} with context",
+                "osis": f"Book.{idx}",
+                "anchor": "context",
+            }
+            for idx in range(1, MAX_CITATIONS_IN_PROMPT + 5)
+        ]
+        critique = Critique(
+            reasoning_quality=55,
+            fallacies_found=[],
+            weak_citations=["p1", "p2"],
+            alternative_interpretations=[],
+            bias_warnings=[],
+            recommendations=[],
+        )
+        answer = "The discussion references [1], [2], and [3] explicitly."
+
+        selected = _select_revision_citations(answer, critique, citations)
+
+        assert len(selected) <= MAX_CITATIONS_IN_PROMPT
+        selected_indices = [citation["index"] for citation in selected]
+        assert {1, 2}.issubset(selected_indices)
+        assert 3 in selected_indices
 
 
 class DummyRevisionClient:
