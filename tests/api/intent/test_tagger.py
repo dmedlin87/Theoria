@@ -13,11 +13,18 @@ from theo.services.api.app.intent import tagger as intent_tagger
 class _StubPipeline:
     """Lightweight pipeline implementation used for tests."""
 
-    def __init__(self, label: str, probabilities: list[float]) -> None:
+    def __init__(
+        self,
+        *,
+        label: str,
+        probabilities: list[float],
+        classes: list[str] | None = None,
+    ) -> None:
         self._label = label
         self._probabilities = probabilities
+        class_labels = classes or [label, "fallback"][: len(probabilities)]
         self.named_steps = {
-            "classifier": SimpleNamespace(classes_=[label, "fallback"][: len(probabilities)])
+            "classifier": SimpleNamespace(classes_=class_labels),
         }
 
     def predict(self, messages: list[str]) -> list[str]:  # pragma: no cover - exercised in tests
@@ -47,7 +54,8 @@ def test_predict_returns_structured_tag_with_confidence(monkeypatch: pytest.Monk
     """IntentTagger.predict should decode labels and surface confidence."""
 
     label = "purchase::positive"
-    pipeline = _StubPipeline(label=label, probabilities=[0.87, 0.13])
+    classes = ["fallback", label]
+    pipeline = _StubPipeline(label=label, probabilities=[0.13, 0.87], classes=classes)
     artifact = {
         "pipeline": pipeline,
         "label_schema": {"purchase": {"stance": ["positive"]}},
