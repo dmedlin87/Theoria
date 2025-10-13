@@ -4,8 +4,8 @@ import "@testing-library/jest-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
 
 import { SavedSearchControls } from "../../../app/search/components/SavedSearchControls";
-import type { SavedSearch } from "../../../app/search/components/SearchPageClient";
 import type { SearchFilters } from "../../../app/search/searchParams";
+import type { SavedSearch } from "../../../app/search/components/filters/types";
 
 const SAMPLE_FILTERS: SearchFilters = {
   query: "logos",

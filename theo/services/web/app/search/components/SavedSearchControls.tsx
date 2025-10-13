@@ -6,6 +6,7 @@ import styles from "./SearchPageClient.module.css";
 
 import type { SavedSearch } from "./SearchPageClient";
 import type { SearchFilters } from "../searchParams";
+import type { SavedSearch } from "./filters/types";
 
 const visuallyHiddenStyle: CSSProperties = {
   border: 0,
@@ -86,14 +87,12 @@ export function SavedSearchControls({
                       onClick={() => {
                         void onApplySavedSearch(saved);
                       }}
-                      aria-label={`Load “${saved.name}” saved search`}
                     >
                       Load preset
                     </button>
                     <button
                       type="button"
                       onClick={() => onDeleteSavedSearch(saved.id)}
-                      aria-label={`Delete “${saved.name}” saved search`}
                     >
                       Delete
                     </button>

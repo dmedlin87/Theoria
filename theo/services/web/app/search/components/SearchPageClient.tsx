@@ -33,6 +33,28 @@ import {
   serializeSearchParams,
   type SearchFilters,
 } from "../searchParams";
+import {
+  COLLECTION_FACETS,
+  CUSTOM_PRESET_VALUE,
+  DATASET_FILTERS,
+  DATASET_LABELS,
+  DOMAIN_LABELS,
+  DOMAIN_OPTIONS,
+  getPresetLabel,
+  MODE_PRESETS,
+  SOURCE_LABELS,
+  SOURCE_OPTIONS,
+  TRADITION_LABELS,
+  TRADITION_OPTIONS,
+  VARIANT_FILTERS,
+  VARIANT_LABELS,
+} from "./filters/constants";
+import { useSearchFiltersState } from "./filters/useSearchFiltersState";
+import type {
+  FilterDisplay,
+  SavedSearch,
+  SavedSearchFilterChip,
+} from "./filters/types";
 
 const classNames = (
   ...classes: Array<string | false | null | undefined>
@@ -146,16 +168,6 @@ const EMPTY_FILTERS: SearchFilters = {
   includeVariants: false,
   includeDisputed: false,
   preset: "",
-};
-
-type SavedSearchFilterChip = {
-  id: string;
-  text: string;
-};
-
-type FilterDisplay = {
-  chips: SavedSearchFilterChip[];
-  description: string;
 };
 
 function createEmptyFilters(): SearchFilters {
@@ -376,71 +388,6 @@ function formatSavedSearchFilters(filters: SearchFilters): FilterDisplay {
   return { chips, description };
 }
 
-type ModePreset = {
-  value: string;
-  label: string;
-  description: string;
-  filters?: Partial<SearchFilters>;
-};
-
-const MODE_PRESETS: ModePreset[] = [
-  {
-    value: CUSTOM_PRESET_VALUE,
-    label: "Manual configuration",
-    description: "Start with an empty slate and tune filters yourself.",
-  },
-  {
-    value: "scholar",
-    label: "Scholarly exegesis",
-    description: "Variants + disputed passages with manuscript-heavy sources.",
-    filters: {
-      includeVariants: true,
-      includeDisputed: true,
-      collectionFacets: ["Dead Sea Scrolls", "Church Fathers"],
-      datasetFacets: ["dss"],
-      variantFacets: ["disputed"],
-      sourceType: "pdf",
-    },
-  },
-  {
-    value: "devotional",
-    label: "Devotional overview",
-    description: "Focus on canonical material and mainstream commentary.",
-    filters: {
-      includeVariants: false,
-      includeDisputed: false,
-      collectionFacets: ["Church Fathers"],
-      datasetFacets: [],
-      variantFacets: [],
-      sourceType: "markdown",
-    },
-  },
-  {
-    value: "textual-critical",
-    label: "Textual criticism",
-    description: "Surface disputed readings and variant apparatus notes.",
-    filters: {
-      includeVariants: true,
-      includeDisputed: true,
-      collectionFacets: ["Dead Sea Scrolls", "Second Temple"],
-      datasetFacets: ["dss"],
-      variantFacets: ["disputed", "harmonized"],
-      sourceType: "pdf",
-    },
-  },
-];
-
-function getPresetLabel(value: string): string {
-  const preset = MODE_PRESETS.find((item) => item.value === value);
-  return preset ? preset.label : value;
-}
-
-export type SavedSearch = {
-  id: string;
-  name: string;
-  filters: SearchFilters;
-  createdAt: number;
-};
 
 type SearchResult = components["schemas"]["HybridSearchResult"];
 
@@ -537,33 +484,50 @@ export default function SearchPageClient({
   const [uiMode, setUiMode] = useUiModePreference();
   const isAdvancedUi = uiMode === "advanced";
   const { addToast } = useToast();
-  const [query, setQuery] = useState<string>(() => initialFilters.query);
-  const [osis, setOsis] = useState<string>(() => initialFilters.osis);
-  const [collection, setCollection] = useState<string>(() => initialFilters.collection);
-  const [author, setAuthor] = useState<string>(() => initialFilters.author);
-  const [sourceType, setSourceType] = useState<string>(() => initialFilters.sourceType);
-  const [theologicalTradition, setTheologicalTradition] = useState<string>(
-    () => initialFilters.theologicalTradition,
-  );
-  const [topicDomain, setTopicDomain] = useState<string>(() => initialFilters.topicDomain);
-  const [collectionFacets, setCollectionFacets] = useState<string[]>(
-    () => [...initialFilters.collectionFacets],
-  );
-  const [datasetFacets, setDatasetFacets] = useState<string[]>(
-    () => [...initialFilters.datasetFacets],
-  );
-  const [variantFacets, setVariantFacets] = useState<string[]>(
-    () => [...initialFilters.variantFacets],
-  );
-  const [dateStart, setDateStart] = useState<string>(() => initialFilters.dateStart);
-  const [dateEnd, setDateEnd] = useState<string>(() => initialFilters.dateEnd);
-  const [includeVariants, setIncludeVariants] = useState<boolean>(() => initialFilters.includeVariants);
-  const [includeDisputed, setIncludeDisputed] = useState<boolean>(
-    () => initialFilters.includeDisputed,
-  );
-  const [presetSelection, setPresetSelection] = useState<string>(
-    () => initialFilters.preset || CUSTOM_PRESET_VALUE,
-  );
+  const {
+    state: {
+      query,
+      osis,
+      collection,
+      author,
+      sourceType,
+      theologicalTradition,
+      topicDomain,
+      collectionFacets,
+      datasetFacets,
+      variantFacets,
+      dateStart,
+      dateEnd,
+      includeVariants,
+      includeDisputed,
+      presetSelection,
+    },
+    setState: {
+      setQuery,
+      setOsis,
+      setCollection,
+      setAuthor,
+      setSourceType,
+      setTheologicalTradition,
+      setTopicDomain,
+      setCollectionFacets,
+      setDatasetFacets,
+      setVariantFacets,
+      setDateStart,
+      setDateEnd,
+      setIncludeVariants,
+      setIncludeDisputed,
+      setPresetSelection,
+    },
+    derived: { presetIsCustom, currentFilters, filterChips, queryTokens },
+    actions: {
+      markPresetAsCustom,
+      applyFilters,
+      toggleCollectionFacet,
+      toggleDatasetFacet,
+      toggleVariantFacet,
+    },
+  } = useSearchFiltersState(initialFilters);
   const [isPresetChanging, setIsPresetChanging] = useState(false);
   const [sortKey, setSortKey] = usePersistentSort();
   const [groups, setGroups] = useState<DocumentGroup[]>(() =>
@@ -585,52 +549,6 @@ export default function SearchPageClient({
   const osisInputRef = useRef<HTMLInputElement | null>(null);
   const isBeginnerMode = uiMode === "simple";
 
-  const presetIsCustom = presetSelection === CUSTOM_PRESET_VALUE || presetSelection === "";
-
-  const markPresetAsCustom = useCallback(() => {
-    setPresetSelection((current) =>
-      current === CUSTOM_PRESET_VALUE ? current : CUSTOM_PRESET_VALUE,
-    );
-  }, []);
-
-  const currentFilters = useMemo<SearchFilters>(
-    () => ({
-      query: query.trim(),
-      osis: osis.trim(),
-      collection: collection.trim(),
-      author: author.trim(),
-      sourceType,
-      theologicalTradition: theologicalTradition.trim(),
-      topicDomain: topicDomain.trim(),
-      collectionFacets,
-      datasetFacets,
-      variantFacets,
-      dateStart: dateStart.trim(),
-      dateEnd: dateEnd.trim(),
-      includeVariants,
-      includeDisputed,
-      preset: presetIsCustom ? "" : presetSelection.trim(),
-    }),
-    [
-      author,
-      collection,
-      collectionFacets,
-      datasetFacets,
-      variantFacets,
-      dateEnd,
-      dateStart,
-      theologicalTradition,
-      topicDomain,
-      includeDisputed,
-      includeVariants,
-      osis,
-      presetIsCustom,
-      presetSelection,
-      query,
-      sourceType,
-    ],
-  );
-
   const arraysEqual = useCallback((left: string[], right: string[]) => {
     if (left === right) return true;
     if (left.length !== right.length) return false;
@@ -648,57 +566,6 @@ export default function SearchPageClient({
     },
     [router, searchParams],
   );
-
-  const filterChips = useMemo(() => {
-    const chips: { label: string; value: string }[] = [];
-    if (collection) chips.push({ label: "Collection", value: collection });
-    if (author) chips.push({ label: "Author", value: author });
-    if (sourceType) chips.push({ label: "Source", value: sourceType });
-    if (theologicalTradition)
-      chips.push({ label: "Tradition", value: theologicalTradition });
-    if (topicDomain) chips.push({ label: "Topic", value: topicDomain });
-    collectionFacets.forEach((facet) => chips.push({ label: "Facet", value: facet }));
-    datasetFacets.forEach((facet) =>
-      chips.push({ label: "Dataset", value: DATASET_LABELS.get(facet) ?? facet }),
-    );
-    variantFacets.forEach((facet) =>
-      chips.push({ label: "Variant", value: VARIANT_LABELS.get(facet) ?? facet }),
-    );
-    if (dateStart || dateEnd) {
-      chips.push({ label: "Date", value: `${dateStart || "…"} – ${dateEnd || "…"}` });
-    }
-    if (includeVariants) chips.push({ label: "Variants", value: "Included" });
-    if (includeDisputed) chips.push({ label: "Disputed", value: "Included" });
-    if (!presetIsCustom) {
-      const presetLabel =
-        MODE_PRESETS.find((candidate) => candidate.value === presetSelection)?.label ??
-        presetSelection;
-      chips.push({ label: "Preset", value: presetLabel });
-    }
-    return chips;
-  }, [
-    author,
-    collection,
-    collectionFacets,
-    datasetFacets,
-    variantFacets,
-    dateEnd,
-    dateStart,
-    includeDisputed,
-    includeVariants,
-    presetIsCustom,
-    presetSelection,
-    sourceType,
-    theologicalTradition,
-    topicDomain,
-  ]);
-
-  const queryTokens = useMemo(() => {
-    return query
-      .split(/\s+/)
-      .map((token) => token.trim())
-      .filter(Boolean);
-  }, [query]);
 
   const runSearch = useCallback(
     async (filters: SearchFilters) => {
@@ -811,27 +678,6 @@ export default function SearchPageClient({
     await runSearch(filters);
   };
 
-  const applyFilters = useCallback(
-    (filters: SearchFilters) => {
-      setQuery(filters.query);
-      setOsis(filters.osis);
-      setCollection(filters.collection);
-      setAuthor(filters.author);
-      setSourceType(filters.sourceType);
-      setTheologicalTradition(filters.theologicalTradition);
-      setTopicDomain(filters.topicDomain);
-      setCollectionFacets([...filters.collectionFacets]);
-      setDatasetFacets([...filters.datasetFacets]);
-      setVariantFacets([...filters.variantFacets]);
-      setDateStart(filters.dateStart);
-      setDateEnd(filters.dateEnd);
-      setIncludeVariants(filters.includeVariants);
-      setIncludeDisputed(filters.includeDisputed);
-      setPresetSelection(filters.preset ? filters.preset : CUSTOM_PRESET_VALUE);
-    },
-    [author, collection, collectionFacets, datasetFacets, includeDisputed, includeVariants, sourceType, theologicalTradition, topicDomain, variantFacets, dateEnd, dateStart, presetIsCustom, presetSelection],
-  );
-
   const handleShowErrorDetails = useCallback(
     (traceId: string | null) => {
       const detailMessage = traceId
@@ -909,45 +755,6 @@ export default function SearchPageClient({
       void runSearch(nextFilters).finally(() => setIsPresetChanging(false));
     },
     [applyFilters, currentFilters, runSearch, updateUrlForFilters, isSearching],
-  );
-
-  const toggleFacet = useCallback(
-    (facet: string) => {
-      setCollectionFacets((current) => {
-        const next = current.includes(facet)
-          ? current.filter((value) => value !== facet)
-          : [...current, facet];
-        markPresetAsCustom();
-        return next;
-      });
-    },
-    [markPresetAsCustom],
-  );
-
-  const toggleDatasetFacet = useCallback(
-    (facet: string) => {
-      setDatasetFacets((current) => {
-        const next = current.includes(facet)
-          ? current.filter((value) => value !== facet)
-          : [...current, facet];
-        markPresetAsCustom();
-        return next;
-      });
-    },
-    [markPresetAsCustom],
-  );
-
-  const toggleVariantFacet = useCallback(
-    (facet: string) => {
-      setVariantFacets((current) => {
-        const next = current.includes(facet)
-          ? current.filter((value) => value !== facet)
-          : [...current, facet];
-        markPresetAsCustom();
-        return next;
-      });
-    },
-    [markPresetAsCustom],
   );
 
   const handleSavedSearchSubmit = useCallback(
@@ -1219,7 +1026,7 @@ export default function SearchPageClient({
               <input
                 type="checkbox"
                 checked={collectionFacets.includes(facet)}
-                onChange={() => toggleFacet(facet)}
+                onChange={() => toggleCollectionFacet(facet)}
               />
               {facet}
             </label>

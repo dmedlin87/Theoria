@@ -8,8 +8,6 @@ import {
   FileText,
   Globe,
   Search,
-  ThumbsDown,
-  ThumbsUp,
   Upload as UploadIcon,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,10 +29,17 @@ import {
 } from "../lib/guardrails";
 import { useMode } from "../mode-context";
 import { emitTelemetry, submitFeedback, type FeedbackAction } from "../lib/telemetry";
-import { useChatWorkspaceState, type Reaction, type ConversationEntry, type AssistantConversationEntry, type GuardrailState } from "./useChatWorkspaceState";
+import type {
+  Reaction,
+  ConversationEntry,
+  AssistantConversationEntry,
+  GuardrailState,
+} from "./useChatWorkspaceState";
 import { useSessionRestoration, useSessionPersistence } from "./useSessionRestoration";
 import { useChatExecution } from "./useChatExecution";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
+import { ChatTranscript, type TranscriptEntry } from "./components/transcript/ChatTranscript";
+import { useChatSessionState } from "./hooks/useChatSessionState";
 
 import styles from "./ChatWorkspace.module.css";
 
@@ -73,15 +78,41 @@ export default function ChatWorkspace({
     clientRef.current = activeClient;
   }, [activeClient]);
 
-  const [conversation, setConversation] = useState<ConversationEntry[]>([]);
+  const {
+    state: {
+      conversation,
+      feedbackSelections,
+      pendingFeedbackIds,
+      sessionId,
+      isRestoring,
+      frequentlyOpenedPanels,
+      defaultFilters,
+      isStreaming,
+      activeAssistantId,
+      guardrail,
+      errorMessage,
+      lastQuestion,
+    },
+    setters: {
+      setConversation,
+      setFeedbackSelections,
+      setPendingFeedbackIds,
+      setSessionId,
+      setIsRestoring,
+      setFrequentlyOpenedPanels,
+      setDefaultFilters,
+      setIsStreaming,
+      setActiveAssistantId,
+      setGuardrail,
+      setErrorMessage,
+      setLastQuestion,
+    },
+    selectors: { hasTranscript },
+  } = useChatSessionState();
   const conversationRef = useRef<ConversationEntry[]>(conversation);
   useEffect(() => {
     conversationRef.current = conversation;
   }, [conversation]);
-  const [feedbackSelections, setFeedbackSelections] = useState<
-    Partial<Record<string, Reaction>>
-  >({});
-  const [pendingFeedbackIds, setPendingFeedbackIds] = useState<Set<string>>(new Set());
 
   const [inputValue, setInputValue] = useState(initialPrompt ?? "");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -90,16 +121,6 @@ export default function ChatWorkspace({
       setInputValue(initialPrompt);
     }
   }, [initialPrompt]);
-
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(true);
-  const [frequentlyOpenedPanels, setFrequentlyOpenedPanels] = useState<string[]>([]);
-  const [defaultFilters, setDefaultFilters] = useState<HybridSearchFilters | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
-  const [guardrail, setGuardrail] = useState<GuardrailState>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lastQuestion, setLastQuestion] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoSubmitRef = useRef(false);
 
@@ -458,9 +479,7 @@ export default function ChatWorkspace({
     void executeChat(initialPrompt);
   }, [autoSubmit, executeChat, initialPrompt, isRestoring]);
 
-  const hasTranscript = conversation.length > 0;
-
-  const transcript = useMemo(() => {
+  const transcript = useMemo<TranscriptEntry[]>(() => {
     return conversation.map((entry) => {
       if (entry.role === "assistant") {
         const isActive = entry.id === activeAssistantId && isStreaming;
