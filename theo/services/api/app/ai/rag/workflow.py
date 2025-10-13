@@ -66,6 +66,7 @@ from .models import (
 from ..reasoning.metacognition import (
     Critique,
     RevisionResult,
+    REVISION_QUALITY_THRESHOLD,
     critique_reasoning,
     revise_with_critique,
 )
@@ -427,6 +428,14 @@ class GuardedAnswerPipeline:
                 )
             except Exception as exc:  # pragma: no cover - defensive guard
                 LOGGER.warning("Failed to critique model output", exc_info=exc)
+                if self.recorder:
+                    self.recorder.log_step(
+                        tool="rag.critique",
+                        action="critique_reasoning",
+                        status="failed",
+                        input_payload={"model_output": model_output[:2000]},
+                        error_message=str(exc),
+                    )
             else:
                 critique_schema = _critique_to_schema(critique_obj)
                 if _should_attempt_revision(critique_obj) and selected_model is not None:
@@ -1485,7 +1494,7 @@ def _should_attempt_revision(critique: Critique) -> bool:
 
     if critique.fallacies_found or critique.weak_citations or critique.bias_warnings:
         return True
-    if critique.reasoning_quality < 80:
+    if critique.reasoning_quality < REVISION_QUALITY_THRESHOLD:
         return True
     actionable_recommendations = [
         recommendation
