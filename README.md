@@ -1,12 +1,37 @@
 # Theoria
 
-**Theoria is a research engine for theology** that indexes your library (papers, notes, YouTube transcripts, audio), normalizes Scripture references (OSIS), and provides deterministic, verse-anchored search with a Verse Aggregator across your entire corpus.
+**A modern research engine for theology** that indexes your library (papers, notes, YouTube transcripts, audio), normalizes Scripture references (OSIS), and provides deterministic, verse-anchored search with AI-powered insights.
 
-See the following references for the complete system architecture and latest case builder specifications:
+## ✨ Highlights
 
-- [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md)
-- [`docs/theoria_instruction_prompt.md`](docs/theoria_instruction_prompt.md)
-- [`case builder v4.md`](case%20builder%20v4.md)
+- 🔍 **Hybrid Search** – Semantic + lexical search with pgvector embeddings
+- 📖 **Scripture-Anchored** – Automatic OSIS normalization and verse aggregation
+- 🤖 **AI Workflows** – Sermon prep, comparative analysis, devotional guides with strict citations
+- 🎨 **Modern UI** – Professional animations, dark mode, command palette (⌘K)
+- ♿ **Accessible** – WCAG 2.1 AA compliant with keyboard navigation
+- 📱 **PWA Ready** – Installable as native app on desktop and mobile
+- ⚡ **Fast** – GPU-accelerated animations, optimized performance
+- 🔌 **MCP Integration** – Connect to ChatGPT and other AI tools
+
+## 📚 Quick Links
+
+- **[System Architecture](docs/BLUEPRINT.md)** – Complete design and architecture
+- **[Getting Started](#quick-start)** – Run locally in minutes
+- **[UI Demo](http://localhost:3000/demo-animations)** – See animations live (after starting dev server)
+- **[API Documentation](http://localhost:8000/docs)** – Interactive API explorer
+- **[Case Builder v4](case%20builder%20v4.md)** – Latest specifications
+
+## 🎉 What's New
+
+### Recent Enhancements
+
+- ✨ **Animation System** – 10 components enhanced with context-aware animations (bounce, shake, pulse)
+- 🎨 **Theme Toggle** – User-selectable light/dark/auto themes with smooth transitions
+- ⌨️ **Command Palette** – Fast keyboard navigation with ⌘K/Ctrl+K shortcut
+- 📱 **PWA Manifest** – Install Theoria as a native app on any device
+- ♿ **Accessibility** – Full WCAG 2.1 AA compliance with reduced motion support
+
+See [ANIMATION_ENHANCEMENTS_COMPLETE.md](ANIMATION_ENHANCEMENTS_COMPLETE.md) for complete details.
 
 ## Features
 
@@ -28,11 +53,42 @@ Theoria layers grounded generative capabilities on top of the deterministic retr
 - **Topic Monitoring** – Track emerging theological topics via OpenAlex-enhanced clustering with weekly digest notifications
 - **Real-Time Tracking** – Monitor background ingestion jobs, edit document metadata inline, and surface historian notes in the web UI
 
+### Modern User Interface
+
+Theoria features a polished, accessible web interface with modern UX enhancements:
+
+- **Professional Animations** – Context-aware animations throughout (bounce for success, shake for errors, pulse for active states)
+- **Theme Customization** – User-selectable light/dark/auto themes with smooth transitions and persistent preferences
+- **Command Palette** – Keyboard-first navigation with ⌘K/Ctrl+K shortcut for instant access to all features
+- **PWA Support** – Installable as a native app on desktop and mobile with offline capabilities
+- **Accessibility First** – WCAG 2.1 AA compliant with screen reader support, keyboard navigation, and reduced motion preferences
+- **Loading Feedback** – Shimmer skeletons, rotating spinners, and staggered list animations for clear visual feedback
+- **Responsive Design** – Mobile-first approach with adaptive layouts for all screen sizes
+
+### Feature Matrix
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| 📁 **Local File Ingestion** | PDF, DOCX, TXT, Markdown | ✅ Stable |
+| 🌐 **URL Ingestion** | Web pages, YouTube transcripts | ✅ Stable |
+| 🔍 **Hybrid Search** | Semantic + lexical with pgvector | ✅ Stable |
+| 📖 **OSIS Normalization** | Automatic Scripture reference detection | ✅ Stable |
+| 📊 **Verse Aggregator** | Corpus-wide verse snippet collection | ✅ Stable |
+| 🤖 **AI Workflows** | Sermon prep, analysis, devotionals | ✅ Stable |
+| 🎨 **Animations** | Context-aware UI micro-interactions | ✅ Stable |
+| 🌓 **Dark Mode** | User-selectable themes | ✅ Stable |
+| ⌨️ **Command Palette** | Keyboard navigation (⌘K) | ✅ Stable |
+| 📱 **PWA Support** | Installable native app | ✅ Stable |
+| 🔌 **MCP Integration** | ChatGPT connector | ✅ Stable |
+| 📈 **Topic Monitoring** | OpenAlex clustering | ✅ Stable |
+| 🔄 **Real-Time Jobs** | WebSocket job tracking | ✅ Stable |
+
 ### Getting Started
 
 - **CLI Usage**: Run `python -m theo.services.cli.ingest_folder --help` or see the [CLI guide](docs/CLI.md)
 - **MCP Integration**: Follow the [MCP integration execution guide](docs/mcp_integration_guide.md) for ChatGPT connector setup
 - **Search API Authentication**: Review the [authentication guide](docs/authentication.md) for the `Authorization` vs `X-API-Key` header contract and environment configuration
+- **UI Features**: Press ⌘K/Ctrl+K for command palette, toggle theme in footer, visit `/demo-animations` for live showcase
 
 ## Quick Start
 
@@ -106,6 +162,21 @@ Open <http://localhost:3000> in your browser.
 ### UI Component Toolkit
 
 The React application standardizes accessible overlays, menus, and notifications with Radix UI primitives (`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-tooltip`, and `@radix-ui/react-toast`). Shared wrappers live under [`app/components/ui`](theo/services/web/app/components/ui) so feature components can consume consistent tokens, keyboard behaviour, and screen-reader semantics without re-implementing focus management.
+
+#### Animation System
+
+All UI animations are CSS-based (GPU-accelerated) with zero JavaScript overhead. The animation utilities in [`styles/animations.css`](theo/services/web/styles/animations.css) provide reusable classes for:
+
+- **Entrance effects**: `fade-in`, `slide-up`, `slide-down`, `scale-in`
+- **Attention grabbers**: `bounce`, `shake`, `pulse`
+- **Loading states**: `spin`, `shimmer`, `stagger-item`
+- **Reduced motion**: Automatically respects user preferences
+
+Visit `/demo-animations` in the web UI for a live showcase of all available animations.
+
+#### Theme System
+
+The design system in [`app/theme.css`](theo/services/web/app/theme.css) uses CSS custom properties for theme-aware colors, shadows, and transitions. Users can toggle between light, dark, and auto (system) modes via the theme toggle in the footer. Theme preferences persist across sessions using localStorage.
 
 #### Research modes in the web UI
 
@@ -292,13 +363,32 @@ Review [`docs/adr/0001-expose-theoengine-via-mcp.md`](docs/adr/0001-expose-theoe
 
 ## Documentation
 
+### Architecture & Design
+
 - **[BLUEPRINT.md](docs/BLUEPRINT.md)** – Complete system architecture and design
+- **[ADR Directory](docs/adr/)** – Architectural decision records
+- **[Case Builder v4](case%20builder%20v4.md)** – Latest case builder specifications
+
+### Usage Guides
+
 - **[CLI.md](docs/CLI.md)** – Command-line interface guide
 - **[API.md](docs/API.md)** – API reference and endpoints
 - **[MCP Integration Guide](docs/mcp_integration_guide.md)** – ChatGPT connector setup
+- **[Authentication Guide](docs/authentication.md)** – API key and JWT configuration
+
+### UI Enhancements
+
+- **[Animation Enhancements](ANIMATION_ENHANCEMENTS_COMPLETE.md)** – Complete animation system documentation
+- **[UI Overhaul Summary](UI_OVERHAUL_SUMMARY.md)** – Design system refresh details
+- **[UI Loading Improvements](UI_LOADING_IMPROVEMENTS.md)** – Loading state patterns
+- **[Navigation Improvements](NAVIGATION_IMPROVEMENTS.md)** – Navigation UX enhancements
+
+### Quality & Testing
+
 - **[Performance Monitoring](docs/performance.md)** – Lighthouse CI and Core Web Vitals
-- **[Reranker MVP Plan](docs/reranker_mvp.md)** – Dataset expectations and export conventions
 - **[Test Map](docs/testing/TEST_MAP.md)** – Testing strategy and coverage
+- **[Reranker MVP Plan](docs/reranker_mvp.md)** – Dataset expectations and export conventions
+- **[Security](SECURITY.md)** – Security policies and threat model
 
 ## Contributing
 
