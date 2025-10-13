@@ -17,6 +17,7 @@ from theo.application.facades.settings import Settings, get_settings
 from ..models.search import HybridSearchRequest, HybridSearchResult
 from ..ranking.re_ranker import Reranker, load_reranker
 from ..retriever.hybrid import hybrid_search
+from ..telemetry import SEARCH_RERANKER_EVENTS
 
 LOGGER = logging.getLogger(__name__)
 
@@ -118,6 +119,7 @@ class _RerankerCache:
                                 "error": str(exc),
                             },
                         )
+                        SEARCH_RERANKER_EVENTS.labels(event="load_failed").inc()
                     retry_in = self.cooldown_seconds
                     retry_at = datetime.now(timezone.utc) + timedelta(
                         seconds=retry_in
@@ -170,6 +172,11 @@ class RetrievalService:
                 self.settings.reranker_model_sha256,
             )
             if reranker is not None:
+                model_path = (
+                    Path(self.settings.reranker_model_path)
+                    if self.settings.reranker_model_path is not None
+                    else None
+                )
                 try:
                     top_n = min(len(results), self.reranker_top_k)
                     if top_n:
@@ -178,10 +185,19 @@ class RetrievalService:
                         for index, item in enumerate(ordered, start=1):
                             item.rank = index
                         results = ordered
-                        model_path = Path(self.settings.reranker_model_path)
-                        reranker_header = model_path.name or str(model_path)
-                except Exception:
-                    pass
+                        if model_path is not None:
+                            reranker_header = model_path.name or str(model_path)
+                except Exception as exc:
+                    path_str = str(model_path) if model_path is not None else "<unknown>"
+                    LOGGER.exception(
+                        "search.reranker_execution_failed",
+                        extra={
+                            "event": "search.reranker_execution_failed",
+                            "model_path": path_str,
+                            "error": str(exc),
+                        },
+                    )
+                    SEARCH_RERANKER_EVENTS.labels(event="execution_failed").inc()
 
         return results, reranker_header
 

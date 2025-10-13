@@ -11,6 +11,7 @@ services:
       PYTHONPATH: /app
       THEO_AUTH_ALLOW_ANONYMOUS: "1"
       THEO_ALLOW_INSECURE_STARTUP: "1"
+      THEORIA_ENVIRONMENT: "development"
       THEORIA_PROFILE: "${THEORIA_PROFILE:-dev}"
       THEORIA_API_PORT: "${THEORIA_API_PORT:-8000}"
     volumes:
@@ -27,6 +28,7 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: "http://localhost:${THEORIA_API_PORT:-8000}"
       THEORIA_PROFILE: "${THEORIA_PROFILE:-dev}"
+      THEORIA_ENVIRONMENT: "development"
       NODE_ENV: development
       THEORIA_WEB_PORT: "${THEORIA_WEB_PORT:-3000}"
       THEORIA_API_PORT: "${THEORIA_API_PORT:-8000}"

@@ -153,6 +153,11 @@ CITATION_DRIFT_EVENTS: CounterMetric = _build_counter(
     "Theo Engine cached citation validation outcomes.",
     labelnames=("status",),
 )
+SEARCH_RERANKER_EVENTS: CounterMetric = _build_counter(
+    "theo_search_reranker_events_total",
+    "Theo Engine reranker lifecycle events.",
+    labelnames=("event",),
+)
 
 
 def _serialise_value(value: Any) -> Any:
@@ -258,6 +263,7 @@ __all__ = [
     "set_span_attribute",
     "RAG_CACHE_EVENTS",
     "CITATION_DRIFT_EVENTS",
+    "SEARCH_RERANKER_EVENTS",
 ]
 
 
