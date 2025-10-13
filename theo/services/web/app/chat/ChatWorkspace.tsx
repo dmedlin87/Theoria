@@ -8,8 +8,6 @@ import {
   FileText,
   Globe,
   Search,
-  ThumbsDown,
-  ThumbsUp,
   Upload as UploadIcon,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,10 +29,17 @@ import {
 } from "../lib/guardrails";
 import { useMode } from "../mode-context";
 import { emitTelemetry, submitFeedback, type FeedbackAction } from "../lib/telemetry";
-import { useChatWorkspaceState, type Reaction, type ConversationEntry, type AssistantConversationEntry, type GuardrailState } from "./useChatWorkspaceState";
+import type {
+  Reaction,
+  ConversationEntry,
+  AssistantConversationEntry,
+  GuardrailState,
+} from "./useChatWorkspaceState";
 import { useSessionRestoration, useSessionPersistence } from "./useSessionRestoration";
 import { useChatExecution } from "./useChatExecution";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
+import { ChatTranscript, type TranscriptEntry } from "./components/transcript/ChatTranscript";
+import { useChatSessionState } from "./hooks/useChatSessionState";
 
 type ChatWorkspaceProps = {
   client?: ChatWorkflowClient;
@@ -65,15 +70,41 @@ export default function ChatWorkspace({
     clientRef.current = activeClient;
   }, [activeClient]);
 
-  const [conversation, setConversation] = useState<ConversationEntry[]>([]);
+  const {
+    state: {
+      conversation,
+      feedbackSelections,
+      pendingFeedbackIds,
+      sessionId,
+      isRestoring,
+      frequentlyOpenedPanels,
+      defaultFilters,
+      isStreaming,
+      activeAssistantId,
+      guardrail,
+      errorMessage,
+      lastQuestion,
+    },
+    setters: {
+      setConversation,
+      setFeedbackSelections,
+      setPendingFeedbackIds,
+      setSessionId,
+      setIsRestoring,
+      setFrequentlyOpenedPanels,
+      setDefaultFilters,
+      setIsStreaming,
+      setActiveAssistantId,
+      setGuardrail,
+      setErrorMessage,
+      setLastQuestion,
+    },
+    selectors: { hasTranscript },
+  } = useChatSessionState();
   const conversationRef = useRef<ConversationEntry[]>(conversation);
   useEffect(() => {
     conversationRef.current = conversation;
   }, [conversation]);
-  const [feedbackSelections, setFeedbackSelections] = useState<
-    Partial<Record<string, Reaction>>
-  >({});
-  const [pendingFeedbackIds, setPendingFeedbackIds] = useState<Set<string>>(new Set());
 
   const [inputValue, setInputValue] = useState(initialPrompt ?? "");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -82,16 +113,6 @@ export default function ChatWorkspace({
       setInputValue(initialPrompt);
     }
   }, [initialPrompt]);
-
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(true);
-  const [frequentlyOpenedPanels, setFrequentlyOpenedPanels] = useState<string[]>([]);
-  const [defaultFilters, setDefaultFilters] = useState<HybridSearchFilters | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
-  const [guardrail, setGuardrail] = useState<GuardrailState>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lastQuestion, setLastQuestion] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoSubmitRef = useRef(false);
 
@@ -450,9 +471,7 @@ export default function ChatWorkspace({
     void executeChat(initialPrompt);
   }, [autoSubmit, executeChat, initialPrompt, isRestoring]);
 
-  const hasTranscript = conversation.length > 0;
-
-  const transcript = useMemo(() => {
+  const transcript = useMemo<TranscriptEntry[]>(() => {
     return conversation.map((entry) => {
       if (entry.role === "assistant") {
         const isActive = entry.id === activeAssistantId && isStreaming;
@@ -642,99 +661,15 @@ export default function ChatWorkspace({
       </section>
 
       <div className="chat-transcript" role="log" aria-label="Chat transcript">
-        {hasTranscript ? (
-          transcript.map((entry) => {
-            const selection = feedbackSelections[entry.id] ?? null;
-            const feedbackPending = pendingFeedbackIds.has(entry.id);
-            const feedbackDisabled = feedbackPending || entry.isActive;
-            return (
-              <article key={entry.id} className={`chat-message chat-message--${entry.role}`}>
-                <header>{entry.role === "user" ? "You" : "Theo"}</header>
-                <p aria-live={entry.isActive ? "polite" : undefined}>{entry.displayContent || "Awaiting response."}</p>
-                {entry.role === "assistant" && entry.citations.length > 0 && (
-                  <aside className="chat-citations" aria-label="Citations">
-                    <h4>Citations</h4>
-                    <ol>
-                      {entry.citations.map((citation) => {
-                      const verseHref = `/verse/${encodeURIComponent(citation.osis)}`;
-                      const searchParams = new URLSearchParams({ osis: citation.osis });
-                      const searchHref = `/search?${searchParams.toString()}`;
-                      return (
-                        <li key={`${entry.id}-${citation.index}`} className="chat-citation-item">
-                          <div>
-                            <p className="chat-citation-heading">{citation.osis}</p>
-                            <p className="chat-citation-snippet">“{citation.snippet}”</p>
-                            {citation.document_title && (
-                              <p className="chat-citation-source">{citation.document_title}</p>
-                            )}
-                          </div>
-                          <div className="chat-citation-actions">
-                            <Link href={verseHref}>Open {citation.anchor}</Link>
-                            <Link href={searchHref}>Search references</Link>
-                          </div>
-                        </li>
-                      );
-                      })}
-                    </ol>
-                  </aside>
-                )}
-                {entry.role === "assistant" && (
-                  <div className="chat-feedback-controls">
-                    <button
-                      type="button"
-                      className={`chat-feedback-button chat-feedback-button--positive${
-                        selection === "like" ? " chat-feedback-button--active" : ""
-                      }`}
-                    onClick={() => handleAssistantFeedback(entry.id, "like")}
-                    disabled={feedbackDisabled}
-                    aria-pressed={selection === "like"}
-                    aria-label="Mark response helpful"
-                  >
-                    <Icon icon={ThumbsUp} size="md" />
-                    <span className="visually-hidden">Helpful response</span>
-                  </button>
-                    <button
-                      type="button"
-                      className={`chat-feedback-button chat-feedback-button--negative${
-                        selection === "dislike" ? " chat-feedback-button--active" : ""
-                      }`}
-                    onClick={() => handleAssistantFeedback(entry.id, "dislike")}
-                    disabled={feedbackDisabled}
-                    aria-pressed={selection === "dislike"}
-                    aria-label="Mark response unhelpful"
-                  >
-                    <Icon icon={ThumbsDown} size="md" />
-                    <span className="visually-hidden">Unhelpful response</span>
-                  </button>
-                  </div>
-                )}
-              </article>
-            );
-          })
-        ) : (
-          <div className="chat-empty-state">
-            <h3>Start the conversation</h3>
-            <p>Ask about a passage, doctrine, or theme and we’ll respond with cited insights.</p>
-            <ul className="chat-empty-state-actions">
-              {sampleQuestions.map((question, index) => (
-                <li key={question}>
-                  <button
-                    type="button"
-                    className="chat-empty-state-chip"
-                    onClick={() => handleSampleQuestionClick(question, index)}
-                  >
-                    {question}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="chat-empty-state-links">
-              Prefer browsing? Explore the <Link href="/search">Search</Link> and
-              {" "}
-              <Link href="/verse">Verse explorer</Link>.
-            </p>
-          </div>
-        )}
+        <ChatTranscript
+          entries={transcript}
+          hasTranscript={hasTranscript}
+          feedbackSelections={feedbackSelections}
+          pendingFeedbackIds={pendingFeedbackIds}
+          onFeedback={handleAssistantFeedback}
+          sampleQuestions={sampleQuestions}
+          onSampleQuestionClick={handleSampleQuestionClick}
+        />
       </div>
 
       <div className="chat-session-controls" aria-label="Session history controls">

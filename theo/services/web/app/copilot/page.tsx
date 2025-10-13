@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 import ErrorCallout from "../components/ErrorCallout";
@@ -53,6 +53,7 @@ import {
   type VerseFormState,
 } from "./components/workflow-hooks";
 import { EXPORT_PRESETS } from "./components/export-presets";
+import { useCopilotWorkflowState } from "./hooks/useCopilotWorkflowState";
 
 const WORKFLOWS: { id: WorkflowId; label: string; description: string }[] = [
   { id: "verse", label: "Verse brief", description: "Ask a grounded question anchored to a verse." },
@@ -160,17 +161,34 @@ export default function CopilotPage(): JSX.Element {
   const citationManagerEndpoint = useMemo(() => getCitationManagerEndpoint(), []);
   const [uiMode, setUiMode] = useUiModePreference();
   const isAdvancedUi = uiMode === "advanced";
-  const [enabled, setEnabled] = useState<boolean | null>(null);
-  const [workflow, setWorkflow] = useState<WorkflowId>("verse");
-  const [result, setResult] = useState<CopilotResult | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<{ message: string; suggestions?: GuardrailSuggestion[] } | null>(null);
-  const [citationExportStatus, setCitationExportStatus] = useState<string | null>(null);
-  const [isSendingCitations, setIsSendingCitations] = useState(false);
-  const [researchFeatures, setResearchFeatures] = useState<ResearchFeatureFlags | null>(null);
-  const [researchFeaturesError, setResearchFeaturesError] = useState<string | null>(null);
-  const [activeTool, setActiveTool] = useState<ActiveToolState | null>(null);
-  const [drawerOsis, setDrawerOsis] = useState<string>("");
+  const {
+    state: {
+      enabled,
+      workflow,
+      result,
+      isRunning,
+      error,
+      citationExportStatus,
+      isSendingCitations,
+      researchFeatures,
+      researchFeaturesError,
+      activeTool,
+      drawerOsis,
+    },
+    setters: {
+      setEnabled,
+      setWorkflow,
+      setResult,
+      setIsRunning,
+      setError,
+      setCitationExportStatus,
+      setIsSendingCitations,
+      setResearchFeatures,
+      setResearchFeaturesError,
+      setActiveTool,
+      setDrawerOsis,
+    },
+  } = useCopilotWorkflowState();
   const { addToast } = useToast();
 
   useEffect(() => {
