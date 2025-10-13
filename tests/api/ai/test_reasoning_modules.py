@@ -14,6 +14,8 @@ from theo.services.api.app.ai.reasoning.chain_of_thought import (
 )
 from theo.services.api.app.ai.reasoning.insights import InsightDetector
 from theo.services.api.app.ai.reasoning.metacognition import (
+    DEFAULT_QUALITY_SCORE,
+    MAX_REVISION_CITATIONS,
     critique_reasoning,
     revise_with_critique,
 )
@@ -77,6 +79,19 @@ class TestFallacyDetector:
         ad_hom = next(w for w in warnings if w.fallacy_type == "ad_hominem")
         assert ad_hom.suggestion is not None
         assert "argument's logic" in ad_hom.suggestion
+
+    def test_no_false_positive_for_parallel_citations(self):
+        """Contextual citation lists with explanation should not be flagged."""
+
+        text = (
+            "Since the text teaches love for enemies (Matt 5:44), Christians are called to pacifism. "
+            "See Matt 5:38-48, Luke 6:27-36, Rom 12:17-21, 1 Pet 3:9, 1 Thess 5:15 for parallel teachings."
+        )
+
+        warnings = detect_fallacies(text)
+
+        assert not any(w.fallacy_type == "proof_texting" for w in warnings)
+        assert not any(w.fallacy_type == "circular_reasoning" for w in warnings)
 
 
 class TestChainOfThought:
@@ -242,6 +257,26 @@ class TestMetacognition:
 
         assert len(critique.weak_citations) > 0
 
+    def test_weak_citation_requires_proximity(self):
+        """Citations mentioned without nearby explanation should be weak."""
+
+        reasoning = "Paul discusses grace broadly without detail."
+        answer = (
+            "Grace appears throughout Paul's letters in many forms."
+            "The church debated the issue for centuries. [1]"
+        )
+        citations = [
+            {
+                "index": 1,
+                "passage_id": "p1",
+                "snippet": "For by grace you have been saved through faith",
+            }
+        ]
+
+        critique = critique_reasoning(reasoning, answer, citations)
+
+        assert critique.weak_citations == ["p1"]
+
     def test_detects_perspective_bias(self):
         """Should detect apologetic or skeptical bias."""
         reasoning = "Everything is coherent and harmonious and consistent and resolves perfectly."
@@ -251,7 +286,9 @@ class TestMetacognition:
         critique = critique_reasoning(reasoning, answer, citations)
 
         assert len(critique.bias_warnings) > 0
-        assert any("apologetic bias" in w for w in critique.bias_warnings)
+        assert any(
+            "engage with skeptical objections" in w for w in critique.bias_warnings
+        )
 
     def test_accepts_high_quality_reasoning(self):
         """Should rate clean reasoning highly."""
@@ -263,7 +300,7 @@ class TestMetacognition:
 4. Alternative readings exist but this is standard interpretation
 </thinking>
 """
-        answer = "Paul teaches all have sinned [1]. This echoes Psalm 14 [2]."
+        answer = "Paul teaches all have sinned [1]. This echoes Psalm 14 where none are righteous [2]."
         citations = [
             {"index": 1, "passage_id": "p1", "snippet": "all have sinned"},
             {"index": 2, "passage_id": "p2", "snippet": "there is no one righteous"},
@@ -273,6 +310,36 @@ class TestMetacognition:
 
         assert critique.reasoning_quality >= 65
         assert len(critique.fallacies_found) == 0
+
+    def test_bias_detection_allows_balanced_language(self):
+        """Balanced reasoning with counterpoints should not raise warnings."""
+
+        reasoning = (
+            "The narrative feels coherent; however, critics argue there is tension,"
+            " and the response considers both harmonization and skepticism."
+        )
+        answer = (
+            "Some scholars highlight contradictions, but others note overall unity."
+        )
+
+        critique = critique_reasoning(reasoning, answer, [])
+
+        assert critique.bias_warnings == []
+
+    def test_handles_invalid_citations_gracefully(self):
+        """Malformed citation entries should be ignored without crashing."""
+
+        reasoning = "Paul appeals to scripture."
+        answer = "See [2] for a summary."
+        citations = [
+            {"index": 0, "passage_id": "", "snippet": None},
+            {"index": 2, "passage_id": "p2", "snippet": None},
+        ]
+
+        critique = critique_reasoning(reasoning, answer, citations)
+
+        assert critique.weak_citations == ["p2"]
+        assert critique.reasoning_quality < DEFAULT_QUALITY_SCORE
 
 
 class DummyRevisionClient:
@@ -378,6 +445,39 @@ class TestRevision:
         assert "Mitigated bias" in " ".join(result.critique_addressed)
         assert result.improvements
         assert result.revised_critique.reasoning_quality >= critique.reasoning_quality
+
+    def test_revision_prompt_limits_citations(self):
+        """Revision prompt should cap the number of citations to avoid overflow."""
+
+        original_answer = "Balanced response with many references. Sources: " + \
+            " ".join(f"[{i}]" for i in range(1, 25))
+
+        citations = [
+            {
+                "index": i,
+                "passage_id": f"p{i}",
+                "snippet": f"Snippet content {i} emphasises grace and community.",
+            }
+            for i in range(1, 25)
+        ]
+
+        critique = critique_reasoning(original_answer, original_answer, citations)
+        client = DummyRevisionClient(
+            "<revised_answer>Updated answer with focus on key citations. Sources: [1]</revised_answer>"
+        )
+
+        revise_with_critique(
+            original_answer=original_answer,
+            critique=critique,
+            client=client,
+            model="test-model",
+            reasoning_trace=original_answer,
+            citations=citations,
+        )
+
+        assert client.last_prompt is not None
+        displayed_citations = [line for line in client.last_prompt.splitlines() if line.strip().startswith("[")]
+        assert len(displayed_citations) <= MAX_REVISION_CITATIONS
 
 
 @pytest.fixture

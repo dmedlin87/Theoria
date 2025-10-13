@@ -23,7 +23,7 @@ class FallacyDetector:
 
     # Formal fallacies
     AFFIRMING_CONSEQUENT = re.compile(
-        r"\b(?:if|when)\s+\w+.*then\s+\w+.*(?:therefore|thus|so)\s+\w+",
+        r"\b(?:if|when)\s+(?P<ante>[^.?!]{3,80})\s+then\s+(?P<cons>[^.?!]{3,80})",
         re.IGNORECASE,
     )
 
@@ -41,7 +41,7 @@ class FallacyDetector:
     )
 
     CIRCULAR_REASONING = re.compile(
-        r"\b(?:because|since)\s+(?:the\s+)?(?:bible|scripture|text)\s+(?:says|teaches|is\s+true)",
+        r"\b(?:because|since)\s+(?:the\s+)?(?:bible|scripture|text)\s+(?:says|teaches)",
         re.IGNORECASE,
     )
 
@@ -51,7 +51,7 @@ class FallacyDetector:
     )
 
     FALSE_DICHOTOMY = re.compile(
-        r"\b(?:either|must\s+be)\s+\w+\s+(?:or|otherwise)\s+\w+",
+        r"\beither\b[^.?!]{3,80}?\bor\b[^.?!]{3,80}",
         re.IGNORECASE,
     )
 
@@ -137,11 +137,35 @@ class FallacyDetector:
     def detect(self, text: str) -> list[FallacyWarning]:
         """Detect fallacies in the given text."""
         warnings: list[FallacyWarning] = []
+        seen_matches: set[tuple[str, str]] = set()
 
         for pattern, fallacy_type, severity, description in self.FALLACY_PATTERNS:
             matches = pattern.finditer(text)
             for match in matches:
+                if fallacy_type == "circular_reasoning" and not self._is_circular_context(
+                    match, text
+                ):
+                    continue
+                if fallacy_type == "proof_texting" and not self._is_proof_texting_context(
+                    match, text
+                ):
+                    continue
+                if fallacy_type == "false_dichotomy" and not self._is_false_dichotomy_context(
+                    match, text
+                ):
+                    continue
+                if (
+                    fallacy_type == "affirming_consequent"
+                    and not self._is_affirming_consequent(match, text)
+                ):
+                    continue
+
                 matched_text = match.group(0)
+                key = (fallacy_type, re.sub(r"\s+", " ", matched_text.strip().lower()))
+                if key in seen_matches:
+                    continue
+                seen_matches.add(key)
+
                 suggestion = self._get_suggestion(fallacy_type)
 
                 warnings.append(
@@ -155,6 +179,81 @@ class FallacyDetector:
                 )
 
         return warnings
+
+    @staticmethod
+    def _extract_sentence(text: str, position: int) -> str:
+        start = text.rfind(".", 0, position) + 1
+        start = max(start, text.rfind("?", 0, position) + 1, text.rfind("!", 0, position) + 1)
+        end_candidates = [
+            idx for idx in (text.find(delim, position) for delim in ".?!") if idx != -1
+        ]
+        end = min(end_candidates) if end_candidates else len(text)
+        return text[start:end]
+
+    def _is_circular_context(self, match: re.Match[str], text: str) -> bool:
+        sentence = self._extract_sentence(text, match.start())
+        trailing_claim = re.search(
+            r"(therefore|thus|so)\s+(?:we\s+)?(?:know|conclude|it\s+is)\s+(?:true|reliable|correct)",
+            sentence,
+            re.IGNORECASE,
+        )
+        direct_assertion = re.search(
+            r"\bis\s+(?:true|reliable|correct)\s+because\s+(?:the\s+)?(?:bible|scripture|text)\s+(?:says|teaches)",
+            sentence,
+            re.IGNORECASE,
+        )
+        return bool(trailing_claim or direct_assertion)
+
+    def _is_proof_texting_context(self, match: re.Match[str], text: str) -> bool:
+        span = match.group(0)
+        non_citation_content = re.sub(
+            r"(?:[1-3]?[A-Z][a-z]+\.?\s*\d+(?::\d+|\.\d+)?|\s|,|;|and|or|cf\.)",
+            "",
+            span,
+            flags=re.IGNORECASE,
+        )
+        if non_citation_content:
+            return False
+
+        trailing_context = text[match.end() : match.end() + 120]
+        explanatory = re.search(
+            r"\b(parallel|context|discussion|explain|explores|summarises|survey)\b",
+            trailing_context,
+            re.IGNORECASE,
+        )
+        return explanatory is None
+
+    def _is_false_dichotomy_context(self, match: re.Match[str], text: str) -> bool:
+        sentence = self._extract_sentence(text, match.start())
+        return bool(
+            re.search(
+                r"\b(no other|only|must|cannot both|exclusive|one true)\b",
+                sentence,
+                re.IGNORECASE,
+            )
+        )
+
+    def _is_affirming_consequent(self, match: re.Match[str], text: str) -> bool:
+        antecedent = match.group("ante").strip()
+        consequent = match.group("cons").strip()
+        remainder = text[match.end() : match.end() + 200]
+        if not antecedent or not consequent:
+            return False
+
+        consequent_present = re.search(
+            rf"\b{re.escape(consequent.strip().split(',')[0])}\b",
+            remainder,
+            re.IGNORECASE,
+        )
+
+        antecedent_fragment = antecedent.strip().split(",")[0][:40].lower()
+        conclusion_pattern = re.compile(
+            rf"(therefore|thus|so)\s+(?:we\s+)?(?:conclude|know|affirm|it\s+follows)\s+{re.escape(antecedent_fragment)}",
+            re.IGNORECASE,
+        )
+
+        remainder_lower = remainder.lower()
+        return bool(consequent_present and conclusion_pattern.search(remainder_lower))
 
     def _get_suggestion(self, fallacy_type: str) -> str | None:
         """Get remediation suggestion for a fallacy type."""

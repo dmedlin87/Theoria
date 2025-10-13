@@ -427,6 +427,17 @@ class GuardedAnswerPipeline:
                 )
             except Exception as exc:  # pragma: no cover - defensive guard
                 LOGGER.warning("Failed to critique model output", exc_info=exc)
+                if self.recorder:
+                    self.recorder.log_step(
+                        tool="rag.critique",
+                        action="critique_reasoning",
+                        status="failed",
+                        input_payload={
+                            "citation_count": len(citation_payloads),
+                        },
+                        output_digest=str(exc),
+                        error_message=str(exc),
+                    )
             else:
                 critique_schema = _critique_to_schema(critique_obj)
                 if _should_attempt_revision(critique_obj) and selected_model is not None:

@@ -2,33 +2,109 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
+import logging
 import re
 import textwrap
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from ..clients import LanguageModelClient
 from ..rag.guardrail_helpers import scrub_adversarial_language
 from .fallacies import FallacyWarning, detect_fallacies
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
+# Quality scoring configuration – calibrated constants kept in one location to
+# make tuning easier and to avoid magic numbers sprinkled throughout the file.
+DEFAULT_QUALITY_SCORE = 70
+QUALITY_MIN = 0
+QUALITY_MAX = 100
+HIGH_FALLACY_PENALTY = 15
+MEDIUM_FALLACY_PENALTY = 8
+WEAK_CITATION_PENALTY = 5
+BIAS_WARNING_PENALTY = 10
+
+
+# Revision prompt configuration.
+MAX_REVISION_CITATIONS = 12
+REVISION_CITATION_SNIPPET_LIMIT = 180
+
+
+# Expanded stopword list used when evaluating citation snippets. The list
+# favours high-frequency English function words and common theological terms to
+# reduce accidental overlaps.
 _STOPWORDS = {
-    "the",
+    "a",
+    "an",
     "and",
-    "that",
-    "this",
-    "with",
-    "from",
-    "into",
-    "have",
+    "are",
+    "as",
+    "at",
+    "be",
+    "been",
+    "but",
+    "by",
+    "can",
+    "could",
+    "did",
+    "do",
+    "does",
     "for",
-    "your",
-    "their",
+    "from",
+    "god",
+    "grace",
+    "had",
+    "has",
+    "have",
+    "having",
+    "he",
+    "her",
+    "his",
+    "into",
+    "is",
+    "it",
+    "its",
+    "jesus",
+    "lord",
+    "may",
+    "might",
+    "not",
+    "of",
+    "on",
+    "or",
+    "our",
     "shall",
-    "will",
+    "she",
+    "should",
+    "that",
+    "the",
+    "their",
+    "them",
+    "then",
+    "there",
+    "they",
+    "this",
+    "those",
+    "through",
+    "to",
+    "was",
+    "we",
+    "were",
     "what",
     "when",
-    "then",
+    "where",
+    "which",
+    "who",
+    "whom",
+    "why",
+    "will",
+    "with",
+    "would",
+    "you",
+    "faith",
 }
 
 
@@ -78,30 +154,34 @@ def critique_reasoning(
     Returns:
         Critique with quality assessment
     """
-    critique = Critique(reasoning_quality=70)  # Default mid-range
+    critique = Critique(reasoning_quality=DEFAULT_QUALITY_SCORE)
 
     # Detect logical fallacies
     fallacies = detect_fallacies(reasoning_trace + " " + answer)
     critique.fallacies_found = fallacies
 
-    # Penalize quality for fallacies
-    fallacy_penalty = len([f for f in fallacies if f.severity == "high"]) * 15
-    fallacy_penalty += len([f for f in fallacies if f.severity == "medium"]) * 8
-    critique.reasoning_quality = max(0, critique.reasoning_quality - fallacy_penalty)
+    unique_high = {f.fallacy_type for f in fallacies if f.severity == "high"}
+    unique_medium = {f.fallacy_type for f in fallacies if f.severity == "medium"}
+    fallacy_penalty = (
+        len(unique_high) * HIGH_FALLACY_PENALTY
+        + len(unique_medium) * MEDIUM_FALLACY_PENALTY
+    )
+
+    total_penalty = fallacy_penalty
 
     # Check citation grounding
     weak_citations = _identify_weak_citations(answer, citations)
     critique.weak_citations = weak_citations
 
     if weak_citations:
-        critique.reasoning_quality -= len(weak_citations) * 5
+        total_penalty += len(weak_citations) * WEAK_CITATION_PENALTY
 
     # Check for perspective bias
     bias_warnings = _detect_bias(reasoning_trace, answer)
     critique.bias_warnings = bias_warnings
 
     if bias_warnings:
-        critique.reasoning_quality -= len(bias_warnings) * 10
+        total_penalty += len(bias_warnings) * BIAS_WARNING_PENALTY
 
     # Surface alternative interpretations explicitly mentioned in the reasoning
     critique.alternative_interpretations = _extract_alternative_interpretations(
@@ -109,7 +189,17 @@ def critique_reasoning(
     )
 
     # Clamp reasoning quality after all adjustments to the documented 0-100 range
-    critique.reasoning_quality = max(0, min(critique.reasoning_quality, 100))
+    critique.reasoning_quality = max(
+        QUALITY_MIN,
+        min(DEFAULT_QUALITY_SCORE - total_penalty, QUALITY_MAX),
+    )
+
+    _log_critique_outcome(
+        fallacies=fallacies,
+        weak_citations=weak_citations,
+        bias_warnings=bias_warnings,
+        final_quality=critique.reasoning_quality,
+    )
 
     # Generate recommendations
     critique.recommendations = _generate_recommendations(critique)
@@ -134,27 +224,71 @@ def _identify_weak_citations(answer: str, citations: list[dict]) -> list[str]:
     """
     weak: list[str] = []
 
-    # Simple heuristic: if citation is mentioned but snippet doesn't appear, it's weak
+    if not answer.strip() or not citations:
+        return weak
+
     answer_lower = answer.lower()
+    index_positions = {
+        int(match.group(1)): match.start()
+        for match in re.finditer(r"\[(\d+)\]", answer)
+    }
 
-    for citation in citations:
-        index = citation.get("index", 0)
-        snippet = citation.get("snippet", "")
+    for citation in _iter_valid_citations(citations):
+        index = citation["index"]
+        passage_id = citation["passage_id"]
+        snippet = citation.get("snippet", "") or ""
 
-        citation_mentioned = f"[{index}]" in answer
+        if index not in index_positions:
+            continue
 
-        cleaned_snippet = re.sub(r"[^a-z0-9\s]", " ", snippet.lower())
-        snippet_words = {
-            word
-            for word in cleaned_snippet.split()[:10]
-            if len(word) > 3 and word not in _STOPWORDS
-        }
-        snippet_overlap = any(word in answer_lower for word in snippet_words)
+        marker_position = index_positions[index]
+        window_start = max(0, marker_position - 220)
+        window_end = min(len(answer_lower), marker_position + 160)
+        context_window = answer_lower[window_start:window_end]
 
-        if citation_mentioned and not snippet_overlap:
-            weak.append(citation.get("passage_id", ""))
+        if not snippet.strip():
+            _LOGGER.debug(
+                "Citation %s has no snippet; flagging as weak", passage_id
+            )
+            weak.append(passage_id)
+            continue
 
-    return weak
+        snippet_tokens = _tokenise_snippet(snippet)
+        if not snippet_tokens:
+            _LOGGER.debug(
+                "Citation %s snippet lacks discriminative tokens; flagging as weak",
+                passage_id,
+            )
+            weak.append(passage_id)
+            continue
+
+        overlap = sum(1 for token in snippet_tokens if token in context_window)
+        token_ratio = overlap / len(snippet_tokens)
+
+        has_explanation = bool(
+            re.search(
+                r"\b(explain|support|show|demonstrate|argue|because|context)\w*",
+                context_window,
+            )
+        )
+
+        if token_ratio < 0.35 or (
+            overlap < 2 and token_ratio < 0.75 and not has_explanation
+        ):
+            _LOGGER.debug(
+                "Citation %s considered weak (ratio=%.2f, overlap=%s, explanation=%s)",
+                passage_id,
+                token_ratio,
+                overlap,
+                has_explanation,
+            )
+            weak.append(passage_id)
+
+    # Preserve order while removing duplicates
+    deduped: dict[str, None] = {}
+    for passage_id in weak:
+        deduped.setdefault(passage_id, None)
+    return list(deduped.keys())
 
 
 def _detect_bias(reasoning_trace: str, answer: str) -> list[str]:
@@ -175,8 +309,27 @@ def _detect_bias(reasoning_trace: str, answer: str) -> list[str]:
     warnings: list[str] = []
 
     combined_text = (reasoning_trace + " " + answer).lower()
+    if not combined_text.strip():
+        return warnings
 
-    # Check for apologetic bias markers
+    balance_indicators = bool(
+        re.search(
+            r"\b(on the other hand|however|critics|supporters|alternatively|nevertheless)\b",
+            combined_text,
+        )
+    )
+
+    def _score_markers(markers: list[str]) -> int:
+        score = 0
+        for marker in markers:
+            pattern = re.compile(rf"\b{re.escape(marker)}\b")
+            for match in pattern.finditer(combined_text):
+                prefix = combined_text[max(0, match.start() - 15) : match.start()]
+                if re.search(r"\b(not|lack|lacks|without|question|debate|dispute)\b", prefix):
+                    continue
+                score += 1
+        return score
+
     apologetic_markers = [
         "harmony",
         "harmonious",
@@ -186,10 +339,9 @@ def _detect_bias(reasoning_trace: str, answer: str) -> list[str]:
         "complements",
         "aligned",
         "seamless",
+        "vindicates",
+        "defends",
     ]
-    apologetic_count = sum(1 for marker in apologetic_markers if marker in combined_text)
-
-    # Check for skeptical bias markers
     skeptical_markers = [
         "contradiction",
         "inconsistent",
@@ -197,19 +349,43 @@ def _detect_bias(reasoning_trace: str, answer: str) -> list[str]:
         "error",
         "impossible",
         "fabricated",
+        "untenable",
+        "fails",
+        "undermines",
     ]
-    skeptical_count = sum(1 for marker in skeptical_markers if marker in combined_text)
 
-    # If heavily skewed, flag bias
-    if apologetic_count >= 3 and skeptical_count <= 1:
-        warnings.append("Reasoning shows apologetic bias - consider skeptical objections")
+    apologetic_score = _score_markers(apologetic_markers)
+    skeptical_score = _score_markers(skeptical_markers)
 
-    if skeptical_count >= 4 and apologetic_count <= 1:
-        warnings.append("Reasoning shows skeptical bias - consider harmonization attempts")
+    if (
+        apologetic_score >= 2
+        and apologetic_score >= skeptical_score + 2
+        and not balance_indicators
+    ):
+        warnings.append(
+            "Reasoning shows apologetic bias - engage with skeptical objections"
+        )
 
-    # Check for dismissiveness
-    if "obviously" in combined_text or "clearly" in combined_text:
-        warnings.append("Overconfident language detected - claims may need more support")
+    if (
+        skeptical_score >= 2
+        and skeptical_score >= apologetic_score + 2
+        and not balance_indicators
+    ):
+        warnings.append(
+            "Reasoning shows skeptical bias - consider harmonization attempts"
+        )
+
+    dismissive_patterns = [
+        re.compile(r"\b(obviously|clearly|undeniably|without question)\b"),
+        re.compile(r"\bno\s+reasonable\s+(?:person|reader)\b"),
+        re.compile(r"how\s+could\s+(?:anyone|someone)\s+(?:deny|doubt|question)"),
+    ]
+    for pattern in dismissive_patterns:
+        if pattern.search(combined_text):
+            warnings.append(
+                "Overconfident or dismissive language detected - add supporting evidence"
+            )
+            break
 
     return warnings
 
@@ -415,8 +591,12 @@ def _build_revision_prompt(
 ) -> str:
     """Construct a structured prompt instructing the model to revise."""
 
+    selected_citations = _select_revision_citations(
+        original_answer, critique, citations
+    )
+
     fallacies_section = _format_fallacies(critique.fallacies_found)
-    weak_citations_section = _format_weak_citations(critique, citations)
+    weak_citations_section = _format_weak_citations(critique, selected_citations)
     bias_section = _format_simple_list(
         critique.bias_warnings, empty_message="- None detected."
     )
@@ -424,7 +604,7 @@ def _build_revision_prompt(
         critique.recommendations,
         empty_message="- None provided.",
     )
-    citations_section = _format_citations(citations)
+    citations_section = _format_citations(selected_citations)
 
     original_block = textwrap.indent(original_answer.strip(), "    ")
 
@@ -448,7 +628,8 @@ def _build_revision_prompt(
         - Recommendations:
         {recommendations_section}
 
-        Citations available (preserve indices and ensure they support the claims):
+        Citations available (preserve indices and ensure they support the claims).
+        The list has been prioritised to keep the prompt within the model context:
         {citations_section}
 
         Revise the answer to resolve the issues above. Keep the revised answer concise
@@ -518,19 +699,145 @@ def _format_weak_citations(critique: Critique, citations: list[dict]) -> str:
 
 def _format_citations(citations: list[dict]) -> str:
     if not citations:
-        return "None provided."
-    lines = []
+        return "- None provided."
+
+    lines: list[str] = []
     for citation in citations:
         index = citation.get("index")
         snippet = scrub_adversarial_language(
             (citation.get("snippet") or "").strip()
         ) or ""
-        osis = citation.get("osis") or citation.get("document_title") or citation.get("document_id") or "?"
-        anchor = citation.get("anchor") or "context"
-        lines.append(
-            f"[{index}] {osis} ({anchor}) — {snippet}"
+        if len(snippet) > REVISION_CITATION_SNIPPET_LIMIT:
+            snippet = snippet[:REVISION_CITATION_SNIPPET_LIMIT].rstrip() + "…"
+        osis = (
+            citation.get("osis")
+            or citation.get("document_title")
+            or citation.get("document_id")
+            or "?"
         )
+        anchor = citation.get("anchor") or "context"
+        lines.append(f"[{index}] {osis} ({anchor}) — {snippet}")
     return "\n".join(lines)
+
+
+def _select_revision_citations(
+    original_answer: str, critique: Critique, citations: list[dict]
+) -> list[dict]:
+    """Prioritise citations for the revision prompt.
+
+    The selection keeps weak citations and those referenced in the original
+    answer first, then fills any remaining slots with other valid citations up
+    to the configured maximum. This guards against runaway prompt growth while
+    ensuring the model sees the context it needs to address critique items.
+    """
+
+    valid_citations: list[dict] = []
+    seen_indices: set[int] = set()
+    for citation in _iter_valid_citations(citations):
+        index = citation["index"]
+        if index in seen_indices:
+            continue
+        seen_indices.add(index)
+        valid_citations.append(citation)
+
+    if not valid_citations:
+        return []
+
+    referenced_indices = {
+        int(match.group(1))
+        for match in re.finditer(r"\[(\d+)\]", original_answer)
+    }
+    weak_passage_ids = set(filter(None, critique.weak_citations))
+
+    weak_priority: list[dict] = []
+    referenced_priority: list[dict] = []
+    remainder: list[dict] = []
+
+    for citation in valid_citations:
+        passage_id = citation.get("passage_id")
+        index = citation["index"]
+        if passage_id in weak_passage_ids:
+            weak_priority.append(citation)
+        elif index in referenced_indices:
+            referenced_priority.append(citation)
+        else:
+            remainder.append(citation)
+
+    ordered = weak_priority + referenced_priority + remainder
+    if len(ordered) > MAX_REVISION_CITATIONS:
+        _LOGGER.info(
+            "Truncating revision citations",
+            extra={
+                "selected": len(ordered),
+                "max": MAX_REVISION_CITATIONS,
+                "weak_citations": list(weak_passage_ids),
+            },
+        )
+    return ordered[:MAX_REVISION_CITATIONS]
+
+
+def _iter_valid_citations(citations: Iterable[dict]) -> Iterator[dict]:
+    """Yield citations that satisfy the minimal schema requirements."""
+
+    for citation in citations:
+        if not isinstance(citation, dict):
+            _LOGGER.debug("Skipping non-dict citation entry: %r", citation)
+            continue
+
+        index = citation.get("index")
+        passage_id = citation.get("passage_id")
+        snippet = citation.get("snippet")
+
+        if not isinstance(index, int) or index < 1:
+            _LOGGER.debug("Skipping citation with invalid index: %r", citation)
+            continue
+        if not isinstance(passage_id, str) or not passage_id.strip():
+            _LOGGER.debug("Skipping citation with missing passage_id: %r", citation)
+            continue
+        if snippet is not None and not isinstance(snippet, str):
+            _LOGGER.debug("Coercing non-string snippet for citation %s", passage_id)
+            citation = {**citation, "snippet": str(snippet)}
+
+        yield citation
+
+
+def _tokenise_snippet(snippet: str) -> set[str]:
+    """Return discriminative tokens from a snippet for overlap checks."""
+
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", snippet.lower())
+    tokens = {
+        word
+        for word in cleaned.split()
+        if len(word) > 3 and word not in _STOPWORDS
+    }
+    return tokens
+
+
+def _log_critique_outcome(
+    *,
+    fallacies: Iterable[FallacyWarning],
+    weak_citations: Iterable[str],
+    bias_warnings: Iterable[str],
+    final_quality: int,
+) -> None:
+    """Emit structured logs describing the critique decision path."""
+
+    if not _LOGGER.isEnabledFor(logging.INFO):
+        return
+
+    fallacy_summary: dict[str, int] = defaultdict(int)
+    for fallacy in fallacies:
+        fallacy_summary[fallacy.fallacy_type] += 1
+
+    _LOGGER.info(
+        "Metacognition critique computed",
+        extra={
+            "quality": final_quality,
+            "fallacies": dict(fallacy_summary),
+            "weak_citations": list(weak_citations),
+            "bias_warnings": list(bias_warnings),
+        },
+    )
 
 
 def _extract_revised_answer(completion: str) -> str:
