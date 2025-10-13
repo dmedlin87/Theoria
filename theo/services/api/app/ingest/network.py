@@ -244,7 +244,13 @@ def fetch_web_document(
         ensure_url_allowed(settings, final_url)
 
         if max_bytes is not None:
-            content_length = response.headers.get("Content-Length")
+            headers = getattr(response, "headers", None)
+            content_length = None
+            if headers is not None:
+                if hasattr(headers, "get"):
+                    content_length = headers.get("Content-Length")
+                else:  # pragma: no cover - extremely defensive
+                    content_length = getattr(headers, "Content-Length", None)
             if content_length:
                 try:
                     total_bytes = int(content_length)
