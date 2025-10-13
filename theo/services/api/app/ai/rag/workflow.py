@@ -440,6 +440,7 @@ class GuardedAnswerPipeline:
                                     revision_result.revised_answer,
                                     citations,
                                 )
+                                ensure_completion_safe(revision_result.revised_answer)
                             except GuardrailError as exc:
                                 LOGGER.warning(
                                     "Revised answer failed guardrail validation; reverting to original output",
@@ -476,7 +477,6 @@ class GuardedAnswerPipeline:
                                 model_output = original_model_output
                                 validation_result = original_validation_result
                             else:
-                                ensure_completion_safe(revision_result.revised_answer)
                                 revision_schema = revision_candidate
                                 model_output = revision_result.revised_answer
                                 validation_result = revised_validation
