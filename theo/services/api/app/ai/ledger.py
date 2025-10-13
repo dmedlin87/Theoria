@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 import logging
 import os
@@ -316,6 +317,19 @@ class LedgerTransaction:
                 cache_key,
             ),
         )
+        record = CacheRecord(
+            cache_key=cache_key,
+            model_name=model_name,
+            workflow=workflow,
+            prompt="",
+            temperature=0.0,
+            max_output_tokens=0,
+            output=output,
+            latency_ms=float(latency_ms),
+            cost=float(cost),
+            created_at=timestamp,
+        )
+        self._ledger._store_preserved(record)
 
     def mark_inflight_error(self, cache_key: str, message: str) -> None:
         timestamp = time.time()
@@ -355,6 +369,8 @@ class SharedLedger:
         if self._path.parent and not self._path.parent.exists():
             self._path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
+        self._preserved_lock = threading.Lock()
+        self._preserved_records: dict[str, CacheRecord] = {}
         self._initialize()
 
     # ------------------------------------------------------------------
@@ -440,6 +456,18 @@ class SharedLedger:
             """
         )
 
+    def _store_preserved(self, record: CacheRecord) -> None:
+        with self._preserved_lock:
+            self._preserved_records[record.cache_key] = record
+
+    def _get_preserved(self, cache_key: str) -> CacheRecord | None:
+        with self._preserved_lock:
+            return self._preserved_records.get(cache_key)
+
+    def _clear_preserved(self, cache_key: str) -> None:
+        with self._preserved_lock:
+            self._preserved_records.pop(cache_key, None)
+
     # ------------------------------------------------------------------
     # Transaction handling
     # ------------------------------------------------------------------
@@ -473,7 +501,9 @@ class SharedLedger:
     # ------------------------------------------------------------------
     @staticmethod
     def encode_cache_key(parts: tuple[str, str, str, float, int]) -> str:
-        return json.dumps(parts, separators=(",", ":"))
+        model_name, workflow, prompt, temperature, max_tokens = parts
+        content = f"{model_name}:{workflow}:{temperature}:{max_tokens}:{prompt}"
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()[:32]
 
     # ------------------------------------------------------------------
     # Inflight waiting utilities
@@ -539,6 +569,10 @@ class SharedLedger:
         last_status: str | None = None
         last_updated_at: float | None = None
         missing_logged = False
+        preserved_record = self._get_preserved(cache_key)
+        preserved_completed_at: float | None = (
+            preserved_record.created_at if preserved_record is not None else None
+        )
 
         def _row_to_record(row: InflightRow) -> CacheRecord:
             created_at = row.completed_at or row.updated_at
@@ -558,6 +592,17 @@ class SharedLedger:
         while True:
             now = time.time()
             if deadline is not None and now >= deadline:
+                if preserved_record is not None and (
+                    preserved_completed_at is None
+                    or preserved_completed_at >= comparison_floor
+                ):
+                    _record_event(
+                        "delivered",
+                        cache_key,
+                        source="preserved",
+                        status=last_status,
+                    )
+                    return preserved_record
                 # Only purge stale inflight entries once we know the owning
                 # router can no longer update them.
                 _record_event(
@@ -576,6 +621,13 @@ class SharedLedger:
                     error_msg = f"{error_msg}: {last_error_message}"
                 raise GenerationError(error_msg)
             row = self._read_inflight(cache_key)
+            shared_preserved = self._get_preserved(cache_key)
+            if shared_preserved is not None and (
+                preserved_record is None
+                or shared_preserved.created_at >= (preserved_completed_at or shared_preserved.created_at)
+            ):
+                preserved_record = shared_preserved
+                preserved_completed_at = shared_preserved.created_at
             if row is None:
                 # No inflight record – attempt to resolve from cache.
                 if not missing_logged:
@@ -586,6 +638,17 @@ class SharedLedger:
                 if cached is not None:
                     _record_event("cache_hit", cache_key, source="cache")
                     return cached
+                if preserved_record is not None and (
+                    preserved_completed_at is None
+                    or preserved_completed_at >= comparison_floor
+                ):
+                    _record_event(
+                        "delivered",
+                        cache_key,
+                        source="preserved",
+                        status=last_status,
+                    )
+                    return preserved_record
                 time.sleep(poll_interval)
                 continue
             else:
@@ -594,6 +657,28 @@ class SharedLedger:
                     missing_logged = False
                 if observed_updated_at is None:
                     observed_updated_at = row.updated_at
+                if (
+                    row.output is not None
+                    and row.completed_at is not None
+                    and (
+                        preserved_completed_at is None
+                        or row.completed_at >= preserved_completed_at
+                    )
+                ):
+                    preserved_completed_at = row.completed_at
+                    preserved_record = _row_to_record(row)
+                    self._store_preserved(preserved_record)
+                    if (
+                        row.status == "waiting"
+                        and row.completed_at >= comparison_floor
+                    ):
+                        _record_event(
+                            "delivered",
+                            cache_key,
+                            source="preserved",
+                            status=row.status,
+                        )
+                        return preserved_record
                 if row.updated_at < comparison_floor:
                     _record_event(
                         "stale_row",
@@ -644,7 +729,11 @@ class SharedLedger:
                         cached = txn.get_cache_entry(cache_key)
                     if cached is not None:
                         return cached
-                    comparison_floor = row.updated_at
+                    if not (
+                        row.output is not None
+                        and row.completed_at is not None
+                    ):
+                        comparison_floor = row.updated_at
                     observed_updated_at = row.updated_at
                 time.sleep(poll_interval)
                 continue
@@ -731,6 +820,8 @@ class SharedLedger:
             txn.clear_latency()
             txn.clear_cache()
             txn.clear_inflight()
+        with self._preserved_lock:
+            self._preserved_records.clear()
 
 
 __all__ = ["SharedLedger", "LedgerTransaction", "CacheRecord", "InflightRow"]

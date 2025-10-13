@@ -696,6 +696,79 @@ def test_wait_for_inflight_recovers_from_transient_error(tmp_path):
     assert outputs == ["recovered"]
 
 
+def test_wait_for_inflight_preserves_completed_output_after_restart_failure(
+    tmp_path, monkeypatch
+):
+    ledger_path = tmp_path / "restart-failure.db"
+    ledger = SharedLedger(str(ledger_path))
+    ledger.reset()
+    cache_key = "cache-key"
+
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+
+    first_waiting_seen = threading.Event()
+    restart_waiting_seen = threading.Event()
+    release_initial = threading.Event()
+    release_restart = threading.Event()
+
+    original_read = ledger._read_inflight
+
+    def _instrumented_read(cache_key_arg: str, *, _orig=original_read):
+        row = _orig(cache_key_arg)
+        if row is not None and row.status == "waiting":
+            if row.output is None and not first_waiting_seen.is_set():
+                first_waiting_seen.set()
+                release_initial.wait(timeout=2.0)
+            elif row.output is not None and not restart_waiting_seen.is_set():
+                restart_waiting_seen.set()
+                release_restart.wait(timeout=2.0)
+        return row
+
+    monkeypatch.setattr(ledger, "_read_inflight", _instrumented_read)
+
+    outputs: list[str] = []
+    errors: list[Exception] = []
+
+    def _waiter() -> None:
+        try:
+            record = ledger.wait_for_inflight(
+                cache_key, poll_interval=0.01, timeout=2.0
+            )
+            outputs.append(record.output)
+        except Exception as exc:  # pragma: no cover - unexpected
+            errors.append(exc)
+
+    thread = threading.Thread(target=_waiter)
+    thread.start()
+
+    assert first_waiting_seen.wait(timeout=1.0)
+    with ledger.transaction() as txn:
+        txn.mark_inflight_success(
+            cache_key,
+            model_name="model",
+            workflow="workflow",
+            output="shared-output",
+            latency_ms=11.0,
+            cost=0.3,
+        )
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+    release_initial.set()
+
+    assert restart_waiting_seen.wait(timeout=1.0)
+    with ledger.transaction() as txn:
+        txn.mark_inflight_error(cache_key, "new owner failed")
+    release_restart.set()
+
+    thread.join(timeout=5)
+    if thread.is_alive():
+        pytest.fail("Waiter thread timed out waiting for preserved completion")
+
+    assert not errors, f"Errors occurred in waiter thread: {errors}"
+    assert outputs == ["shared-output"]
+
+
 def test_wait_for_inflight_returns_empty_output(tmp_path):
     ledger_path = tmp_path / "empty-output.db"
     ledger = SharedLedger(str(ledger_path))
