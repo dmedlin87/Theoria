@@ -21,7 +21,9 @@ from theo.services.api.app.ai import router as router_module
 
 
 @pytest.fixture(autouse=True)
-def _reset_router_state():
+def _reset_router_state(monkeypatch):
+    # Set shorter timeout for tests to avoid hanging
+    monkeypatch.setenv("THEO_ROUTER_INFLIGHT_TIMEOUT", "10.0")
     reset_router_state()
     yield
     reset_router_state()
@@ -634,11 +636,12 @@ def test_wait_for_inflight_handles_transient_absence(tmp_path):
             cost=0.1,
         )
 
-    for thread in threads:
+    for i, thread in enumerate(threads):
         thread.join(timeout=5)
-        assert not thread.is_alive()
+        if thread.is_alive():
+            pytest.fail(f"Thread {i} timed out waiting for inflight completion")
 
-    assert not errors
+    assert not errors, f"Errors occurred in waiter threads: {errors}"
     assert outputs == ["shared-output"] * waiter_count
 
 
@@ -687,8 +690,9 @@ def test_wait_for_inflight_recovers_from_transient_error(tmp_path):
         )
 
     thread.join(timeout=5)
-    assert not thread.is_alive()
-    assert not errors
+    if thread.is_alive():
+        pytest.fail("Waiter thread timed out waiting for recovery from transient error")
+    assert not errors, f"Errors occurred in waiter thread: {errors}"
     assert outputs == ["recovered"]
 
 
@@ -732,8 +736,9 @@ def test_wait_for_inflight_returns_empty_output(tmp_path):
         )
 
     thread.join(timeout=5)
-    assert not thread.is_alive()
-    assert not errors
+    if thread.is_alive():
+        pytest.fail("Waiter thread timed out waiting for empty output")
+    assert not errors, f"Errors occurred in waiter thread: {errors}"
     assert outputs == [""]
 
 
@@ -788,8 +793,9 @@ def test_wait_for_inflight_waits_for_late_cache_write(tmp_path):
         )
 
     thread.join(timeout=5)
-    assert not thread.is_alive()
-    assert not errors
+    if thread.is_alive():
+        pytest.fail("Waiter thread timed out waiting for late cache write")
+    assert not errors, f"Errors occurred in waiter thread: {errors}"
     assert outputs == ["cached-output"]
 
 
@@ -841,19 +847,28 @@ def test_wait_for_inflight_handles_restart_requeue(tmp_path):
         )
 
     thread.join(timeout=5)
-    assert not thread.is_alive()
-    assert not errors
+    if thread.is_alive():
+        pytest.fail("Waiter thread timed out waiting for restart requeue")
+    assert not errors, f"Errors occurred in waiter thread: {errors}"
     assert outputs == ["after-restart"]
 
 
 def test_router_shared_spend_across_processes(tmp_path):
     ledger_path = tmp_path / "shared-ledger.db"
-    SharedLedger(str(ledger_path)).reset()
+    # Reset in a context to ensure cleanup
+    ledger = SharedLedger(str(ledger_path))
+    ledger.reset()
+    del ledger  # Ensure connections are closed
+    time.sleep(0.1)  # Allow WAL cleanup
     results: mp.Queue = mp.Queue()
 
     first = mp.Process(target=_process_budget_run, args=(str(ledger_path), results))
     first.start()
-    first.join()
+    first.join(timeout=75.0)
+    if first.is_alive():
+        first.terminate()
+        first.join(timeout=2.0)
+        pytest.fail("First process timed out and was terminated")
     assert first.exitcode == 0
     first_result = results.get(timeout=5)
 
@@ -863,7 +878,11 @@ def test_router_shared_spend_across_processes(tmp_path):
 
     second = mp.Process(target=_process_budget_run, args=(str(ledger_path), results))
     second.start()
-    second.join()
+    second.join(timeout=75.0)
+    if second.is_alive():
+        second.terminate()
+        second.join(timeout=2.0)
+        pytest.fail("Second process timed out and was terminated")
     assert second.exitcode == 0
     second_result = results.get(timeout=5)
 
@@ -874,7 +893,11 @@ def test_router_shared_spend_across_processes(tmp_path):
 
 def test_router_shared_latency_across_processes(tmp_path):
     ledger_path = tmp_path / "latency-ledger.db"
-    SharedLedger(str(ledger_path)).reset()
+    # Reset in a context to ensure cleanup
+    ledger = SharedLedger(str(ledger_path))
+    ledger.reset()
+    del ledger  # Ensure connections are closed
+    time.sleep(0.1)  # Allow WAL cleanup
     results: mp.Queue = mp.Queue()
 
     first = mp.Process(
@@ -883,7 +906,11 @@ def test_router_shared_latency_across_processes(tmp_path):
         kwargs={"delay": 0.05},
     )
     first.start()
-    first.join()
+    first.join(timeout=75.0)
+    if first.is_alive():
+        first.terminate()
+        first.join(timeout=2.0)
+        pytest.fail("First process timed out and was terminated")
     assert first.exitcode == 0
     first_result = results.get(timeout=5)
 
@@ -898,7 +925,11 @@ def test_router_shared_latency_across_processes(tmp_path):
         kwargs={"delay": 0.05},
     )
     second.start()
-    second.join()
+    second.join(timeout=75.0)
+    if second.is_alive():
+        second.terminate()
+        second.join(timeout=2.0)
+        pytest.fail("Second process timed out and was terminated")
     assert second.exitcode == 0
     second_result = results.get(timeout=5)
 

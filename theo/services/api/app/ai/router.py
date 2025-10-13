@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import logging
+import os
 import time
 from typing import Any, Iterator
 
@@ -98,12 +99,16 @@ class LLMRouterService:
     DEFAULT_CACHE_MAX_ENTRIES = 128
     DEFAULT_CIRCUIT_BREAKER_THRESHOLD = 3
     DEFAULT_CIRCUIT_BREAKER_TIMEOUT = 60.0
+    DEFAULT_INFLIGHT_WAIT_TIMEOUT = 120.0
 
     def __init__(self, registry: LLMRegistry, ledger: SharedLedger | None = None) -> None:
         self.registry = registry
         self._ledger = ledger or _LEDGER
         self._model_health: dict[str, _ModelHealth] = {}
         self._tokenizer_cache: dict[str, Any] = {}
+        # Allow timeout override for testing
+        env_timeout = os.environ.get("THEO_ROUTER_INFLIGHT_TIMEOUT")
+        self._inflight_timeout = float(env_timeout) if env_timeout else self.DEFAULT_INFLIGHT_WAIT_TIMEOUT
 
     # ------------------------------------------------------------------
     # Candidate selection
@@ -280,7 +285,7 @@ class LLMRouterService:
                 )
                 try:
                     self._ledger.wait_for_inflight(
-                        cache_key, observed_updated_at=wait_observed_updated_at
+                        cache_key, observed_updated_at=wait_observed_updated_at, timeout=self._inflight_timeout
                     )
                 except GenerationError:
                     _record_router_ledger_event(
@@ -323,7 +328,7 @@ class LLMRouterService:
                 )
                 span.set_attribute("llm.cache_status", cache_status)
                 record = self._ledger.wait_for_inflight(
-                    cache_key, observed_updated_at=wait_observed_updated_at
+                    cache_key, observed_updated_at=wait_observed_updated_at, timeout=self._inflight_timeout
                 )
                 _record_router_ledger_event(
                     "wait_for_primary_complete",
