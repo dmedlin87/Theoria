@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.fallacies import *  # noqa: F401,F403
+from ..compat.research.fallacies import (
+    FallacyHit,
+    fallacy_detect,
+)
 
 warn(
     "Importing from 'theo.services.api.app.research.fallacies' is deprecated; "

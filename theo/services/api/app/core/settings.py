@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from warnings import warn
 
-from theo.application.facades.settings import *  # noqa: F401,F403
+from theo.application.facades.settings import (
+    Settings,
+    get_settings,
+    get_settings_cipher,
+)
 
 warn(
     "Importing from 'theo.services.api.app.core.settings' is deprecated; "

@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.dss_links import *  # noqa: F401,F403
+from ..compat.research.dss_links import (
+    DssLinkEntry,
+    dss_links_dataset,
+    fetch_dss_links,
+)
 
 warn(
     "Importing from 'theo.services.api.app.research.dss_links' is deprecated; "

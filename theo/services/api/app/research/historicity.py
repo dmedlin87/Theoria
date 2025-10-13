@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.historicity import *  # noqa: F401,F403
+from ..compat.research.historicity import (
+    HistoricityEntry,
+    historicity_search,
+)
 
 warn(
     "Importing from 'theo.services.api.app.research.historicity' is deprecated; "

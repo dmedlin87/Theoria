@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from warnings import warn
 
-from theo.application.facades.version import *  # noqa: F401,F403
+from theo.application.facades.version import get_git_sha
 
 warn(
     "Importing from 'theo.services.api.app.core.version' is deprecated; "

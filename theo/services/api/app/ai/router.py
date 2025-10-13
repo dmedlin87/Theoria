@@ -462,7 +462,7 @@ class LLMRouterService:
                 span.set_attribute("llm.completion_tokens", completion_tokens)
                 span.set_attribute("llm.cost", cost)
                 span.set_attribute("llm.budget_status", "accepted")
-                
+
                 # Record success for circuit breaker
                 self._record_model_success(model.name)
 
@@ -548,11 +548,11 @@ class LLMRouterService:
         config = self._workflow_config(model, workflow)
         ceiling = self._as_float(config.get("spend_ceiling"))
         latency_threshold = self._as_float(config.get("latency_threshold_ms"))
-        
+
         # Check circuit breaker
         if not self._check_circuit_breaker(model.name, config):
             return False
-        
+
         with self._ledger.transaction() as txn:
             if ceiling is not None and txn.get_spend(model.name) >= ceiling:
                 return False
@@ -583,10 +583,10 @@ class LLMRouterService:
         health = self._model_health.get(model_name)
         if health is None:
             return True
-        
+
         threshold = self._as_float(config.get("circuit_breaker_threshold")) or self.DEFAULT_CIRCUIT_BREAKER_THRESHOLD
         timeout = self._as_float(config.get("circuit_breaker_timeout_s")) or self.DEFAULT_CIRCUIT_BREAKER_TIMEOUT
-        
+
         if health.consecutive_failures >= threshold:
             if health.last_failure_time is not None:
                 elapsed = time.time() - health.last_failure_time
@@ -629,7 +629,7 @@ class LLMRouterService:
         """Estimate token count for text using tiktoken or fallback."""
         if not text:
             return 0
-        
+
         fallback_estimate = max(len(text) // 4, 0)
 
         try:
@@ -644,14 +644,14 @@ class LLMRouterService:
                     encoding_name = "cl100k_base"
                 elif "davinci" in model_name.lower() or "curie" in model_name.lower():
                     encoding_name = "p50k_base"
-            
+
             if encoding_name not in self._tokenizer_cache:
                 try:
                     self._tokenizer_cache[encoding_name] = tiktoken.get_encoding(encoding_name)
                 except Exception:
                     # Fall back to cl100k_base if specific encoding fails
                     self._tokenizer_cache[encoding_name] = tiktoken.get_encoding("cl100k_base")
-            
+
             encoder = self._tokenizer_cache[encoding_name]
             token_count = len(encoder.encode(text, disallowed_special=()))
             return max(token_count, fallback_estimate)

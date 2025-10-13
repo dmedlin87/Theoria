@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.morphology import *  # noqa: F401,F403
+from ..compat.research.morphology import (
+    MorphToken,
+    fetch_morphology,
+)
 
 warn(
     "Importing from 'theo.services.api.app.research.morphology' is deprecated; "

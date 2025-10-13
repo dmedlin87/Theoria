@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from warnings import warn
 
-from theo.application.facades.runtime import *  # noqa: F401,F403
+from theo.application.facades.runtime import allow_insecure_startup
 
 warn(
     "Importing from 'theo.services.api.app.core.runtime' is deprecated; "

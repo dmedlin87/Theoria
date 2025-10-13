@@ -33,17 +33,17 @@ class InsightDetector:
         self, reasoning_trace: str, passages: list[dict]
     ) -> list[Insight]:
         """Detect insights from chain-of-thought reasoning.
-        
+
         Looks for:
         - Explicit <insight> tags in reasoning
         - Cross-references between distant OSIS ranges
         - Patterns across multiple passages
         - Novel resolutions of contradictions
-        
+
         Args:
             reasoning_trace: The chain-of-thought text
             passages: Retrieved passages involved
-            
+
         Returns:
             List of detected insights
         """
@@ -80,16 +80,16 @@ class InsightDetector:
 
     def _estimate_novelty(self, description: str, passages: list[dict]) -> float:
         """Estimate how novel an insight is.
-        
+
         Factors:
         - Number of passages involved (more = higher novelty)
         - Distance between OSIS refs (wider = higher novelty)
         - Rarity of co-occurrence in corpus
-        
+
         Args:
             description: The insight description
             passages: Passages involved
-            
+
         Returns:
             Novelty score 0.0 - 1.0
         """
@@ -104,12 +104,12 @@ class InsightDetector:
 
     def _detect_cross_references(self, passages: list[dict]) -> list[Insight]:
         """Auto-detect cross-references between distant scripture ranges.
-        
+
         If passages span multiple books or distant chapters, flag as insight.
-        
+
         Args:
             passages: Retrieved passages
-            
+
         Returns:
             Cross-reference insights
         """
@@ -140,15 +140,15 @@ class InsightDetector:
 
     def _detect_patterns(self, passages: list[dict]) -> list[Insight]:
         """Auto-detect recurring patterns across passages.
-        
+
         Looks for:
         - Same verse cited by 5+ different documents
         - Recurring theological terms
         - Consistent perspective across sources
-        
+
         Args:
             passages: Retrieved passages
-            
+
         Returns:
             Pattern insights
         """
@@ -182,12 +182,12 @@ def detect_insights(
     reasoning_trace: str, passages: list[dict], session: Session
 ) -> list[Insight]:
     """Convenience function to detect insights.
-    
+
     Args:
         reasoning_trace: Chain-of-thought reasoning text
         passages: Retrieved passages
         session: Database session
-        
+
     Returns:
         List of detected insights
     """

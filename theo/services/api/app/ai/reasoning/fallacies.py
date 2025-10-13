@@ -169,10 +169,10 @@ class FallacyDetector:
 # Module-level convenience function
 def detect_fallacies(text: str) -> list[FallacyWarning]:
     """Detect logical fallacies in text.
-    
+
     Args:
         text: The text to analyze for fallacies
-        
+
     Returns:
         List of detected fallacy warnings
     """

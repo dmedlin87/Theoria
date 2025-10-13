@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from warnings import warn
 
-from ..compat.research.scripture import *  # noqa: F401,F403
+from ..compat.research.scripture import (
+    Verse,
+    fetch_passage,
+)
 
 warn(
     "Importing from 'theo.services.api.app.research.scripture' is deprecated; "

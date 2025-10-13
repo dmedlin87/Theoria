@@ -62,19 +62,19 @@ def critique_reasoning(
     citations: list[dict],
 ) -> Critique:
     """Generate a self-critique of reasoning quality.
-    
+
     Evaluates:
     - Logical fallacies
     - Citation grounding strength
     - Alternative interpretations missed
     - Perspective bias
     - Overall reasoning quality
-    
+
     Args:
         reasoning_trace: The chain-of-thought reasoning
         answer: The final generated answer
         citations: Citations used
-        
+
     Returns:
         Critique with quality assessment
     """
@@ -111,16 +111,16 @@ def critique_reasoning(
 
 def _identify_weak_citations(answer: str, citations: list[dict]) -> list[str]:
     """Identify citations weakly connected to claims.
-    
+
     Looks for:
     - Citations mentioned but not explained
     - Vague connections ("as the Bible says...")
     - Missing context for quoted text
-    
+
     Args:
         answer: Generated answer
         citations: Citations list
-        
+
     Returns:
         List of passage IDs with weak connections
     """
@@ -151,16 +151,16 @@ def _identify_weak_citations(answer: str, citations: list[dict]) -> list[str]:
 
 def _detect_bias(reasoning_trace: str, answer: str) -> list[str]:
     """Detect perspective bias in reasoning.
-    
+
     Looks for:
     - Exclusively apologetic language
     - Exclusively skeptical language
     - Dismissing alternative views without engagement
-    
+
     Args:
         reasoning_trace: Reasoning trace
         answer: Final answer
-        
+
     Returns:
         Bias warnings
     """
@@ -208,10 +208,10 @@ def _detect_bias(reasoning_trace: str, answer: str) -> list[str]:
 
 def _generate_recommendations(critique: Critique) -> list[str]:
     """Generate improvement recommendations based on critique.
-    
+
     Args:
         critique: The critique object
-        
+
     Returns:
         List of actionable recommendations
     """
