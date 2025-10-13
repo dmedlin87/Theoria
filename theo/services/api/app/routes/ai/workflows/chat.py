@@ -224,59 +224,6 @@ def _prepare_memory_context(
     entries: Sequence[ChatMemoryEntry],
     *,
     query: str | None = None,
-) -> list[str]:
-    if not entries:
-        return []
-
-    memory_index = memory_index_module.get_memory_index()
-    ranked_entries: list[ChatMemoryEntry] = []
-    seen_ids: set[int] = set()
-    query_embedding: list[float] | None = None
-
-    if query:
-        try:
-            query_embedding = memory_index.embed_query(query)
-        except Exception:  # pragma: no cover - defensive guardrail
-            LOGGER.debug("Failed to embed chat query for memory ranking", exc_info=True)
-            query_embedding = None
-
-    if query_embedding:
-        scored: list[tuple[float, ChatMemoryEntry]] = []
-        for entry in entries:
-            if not entry.embedding:
-                continue
-            score = memory_index.score_similarity(query_embedding, entry.embedding)
-            if score is None:
-                continue
-            scored.append((score, entry))
-        scored.sort(key=lambda item: item[0], reverse=True)
-        for _, entry in scored:
-            if len(ranked_entries) >= _MAX_CONTEXT_SNIPPETS:
-                break
-            ranked_entries.append(entry)
-            seen_ids.add(id(entry))
-
-    for entry in reversed(entries):
-        if len(ranked_entries) >= _MAX_CONTEXT_SNIPPETS:
-            break
-        entry_id = id(entry)
-        if entry_id in seen_ids:
-            continue
-        ranked_entries.append(entry)
-        seen_ids.add(entry_id)
-
-    remaining = CHAT_SESSION_MEMORY_CHAR_BUDGET
-    selected: list[str] = []
-    for entry in ranked_entries:
-        snippet_text = memory_index_module.render_memory_snippet(
-            entry.question,
-            entry.answer,
-            answer_summary=entry.answer_summary,
-        )
-        snippet = _truncate_text(
-            snippet_text,
-            min(_MEMORY_TEXT_LIMIT * 2, remaining),
-        )
     focus: MemoryFocus | None = None,
 ) -> list[str]:
     if not entries:
