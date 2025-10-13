@@ -156,8 +156,8 @@ Added `_ModelHealth` dataclass tracking:
 Access via router introspection:
 
 ```python
-router._model_health["gpt-4"].consecutive_failures
-router._model_health["gpt-4"].last_success_time
+router._model_health["gpt-5-mini"].consecutive_failures
+router._model_health["gpt-5-mini"].last_success_time
 ```
 
 ### Benefits: Real-Time Metrics
@@ -404,7 +404,7 @@ assert router._is_available(failing_model.name, workflow)
 ### 2. Token Estimation
 
 ```python
-tokens = router._estimate_tokens("Hello, world!", "gpt-4")
+tokens = router._estimate_tokens("Hello, world!", "gpt-5-mini")
 assert tokens > 0  # Should use tiktoken
 assert tokens != len("Hello, world!") // 4  # More accurate
 ```
