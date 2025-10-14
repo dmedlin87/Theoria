@@ -671,9 +671,20 @@ class SharedLedger:
                     preserved_completed_at = row.completed_at
                     preserved_record = _row_to_record(row)
                     self._store_preserved(preserved_record)
+                    last_error_message = None
+                    if preserved_completed_at is not None and preserved_completed_at >= start:
+                        if row.status == "waiting":
+                            _record_event(
+                                "delivered",
+                                cache_key,
+                                source="preserved",
+                                status=row.status,
+                            )
+                            return preserved_record
                     if (
                         row.status == "waiting"
-                        and row.completed_at >= comparison_floor
+                        and preserved_completed_at is not None
+                        and preserved_completed_at >= comparison_floor
                     ):
                         _record_event(
                             "delivered",
@@ -716,6 +727,8 @@ class SharedLedger:
                     or row.completed_at >= comparison_floor
                 )
             ):
+                if row.status == "success":
+                    last_error_message = None
                 _record_event(
                     "delivered",
                     cache_key,
@@ -743,6 +756,7 @@ class SharedLedger:
                 continue
             if row.status == "success":
                 if row.output is not None:
+                    last_error_message = None
                     _record_event(
                         "delivered",
                         cache_key,

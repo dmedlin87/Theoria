@@ -486,6 +486,8 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
         start_barrier.wait()
         return router.execute_generation(workflow="chat", model=model, prompt="simultaneous")
 
+    initial_updated_at: float | None = None
+
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(_invoke) for _ in range(3)]
         assert first_started.wait(timeout=2.0)
@@ -494,6 +496,9 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
             (model.name, "chat", "simultaneous", 0.2, 800)
         )
         with router._ledger.transaction() as txn:
+            inflight_snapshot = txn.get_inflight(cache_key)
+            if inflight_snapshot is not None:
+                initial_updated_at = inflight_snapshot.updated_at
             txn.mark_inflight_error(cache_key, "transient failure")
 
         time.sleep(0.05)
@@ -518,6 +523,18 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
     )
     assert late_record.output == "shared-output"
     assert router.get_spend("primary") == pytest.approx(results[0].cost)
+
+    with router._ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name=model.name, workflow="chat")
+
+    assert initial_updated_at is not None
+    replayed_record = router._ledger.wait_for_inflight(
+        cache_key,
+        poll_interval=0.01,
+        timeout=1.0,
+        observed_updated_at=initial_updated_at,
+    )
+    assert replayed_record.output == "shared-output"
 
 
 def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch):
@@ -574,6 +591,10 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
     monkeypatch.setattr(router._ledger, "wait_for_inflight", _slow_wait)
 
     barrier = threading.Barrier(3)
+    cache_key = router._ledger.encode_cache_key(
+        (model.name, "chat", "simultaneous", 0.2, 800)
+    )
+    initial_updated_at: float | None = None
 
     def _invoke() -> RoutedGeneration:
         barrier.wait()
@@ -584,6 +605,14 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(_invoke) for _ in range(3)]
         assert first_call_done.wait(timeout=2.0)
+        deadline = time.time() + 2.0
+        while initial_updated_at is None and time.time() < deadline:
+            with router._ledger.transaction() as txn:
+                snapshot = txn.get_inflight(cache_key)
+            if snapshot is not None:
+                initial_updated_at = snapshot.updated_at
+            else:
+                time.sleep(0.01)
         time.sleep(0.15)
 
         def _expect_error() -> None:
@@ -606,6 +635,18 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
         cache_key, poll_interval=0.01, timeout=1.0
     )
     assert preserved_record.output == "shared-output"
+
+    with router._ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name=model.name, workflow="chat")
+
+    assert initial_updated_at is not None
+    replayed_record = router._ledger.wait_for_inflight(
+        cache_key,
+        poll_interval=0.01,
+        timeout=1.0,
+        observed_updated_at=initial_updated_at,
+    )
+    assert replayed_record.output == "shared-output"
 
 
 def test_wait_for_inflight_handles_transient_absence(tmp_path):
