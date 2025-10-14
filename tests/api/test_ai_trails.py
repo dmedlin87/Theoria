@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 import sys
@@ -18,7 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.services.api.app.ai.trails import TrailService, TrailStepDigest
 from theo.application.facades.database import Base
 from theo.services.api.app.db.models import AgentTrail, ChatSession
-from theo.services.api.app.models.ai import ChatMemoryEntry
+from theo.services.api.app.models.ai import ChatGoalState, ChatMemoryEntry
 
 
 @pytest.fixture()
@@ -177,6 +178,82 @@ def test_trail_digest_persists_chat_memory(
             {"session_id": "chat-session-1", "trail_id": trail_id, "action": "Review commentary on John 1"},
         )
     ]
+
+
+def test_trail_digest_updates_goal_progress(session: Session) -> None:
+    service = TrailService(session)
+
+    with service.start_trail(
+        workflow="chat",
+        plan_md="Plan",
+        mode="chat",
+        input_payload={
+            "session_id": "chat-session-goal",
+            "messages": [{"role": "user", "content": "Track resurrection harmonisation"}],
+            "filters": {},
+        },
+        user_id="tester",
+    ) as recorder:
+        now = datetime.now(UTC)
+        previous_interaction = now - timedelta(hours=1)
+        goal = ChatGoalState(
+            id="goal-harmonise",
+            title="Harmonise resurrection narratives",
+            trail_id=recorder.trail.id,
+            status="active",
+            priority=0,
+            summary="Previous insight",
+            created_at=now - timedelta(days=1),
+            updated_at=previous_interaction,
+            last_interaction_at=previous_interaction,
+        )
+        chat_session = ChatSession(
+            id="chat-session-goal",
+            user_id="tester",
+            stance="chat",
+            summary="Previous insight",
+            memory_snippets=[],
+            document_ids=[],
+            goals=[goal.model_dump(mode="json")],
+            preferences=None,
+            created_at=now - timedelta(days=1),
+            updated_at=now - timedelta(hours=1),
+            last_interaction_at=now - timedelta(hours=1),
+        )
+        session.add(chat_session)
+        session.flush()
+
+        digest = TrailStepDigest(
+            summary="New census discovery ties into resurrection timeline.",
+            key_entities=["Roman census"],
+            recommended_actions=["Compare census records"]
+        )
+        recorder.log_step(
+            tool="rag.compose",
+            output_payload={"answer": {"summary": digest.summary}},
+            digest=digest,
+            significant=True,
+        )
+        trail_id = recorder.trail.id
+        recorder.finalize(
+            final_md=digest.summary,
+            output_payload={"answer": {"summary": digest.summary}},
+        )
+
+    session.expire_all()
+    chat_session = session.get(ChatSession, "chat-session-goal")
+    assert chat_session is not None
+    assert chat_session.summary.startswith("New census discovery")
+    assert len(chat_session.memory_snippets) == 1
+    entry = ChatMemoryEntry.model_validate(chat_session.memory_snippets[0])
+    assert entry.trail_id == trail_id
+    assert entry.goal_id == "goal-harmonise"
+    assert entry.goal_ids == ["goal-harmonise"]
+
+    stored_goal = ChatGoalState.model_validate(chat_session.goals[0])
+    assert stored_goal.summary == "New census discovery ties into resurrection timeline."
+    assert stored_goal.last_interaction_at > previous_interaction
+    assert stored_goal.updated_at == stored_goal.last_interaction_at
 
 
 def test_trail_digest_deduplicates_entries(
