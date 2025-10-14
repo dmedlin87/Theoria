@@ -321,7 +321,7 @@ jobs:
         uses: trufflesecurity/trufflehog@v3.90.8
         with:
           path: .
-          extra_args: "--only-verified --fail --json --results-file trufflehog-results.json"
+          extra_args: "--only-verified --fail --json > trufflehog-results.json"
 
       - name: Upload TruffleHog findings
         if: always()
