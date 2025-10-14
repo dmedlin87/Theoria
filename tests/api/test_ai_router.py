@@ -511,6 +511,12 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
     outputs = {result.output for result in results}
     outputs.add(ledger_wait_record.output)
     assert outputs == {"shared-output"}
+    with router._ledger.transaction() as txn:
+        txn.clear_single_inflight(cache_key)
+    late_record = router._ledger.wait_for_inflight(
+        cache_key, poll_interval=0.01, timeout=1.0
+    )
+    assert late_record.output == "shared-output"
     assert router.get_spend("primary") == pytest.approx(results[0].cost)
 
 
@@ -591,6 +597,15 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
 
     assert call_count == 2
     assert {result.output for result in results} == {"shared-output"}
+    cache_key = router._ledger.encode_cache_key(
+        (model.name, "chat", "simultaneous", 0.2, 800)
+    )
+    with router._ledger.transaction() as txn:
+        txn.clear_single_inflight(cache_key)
+    preserved_record = router._ledger.wait_for_inflight(
+        cache_key, poll_interval=0.01, timeout=1.0
+    )
+    assert preserved_record.output == "shared-output"
 
 
 def test_wait_for_inflight_handles_transient_absence(tmp_path):
