@@ -120,11 +120,26 @@ pip install -r requirements.txt
 
 ### Running Tests
 
-Execute the automated test suite from the repository root:
+Execute the automated Python test suite from the repository root:
 
 ```bash
-pytest
+pytest -q
 ```
+
+Additional targeted checks are available once dependencies are installed:
+
+- **pgvector-backed flows** – append `--use-pgvector` (or set
+  `PYTEST_USE_PGVECTOR=1`) to boot a Postgres + pgvector container for the
+  ingestion and search pipelines.
+- **Frontend unit tests** – from `theo/services/web`, run `npm test` for the
+  legacy Jest harness or `npm run test:vitest` for the Vitest suite and coverage
+  enforcement.
+- **Playwright smoke tests** – from `theo/services/web`, execute
+  `npm run test:e2e:smoke` to exercise the tagged end-to-end journeys. The
+  `npm run test:e2e:full` target runs the complete regression matrix.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for a full testing matrix and guidance on
+optional property and worker retry suites.
 
 ### Running the API
 
