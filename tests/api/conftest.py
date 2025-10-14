@@ -57,6 +57,7 @@ def _disable_migrations(
 
     original_run_sql_migrations = migrations_module.run_sql_migrations
     original_configure_engine = database_module.configure_engine
+    original_create_engine = getattr(database_module, "_create_engine", None)
 
     def _needs_sqlite_perspective(engine) -> bool:
         if engine is None:
@@ -174,9 +175,21 @@ def _disable_migrations(
         _ensure_sqlite_perspective(engine)
         return engine
 
+    def _create_engine_with_perspective(*args, **kwargs):
+        engine = original_create_engine(*args, **kwargs)
+        _ensure_sqlite_perspective(engine)
+        return engine
+
     existing_engine = getattr(database_module, "_engine", None)
     if existing_engine is not None:
         _ensure_sqlite_perspective(existing_engine)
+
+    if original_create_engine is not None:
+        monkeypatch.setattr(database_module, "_create_engine", _create_engine_with_perspective)
+        monkeypatch.setattr(
+            "theo.application.facades.database._create_engine",
+            _create_engine_with_perspective,
+        )
 
     monkeypatch.setattr(database_module, "configure_engine", _configure_engine_with_perspective)
     monkeypatch.setattr(
