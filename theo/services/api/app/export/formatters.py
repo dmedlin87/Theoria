@@ -321,6 +321,9 @@ def _document_to_record(
             base_record["metadata"] = _select_nested_mapping_values(
                 document.metadata, metadata_selectors
             )
+            if "metadata" not in allowed_fields:
+                allowed_fields = set(allowed_fields)
+                allowed_fields.add("metadata")
         elif "metadata" not in allowed_fields:
             base_record.pop("metadata", None)
     return _filter_values(base_record, allowed_fields, field_order)
