@@ -178,7 +178,7 @@ class FallacyDetector:
             if not antecedent or not consequent:
                 return False
             conclusion_pattern = re.compile(
-                rf"\b(?:therefore|thus|so)\s+(?:{re.escape(consequent)}|it\s+must\s+be\s+that\s+{re.escape(antecedent)})",
+                rf"\b(?:therefore|thus|so)[\s,]+(?:{re.escape(consequent)}|{re.escape(antecedent)}|it\s+must\s+be\s+that\s+{re.escape(antecedent)})",
                 re.IGNORECASE,
             )
             if not conclusion_pattern.search(snippet):
