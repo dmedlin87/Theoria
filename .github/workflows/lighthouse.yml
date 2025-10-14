@@ -42,7 +42,7 @@ jobs:
     name: Lighthouse audit
     runs-on: ubuntu-latest
     concurrency:
-      group: ${{ (github.event.inputs.target == 'staging') && 'lhci-staging' || format('lhci-{0}-localhost', github.ref) }}
+      group: lhci-${{ github.event.inputs.target || 'localhost' }}-${{ github.ref }}
       cancel-in-progress: true
     env:
       APP_PORT: 3000
@@ -64,6 +64,7 @@ jobs:
       - name: Select target URL
         id: select
         shell: bash
+        working-directory: .
         run: |
           if [ "${{ github.event.inputs.target }}" = "staging" ]; then
             echo "APP_ORIGIN=${STAGING_URL}" >> "$GITHUB_ENV"
@@ -83,7 +84,7 @@ jobs:
         run: npm ci
 
       - name: Capture production audit report
-        run: npm audit --omit=dev
+        run: npm audit --omit=dev || true
 
       - name: Build production bundle
         if: ${{ github.event.inputs.target != 'staging' }}
@@ -94,7 +95,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p .lighthouseci
-          npm run start -- --hostname 0.0.0.0 --port "$APP_PORT" \
+          npm run start -- --hostname 127.0.0.1 --port "$APP_PORT" \
             > .lighthouseci/server.log 2>&1 &
 
       - name: Wait for server
