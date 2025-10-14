@@ -29,12 +29,17 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
+            constraints-ci.txt
+
+      - name: Preinstall CPU-only PyTorch
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -c constraints-ci.txt
+          pip install -r requirements-dev.txt -c constraints-ci.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -46,6 +51,14 @@ jobs:
       - name: Install Node.js dependencies
         working-directory: theo/services/web
         run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('theo/services/web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
         working-directory: theo/services/web
@@ -142,21 +155,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -167,6 +165,14 @@ jobs:
       - name: Install Node.js dependencies
         working-directory: theo/services/web
         run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('theo/services/web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
         working-directory: theo/services/web
@@ -215,23 +221,6 @@ jobs:
         if: steps.verify-token.outputs.skip != 'true'
         uses: actions/checkout@v5
 
-      - name: Set up Python
-        if: steps.verify-token.outputs.skip != 'true'
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
-
-      - name: Install Python dependencies
-        if: steps.verify-token.outputs.skip != 'true'
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
       - name: Set up Node.js
         if: steps.verify-token.outputs.skip != 'true'
         uses: actions/setup-node@v5
@@ -244,6 +233,15 @@ jobs:
         if: steps.verify-token.outputs.skip != 'true'
         working-directory: theo/services/web
         run: npm ci
+
+      - name: Cache Playwright browsers
+        if: steps.verify-token.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('theo/services/web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
         if: steps.verify-token.outputs.skip != 'true'
@@ -290,12 +288,17 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
+            constraints-ci.txt
+
+      - name: Preinstall CPU-only PyTorch
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -c constraints-ci.txt
+          pip install -r requirements-dev.txt -c constraints-ci.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@v5

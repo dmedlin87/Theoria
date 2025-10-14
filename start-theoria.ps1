@@ -759,7 +759,7 @@ function Start-TheoriaApi {
         param($Port, $ProjectRoot, $PythonExe, [hashtable]$EnvVars, [bool]$UseHttps, [hashtable]$Certificate)
 
         foreach ($key in $EnvVars.Keys) {
-            $env:$key = $EnvVars[$key]
+            [System.Environment]::SetEnvironmentVariable($key, $EnvVars[$key])
         }
 
         Set-Location $ProjectRoot
@@ -853,7 +853,7 @@ function Start-TheoriaWeb {
         }
 
         foreach ($key in $EnvVars.Keys) {
-            $env:$key = $EnvVars[$key]
+            [System.Environment]::SetEnvironmentVariable($key, $EnvVars[$key])
         }
 
         Push-Location $WebRoot

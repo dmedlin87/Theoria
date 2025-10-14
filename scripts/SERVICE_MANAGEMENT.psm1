@@ -248,7 +248,7 @@ function Get-PrometheusMetrics {
 
     foreach ($svcKey in $script:MetricsState.Services.Keys) {
         $entry = $script:MetricsState.Services[$svcKey]
-        $labels = "service=\"$($entry.service)\""
+        $labels = 'service="{0}"' -f $entry.service
         $lines.Add("theoria_service_status{$labels} $($entry.status)")
         $lines.Add("theoria_service_restarts{$labels} $($entry.restart_count)")
         $lines.Add("theoria_service_healthchecks_total{$labels} $($entry.total_checks)")
@@ -265,7 +265,7 @@ function Get-PrometheusMetrics {
     }
 
     foreach ($alert in $script:MetricsState.Alerts) {
-        $labels = "service=\"$($alert.service)\",severity=\"$($alert.severity)\""
+        $labels = 'service="{0}",severity="{1}"' -f $alert.service, $alert.severity
         $lines.Add("theoria_service_alerts_total{$labels} $($alert.total)")
     }
 
