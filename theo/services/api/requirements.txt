@@ -4,13 +4,13 @@ psycopg-binary==3.2.8
 SQLAlchemy==2.0.36
 pgvector==0.3.3
 pydantic==2.7.4
-python-multipart==0.0.12
+python-multipart==0.0.18
 celery==5.4.0
 redis==5.2.0
 pythonbible==0.13.1
 PyYAML==6.0.2
 click==8.1.7
-pypdf==5.1.0
+pypdf==6.0.0
 webvtt-py==0.5.1
 youtube-transcript-api==0.6.2
 docling==2.28.4
