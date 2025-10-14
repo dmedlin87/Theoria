@@ -561,6 +561,10 @@ class SharedLedger:
 
         start = time.time()
         comparison_floor = observed_updated_at if observed_updated_at is not None else start
+        # Anchor the minimum timestamp a preserved success must meet so that
+        # later inflight updates (for example, a restarted router recreating a
+        # "waiting" row) do not mask an already-committed result.
+        delivery_floor = comparison_floor
         deadline = start + timeout if timeout is not None else None
         # Remember the latest error so timeout handling can surface a useful
         # message. We only clear stale inflight rows after the caller's timeout
@@ -574,6 +578,15 @@ class SharedLedger:
             preserved_record.created_at if preserved_record is not None else None
         )
         success_missing_output_since: float | None = None
+
+        def _can_use_preserved(*, include_unobserved: bool = False) -> bool:
+            if preserved_record is None:
+                return False
+            if preserved_completed_at is None:
+                return True
+            if observed_updated_at is None:
+                return include_unobserved
+            return preserved_completed_at >= delivery_floor
 
         def _row_to_record(row: InflightRow) -> CacheRecord:
             created_at = row.completed_at or row.updated_at
@@ -593,11 +606,7 @@ class SharedLedger:
         while True:
             now = time.time()
             if deadline is not None and now >= deadline:
-                if preserved_record is not None and (
-                    observed_updated_at is None
-                    or preserved_completed_at is None
-                    or preserved_completed_at >= comparison_floor
-                ):
+                if _can_use_preserved(include_unobserved=True):
                     _record_event(
                         "delivered",
                         cache_key,
@@ -640,11 +649,7 @@ class SharedLedger:
                 if cached is not None:
                     _record_event("cache_hit", cache_key, source="cache")
                     return cached
-                if preserved_record is not None and (
-                    observed_updated_at is None
-                    or preserved_completed_at is None
-                    or preserved_completed_at >= comparison_floor
-                ):
+                if _can_use_preserved(include_unobserved=True):
                     _record_event(
                         "delivered",
                         cache_key,
@@ -683,8 +688,7 @@ class SharedLedger:
                             return preserved_record
                     if (
                         row.status == "waiting"
-                        and preserved_completed_at is not None
-                        and preserved_completed_at >= comparison_floor
+                        and _can_use_preserved(include_unobserved=True)
                     ):
                         _record_event(
                             "delivered",
@@ -738,6 +742,15 @@ class SharedLedger:
                 success_missing_output_since = None
                 return _row_to_record(row)
             if row.status == "waiting":
+                if _can_use_preserved():
+                    _record_event(
+                        "delivered",
+                        cache_key,
+                        source="preserved",
+                        status=row.status,
+                    )
+                    success_missing_output_since = None
+                    return preserved_record
                 if (
                     observed_updated_at is not None
                     and row.updated_at > observed_updated_at
@@ -829,11 +842,7 @@ class SharedLedger:
                     _record_event("cache_hit", cache_key, source="cache")
                     success_missing_output_since = None
                     return cached
-                if preserved_record is not None and (
-                    observed_updated_at is None
-                    or preserved_completed_at is None
-                    or preserved_completed_at >= comparison_floor
-                ):
+                if _can_use_preserved(include_unobserved=True):
                     _record_event(
                         "delivered",
                         cache_key,
