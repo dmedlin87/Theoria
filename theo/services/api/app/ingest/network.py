@@ -278,6 +278,10 @@ def fetch_web_document(
         raise UnsupportedSourceError(
             f"Fetching URL timed out after {timeout} seconds"
         ) from exc
+    except TimeoutError as exc:
+        raise UnsupportedSourceError(
+            f"Fetching URL timed out after {timeout} seconds"
+        ) from exc
     except (IncompleteRead, ContentTooShortError) as exc:
         raise UnsupportedSourceError(
             "Network connection ended before the response completed"
