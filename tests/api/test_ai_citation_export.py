@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
 import sys
+from uuid import uuid5
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,8 +17,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.application.facades.database import get_session
+from theo.application.facades import database as database_module
+from theo.application.facades.database import configure_engine, get_engine, get_session
 from theo.services.api.app.db.models import Document, Passage, PassageVerse
+from theo.services.api.app.db.seeds import CONTRADICTION_NAMESPACE
 from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.main import app
 from theo.services.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _build_csl_entry
@@ -77,6 +81,196 @@ def client(api_engine) -> Generator[TestClient, None, None]:
             yield test_client
     finally:
         app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.mark.enable_migrations
+def test_api_startup_recovers_missing_perspective_column(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "legacy.sqlite"
+    database_url = f"sqlite:///{database_path}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+
+    contradictions_path = PROJECT_ROOT / "data" / "seeds" / "contradictions.json"
+    legacy_payload = json.loads(contradictions_path.read_text(encoding="utf-8"))
+    assert legacy_payload, "Expected bundled contradiction seeds to be present"
+    first_entry = legacy_payload[0]
+    osis_a = first_entry["osis_a"]
+    osis_b = first_entry["osis_b"]
+    source = first_entry.get("source") or "community"
+    perspective = (first_entry.get("perspective") or "skeptical").strip().lower()
+    legacy_identifier = str(
+        uuid5(
+            CONTRADICTION_NAMESPACE,
+            "|".join([osis_a.lower(), osis_b.lower(), source.lower(), perspective]),
+        )
+    )
+
+    ledger_value = json.dumps(
+        {
+            "applied_at": "2024-01-01T00:00:00+00:00",
+            "filename": "20250129_add_perspective_to_contradiction_seeds.sql",
+        }
+    )
+
+    bootstrap_engine = create_engine(database_url, future=True)
+    try:
+        with bootstrap_engine.begin() as connection:
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.exec_driver_sql(
+                """
+                INSERT INTO app_settings (key, value, created_at, updated_at)
+                VALUES (:key, :value, :created, :updated)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    created_at = excluded.created_at,
+                    updated_at = excluded.updated_at
+                """,
+                {
+                    "key": "db:migration:20250129_add_perspective_to_contradiction_seeds.sql",
+                    "value": ledger_value,
+                    "created": "2024-01-01T00:00:00+00:00",
+                    "updated": "2024-01-01T00:00:00+00:00",
+                },
+            )
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE contradiction_seeds (
+                    id TEXT PRIMARY KEY,
+                    osis_a TEXT NOT NULL,
+                    osis_b TEXT NOT NULL,
+                    summary TEXT,
+                    source TEXT,
+                    tags TEXT,
+                    weight REAL DEFAULT 1.0,
+                    start_verse_id_a INTEGER,
+                    end_verse_id_a INTEGER,
+                    start_verse_id INTEGER,
+                    end_verse_id INTEGER,
+                    start_verse_id_b INTEGER,
+                    end_verse_id_b INTEGER,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.exec_driver_sql(
+                """
+                INSERT INTO contradiction_seeds (
+                    id, osis_a, osis_b, summary, source, tags, weight,
+                    start_verse_id_a, end_verse_id_a,
+                    start_verse_id, end_verse_id,
+                    start_verse_id_b, end_verse_id_b,
+                    created_at
+                ) VALUES (
+                    :id, :osis_a, :osis_b, :summary, :source, :tags, :weight,
+                    NULL, NULL,
+                    NULL, NULL,
+                    NULL, NULL,
+                    :created_at
+                )
+                """,
+                {
+                    "id": legacy_identifier,
+                    "osis_a": osis_a,
+                    "osis_b": osis_b,
+                    "summary": first_entry.get("summary"),
+                    "source": source,
+                    "tags": json.dumps(first_entry.get("tags")),
+                    "weight": float(first_entry.get("weight", 1.0)),
+                    "created_at": "2024-01-01T00:00:00+00:00",
+                },
+            )
+    finally:
+        bootstrap_engine.dispose()
+
+    previous_engine = database_module._engine
+    previous_session_factory = database_module._SessionLocal
+
+    try:
+        configure_engine(database_url)
+
+        with TestClient(app) as test_client:
+            with Session(get_engine()) as session:
+                columns = session.execute(
+                    text("PRAGMA table_info('contradiction_seeds')")
+                ).all()
+                assert any(column[1] == "perspective" for column in columns)
+                perspective_value = session.execute(
+                    text(
+                        "SELECT perspective FROM contradiction_seeds WHERE id = :identifier"
+                    ),
+                    {"identifier": legacy_identifier},
+                ).scalar_one()
+                assert perspective_value == perspective
+
+            with Session(get_engine()) as session:
+                document = Document(
+                    id="doc-legacy",
+                    title="Legacy Document",
+                    authors=["Legacy Author"],
+                    doi="10.1234/legacy",
+                    source_url="https://legacy.test",
+                    source_type="article",
+                    collection="Legacy",
+                    year=2023,
+                    abstract="Legacy abstract",
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
+                )
+                osis_reference = "John.1.1"
+                john_ids = list(sorted(expand_osis_reference(osis_reference)))
+                passage = Passage(
+                    id="passage-legacy",
+                    document_id=document.id,
+                    text="Legacy passage",
+                    osis_ref=osis_reference,
+                    osis_verse_ids=john_ids,
+                    page_no=1,
+                    t_start=0.0,
+                    t_end=5.0,
+                )
+                session.add(document)
+                session.add(passage)
+                session.add_all(
+                    [
+                        PassageVerse(passage_id=passage.id, verse_id=verse_id)
+                        for verse_id in john_ids
+                    ]
+                )
+                session.commit()
+
+            response = test_client.post(
+                "/ai/citations/export",
+                json={
+                    "citations": [
+                        {
+                            "index": 1,
+                            "osis": "John.1.1",
+                            "anchor": "John 1:1",
+                            "passage_id": "passage-legacy",
+                            "document_id": "doc-legacy",
+                            "document_title": "Legacy Document",
+                            "snippet": "Legacy passage",
+                        }
+                    ]
+                },
+            )
+
+            assert response.status_code == 200
+    finally:
+        if database_module._engine is not None:
+            database_module._engine.dispose()
+        database_module._engine = previous_engine
+        database_module._SessionLocal = previous_session_factory
 
 
 def test_export_citations_returns_csl_payload(client: TestClient) -> None:

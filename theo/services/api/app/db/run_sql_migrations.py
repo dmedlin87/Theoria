@@ -344,18 +344,33 @@ def run_sql_migrations(
                 dialect_name == "sqlite"
                 and migration_name == _SQLITE_PERSPECTIVE_MIGRATION
             )
-            has_perspective_column = True
+            sqlite_missing_perspective = False
             if is_sqlite_perspective_migration:
-                has_perspective_column = _sqlite_has_column(
-                    engine, "contradiction_seeds", "perspective"
-                )
-                if not has_perspective_column:
+                sqlite_missing_perspective = True
+                try:
+                    connection = session.connection()
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug(
+                        "Unable to inspect SQLite contradiction seeds table prior to migration",  # noqa: E501
+                        exc_info=exc,
+                    )
+                else:
+                    try:
+                        sqlite_missing_perspective = not _sqlite_table_has_column(
+                            connection, "contradiction_seeds", "perspective"
+                        )
+                    except Exception as exc:  # pragma: no cover - defensive
+                        logger.debug(
+                            "SQLite perspective inspection failed prior to migration", exc_info=exc
+                        )
+                        sqlite_missing_perspective = True
+                if sqlite_missing_perspective:
                     logger.info(
                         "SQLite perspective column missing prior to migration; enforcing recreation"
                     )
 
             if existing_entry:
-                if is_sqlite_perspective_migration and not has_perspective_column:
+                if is_sqlite_perspective_migration and sqlite_missing_perspective:
                     logger.info(
                         "Reapplying SQLite perspective migration; removing existing ledger entry"
                     )
@@ -401,7 +416,7 @@ def run_sql_migrations(
             should_execute = True
             if (
                 is_sqlite_perspective_migration
-                and has_perspective_column
+                and not sqlite_missing_perspective
                 and existing_entry is None
             ):
                 logger.debug(
@@ -457,9 +472,15 @@ def run_sql_migrations(
                         connection.exec_driver_sql(sql)
 
                 if is_sqlite_perspective_migration:
-                    recreated = _sqlite_has_column(
-                        engine, "contradiction_seeds", "perspective"
-                    )
+                    try:
+                        recreated = _sqlite_table_has_column(
+                            session.connection(), "contradiction_seeds", "perspective"
+                        )
+                    except Exception as exc:  # pragma: no cover - defensive
+                        logger.debug(
+                            "SQLite perspective inspection failed after migration", exc_info=exc
+                        )
+                        recreated = False
                     if recreated:
                         logger.info(
                             "SQLite perspective column present after migration execution",
