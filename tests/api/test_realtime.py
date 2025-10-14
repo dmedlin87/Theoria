@@ -1,5 +1,6 @@
 import os
 
+import anyio
 import pytest
 from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
@@ -95,10 +96,15 @@ def test_realtime_poll_requires_authentication(realtime_client: TestClient) -> N
 
 
 @pytest.mark.no_auth_override
-def test_realtime_websocket_requires_authentication(realtime_client: TestClient) -> None:
-    with pytest.raises(WebSocketDenialResponse) as exc:
+async def test_realtime_websocket_requires_authentication(
+    realtime_client: TestClient,
+) -> None:
+    def _connect_without_credentials() -> None:
         with realtime_client.websocket_connect("/realtime/notebooks/example"):
             pytest.fail("Unauthenticated websocket should not be accepted")
+
+    with pytest.raises(WebSocketDenialResponse) as exc:
+        await anyio.to_thread.run_sync(_connect_without_credentials)
 
     assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
 
