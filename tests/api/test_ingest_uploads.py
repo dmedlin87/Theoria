@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.application.facades.database import get_session  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.ingest import parsers as ingest_parsers  # noqa: E402
-from theo.services.api.app.ingest.pipeline import parse_text_file  # noqa: E402
+from theo.services.api.app.ingest.pipeline import _parse_text_file  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
 
 
@@ -140,7 +140,7 @@ def test_ingest_markdown_with_windows_1252_bytes(
     def fake_pipeline(
         _session, path: Path, frontmatter, *, dependencies=None
     ) -> object:
-        body, _ = parse_text_file(path)
+        body, _ = _parse_text_file(path)
         captured["body"] = body
         return _mkdoc()
 
@@ -164,6 +164,44 @@ def test_ingest_markdown_with_windows_1252_bytes(
     assert response.status_code == 200
     assert "body" in captured
     assert "\ufffd" in captured["body"]
+
+
+def test_ingest_file_pipeline_exposes_private_parse_text_helper(
+    tmp_path: Path, monkeypatch, api_client
+) -> None:
+    from theo.services.api.app.ingest import pipeline as ingest_pipeline
+
+    captured: dict[str, object] = {}
+
+    def fake_pipeline(
+        _session, path: Path, frontmatter, *, dependencies=None
+    ) -> object:
+        body, metadata = ingest_pipeline._parse_text_file(path)
+        captured["body"] = body
+        captured["metadata"] = metadata
+        captured["callable"] = ingest_pipeline._parse_text_file
+        return _mkdoc()
+
+    monkeypatch.setattr(ingest_module, "run_pipeline_for_file", fake_pipeline)
+
+    tmp_dir = tmp_path / "uploads"
+    tmp_dir.mkdir()
+
+    monkeypatch.setattr(
+        ingest_module.tempfile,
+        "mkdtemp",
+        lambda *args, **kwargs: str(tmp_dir),
+    )
+
+    response = api_client.post(
+        "/ingest/file",
+        files={"file": ("note.md", b"content", "text/markdown")},
+    )
+
+    assert response.status_code == 200
+    assert captured.get("callable") is _parse_text_file
+    assert "body" in captured
+    assert "metadata" in captured
 
 
 def test_ingest_html_with_windows_1252_bytes(

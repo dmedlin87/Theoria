@@ -573,6 +573,7 @@ class SharedLedger:
         preserved_completed_at: float | None = (
             preserved_record.created_at if preserved_record is not None else None
         )
+        success_missing_output_since: float | None = None
 
         def _row_to_record(row: InflightRow) -> CacheRecord:
             created_at = row.completed_at or row.updated_at
@@ -593,7 +594,8 @@ class SharedLedger:
             now = time.time()
             if deadline is not None and now >= deadline:
                 if preserved_record is not None and (
-                    preserved_completed_at is None
+                    observed_updated_at is None
+                    or preserved_completed_at is None
                     or preserved_completed_at >= comparison_floor
                 ):
                     _record_event(
@@ -639,7 +641,8 @@ class SharedLedger:
                     _record_event("cache_hit", cache_key, source="cache")
                     return cached
                 if preserved_record is not None and (
-                    preserved_completed_at is None
+                    observed_updated_at is None
+                    or preserved_completed_at is None
                     or preserved_completed_at >= comparison_floor
                 ):
                     _record_event(
@@ -668,9 +671,20 @@ class SharedLedger:
                     preserved_completed_at = row.completed_at
                     preserved_record = _row_to_record(row)
                     self._store_preserved(preserved_record)
+                    last_error_message = None
+                    if preserved_completed_at is not None and preserved_completed_at >= start:
+                        if row.status == "waiting":
+                            _record_event(
+                                "delivered",
+                                cache_key,
+                                source="preserved",
+                                status=row.status,
+                            )
+                            return preserved_record
                     if (
                         row.status == "waiting"
-                        and row.completed_at >= comparison_floor
+                        and preserved_completed_at is not None
+                        and preserved_completed_at >= comparison_floor
                     ):
                         _record_event(
                             "delivered",
@@ -713,12 +727,15 @@ class SharedLedger:
                     or row.completed_at >= comparison_floor
                 )
             ):
+                if row.status == "success":
+                    last_error_message = None
                 _record_event(
                     "delivered",
                     cache_key,
                     source="ledger",
                     status=row.status,
                 )
+                success_missing_output_since = None
                 return _row_to_record(row)
             if row.status == "waiting":
                 if (
@@ -739,23 +756,32 @@ class SharedLedger:
                 continue
             if row.status == "success":
                 if row.output is not None:
+                    last_error_message = None
                     _record_event(
                         "delivered",
                         cache_key,
                         source="ledger",
                         status=row.status,
                     )
+                    success_missing_output_since = None
                     return _row_to_record(row)
                 with self.transaction() as txn:
                     cached = txn.get_cache_entry(cache_key)
                 if cached is not None:
                     _record_event("cache_hit", cache_key, source="cache")
+                    success_missing_output_since = None
                     return cached
+                if success_missing_output_since is None:
+                    success_missing_output_since = now
+                    _record_event(
+                        "success_missing_output",
+                        cache_key,
+                        status=row.status,
+                    )
                 logger.warning(
                     "Inflight success for %s missing output; waiting for owner to finish",
                     cache_key,
                 )
-                last_error_message = "Deduplicated generation completed without a result"
                 time.sleep(poll_interval)
                 continue
             if row.status == "error":
@@ -779,6 +805,12 @@ class SharedLedger:
                     # A transient failure was observed, but the owning router may
                     # still be retrying. Keep polling instead of clearing the row so
                     # all waiters eventually share the successful output.
+                    if success_missing_output_since is not None:
+                        _record_event(
+                            "awaiting_success_output",
+                            cache_key,
+                            status=row.status,
+                        )
                     _record_event(
                         "transient_error",
                         cache_key,
@@ -795,7 +827,21 @@ class SharedLedger:
                     cached = txn.get_cache_entry(cache_key)
                 if cached is not None:
                     _record_event("cache_hit", cache_key, source="cache")
+                    success_missing_output_since = None
                     return cached
+                if preserved_record is not None and (
+                    observed_updated_at is None
+                    or preserved_completed_at is None
+                    or preserved_completed_at >= comparison_floor
+                ):
+                    _record_event(
+                        "delivered",
+                        cache_key,
+                        source="preserved",
+                        status=row.status,
+                    )
+                    success_missing_output_since = None
+                    return preserved_record
                 _record_event(
                     "error_raised",
                     cache_key,

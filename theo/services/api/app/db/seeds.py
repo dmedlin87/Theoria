@@ -442,19 +442,21 @@ def seed_contradiction_claims(session: Session) -> None:
     """Load contradiction seeds into the database in an idempotent manner."""
 
     table = ContradictionSeed.__table__
-    if _recreate_seed_table_if_missing_column(
-        session, table, "perspective", dataset_label="contradiction"
-    ):
-        logger.info(
-            "Rebuilt %s table missing 'perspective' column; reseeding contradiction seeds",
-            table.name,
+    try:
+        perspective_ready = _ensure_perspective_column(
+            session,
+            table,
+            "contradiction",
+            required_columns=("created_at",)
+            if hasattr(ContradictionSeed, "created_at")
+            else None,
         )
-    if not _ensure_perspective_column(
-        session,
-        table,
-        "contradiction",
-        required_columns=("created_at",) if hasattr(ContradictionSeed, "created_at") else None,
-    ):
+    except OperationalError as exc:
+        if _handle_missing_perspective_error(session, "contradiction", exc):
+            return
+        raise
+
+    if not perspective_ready:
         return
 
     range_columns = [
@@ -485,6 +487,15 @@ def seed_contradiction_claims(session: Session) -> None:
 
     def _load(target_session: Session) -> None:
         seen_ids: set[str] = set()
+        if not _table_has_column(
+            target_session, table.name, "perspective", schema=table.schema
+        ):
+            target_session.rollback()
+            logger.warning(
+                "Skipping %s seeds because 'perspective' column is missing",
+                "contradiction",
+            )
+            return
         try:
             for entry in payload:
                 osis_a = entry.get("osis_a")

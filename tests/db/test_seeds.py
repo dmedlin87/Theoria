@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import sys
 import logging
+import importlib
 from pathlib import Path
 
+import anyio
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -234,4 +236,122 @@ def test_seed_reference_data_repairs_missing_perspective_column(
         assert contradiction_perspectives == ["skeptical"]
         assert harmony_perspectives == ["apologetic"]
         assert commentary_perspectives == ["neutral"]
+
+
+def test_api_boots_contradiction_seeding_without_migrations(
+    tmp_path, monkeypatch
+) -> None:
+    """Boot the API without migrations and ensure contradiction seeding succeeds."""
+
+    db_path = tmp_path / "api.sqlite"
+    bootstrap_engine = create_engine(f"sqlite:///{db_path}", future=True)
+    try:
+        with bootstrap_engine.begin() as connection:
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE contradiction_seeds (
+                    id TEXT PRIMARY KEY,
+                    osis_a TEXT NOT NULL,
+                    osis_b TEXT NOT NULL,
+                    summary TEXT,
+                    source TEXT,
+                    tags TEXT,
+                    weight FLOAT NOT NULL DEFAULT 1.0,
+                    start_verse_id_a INTEGER,
+                    end_verse_id_a INTEGER,
+                    start_verse_id INTEGER,
+                    end_verse_id INTEGER,
+                    start_verse_id_b INTEGER,
+                    end_verse_id_b INTEGER,
+                    created_at TIMESTAMP NOT NULL
+                );
+                """
+            )
+    finally:
+        bootstrap_engine.dispose()
+
+    database_url = f"sqlite:///{db_path}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("THEO_DATABASE_URL", database_url)
+    monkeypatch.setenv("THEO_ALLOW_INSECURE_STARTUP", "1")
+    monkeypatch.setenv("THEORIA_ENVIRONMENT", "development")
+    monkeypatch.setenv("SETTINGS_SECRET_KEY", "test-secret")
+
+    from theo.application.facades import settings as settings_module
+    settings_module.get_settings.cache_clear()
+    settings_module.get_settings_cipher.cache_clear()
+
+    from theo.application.facades import database as database_module
+    database_module._engine = None  # type: ignore[attr-defined]
+    database_module._SessionLocal = None  # type: ignore[attr-defined]
+
+    if "theo.services.api.app.main" in sys.modules:
+        importlib.reload(sys.modules["theo.services.api.app.main"])
+    else:
+        importlib.import_module("theo.services.api.app.main")
+    main_module = sys.modules["theo.services.api.app.main"]
+
+    monkeypatch.setattr(main_module, "run_sql_migrations", lambda *_, **__: [])
+    from theo.services.api.app.db import run_sql_migrations as migrations_module
+
+    monkeypatch.setattr(
+        migrations_module,
+        "run_sql_migrations",
+        lambda *_, **__: [],
+    )
+
+    seed_dir = tmp_path / "seeds"
+    seed_dir.mkdir()
+    minimal_payload = [
+        {
+            "osis_a": "Gen.1.1",
+            "osis_b": "Gen.1.2",
+            "source": "test",
+            "summary": "first",
+            "perspective": "skeptical",
+        }
+    ]
+    (seed_dir / "contradictions.json").write_text(
+        json.dumps(minimal_payload), encoding="utf-8"
+    )
+
+    from theo.services.api.app.db import seeds as seeds_module
+
+    monkeypatch.setattr(seeds_module, "SEED_ROOT", seed_dir)
+    monkeypatch.setattr(seeds_module, "seed_harmony_claims", lambda session: None)
+    monkeypatch.setattr(
+        seeds_module, "seed_commentary_excerpts", lambda session: None
+    )
+    monkeypatch.setattr(seeds_module, "seed_geo_places", lambda session: None)
+    monkeypatch.setattr(seeds_module, "seed_openbible_geo", lambda session: None)
+
+    app = main_module.create_app()
+
+    async def _run_lifespan() -> None:
+        async with app.router.lifespan_context(app):
+            pass
+
+    anyio.run(_run_lifespan)
+
+    verification_engine = create_engine(f"sqlite:///{db_path}", future=True)
+    try:
+        with verification_engine.connect() as connection:
+            columns = [
+                row[1]
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info('contradiction_seeds')"
+                )
+            ]
+            assert "perspective" in columns
+            count = connection.exec_driver_sql(
+                "SELECT COUNT(*) FROM contradiction_seeds"
+            ).scalar_one()
+            assert count > 0
+    finally:
+        verification_engine.dispose()
+
+    if database_module._engine is not None:  # type: ignore[attr-defined]
+        database_module._engine.dispose()  # type: ignore[attr-defined]
+    database_module._engine = None  # type: ignore[attr-defined]
+    database_module._SessionLocal = None  # type: ignore[attr-defined]
 
