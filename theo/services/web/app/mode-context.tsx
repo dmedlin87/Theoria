@@ -6,7 +6,6 @@
 
 import {
   type ReactNode,
-  type FocusEvent,
   createContext,
   useCallback,
   useContext,
@@ -136,98 +135,9 @@ function getModeSummary(mode: ResearchMode): string {
 
 export function ModeSwitcher(): JSX.Element {
   const { mode, modes, setMode } = useMode();
-  const [tooltipOpen, setTooltipOpen] = useState(false);
   const tooltipId = useId();
+  const [tooltipOpen, setTooltipOpen] = useState(false);
 
-  const handleFocusOut = useCallback(
-    (event: FocusEvent<HTMLDivElement>) => {
-      const nextFocused = event.relatedTarget as Node | null;
-      if (!tooltipWrapperRef.current?.contains(nextFocused)) {
-        setShowTooltip(false);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!showTooltip) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!tooltipWrapperRef.current?.contains(event.target as Node)) {
-        setShowTooltip(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowTooltip(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [showTooltip]);
-
-  return (
-    <div
-      className="mode-switcher-compact"
-      aria-live="polite"
-      ref={tooltipWrapperRef}
-      onBlurCapture={handleFocusOut}
-    >
-      <div className="mode-switcher-compact__control">
-        <label htmlFor="mode-selector" className="mode-switcher-compact__label">
-          Mode
-        </label>
-        <select
-          id="mode-selector"
-          value={mode.id}
-          onChange={(event) => setMode(event.target.value as ResearchModeId)}
-          className="mode-switcher-compact__select"
-          title={mode.description}
-        >
-          {modes.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="mode-switcher-compact__info"
-          onClick={() => setShowTooltip(!showTooltip)}
-          aria-label="Show mode information"
-          aria-expanded={showTooltip}
-          aria-controls={tooltipId}
-          aria-describedby={showTooltip ? tooltipId : undefined}
-          title="Learn about research modes"
-        >
-          ?
-        </button>
-      </div>
-      <p className="mode-switcher-compact__summary">
-        {mode.label} — {getModeSummary(mode)}
-      </p>
-      {showTooltip && (
-        <div
-          className="mode-switcher-compact__tooltip"
-          role="tooltip"
-          id={tooltipId}
-        >
-          <div className="mode-switcher-compact__tooltip-header">
-            <h4 className="mode-switcher-compact__tooltip-title">{mode.label} mode</h4>
-            <button
-              type="button"
-              className="mode-switcher-compact__tooltip-close"
-              onClick={() => setShowTooltip(false)}
-              aria-label="Close"
   return (
     <TooltipProvider>
       <div className="mode-switcher-compact" aria-live="polite">

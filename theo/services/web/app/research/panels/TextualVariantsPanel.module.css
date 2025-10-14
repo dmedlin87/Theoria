@@ -1,0 +1,340 @@
+/* TextualVariantsPanel Specific Styles */
+
+.panel {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.heading {
+  margin-top: 0;
+}
+
+.description {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.modeInfo {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.dssLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.dssLoading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.dssLinkWrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dssLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-full);
+  background: var(--color-info-soft);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.dssLink:hover {
+  background: var(--color-info);
+  color: var(--color-text-inverse);
+  text-decoration: none;
+}
+
+.dssCount {
+  background: var(--color-info);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-full);
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.dssDetails {
+  font-size: 0.8rem;
+}
+
+.dssDetailsSummary {
+  cursor: pointer;
+}
+
+.dssDetailsList {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.dssError {
+  color: var(--color-danger);
+  font-size: 0.8rem;
+}
+
+.summary {
+  margin-top: var(--space-2);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.summaryHeading {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.summaryText {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.comparisonWorkspace {
+  margin-top: var(--space-3);
+  border: 1px solid var(--color-accent-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  background: var(--color-accent-soft);
+}
+
+.comparisonHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.comparisonHeading {
+  margin: 0;
+}
+
+.comparisonPrompt {
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.comparisonTableWrapper {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+}
+
+.comparisonTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 460px;
+}
+
+.comparisonTable th {
+  text-align: left;
+  padding: var(--space-1);
+  border-bottom: 2px solid var(--color-accent);
+  font-size: 0.85rem;
+  color: var(--color-accent-hover);
+}
+
+.comparisonTable tbody th {
+  padding: var(--space-1);
+  font-size: 0.8rem;
+  color: var(--color-accent);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-accent-soft);
+}
+
+.comparisonTable td {
+  padding: var(--space-1);
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.filters {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.filterLabel {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.filterSelect {
+  padding: 0.25rem 0.5rem;
+}
+
+.loading {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.error {
+  margin-top: var(--space-2);
+  color: var(--color-danger);
+}
+
+.noResults {
+  margin-top: var(--space-2);
+}
+
+.resultsGrid {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.chronologySection {
+  margin-bottom: var(--space-3);
+}
+
+.chronologyHeading {
+  margin: 0 0 var(--space-1);
+}
+
+.chronologyTimeline {
+  position: relative;
+  height: 2px;
+  background: var(--color-border-default);
+  border-radius: var(--radius-full);
+  margin-bottom: 0.75rem;
+}
+
+.chronologyPoint {
+  position: absolute;
+  top: -5px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border-subtle);
+}
+
+.chronologyPoint--mainstream {
+  background: var(--color-accent);
+}
+
+.chronologyPoint--disputed {
+  background: var(--color-danger);
+}
+
+.chronologyList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.chronologyItem {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.chronologyDate {
+  color: var(--color-text-primary);
+}
+
+.variantsGrid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.variantCard {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem;
+  background: var(--color-surface-muted);
+}
+
+.variantCard--selected {
+  border: 2px solid var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.variantHeader {
+  margin-bottom: var(--space-1);
+}
+
+.variantHeaderTop {
+  display: flex;
+  gap: var(--space-1);
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.variantInfo {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.variantNameRow {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.variantMeta {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.variantBadges {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.variantReading {
+  margin: 0 0 var(--space-1);
+  line-height: 1.6;
+}
+
+.variantNote {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.variantFooter {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.highlightDifferent {
+  background: rgba(248, 113, 113, 0.2);
+  border-radius: 0.35rem;
+  padding: 0.125rem 0.35rem;
+  display: inline-block;
+}
+
+.highlightPlaceholder {
+  color: var(--color-text-muted);
+}

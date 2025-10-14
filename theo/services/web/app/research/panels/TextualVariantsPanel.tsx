@@ -15,6 +15,7 @@ import {
 import { useMode } from "../../mode-context";
 import { getApiBaseUrl } from "../../lib/api";
 import type { ResearchFeatureFlags } from "../types";
+import styles from "./TextualVariantsPanel.module.css";
 
 const MAX_COMPARISON_SELECTIONS = 2;
 
@@ -204,18 +205,10 @@ function highlightDifference(
   accessor: (reading: VariantReading) => string | null | undefined,
 ): ReactNode {
   if (!value) {
-    return <span style={{ color: "var(--muted-foreground, #64748b)" }}>—</span>;
+    return <span className={styles.highlightPlaceholder}>—</span>;
   }
   const differs = all.some((reading) => accessor(reading) !== value);
-  const style = differs
-    ? {
-        background: "rgba(248, 113, 113, 0.2)",
-        borderRadius: "0.35rem",
-        padding: "0.125rem 0.35rem",
-        display: "inline-block",
-      }
-    : undefined;
-  return <span style={style}>{value}</span>;
+  return <span className={differs ? styles.highlightDifferent : undefined}>{value}</span>;
 }
 
 export default function TextualVariantsPanel({
@@ -478,75 +471,44 @@ export default function TextualVariantsPanel({
   return (
     <section
       aria-labelledby="textual-variants-heading"
-      style={{
-        background: "#fff",
-        borderRadius: "0.5rem",
-        padding: "1rem",
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
-      }}
+      className={styles.panel}
     >
-      <h3 id="textual-variants-heading" style={{ marginTop: 0 }}>
+      <h3 id="textual-variants-heading" className={styles.heading}>
         Textual variants
       </h3>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
+      <p className={styles.description}>
         Compare witness readings for <strong>{osis}</strong> with timeline and commentary cues.
       </p>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.875rem" }}>
+      <p className={styles.modeInfo}>
         {formatEmphasisSummary(mode)}
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+      <div className={styles.dssLinks}>
         {dssLoading ? (
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.35rem",
-              fontSize: "0.8rem",
-              color: "var(--muted-foreground, #64748b)",
-            }}
-          >
+          <span className={styles.dssLoading}>
             Checking Dead Sea Scrolls links…
           </span>
         ) : null}
         {firstDssLink ? (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+          <div className={styles.dssLinkWrapper}>
             <a
               href={firstDssLink.url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                padding: "0.35rem 0.75rem",
-                borderRadius: "999px",
-                background: "#e0f2fe",
-                color: "#0f172a",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
+              className={styles.dssLink}
               title={otherDssLinks
                 .map((link) => link.title || link.fragment || link.url)
                 .filter((entry): entry is string => Boolean(entry))
                 .join("\n")}
             >
               Dead Sea Scrolls
-              <span
-                style={{
-                  background: "#0ea5e9",
-                  color: "#fff",
-                  borderRadius: "999px",
-                  padding: "0.1rem 0.5rem",
-                  fontSize: "0.75rem",
-                }}
-              >
+              <span className={styles.dssCount}>
                 {dssLinks.length}
               </span>
             </a>
             {otherDssLinks.length > 0 ? (
-              <details style={{ fontSize: "0.8rem" }}>
-                <summary style={{ cursor: "pointer" }}>More fragments</summary>
-                <ul style={{ margin: "0.25rem 0 0", paddingLeft: "1.25rem" }}>
+              <details className={styles.dssDetails}>
+                <summary className={styles.dssDetailsSummary}>More fragments</summary>
+                <ul className={styles.dssDetailsList}>
                   {otherDssLinks.map((link) => (
                     <li key={link.id}>
                       <a href={link.url} target="_blank" rel="noopener noreferrer">
@@ -560,7 +522,7 @@ export default function TextualVariantsPanel({
           </div>
         ) : null}
         {dssError ? (
-          <span style={{ color: "#b91c1c", fontSize: "0.8rem" }}>
+          <span className={styles.dssError}>
             DSS links unavailable: {dssError}
           </span>
         ) : null}
@@ -569,83 +531,39 @@ export default function TextualVariantsPanel({
       {summary ? (
         <aside
           aria-label="Variant summary"
-          style={{
-            marginTop: "1rem",
-            background: "var(--muted, #f8fafc)",
-            borderRadius: "0.5rem",
-            padding: "0.75rem",
-            border: "1px solid var(--border, #e5e7eb)",
-          }}
+          className={styles.summary}
         >
-          <strong style={{ display: "block", marginBottom: "0.25rem" }}>
+          <strong className={styles.summaryHeading}>
             Mainstream vs. competing readings
           </strong>
-          <p style={{ margin: 0, lineHeight: 1.6 }}>{summary}</p>
+          <p className={styles.summaryText}>{summary}</p>
         </aside>
       ) : null}
 
       {selectedReadings.length > 0 ? (
-        <aside
-          style={{
-            marginTop: "1.5rem",
-            border: "1px solid #cbd5f5",
-            borderRadius: "0.75rem",
-            padding: "1rem",
-            background: "#eef2ff",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "1rem",
-              flexWrap: "wrap",
-            }}
-          >
-            <h4 style={{ margin: 0 }}>Comparison workspace</h4>
+        <aside className={styles.comparisonWorkspace}>
+          <div className={styles.comparisonHeader}>
+            <h4 className={styles.comparisonHeading}>Comparison workspace</h4>
             <button type="button" onClick={clearComparison}>
               Clear selection
             </button>
           </div>
           {selectedReadings.length < MAX_COMPARISON_SELECTIONS ? (
-            <p style={{ margin: "0.5rem 0", fontSize: "0.85rem", color: "#4b5563" }}>
+            <p className={styles.comparisonPrompt}>
               Select another witness to complete the side-by-side comparison.
             </p>
           ) : null}
-          <div style={{ overflowX: "auto", marginTop: "0.75rem" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                minWidth: "460px",
-              }}
-            >
+          <div className={styles.comparisonTableWrapper}>
+            <table className={styles.comparisonTable}>
               <thead>
                 <tr>
-                  <th
-                    scope="col"
-                    style={{
-                      textAlign: "left",
-                      padding: "0.5rem",
-                      borderBottom: "2px solid rgba(99, 102, 241, 0.4)",
-                      fontSize: "0.85rem",
-                      color: "#312e81",
-                    }}
-                  >
+                  <th scope="col">
                     Attribute
                   </th>
                   {selectedReadings.map((reading) => (
                     <th
                       key={reading.id}
                       scope="col"
-                      style={{
-                        textAlign: "left",
-                        padding: "0.5rem",
-                        borderBottom: "2px solid rgba(99, 102, 241, 0.4)",
-                        fontSize: "0.85rem",
-                        color: "#312e81",
-                      }}
                     >
                       {readingDisplayName(reading)}
                     </th>
@@ -655,28 +573,11 @@ export default function TextualVariantsPanel({
               <tbody>
                 {comparisonRows.map((row) => (
                   <tr key={row.label}>
-                    <th
-                      scope="row"
-                      style={{
-                        textAlign: "left",
-                        padding: "0.5rem",
-                        fontSize: "0.8rem",
-                        color: "#4338ca",
-                        borderBottom: "1px solid rgba(148, 163, 184, 0.35)",
-                        background: "rgba(129, 140, 248, 0.08)",
-                      }}
-                    >
+                    <th scope="row">
                       {row.label}
                     </th>
                     {selectedReadings.map((reading, index) => (
-                      <td
-                        key={`${reading.id}-${row.label}`}
-                        style={{
-                          padding: "0.5rem",
-                          fontSize: "0.85rem",
-                          borderBottom: "1px solid rgba(226, 232, 240, 0.9)",
-                        }}
-                      >
+                      <td key={`${reading.id}-${row.label}`}>
                         {row.render(reading, { index, all: selectedReadings })}
                       </td>
                     ))}
@@ -687,16 +588,8 @@ export default function TextualVariantsPanel({
           </div>
         </aside>
       ) : null}
-      <div
-        style={{
-          marginTop: "1.25rem",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "0.75rem",
-          alignItems: "center",
-        }}
-      >
-        <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+      <div className={styles.filters}>
+        <label className={styles.filterLabel}>
           <input
             type="checkbox"
             checked={showDisputedOnly}
@@ -704,12 +597,12 @@ export default function TextualVariantsPanel({
           />
           Disputed readings only
         </label>
-        <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <label className={styles.filterLabel}>
           Category
           <select
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
-            style={{ padding: "0.25rem 0.5rem" }}
+            className={styles.filterSelect}
           >
             <option value="all">All categories ({readings.length})</option>
             {categoryOptions.map((option) => (
@@ -722,27 +615,21 @@ export default function TextualVariantsPanel({
       </div>
 
       {loading ? (
-        <p style={{ marginTop: "1rem" }}>Loading textual variants…</p>
+        <p className={styles.loading} role="status">Loading textual variants…</p>
       ) : error ? (
-        <p role="alert" style={{ color: "var(--danger, #b91c1c)", marginTop: "1rem" }}>
+        <p role="alert" className={styles.error}>
           Unable to load textual variants. {error}
         </p>
       ) : readings.length === 0 ? (
-        <p style={{ marginTop: "1rem" }}>No textual variants available.</p>
+        <p className={styles.noResults}>No textual variants available.</p>
       ) : (
-        <div style={{ display: "grid", gap: "1.25rem", marginTop: "1rem" }}>
+        <div className={styles.resultsGrid}>
           {chronology.length > 0 ? (
-            <div>
-              <h4 style={{ margin: "0 0 0.5rem" }}>Manuscript chronology</h4>
+            <div className={styles.chronologySection}>
+              <h4 className={styles.chronologyHeading}>Manuscript chronology</h4>
               <div
                 aria-hidden="true"
-                style={{
-                  position: "relative",
-                  height: "2px",
-                  background: "#e2e8f0",
-                  borderRadius: "999px",
-                  marginBottom: "0.75rem",
-                }}
+                className={styles.chronologyTimeline}
               >
                 {chronology.map((point) => {
                   const ratio =
@@ -753,43 +640,22 @@ export default function TextualVariantsPanel({
                     <span
                       key={point.id}
                       title={`${point.label}${point.dateLabel ? ` · ${point.dateLabel}` : ""}`}
+                      className={`${styles.chronologyPoint} ${point.disputed ? styles["chronologyPoint--disputed"] : styles["chronologyPoint--mainstream"]}`}
                       style={{
-                        position: "absolute",
                         left: `calc(${ratio * 100}% - 6px)`,
-                        top: "-5px",
-                        width: "12px",
-                        height: "12px",
-                        borderRadius: "999px",
-                        background: point.disputed ? "#b91c1c" : "#2563eb",
-                        border: "2px solid #fff",
-                        boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.1)",
                       }}
                     />
                   );
                 })}
               </div>
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: 0,
-                  margin: 0,
-                  display: "grid",
-                  gap: "0.5rem",
-                }}
-              >
+              <ul className={styles.chronologyList}>
                 {chronology.map((point) => (
                   <li
                     key={`${point.id}-chronology`}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "1rem",
-                      fontSize: "0.875rem",
-                      color: "var(--muted-foreground, #4b5563)",
-                    }}
+                    className={styles.chronologyItem}
                   >
                     <span>
-                      <strong style={{ color: "#1f2937" }}>
+                      <strong className={styles.chronologyDate}>
                         {point.dateLabel ?? formatYearLabel(point.year)}
                       </strong>
                       {point.disputed ? " · disputed" : ""}
@@ -804,7 +670,7 @@ export default function TextualVariantsPanel({
           {filteredReadings.length === 0 ? (
             <p>No variants match the current filters.</p>
           ) : (
-            <div style={{ display: "grid", gap: "1rem" }}>
+            <div className={styles.variantsGrid}>
               {filteredReadings.map((reading) => {
                 const isSelected = selectedWitnesses.includes(reading.id);
                 const compareLabel = isSelected
@@ -819,100 +685,36 @@ export default function TextualVariantsPanel({
                 return (
                   <article
                     key={reading.id}
-                    style={{
-                      border: isSelected
-                        ? "2px solid rgba(59, 130, 246, 0.8)"
-                        : "1px solid var(--border, #e5e7eb)",
-                      borderRadius: "0.75rem",
-                      padding: "0.75rem",
-                      background: "var(--muted, #f8fafc)",
-                    }}
+                    className={`${styles.variantCard} ${isSelected ? styles["variantCard--selected"] : ""}`}
                   >
-                    <header style={{ marginBottom: "0.5rem" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.5rem",
-                          alignItems: "baseline",
-                          flexWrap: "wrap",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div style={{ display: "grid", gap: "0.35rem" }}>
-                          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <header className={styles.variantHeader}>
+                      <div className={styles.variantHeaderTop}>
+                        <div className={styles.variantInfo}>
+                          <div className={styles.variantNameRow}>
                             <strong>{readingDisplayName(reading)}</strong>
-                            <span
-                              style={{
-                                fontSize: "0.875rem",
-                                color: "var(--muted-foreground, #4b5563)",
-                              }}
-                            >
+                            <span className={styles.variantMeta}>
                               {reading.category}
                               {reading.translation ? ` · ${reading.translation}` : ""}
                             </span>
                           </div>
-                          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                          <div className={styles.variantBadges}>
                             {reading.dataset ? (
-                              <span
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "0.25rem",
-                                  background: "#dbeafe",
-                                  color: "#1d4ed8",
-                                  fontSize: "0.75rem",
-                                  padding: "0.125rem 0.5rem",
-                                  borderRadius: "999px",
-                                }}
-                              >
+                              <span className="badge badge-primary text-xs">
                                 {reading.dataset}
                               </span>
                             ) : null}
                             {reading.disputed ? (
-                              <span
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "0.25rem",
-                                  background: "#fee2e2",
-                                  color: "#991b1b",
-                                  fontSize: "0.75rem",
-                                  padding: "0.125rem 0.5rem",
-                                  borderRadius: "999px",
-                                }}
-                              >
+                              <span className="badge badge-danger text-xs">
                                 Disputed
                               </span>
                             ) : null}
                             {confidenceLabel ? (
-                              <span
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "0.25rem",
-                                  background: "#ede9fe",
-                                  color: "#5b21b6",
-                                  fontSize: "0.75rem",
-                                  padding: "0.125rem 0.5rem",
-                                  borderRadius: "999px",
-                                }}
-                              >
+                              <span className="badge badge-secondary text-xs">
                                 {confidenceLabel}
                               </span>
                             ) : null}
                             {reading.witness_metadata?.date ? (
-                              <span
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "0.25rem",
-                                  background: "#fef3c7",
-                                  color: "#b45309",
-                                  fontSize: "0.75rem",
-                                  padding: "0.125rem 0.5rem",
-                                  borderRadius: "999px",
-                                }}
-                              >
+                              <span className="badge badge-warning text-xs">
                                 {reading.witness_metadata.date}
                               </span>
                             ) : null}
@@ -923,29 +725,13 @@ export default function TextualVariantsPanel({
                         </button>
                       </div>
                     </header>
-                    <p style={{ margin: "0 0 0.5rem", lineHeight: 1.6 }}>{reading.reading}</p>
+                    <p className={styles.variantReading}>{reading.reading}</p>
                     {reading.note ? (
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "0.875rem",
-                          color: "var(--muted-foreground, #4b5563)",
-                          lineHeight: 1.6,
-                        }}
-                      >
+                      <p className={styles.variantNote}>
                         {reading.note}
                       </p>
                     ) : null}
-                    <footer
-                      style={{
-                        marginTop: "0.75rem",
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: "0.75rem",
-                        fontSize: "0.875rem",
-                        color: "var(--muted-foreground, #4b5563)",
-                      }}
-                    >
+                    <footer className={styles.variantFooter}>
                       {reading.source ? <span>Source: {reading.source}</span> : null}
                       {reading.witness_metadata?.provenance ? (
                         <span>Provenance: {reading.witness_metadata.provenance}</span>

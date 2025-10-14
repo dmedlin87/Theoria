@@ -164,8 +164,13 @@
   );
 
   --color-positive: hsl(152 78% 42%);
+  --color-positive-soft: hsla(152 78% 42% / 0.12);
   --color-warning: hsl(38 92% 52%);
+  --color-warning-soft: hsla(38 92% 52% / 0.12);
   --color-danger: hsl(0 83% 58%);
+  --color-danger-soft: hsla(0 83% 58% / 0.12);
+  --color-info: hsl(199 89% 48%);
+  --color-info-soft: hsla(199 89% 48% / 0.12);
 
   --shadow-xs: 0 1px 2px hsla(var(--shadow-color) / var(--shadow-key-opacity));
   --shadow-sm: 0 2px 8px hsla(var(--shadow-color) / var(--shadow-ambient-opacity)),
