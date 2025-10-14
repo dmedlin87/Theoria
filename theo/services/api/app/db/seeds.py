@@ -260,41 +260,78 @@ def _ensure_perspective_column(
     if dialect_name == "sqlite" and bind is not None:
         connection, should_close = _get_session_connection(session)
         try:
-            if connection is not None:
-                statement = f'ALTER TABLE "{table.name}" ADD COLUMN perspective TEXT'
-                try:
-                    connection.exec_driver_sql(statement)
-                except OperationalError as exc:  # pragma: no cover - duplicate column
-                    message = str(getattr(exc, "orig", exc)).lower()
-                    duplicate_indicators = ("duplicate column", "already exists")
-                    if not any(indicator in message for indicator in duplicate_indicators):
-                        logger.debug(
-                            "Failed to backfill perspective column for %s seeds: %s",
-                            dataset_label,
-                            exc,
-                        )
-                        session.rollback()
-                        return False
-                except Exception as exc:  # pragma: no cover - defensive
+            if connection is None:
+                session.rollback()
+                logger.warning(
+                    "Skipping %s seeds because SQLite connection could not be established",  # noqa: E501
+                    dataset_label,
+                )
+                return False
+
+            escaped_table = table.name.replace('"', '""')
+            alter_statement = f'ALTER TABLE "{escaped_table}" ADD COLUMN perspective TEXT'
+            try:
+                connection.exec_driver_sql(alter_statement)
+            except OperationalError as exc:  # pragma: no cover - duplicate column
+                message = str(getattr(exc, "orig", exc)).lower()
+                duplicate_indicators = ("duplicate column", "already exists")
+                if not any(indicator in message for indicator in duplicate_indicators):
                     logger.debug(
-                        "Unexpected error while backfilling perspective column for %s seeds: %s",
+                        "Failed to create perspective column for %s seeds: %s",
                         dataset_label,
                         exc,
                     )
                     session.rollback()
                     return False
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug(
+                    "Unexpected error while creating perspective column for %s seeds: %s",
+                    dataset_label,
+                    exc,
+                )
+                session.rollback()
+                return False
+
+            if not _table_has_column(session, table.name, "perspective", schema=table.schema):
+                session.rollback()
+                logger.warning(
+                    "Skipping %s seeds because 'perspective' column is missing", dataset_label
+                )
+                return False
+
+            update_statement = (
+                f'UPDATE "{escaped_table}" '
+                "SET perspective = COALESCE(perspective, 'skeptical') "
+                "WHERE perspective IS NULL"
+            )
+            try:
+                connection.exec_driver_sql(update_statement)
+            except OperationalError as exc:  # pragma: no cover - defensive
+                logger.debug(
+                    "Failed to backfill perspective column for %s seeds: %s",
+                    dataset_label,
+                    exc,
+                )
+                session.rollback()
+                return False
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug(
+                    "Unexpected error while backfilling perspective column for %s seeds: %s",
+                    dataset_label,
+                    exc,
+                )
+                session.rollback()
+                return False
+
+            try:
+                session.commit()
+            except Exception:  # pragma: no cover - defensive
+                session.rollback()
+                raise
+            return True
         finally:
             if should_close and connection is not None:
                 connection.close()
-
-        if _table_has_column(session, table.name, "perspective", schema=table.schema):
-            if initially_missing:
-                try:
-                    session.commit()
-                except Exception:  # pragma: no cover - defensive
-                    session.rollback()
-                    raise
-            return True
 
     session.rollback()
     logger.warning(
