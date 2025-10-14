@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..db.models import AgentTrail, ChatSession
 from ..models.ai import (
+    ChatGoalState,
     ChatMemoryEntry,
     ChatSessionMessage,
     ChatSessionPreferences,
@@ -95,6 +96,15 @@ class TrailsMemoryBridge:
         preferences = self._resolve_preferences(existing, trail)
 
         goals = chat_workflow._load_goal_entries(existing)
+        active_goal = self._resolve_trail_goal(trail, goals)
+        if active_goal is not None:
+            if not entry.goal_id:
+                entry.goal_id = active_goal.id
+            if entry.goal_ids:
+                if active_goal.id not in entry.goal_ids:
+                    entry.goal_ids.append(active_goal.id)
+            else:
+                entry.goal_ids = [active_goal.id]
 
         chat_workflow._persist_chat_session(
             self._session,
@@ -109,7 +119,7 @@ class TrailsMemoryBridge:
             answer=answer,
             preferences=preferences,
             goals=goals,
-            active_goal=None,
+            active_goal=active_goal,
             memory_entry=entry,
         )
 
@@ -191,6 +201,19 @@ class TrailsMemoryBridge:
                 LOGGER.debug(
                     "Failed to enqueue follow-up retrieval", exc_info=True
                 )
+
+    def _resolve_trail_goal(
+        self, trail: AgentTrail, goals: Sequence[ChatGoalState]
+    ) -> ChatGoalState | None:
+        trail_id = getattr(trail, "id", None)
+        if not isinstance(trail_id, str) or not trail_id.strip():
+            return None
+        normalised_trail = trail_id.strip().lower()
+        for goal in goals:
+            candidate = getattr(goal, "trail_id", None)
+            if isinstance(candidate, str) and candidate.strip().lower() == normalised_trail:
+                return goal
+        return None
 
 
 __all__ = ["TrailsMemoryBridge"]
