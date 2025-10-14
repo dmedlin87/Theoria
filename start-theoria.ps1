@@ -46,17 +46,25 @@
 #>
 
 param(
+    [ValidateRange(1024, 65535)]
     [int]$ApiPort = 8000,
+    [ValidateRange(1024, 65535)]
     [int]$WebPort = 3000,
     [switch]$SkipHealthChecks = $false,
     [switch]$Verbose = $false,
     [switch]$LogToFile = $false,
     [switch]$ShowMetrics = $false,
     [ValidateSet('dev','staging')]
-    [string]$Profile = 'dev',
+    [string]$DeploymentProfile = 'dev',
     [switch]$UseHttps = $false,
     [switch]$TelemetryOptIn = $false,
-    [switch]$TelemetryOptOut = $false
+    [switch]$TelemetryOptOut = $false,
+    [string]$ConfigPath = '',
+    [string]$ActiveDeploymentColor = '',
+    [int]$MetricsPort = 0,
+    [string]$MetricsFile = '',
+    [switch]$EnableProfiling = $false,
+    [switch]$EnableAlerts = $false
 )
 
 $ErrorActionPreference = 'Stop'
@@ -83,6 +91,19 @@ $script:StartTime = Get-Date
 $script:LogBuffer = [System.Collections.Generic.List[string]]::new()
 $script:AlertConfig = $null
 $script:ProfilingEnabled = $EnableProfiling.IsPresent
+$script:CircuitBreakerThreshold = 5  # consecutive failures before circuit opens
+$script:CircuitBreakerResetTime = 60  # seconds before attempting reset
+$script:ExitHandler = $null
+
+# Validate port conflicts
+if ($ApiPort -eq $WebPort) {
+    throw "API and Web ports cannot be the same. API: $ApiPort, Web: $WebPort"
+}
+
+# Set default config path if not provided
+if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
+    $ConfigPath = Join-Path $ProjectRoot "infra/service-manager/config.yml"
+}
 
 # Load service management helpers
 $serviceModulePath = Join-Path $ProjectRoot "scripts/SERVICE_MANAGEMENT.psm1"
@@ -114,9 +135,9 @@ $script:Profiles = @{
     }
 }
 
-$script:ProfileName = $Profile.ToLower()
+$script:ProfileName = $DeploymentProfile.ToLower()
 if (-not $script:Profiles.ContainsKey($script:ProfileName)) {
-    throw "Unknown profile '$Profile'. Supported profiles: $($script:Profiles.Keys -join ', ')"
+    throw "Unknown profile '$DeploymentProfile'. Supported profiles: $($script:Profiles.Keys -join ', ')"
 }
 
 $script:CurrentProfile = $script:Profiles[$script:ProfileName]
@@ -160,6 +181,12 @@ $script:Services = @{
         LastHealthCheckDuration = 0
         AverageResponseTime = 0
         LastError = $null
+        ConsecutiveFailures = 0
+        CircuitBreakerOpen = $false
+        CircuitBreakerOpenTime = $null
+        HealthCheckInterval = 10
+        NextHealthCheck = $null
+        ProcessName = 'python'
     }
     Web = @{
         Name = "Theoria Web"
@@ -175,6 +202,12 @@ $script:Services = @{
         LastHealthCheckDuration = 0
         AverageResponseTime = 0
         LastError = $null
+        ConsecutiveFailures = 0
+        CircuitBreakerOpen = $false
+        CircuitBreakerOpenTime = $null
+        HealthCheckInterval = 10
+        NextHealthCheck = $null
+        ProcessName = 'node'
     }
 }
 
@@ -183,23 +216,36 @@ $portOverrides = @{
     Web = $WebPort
 }
 
-$configuration = Import-ServiceConfiguration -Path $ConfigPath -PortOverrides $portOverrides -ActiveColor $ActiveDeploymentColor
-$script:Services = Initialize-ServiceState -Configuration $configuration
+# Only load service configuration if the module provides these functions and config exists
+$configuration = $null
+if ((Get-Command Import-ServiceConfiguration -ErrorAction SilentlyContinue) -and (Test-Path $ConfigPath)) {
+    try {
+        $configuration = Import-ServiceConfiguration -Path $ConfigPath -PortOverrides $portOverrides -ActiveColor $ActiveDeploymentColor
+        if (Get-Command Initialize-ServiceState -ErrorAction SilentlyContinue) {
+            $script:Services = Initialize-ServiceState -Configuration $configuration
+        }
+    } catch {
+        Write-TheoriaLog "Warning: Could not load service configuration: $_" -Level Warning
+        $configuration = @{ alerts = @{}; metrics = @{ port = 0; exportFile = '' }; profiling = @{ enabled = $false } }
+    }
+} else {
+    $configuration = @{ alerts = @{}; metrics = @{ port = 0; exportFile = '' }; profiling = @{ enabled = $false } }
+}
 
-$script:AlertConfig = $configuration.alerts
+$script:AlertConfig = if ($configuration -and $configuration.alerts) { $configuration.alerts } else { @{} }
 $script:AlertsEnabled = $EnableAlerts.IsPresent -or (
-    ($configuration.alerts.email.enabled -and $configuration.alerts.email.recipients.Count -gt 0) -or
-    ($configuration.alerts.slack.enabled -and $configuration.alerts.slack.webhookUrl)
+    ($configuration -and $configuration.alerts -and $configuration.alerts.email -and $configuration.alerts.email.enabled -and $configuration.alerts.email.recipients -and $configuration.alerts.email.recipients.Count -gt 0) -or
+    ($configuration -and $configuration.alerts -and $configuration.alerts.slack -and $configuration.alerts.slack.enabled -and $configuration.alerts.slack.webhookUrl)
 )
 
-$configMetricsPort = if ($MetricsPort -gt 0) { $MetricsPort } elseif ($configuration.metrics.port) { [int]$configuration.metrics.port } else { 0 }
-$configMetricsFile = if ($MetricsFile) { $MetricsFile } else { $configuration.metrics.exportFile }
+$configMetricsPort = if ($MetricsPort -gt 0) { $MetricsPort } elseif ($configuration -and $configuration.metrics -and $configuration.metrics.port) { [int]$configuration.metrics.port } else { 0 }
+$configMetricsFile = if ($MetricsFile) { $MetricsFile } elseif ($configuration -and $configuration.metrics -and $configuration.metrics.exportFile) { $configuration.metrics.exportFile } else { '' }
 
 if ($configMetricsFile -and -not [System.IO.Path]::IsPathRooted($configMetricsFile)) {
     $configMetricsFile = Join-Path $script:ProjectRoot $configMetricsFile
 }
 
-if (-not $script:ProfilingEnabled) {
+if (-not $script:ProfilingEnabled -and $configuration -and $configuration.profiling) {
     $script:ProfilingEnabled = $configuration.profiling.enabled
 }
 
@@ -213,12 +259,18 @@ if ($script:Services.ContainsKey('Web')) {
     $script:WebHealthEndpoint = $script:Services.Web.HealthEndpoint
 }
 
-Register-MetricsEndpoint -Port $configMetricsPort -FilePath $configMetricsFile | Out-Null
-if ($configMetricsPort -gt 0) {
-    Write-TheoriaLog "Metrics endpoint available at http://localhost:$configMetricsPort/metrics" -Level Info
-}
-if ($configMetricsFile) {
-    Write-TheoriaLog "Metrics snapshot file: $configMetricsFile" -Level Debug
+if (Get-Command Register-MetricsEndpoint -ErrorAction SilentlyContinue) {
+    try {
+        Register-MetricsEndpoint -Port $configMetricsPort -FilePath $configMetricsFile | Out-Null
+        if ($configMetricsPort -gt 0) {
+            Write-TheoriaLog "Metrics endpoint available at http://localhost:$configMetricsPort/metrics" -Level Info
+        }
+        if ($configMetricsFile) {
+            Write-TheoriaLog "Metrics snapshot file: $configMetricsFile" -Level Debug
+        }
+    } catch {
+        Write-TheoriaLog "Warning: Could not register metrics endpoint: $_" -Level Debug
+    }
 }
 
 # ============================================================================
@@ -244,12 +296,12 @@ function Write-TheoriaLog {
     }
     
     $icons = @{
-        Info = "ℹ"
-        Success = "✓"
-        Warning = "⚠"
-        Error = "✗"
-        Debug = "→"
-        Metric = "📊"
+        Info = "[i]"
+        Success = "[+]"
+        Warning = "[!]"
+        Error = "[x]"
+        Debug = ">>>"
+        Metric = "[#]"
     }
     
     if ($Level -eq "Debug" -and -not $Verbose) { return }
@@ -291,15 +343,15 @@ function Write-TheoriaLog {
 
 function Write-TheoriaBanner {
     Write-Host "`n" -NoNewline
-    Write-Host "╔══════════════════════════════════════════════════════════╗" -ForegroundColor Magenta
-    Write-Host "║                                                          ║" -ForegroundColor Magenta
-    Write-Host "║              " -ForegroundColor Magenta -NoNewline
+    Write-Host "===========================================================" -ForegroundColor Magenta
+    Write-Host "|                                                         |" -ForegroundColor Magenta
+    Write-Host "|              " -ForegroundColor Magenta -NoNewline
     Write-Host "THEORIA ENGINE" -ForegroundColor White -NoNewline
-    Write-Host " - Service Launcher            ║" -ForegroundColor Magenta
-    Write-Host "║                                                          ║" -ForegroundColor Magenta
-    Write-Host "║          Research workspace for theology                ║" -ForegroundColor Magenta
-    Write-Host "║                                                          ║" -ForegroundColor Magenta
-    Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Magenta
+    Write-Host " - Service Launcher            |" -ForegroundColor Magenta
+    Write-Host "|                                                         |" -ForegroundColor Magenta
+    Write-Host "|          Research workspace for theology               |" -ForegroundColor Magenta
+    Write-Host "|                                                         |" -ForegroundColor Magenta
+    Write-Host "===========================================================" -ForegroundColor Magenta
     Write-Host ""
 }
 
@@ -377,12 +429,12 @@ function Invoke-RuntimeInstallation {
         if ($AvailableManagers -notcontains $installer.tool) { continue }
 
         $command = $installer.tool
-        $args = @($installer.args)
+        $installArgs = @($installer.args)
 
         Write-TheoriaLog "Attempting to install $($Runtime.name) using $command..." -Level Info
 
         try {
-            $process = Start-Process -FilePath $command -ArgumentList $args -Wait -NoNewWindow -PassThru -ErrorAction Stop
+            $process = Start-Process -FilePath $command -ArgumentList $installArgs -Wait -NoNewWindow -PassThru -ErrorAction Stop
             if ($process.ExitCode -eq 0) {
                 Write-TheoriaLog "$($Runtime.name) installation completed" -Level Success
                 return $true
@@ -398,7 +450,7 @@ function Invoke-RuntimeInstallation {
 function Get-DockerComposeCommand {
     try {
         $docker = Get-Command 'docker' -ErrorAction Stop
-        $composeCheck = & $docker.Source 'compose' 'version' 2>$null
+        $null = & $docker.Source 'compose' 'version' 2>$null
         if ($LASTEXITCODE -eq 0) {
             return @{ Command = $docker.Source; Arguments = @('compose') }
         }
@@ -445,7 +497,7 @@ function Invoke-DockerFallback {
     }
 }
 
-function Ensure-DevCertificates {
+function Initialize-DevCertificates {
     if (-not $script:HttpsRequested) { return }
 
     $certOutputDir = Join-Path $script:ProjectRoot "infra\certs"
@@ -576,20 +628,33 @@ function Test-Prerequisite {
 }
 
 function Test-PortAvailable {
-    param([int]$Port)
+    param(
+        [ValidateRange(1, 65535)]
+        [int]$Port
+    )
+    
+    if ($Port -le 1023) {
+        Write-TheoriaLog "Warning: Port $Port is in the well-known port range (1-1023) and may require elevated privileges" -Level Warning
+    }
     
     try {
-        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $Port)
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
         $listener.Start()
         $listener.Stop()
+        $listener = $null
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
         return $true
     } catch {
+        Write-TheoriaLog "Port $Port is in use or unavailable: $_" -Level Debug
         return $false
     }
 }
 
 function Test-ServiceHealth {
     param(
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]$Endpoint,
         [ref]$Diagnostics
     )
@@ -603,12 +668,25 @@ function Test-ServiceHealth {
     }
     
     try {
+        # Validate endpoint format
+        if (-not ($Endpoint -match '^https?://')) {
+            throw "Invalid endpoint format: $Endpoint"
+        }
+        
         $response = Invoke-WebRequest -Uri $Endpoint -TimeoutSec $script:HealthCheckTimeout -UseBasicParsing -ErrorAction Stop -MaximumRedirection 0
         $result.Healthy = $response.StatusCode -eq 200
         $result.StatusCode = $response.StatusCode
+    } catch [System.Net.WebException] {
+        $result.Error = "Network error: $($_.Exception.Message)"
+        $result.StatusCode = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+    } catch [System.Threading.Tasks.TaskCanceledException] {
+        $result.Error = "Request timed out after $($script:HealthCheckTimeout) seconds"
+        $result.StatusCode = 0
     } catch {
         $result.Error = $_.Exception.Message
-        $result.StatusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode.value__ } else { 0 }
+        $result.StatusCode = if ($_.Exception.Response) { 
+            try { [int]$_.Exception.Response.StatusCode } catch { 0 }
+        } else { 0 }
     } finally {
         $stopwatch.Stop()
         $result.ResponseTime = $stopwatch.Elapsed.TotalMilliseconds
@@ -623,12 +701,22 @@ function Test-ServiceHealth {
 
 function Stop-TheoriaService {
     param(
+        [Parameter(Mandatory=$true)]
+        [ValidateSet('Api', 'Web')]
         [string]$ServiceKey,
         [switch]$Force = $false
     )
     
+    if (-not $script:Services.ContainsKey($ServiceKey)) {
+        Write-TheoriaLog "Unknown service key: $ServiceKey" -Level Warning
+        return
+    }
+    
     $service = $script:Services[$ServiceKey]
-    if (-not $service.Job) { return }
+    if (-not $service -or -not $service.Job) { 
+        Write-TheoriaLog "Service $ServiceKey has no active job" -Level Debug
+        return 
+    }
     
     Write-TheoriaLog "Stopping $($service.Name)..." -Level Info
     
@@ -664,16 +752,28 @@ function Stop-TheoriaService {
         Write-TheoriaLog "Error stopping $($service.Name): $_" -Level Error -Metadata @{ error = $_.Exception.Message }
     }
 
-    Update-ServiceMetricsEntry -ServiceState $service -Diagnostics $null -Profiling $null
-    Get-PrometheusMetrics | Out-Null
+    if (Get-Command Update-ServiceMetricsEntry -ErrorAction SilentlyContinue) {
+        Update-ServiceMetricsEntry -ServiceState $service -Diagnostics $null -Profiling $null
+    }
+    if (Get-Command Get-PrometheusMetrics -ErrorAction SilentlyContinue) {
+        Get-PrometheusMetrics | Out-Null
+    }
 }
 
 function Wait-ServiceReady {
     param(
+        [Parameter(Mandatory=$true)]
+        [ValidateSet('Api', 'Web')]
         [string]$ServiceKey,
+        [Parameter(Mandatory=$true)]
         [System.Management.Automation.Job]$Job,
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]$HealthEndpoint,
+        [ValidateRange(1, 300)]
         [int]$MaxWaitSeconds,
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]$DisplayUrl
     )
     
@@ -726,8 +826,8 @@ function Start-TheoriaApi {
     Write-TheoriaLog "Starting Theoria API on port $ApiPort..." -Level Info
 
     # Check port availability
-    if (-not (Test-PortAvailable -Port $servicePort)) {
-        Write-TheoriaLog "Port $servicePort is already in use" -Level Error
+    if (-not (Test-PortAvailable -Port $ApiPort)) {
+        Write-TheoriaLog "Port $ApiPort is already in use" -Level Error
         return $false
     }
 
@@ -736,6 +836,19 @@ function Start-TheoriaApi {
     if (-not (Test-Path $venvPython)) {
         Write-TheoriaLog "Virtual environment not found at $venvPython" -Level Error
         Write-TheoriaLog "Please create a virtual environment first: python -m venv .venv" -Level Error
+        return $false
+    }
+    
+    # Verify uvicorn is installed
+    try {
+        & $venvPython -m uvicorn --version 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-TheoriaLog "Uvicorn not found in virtual environment" -Level Error
+            Write-TheoriaLog "Please install dependencies: .venv\Scripts\pip install -r requirements.txt" -Level Error
+            return $false
+        }
+    } catch {
+        Write-TheoriaLog "Failed to verify uvicorn: $_" -Level Error
         return $false
     }
 
@@ -804,29 +917,46 @@ function Start-TheoriaWeb {
     Write-TheoriaLog "Starting Theoria Web UI on port $WebPort..." -Level Info
 
     # Check port availability
-    if (-not (Test-PortAvailable -Port $servicePort)) {
-        Write-TheoriaLog "Port $servicePort is already in use" -Level Error
+    if (-not (Test-PortAvailable -Port $WebPort)) {
+        Write-TheoriaLog "Port $WebPort is already in use" -Level Error
         return $false
     }
 
+    # Verify web root exists
+    if (-not (Test-Path $script:WebRoot)) {
+        Write-TheoriaLog "Web root not found at $script:WebRoot" -Level Error
+        return $false
+    }
+    
+    # Check if package.json exists
+    $packageJson = Join-Path $script:WebRoot "package.json"
+    if (-not (Test-Path $packageJson)) {
+        Write-TheoriaLog "package.json not found at $packageJson" -Level Error
+        return $false
+    }
+    
     # Check if node_modules exists
     $nodeModulesPath = Join-Path $script:WebRoot "node_modules"
     if (-not (Test-Path $nodeModulesPath)) {
         Write-TheoriaLog "Installing Node.js dependencies (first time only)..." -Level Info
         Push-Location $script:WebRoot
         try {
-            npm install 2>&1 | Out-Null
+            $installOutput = npm install 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-TheoriaLog "Dependencies installed successfully" -Level Success
             } else {
-                Write-TheoriaLog "npm install completed with warnings" -Level Warning
+                Write-TheoriaLog "npm install completed with exit code $LASTEXITCODE" -Level Warning
+                if ($Verbose) {
+                    Write-TheoriaLog "npm output: $installOutput" -Level Debug
+                }
             }
         } catch {
             Write-TheoriaLog "Failed to install dependencies: $_" -Level Error
             Pop-Location
             return $false
+        } finally {
+            Pop-Location
         }
-        Pop-Location
     }
 
     $webEnv = New-ServiceEnvironment
@@ -910,13 +1040,9 @@ function Get-ServiceMetrics {
 }
 
 function Show-ServiceStatus {
-    $sb = [System.Text.StringBuilder]::new()
-    [void]$sb.AppendLine("`n╔══════════════════════════════════════════════════════════╗")
-    [void]$sb.AppendLine("║               SERVICE STATUS DASHBOARD                  ║")
-    [void]$sb.AppendLine("╠══════════════════════════════════════════════════════════╣")
-    
-    Write-Host $sb.ToString() -ForegroundColor Cyan -NoNewline
-    $sb.Clear()
+    Write-Host "`n===========================================================" -ForegroundColor Cyan
+    Write-Host "|               SERVICE STATUS DASHBOARD                  |" -ForegroundColor Cyan
+    Write-Host "===========================================================" -ForegroundColor Cyan
     
     foreach ($serviceKey in $script:Services.Keys) {
         $metrics = Get-ServiceMetrics -ServiceKey $serviceKey
@@ -927,26 +1053,26 @@ function Show-ServiceStatus {
             default { "Gray" }
         }
         
-        Write-Host "║ " -ForegroundColor Cyan -NoNewline
+        Write-Host "| " -ForegroundColor Cyan -NoNewline
         Write-Host "$($metrics.Name)" -ForegroundColor White -NoNewline
         Write-Host " [" -NoNewline
         Write-Host "$($metrics.Status)" -ForegroundColor $statusColor -NoNewline
         Write-Host "]" -NoNewline
         $padding1 = 55 - $metrics.Name.Length - $metrics.Status.Length - 4
         Write-Host (" " * $padding1) -NoNewline
-        Write-Host "║" -ForegroundColor Cyan
+        Write-Host "|" -ForegroundColor Cyan
         
         $metricsLine = "  Uptime: $($metrics.Uptime) | Health: $($metrics.HealthRate) | Avg Response: $($metrics.AvgResponseTime)"
-        Write-Host "║$metricsLine" -NoNewline
+        Write-Host "|$metricsLine" -NoNewline
         $padding2 = 59 - $metricsLine.Length
         Write-Host (" " * $padding2) -NoNewline
-        Write-Host "║" -ForegroundColor Cyan
+        Write-Host "|" -ForegroundColor Cyan
         
         if ($metrics.RestartCount -gt 0) {
             $restartLine = "  Restarts: $($metrics.RestartCount)"
-            Write-Host "║$restartLine" -ForegroundColor Yellow -NoNewline
+            Write-Host "|$restartLine" -ForegroundColor Yellow -NoNewline
             Write-Host (" " * (59 - $restartLine.Length)) -NoNewline
-            Write-Host "║" -ForegroundColor Cyan
+            Write-Host "|" -ForegroundColor Cyan
         }
 
         if ($script:ProfilingEnabled -and $script:Services[$serviceKey].LastProfilingSnapshot) {
@@ -954,19 +1080,19 @@ function Show-ServiceStatus {
             $cpuSeconds = if ($snapshot.ContainsKey('CpuSecondsTotal')) { [math]::Round($snapshot.CpuSecondsTotal, 2) } else { 0 }
             $memoryMb = if ($snapshot.ContainsKey('WorkingSetBytes')) { [math]::Round($snapshot.WorkingSetBytes / 1MB, 2) } else { 0 }
             $profileLine = "  CPU(s): $cpuSeconds | Memory: ${memoryMb}MB"
-            Write-Host "║$profileLine" -ForegroundColor Magenta -NoNewline
+            Write-Host "|$profileLine" -ForegroundColor Magenta -NoNewline
             Write-Host (" " * (59 - $profileLine.Length)) -NoNewline
-            Write-Host "║" -ForegroundColor Cyan
+            Write-Host "|" -ForegroundColor Cyan
         }
     }
     
     $totalUptime = ((Get-Date) - $script:StartTime).ToString('hh\:mm\:ss')
     $runtimeLine = "Total Runtime: $totalUptime"
-    Write-Host "╠══════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
-    Write-Host "║ $runtimeLine" -NoNewline
+    Write-Host "===========================================================" -ForegroundColor Cyan
+    Write-Host "| $runtimeLine" -NoNewline
     Write-Host (" " * (59 - $runtimeLine.Length - 1)) -NoNewline
-    Write-Host "║" -ForegroundColor Cyan
-    Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "|" -ForegroundColor Cyan
+    Write-Host "===========================================================" -ForegroundColor Cyan
 }
 
 function Invoke-ServiceRestart {
@@ -1037,8 +1163,12 @@ function Start-HealthMonitor {
             }
 
             $profiling = $null
-            if ($script:ProfilingEnabled) {
-                $profiling = Get-ProfilingSnapshot -ProcessName $service.ProcessName
+            if ($script:ProfilingEnabled -and (Get-Command Get-ProfilingSnapshot -ErrorAction SilentlyContinue)) {
+                try {
+                    $profiling = Get-ProfilingSnapshot -ProcessName $service.ProcessName
+                } catch {
+                    Write-TheoriaLog "Failed to get profiling snapshot: $_" -Level Debug
+                }
             }
 
             if (-not $isHealthy) {
@@ -1052,8 +1182,12 @@ function Start-HealthMonitor {
                     response_time_ms = $diagnostics.ResponseTime
                 }
 
-                if ($script:AlertsEnabled -and $service.HealthCheckFailures -eq 1) {
-                    Send-ServiceAlert -AlertConfig $script:AlertConfig -ServiceName $service.Name -Message "Health check failed with status $($diagnostics.StatusCode). $($diagnostics.Error)" -Severity "critical"
+                if ($script:AlertsEnabled -and $service.HealthCheckFailures -eq 1 -and (Get-Command Send-ServiceAlert -ErrorAction SilentlyContinue)) {
+                    try {
+                        Send-ServiceAlert -AlertConfig $script:AlertConfig -ServiceName $service.Name -Message "Health check failed with status $($diagnostics.StatusCode). $($diagnostics.Error)" -Severity "critical"
+                    } catch {
+                        Write-TheoriaLog "Failed to send service alert: $_" -Level Debug
+                    }
                 }
 
                 $backoffMultiplier = [math]::Pow(2, [math]::Min($service.RestartCount, 4))
@@ -1085,8 +1219,12 @@ function Start-HealthMonitor {
             } else {
                 if ($service.HealthCheckFailures -gt 0) {
                     Write-TheoriaLog "$($service.Name) recovered (response: $($diagnostics.ResponseTime)ms)" -Level Success
-                    if ($script:AlertsEnabled) {
-                        Send-ServiceAlert -AlertConfig $script:AlertConfig -ServiceName $service.Name -Message "Service recovered" -Severity "info"
+                    if ($script:AlertsEnabled -and (Get-Command Send-ServiceAlert -ErrorAction SilentlyContinue)) {
+                        try {
+                            Send-ServiceAlert -AlertConfig $script:AlertConfig -ServiceName $service.Name -Message "Service recovered" -Severity "info"
+                        } catch {
+                            Write-TheoriaLog "Failed to send recovery alert: $_" -Level Debug
+                        }
                     }
                 }
 
@@ -1097,9 +1235,17 @@ function Start-HealthMonitor {
                 }
             }
 
-            Update-ServiceMetricsEntry -ServiceState $service -Diagnostics $diagnostics -Profiling $profiling
+            if (Get-Command Update-ServiceMetricsEntry -ErrorAction SilentlyContinue) {
+                try {
+                    Update-ServiceMetricsEntry -ServiceState $service -Diagnostics $diagnostics -Profiling $profiling
+                } catch {
+                    Write-TheoriaLog "Failed to update metrics: $_" -Level Debug
+                }
+            }
             $service.LastProfilingSnapshot = $profiling
-            Get-PrometheusMetrics | Out-Null
+            if (Get-Command Get-PrometheusMetrics -ErrorAction SilentlyContinue) {
+                Get-PrometheusMetrics | Out-Null
+            }
         }
     }
 }
@@ -1255,7 +1401,7 @@ function Start-Theoria {
     }
 
     if ($script:HttpsRequested) {
-        Ensure-DevCertificates
+        Initialize-DevCertificates
         if ($script:HttpsEnabled) {
             try {
                 Add-Type @"
@@ -1322,48 +1468,52 @@ public class TheoriaBypassCerts {
     $webDisplay = if ($script:HttpsEnabled) { "https://localhost:$WebPort" } else { "http://localhost:$WebPort" }
     $docsDisplay = if ($script:HttpsEnabled) { "https://localhost:$ApiPort/docs" } else { "http://127.0.0.1:$ApiPort/docs" }
 
-    Write-Host "`n╔══════════════════════════════════════════════════════════╗" -ForegroundColor Green
-    Write-Host "║                                                          ║" -ForegroundColor Green
-    Write-Host "║                 " -ForegroundColor Green -NoNewline
-    Write-Host "🚀 THEORIA IS READY! 🚀" -ForegroundColor White -NoNewline
-    Write-Host "                 ║" -ForegroundColor Green
-    Write-Host "║                                                          ║" -ForegroundColor Green
-    Write-Host ("║" + ("  API:     $apiDisplay").PadRight(58) + "║") -ForegroundColor Green
-    Write-Host ("║" + ("  Web UI:  $webDisplay").PadRight(58) + "║") -ForegroundColor Green
-    Write-Host ("║" + ("  Docs:    $docsDisplay").PadRight(58) + "║") -ForegroundColor Green
-    Write-Host "║                                                          ║" -ForegroundColor Green
-    Write-Host "║  Features:                                               ║" -ForegroundColor Green
-    Write-Host "║    ✓ Auto-recovery with exponential backoff             ║" -ForegroundColor Green
-    $intervalSummary = ($script:Services.Keys | ForEach-Object { "$($script:Services[$_].Name): $($script:Services[$_].HealthCheckInterval)s" }) -join ", "
-    Write-Host "║    ✓ Health monitoring (intervals: $intervalSummary)            ║" -ForegroundColor Green
+    Write-Host "`n===========================================================" -ForegroundColor Green
+    Write-Host "|                                                         |" -ForegroundColor Green
+    Write-Host "|                 " -ForegroundColor Green -NoNewline
+    Write-Host "THEORIA IS READY!" -ForegroundColor White -NoNewline
+    Write-Host "                        |" -ForegroundColor Green
+    Write-Host "|                                                         |" -ForegroundColor Green
+    Write-Host ("|" + ("  API:     $apiDisplay").PadRight(57) + "|") -ForegroundColor Green
+    Write-Host ("|" + ("  Web UI:  $webDisplay").PadRight(57) + "|") -ForegroundColor Green
+    Write-Host ("|" + ("  Docs:    $docsDisplay").PadRight(57) + "|") -ForegroundColor Green
+    Write-Host "|                                                         |" -ForegroundColor Green
+    Write-Host "|  Features:                                              |" -ForegroundColor Green
+    Write-Host "|    [+] Auto-recovery with exponential backoff           |" -ForegroundColor Green
+    $intervalSummary = ($script:Services.Keys | ForEach-Object { "$($_): $($script:Services[$_].HealthCheckInterval)s" }) -join ", "
+    Write-Host "|    [+] Health monitoring (intervals: $intervalSummary)          |" -ForegroundColor Green
     if ($ShowMetrics) {
-        Write-Host "║    ✓ Real-time metrics dashboard                        ║" -ForegroundColor Green
+        Write-Host "|    [+] Real-time metrics dashboard                      |" -ForegroundColor Green
     }
     if ($LogToFile) {
-        Write-Host "║    ✓ Structured logging enabled                         ║" -ForegroundColor Green
+        Write-Host "|    [+] Structured logging enabled                       |" -ForegroundColor Green
     }
-    Write-Host "║                                                          ║" -ForegroundColor Green
-    Write-Host "║  Press Ctrl+C to stop all services gracefully           ║" -ForegroundColor Green
-    Write-Host "║                                                          ║" -ForegroundColor Green
-    Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host "|                                                         |" -ForegroundColor Green
+    Write-Host "|  Press Ctrl+C to stop all services gracefully           |" -ForegroundColor Green
+    Write-Host "|                                                         |" -ForegroundColor Green
+    Write-Host "===========================================================" -ForegroundColor Green
     Write-Host ""
 
     Write-TelemetryEvent -EventName 'launcher_ready' -Metadata @{ profile = $script:ProfileName; https = $script:HttpsEnabled; api_port = $ApiPort; web_port = $WebPort }
 
     # Set up Ctrl+C handler
-    $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
+    $script:ExitHandler = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
         Write-Host "`n`nShutting down Theoria services..." -ForegroundColor Yellow
-        Stop-TheoriaService -ServiceKey "Web"
-        Stop-TheoriaService -ServiceKey "Api"
+        try {
+            Stop-TheoriaService -ServiceKey "Web" -ErrorAction SilentlyContinue
+            Stop-TheoriaService -ServiceKey "Api" -ErrorAction SilentlyContinue
+        } catch {
+            Write-Host "Error during shutdown: $_" -ForegroundColor Red
+        }
     }
     
     # Start health monitoring
     try {
         Start-HealthMonitor
     } finally {
-        Write-Host "`n`n╔══════════════════════════════════════════════════════════╗" -ForegroundColor Yellow
-        Write-Host "║                SHUTTING DOWN SERVICES                    ║" -ForegroundColor Yellow
-        Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Yellow
+        Write-Host "`n`n===========================================================" -ForegroundColor Yellow
+        Write-Host "|                SHUTTING DOWN SERVICES                    |" -ForegroundColor Yellow
+        Write-Host "===========================================================" -ForegroundColor Yellow
         Write-Host ""
         
         # Flush any remaining logs
@@ -1374,7 +1524,13 @@ public class TheoriaBypassCerts {
             } catch {}
         }
 
-        Stop-MetricsEndpoint
+        if (Get-Command Stop-MetricsEndpoint -ErrorAction SilentlyContinue) {
+            try {
+                Stop-MetricsEndpoint
+            } catch {
+                Write-TheoriaLog "Failed to stop metrics endpoint: $_" -Level Debug
+            }
+        }
 
         # Graceful shutdown with timeout
         Stop-TheoriaService -ServiceKey "Web"
@@ -1383,41 +1539,41 @@ public class TheoriaBypassCerts {
         # Generate session summary
         $totalRuntime = (Get-Date) - $script:StartTime
         Write-TelemetryEvent -EventName 'launcher_shutdown' -Metadata @{ profile = $script:ProfileName; runtime_seconds = [math]::Round($totalRuntime.TotalSeconds, 2) }
-        Write-Host "`n╔══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-        Write-Host "║                   SESSION SUMMARY                        ║" -ForegroundColor Cyan
-        Write-Host "╠══════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
+        Write-Host "`n===========================================================" -ForegroundColor Cyan
+        Write-Host "|                   SESSION SUMMARY                        |" -ForegroundColor Cyan
+        Write-Host "===========================================================" -ForegroundColor Cyan
         $runtimeStr = $totalRuntime.ToString('hh\:mm\:ss')
         $runtimeLine = "Total Runtime: $runtimeStr"
-        Write-Host "║ $runtimeLine" -NoNewline
-        Write-Host (" " * (59 - $runtimeLine.Length - 1)) -NoNewline
-        Write-Host "║" -ForegroundColor Cyan
+        Write-Host "| $runtimeLine" -NoNewline
+        Write-Host (" " * (57 - $runtimeLine.Length - 1)) -NoNewline
+        Write-Host "|" -ForegroundColor Cyan
         
         foreach ($serviceKey in $script:Services.Keys) {
             $metrics = Get-ServiceMetrics -ServiceKey $serviceKey
             $nameLine = "$($metrics.Name):"
-            Write-Host "║ $nameLine" -NoNewline
-            Write-Host (" " * (59 - $nameLine.Length - 1)) -NoNewline
-            Write-Host "║" -ForegroundColor Cyan
+            Write-Host "| $nameLine" -NoNewline
+            Write-Host (" " * (57 - $nameLine.Length - 1)) -NoNewline
+            Write-Host "|" -ForegroundColor Cyan
             
             $uptimeLine = "  Uptime: $($metrics.Uptime)"
-            Write-Host "║$uptimeLine" -NoNewline
-            Write-Host (" " * (59 - $uptimeLine.Length)) -NoNewline
-            Write-Host "║" -ForegroundColor Cyan
+            Write-Host "|$uptimeLine" -NoNewline
+            Write-Host (" " * (57 - $uptimeLine.Length)) -NoNewline
+            Write-Host "|" -ForegroundColor Cyan
             
             $healthLine = "  Health Checks: $($metrics.TotalChecks) ($($metrics.HealthRate) success)"
-            Write-Host "║$healthLine" -NoNewline
-            Write-Host (" " * (59 - $healthLine.Length)) -NoNewline
-            Write-Host "║" -ForegroundColor Cyan
+            Write-Host "|$healthLine" -NoNewline
+            Write-Host (" " * (57 - $healthLine.Length)) -NoNewline
+            Write-Host "|" -ForegroundColor Cyan
             
             if ($metrics.RestartCount -gt 0) {
                 $restartLine = "  Restarts: $($metrics.RestartCount)"
-                Write-Host "║$restartLine" -ForegroundColor Yellow -NoNewline
-                Write-Host (" " * (59 - $restartLine.Length)) -NoNewline
-                Write-Host "║" -ForegroundColor Cyan
+                Write-Host "|$restartLine" -ForegroundColor Yellow -NoNewline
+                Write-Host (" " * (57 - $restartLine.Length)) -NoNewline
+                Write-Host "|" -ForegroundColor Cyan
             }
         }
         
-        Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+        Write-Host "===========================================================" -ForegroundColor Cyan
         
         if ($LogToFile) {
             Write-TheoriaLog "Session logs saved to: $script:LogFile" -Level Info

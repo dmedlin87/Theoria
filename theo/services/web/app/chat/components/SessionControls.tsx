@@ -24,7 +24,7 @@ import {
   DialogActions,
   DialogClose,
 } from "../../components/ui/dialog";
-import "../../components/ui/tokens.module.css";
+import "../../components/ui/tokens.css";
 import styles from "./SessionControls.module.css";
 
 type SessionControlsProps = {

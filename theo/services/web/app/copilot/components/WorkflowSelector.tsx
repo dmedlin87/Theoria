@@ -1,5 +1,5 @@
 import styles from "./workflow-selector.module.css";
-import "../../components/ui/tokens.module.css";
+import "../../components/ui/tokens.css";
 
 type WorkflowOption = {
   id: string;

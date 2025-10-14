@@ -4,7 +4,7 @@ import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactN
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 import styles from "./dialog.module.css";
-import "./tokens.module.css";
+import "./tokens.css";
 
 type DialogContentProps = ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   className?: string;
@@ -57,7 +57,7 @@ export const DialogActions = ({
   className,
 }: {
   children: ReactNode;
-  className?: string;
+  className?: string | undefined;
 }): JSX.Element => {
   return <div className={cx(styles.actions, className)}>{children}</div>;
 };

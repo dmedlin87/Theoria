@@ -4,7 +4,7 @@ import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "reac
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 import styles from "./tooltip.module.css";
-import "./tokens.module.css";
+import "./tokens.css";
 
 type TooltipContentProps = ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> & {
   className?: string;

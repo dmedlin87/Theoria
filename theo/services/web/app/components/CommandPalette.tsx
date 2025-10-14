@@ -3,7 +3,7 @@
 import { Command } from "cmdk";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import "./CommandPalette.module.css";
+import "./CommandPalette.css";
 
 interface CommandEntry {
   label: string;

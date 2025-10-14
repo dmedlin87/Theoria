@@ -1,4 +1,4 @@
-:global(:root) {
+:root {
   --ui-radius-sm: 0.375rem;
   --ui-radius-md: 0.5rem;
   --ui-radius-lg: 0.75rem;

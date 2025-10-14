@@ -4,7 +4,7 @@ import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactN
 import * as ToastPrimitive from "@radix-ui/react-toast";
 
 import styles from "./toast.module.css";
-import "./tokens.module.css";
+import "./tokens.css";
 
 type ToastRootProps = ComponentPropsWithoutRef<typeof ToastPrimitive.Root> & {
   className?: string;

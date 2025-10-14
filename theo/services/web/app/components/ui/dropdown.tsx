@@ -4,7 +4,7 @@ import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "reac
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 
 import styles from "./dropdown.module.css";
-import "./tokens.module.css";
+import "./tokens.css";
 
 type DropdownContentProps = ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & {
   className?: string;
