@@ -43,16 +43,12 @@ _resolve_host_addresses = ingest_network.resolve_host_addresses
 # Keep this close to the imports so reloads and import * behaviour keep the
 # attribute available for existing integrations.  Some integration tests reach
 # into the module to swap out the helper and expect it to exist even if the
-# public ``parse_text_file`` symbol is renamed.  Using an explicit wrapper keeps
+# public ``parse_text_file`` symbol is renamed.  Using an explicit alias keeps
 # the attribute stable across reloads and avoids AttributeErrors when tests
 # access ``_parse_text_file`` before monkeypatching.
 
 
-def _parse_text_file(path: Path) -> tuple[str, Frontmatter]:
-    """Backward compatible wrapper around :func:`parse_text_file`."""
-
-    body, frontmatter = parse_text_file(path)
-    return body, frontmatter
+_parse_text_file = parse_text_file
 
 
 __all__ = [
