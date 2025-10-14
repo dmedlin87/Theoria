@@ -1,0 +1,155 @@
+/* CitationList Component Styles */
+
+.container {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+/* Citations List */
+.citationsList {
+  padding-left: 1.25rem;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.citationItem {
+  margin: 0;
+}
+
+/* Citation Card/Link */
+.citationCard {
+  display: block;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.citationCard:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-default);
+}
+
+.citationReference {
+  font-weight: 600;
+}
+
+.documentTitle {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.citationSnippet {
+  display: block;
+  margin-top: 0.35rem;
+  font-style: italic;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+/* Notes Attached to Citations */
+.notesList {
+  margin: 0.75rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.noteItem {
+  font-size: 0.85rem;
+  background: var(--color-surface-muted);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.noteHeader {
+  font-weight: 600;
+  display: block;
+}
+
+.noteBody {
+  display: block;
+  margin-top: 0.15rem;
+}
+
+/* Research Note Section */
+.researchNoteSection {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface);
+  display: grid;
+  gap: 0.5rem;
+}
+
+.formRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.formLabel {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.labelText {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.selectInput {
+  min-width: 16rem;
+  padding: 0.35rem;
+}
+
+.saveButton {
+  align-self: flex-end;
+}
+
+/* Export Section */
+.exportSection {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Status Messages */
+.errorMessage {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.successMessage {
+  margin: 0;
+  color: var(--color-positive);
+}
+
+.loadingMessage {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .formRow {
+    flex-direction: column;
+  }
+
+  .selectInput {
+    min-width: 100%;
+  }
+
+  .saveButton {
+    align-self: stretch;
+  }
+}

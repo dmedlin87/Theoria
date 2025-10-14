@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { getApiBaseUrl } from "../lib/api";
+import styles from "./DeliverableExportAction.module.css";
 
 type DeliverableFormat = "markdown" | "ndjson" | "csv" | "pdf";
 
@@ -135,17 +136,14 @@ export default function DeliverableExportAction({
   }, [baseUrl, preparingText, requestPayload, status, successText]);
 
   return (
-    <div style={{ display: "grid", gap: "0.5rem", alignItems: "start" }}>
+    <div className={styles.container}>
       <button type="button" onClick={handleClick} disabled={status === "loading"}>
         {status === "loading" ? preparingText : label}
       </button>
       {message && (
         <p
           role={status === "error" ? "alert" : "status"}
-          style={{
-            color: status === "error" ? "var(--danger, #b91c1c)" : "inherit",
-            margin: 0,
-          }}
+          className={`${styles.message} ${status === "error" ? styles.messageError : ""}`}
         >
           {message}
           {manifest && status === "success" ? (
@@ -156,7 +154,7 @@ export default function DeliverableExportAction({
         </p>
       )}
       {downloads.length > 0 ? (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.35rem" }}>
+        <ul className={styles.downloadsList}>
           {downloads.map((download) => (
             <li key={download.filename}>
               <a href={download.href} download={download.filename}>

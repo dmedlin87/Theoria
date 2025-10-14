@@ -825,6 +825,34 @@ def test_wait_for_inflight_preserves_completed_output_after_restart_failure(
     assert outputs == ["shared-output"]
 
 
+def test_wait_for_inflight_replays_preserved_after_restart_for_new_waiter(tmp_path):
+    ledger_path = tmp_path / "restart-new-waiter.db"
+    ledger = SharedLedger(str(ledger_path))
+    ledger.reset()
+    cache_key = "cache-key"
+
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+    with ledger.transaction() as txn:
+        txn.mark_inflight_success(
+            cache_key,
+            model_name="model",
+            workflow="workflow",
+            output="shared-output",
+            latency_ms=5.0,
+            cost=0.1,
+        )
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+
+    record = ledger.wait_for_inflight(
+        cache_key,
+        poll_interval=0.01,
+        timeout=0.3,
+    )
+    assert record.output == "shared-output"
+
+
 def test_wait_for_inflight_returns_empty_output(tmp_path):
     ledger_path = tmp_path / "empty-output.db"
     ledger = SharedLedger(str(ledger_path))

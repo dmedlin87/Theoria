@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import styles from "./CommentariesPanel.module.css";
 
 import ModeChangeBanner from "../../components/ModeChangeBanner";
 import { formatEmphasisSummary } from "../../mode-config";
@@ -146,47 +147,24 @@ export default function CommentariesPanel({ osis, features }: CommentariesPanelP
   return (
     <section
       aria-labelledby="commentaries-heading"
-      style={{
-        background: "#fff",
-        borderRadius: "0.5rem",
-        padding: "1rem",
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
-      }}
+      className={styles.panel}
     >
-      <h3 id="commentaries-heading" style={{ marginTop: 0 }}>
+      <h3 id="commentaries-heading" className={styles.panelHeading}>
         Commentaries & notes
       </h3>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
+      <p className={styles.description}>
         Curated research notes anchored to <strong>{osis}</strong>.
       </p>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.9rem" }}>
+      <p className={styles.modeSummary}>
         {modeSummary}
       </p>
-      <div
-        style={{
-          display: "flex",
-          gap: "0.75rem",
-          alignItems: "center",
-          flexWrap: "wrap",
-          marginBottom: "1rem",
-        }}
-      >
-        <fieldset
-          style={{
-            display: "grid",
-            gap: "0.5rem",
-            padding: "0.75rem",
-            borderRadius: "0.5rem",
-            border: "1px solid var(--border, #d1d5db)",
-            minWidth: "16rem",
-            margin: 0,
-          }}
-        >
-          <legend style={{ fontWeight: 600, fontSize: "0.875rem" }}>Perspectives</legend>
+      <div className={styles.filterContainer}>
+        <fieldset className={styles.fieldset}>
+          <legend className={styles.legend}>Perspectives</legend>
           {commentaryPerspectiveOptions.map((option) => (
             <label
               key={option.id}
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem" }}
+              className={styles.checkboxLabel}
             >
               <input
                 type="checkbox"
@@ -200,7 +178,7 @@ export default function CommentariesPanel({ osis, features }: CommentariesPanelP
               />
               <span>
                 <strong>{option.label}</strong>
-                <span style={{ color: "var(--muted-foreground, #6b7280)", display: "block" }}>
+                <span className={styles.optionDescription}>
                   {option.description}
                 </span>
               </span>
@@ -210,86 +188,54 @@ export default function CommentariesPanel({ osis, features }: CommentariesPanelP
         <ModeChangeBanner area="Commentaries" />
       </div>
       {activePerspectives.length === 0 ? (
-        <p style={{ margin: 0, color: "var(--muted-foreground, #6b7280)" }}>
+        <p className={styles.emptyMessage}>
           All perspectives are hidden. Enable at least one checkbox to surface commentary excerpts.
         </p>
       ) : loading ? (
         <p>Loading commentaries…</p>
       ) : error ? (
-        <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+        <p role="alert" className={styles.errorMessage}>
           Unable to load commentaries. {error}
         </p>
       ) : commentaries.length === 0 ? (
         <p>No commentaries recorded yet.</p>
       ) : (
-        <ul
-          style={{
-            listStyle: "none",
-            padding: 0,
-            margin: 0,
-            display: "grid",
-            gap: "1rem",
-          }}
-        >
+        <ul className={styles.commentariesList}>
           {commentaries.map((note) => (
             <li
               key={note.id}
-              style={{
-                border: "1px solid var(--border, #e5e7eb)",
-                borderRadius: "0.5rem",
-                padding: "0.75rem",
-              }}
+              className={styles.commentaryCard}
             >
-              <header style={{ marginBottom: "0.5rem" }}>
-                <h4 style={{ margin: "0 0 0.25rem" }}>{note.title ?? "Untitled commentary"}</h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-                  <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground, #6b7280)" }}>
+              <header className={styles.commentaryHeader}>
+                <h4 className={styles.commentaryTitle}>{note.title ?? "Untitled commentary"}</h4>
+                <div className={styles.metaRow}>
+                  <span className={styles.osisLabel}>
                     OSIS: {note.osis}
                   </span>
                   {note.perspective ? (
                     <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "0.25rem",
-                        padding: "0.25rem 0.5rem",
-                        borderRadius: "9999px",
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        background:
-                          note.perspective === "apologetic"
-                            ? "rgba(16, 185, 129, 0.18)"
-                            : note.perspective === "skeptical"
-                            ? "rgba(239, 68, 68, 0.18)"
-                            : "rgba(148, 163, 184, 0.2)",
-                        color:
-                          note.perspective === "apologetic"
-                            ? "#047857"
-                            : note.perspective === "skeptical"
-                            ? "#b91c1c"
-                            : "#1e293b",
-                      }}
+                      className={`${styles.perspectiveBadge} ${styles[note.perspective]}`}
                     >
                       {note.perspective}
                     </span>
                   ) : (
-                    <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground, #6b7280)" }}>
+                    <span className={styles.perspectiveUnset}>
                       Perspective not set
                     </span>
                   )}
                   {note.source ? (
-                    <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground, #6b7280)" }}>
+                    <span className={styles.sourceLabel}>
                       Source: {note.source}
                     </span>
                   ) : null}
                 </div>
                 {note.tags && note.tags.length > 0 ? (
-                  <p style={{ margin: "0.35rem 0 0", fontSize: "0.75rem", color: "var(--muted-foreground, #4b5563)" }}>
+                  <p className={styles.tagsLabel}>
                     Tags: {note.tags.join(", ")}
                   </p>
                 ) : null}
               </header>
-              <p style={{ margin: "0 0 0.5rem", lineHeight: 1.6 }}>{note.excerpt}</p>
+              <p className={styles.excerptText}>{note.excerpt}</p>
             </li>
           ))}
         </ul>

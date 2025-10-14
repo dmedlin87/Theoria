@@ -1,0 +1,22 @@
+/* DigestDashboard Component Styles */
+
+.container {
+  gap: 2rem;
+}
+
+.section {
+  gap: 1rem;
+}
+
+.sectionHeader {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.userIdCluster {
+  gap: 0.5rem;
+}
+
+.userIdInput {
+  margin-left: 0.5rem;
+}

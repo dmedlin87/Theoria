@@ -1,3 +1,5 @@
+import styles from "./WatchlistTable.module.css";
+
 import type { WatchlistResponse } from "../types";
 
 type WatchlistTableProps = {
@@ -42,13 +44,13 @@ export default function WatchlistTable({
   fromCommaList,
 }: WatchlistTableProps): JSX.Element {
   return (
-    <div className="stack" style={{ gap: "1rem" }}>
-      <div className="cluster" style={{ justifyContent: "space-between", gap: "0.5rem" }}>
+    <div className={`stack ${styles.container}`}>
+      <div className={`cluster ${styles.headerRow}`}>
         <div>
           <h2 id="watchlist-admin">Watchlists</h2>
           <p>Monitor topics, keywords, and authors for specific users.</p>
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <label className={styles.activeCheckbox}>
           <input
             type="checkbox"
             checked={showActiveOnly}
@@ -100,7 +102,7 @@ export default function WatchlistTable({
                   />
                 </td>
                 <td>
-                  <div className="stack" style={{ gap: "0.25rem" }}>
+                  <div className={`stack ${styles.filtersStack}`}>
                     <label>
                       Topics
                       <input
@@ -158,7 +160,7 @@ export default function WatchlistTable({
                   </label>
                 </td>
                 <td>
-                  <div className="stack" style={{ gap: "0.25rem" }}>
+                  <div className={`stack ${styles.actionsStack}`}>
                     <button type="button" className="button secondary" onClick={() => onSave(watchlist)}>
                       Save changes
                     </button>
@@ -188,7 +190,7 @@ export default function WatchlistTable({
         </tbody>
       </table>
       {totalCount > watchlists.length ? (
-        <div className="cluster" style={{ gap: "0.5rem" }}>
+        <div className={`cluster ${styles.pagination}`}>
           <button type="button" className="button secondary" onClick={onPreviousPage} disabled={page === 0}>
             Previous
           </button>

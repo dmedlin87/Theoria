@@ -1,3 +1,5 @@
+import styles from "./WatchlistEventsPanel.module.css";
+
 import FormError from "../../../components/FormError";
 import type { WatchlistRunResponse } from "../types";
 
@@ -21,7 +23,7 @@ export default function WatchlistEventsPanel({
   formatDate,
 }: WatchlistEventsPanelProps): JSX.Element {
   return (
-    <div className="card stack" style={{ padding: "1rem", gap: "0.75rem" }}>
+    <div className={`card stack ${styles.panel}`}>
       <h3>Recent watchlist runs</h3>
       <label>
         Since timestamp (ISO)
@@ -29,7 +31,7 @@ export default function WatchlistEventsPanel({
           value={eventsSince}
           onChange={(event) => onEventsSinceChange(event.target.value)}
           placeholder="2024-01-01T00:00:00Z"
-          style={{ marginLeft: "0.5rem" }}
+          className={styles.timestampInput}
         />
       </label>
       {eventsLoading ? <p>Loading events…</p> : null}
@@ -39,10 +41,10 @@ export default function WatchlistEventsPanel({
           Showing {events.length} events for watchlist <strong>{eventsWatchlistId}</strong>.
         </p>
       ) : null}
-      <ul className="stack" style={{ gap: "0.5rem" }}>
+      <ul className={`stack ${styles.eventsList}`}>
         {events.map((event) => (
-          <li key={`${event.watchlist_id}-${event.run_started}`} className="card" style={{ padding: "0.75rem" }}>
-            <div className="cluster" style={{ justifyContent: "space-between" }}>
+          <li key={`${event.watchlist_id}-${event.run_started}`} className={`card ${styles.eventCard}`}>
+            <div className={`cluster ${styles.eventHeader}`}>
               <strong>{formatDate(event.run_started)}</strong>
               <span>{event.delivery_status ?? "pending"}</span>
             </div>

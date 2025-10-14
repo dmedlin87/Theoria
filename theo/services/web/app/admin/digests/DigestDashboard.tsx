@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import styles from "./DigestDashboard.module.css";
 
 import FormError from "../../components/FormError";
 import { createTheoApiClient } from "../../lib/api-client";
@@ -153,7 +154,7 @@ export default function DigestDashboard(): JSX.Element {
   const paginatedWatchlists = pagination.paginated;
 
   return (
-    <div className="stack" style={{ gap: "2rem" }}>
+    <div className={`stack ${styles.container}`}>
       <DigestOverview
         digest={topicDigest.digest}
         isLoading={topicDigest.isLoading}
@@ -164,16 +165,16 @@ export default function DigestDashboard(): JSX.Element {
         isRefreshing={topicDigest.isRefreshing}
       />
 
-      <section aria-labelledby="watchlist-admin" className="stack" style={{ gap: "1rem" }}>
-        <div className="cluster" style={{ justifyContent: "space-between", gap: "1rem" }}>
-          <div className="cluster" style={{ gap: "0.5rem" }}>
+      <section aria-labelledby="watchlist-admin" className={`stack ${styles.section}`}>
+        <div className={`cluster ${styles.sectionHeader}`}>
+          <div className={`cluster ${styles.userIdCluster}`}>
             <label>
               User ID
               <input
                 value={userId}
                 onChange={(event) => setUserId(event.target.value)}
                 placeholder="owner-123"
-                style={{ marginLeft: "0.5rem" }}
+                className={styles.userIdInput}
               />
             </label>
             <button

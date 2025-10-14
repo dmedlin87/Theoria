@@ -1,0 +1,141 @@
+/* Copilot Page Specific Styles */
+
+.pageHeader {
+  margin-bottom: var(--space-2);
+}
+
+.modeInfo {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.uiModeSection {
+  margin: var(--space-3) 0;
+}
+
+.advancedPanel {
+  border: 1px solid var(--color-accent-soft);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem var(--space-2);
+  background: var(--color-surface);
+  margin-bottom: var(--space-3);
+}
+
+.advancedSummary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.advancedDescription {
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.advancedContent {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.simpleModeHint {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.advancedToolsSection {
+  margin-top: var(--space-3);
+  padding: 1.25rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.toolsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.toolsHeaderContent {
+  max-width: 48ch;
+}
+
+.toolsHeading {
+  margin: 0;
+}
+
+.toolsDescription {
+  margin: 0.25rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.toolsActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.toolsTip {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.workflowForm {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 600px;
+}
+
+.drawerHeading {
+  margin: 0;
+}
+
+.drawerDescription {
+  margin: 0.25rem 0 0;
+  color: var(--color-text-secondary);
+}
+
+.drawerCloseButton {
+  border: none;
+  background: transparent;
+  color: var(--color-accent);
+  font-weight: 600;
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.drawerCloseButton:hover {
+  background: var(--color-accent-soft);
+}
+
+.drawerCloseButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.errorSection {
+  margin-top: var(--space-2);
+}
+
+.errorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.loadingSection {
+  margin-top: var(--space-2);
+}

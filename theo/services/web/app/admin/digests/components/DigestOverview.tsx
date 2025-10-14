@@ -1,5 +1,6 @@
 import FormError from "../../../components/FormError";
 import type { TopicDigest } from "../types";
+import styles from "./DigestOverview.module.css";
 
 type DigestOverviewProps = {
   digest: TopicDigest | null;
@@ -27,18 +28,17 @@ export default function DigestOverview({
   };
   return (
     <section aria-labelledby="digest-overview">
-      <header className="cluster" style={{ justifyContent: "space-between", gap: "1rem" }}>
+      <header className={styles.header}>
         <div>
           <h1 id="digest-overview">Topic digests</h1>
           <p>View the latest topical activity across the corpus and trigger a new digest run.</p>
         </div>
         <form
-          className="cluster"
+          className={styles.form}
           onSubmit={(event) => {
             event.preventDefault();
             onRefresh();
           }}
-          style={{ gap: "0.5rem" }}
         >
           <label>
             Lookback hours
@@ -47,7 +47,7 @@ export default function DigestOverview({
               min={1}
               value={refreshHours}
               onChange={(event) => onRefreshHoursChange(event.target.value)}
-              style={{ marginLeft: "0.5rem", width: "6rem" }}
+              className={styles.input}
             />
           </label>
           <button type="submit" className="button" disabled={isRefreshing}>
@@ -58,7 +58,7 @@ export default function DigestOverview({
       {isLoading ? <p>Loading digest…</p> : null}
       <FormError message={error} />
       {digest ? (
-        <div className="stack" style={{ marginTop: "1rem", gap: "0.75rem" }}>
+        <div className={styles.content}>
           <p>
             Generated {formatTimestamp(digest.generated_at)} for window starting {" "}
             {formatTimestamp(digest.window_start)}.

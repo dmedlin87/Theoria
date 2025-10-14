@@ -1,0 +1,31 @@
+/* ResearchPanels Component Styles */
+
+.container {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.heading {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.description {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.modeSummary {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-muted);
+}
+
+.helpText {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.emptyMessage {
+  color: var(--color-text-muted);
+}

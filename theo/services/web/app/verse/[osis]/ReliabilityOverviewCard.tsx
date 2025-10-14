@@ -1,3 +1,5 @@
+import styles from "./ReliabilityOverviewCard.module.css";
+
 import { getApiBaseUrl } from "../../lib/api";
 
 type OverviewBullet = {
@@ -56,33 +58,22 @@ function SectionList({
   items: OverviewBullet[];
 }) {
   return (
-    <section aria-label={title} style={{ display: "grid", gap: "0.5rem" }}>
-      <h4 style={{ margin: "0.5rem 0 0" }}>{title}</h4>
+    <section aria-label={title} className={styles.section}>
+      <h4 className={styles.sectionTitle}>{title}</h4>
       {items.length === 0 ? (
-        <p style={{ margin: 0, color: "var(--muted-foreground, #4b5563)" }}>
+        <p className={styles.emptyState}>
           Nothing to report yet.
         </p>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.75rem" }}>
+        <ul className={styles.itemsList}>
           {items.map((item, index) => (
             <li
               key={`${item.summary}-${index}`}
-              style={{
-                border: "1px solid var(--border, #e5e7eb)",
-                borderRadius: "0.5rem",
-                padding: "0.75rem",
-                background: "#fff",
-              }}
+              className={styles.itemCard}
             >
-              <p style={{ margin: 0 }}>{item.summary}</p>
+              <p className={styles.itemSummary}>{item.summary}</p>
               {item.citations.length > 0 ? (
-                <p
-                  style={{
-                    margin: "0.5rem 0 0",
-                    fontSize: "0.875rem",
-                    color: "var(--muted-foreground, #4b5563)",
-                  }}
-                >
+                <p className={styles.itemSources}>
                   Sources: {item.citations.join(", ")}
                 </p>
               ) : null}
@@ -140,42 +131,35 @@ export default async function ReliabilityOverviewCard({
   return (
     <div
       aria-labelledby="reliability-overview-heading"
-      style={{
-        background: "#f8fafc",
-        borderRadius: "0.75rem",
-        padding: "1.25rem",
-        border: "1px solid var(--border, #e5e7eb)",
-        display: "grid",
-        gap: "1rem",
-      }}
+      className={styles.card}
     >
       <header>
-        <h3 id="reliability-overview-heading" style={{ margin: "0 0 0.25rem" }}>
+        <h3 id="reliability-overview-heading" className={styles.heading}>
           Reliability snapshot
         </h3>
-        <p style={{ margin: 0 }}>{modeSummary}</p>
-        <p style={{ margin: "0.25rem 0 0", fontSize: "0.875rem", color: "var(--muted-foreground, #4b5563)" }}>
+        <p className={styles.description}>{modeSummary}</p>
+        <p className={styles.modeLabel}>
           Mode: <strong>{activeMode}</strong>
         </p>
       </header>
 
       {error ? (
-        <p role="alert" style={{ color: "var(--danger, #b91c1c)", margin: 0 }}>
+        <p role="alert" className={styles.errorMessage}>
           Unable to load the overview. {error}
         </p>
       ) : null}
 
       {!error && !overview ? (
-        <p style={{ margin: 0 }}>Loading reliability highlights…</p>
+        <p className={styles.loadingMessage}>Loading reliability highlights…</p>
       ) : null}
 
       {overview && !error ? (
         !hasOverviewContent ? (
-          <p style={{ margin: 0 }}>
+          <p className={styles.emptyMessage}>
             No overview data is available yet. Add research notes to build this snapshot.
           </p>
         ) : (
-          <div style={{ display: "grid", gap: "1rem" }}>
+          <div className={styles.sectionsContainer}>
             <SectionList title="Consensus threads" items={consensusItems} />
             <SectionList title="Disputed points" items={disputedItems} />
             <SectionList title="Key manuscripts" items={manuscriptItems} />

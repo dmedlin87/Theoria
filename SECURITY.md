@@ -11,7 +11,7 @@
 ## Reporting a Vulnerability
 
 - Email: `security@theoengine.com`
-- GPG: `0xA1E3E2FF` (see `docs/keys/security.asc` – pending publishing)
+- GPG: `0xA1E3E2FF` (see `docs/keys/security.asc`)
 - Response commitment: initial acknowledgement within **2 business days**, status update every **5 business days** until resolution.
 
 Include the following:

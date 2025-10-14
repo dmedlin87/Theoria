@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import styles from "./NotebookRealtimeListener.module.css";
 
 import { getApiBaseUrl } from "../lib/api";
 
@@ -123,47 +124,16 @@ export default function NotebookRealtimeListener({
     }
   }, [state]);
 
-  const badgeColor = useMemo(() => {
-    switch (state) {
-      case "connected":
-        return "#16a34a";
-      case "disconnected":
-        return "#b91c1c";
-      default:
-        return "#f59e0b";
-    }
-  }, [state]);
-
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "0.5rem",
-        fontSize: "0.875rem",
-      }}
-    >
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.35rem",
-          color: "var(--muted-foreground, #4b5563)",
-        }}
-      >
+    <div className={styles.container}>
+      <span className={styles.statusBadge}>
         <span
           aria-hidden
-          style={{
-            display: "inline-block",
-            width: "0.65rem",
-            height: "0.65rem",
-            borderRadius: "999px",
-            backgroundColor: badgeColor,
-          }}
+          className={`${styles.statusIndicator} ${styles[state]}`}
         />
         {badgeLabel}
       </span>
-      <span style={{ color: "var(--muted-foreground, #4b5563)", fontSize: "0.75rem" }}>
+      <span className={styles.versionText}>
         Version {version}
       </span>
     </div>

@@ -1,6 +1,7 @@
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Suspense } from "react";
+import styles from "./verse-page.module.css";
+
 import Breadcrumbs from "../../components/Breadcrumbs";
 import VirtualList from "../../components/VirtualList";
 
@@ -14,11 +15,7 @@ import type { ResearchFeatureFlags } from "../../research/types";
 import ReliabilityOverviewCard from "./ReliabilityOverviewCard";
 import type { VerseGraphResponse } from "./graphTypes";
 import { VerseReliabilitySkeleton, VerseResearchSkeleton } from "./VerseSkeletons";
-
-const VerseGraphSection = dynamic(() => import("./VerseGraphSection"), {
-  loading: () => <GraphSectionSkeleton />,
-  ssr: false,
-});
+import VerseGraphSection from "./VerseGraphSection";
 
 const TIMELINE_WINDOWS = ["week", "month", "quarter", "year"] as const;
 type TimelineWindow = (typeof TIMELINE_WINDOWS)[number];
@@ -232,7 +229,7 @@ function TimelineSection({
 }) {
   if (error) {
     return (
-      <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+      <p role="alert" className={styles.errorMessage}>
         Unable to load timeline. {error}
       </p>
     );
@@ -261,31 +258,22 @@ function TimelineSection({
       <p className="text-muted mb-3">
         Showing {timeline.buckets.length} {activeWindow} buckets totaling {timeline.total_mentions} mentions.
       </p>
-      <ul className="stack-md" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      <ul className={`stack-md ${styles.timelineList}`}>
         {timeline.buckets.map((bucket) => {
           const ratio = Math.max(bucket.count / maxCount, 0);
           return (
             <li key={`${bucket.label}-${bucket.start}`} className="panel">
-              <div className="cluster" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+              <div className={`cluster ${styles.bucketHeader}`}>
                 <strong>{bucket.label}</strong>
                 <span className="text-muted">{bucket.count} mentions</span>
               </div>
               <div
                 aria-hidden="true"
-                style={{
-                  marginTop: "0.5rem",
-                  height: "0.5rem",
-                  background: "var(--color-border-subtle)",
-                  borderRadius: "var(--radius-full)",
-                  overflow: "hidden",
-                }}
+                className={styles.progressBarTrack}
               >
                 <div
-                  style={{
-                    width: `${Math.round(ratio * 100)}%`,
-                    background: "var(--color-accent)",
-                    height: "100%",
-                  }}
+                  className={styles.progressBarFill}
+                  style={{ width: `${Math.round(ratio * 100)}%` }}
                 />
               </div>
               <p className="text-sm text-muted mt-2 mb-0">
@@ -402,18 +390,20 @@ export default async function VersePage({ params, searchParams }: VersePageProps
           />
 
           {error ? (
-            <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+            <p role="alert" className={styles.errorMessage}>
               Unable to load mentions. {error}
             </p>
           ) : null}
 
           {graphError ? (
-            <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+            <p role="alert" className={styles.errorMessage}>
               Unable to load relationship graph. {graphError}
             </p>
           ) : null}
 
-          {!graphError ? <VerseGraphSection graph={graph} /> : null}
+          {!graphError ? (
+            graph ? <VerseGraphSection graph={graph} /> : <GraphSectionSkeleton />
+          ) : null}
 
           <form method="get" className="card mt-3">
             <div className="stack-md">
@@ -482,7 +472,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
           </p>
 
           {featuresError ? (
-            <p role="alert" style={{ margin: "0 0 1rem", color: "#b91c1c" }}>
+            <p role="alert" className={styles.errorMessageWithMargin}>
               Unable to load research capabilities. {featuresError}
             </p>
           ) : null}

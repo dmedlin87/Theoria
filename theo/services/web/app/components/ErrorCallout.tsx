@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
+import styles from "./ErrorCallout.module.css";
 
 export type ErrorCalloutProps = {
   message: string;
@@ -34,7 +35,7 @@ export function ErrorCallout({
   return (
     <div role="alert" className={`alert alert-danger ${shouldShake ? 'shake' : ''}`.trim()}>
       <p className="alert__message">{message}</p>
-      <div className="cluster-sm" style={{ alignItems: "center" }}>
+      <div className={`cluster-sm ${styles.actions}`}>
         {onRetry && (
           <button type="button" onClick={onRetry} className="btn btn-sm btn-danger">
             {retryLabel}
@@ -44,8 +45,7 @@ export function ErrorCallout({
           <button
             type="button"
             onClick={() => onShowDetails(normalizedTraceId)}
-            className="btn-ghost btn-sm"
-            style={{ color: "var(--color-danger)" }}
+            className={`btn-ghost btn-sm ${styles.detailsButton}`}
           >
             {detailsLabel}
           </button>
@@ -53,7 +53,7 @@ export function ErrorCallout({
         {actions}
       </div>
       {normalizedTraceId && (
-        <p className="text-sm text-danger" style={{ margin: 0 }}>
+        <p className={`text-sm text-danger ${styles.traceInfo}`}>
           Support code: <code>{normalizedTraceId}</code>
         </p>
       )}

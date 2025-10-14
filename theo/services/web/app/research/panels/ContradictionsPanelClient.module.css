@@ -1,0 +1,199 @@
+/* ContradictionsPanelClient Component Styles */
+
+.container {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Filter Section */
+.filterSection {
+  display: grid;
+  gap: 0.75rem;
+  background: var(--color-surface-muted);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.formLabel {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.labelText {
+  font-weight: 600;
+}
+
+.select {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.fieldset {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin: 0;
+  background: var(--color-surface);
+}
+
+.legend {
+  font-weight: 600;
+}
+
+.checkboxGroup {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.helperText {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+/* Status Messages */
+.hiddenMessage {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.emptyMessage {
+  margin: 0;
+}
+
+/* Contradictions List */
+.contradictionsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.contradictionCard {
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  background: var(--color-surface);
+  transition: border-color 0.2s ease;
+}
+
+.contradictionCard:hover {
+  border-color: var(--color-border-strong);
+}
+
+.cardHeader {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cardSummary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.osisLabel {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+/* Perspective Badge */
+.perspectiveContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.perspectiveContainer.apologetic {
+  color: var(--color-positive);
+}
+
+.perspectiveContainer.skeptical {
+  color: var(--color-danger);
+}
+
+.perspectiveContainer.neutral {
+  color: var(--color-text-secondary);
+}
+
+.perspectiveBadge {
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+}
+
+.perspectiveBadge.apologetic {
+  background: var(--color-positive-soft);
+}
+
+.perspectiveBadge.skeptical {
+  background: var(--color-danger-soft);
+}
+
+.perspectiveBadge.neutral {
+  background: var(--color-surface-muted);
+}
+
+/* Weight */
+.weightLabel {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* Tags */
+.tagsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  border-radius: 999px;
+  background: var(--color-info-soft);
+  color: var(--color-info);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+}
+
+/* Source */
+.sourceLabel {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.sourceLink {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.sourceLink:hover {
+  text-decoration: underline;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .contradictionCard {
+    padding: 0.75rem;
+  }
+  
+  .filterSection {
+    padding: 0.5rem;
+  }
+}

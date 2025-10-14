@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
+import styles from "./ResearchPanels.module.css";
 
 import ModeChangeBanner from "../components/ModeChangeBanner";
 import { formatEmphasisSummary } from "../mode-config";
@@ -51,17 +52,17 @@ export default function ResearchPanels({ osis, features }: ResearchPanelsProps) 
   );
 
   return (
-    <div style={{ display: "grid", gap: "1.5rem" }}>
+    <div className={styles.container}>
       <header>
-        <h2 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Research</h2>
-        <p style={{ margin: 0, color: "var(--muted-foreground, #4b5563)" }}>
+        <h2 className={styles.heading}>Research</h2>
+        <p className={styles.description}>
           Explore related findings for <strong>{osis}</strong> in{" "}
           <strong>{mode.label}</strong> mode.
         </p>
-        <p style={{ margin: "0.5rem 0 0", color: "var(--muted-foreground, #64748b)" }}>
+        <p className={styles.modeSummary}>
           {modeSummary}
         </p>
-        <p style={{ margin: "0.5rem 0 0", color: "var(--muted-foreground, #64748b)", fontSize: "0.9rem" }}>
+        <p className={styles.helpText}>
           Prefer chatting? Open these panels inline from the Copilot workspace with the <code>/research</code> command.
         </p>
         <ModeChangeBanner area="Research panels" />
@@ -88,7 +89,7 @@ export default function ResearchPanels({ osis, features }: ResearchPanelsProps) 
       {features.geo ? <GeoPanel osis={osis} features={features} /> : null}
 
       {!hasAnyPanel && (
-        <p style={{ color: "var(--muted-foreground, #4b5563)" }}>
+        <p className={styles.emptyMessage}>
           No research panels are available for this verse yet.
         </p>
       )}

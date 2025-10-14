@@ -1,3 +1,5 @@
+import styles from "./WorkflowResultPanel.module.css";
+
 import RAGAnswerBlock from "./RAGAnswer";
 import type { CopilotResult, RAGCitation, WorkflowId } from "./types";
 import { EXPORT_PRESET_LOOKUP } from "./export-presets";
@@ -26,8 +28,8 @@ export default function WorkflowResultPanel({
     workflowId,
   } as const;
   return (
-    <section style={{ marginTop: "2rem", background: "#fff", padding: "1.5rem", borderRadius: "0.75rem" }}>
-      <p style={{ marginTop: 0, marginBottom: "1rem", color: "#4b5563" }}>{summary}</p>
+    <section className={styles.panel}>
+      <p className={styles.summary}>{summary}</p>
       {result.kind === "verse" && (
         <>
           <h3>Verse brief for {result.payload.osis}</h3>
@@ -109,11 +111,11 @@ export default function WorkflowResultPanel({
           <h3>Devotional guide for {result.payload.osis}</h3>
           <p>Focus: {result.payload.focus}</p>
           <h4>Reflection prompts</h4>
-          <pre style={{ background: "#f9fafb", padding: "0.75rem", whiteSpace: "pre-wrap" }}>
+          <pre className={styles.codeBlock}>
             {result.payload.reflection}
           </pre>
           <h4>Prayer</h4>
-          <pre style={{ background: "#f9fafb", padding: "0.75rem", whiteSpace: "pre-wrap" }}>
+          <pre className={styles.codeBlock}>
             {result.payload.prayer}
           </pre>
           <RAGAnswerBlock
@@ -125,7 +127,7 @@ export default function WorkflowResultPanel({
       {result.kind === "collaboration" && (
         <>
           <h3>Collaboration synthesis — {result.payload.thread}</h3>
-          <pre style={{ background: "#f9fafb", padding: "0.75rem", whiteSpace: "pre-wrap" }}>
+          <pre className={styles.codeBlock}>
             {result.payload.synthesized_view}
           </pre>
           <RAGAnswerBlock
@@ -160,7 +162,7 @@ export default function WorkflowResultPanel({
             {result.payload.mediaType && <p>Media type: {result.payload.mediaType}</p>}
             <details>
               <summary>Preview content</summary>
-              <pre style={{ background: "#f9fafb", padding: "0.75rem", whiteSpace: "pre-wrap" }}>
+              <pre className={styles.codeBlock}>
                 {result.payload.content}
               </pre>
             </details>

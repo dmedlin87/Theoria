@@ -1,0 +1,29 @@
+/* ContradictionsPanel Component Styles */
+
+.container {
+  background: var(--color-surface);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: var(--shadow-xs);
+}
+
+.heading {
+  margin-top: 0;
+}
+
+.description {
+  margin: 0 0 1rem;
+  color: var(--color-text-muted);
+}
+
+.errorMessage {
+  color: var(--color-danger);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .container {
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+  }
+}

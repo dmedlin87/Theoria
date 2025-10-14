@@ -1,4 +1,5 @@
 import FormError from "../../../components/FormError";
+import styles from "./WatchlistCreationForm.module.css";
 
 type WatchlistCreationFormProps = {
   name: string;
@@ -41,8 +42,7 @@ export default function WatchlistCreationForm({
 }: WatchlistCreationFormProps): JSX.Element {
   return (
     <form
-      className="stack"
-      style={{ gap: "0.75rem", border: "1px solid #e2e8f0", padding: "1rem", borderRadius: "0.75rem" }}
+      className={styles.form}
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();

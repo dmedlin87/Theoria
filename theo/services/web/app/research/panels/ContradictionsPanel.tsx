@@ -11,6 +11,7 @@ import ContradictionsPanelClient, {
   type ModeState,
   type ViewingMode,
 } from "./ContradictionsPanelClient";
+import styles from "./ContradictionsPanel.module.css";
 
 export type ContradictionRecord = {
   id: string;
@@ -175,23 +176,18 @@ export default function ContradictionsPanel({ osis, features }: ContradictionsPa
   return (
     <section
       aria-labelledby="contradictions-heading"
-      style={{
-        background: "#fff",
-        borderRadius: "0.5rem",
-        padding: "1rem",
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
-      }}
+      className={styles.container}
     >
-      <h3 id="contradictions-heading" style={{ marginTop: 0 }}>
+      <h3 id="contradictions-heading" className={styles.heading}>
         Potential contradictions
       </h3>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
+      <p className={styles.description}>
         {modeSummary}
       </p>
       {loading ? (
         <p>Loading contradictions…</p>
       ) : error ? (
-        <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+        <p role="alert" className={styles.errorMessage}>
           Unable to load contradictions. {error}
         </p>
       ) : contradictions.length === 0 ? (

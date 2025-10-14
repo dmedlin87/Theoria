@@ -1,0 +1,39 @@
+/* NotebookRealtimeListener Component Styles */
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-text-muted);
+}
+
+.statusIndicator {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+}
+
+.statusIndicator.connected {
+  background-color: var(--color-positive);
+}
+
+.statusIndicator.disconnected {
+  background-color: var(--color-danger);
+}
+
+.statusIndicator.connecting {
+  background-color: var(--color-warning);
+}
+
+.versionText {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}

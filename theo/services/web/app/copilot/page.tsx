@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useRouter } from "next/navigation";
 
 import ErrorCallout from "../components/ErrorCallout";
+import styles from "./copilot-page.module.css";
 import ModeChangeBanner from "../components/ModeChangeBanner";
 import UiModeToggle from "../components/UiModeToggle";
 import { useToast } from "../components/Toast";
@@ -194,6 +195,8 @@ export default function CopilotPage(): JSX.Element {
   const { addToast } = useToast();
   const copilotHeadingId = "copilot-title";
   const verseResearchDescriptionId = "verse-research-description";
+  const drawerContainerRef = useRef<HTMLElement | null>(null);
+  const drawerCloseButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (error) {
@@ -562,66 +565,50 @@ export default function CopilotPage(): JSX.Element {
 
   return (
     <section aria-labelledby={copilotHeadingId}>
-      <header className="page-header" style={{ marginBottom: "1rem" }}>
+      <header className={`page-header ${styles.pageHeader}`}>
         <h1 id={copilotHeadingId}>Copilot</h1>
         <p>Run grounded workflows that stay anchored to your corpus.</p>
-        <p style={{ marginTop: "0.5rem", color: "#4b5563" }}>{formatEmphasisSummary(mode)}</p>
+        <p className={styles.modeInfo}>{formatEmphasisSummary(mode)}</p>
       </header>
       <ModeChangeBanner area="Copilot workspace" />
 
-      <div style={{ margin: "1.5rem 0" }}>
+      <div className={styles.uiModeSection}>
         <UiModeToggle mode={uiMode} onChange={setUiMode} />
       </div>
 
       {isAdvancedUi ? (
         workflowControls
       ) : (
-        <details
-          style={{
-            border: "1px solid #cbd5f5",
-            borderRadius: "0.75rem",
-            padding: "0.75rem 1rem",
-            background: "#f8fafc",
-            marginBottom: "1.5rem",
-          }}
-        >
-          <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+        <details className={styles.advancedPanel}>
+          <summary className={styles.advancedSummary}>
             Advanced workflows & presets
           </summary>
-          <p style={{ margin: "0.75rem 0", fontSize: "0.9rem", color: "#475569" }}>
+          <p className={styles.advancedDescription}>
             Open this panel when you need sermon prep, exports, or quick-start presets. Everything stays one click away.
           </p>
-          <div style={{ display: "grid", gap: "1rem" }}>{workflowControls}</div>
+          <div className={styles.advancedContent}>{workflowControls}</div>
         </details>
       )}
 
       {!isAdvancedUi && (
-        <p style={{ marginBottom: "1rem", color: "#475569" }}>
+        <p className={styles.simpleModeHint}>
           Simple mode focuses on verse briefs. Expand the advanced panel to switch workflows.
         </p>
       )}
 
       <section
         aria-labelledby="advanced-tools-heading"
-        style={{
-          marginTop: "1.5rem",
-          padding: "1.25rem",
-          border: "1px solid #e2e8f0",
-          borderRadius: "0.75rem",
-          background: "#f8fafc",
-          display: "grid",
-          gap: "0.75rem",
-        }}
+        className={styles.advancedToolsSection}
       >
-        <header style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", justifyContent: "space-between" }}>
-          <div style={{ maxWidth: "48ch" }}>
-            <h2 id="advanced-tools-heading" style={{ margin: 0 }}>Advanced tools</h2>
-            <p style={{ margin: "0.25rem 0 0", color: "#475569", fontSize: "0.9rem" }}>
+        <header className={styles.toolsHeader}>
+          <div className={styles.toolsHeaderContent}>
+            <h2 id="advanced-tools-heading" className={styles.toolsHeading}>Advanced tools</h2>
+            <p className={styles.toolsDescription}>
               Launch research modules inline or trigger them with slash commands like <code>/research</code> from the
               question box.
             </p>
           </div>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-start" }}>
+          <div className={styles.toolsActions}>
             <button
               type="button"
               className={workflowStyles.button}
@@ -640,19 +627,19 @@ export default function CopilotPage(): JSX.Element {
           </div>
         </header>
         {researchFeaturesError ? (
-          <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+          <p role="alert" className={styles.errorText}>
             Unable to load research capabilities. {researchFeaturesError}
           </p>
         ) : null}
         {researchEnabled ? (
-          <p style={{ margin: 0, color: "#64748b", fontSize: "0.85rem" }}>
+          <p className={styles.toolsTip}>
             Tip: try <code>/research {currentFormOsis || "John.1.1"}</code> in the question field to open these panels
             without leaving the workspace.
           </p>
         ) : null}
       </section>
 
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem", maxWidth: 600 }}>
+      <form onSubmit={handleSubmit} className={styles.workflowForm}>
         <WorkflowFormFields
           workflow={workflow}
           exportPresets={EXPORT_PRESETS}
@@ -748,8 +735,8 @@ export default function CopilotPage(): JSX.Element {
           >
             <div className="drawer-header">
               <div>
-                <h3 id="verse-research-title" style={{ margin: 0 }}>Verse research panels</h3>
-                <p id={verseResearchDescriptionId} style={{ margin: "0.25rem 0 0", color: "#475569" }}>
+                <h3 id="verse-research-title" className={styles.drawerHeading}>Verse research panels</h3>
+                <p id={verseResearchDescriptionId} className={styles.drawerDescription}>
                   Inspect contradictions, cross-references, morphology, and commentaries inline while you chat.
                 </p>
               </div>
@@ -757,13 +744,7 @@ export default function CopilotPage(): JSX.Element {
                 type="button"
                 onClick={closeActiveTool}
                 ref={drawerCloseButtonRef}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "#1d4ed8",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                }}
+                className={styles.drawerCloseButton}
               >
                 Close
               </button>
@@ -780,7 +761,7 @@ export default function CopilotPage(): JSX.Element {
               </label>
 
               {researchFeaturesError ? (
-                <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+                <p role="alert" className={styles.errorText}>
                   {researchFeaturesError}
                 </p>
               ) : null}
@@ -803,18 +784,17 @@ export default function CopilotPage(): JSX.Element {
       )}
 
       {error && (
-        <div style={{ marginTop: "1rem" }}>
+        <div className={styles.errorSection}>
           <ErrorCallout
             message={error.message}
             actions={
               error.suggestions ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                <div className={styles.errorActions}>
                   {error.suggestions.map((suggestion, index) => (
                     <button
                       key={`${suggestion.action}-${index}`}
                       type="button"
                       onClick={() => handleSuggestionAction(suggestion)}
-                      title={suggestion.description ?? undefined}
                     >
                       {suggestion.label}
                     </button>
@@ -827,7 +807,7 @@ export default function CopilotPage(): JSX.Element {
       )}
 
       {isRunning && (
-        <div style={{ marginTop: "1rem" }}>
+        <div className={styles.loadingSection}>
           <CopilotSkeleton />
         </div>
       )}

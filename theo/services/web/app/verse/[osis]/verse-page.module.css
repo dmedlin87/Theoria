@@ -1,0 +1,37 @@
+/* Verse Page Component Styles */
+
+.errorMessage {
+  color: var(--color-danger);
+}
+
+.errorMessageWithMargin {
+  margin: 0 0 1rem;
+  color: var(--color-danger);
+}
+
+/* Timeline Section */
+.timelineList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.bucketHeader {
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+/* Progress Bar */
+.progressBarTrack {
+  margin-top: 0.5rem;
+  height: 0.5rem;
+  background: var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressBarFill {
+  background: var(--color-accent);
+  height: 100%;
+  transition: width 0.3s ease;
+}

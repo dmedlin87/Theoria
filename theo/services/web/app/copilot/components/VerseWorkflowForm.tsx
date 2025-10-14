@@ -1,6 +1,7 @@
 "use client";
 
 import type { VerseFormState } from "./workflow-hooks";
+import styles from "./VerseWorkflowForm.module.css";
 
 interface VerseWorkflowFormProps {
   form: VerseFormState;
@@ -79,7 +80,7 @@ export default function VerseWorkflowForm({
       </div>
 
       <div className="cluster-sm">
-        <label className="cluster-sm" style={{ cursor: "pointer", alignItems: "center" }}>
+        <label className={`cluster-sm ${styles.checkboxLabel}`}>
           <input
             type="checkbox"
             checked={form.useAdvanced}
