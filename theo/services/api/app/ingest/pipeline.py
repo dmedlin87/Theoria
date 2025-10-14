@@ -14,7 +14,7 @@ from ..db.models import Document, TranscriptSegment
 from ..telemetry import instrument_workflow, set_span_attribute
 from .embeddings import get_embedding_service
 from .exceptions import UnsupportedSourceError
-from .metadata import load_frontmatter, merge_metadata, parse_text_file
+from .metadata import Frontmatter, load_frontmatter, merge_metadata, parse_text_file
 from . import network as ingest_network
 from .network import fetch_web_document
 from .orchestrator import IngestOrchestrator, OrchestratorResult
@@ -43,15 +43,12 @@ _resolve_host_addresses = ingest_network.resolve_host_addresses
 # Keep this close to the imports so reloads and import * behaviour keep the
 # attribute available for existing integrations.  Some integration tests reach
 # into the module to swap out the helper and expect it to exist even if the
-# public ``parse_text_file`` symbol is renamed.  Using an explicit wrapper keeps
+# public ``parse_text_file`` symbol is renamed.  Using an explicit alias keeps
 # the attribute stable across reloads and avoids AttributeErrors when tests
 # access ``_parse_text_file`` before monkeypatching.
 
 
-def _parse_text_file(path):
-    """Backward compatible wrapper around :func:`parse_text_file`."""
-
-    return parse_text_file(path)
+_parse_text_file = parse_text_file
 
 
 __all__ = [

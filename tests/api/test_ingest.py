@@ -613,6 +613,10 @@ def test_ingest_url_times_out_on_slow_response(
         == "Fetching URL timed out after 0.5 seconds"
     )
     assert payload.get("error", {}).get("severity") == "user"
+    assert (
+        payload.get("error", {}).get("hint")
+        == "Review the URL and ensure it meets ingestion requirements."
+    )
     assert call_counter["count"] == 1
 
 
@@ -665,6 +669,10 @@ def test_ingest_url_rejects_oversized_response(
         == "Fetched content exceeded maximum allowed size of 10 bytes"
     )
     assert payload.get("error", {}).get("severity") == "user"
+    assert (
+        payload.get("error", {}).get("hint")
+        == "Review the URL and ensure it meets ingestion requirements."
+    )
     assert call_counter["count"] == 1
 
 
@@ -733,6 +741,10 @@ def test_ingest_url_detects_redirect_loop(
     assert payload.get("error", {}).get("code") == "INGESTION_UNSUPPORTED_SOURCE"
     assert payload.get("error", {}).get("message") == "URL redirect loop detected"
     assert payload.get("error", {}).get("severity") == "user"
+    assert (
+        payload.get("error", {}).get("hint")
+        == "Review the URL and ensure it meets ingestion requirements."
+    )
     assert call_counter["count"] == 1
 
 def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:

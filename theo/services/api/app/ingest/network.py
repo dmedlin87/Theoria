@@ -208,6 +208,7 @@ def fetch_web_document(
 
     request = Request(url, headers={"User-Agent": settings.user_agent})
 
+    response = None
     try:
         response = opener.open(request, timeout=timeout)
     except UnsupportedSourceError:
@@ -277,6 +278,10 @@ def fetch_web_document(
         raise UnsupportedSourceError(
             f"Fetching URL timed out after {timeout} seconds"
         ) from exc
+    except TimeoutError as exc:
+        raise UnsupportedSourceError(
+            f"Fetching URL timed out after {timeout} seconds"
+        ) from exc
     except (IncompleteRead, ContentTooShortError) as exc:
         raise UnsupportedSourceError(
             "Network connection ended before the response completed"
@@ -286,7 +291,11 @@ def fetch_web_document(
     except OSError as exc:
         raise UnsupportedSourceError(f"Unable to fetch URL: {url}") from exc
     finally:
-        response.close()
+        if response is not None:
+            try:
+                response.close()
+            except Exception:
+                pass
 
     encoding = response.headers.get_content_charset() or "utf-8"
     try:

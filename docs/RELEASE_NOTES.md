@@ -9,3 +9,6 @@
   `ingest_url_blocked_ip_networks`, and `ingest_url_allowed_hosts`.
 - Corrected the guardrail error copy for unparsable citations to match our
   preferred spelling in customer-facing messages.
+- Restored the private `_parse_text_file` alias in the ingestion pipeline so
+  downstream extensions that monkeypatch the helper can continue importing it
+  without changes.

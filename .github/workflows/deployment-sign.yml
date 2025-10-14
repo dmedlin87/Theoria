@@ -54,6 +54,23 @@ jobs:
             ${{ steps.meta.outputs.image }}:${{ github.sha }}
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version_tag }}
 
+      - name: Scan image for vulnerabilities
+        id: trivy
+        uses: aquasecurity/trivy-action@0.27.0
+        with:
+          image-ref: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          vuln-type: 'os,library'
+
+      - name: Upload Trivy scan report
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.10.0
         with:

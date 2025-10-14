@@ -241,7 +241,9 @@ async def ingest_file(
 async def ingest_url(
     payload: UrlIngestRequest,
     session: Session = Depends(get_session),
-    ingestion_service: IngestionService = Depends(get_ingestion_service),
+    ingestion_service: IngestionService = Depends(
+        _ingestion_service_with_overrides
+    ),
 ) -> DocumentIngestResponse:
     try:
         if ingestion_service.run_url_pipeline is _run_pipeline_for_url:
