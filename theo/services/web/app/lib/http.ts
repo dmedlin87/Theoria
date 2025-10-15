@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from "./api";
+import { resolveAuthHeaders } from "./api-config-store";
 
 type HttpErrorListener = (error: TheoApiError | NetworkError) => void;
 
@@ -191,6 +192,8 @@ export function createHttpClient(baseUrl?: string): HttpClient {
     let lastError: Error | null = null;
     const maxAttempts = retries + 1;
 
+    const authHeaders = resolveAuthHeaders();
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         // Check if request was cancelled
@@ -201,6 +204,7 @@ export function createHttpClient(baseUrl?: string): HttpClient {
         const response = await fetch(`${resolved}${path}`, {
           cache: "no-store",
           headers: {
+            ...authHeaders,
             ...defaultHeaders,
             ...(headers ?? {}),
           },
