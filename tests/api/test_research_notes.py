@@ -79,7 +79,7 @@ def _draft_from_payload(payload: Mapping[str, object]) -> ResearchNoteDraft:
         )
 
     confidence = payload.get("confidence")
-    confidence_value = float(confidence) if isinstance(confidence, (int, float)) else None
+    confidence_value = float(confidence) if confidence is not None else None
 
     return ResearchNoteDraft(
         osis=str(payload.get("osis")),
