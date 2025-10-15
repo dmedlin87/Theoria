@@ -49,7 +49,7 @@
 - **Suggested fix**: Update the hint (or the CLI default) so both surfaces agree on the default author label.
 - **References**: [`SimpleIngestForm.tsx`](../theo/services/web/app/upload/components/SimpleIngestForm.tsx) lines 186-188 and [`ingest_folder.py`](../theo/services/cli/ingest_folder.py) lines 56-58. 【F:theo/services/web/app/upload/components/SimpleIngestForm.tsx†L186-L188】【F:theo/services/cli/ingest_folder.py†L56-L58】
 
-## Add coverage for HTTP retry behaviour
+## Add coverage for HTTP retry behavior
 - **Location**: `theo/services/web/tests/lib/http.vitest.ts`
 - **Issue**: The Vitest suite exercises success paths and header merging but never asserts that `createHttpClient` retries network failures according to the `retries` option, leaving the exponential backoff branch untested.
 - **Why it matters**: Without a regression test, changes to the retry loop could silently break resiliency.
