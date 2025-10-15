@@ -248,6 +248,7 @@ def _ensure_perspective_column(
     dataset_label: str,
     *,
     required_columns: Iterable[str] | None = None,
+    allow_repair: bool = True,
 ) -> bool:
     """Verify the ``perspective`` column exists before reading from ``table``."""
 
@@ -270,6 +271,16 @@ def _ensure_perspective_column(
                 dataset_label,
             )
             return False
+
+    if allow_repair:
+        _rebuild_perspective_column(
+            session,
+            table,
+            dataset_label=dataset_label,
+            log_suffix=f"retrying {dataset_label} seeds",
+        )
+        if _table_has_column(session, table.name, "perspective", schema=table.schema):
+            return True
 
     session.rollback()
     logger.warning(
