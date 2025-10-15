@@ -1,0 +1,132 @@
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: inherit;
+}
+
+.badgeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-base), color var(--transition-base),
+    border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.badgeButton:hover,
+.badgeButton:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: var(--shadow-sm), 0 0 0 3px color-mix(in srgb, var(--color-accent-glow) 45%, transparent);
+}
+
+.badgeButton:focus-visible {
+  outline: none;
+}
+
+.badgeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.statusDot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.statusHealthy {
+  color: var(--color-positive);
+  border-color: color-mix(in srgb, var(--color-positive) 40%, transparent);
+  background: color-mix(in srgb, var(--color-positive-soft) 70%, transparent);
+}
+
+.statusDegraded {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
+  background: color-mix(in srgb, var(--color-warning-soft) 70%, transparent);
+}
+
+.statusUnauthenticated {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--color-accent-soft) 65%, transparent);
+}
+
+.statusOffline {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger-soft) 70%, transparent);
+}
+
+.checking {
+  animation: indicator-pulse 1.6s ease-in-out infinite;
+}
+
+.spinner {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: indicator-spin 0.9s linear infinite;
+}
+
+.label {
+  white-space: nowrap;
+}
+
+.message {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.inlineVariant {
+  align-items: flex-start;
+}
+
+.inlineVariant .badgeButton {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.875rem;
+}
+
+.tooltipContent {
+  max-width: 18rem;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.tooltipMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-subtle);
+}
+
+@keyframes indicator-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes indicator-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}

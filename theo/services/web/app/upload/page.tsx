@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout from "../components/ErrorCallout";
+import { ConnectionStatusIndicatorDisplay } from "../components/ConnectionStatusIndicator";
 import { useToast } from "../components/Toast";
+import { useApiHealth } from "../lib/useApiHealth";
 import { getApiBaseUrl } from "../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../lib/errorUtils";
 import { interpretApiError, type InterpretedApiError } from "../lib/errorMessages";
@@ -40,6 +42,8 @@ async function readErrorDetails(response: Response, fallback: string): Promise<E
 }
 
 export default function UploadPage(): JSX.Element {
+  const apiHealth = useApiHealth();
+  const isApiUnavailable = apiHealth.status === "offline" || apiHealth.status === "unauthenticated";
   const [simpleProgress, setSimpleProgress] = useState<SimpleIngestEvent[]>([]);
   const [simpleError, setSimpleError] = useState<string | null>(null);
   const [simpleSuccess, setSimpleSuccess] = useState<string | null>(null);
@@ -426,6 +430,20 @@ export default function UploadPage(): JSX.Element {
         the advanced settings to tweak metadata or post-batch operations. Manual file and URL uploads remain available
         below.
       </p>
+      <div className="upload-status-indicator" role="note" aria-live="polite">
+        <ConnectionStatusIndicatorDisplay
+          health={apiHealth}
+          showMessage
+          announce={false}
+          variant="inline"
+        />
+        {isApiUnavailable ? (
+          <p className="upload-status-hint">
+            Verify your credentials and API server before running new ingests. Actions are paused until the connection
+            recovers.
+          </p>
+        ) : null}
+      </div>
 
       <SimpleIngestForm
         onSubmit={handleSimpleIngestSubmit}
