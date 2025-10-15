@@ -150,7 +150,7 @@ function interpretNetworkError(
   if (timedOut) {
     return {
       status: "offline",
-      message: `API health check timed out after ${Math.round(timeoutMs / 100) / 10}s.`,
+      message: `API health check timed out after ${timeoutMs / 1000}s.`,
     };
   }
 
