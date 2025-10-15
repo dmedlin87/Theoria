@@ -737,7 +737,7 @@ class EchoClient:
             if not index_value or not remainder:
                 continue
 
-            if " (OSIS " not in remainder:
+            if remainder.count(" (OSIS ") != 1:
                 continue
             snippet_part, metadata = remainder.rsplit(" (OSIS ", 1)
             snippet_value = snippet_part.strip()
