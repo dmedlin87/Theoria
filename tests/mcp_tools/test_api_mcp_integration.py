@@ -115,7 +115,7 @@ class TestHandleNoteWrite:
         assert list(draft.tags) == ["grace", "love"]
         assert len(draft.evidences) == 1
         evidence = draft.evidences[0]
-        assert evidence.osis_refs == ("John.3.16",)
+        assert list(evidence.osis_refs) == ["John.3.16"]
         assert evidence.meta == {"translation": "KJV"}
 
     def test_preview_when_commit_false(self, fake_service):
