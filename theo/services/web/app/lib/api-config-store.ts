@@ -4,8 +4,171 @@ export type ApiCredentials = {
 };
 
 const STORAGE_KEY = "theo.api.credentials";
+const ENCRYPTED_PREFIX = "enc-v1:";
+const MIN_PASSPHRASE_LENGTH = 12;
 
 let cachedCredentials: ApiCredentials | null = null;
+let cachedCryptoKey: CryptoKey | null = null;
+let cachedCryptoPassphrase: string | null = null;
+
+type RuntimeCryptoContext = {
+  crypto: Crypto;
+  passphrase: string;
+};
+
+function getRuntimeCrypto(): RuntimeCryptoContext | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const runtimePassphrase = (window as any)?.THEO_API_ENCRYPTION_PASSPHRASE;
+  if (
+    typeof runtimePassphrase !== "string" ||
+    runtimePassphrase.length < MIN_PASSPHRASE_LENGTH
+  ) {
+    return null;
+  }
+
+  const runtimeCrypto = window.crypto;
+  if (!runtimeCrypto || !runtimeCrypto.subtle) {
+    return null;
+  }
+
+  return {
+    crypto: runtimeCrypto,
+    passphrase: runtimePassphrase,
+  };
+}
+
+async function getAesKey(context: RuntimeCryptoContext): Promise<CryptoKey | null> {
+  if (cachedCryptoKey && cachedCryptoPassphrase === context.passphrase) {
+    return cachedCryptoKey;
+  }
+
+  const encoder = new TextEncoder();
+  try {
+    const keyMaterial = await context.crypto.subtle.importKey(
+      "raw",
+      encoder.encode(context.passphrase),
+      { name: "PBKDF2" },
+      false,
+      ["deriveKey"],
+    );
+
+    const derivedKey = await context.crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: encoder.encode("theo-api-credentials"),
+        iterations: 100000,
+        hash: "SHA-256",
+      },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"],
+    );
+
+    cachedCryptoKey = derivedKey;
+    cachedCryptoPassphrase = context.passphrase;
+    return derivedKey;
+  } catch {
+    cachedCryptoKey = null;
+    cachedCryptoPassphrase = null;
+    return null;
+  }
+}
+
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToBuffer(str: string): ArrayBuffer {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+// Encrypts a JS object, returns base64 string containing IV and ciphertext
+async function encryptData(data: object): Promise<string> {
+  const context = getRuntimeCrypto();
+  if (!context) {
+    return JSON.stringify(data);
+  }
+
+  const key = await getAesKey(context);
+  if (!key) {
+    return JSON.stringify(data);
+  }
+
+  try {
+    const payload = JSON.stringify(data);
+    const encoder = new TextEncoder();
+    const iv = context.crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await context.crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      encoder.encode(payload),
+    );
+
+    return `${ENCRYPTED_PREFIX}${bufferToBase64(iv.buffer)}:${bufferToBase64(ciphertext)}`;
+  } catch {
+    return JSON.stringify(data);
+  }
+}
+
+// Decrypts an encrypted payload (or plain JSON), returns JS object
+async function decryptData(encrypted: string): Promise<object | null> {
+  if (!encrypted) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(encrypted);
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+  } catch {
+    // Not plain JSON; attempt to decrypt as AES-GCM payload
+  }
+
+  const context = getRuntimeCrypto();
+  if (!context) {
+    return null;
+  }
+
+  const token = encrypted.startsWith(ENCRYPTED_PREFIX)
+    ? encrypted.slice(ENCRYPTED_PREFIX.length)
+    : encrypted;
+  const [ivB64, ctB64] = token.split(":");
+  if (!ivB64 || !ctB64) {
+    return null;
+  }
+
+  const key = await getAesKey(context);
+  if (!key) {
+    return null;
+  }
+
+  try {
+    const decrypted = await context.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: new Uint8Array(base64ToBuffer(ivB64)) },
+      key,
+      base64ToBuffer(ctB64),
+    );
+    const decoder = new TextDecoder();
+    return JSON.parse(decoder.decode(decrypted));
+  } catch (err) {
+    console.error("Failed to decrypt API credentials:", err);
+  }
+}
 
 function normalizeValue(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
@@ -32,7 +195,8 @@ export function setCachedCredentials(credentials: ApiCredentials | null): void {
   cachedCredentials = credentials ? normalizeCredentials(credentials) : null;
 }
 
-export function readCredentialsFromStorage(): ApiCredentials | null {
+// Returns a promise for credentials; must be awaited by caller!
+export async function readCredentialsFromStorage(): Promise<ApiCredentials | null> {
   if (typeof window === "undefined") {
     return null;
   }
@@ -41,7 +205,8 @@ export function readCredentialsFromStorage(): ApiCredentials | null {
     if (!raw) {
       return null;
     }
-    const parsed = JSON.parse(raw) as Partial<ApiCredentials> | null;
+    // Attempt to decrypt (or parse plain JSON) before using the stored payload
+    const parsed = await decryptData(raw) as Partial<ApiCredentials> | null;
     if (!parsed || typeof parsed !== "object") {
       return null;
     }
@@ -55,7 +220,8 @@ export function readCredentialsFromStorage(): ApiCredentials | null {
   }
 }
 
-export function writeCredentialsToStorage(credentials: ApiCredentials): void {
+// Returns a promise; must be awaited if caller cares about completion!
+export async function writeCredentialsToStorage(credentials: ApiCredentials): Promise<void> {
   if (typeof window === "undefined") {
     return;
   }
@@ -65,7 +231,8 @@ export function writeCredentialsToStorage(credentials: ApiCredentials): void {
     return;
   }
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    const encrypted = await encryptData(normalized);
+    window.localStorage.setItem(STORAGE_KEY, encrypted);
   } catch {
     // Ignore storage errors (private browsing, quota issues, etc.)
   }
