@@ -37,7 +37,7 @@ from .stages.persisters import TextDocumentPersister, TranscriptDocumentPersiste
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 
-_resolve_host_addresses = ingest_network.resolve_host_addresses
+_parse_text_file = parse_text_file
 
 # Legacy alias retained for older tests/hooks that patch the private helper.
 # Keep this close to the imports so reloads and import * behaviour keep the
@@ -48,7 +48,7 @@ _resolve_host_addresses = ingest_network.resolve_host_addresses
 # access ``_parse_text_file`` before monkeypatching.
 
 
-_parse_text_file = parse_text_file
+_resolve_host_addresses = ingest_network.resolve_host_addresses
 
 
 __all__ = [

@@ -204,6 +204,12 @@ def test_ingest_file_pipeline_exposes_private_parse_text_helper(
     assert "metadata" in captured
 
 
+def test_ingest_pipeline_alias_is_kept() -> None:
+    from theo.services.api.app.ingest import pipeline as ingest_pipeline
+
+    assert ingest_pipeline._parse_text_file is ingest_pipeline.parse_text_file
+
+
 def test_ingest_html_with_windows_1252_bytes(
     tmp_path: Path, monkeypatch, api_client
 ) -> None:
