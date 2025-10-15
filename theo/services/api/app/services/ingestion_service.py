@@ -316,7 +316,7 @@ def get_ingestion_service(
         run_file_pipeline=run_file,
         run_url_pipeline=run_url,
         run_transcript_pipeline=run_transcript,
-        cli_module=_load_cli_ingest_module(),
+        cli_module=cli_source,
         log_workflow=log_workflow_event,
     )
 
