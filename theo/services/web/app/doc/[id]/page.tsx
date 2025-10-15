@@ -5,8 +5,8 @@ import type { DocumentDetail } from "./types";
 import { getApiBaseUrl } from "../../lib/api";
 
 interface DocumentPageProps {
-  params: { id: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 async function fetchDocument(id: string): Promise<DocumentDetail> {
@@ -22,6 +22,7 @@ async function fetchDocument(id: string): Promise<DocumentDetail> {
 }
 
 export default async function DocumentPage({ params }: DocumentPageProps) {
-  const document = await fetchDocument(params.id);
+  const { id } = await params;
+  const document = await fetchDocument(id);
   return <DocumentClient initialDocument={document} />;
 }

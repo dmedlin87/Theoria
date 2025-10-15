@@ -7,7 +7,7 @@
   align-items: flex-start;
   justify-content: center;
   padding-top: 15vh;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: overlay-fade-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);

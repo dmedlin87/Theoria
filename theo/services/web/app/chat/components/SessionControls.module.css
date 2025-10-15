@@ -16,16 +16,16 @@
   padding: 0.625rem 1.25rem;
   font-size: 0.9375rem;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
+  box-shadow: var(--shadow-md);
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, color 150ms ease;
 }
 
 .trigger:hover:enabled,
 .trigger:focus-visible {
   background: var(--ui-color-border-strong);
-  color: #fff;
+  color: var(--color-text-inverse);
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(29, 78, 216, 0.22);
+  box-shadow: var(--shadow-lg);
   outline: none;
 }
 
@@ -51,15 +51,16 @@
   border: none;
   border-radius: var(--ui-radius-md);
   background: var(--ui-color-error);
-  color: #fff;
+  color: var(--color-text-inverse);
   padding: 0.5rem 1rem;
   font-weight: 600;
   cursor: pointer;
+  font-size: 0.9375rem;
 }
 
 .dialogPrimary:hover,
 .dialogPrimary:focus-visible {
-  background: #991b1b;
+  background: var(--color-danger);
   outline: none;
 }
 

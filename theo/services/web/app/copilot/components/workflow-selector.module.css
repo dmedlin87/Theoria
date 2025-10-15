@@ -31,8 +31,8 @@
 
 .buttonActive {
   border: 2px solid var(--ui-color-border-strong);
-  background: #eff4ff;
-  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+  background: var(--color-accent-soft);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
 .header {
