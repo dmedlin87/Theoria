@@ -1,0 +1,76 @@
+/* VerseGraphSection Component Styles */
+
+.section {
+  margin: 2rem 0;
+}
+
+.heading {
+  margin-bottom: 0.5rem;
+}
+
+.emptyMessage {
+  margin: 0;
+}
+
+.summary {
+  margin: 0 0 1rem;
+  color: var(--color-text-muted);
+}
+
+/* Layout */
+.mainGrid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: start;
+}
+
+.filtersContainer {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Filters */
+.fieldset {
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  background: var(--color-surface);
+  margin: 0;
+}
+
+.legend {
+  font-weight: 600;
+}
+
+.checkboxLabel {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Graph Container */
+.graphContainer {
+  background: var(--color-surface);
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border-subtle);
+  padding: 1rem;
+  overflow: hidden;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .section {
+    margin: 1.5rem 0;
+  }
+  
+  .graphContainer {
+    padding: 0.75rem;
+  }
+}

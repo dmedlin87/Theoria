@@ -1,3 +1,4 @@
+import styles from "./WorkflowFormFields.module.css";
 import type { ExportPreset, ExportPresetId, WorkflowId } from "./types";
 import type {
   CollaborationFormState,
@@ -49,16 +50,16 @@ export default function WorkflowFormFields({
               onChange={(event) => verse.onChange({ passage: event.target.value })}
               placeholder="Mark 16:9–20"
               required={!verse.form.useAdvanced}
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
           {!verse.form.useAdvanced && (
-            <p style={{ margin: "-0.5rem 0 0", fontSize: "0.85rem", color: "#475569" }}>
-              Describe a passage naturally, such as “Mark 16:9–20” or “John 1:1-5”. We will resolve the exact
+            <p className={styles.helperText}>
+              Describe a passage naturally, such as "Mark 16:9–20" or "John 1:1-5". We will resolve the exact
               reference for you.
             </p>
           )}
-          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <label className={styles.checkboxLabel}>
             <input
               type="checkbox"
               checked={verse.form.useAdvanced}
@@ -76,7 +77,7 @@ export default function WorkflowFormFields({
                   onChange={(event) => verse.onChange({ osis: event.target.value })}
                   placeholder="John.1.1-5"
                   required
-                  style={{ width: "100%" }}
+                  className={styles.fullWidthInput}
                 />
               </label>
             </>
@@ -100,7 +101,7 @@ export default function WorkflowFormFields({
                 }
               }}
               placeholder="What themes emerge in the Beatitudes?"
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
         </>
@@ -116,7 +117,7 @@ export default function WorkflowFormFields({
               onChange={(event) => sermon.onChange({ topic: event.target.value })}
               placeholder="Grace and forgiveness"
               required
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
           <label>
@@ -126,7 +127,7 @@ export default function WorkflowFormFields({
               value={sermon.form.osis}
               onChange={(event) => sermon.onChange({ osis: event.target.value })}
               placeholder="Luke.15"
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
         </>
@@ -142,7 +143,7 @@ export default function WorkflowFormFields({
               onChange={(event) => comparative.onChange({ osis: event.target.value })}
               placeholder="John.1.1"
               required
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
           <label>
@@ -153,7 +154,7 @@ export default function WorkflowFormFields({
               onChange={(event) => comparative.onChange({ participants: event.target.value })}
               placeholder="Augustine, Luther, Calvin"
               required
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
         </>
@@ -167,7 +168,7 @@ export default function WorkflowFormFields({
             value={multimedia.form.collection}
             onChange={(event) => multimedia.onChange({ collection: event.target.value })}
             placeholder="Gospels"
-            style={{ width: "100%" }}
+            className={styles.fullWidthInput}
           />
         </label>
       );
@@ -182,7 +183,7 @@ export default function WorkflowFormFields({
               onChange={(event) => devotional.onChange({ osis: event.target.value })}
               placeholder="John.1.1-5"
               required
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
           <label>
@@ -193,7 +194,7 @@ export default function WorkflowFormFields({
               onChange={(event) => devotional.onChange({ focus: event.target.value })}
               placeholder="God's Word in creation"
               required
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
         </>
@@ -209,7 +210,7 @@ export default function WorkflowFormFields({
               onChange={(event) => collaboration.onChange({ thread: event.target.value })}
               placeholder="forum-thread-42"
               required
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
           <label>
@@ -220,7 +221,7 @@ export default function WorkflowFormFields({
               onChange={(event) => collaboration.onChange({ osis: event.target.value })}
               placeholder="Romans.8.1-4"
               required
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
           <label>
@@ -231,7 +232,7 @@ export default function WorkflowFormFields({
               onChange={(event) => collaboration.onChange({ viewpoints: event.target.value })}
               placeholder="Logos Christology, Early Fathers, Reformers"
               required
-              style={{ width: "100%" }}
+              className={styles.fullWidthInput}
             />
           </label>
         </>
@@ -245,7 +246,7 @@ export default function WorkflowFormFields({
             value={curation.form.since}
             onChange={(event) => curation.onChange({ since: event.target.value })}
             placeholder="2024-01-01T00:00:00"
-            style={{ width: "100%" }}
+            className={styles.fullWidthInput}
           />
         </label>
       );
@@ -260,7 +261,7 @@ export default function WorkflowFormFields({
                 exportPreset.onChange({ preset: event.target.value as ExportPresetId })
               }
               name="exportPreset"
-              style={{ width: "100%" }}
+              className={styles.fullWidthSelect}
             >
               {exportPresets.map((preset) => (
                 <option key={preset.id} value={preset.id}>
@@ -277,7 +278,7 @@ export default function WorkflowFormFields({
             if (preset.type === "sermon") {
               return (
                 <>
-                  <p style={{ margin: 0, color: "#555" }}>{preset.description}</p>
+                  <p className={styles.presetDescription}>{preset.description}</p>
                   <label>
                     Sermon topic
                     <input
@@ -286,7 +287,7 @@ export default function WorkflowFormFields({
                       onChange={(event) => exportPreset.onChange({ topic: event.target.value })}
                       placeholder="Embodied hope"
                       required
-                      style={{ width: "100%" }}
+                      className={styles.fullWidthInput}
                     />
                   </label>
                   <label>
@@ -296,7 +297,7 @@ export default function WorkflowFormFields({
                       value={exportPreset.form.osis}
                       onChange={(event) => exportPreset.onChange({ osis: event.target.value })}
                       placeholder="John.1.1"
-                      style={{ width: "100%" }}
+                      className={styles.fullWidthInput}
                     />
                   </label>
                 </>
@@ -304,7 +305,7 @@ export default function WorkflowFormFields({
             }
             return (
               <>
-                <p style={{ margin: 0, color: "#555" }}>{preset.description}</p>
+                <p className={styles.presetDescription}>{preset.description}</p>
                 <label>
                   Document identifier
                   <input
@@ -313,7 +314,7 @@ export default function WorkflowFormFields({
                     onChange={(event) => exportPreset.onChange({ documentId: event.target.value })}
                     placeholder="doc-123"
                     required
-                    style={{ width: "100%" }}
+                    className={styles.fullWidthInput}
                   />
                 </label>
               </>

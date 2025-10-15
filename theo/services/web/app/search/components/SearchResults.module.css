@@ -1,0 +1,12 @@
+/* SearchResults Component Styles */
+
+.panel {
+  padding: var(--space-2);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .panel {
+    padding: var(--space-1);
+  }
+}

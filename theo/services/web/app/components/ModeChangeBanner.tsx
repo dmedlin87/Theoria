@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { useMode } from "../mode-context";
+import styles from "./ModeChangeBanner.module.css";
 
 interface ModeChangeBannerProps {
   area: string;
@@ -44,18 +45,7 @@ export default function ModeChangeBanner({ area }: ModeChangeBannerProps) {
   }
 
   return (
-    <div
-      role="status"
-      style={{
-        margin: "0.75rem 0",
-        padding: "0.75rem 1rem",
-        borderRadius: "0.75rem",
-        background: "rgba(37, 99, 235, 0.1)",
-        color: "#1d4ed8",
-        border: "1px solid rgba(37, 99, 235, 0.2)",
-        fontSize: "0.9rem",
-      }}
-    >
+    <div role="status" className={styles.banner}>
       {message}
     </div>
   );

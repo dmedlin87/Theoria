@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent } from "react";
+import styles from "./SortControls.module.css";
 
 import { GroupSortKey } from "../groupSorting";
 
@@ -36,32 +37,16 @@ export function SortControls({ value, onChange }: SortControlsProps): JSX.Elemen
     <fieldset
       role="radiogroup"
       aria-label="Sort search results"
-      style={{
-        border: "1px solid #d1d5db",
-        borderRadius: "0.75rem",
-        padding: "0.75rem 1rem",
-        display: "grid",
-        gap: "0.5rem",
-      }}
+      className={styles.fieldset}
     >
-      <legend style={{ fontWeight: 600, padding: "0 0.5rem" }}>Sort results</legend>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+      <legend className={styles.legend}>Sort results</legend>
+      <div className={styles.optionsContainer}>
         {SORT_OPTIONS.map((option) => {
           const isActive = value === option.key;
           return (
             <label
               key={option.key}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.5rem 0.75rem",
-                borderRadius: "999px",
-                border: isActive ? "2px solid #1d4ed8" : "1px solid #d1d5db",
-                background: isActive ? "#dbeafe" : "#f9fafb",
-                cursor: "pointer",
-                transition: "all 0.2s ease-in-out",
-              }}
+              className={`${styles.optionLabel} ${isActive ? styles.active : ""}`}
             >
               <input
                 type="radio"
@@ -69,14 +54,14 @@ export function SortControls({ value, onChange }: SortControlsProps): JSX.Elemen
                 value={option.key}
                 checked={isActive}
                 onChange={handleChange}
-                style={{ margin: 0 }}
+                className={styles.radioInput}
                 aria-describedby={`sort-${option.key}-description`}
               />
               <span>
-                <span style={{ display: "block", fontWeight: 600 }}>{option.label}</span>
+                <span className={styles.optionTitle}>{option.label}</span>
                 <span
                   id={`sort-${option.key}-description`}
-                  style={{ display: "block", fontSize: "0.8rem", color: "#4b5563" }}
+                  className={styles.optionDescription}
                 >
                   {option.description}
                 </span>

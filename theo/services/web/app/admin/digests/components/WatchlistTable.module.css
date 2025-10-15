@@ -1,0 +1,28 @@
+/* WatchlistTable Component Styles */
+
+.container {
+  gap: 1rem;
+}
+
+.headerRow {
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.activeCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filtersStack {
+  gap: 0.25rem;
+}
+
+.actionsStack {
+  gap: 0.25rem;
+}
+
+.pagination {
+  gap: 0.5rem;
+}

@@ -7,6 +7,7 @@ import Breadcrumbs from "../../components/Breadcrumbs";
 import VirtualList from "../../components/VirtualList";
 
 import DeliverableExportAction from "../../components/DeliverableExportAction";
+import styles from "./DocumentClient.module.css";
 import { buildPassageLink, formatAnchor, getApiBaseUrl } from "../../lib/api";
 import type {
   DocumentAnnotation,
@@ -306,10 +307,10 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
       <h2>{document.title ?? "Document"}</h2>
       <p>Document ID: {document.id}</p>
 
-      <details open style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>
-        <summary style={{ fontSize: "1.125rem", fontWeight: 600, cursor: "pointer" }}>Read & annotate</summary>
-        <div style={{ marginTop: "1rem", display: "grid", gap: "1.5rem" }}>
-          <div style={{ display: "grid", gap: "0.35rem" }}>
+      <details open className={styles.detailsSection}>
+        <summary className={styles.detailsSummary}>Read & annotate</summary>
+        <div className={styles.detailsContent}>
+          <div className={styles.metaGrid}>
             {document.source_url &&
               (isSafeSourceUrl(document.source_url) ? (
                 <a href={document.source_url} target="_blank" rel="noopener noreferrer">
@@ -326,7 +327,7 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
 
           <section aria-labelledby="document-annotations-heading">
             <h2 id="document-annotations-heading">Annotations</h2>
-            <form onSubmit={handleAnnotationSubmit} style={{ display: "grid", gap: "0.5rem", maxWidth: 520 }}>
+            <form onSubmit={handleAnnotationSubmit} className={styles.annotationForm}>
               <textarea
                 name="annotation"
                 ref={annotationTextareaRef}
@@ -334,58 +335,31 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
                 onChange={(event) => setNewAnnotation(event.target.value)}
                 rows={3}
                 placeholder="Add a researcher note"
-                style={{ width: "100%" }}
+                className={styles.annotationTextarea}
               />
-              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+              <div className={styles.formActions}>
                 <button type="submit" disabled={isSavingAnnotation}>
                   {isSavingAnnotation ? "Saving." : "Add annotation"}
                 </button>
                 {annotationError && (
-                  <span role="alert" style={{ color: "crimson" }}>
+                  <span role="alert" className={styles.errorText}>
                     {annotationError}
                   </span>
                 )}
               </div>
             </form>
             {document.annotations.length === 0 ? (
-              <p style={{ marginTop: "1rem" }}>No annotations yet.</p>
+              <p className={styles.noResults}>No annotations yet.</p>
             ) : (
-              <ul style={{ listStyle: "none", margin: "1rem 0 0", padding: 0, display: "grid", gap: "0.75rem" }}>
+              <ul className={styles.annotationsList}>
                 {document.annotations.map((annotation) => {
-              const badgeStyle = typeBadgeStyles[annotation.type] ?? typeBadgeStyles.note;
               const badges = (
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      fontSize: "0.75rem",
-                      padding: "0.125rem 0.5rem",
-                      borderRadius: "999px",
-                      fontWeight: 600,
-                      background: badgeStyle.background,
-                      color: badgeStyle.color,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.03em",
-                    }}
-                  >
+                <div className={styles.annotationBadges}>
+                  <span className={`${styles.annotationBadge} ${styles[`annotationBadge--${annotation.type}`]}`}>
                     {typeLabels[annotation.type]}
                   </span>
                   {annotation.stance ? (
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        fontSize: "0.75rem",
-                        padding: "0.125rem 0.5rem",
-                        borderRadius: "999px",
-                        fontWeight: 600,
-                        background: "#f8fafc",
-                        color: "#0f172a",
-                        border: "1px solid #cbd5f5",
-                        letterSpacing: "0.03em",
-                      }}
-                    >
+                    <span className={styles.annotationStance}>
                       {annotation.stance}
                     </span>
                   ) : null}
@@ -395,14 +369,14 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
               return (
                 <li
                   key={annotation.id}
-                  style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "0.5rem", padding: "0.75rem" }}
+                  className={styles.annotationCard}
                 >
                   {badges}
-                  <p style={{ margin: "0 0 0.5rem", whiteSpace: "pre-wrap" }}>{annotation.body}</p>
+                  <p className={styles.annotationBody}>{annotation.body}</p>
                   {annotation.passage_ids.length > 0 ? (
-                    <div style={{ marginBottom: "0.5rem" }}>
-                      <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#475569" }}>Linked passages</span>
-                      <ul style={{ margin: "0.25rem 0 0", paddingLeft: "1rem", display: "grid", gap: "0.25rem" }}>
+                    <div className={styles.linkedPassages}>
+                      <span className={styles.linkedPassagesLabel}>Linked passages</span>
+                      <ul className={styles.linkedPassagesList}>
                         {annotation.passage_ids.map((passageId, index) => {
                           const passage = passageLookup.get(passageId);
                           const anchorLabel = passage ? formatAnchor({
@@ -419,7 +393,7 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
                               <Link
                                 href={href}
                                 prefetch={false}
-                                style={{ color: "#2563eb", textDecoration: "underline" }}
+                                className={styles.passageLink}
                               >
                                 {anchorLabel || `Passage ${index + 1}`}
                               </Link>
@@ -429,20 +403,12 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
                       </ul>
                     </div>
                   ) : null}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontSize: "0.85rem",
-                      color: "#555",
-                    }}
-                  >
+                  <div className={styles.annotationFooter}>
                     <span>{formatTimestamp(annotation.updated_at)}</span>
                     <button
                       type="button"
                       onClick={() => handleDeleteAnnotation(annotation.id)}
-                      style={{ color: "crimson", background: "none", border: "none", cursor: "pointer" }}
+                      className={styles.deleteButton}
                     >
                       Delete
                     </button>
@@ -455,18 +421,18 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
           </section>
 
           <section>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-              <h2 style={{ margin: 0 }}>Passages</h2>
+            <div className={styles.passagesHeader}>
+              <h2 className={styles.passagesHeading}>Passages</h2>
               <button
                 type="button"
                 onClick={handleAddAnnotationShortcut}
-                style={{ padding: "0.5rem 0.85rem", borderRadius: "999px", border: "1px solid #2563eb", background: "#2563eb", color: "#fff" }}
+                className={styles.addAnnotationButton}
               >
                 Add annotation
               </button>
             </div>
             {document.passages.length === 0 ? (
-              <p style={{ marginTop: "1rem" }}>No passages available for this document.</p>
+              <p className={styles.noResults}>No passages available for this document.</p>
             ) : (
               <VirtualList
                 items={document.passages}
@@ -491,15 +457,15 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
                       data-last={index === document.passages.length - 1}
                     >
                       <article>
-                        <header>
-                          {anchor && <p style={{ margin: "0 0 0.5rem" }}>{anchor}</p>}
+                        <header className={styles.passageHeader}>
+                          {anchor && <p className={styles.passageMeta}>{anchor}</p>}
                           {passage.osis_ref && (
-                            <p style={{ margin: 0 }}>
+                            <p className={styles.passageMeta}>
                               Verse reference: <Link href={`/verse/${passage.osis_ref}`}>{passage.osis_ref}</Link>
                             </p>
                           )}
                         </header>
-                        <p style={{ marginTop: "0.75rem", whiteSpace: "pre-wrap" }}>{passage.text}</p>
+                        <p className={styles.passageText}>{passage.text}</p>
                       </article>
                     </div>
                   );
@@ -510,9 +476,9 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
         </div>
       </details>
 
-      <details style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>
-        <summary style={{ fontSize: "1.125rem", fontWeight: 600, cursor: "pointer" }}>Exports</summary>
-        <div style={{ marginTop: "1rem" }}>
+      <details className={styles.detailsSection}>
+        <summary className={styles.detailsSummary}>Exports</summary>
+        <div className={styles.detailsContent}>
           <DeliverableExportAction
             label="Export Q&A digest"
             preparingText="Generating transcript digest…"
@@ -527,64 +493,64 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
         </div>
       </details>
 
-      <details style={{ margin: "1.5rem 0", border: "1px solid #e2e8f0", borderRadius: "0.75rem", padding: "1rem" }}>
-        <summary style={{ fontSize: "1.125rem", fontWeight: 600, cursor: "pointer" }}>Edit metadata</summary>
+      <details className={styles.detailsSection}>
+        <summary className={styles.detailsSummary}>Edit metadata</summary>
         <form
           onSubmit={handleMetadataSubmit}
-          style={{ marginTop: "1rem", display: "grid", gap: "0.75rem", maxWidth: 560 }}
+          className={styles.metadataForm}
         >
-          <fieldset disabled={isSavingMetadata} style={{ display: "grid", gap: "0.75rem" }}>
-            <label>
-              Title
+          <fieldset disabled={isSavingMetadata} className={styles.metadataFieldset}>
+            <label className={styles.formField}>
+              <span className={styles.formLabel}>Title</span>
               <input
                 type="text"
                 name="title"
                 value={metadataDraft.title}
                 onChange={handleMetadataInputChange("title")}
-                style={{ width: "100%" }}
+                className={styles.formInput}
               />
             </label>
-            <label>
-              Collection
+            <label className={styles.formField}>
+              <span className={styles.formLabel}>Collection</span>
               <input
                 type="text"
                 name="collection"
                 value={metadataDraft.collection}
                 onChange={handleMetadataInputChange("collection")}
-                style={{ width: "100%" }}
+                className={styles.formInput}
               />
             </label>
-            <label>
-              Authors (comma separated)
+            <label className={styles.formField}>
+              <span className={styles.formLabel}>Authors (comma separated)</span>
               <input
                 type="text"
                 name="authors"
                 value={metadataDraft.authors}
                 onChange={handleMetadataInputChange("authors")}
-                style={{ width: "100%" }}
+                className={styles.formInput}
               />
             </label>
-            <label>
-              Source type
+            <label className={styles.formField}>
+              <span className={styles.formLabel}>Source type</span>
               <input
                 type="text"
                 name="source_type"
                 value={metadataDraft.sourceType}
                 onChange={handleMetadataInputChange("sourceType")}
-                style={{ width: "100%" }}
+                className={styles.formInput}
               />
             </label>
-            <label>
-              Abstract
+            <label className={styles.formField}>
+              <span className={styles.formLabel}>Abstract</span>
               <textarea
                 name="abstract"
                 value={metadataDraft.abstract}
                 onChange={handleMetadataInputChange("abstract")}
                 rows={4}
-                style={{ width: "100%" }}
+                className={styles.formTextarea}
               />
             </label>
-            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+            <div className={styles.formActions}>
               <button type="submit">{isSavingMetadata ? "Saving." : "Save changes"}</button>
               {lastMetadataSnapshot && !isSavingMetadata && (
                 <button type="button" onClick={handleMetadataUndo}>
@@ -594,12 +560,12 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
             </div>
           </fieldset>
           {metadataMessage && (
-            <p role="status" style={{ margin: 0 }}>
+            <p role="status" className={styles.statusMessage}>
               {metadataMessage}
             </p>
           )}
           {metadataError && (
-            <p role="alert" style={{ color: "crimson", margin: 0 }}>
+            <p role="alert" className={`${styles.statusMessage} ${styles.errorText}`}>
               {metadataError}
             </p>
           )}

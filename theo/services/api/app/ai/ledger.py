@@ -704,6 +704,9 @@ class SharedLedger:
                     missing_logged = False
                 if observed_updated_at is None:
                     observed_updated_at = row.updated_at
+                    # Ensure preserved completions that predate this waiter
+                    # remain eligible when we encounter earlier update times.
+                    delivery_floor = min(delivery_floor, observed_updated_at)
                 if (
                     row.output is not None
                     and row.completed_at is not None
@@ -715,6 +718,8 @@ class SharedLedger:
                     preserved_completed_at = row.completed_at
                     preserved_record = _row_to_record(row)
                     self._store_preserved(preserved_record)
+                    if preserved_completed_at is not None:
+                        delivery_floor = min(delivery_floor, preserved_completed_at)
                     last_error_message = None
                     if preserved_completed_at is not None and preserved_completed_at >= start:
                         if row.status == "waiting":
@@ -745,6 +750,7 @@ class SharedLedger:
                         comparison_floor=comparison_floor,
                     )
                     comparison_floor = row.updated_at
+                    delivery_floor = min(delivery_floor, comparison_floor)
                 if (
                     last_status != row.status
                     or last_updated_at is None
@@ -852,7 +858,9 @@ class SharedLedger:
                         and row.completed_at is not None
                     ):
                         comparison_floor = row.updated_at
+                        delivery_floor = min(delivery_floor, comparison_floor)
                     observed_updated_at = row.updated_at
+                    delivery_floor = min(delivery_floor, observed_updated_at)
                 time.sleep(poll_interval)
                 continue
             if row.status == "success":

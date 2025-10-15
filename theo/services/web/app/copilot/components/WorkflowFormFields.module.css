@@ -1,0 +1,26 @@
+/* WorkflowFormFields Component Styles */
+
+.fullWidthInput {
+  width: 100%;
+}
+
+.fullWidthSelect {
+  width: 100%;
+}
+
+.helperText {
+  margin: -0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.presetDescription {
+  margin: 0;
+  color: var(--color-text-muted);
+}

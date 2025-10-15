@@ -1,0 +1,178 @@
+/* Export Page Styles */
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.pageTitle {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.pageDescription {
+  margin-bottom: 1.5rem;
+}
+
+/* Form Section */
+.formSection {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.formLabel {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.formLabelTight {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.textarea {
+  font-family: var(--font-mono);
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.input {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.select {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.filterGrid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+/* Buttons */
+.buttonGroup {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.primaryButton {
+  padding: 0.75rem 1.5rem;
+  border-radius: 999px;
+  border: none;
+  background-color: var(--accent);
+  color: white;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  padding: 0.75rem 1.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Status Messages */
+.errorMessage {
+  color: var(--color-danger);
+  margin-bottom: 1.5rem;
+}
+
+.successMessage {
+  color: var(--color-positive);
+  margin-bottom: 1.5rem;
+}
+
+/* Preview Section */
+.previewSection {
+  display: grid;
+  gap: 1rem;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.manifestPre {
+  font-size: 0.9rem;
+  padding: 0.75rem;
+  background-color: var(--color-surface-muted);
+  border-radius: 8px;
+  overflow-x: auto;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.previewList {
+  display: grid;
+  gap: 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.previewItem {
+  line-height: 1.5;
+}
+
+.emptyState {
+  color: var(--color-text-muted);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .container {
+    padding: 1.5rem 1rem;
+  }
+
+  .buttonGroup {
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+
+  .filterGrid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,19 @@
+/* ModeChangeBanner Component Styles */
+
+.banner {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-info);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .banner {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.85rem;
+  }
+}

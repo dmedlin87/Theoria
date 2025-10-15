@@ -1,4 +1,5 @@
 import React from "react";
+import styles from "./RAGAnswer.module.css";
 
 import CitationList from "./CitationList";
 import type { RAGAnswer, RAGCitation, WorkflowId } from "./types";
@@ -41,34 +42,26 @@ export default function RAGAnswerBlock({
     : [];
   const showMetadata = Boolean(answer.model_name || answer.model_output || guardrailEntries.length);
   return (
-    <div style={{ marginTop: "1rem", display: "grid", gap: "1rem" }}>
+    <div className={styles.container}>
       <section>
         <h4>Summary</h4>
-        <p style={{ lineHeight: 1.6 }}>{answer.summary}</p>
+        <p className={styles.summaryText}>{answer.summary}</p>
       </section>
       {showMetadata ? (
         <section>
           <h4>Model metadata</h4>
-          <div style={{ display: "grid", gap: "0.25rem" }}>
+          <div className={styles.metadataContainer}>
             {answer.model_name ? (
               <div>
-                <span style={{ fontWeight: 600 }}>Model:</span> {answer.model_name}
+                <span className={styles.modelLabel}>Model:</span> {answer.model_name}
               </div>
             ) : null}
             {guardrailEntries.length ? (
-              <dl
-                style={{
-                  margin: 0,
-                  display: "grid",
-                  gridTemplateColumns: "max-content 1fr",
-                  columnGap: "0.5rem",
-                  rowGap: "0.25rem",
-                }}
-              >
+              <dl className={styles.guardrailList}>
                 {guardrailEntries.map(([key, value]) => (
                   <React.Fragment key={key}>
-                    <dt style={{ fontWeight: 600 }}>{formatGuardrailLabel(key)}</dt>
-                    <dd style={{ margin: 0 }}>{value}</dd>
+                    <dt className={styles.guardrailTerm}>{formatGuardrailLabel(key)}</dt>
+                    <dd className={styles.guardrailDefinition}>{value}</dd>
                   </React.Fragment>
                 ))}
               </dl>
@@ -76,14 +69,7 @@ export default function RAGAnswerBlock({
             {answer.model_output ? (
               <details>
                 <summary>View raw model output</summary>
-                <pre
-                  style={{
-                    marginTop: "0.5rem",
-                    background: "#f9fafb",
-                    padding: "0.75rem",
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
+                <pre className={styles.rawOutput}>
                   {answer.model_output}
                 </pre>
               </details>

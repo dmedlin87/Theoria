@@ -82,16 +82,17 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
   return (
     <RadixToastProvider label="Notifications" swipeDirection="right">
       <ToastViewport />
-    <div
-      role="region"
-      aria-label="Notifications"
-      aria-live="polite"
-      aria-atomic="false"
-      className="toast-container"
-    >
-      {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
-      ))}
+      <div
+        role="region"
+        aria-label="Notifications"
+        aria-live="polite"
+        aria-atomic="false"
+        className="toast-container"
+      >
+        {toasts.map((toast) => (
+          <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
+        ))}
+      </div>
     </RadixToastProvider>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import styles from "./MorphologyPanel.module.css";
 
 import { formatEmphasisSummary } from "../../mode-config";
 import { useMode } from "../../mode-context";
@@ -82,45 +83,40 @@ export default function MorphologyPanel({ osis, features }: MorphologyPanelProps
   return (
     <section
       aria-labelledby="morphology-heading"
-      style={{
-        background: "#fff",
-        borderRadius: "0.5rem",
-        padding: "1rem",
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
-      }}
+      className={styles.panel}
     >
-      <h3 id="morphology-heading" style={{ marginTop: 0 }}>
+      <h3 id="morphology-heading" className={styles.panelHeading}>
         Morphology
       </h3>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
+      <p className={styles.description}>
         Analyze lexical and grammatical details for <strong>{osis}</strong>.
       </p>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.875rem" }}>
+      <p className={styles.modeSummary}>
         {modeSummary}
       </p>
       {loading ? (
         <p>Loading morphology…</p>
       ) : error ? (
-        <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+        <p role="alert" className={styles.errorMessage}>
           Unable to load morphology. {error}
         </p>
       ) : tokens.length === 0 ? (
         <p>No morphology tokens available.</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
+        <div className={styles.tableContainer}>
+          <table className={styles.table}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                <th className={styles.tableHeader}>
                   Surface
                 </th>
-                <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                <th className={styles.tableHeader}>
                   Lemma
                 </th>
-                <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                <th className={styles.tableHeader}>
                   Morphology
                 </th>
-                <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                <th className={styles.tableHeader}>
                   Gloss
                 </th>
               </tr>
@@ -128,16 +124,16 @@ export default function MorphologyPanel({ osis, features }: MorphologyPanelProps
             <tbody>
               {tokens.map((token) => (
                 <tr key={`${token.osis}-${token.position ?? "0"}`}>
-                  <td style={{ padding: "0.5rem", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                  <td className={styles.tableCell}>
                     {token.surface}
                   </td>
-                  <td style={{ padding: "0.5rem", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                  <td className={styles.tableCell}>
                     {token.lemma ?? "—"}
                   </td>
-                  <td style={{ padding: "0.5rem", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                  <td className={styles.tableCell}>
                     {token.morph ?? "—"}
                   </td>
-                  <td style={{ padding: "0.5rem", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                  <td className={styles.tableCell}>
                     {token.gloss ?? "—"}
                   </td>
                 </tr>

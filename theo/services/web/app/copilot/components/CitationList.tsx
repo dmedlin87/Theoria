@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getApiBaseUrl } from "../../lib/api";
+import styles from "./CitationList.module.css";
 import type { components } from "../../lib/generated/api";
 import type { RAGCitation, WorkflowId } from "./types";
 
@@ -285,10 +286,10 @@ export default function CitationList({
   }
 
   return (
-    <div style={{ marginTop: "1rem", display: "grid", gap: "1rem" }}>
+    <div className={styles.container}>
       <div>
         <h4>Citations</h4>
-        <ol style={{ paddingLeft: "1.25rem", margin: 0, display: "grid", gap: "0.75rem" }}>
+        <ol className={styles.citationsList}>
           {citations.map((citation) => {
             const notes = (annotationsByDocument[citation.document_id] ?? []).filter(
               (annotation) =>
@@ -298,57 +299,29 @@ export default function CitationList({
             );
             const content = (
               <>
-                <span style={{ fontWeight: 600 }}>
+                <span className={styles.citationReference}>
                   {citation.osis} ({citation.anchor})
                 </span>
                 {citation.document_title && (
-                  <span
-                    style={{
-                      display: "block",
-                      marginTop: "0.25rem",
-                      fontSize: "0.9rem",
-                      color: "#475569",
-                    }}
-                  >
+                  <span className={styles.documentTitle}>
                     {citation.document_title}
                   </span>
                 )}
-                <span
-                  style={{
-                    display: "block",
-                    marginTop: "0.35rem",
-                    fontStyle: "italic",
-                    color: "#0f172a",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  “{citation.snippet}”
+                <span className={styles.citationSnippet}>
+                  "{citation.snippet}"
                 </span>
                 {notes.length ? (
-                  <ul
-                    style={{
-                      margin: "0.75rem 0 0",
-                      paddingLeft: "1rem",
-                      display: "grid",
-                      gap: "0.35rem",
-                    }}
-                  >
+                  <ul className={styles.notesList}>
                     {notes.map((annotation) => (
                       <li
                         key={`${annotation.id}-${citation.index}`}
-                        style={{
-                          fontSize: "0.85rem",
-                          background: "#f1f5f9",
-                          borderRadius: "0.5rem",
-                          padding: "0.5rem 0.75rem",
-                          border: "1px solid #e2e8f0",
-                        }}
+                        className={styles.noteItem}
                       >
-                        <span style={{ fontWeight: 600, display: "block" }}>
+                        <span className={styles.noteHeader}>
                           {annotation.type.charAt(0).toUpperCase() + annotation.type.slice(1)}
                           {annotation.stance ? ` · ${annotation.stance}` : ""}
                         </span>
-                        <span style={{ display: "block", marginTop: "0.15rem" }}>
+                        <span className={styles.noteBody}>
                           {annotation.body}
                         </span>
                       </li>
@@ -357,28 +330,19 @@ export default function CitationList({
                 ) : null}
               </>
             );
-            const commonStyle = {
-              display: "block",
-              padding: "0.75rem",
-              border: "1px solid #e2e8f0",
-              borderRadius: "0.5rem",
-              background: "#f8fafc",
-              textDecoration: "none",
-              color: "inherit",
-            } as const;
             return (
-              <li key={citation.index} style={{ margin: 0 }}>
+              <li key={citation.index} className={styles.citationItem}>
                 {citation.source_url ? (
                   <Link
                     href={citation.source_url}
                     prefetch={false}
-                    style={commonStyle}
+                    className={styles.citationCard}
                     title={`${citation.document_title ?? "Document"} — ${citation.snippet}`}
                   >
                     {content}
                   </Link>
                 ) : (
-                  <div style={commonStyle}>{content}</div>
+                  <div className={styles.citationCard}>{content}</div>
                 )}
               </li>
             );
@@ -387,23 +351,14 @@ export default function CitationList({
       </div>
 
       {documentChoices.length > 0 && hasSummary ? (
-        <section
-          style={{
-            border: "1px solid #e2e8f0",
-            borderRadius: "0.5rem",
-            padding: "0.75rem 1rem",
-            background: "#fff",
-            display: "grid",
-            gap: "0.5rem",
-          }}
-        >
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-            <label style={{ display: "grid", gap: "0.25rem" }}>
-              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Add as research note</span>
+        <section className={styles.researchNoteSection}>
+          <div className={styles.formRow}>
+            <label className={styles.formLabel}>
+              <span className={styles.labelText}>Add as research note</span>
               <select
                 value={selectedDocumentId}
                 onChange={(event) => setSelectedDocumentId(event.target.value)}
-                style={{ minWidth: "16rem", padding: "0.35rem" }}
+                className={styles.selectInput}
               >
                 {documentChoices.map((choice) => (
                   <option key={choice.id} value={choice.id}>
@@ -416,36 +371,29 @@ export default function CitationList({
               type="button"
               onClick={handleSaveClaimEvidence}
               disabled={isSavingBundle || missingPassage}
-              style={{ alignSelf: "flex-end" }}
+              className={styles.saveButton}
             >
               {isSavingBundle ? "Saving notes…" : "Save claim & evidence"}
             </button>
           </div>
           {missingPassage ? (
-            <p style={{ margin: 0, color: "#b91c1c" }}>
+            <p className={styles.errorMessage}>
               Each citation needs a passage reference before saving notes.
             </p>
           ) : null}
           {saveError ? (
-            <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+            <p role="alert" className={styles.errorMessage}>
               {saveError}
             </p>
           ) : null}
           {saveStatus ? (
-            <p style={{ margin: 0, color: "#047857" }}>{saveStatus}</p>
+            <p className={styles.successMessage}>{saveStatus}</p>
           ) : null}
         </section>
       ) : null}
 
       {onExport && (
-        <div
-          style={{
-            marginTop: "0.25rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.5rem",
-          }}
-        >
+        <div className={styles.exportSection}>
           <button
             type="button"
             onClick={() => onExport(citations)}
@@ -454,19 +402,19 @@ export default function CitationList({
             {exporting ? "Exporting citations…" : "Export selected citations"}
           </button>
           {citations.some((citation) => !citation.passage_id) ? (
-            <p style={{ margin: 0, color: "#b91c1c" }}>
+            <p className={styles.errorMessage}>
               Each citation needs a passage reference before you can export.
             </p>
           ) : null}
-          {status ? <p style={{ margin: 0, color: "#047857" }}>{status}</p> : null}
+          {status ? <p className={styles.successMessage}>{status}</p> : null}
         </div>
       )}
 
       {isLoadingAnnotations ? (
-        <p style={{ margin: 0, color: "#475569" }}>Loading linked notes…</p>
+        <p className={styles.loadingMessage}>Loading linked notes…</p>
       ) : null}
       {annotationsError ? (
-        <p role="alert" style={{ margin: 0, color: "#b91c1c" }}>
+        <p role="alert" className={styles.errorMessage}>
           {annotationsError}
         </p>
       ) : null}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import styles from "./GeoPanel.module.css";
 
 import { formatEmphasisSummary } from "../../mode-config";
 import { useMode } from "../../mode-context";
@@ -187,46 +188,41 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
   return (
     <section
       aria-labelledby="geo-panel-heading"
-      style={{
-        background: "#fff",
-        borderRadius: "0.5rem",
-        padding: "1rem",
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
-      }}
+      className={styles.panel}
     >
-      <h3 id="geo-panel-heading" style={{ marginTop: 0 }}>
+      <h3 id="geo-panel-heading" className={styles.panelHeading}>
         Geographic context
       </h3>
-      <p style={{ marginTop: 0 }}>
+      <p className={styles.description}>
         Discover locations linked to <strong>{osis}</strong>.
       </p>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.85rem" }}>{modeSummary}</p>
+      <p className={styles.modeSummary}>{modeSummary}</p>
       {verseLoading ? (
         <p>Loading locations mentioned in this verse…</p>
       ) : null}
       {verseError ? (
-        <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+        <p role="alert" className={styles.errorMessage}>
           {verseError}
         </p>
       ) : null}
       {!verseLoading && !verseError ? (
-        <div style={{ display: "grid", gap: "0.75rem", marginBottom: "1.5rem" }}>
-          <h4 style={{ margin: 0 }}>Places linked to this verse</h4>
+        <div className={styles.versePlacesSection}>
+          <h4 className={styles.sectionTitle}>Places linked to this verse</h4>
           {verseData?.places && verseData.places.length > 0 ? (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.75rem" }}>
+            <ul className={styles.placesList}>
               {verseData.places.map((place) => (
                 <li
                   key={place.ancient_id}
-                  style={{ border: "1px solid var(--border, #e5e7eb)", borderRadius: "0.5rem", padding: "0.75rem" }}
+                  className={styles.placeCard}
                 >
-                  <h4 style={{ margin: "0 0 0.25rem" }}>{place.friendly_id}</h4>
+                  <h4 className={styles.placeTitle}>{place.friendly_id}</h4>
                   {place.classification ? (
-                    <p style={{ margin: "0 0 0.5rem", fontSize: "0.85rem", color: "var(--muted-foreground, #4b5563)" }}>
+                    <p className={styles.placeClassification}>
                       Classification: {place.classification}
                     </p>
                   ) : null}
                   {place.modern_locations.length > 0 ? (
-                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.5rem" }}>
+                    <ul className={styles.locationsList}>
                       {place.modern_locations.map((location) => {
                         const lat =
                           typeof location.latitude === "number"
@@ -237,7 +233,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
                             ? location.longitude.toFixed(2)
                             : null;
                         return (
-                          <li key={location.modern_id} style={{ fontSize: "0.9rem" }}>
+                          <li key={location.modern_id} className={styles.locationItem}>
                             <strong>{location.friendly_id}</strong>
                             {lat && lng ? (
                               <span>
@@ -246,7 +242,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
                               </span>
                             ) : null}
                             {location.names && location.names.length > 0 ? (
-                              <div style={{ color: "var(--muted-foreground, #4b5563)" }}>
+                              <div className={styles.locationAliases}>
                                 Also known as: {location.names.join(", ")}
                               </div>
                             ) : null}
@@ -255,7 +251,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
                       })}
                     </ul>
                   ) : (
-                    <p style={{ margin: 0, fontSize: "0.9rem" }}>
+                    <p className={styles.noLocations}>
                       No modern locations are linked to this place yet.
                     </p>
                   )}
@@ -263,11 +259,11 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
               ))}
             </ul>
           ) : (
-            <p style={{ margin: 0 }}>No catalogued places reference this verse yet.</p>
+            <p className={styles.emptyState}>No catalogued places reference this verse yet.</p>
           )}
           {verseData?.attribution ? (
-            <div style={{ display: "grid", gap: "0.25rem", fontSize: "0.8rem", color: "var(--muted-foreground, #4b5563)" }}>
-              <p style={{ margin: 0 }}>
+            <div className={styles.attribution}>
+              <p className={styles.attributionText}>
                 Geodata ©{" "}
                 <a
                   href={verseData.attribution.url}
@@ -282,7 +278,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
                   : ""}
               </p>
               {verseData.attribution.osm_required ? (
-                <p style={{ margin: 0 }}>
+                <p className={styles.attributionText}>
                   Shapes ©{' '}
                   <a
                     href="https://www.openstreetmap.org/copyright"
@@ -299,15 +295,15 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
         </div>
       ) : null}
 
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem", marginBottom: "1rem" }}>
-        <label style={{ display: "grid", gap: "0.5rem" }}>
+      <form onSubmit={handleSubmit} className={styles.searchForm}>
+        <label className={styles.searchLabel}>
           Search locations
           <input
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="e.g. Jerusalem"
-            style={{ padding: "0.5rem", borderRadius: "0.375rem", border: "1px solid var(--border, #e5e7eb)" }}
+            className={styles.searchInput}
           />
         </label>
         <button type="submit" disabled={loading}>
@@ -316,7 +312,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
       </form>
 
       {error ? (
-        <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+        <p role="alert" className={styles.errorMessage}>
           {error}
         </p>
       ) : null}
@@ -326,7 +322,7 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
       ) : null}
 
       {results.length > 0 && (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.75rem" }}>
+        <ul className={styles.resultsList}>
           {results.map((item, index) => {
             const identifier = item.modern_id || item.slug || item.name || `geo-result-${index}`;
             const lat = typeof item.lat === "number" ? item.lat : null;
@@ -335,16 +331,16 @@ export default function GeoPanel({ osis, features }: GeoPanelProps) {
             return (
               <li
                 key={identifier}
-                style={{ border: "1px solid var(--border, #e5e7eb)", borderRadius: "0.5rem", padding: "0.75rem" }}
+                className={styles.resultCard}
               >
-                <h4 style={{ margin: "0 0 0.25rem" }}>{item.name ?? "Unknown location"}</h4>
+                <h4 className={styles.resultTitle}>{item.name ?? "Unknown location"}</h4>
                 {lat !== null && lng !== null ? (
-                  <p style={{ margin: "0 0 0.25rem", fontSize: "0.875rem" }}>
+                  <p className={styles.coordinates}>
                     Coordinates: {lat.toFixed(2)}, {lng.toFixed(2)}
                   </p>
                 ) : null}
                 {item.aliases && item.aliases.length > 0 ? (
-                  <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted-foreground, #4b5563)" }}>
+                  <p className={styles.aliases}>
                     Also known as: {item.aliases.join(", ")}
                   </p>
                 ) : null}

@@ -20,6 +20,7 @@ import { SavedSearchControls } from "./SavedSearchControls";
 import { DiffWorkspace } from "./DiffWorkspace";
 import { SearchSkeleton } from "./SearchSkeleton";
 import styles from "./SearchPageClient.module.css";
+import additionalStyles from "./SearchPageClient-additions.module.css";
 import {
   parseSearchParams,
   serializeSearchParams,
@@ -52,69 +53,6 @@ const classNames = (
   ...classes: Array<string | false | null | undefined>
 ) => classes.filter(Boolean).join(" ");
 
-const SOURCE_OPTIONS = [
-  { label: "Any source", value: "" },
-  { label: "PDF", value: "pdf" },
-  { label: "Markdown", value: "markdown" },
-  { label: "YouTube", value: "youtube" },
-  { label: "Transcript", value: "transcript" },
-];
-
-const TRADITION_OPTIONS = [
-  { label: "Any tradition", value: "" },
-  { label: "Anglican Communion", value: "anglican" },
-  { label: "Baptist", value: "baptist" },
-  { label: "Roman Catholic", value: "catholic" },
-  { label: "Eastern Orthodox", value: "orthodox" },
-  { label: "Reformed", value: "reformed" },
-  { label: "Wesleyan/Methodist", value: "wesleyan" },
-];
-
-const DOMAIN_OPTIONS = [
-  { label: "Any topic", value: "" },
-  { label: "Christology", value: "christology" },
-  { label: "Soteriology", value: "soteriology" },
-  { label: "Ecclesiology", value: "ecclesiology" },
-  { label: "Sacramental Theology", value: "sacramental" },
-  { label: "Biblical Theology", value: "biblical-theology" },
-  { label: "Christian Ethics", value: "ethics" },
-];
-
-const COLLECTION_FACETS = [
-  "Dead Sea Scrolls",
-  "Nag Hammadi",
-  "Church Fathers",
-  "Second Temple",
-];
-
-const DATASET_FILTERS = [
-  {
-    label: "Dead Sea Scrolls",
-    value: "dss",
-    description: "Qumran fragments and related parallels",
-  },
-  {
-    label: "Nag Hammadi Codices",
-    value: "nag-hammadi",
-    description: "Gnostic corpus for comparative study",
-  },
-];
-
-const VARIANT_FILTERS = [
-  { label: "Disputed readings", value: "disputed" },
-  { label: "Harmonized expansions", value: "harmonized" },
-  { label: "Orthographic shifts", value: "orthographic" },
-];
-
-const DATASET_LABELS = new Map(DATASET_FILTERS.map((option) => [option.value, option.label] as const));
-const VARIANT_LABELS = new Map(VARIANT_FILTERS.map((option) => [option.value, option.label] as const));
-const SOURCE_LABELS = new Map(SOURCE_OPTIONS.map((option) => [option.value, option.label] as const));
-const TRADITION_LABELS = new Map(
-  TRADITION_OPTIONS.map((option) => [option.value, option.label] as const),
-);
-const DOMAIN_LABELS = new Map(DOMAIN_OPTIONS.map((option) => [option.value, option.label] as const));
-
-const CUSTOM_PRESET_VALUE = "custom";
 const SAVED_SEARCH_STORAGE_KEY = "theo.search.saved";
 const FILTER_FIELD_KEYS: Array<keyof SearchFilters> = [
   "query",
@@ -658,24 +596,6 @@ export default function SearchPageClient({
     await runSearch(filters);
   };
 
-  const applyFilters = useCallback((filters: SearchFilters) => {
-    setQuery(filters.query);
-    setOsis(filters.osis);
-    setCollection(filters.collection);
-    setAuthor(filters.author);
-    setSourceType(filters.sourceType);
-    setTheologicalTradition(filters.theologicalTradition);
-    setTopicDomain(filters.topicDomain);
-    setCollectionFacets([...filters.collectionFacets]);
-    setDatasetFacets([...filters.datasetFacets]);
-    setVariantFacets([...filters.variantFacets]);
-    setDateStart(filters.dateStart);
-    setDateEnd(filters.dateEnd);
-    setIncludeVariants(filters.includeVariants);
-    setIncludeDisputed(filters.includeDisputed);
-    setPresetSelection(filters.preset ? filters.preset : CUSTOM_PRESET_VALUE);
-  }, []);
-
   const handleShowErrorDetails = useCallback(
     (traceId: string | null) => {
       const detailMessage = traceId
@@ -929,7 +849,7 @@ export default function SearchPageClient({
           </select>
         </label>
         {activePreset?.description && (
-          <p className={styles["search-advanced-help"]} style={{ marginTop: "0.35rem" }}>
+          <p className={`${styles["search-advanced-help"]} ${additionalStyles.presetDescription}`}>
             {activePreset.description}
           </p>
         )}
@@ -1353,7 +1273,7 @@ export default function SearchPageClient({
           {savedSearchContent}
         </section>
       ) : (
-        <details className={styles["search-advanced-details"]} style={{ margin: "2rem 0" }}>
+        <details className={`${styles["search-advanced-details"]} ${additionalStyles.savedSearchesDetails}`}>
           <summary className={styles["search-advanced-summary"]}>Saved searches</summary>
           <p className={styles["search-advanced-help"]}>
             Expand to store or recall presets. Saved searches remember every active filter.
@@ -1362,7 +1282,7 @@ export default function SearchPageClient({
         </details>
       )}
 
-      <div style={{ margin: "1.5rem 0" }}>
+      <div className={additionalStyles.sortControlsWrapper}>
         <SortControls value={sortKey} onChange={setSortKey} />
       </div>
 
@@ -1397,7 +1317,7 @@ export default function SearchPageClient({
         </>
       )}
       {error && (
-        <div style={{ marginTop: "1rem" }}>
+        <div className={additionalStyles.errorWrapper}>
           <ErrorCallout
             message={error.message}
             traceId={error.traceId}

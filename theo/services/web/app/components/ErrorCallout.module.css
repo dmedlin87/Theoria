@@ -1,0 +1,24 @@
+/* ErrorCallout Component Styles */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.detailsButton {
+  color: var(--color-danger);
+}
+
+.traceInfo {
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

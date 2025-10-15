@@ -4,6 +4,7 @@ import Link from "next/link";
 import VirtualList from "../../components/VirtualList";
 import { buildPassageLink, formatAnchor } from "../../lib/api";
 import type { DocumentGroup } from "../components/SearchPageClient";
+import styles from "./SearchResults.module.css";
 
 interface SearchResultsProps {
   groups: DocumentGroup[];
@@ -83,8 +84,7 @@ export default function SearchResults({
               return (
                 <div
                   key={passage.id}
-                  className="panel"
-                  style={{ padding: "var(--space-2)" }}
+                  className={`panel ${styles.panel}`}
                 >
                   <div className="stack-xs">
                     {passage.osis_ref && (

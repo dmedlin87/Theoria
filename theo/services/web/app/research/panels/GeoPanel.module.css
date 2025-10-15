@@ -1,0 +1,179 @@
+/* GeoPanel Component Styles */
+
+.panel {
+  background: var(--color-surface);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: var(--shadow-xs);
+}
+
+.panelHeading {
+  margin-top: 0;
+}
+
+.description {
+  margin-top: 0;
+}
+
+.modeSummary {
+  margin: 0 0 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.errorMessage {
+  color: var(--color-danger);
+}
+
+/* Verse Places Section */
+.versePlacesSection {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.sectionTitle {
+  margin: 0;
+}
+
+.placesList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.placeCard {
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: var(--color-surface);
+  transition: border-color 0.2s ease;
+}
+
+.placeCard:hover {
+  border-color: var(--color-border-strong);
+}
+
+.placeTitle {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.placeClassification {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.locationsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.locationItem {
+  font-size: 0.9rem;
+}
+
+.locationAliases {
+  color: var(--color-text-muted);
+}
+
+.noLocations {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.emptyState {
+  margin: 0;
+}
+
+/* Attribution */
+.attribution {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.attributionText {
+  margin: 0;
+}
+
+/* Search Form */
+.searchForm {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.searchLabel {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.searchInput {
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* Search Results */
+.resultsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.resultCard {
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: var(--color-surface);
+  transition: border-color 0.2s ease;
+}
+
+.resultCard:hover {
+  border-color: var(--color-border-strong);
+}
+
+.resultTitle {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.coordinates {
+  margin: 0 0 0.25rem;
+  font-size: 0.875rem;
+}
+
+.aliases {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .panel {
+    padding: 0.75rem;
+  }
+
+  .locationItem {
+    font-size: 0.85rem;
+  }
+}

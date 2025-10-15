@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import styles from "./LoadingStates.module.css";
 
 interface SkeletonProps {
   width?: string | number;
@@ -34,7 +35,7 @@ export function SkeletonCard(): JSX.Element {
       <div className="stack-xs mt-2">
         <div className="skeleton skeleton-text" />
         <div className="skeleton skeleton-text" />
-        <div className="skeleton skeleton-text" style={{ width: "70%" }} />
+        <div className={`skeleton skeleton-text ${styles.skeletonTextShort}`} />
       </div>
     </div>
   );

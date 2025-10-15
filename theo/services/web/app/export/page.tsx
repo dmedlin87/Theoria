@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import styles from './export-page.module.css';
 
 const FORMAT_LABELS: Record<string, string> = {
   markdown: 'Markdown (.md)',
@@ -204,80 +205,80 @@ export default function CitationExportPage(): JSX.Element {
   }, [buildPayload, downloadFormat, formatExtension]);
 
   return (
-    <div className="export-page" style={{ maxWidth: 960, margin: '0 auto', padding: '2rem 1.5rem' }}>
-      <h1 style={{ fontSize: '2rem', fontWeight: 600, marginBottom: '1rem' }}>Citation exports</h1>
-      <p style={{ marginBottom: '1.5rem' }}>
+    <div className={styles.container}>
+      <h1 className={styles.pageTitle}>Citation exports</h1>
+      <p className={styles.pageDescription}>
         Generate formatted citations for selected documents or verse mentions. Provide document identifiers (one per line)
         or an OSIS reference to collect matching passages from the Verse Aggregator.
       </p>
 
-      <section style={{ display: 'grid', gap: '1rem', marginBottom: '2rem' }}>
-        <label style={{ display: 'grid', gap: '0.5rem' }}>
+      <section className={styles.formSection}>
+        <label className={styles.formLabel}>
           <span>Document identifiers</span>
           <textarea
             value={documentIds}
             onChange={(event) => setDocumentIds(event.target.value)}
             rows={4}
             placeholder="doc-123\ndoc-456"
-            style={{ fontFamily: 'var(--font-mono)', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--border)' }}
+            className={styles.textarea}
           />
         </label>
 
-        <label style={{ display: 'grid', gap: '0.5rem' }}>
+        <label className={styles.formLabel}>
           <span>OSIS reference</span>
           <input
             value={osis}
             onChange={(event) => setOsis(event.target.value)}
             placeholder="John.1.1"
-            style={{ padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)' }}
+            className={styles.input}
           />
         </label>
 
-        <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-          <label style={{ display: 'grid', gap: '0.25rem' }}>
+        <div className={styles.filterGrid}>
+          <label className={styles.formLabelTight}>
             <span>Collection</span>
             <input
               value={collection}
               onChange={(event) => setCollection(event.target.value)}
               placeholder="sermons"
-              style={{ padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)' }}
+              className={styles.input}
             />
           </label>
-          <label style={{ display: 'grid', gap: '0.25rem' }}>
+          <label className={styles.formLabelTight}>
             <span>Author filter</span>
             <input
               value={author}
               onChange={(event) => setAuthor(event.target.value)}
               placeholder="Jane Doe"
-              style={{ padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)' }}
+              className={styles.input}
             />
           </label>
-          <label style={{ display: 'grid', gap: '0.25rem' }}>
+          <label className={styles.formLabelTight}>
             <span>Source type</span>
             <input
               value={sourceType}
               onChange={(event) => setSourceType(event.target.value)}
               placeholder="sermon"
-              style={{ padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)' }}
+              className={styles.input}
             />
           </label>
-          <label style={{ display: 'grid', gap: '0.25rem' }}>
+          <label className={styles.formLabelTight}>
             <span>Verse mention limit</span>
             <input
               value={limit}
               onChange={(event) => setLimit(event.target.value)}
               placeholder="100"
-              style={{ padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)' }}
+              className={styles.input}
             />
           </label>
         </div>
 
-        <label style={{ display: 'grid', gap: '0.5rem' }}>
+        <label className={styles.formLabel}>
           <span>Citation style</span>
           <select
             value={style}
             onChange={(event) => setStyle(event.target.value)}
-            style={{ padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)' }}
+            className={styles.select}
           >
             <option value="apa">APA</option>
             <option value="chicago">Chicago</option>
@@ -285,12 +286,12 @@ export default function CitationExportPage(): JSX.Element {
           </select>
         </label>
 
-        <label style={{ display: 'grid', gap: '0.5rem' }}>
+        <label className={styles.formLabel}>
           <span>Download format</span>
           <select
             value={downloadFormat}
             onChange={(event) => setDownloadFormat(event.target.value)}
-            style={{ padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)' }}
+            className={styles.select}
           >
             {Object.entries(FORMAT_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -301,19 +302,12 @@ export default function CitationExportPage(): JSX.Element {
         </label>
       </section>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className={styles.buttonGroup}>
         <button
           type="button"
           onClick={handlePreview}
           disabled={loading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: 999,
-            border: 'none',
-            backgroundColor: 'var(--accent)',
-            color: 'white',
-            cursor: 'pointer',
-          }}
+          className={styles.primaryButton}
         >
           {loading ? 'Working…' : 'Preview citations'}
         </button>
@@ -321,55 +315,40 @@ export default function CitationExportPage(): JSX.Element {
           type="button"
           onClick={handleDownload}
           disabled={loading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: 999,
-            border: '1px solid var(--border-strong)',
-            backgroundColor: 'white',
-            color: 'var(--text-strong)',
-            cursor: 'pointer',
-          }}
+          className={styles.secondaryButton}
         >
           Download {FORMAT_LABELS[downloadFormat] ?? downloadFormat.toUpperCase()}
         </button>
       </div>
 
       {error && (
-        <p role="alert" style={{ color: 'var(--danger)', marginBottom: '1.5rem' }}>
+        <p role="alert" className={styles.errorMessage}>
           {error}
         </p>
       )}
       {success && (
-        <p role="status" style={{ color: 'var(--success)', marginBottom: '1.5rem' }}>
+        <p role="status" className={styles.successMessage}>
           {success}
         </p>
       )}
 
-      <section style={{ display: 'grid', gap: '1rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>Preview</h2>
+      <section className={styles.previewSection}>
+        <h2 className={styles.sectionTitle}>Preview</h2>
         {manifest && (
-          <pre
-            style={{
-              fontSize: '0.9rem',
-              padding: '0.75rem',
-              backgroundColor: 'var(--surface-subtle)',
-              borderRadius: 8,
-              overflowX: 'auto',
-            }}
-          >
+          <pre className={styles.manifestPre}>
             {JSON.stringify(manifest, null, 2)}
           </pre>
         )}
         {preview.length > 0 ? (
-          <ol style={{ display: 'grid', gap: '0.75rem', paddingLeft: '1.25rem' }}>
+          <ol className={styles.previewList}>
             {preview.map((item, index) => (
-              <li key={`${index}-${item.slice(0, 12)}`} style={{ lineHeight: 1.5 }}>
+              <li key={`${index}-${item.slice(0, 12)}`} className={styles.previewItem}>
                 {item}
               </li>
             ))}
           </ol>
         ) : (
-          <p style={{ color: 'var(--text-muted)' }}>
+          <p className={styles.emptyState}>
             {loading ? 'Generating preview…' : 'Provide selection criteria and choose “Preview citations” to view formatted output.'}
           </p>
         )}

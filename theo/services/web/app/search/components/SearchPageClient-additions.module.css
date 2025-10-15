@@ -1,0 +1,17 @@
+/* SearchPageClient Additional Styles - Refactored inline styles */
+
+.presetDescription {
+  margin-top: 0.35rem;
+}
+
+.savedSearchesDetails {
+  margin: 2rem 0;
+}
+
+.sortControlsWrapper {
+  margin: 1.5rem 0;
+}
+
+.errorWrapper {
+  margin-top: 1rem;
+}

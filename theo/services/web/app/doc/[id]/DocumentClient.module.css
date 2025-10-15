@@ -1,0 +1,266 @@
+/* DocumentClient Specific Styles */
+
+.detailsSection {
+  margin: var(--space-3) 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+}
+
+.detailsSummary {
+  font-size: 1.125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detailsContent {
+  margin-top: var(--space-2);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.metaGrid {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.annotationForm {
+  display: grid;
+  gap: var(--space-1);
+  max-width: 520px;
+}
+
+.annotationTextarea {
+  width: 100%;
+}
+
+.formActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.errorText {
+  color: var(--color-danger);
+}
+
+.noResults {
+  margin-top: var(--space-2);
+}
+
+.annotationsList {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.annotationCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+}
+
+.annotationBadges {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.annotationBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.annotationBadge--claim {
+  background: #f97316;
+  color: #fff;
+}
+
+.annotationBadge--evidence {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.annotationBadge--question {
+  background: #14b8a6;
+  color: #fff;
+}
+
+.annotationBadge--note {
+  background: var(--color-surface-muted);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+}
+
+.annotationStance {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  background: var(--color-surface-muted);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-accent-soft);
+  letter-spacing: 0.03em;
+}
+
+.annotationBody {
+  margin: 0 0 var(--space-1);
+  white-space: pre-wrap;
+}
+
+.linkedPassages {
+  margin-bottom: var(--space-1);
+}
+
+.linkedPassagesLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.linkedPassagesList {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.passageLink {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.annotationFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.deleteButton {
+  color: var(--color-danger);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.deleteButton:hover {
+  text-decoration: underline;
+}
+
+.passagesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.passagesHeading {
+  margin: 0;
+}
+
+.addAnnotationButton {
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.addAnnotationButton:hover {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.passageHeader {
+  margin: 0 0 var(--space-1);
+}
+
+.passageMeta {
+  margin: 0;
+}
+
+.passageText {
+  margin-top: 0.75rem;
+  white-space: pre-wrap;
+}
+
+.metadataForm {
+  margin-top: var(--space-2);
+  display: grid;
+  gap: 0.75rem;
+  max-width: 560px;
+}
+
+.metadataFieldset {
+  display: grid;
+  gap: 0.75rem;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.formField {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.formLabel {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.formInput {
+  width: 100%;
+  padding: 0.625rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 0.9375rem;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.formTextarea {
+  width: 100%;
+  padding: 0.625rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 0.9375rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.formTextarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.statusMessage {
+  margin: 0;
+}

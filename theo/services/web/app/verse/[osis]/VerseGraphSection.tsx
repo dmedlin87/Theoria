@@ -9,6 +9,7 @@ import {
 } from "d3";
 import type { SimulationLinkDatum, SimulationNodeDatum } from "d3";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import styles from "./VerseGraphSection.module.css";
 
 import { buildPassageLink, formatAnchor } from "../../lib/api";
 import type {
@@ -267,11 +268,11 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
 
   if (!graph) {
     return (
-      <section aria-labelledby="verse-graph-heading" style={{ margin: "2rem 0" }}>
-        <h3 id="verse-graph-heading" style={{ marginBottom: "0.5rem" }}>
+      <section aria-labelledby="verse-graph-heading" className={styles.section}>
+        <h3 id="verse-graph-heading" className={styles.heading}>
           Verse graph
         </h3>
-        <p style={{ margin: 0 }}>Graph data is not available for this verse.</p>
+        <p className={styles.emptyMessage}>Graph data is not available for this verse.</p>
       </section>
     );
   }
@@ -280,30 +281,23 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
   const totalRelationships = graph.edges.length;
 
   return (
-    <section aria-labelledby="verse-graph-heading" style={{ margin: "2rem 0" }}>
-      <h3 id="verse-graph-heading" style={{ marginBottom: "0.5rem" }}>
+    <section aria-labelledby="verse-graph-heading" className={styles.section}>
+      <h3 id="verse-graph-heading" className={styles.heading}>
         Relationship graph
       </h3>
       <p
         data-testid="verse-graph-summary"
-        style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}
+        className={styles.summary}
       >
         Showing {visibleRelationshipCount} of {totalRelationships} relationships.
       </p>
-      <div
-        style={{
-          display: "grid",
-          gap: "1.5rem",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)",
-          alignItems: "start",
-        }}
-      >
-        <div style={{ display: "grid", gap: "1rem" }}>
+      <div className={styles.mainGrid}>
+        <div className={styles.filtersContainer}>
           {graph.filters.perspectives.length > 0 ? (
-            <fieldset style={{ border: "1px solid #e5e7eb", borderRadius: "0.5rem", padding: "1rem" }}>
-              <legend style={{ fontWeight: 600 }}>Perspectives</legend>
+            <fieldset className={styles.fieldset}>
+              <legend className={styles.legend}>Perspectives</legend>
               {graph.filters.perspectives.map((perspective) => (
-                <label key={perspective} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <label key={perspective} className={styles.checkboxLabel}>
                   <input
                     type="checkbox"
                     checked={selectedPerspectives.includes(perspective)}
@@ -315,10 +309,10 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
             </fieldset>
           ) : null}
           {graph.filters.source_types.length > 0 ? (
-            <fieldset style={{ border: "1px solid #e5e7eb", borderRadius: "0.5rem", padding: "1rem" }}>
-              <legend style={{ fontWeight: 600 }}>Source types</legend>
+            <fieldset className={styles.fieldset}>
+              <legend className={styles.legend}>Source types</legend>
               {graph.filters.source_types.map((sourceType) => (
-                <label key={sourceType} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <label key={sourceType} className={styles.checkboxLabel}>
                   <input
                     type="checkbox"
                     checked={selectedSourceTypes.includes(sourceType)}
@@ -332,16 +326,10 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
         </div>
         <div
           data-testid="verse-graph"
-          style={{
-            background: "#fff",
-            borderRadius: "0.75rem",
-            border: "1px solid #e2e8f0",
-            padding: "1rem",
-            overflow: "hidden",
-          }}
+          className={styles.graphContainer}
         >
           {visibleLinks.length === 0 && visibleNodes.length <= 1 ? (
-            <p style={{ margin: 0 }}>
+            <p className={styles.emptyMessage}>
               We couldn&apos;t find related mentions or research seeds for these filters yet.
             </p>
           ) : (

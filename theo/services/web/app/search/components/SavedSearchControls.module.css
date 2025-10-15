@@ -1,0 +1,20 @@
+/* SavedSearchControls Component Styles */
+
+.form {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .form {
+    flex-direction: column;
+  }
+}

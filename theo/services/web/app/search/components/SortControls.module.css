@@ -1,0 +1,70 @@
+/* SortControls Component Styles */
+
+.fieldset {
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  background: var(--color-surface);
+}
+
+.legend {
+  font-weight: 600;
+  padding: 0 0.5rem;
+}
+
+.optionsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.optionLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-muted);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.optionLabel:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.optionLabel.active {
+  border: 2px solid var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.radioInput {
+  margin: 0;
+}
+
+.optionTitle {
+  display: block;
+  font-weight: 600;
+}
+
+.optionDescription {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .fieldset {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .optionLabel {
+    flex: 1 1 100%;
+  }
+}

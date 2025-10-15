@@ -2,9 +2,9 @@
 
 import type { CSSProperties, FormEvent } from "react";
 
-import styles from "./SearchPageClient.module.css";
+import pageStyles from "./SearchPageClient.module.css";
+import styles from "./SavedSearchControls.module.css";
 
-import type { SavedSearch } from "./SearchPageClient";
 import type { SearchFilters } from "../searchParams";
 import type { SavedSearch } from "./filters/types";
 
@@ -46,7 +46,7 @@ export function SavedSearchControls({
 }: SavedSearchControlsProps): JSX.Element {
   return (
     <>
-      <form onSubmit={onSubmit} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+      <form onSubmit={onSubmit} className={styles.form}>
         <label htmlFor="saved-search-name" style={visuallyHiddenStyle}>
           Saved search name
         </label>
@@ -56,32 +56,32 @@ export function SavedSearchControls({
           value={savedSearchName}
           onChange={(event) => onSavedSearchNameChange(event.target.value)}
           placeholder="Name this search"
-          className={styles["search-saved-input"]}
+          className={pageStyles["search-saved-input"]}
         />
         <button type="submit" disabled={!savedSearchName.trim()}>
           Save current filters
         </button>
       </form>
       {savedSearches.length === 0 ? (
-        <p className={styles["search-saved-empty"]}>
+        <p className={pageStyles["search-saved-empty"]}>
           No saved searches yet. Configure filters and click save to store a preset.
         </p>
       ) : (
-        <ul className={styles["search-saved-list"]}>
+        <ul className={pageStyles["search-saved-list"]}>
           {savedSearches.map((saved) => {
             const formatted = formatFilters(saved.filters);
             return (
-              <li key={saved.id} className={styles["search-card"]}>
-                <div className={styles["search-card__header"]}>
-                  <div className={styles["search-card__info"]}>
+              <li key={saved.id} className={pageStyles["search-card"]}>
+                <div className={pageStyles["search-card__header"]}>
+                  <div className={pageStyles["search-card__info"]}>
                     <strong>{saved.name}</strong>
                     {formatted.description && (
-                      <span className={styles["search-card__description"]}>
+                      <span className={pageStyles["search-card__description"]}>
                         {formatted.description}
                       </span>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <div className={styles.actions}>
                     <button
                       type="button"
                       onClick={() => {
@@ -99,9 +99,9 @@ export function SavedSearchControls({
                   </div>
                 </div>
                 {formatted.chips.length > 0 && (
-                  <div className={styles["search-card__chips"]}>
+                  <div className={pageStyles["search-card__chips"]}>
                     {formatted.chips.map((chip) => (
-                      <span key={chip.id} className={styles["search-chip"]}>
+                      <span key={chip.id} className={pageStyles["search-chip"]}>
                         {chip.text}
                       </span>
                     ))}

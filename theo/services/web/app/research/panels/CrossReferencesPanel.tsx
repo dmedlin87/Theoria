@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import styles from "./CrossReferencesPanel.module.css";
 
 import { formatEmphasisSummary } from "../../mode-config";
 import { useMode } from "../../mode-context";
@@ -83,60 +84,37 @@ export default function CrossReferencesPanel({ osis, features }: CrossReferences
   return (
     <section
       aria-labelledby="cross-references-heading"
-      style={{
-        background: "#fff",
-        borderRadius: "0.5rem",
-        padding: "1rem",
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
-      }}
+      className={styles.panel}
     >
-      <h3 id="cross-references-heading" style={{ marginTop: 0 }}>
+      <h3 id="cross-references-heading" className={styles.panelHeading}>
         Cross-references
       </h3>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #4b5563)" }}>
+      <p className={styles.description}>
         Connections cited with <strong>{osis}</strong>.
       </p>
-      <p style={{ margin: "0 0 1rem", color: "var(--muted-foreground, #64748b)", fontSize: "0.875rem" }}>
+      <p className={styles.modeSummary}>
         {modeSummary}
       </p>
       {loading ? (
         <p>Loading cross-references…</p>
       ) : error ? (
-        <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>
+        <p role="alert" className={styles.errorMessage}>
           Unable to load cross-references. {error}
         </p>
       ) : items.length === 0 ? (
         <p>No cross-references available.</p>
       ) : (
-        <ul
-          style={{
-            listStyle: "none",
-            padding: 0,
-            margin: 0,
-            display: "grid",
-            gap: "0.75rem",
-          }}
-        >
+        <ul className={styles.referencesList}>
           {items.map((item) => (
             <li
               key={`${item.source}-${item.target}-${item.dataset ?? "default"}`}
-              style={{
-                border: "1px solid var(--border, #e5e7eb)",
-                borderRadius: "0.5rem",
-                padding: "0.75rem",
-              }}
+              className={styles.referenceCard}
             >
-              <p style={{ margin: "0 0 0.25rem" }}>
+              <p className={styles.referenceTarget}>
                 <strong>{item.target}</strong>
                 {item.summary ? ` — ${item.summary}` : ""}
               </p>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "0.875rem",
-                  color: "var(--muted-foreground, #4b5563)",
-                }}
-              >
+              <p className={styles.referenceMetadata}>
                 Source: {item.source}
                 {item.relation_type ? ` · ${item.relation_type}` : ""}
                 {typeof item.weight === "number" ? ` · Weight ${item.weight.toFixed(2)}` : ""}
