@@ -103,14 +103,29 @@ jobs:
         shell: bash
         run: |
           TARGET_URL="${APP_ORIGIN%/}"
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent --head "$TARGET_URL"; then
+          MAX_ATTEMPTS=20
+          TIMEOUT=60
+          elapsed=0
+          
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            if curl --fail --silent --head --max-time 5 "$TARGET_URL"; then
+              echo "✓ Server ready at $TARGET_URL after ${elapsed}s"
               exit 0
             fi
-            echo "Attempt $attempt to reach $TARGET_URL failed; retrying in 2 seconds..."
-            sleep 2
+            
+            # Exponential backoff: 1s, 2s, 4s, then cap at 5s
+            wait_time=$((attempt < 3 ? 2**attempt : 5))
+            echo "[$attempt/$MAX_ATTEMPTS] Server not ready, waiting ${wait_time}s..."
+            sleep $wait_time
+            elapsed=$((elapsed + wait_time))
+            
+            if [ $elapsed -ge $TIMEOUT ]; then
+              echo "✗ Timeout: Server at $TARGET_URL not ready after ${elapsed}s" >&2
+              exit 1
+            fi
           done
-          echo "Unable to reach $TARGET_URL after multiple attempts." >&2
+          
+          echo "✗ Server at $TARGET_URL not ready after $MAX_ATTEMPTS attempts" >&2
           exit 1
 
       - name: Check staging reachability
@@ -130,7 +145,12 @@ jobs:
       - name: Run Lighthouse CI
         if: ${{ github.event.inputs.target != 'staging' || steps.ping.outputs.reachable == 'true' }}
         env:
-          LHCI_COLLECT__URL: ${{ steps.select.outputs.app_origin }}
+          LHCI_COLLECT__URL: |
+            [
+              "${{ steps.select.outputs.app_origin }}",
+              "${{ steps.select.outputs.app_origin }}/verse/John.3.16",
+              "${{ steps.select.outputs.app_origin }}/search"
+            ]
         run: |
           npx --yes @lhci/cli@0.14.0 autorun --config ../../../lighthouserc.json
 
@@ -157,9 +177,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lighthouse-results
+          name: lighthouse-results-${{ github.event.inputs.target || 'localhost' }}-${{ github.run_number }}
           path: theo/services/web/.lighthouseci
           if-no-files-found: warn
+          retention-days: 30
 
       - name: Stop Next.js server
         if: ${{ always() && github.event.inputs.target != 'staging' }}

@@ -66,27 +66,53 @@ const trackedCategories = [
   ['seo', 'SEO']
 ];
 
+console.log('\n## Lighthouse Performance Comparison\n');
+
+let hasRegression = false;
+
 for (const [url, currentScores] of currentSummary.entries()) {
   const baselineScores = baselineSummary.get(url);
+  const urlPath = new URL(url).pathname || '/';
+  
   if (!baselineScores) {
-    console.log(`No baseline scores stored for ${url}; skipping.`);
+    console.log(`### ${urlPath}\n🆕 **New page** - no baseline available\n`);
     continue;
   }
 
-  console.log(`\nLighthouse comparison for ${url}`);
+  console.log(`### ${urlPath}\n`);
+  
   for (const [key, label] of trackedCategories) {
     const before = baselineScores[key];
     const after = currentScores[key];
     if (typeof before !== 'number' || typeof after !== 'number') {
-      console.log(`  ${label}: missing score data, skipping.`);
+      console.log(`- ${label}: ⚠️ Missing score data`);
       continue;
     }
+    
     const delta = (after - before) * 100;
     const formattedBefore = (before * 100).toFixed(1);
     const formattedAfter = (after * 100).toFixed(1);
-    const prefix = delta === 0 ? '  ' : delta > 0 ? '  ↑' : '  ↓';
-    console.log(
-      `${prefix} ${label}: ${formattedAfter} (baseline ${formattedBefore}, delta ${delta.toFixed(1)})`
-    );
+    const deltaStr = delta.toFixed(1);
+    
+    // Flag significant regressions (>5 points drop in performance or >2 points in others)
+    const threshold = key === 'performance' ? 5 : 2;
+    const isRegression = delta < -threshold;
+    const isImprovement = delta > threshold;
+    
+    if (isRegression) {
+      hasRegression = true;
+      console.log(`- ${label}: 🔴 **${formattedAfter}** (baseline ${formattedBefore}, ${deltaStr})`);
+    } else if (isImprovement) {
+      console.log(`- ${label}: 🟢 **${formattedAfter}** (baseline ${formattedBefore}, +${deltaStr})`);
+    } else if (delta === 0) {
+      console.log(`- ${label}: ${formattedAfter} (no change)`);
+    } else {
+      console.log(`- ${label}: ${formattedAfter} (baseline ${formattedBefore}, ${delta > 0 ? '+' : ''}${deltaStr})`);
+    }
   }
+  console.log('');
+}
+
+if (hasRegression) {
+  console.log('\n⚠️ **Performance regressions detected** - Review the changes above before merging.\n');
 }
