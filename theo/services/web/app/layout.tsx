@@ -62,6 +62,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     {
       label: "Library",
       items: [
+        { href: "/discoveries", label: "Discoveries", match: "/discoveries" },
         { href: "/search", label: "Search" },
         { href: "/verse/John.1.1", label: "Verse explorer", match: "/verse" },
       ],
