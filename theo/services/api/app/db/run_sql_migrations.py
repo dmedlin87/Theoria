@@ -451,52 +451,50 @@ def run_sql_migrations(
                     )
                     should_execute = False
 
-                if should_execute:
-                    logger.info("Applying SQL migration: %s", migration_name)
-                    if dialect_name == "postgresql" and _requires_autocommit(sql):
-                        session.flush()
-                        session.commit()
-                        _execute_autocommit(engine, sql)
+            if should_execute:
+                logger.info("Applying SQL migration: %s", migration_name)
+                if dialect_name == "postgresql" and _requires_autocommit(sql):
+                    session.flush()
+                    session.commit()
+                    _execute_autocommit(engine, sql)
+                else:
+                    connection = session.connection()
+                    if (
+                        dialect_name == "sqlite"
+                        and is_sqlite_perspective_migration
+                        and sqlite_missing_perspective
+                    ):
+                        connection.exec_driver_sql("DROP TABLE IF EXISTS contradiction_seeds")
+                    if dialect_name == "sqlite":
+                        for statement in _split_sql_statements(sql):
+                            if _sqlite_add_column_exists(connection, statement):
+                                logger.debug(
+                                    "Skipping SQLite migration statement; column already exists: %s",
+                                    statement.strip(),
+                                )
+                                continue
+                            connection.exec_driver_sql(statement)
                     else:
-                        connection = session.connection()
-                        if (
-                            dialect_name == "sqlite"
-                            and is_sqlite_perspective_migration
-                            and sqlite_missing_perspective
-                        ):
-                            connection.exec_driver_sql(
-                                "DROP TABLE IF EXISTS contradiction_seeds"
-                            )
-                        if dialect_name == "sqlite":
-                            for statement in _split_sql_statements(sql):
-                                if _sqlite_add_column_exists(connection, statement):
-                                    logger.debug(
-                                        "Skipping SQLite migration statement; column already exists: %s",
-                                        statement.strip(),
-                                    )
-                                    continue
-                                connection.exec_driver_sql(statement)
-                        else:
-                            connection.exec_driver_sql(sql)
+                        connection.exec_driver_sql(sql)
 
-                if is_sqlite_perspective_migration:
-                    try:
-                        recreated = _sqlite_table_has_column(
-                            session.connection(), "contradiction_seeds", "perspective"
-                        )
-                    except Exception as exc:  # pragma: no cover - defensive
-                        logger.debug(
-                            "SQLite perspective inspection failed after migration", exc_info=exc
-                        )
-                        recreated = False
-                    if recreated:
-                        logger.info(
-                            "SQLite perspective column present after migration execution",
-                        )
-                    else:
-                        logger.warning(
-                            "SQLite perspective column still missing after migration execution",
-                            )
+            if dialect_name == "sqlite" and is_sqlite_perspective_migration:
+                try:
+                    recreated = _sqlite_table_has_column(
+                        session.connection(), "contradiction_seeds", "perspective"
+                    )
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug(
+                        "SQLite perspective inspection failed after migration", exc_info=exc
+                    )
+                    recreated = False
+                if recreated:
+                    logger.info(
+                        "SQLite perspective column present after migration execution",
+                    )
+                else:
+                    logger.warning(
+                        "SQLite perspective column still missing after migration execution",
+                    )
 
             session.add(
                 AppSetting(
