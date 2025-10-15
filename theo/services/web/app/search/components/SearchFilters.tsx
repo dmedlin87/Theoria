@@ -1,5 +1,7 @@
 "use client";
 
+import { HelpTooltip, TooltipList, TooltipParagraph } from "../../components/help/HelpTooltip";
+
 interface SearchFiltersProps {
   query: string;
   osis: string;
@@ -78,6 +80,26 @@ export default function SearchFilters({
         <div className="form-field">
           <label htmlFor="search-query" className="form-label">
             Search Query
+            <HelpTooltip
+              label="Query tips"
+              description={
+                <>
+                  <TooltipParagraph>
+                    Combine filters with boolean operators. Examples:
+                  </TooltipParagraph>
+                  <TooltipList
+                    items={[
+                      'Use quotes for phrases: "kingdom of heaven"',
+                      "Exclude terms with NOT or - prefix",
+                      "Filter by field: author:Augustine collection:Patristics",
+                    ]}
+                  />
+                  <TooltipParagraph>
+                    Separate filters with spaces. The search box supports AND/OR groupings.
+                  </TooltipParagraph>
+                </>
+              }
+            />
           </label>
           <input
             id="search-query"
@@ -92,6 +114,22 @@ export default function SearchFilters({
         <div className="form-field">
           <label htmlFor="search-osis" className="form-label">
             OSIS Reference
+            <HelpTooltip
+              label="OSIS format"
+              description={
+                <>
+                  <TooltipParagraph>
+                    Use canonical OSIS notation to target passages.
+                  </TooltipParagraph>
+                  <TooltipList
+                    items={["Book.Chapter.Verse (e.g., John.1.1)", "Ranges: John.3.16-John.3.18", "Multiple passages separated by commas"]}
+                  />
+                  <TooltipParagraph>
+                    Leave blank to search across the entire corpus.
+                  </TooltipParagraph>
+                </>
+              }
+            />
           </label>
           <input
             id="search-osis"

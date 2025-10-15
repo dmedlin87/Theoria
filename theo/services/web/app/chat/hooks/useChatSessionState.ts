@@ -7,6 +7,7 @@ import type {
   Reaction,
 } from "../useChatWorkspaceState";
 import type { HybridSearchFilters } from "../../lib/api-client";
+import type { InterpretedApiError } from "../../lib/errorMessages";
 
 export type ChatSessionState = {
   conversation: ConversationEntry[];
@@ -19,7 +20,7 @@ export type ChatSessionState = {
   isStreaming: boolean;
   activeAssistantId: string | null;
   guardrail: GuardrailState;
-  errorMessage: string | null;
+  errorMessage: InterpretedApiError | null;
   lastQuestion: string | null;
 };
 
@@ -34,7 +35,7 @@ export type ChatSessionSetters = {
   setIsStreaming: Dispatch<SetStateAction<boolean>>;
   setActiveAssistantId: Dispatch<SetStateAction<string | null>>;
   setGuardrail: Dispatch<SetStateAction<GuardrailState>>;
-  setErrorMessage: Dispatch<SetStateAction<string | null>>;
+  setErrorMessage: Dispatch<SetStateAction<InterpretedApiError | null>>;
   setLastQuestion: Dispatch<SetStateAction<string | null>>;
 };
 
@@ -64,7 +65,7 @@ export function useChatSessionState(): UseChatSessionStateResult {
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
   const [guardrail, setGuardrail] = useState<GuardrailState>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<InterpretedApiError | null>(null);
   const [lastQuestion, setLastQuestion] = useState<string | null>(null);
 
   const hasTranscript = useMemo(() => conversation.length > 0, [conversation]);

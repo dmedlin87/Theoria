@@ -1964,6 +1964,16 @@ section + section {
   transform: var(--motion-hover-translate-y-sm);
   box-shadow: var(--shadow-md);
   outline: none;
+.upload-status-indicator {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.upload-status-hint {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.875rem;
 }
 
 .section-title {
