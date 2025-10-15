@@ -20,6 +20,7 @@ interface CommandEntry {
 
 const NAVIGATION_COMMANDS: CommandEntry[] = [
   { label: "Home", href: "/", keywords: "dashboard root" },
+  { label: "Discoveries", href: "/discoveries", keywords: "insights patterns auto-find explore" },
   { label: "Open chat", href: "/chat", keywords: "conversation" },
   { label: "Copilot workspace", href: "/copilot", keywords: "assist" },
   { label: "Search workspace", href: "/search", keywords: "find query" },
