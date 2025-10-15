@@ -28,6 +28,24 @@ def test_scripture_endpoint_returns_range() -> None:
         ]
 
 
+def test_scripture_endpoint_returns_cross_chapter_range() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/scripture",
+            params={"osis": "John.1.50-John.2.2", "translation": "ESV"},
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["translation"] == "ESV"
+        assert payload["meta"]["count"] == 4
+        assert [verse["osis"] for verse in payload["verses"]] == [
+            "John.1.50",
+            "John.1.51",
+            "John.2.1",
+            "John.2.2",
+        ]
+
+
 def test_scripture_endpoint_unknown_translation_returns_404() -> None:
     with TestClient(app) as client:
         response = client.get(

@@ -12,6 +12,30 @@
       "chapter": 1,
       "verse": 2
     },
+    "John.1.50": {
+      "text": "\u1f08\u03c0\u03b5\u03ba\u03c1\u03af\u03b8\u03b7 \u1f41 \u1f38\u03b7\u03c3\u03bf\u1fe6\u03c2 \u03ba\u03b1\u1f76 \u03b5\u1f36\u03c0\u03b5\u03bd \u03b1\u1f50\u03c4\u1f78\u03bd\u00b7 \u1f4c\u03c4\u03b9 \u03b5\u1f36\u03c0\u03cc\u03bd \u03c3\u03bf\u03b9 \u1f4d\u03c4\u03b9 \u03b5\u1f36\u03b4\u03cc\u03bd \u03c3\u03b5 \u1f51\u03c0\u03bf\u03ba\u03ac\u03c4\u03c9 \u03c4\u1fc6\u03c2 \u03c3\u03c5\u03ba\u1fc6\u03c2 \u03c0\u03b9\u03c3\u03c4\u03b5\u03cd\u03b5\u03b9\u03c2; \u03bc\u03b5\u03af\u03b6\u03c9 \u03c4\u03bf\u03cd\u03c4\u03c9\u03bd \u1f44\u03c8\u1fc3.",
+      "book": "John",
+      "chapter": 1,
+      "verse": 50
+    },
+    "John.1.51": {
+      "text": "\u03ba\u03b1\u1f76 \u03bb\u03ad\u03b3\u03b5\u03b9 \u03b1\u1f50\u03c4\u1f78\u03bd\u00b7 \u1f0c\u03bc\u03b7\u03bd \u1f0c\u03bc\u03b7\u03bd \u03bb\u03ad\u03b3\u03c9 \u1f51\u03bc\u1fd6\u03bd, \u1f44\u03c8\u03b5\u03c3\u03b8\u03b5 \u03c4\u1ff6\u03bd \u03bf\u1f50\u03c1\u03b1\u03bd\u1ff6\u03bd \u1f00\u03bd\u03b5\u1f57\u03b3\u03bf\u03c4\u03b1 \u03ba\u03b1\u1f76 \u03c4\u03bf\u1f7a\u03c2 \u1f00\u03b3\u03b3\u03ad\u03bb\u03bf\u03c5\u03c2 \u03c4\u03bf\u1f78\u03c5 \u0398\u03b5\u03bf\u1fe6 \u1f00\u03bd\u03b1\u03b2\u03b1\u03af\u03bd\u03bf\u03bd\u03c4\u03b1\u03c2 \u03ba\u03b1\u1f76 \u03ba\u03b1\u03c4\u03b1\u03b2\u03b1\u03af\u03bd\u03bf\u03bd\u03c4\u03b1\u03c2 \u1f10\u03c0\u1f76 \u03c4\u1ff6 \u03a5\u1f31\u03bf\u1f76 \u03c4\u03bf\u1f7a \u1f08\u03bd\u03b8\u03c1\u1f78\u03c0\u03bf\u03c5.",
+      "book": "John",
+      "chapter": 1,
+      "verse": 51
+    },
+    "John.2.1": {
+      "text": "\u039a\u03b1\u1f76 \u03c4\u1fc6 \u1f21\u03bc\u03ad\u03c1\u1ff3 \u03c4\u1fc6 \u03c4\u03c1\u03af\u03c4\u1fc3 \u03b3\u03ac\u03bc\u03bf\u03c2 \u1f10\u03b3\u03ad\u03bd\u03b5\u03c4\u03bf \u1f10\u03bd \u039a\u03b1\u03bd\u1fb6 \u03c4\u1fc6\u03c2 \u0393\u03b1\u03bb\u03b9\u03bb\u03b1\u03af\u03b1\u03c2, \u03ba\u03b1\u1f76 \u1f26\u03bd \u1f21 \u03bc\u03ae\u03c4\u03b7\u03c1 \u03c4\u03bf\u1f78 \u1f38\u03b7\u03c3\u03bf\u1fe6 \u1f10\u03ba\u03b5\u1fd6.",
+      "book": "John",
+      "chapter": 2,
+      "verse": 1
+    },
+    "John.2.2": {
+      "text": "\u1f10\u03ba\u03bb\u03ae\u03b8\u03b7 \u03b4\u1f72 \u03ba\u03b1\u1f76 \u1f41 \u1f38\u03b7\u03c3\u03bf\u1fe6\u03c2 \u03ba\u03b1\u1f76 \u03bf\u1f30 \u03bc\u03b1\u03b8\u03b7\u03c4\u03b1\u1fd6 \u03b1\u1f50\u03c4\u03bf\u1fe6 \u03b5\u1f30\u03c2 \u03c4\u1ff6 \u03bd \u03b3\u03ac\u03bc\u03bf\u03bd.",
+      "book": "John",
+      "chapter": 2,
+      "verse": 2
+    },
     "Luke.2.1": {
       "text": "\u1f08\u03bd\u03b5\u03b3\u03ad\u03bd\u03b5\u03c4\u03bf \u03b4\u1f70 \u03b5\u03bd \u03b5\u03ba\u03b5\u03af\u03bd\u1ff3 \u03c4\u1f70 \u03ba\u1f70\u03c3\u03c4\u03b1 \u03b3\u03c1\u03ac\u03c6\u03b5\u03c3\u03b8\u03b1\u03b9 \u03b3\u03c1\u03b1\u03c6\u03ae, \u03b5\u03ba\u03b5\u03b4\u03cc\u03c7\u03b8\u03b7 \u03c0\u1f78\u03bd\u03c4\u03b1 \u03ba\u1f70 \u03a3\u03b5\u03b1\u03c4\u03b9\u03bd\u1ff6 \u039a\u03b1\u03af\u03c3\u03b1\u03c1\u03bf\u03c2.",
       "book": "Luke",
@@ -30,6 +54,30 @@
       "text": "He was in the beginning with God.",
       "book": "John",
       "chapter": 1,
+      "verse": 2
+    },
+    "John.1.50": {
+      "text": "Jesus answered him, \u201cBecause I said to you, \u2018I saw you under the fig tree,\u2019 do you believe? You will see greater things than these.\u201d",
+      "book": "John",
+      "chapter": 1,
+      "verse": 50
+    },
+    "John.1.51": {
+      "text": "And he said to him, \u201cTruly, truly, I say to you, you will see heaven opened, and the angels of God ascending and descending on the Son of Man.\u201d",
+      "book": "John",
+      "chapter": 1,
+      "verse": 51
+    },
+    "John.2.1": {
+      "text": "On the third day there was a wedding at Cana in Galilee, and the mother of Jesus was there.",
+      "book": "John",
+      "chapter": 2,
+      "verse": 1
+    },
+    "John.2.2": {
+      "text": "Jesus also was invited to the wedding with his disciples.",
+      "book": "John",
+      "chapter": 2,
       "verse": 2
     },
     "Luke.2.1": {
