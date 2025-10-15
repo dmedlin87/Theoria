@@ -8,6 +8,8 @@ import {
   FileText,
   Globe,
   Search,
+  ThumbsDown,
+  ThumbsUp,
   Upload as UploadIcon,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
