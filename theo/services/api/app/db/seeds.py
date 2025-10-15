@@ -253,20 +253,14 @@ def _ensure_perspective_column(
     """Verify the ``perspective`` column exists before reading from ``table``."""
 
     dependencies = tuple(required_columns or ())
-    if _table_has_column(session, table.name, "perspective", schema=table.schema):
-        if not dependencies:
-            return True
-        missing_dependencies = [
-            column
-            for column in dependencies
-            if not _table_has_column(
-                session, table.name, column, schema=table.schema
-            )
-        ]
-        if not missing_dependencies:
-            return True
-    else:
-        missing_dependencies = list(dependencies) if dependencies else []
+    required = ("perspective", *dependencies)
+    missing = [
+        column
+        for column in required
+        if not _table_has_column(session, table.name, column, schema=table.schema)
+    ]
+    if not missing:
+        return True
 
     if allow_repair:
         _rebuild_perspective_column(
@@ -275,14 +269,27 @@ def _ensure_perspective_column(
             dataset_label=dataset_label,
             log_suffix=f"retrying {dataset_label} seeds",
         )
-        if _table_has_column(session, table.name, "perspective", schema=table.schema):
+        missing = [
+            column
+            for column in required
+            if not _table_has_column(session, table.name, column, schema=table.schema)
+        ]
+        if not missing:
             return True
-        # Fall through to warning path when the repair did not restore the column.
 
     session.rollback()
-    logger.warning(
-        "Skipping %s seeds because 'perspective' column is missing", dataset_label
-    )
+    if "perspective" in missing:
+        logger.warning(
+            "Skipping %s seeds because 'perspective' column is missing",
+            dataset_label,
+        )
+    else:
+        formatted = ", ".join(sorted(missing))
+        logger.warning(
+            "Skipping %s seeds because required column(s) are missing: %s",
+            dataset_label,
+            formatted,
+        )
     return False
 
 
@@ -333,9 +340,6 @@ def _handle_missing_perspective_error(
     """Log and rollback when ``perspective`` column errors are encountered."""
 
     message = str(getattr(exc, "orig", exc)).lower()
-    if "perspective" not in message:
-        return False
-
     missing_indicators = (
         "no such column",
         "unknown column",
@@ -347,9 +351,17 @@ def _handle_missing_perspective_error(
         return False
 
     session.rollback()
-    logger.warning(
-        "Skipping %s seeds because 'perspective' column is missing", dataset_label
-    )
+    if "perspective" in message:
+        logger.warning(
+            "Skipping %s seeds because 'perspective' column is missing",
+            dataset_label,
+        )
+    else:
+        logger.warning(
+            "Skipping %s seeds because a required column is missing (%s)",
+            dataset_label,
+            message,
+        )
     return True
 
 
