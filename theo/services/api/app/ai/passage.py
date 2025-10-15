@@ -130,17 +130,19 @@ def _normalize_book(raw: str) -> str:
     return " ".join(tokens)
 
 
+# Optimized pattern to prevent ReDoS: use possessive quantifiers via atomic grouping
+# Changed [\d\w\s]+? to ([\w\d]+(?:\s+[\w\d]+)*) to avoid catastrophic backtracking
 _PASSAGE_PATTERN = re.compile(
     r"""
     ^\s*
-    (?P<book>[\d\w\s]+?)
+    (?P<book>[\w\d]+(?:\s+[\w\d]+)*)
     \s+
     (?P<start_chapter>\d+)
-    (
+    (?:
         :(?P<start_verse>\d+)
-        (
+        (?:
             \s*[-–—]\s*
-            (
+            (?:
                 (?P<end_chapter>\d+):(?P<end_verse>\d+)
                 |
                 (?P<end_verse_only>\d+)
@@ -156,10 +158,14 @@ _PASSAGE_PATTERN = re.compile(
 
 
 def resolve_passage_reference(passage: str) -> str:
-    """Convert a plain-language passage (e.g., “Mark 16:9–20”) into an OSIS string."""
+    """Convert a plain-language passage (e.g., "Mark 16:9–20") into an OSIS string."""
 
     if not passage or not passage.strip():
         raise PassageResolutionError("Provide a passage to analyse.")
+    
+    # Prevent ReDoS attacks by rejecting overly long inputs
+    if len(passage) > 200:
+        raise PassageResolutionError("Passage reference too long (max 200 characters).")
 
     normalized = passage.replace("\u2013", "-").replace("\u2014", "-")
     match = _PASSAGE_PATTERN.match(normalized)

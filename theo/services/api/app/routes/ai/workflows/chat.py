@@ -270,10 +270,6 @@ def _prepare_memory_context(
 
     ordered = sorted(entries, key=lambda entry: entry.created_at, reverse=True)
     if focus:
-        matched = [entry for entry in ordered if focus.matches(entry)]
-        remainder = [entry for entry in ordered if not focus.matches(entry)]
-    ordered = sorted(entries, key=lambda entry: entry.created_at, reverse=True)
-    if focus:
         matched: list[ChatMemoryEntry] = []
         remainder: list[ChatMemoryEntry] = []
         for entry in ordered:
@@ -297,14 +293,6 @@ def _prepare_memory_context(
     remaining = CHAT_SESSION_MEMORY_CHAR_BUDGET
     selected: list[tuple[ChatMemoryEntry, str]] = []
     for entry in ranked_entries:
-        base = memory_index_module.render_memory_snippet(
-            entry.question,
-            entry.answer,
-            answer_summary=entry.answer_summary,
-        )
-    remaining = CHAT_SESSION_MEMORY_CHAR_BUDGET
-    selected: list[tuple[ChatMemoryEntry, str]] = []
-    for entry in candidates:
         answer_text = (entry.answer_summary or entry.answer or "").strip()
         question_text = entry.question.strip()
         base = f"Q: {question_text} | A: {answer_text}"
@@ -625,7 +613,9 @@ def chat_turn(
         intent_tags=intent_tags,
     )
     memory_focus = focus_metadata.to_focus()
-    memory_context = _prepare_memory_context(memory_entries, focus=memory_focus)
+    memory_context = _prepare_memory_context(
+        memory_entries, query=question, focus=memory_focus
+    )
 
     if memory_context:
         budget_remaining = CHAT_SESSION_TOTAL_CHAR_BUDGET - total_message_chars
