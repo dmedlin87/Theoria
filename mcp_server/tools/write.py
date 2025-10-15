@@ -274,17 +274,6 @@ async def note_write(
                     session,
                     commit=True,
                     draft=draft,
-                    osis=request.osis,
-                    body=request.body,
-                    title=request.title,
-                    stance=request.stance,
-                    claim_type=request.claim_type,
-                    confidence=getattr(request, "confidence", None),
-                    tags=request.tags,
-                    evidences=request.evidences,
-                    request_id=request.request_id,
-                    end_user_id=validated_user_id,
-                    tenant_id=validated_tenant_id,
                 )
                 response = schemas.NoteWriteResponse(
                     request_id=request.request_id,
