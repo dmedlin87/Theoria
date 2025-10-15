@@ -105,9 +105,17 @@ class MemoryIndex:
             return None
         if len(query_embedding) != len(snippet_embedding):
             return None
-        return float(
-            sum(component * other for component, other in zip(query_embedding, snippet_embedding))
+
+        dot_product = sum(
+            component * other for component, other in zip(query_embedding, snippet_embedding)
         )
+        query_norm_squared = sum(component * component for component in query_embedding)
+        snippet_norm_squared = sum(component * component for component in snippet_embedding)
+
+        if query_norm_squared == 0 or snippet_norm_squared == 0:
+            return None
+
+        return float(dot_product / (query_norm_squared ** 0.5 * snippet_norm_squared ** 0.5))
 
     def _embed_text(self, text: str) -> list[float] | None:
         text = (text or "").strip()
