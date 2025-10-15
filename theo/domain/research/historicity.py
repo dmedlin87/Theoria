@@ -30,6 +30,14 @@ def _score_entry(query_tokens: Iterable[str], entry: dict[str, object]) -> float
     title = title_obj if isinstance(title_obj, str) else ""
     summary_obj = entry.get("summary", "")
     summary = summary_obj if isinstance(summary_obj, str) else ""
+    authors_obj = entry.get("authors", [])
+    if isinstance(authors_obj, str):
+        authors_iterable: list[str] = [authors_obj]
+    elif isinstance(authors_obj, IterableABC):
+        authors_iterable = [item for item in authors_obj if isinstance(item, str)]
+    else:
+        authors_iterable = []
+
     tags_obj = entry.get("tags", [])
 
     if isinstance(tags_obj, str):
@@ -41,6 +49,7 @@ def _score_entry(query_tokens: Iterable[str], entry: dict[str, object]) -> float
 
     haystack_parts.append(title)
     haystack_parts.append(summary)
+    haystack_parts.append(" ".join(authors_iterable))
     haystack_parts.append(" ".join(tags_iterable))
     haystack = " ".join(haystack_parts).lower()
     return sum(1.0 for token in query_tokens if token in haystack)
