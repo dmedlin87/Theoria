@@ -22,6 +22,11 @@ from ..ingest.pipeline import (
 from ..models.documents import SimpleIngestRequest
 from ..telemetry import log_workflow_event
 from ..errors import IngestionError, Severity
+from ..utils.imports import LazyImportModule
+
+
+cli_ingest = LazyImportModule("theo.services.cli.ingest_folder")
+
 DocumentLike = Any
 
 _BASE_RUN_PIPELINE_FOR_FILE = run_pipeline_for_file
@@ -54,6 +59,13 @@ class IngestionService:
     run_transcript_pipeline: Callable[..., DocumentLike]
     cli_module: Any
     log_workflow: Callable[..., None]
+
+    def _get_cli_module(self) -> Any:
+        module = self.cli_module
+        loader = getattr(module, "load", None)
+        if callable(loader):
+            module = loader()
+        return module
 
     def ingest_file(
         self,
@@ -119,8 +131,10 @@ class IngestionService:
             self.settings, "simple_ingest_allowed_roots", None
         )
 
+        cli_module = self._get_cli_module()
+
         if not allowlist:
-            finder = getattr(self.cli_module, "find_local_sources", None)
+            finder = getattr(cli_module, "find_local_sources", None)
             if finder is not None:
                 local_sources = finder(payload.sources)
             else:  # pragma: no cover - compatibility shim for older CLI modules
@@ -141,9 +155,9 @@ class IngestionService:
                     data={"sources": local_sources},
                 )
 
-        items = self.cli_module._discover_items(payload.sources, allowlist)
-        overrides = self.cli_module._apply_default_metadata(payload.metadata or {})
-        post_batch_steps = self.cli_module._parse_post_batch_steps(
+        items = cli_module._discover_items(payload.sources, allowlist)
+        overrides = cli_module._apply_default_metadata(payload.metadata or {})
+        post_batch_steps = cli_module._parse_post_batch_steps(
             tuple(payload.post_batch or ())
         )
         mode = payload.mode.lower()
@@ -185,7 +199,7 @@ class IngestionService:
         queued = 0
 
         try:
-            batches = self.cli_module._batched(items, payload.batch_size)
+            batches = cli_module._batched(items, payload.batch_size)
             for batch_number, batch in enumerate(batches, start=1):
                 yield {
                     "event": "batch",
@@ -204,7 +218,7 @@ class IngestionService:
                     continue
 
                 if mode == "api":
-                    document_ids = self.cli_module._ingest_batch_via_api(
+                    document_ids = cli_module._ingest_batch_via_api(
                         batch,
                         overrides,
                         post_batch_steps,
@@ -225,7 +239,7 @@ class IngestionService:
                                 "Post-batch steps require API mode; skipping."
                             ),
                         }
-                    task_ids = self.cli_module._queue_batch_via_worker(
+                    task_ids = cli_module._queue_batch_via_worker(
                         batch, overrides
                     )
                     for item, task_id in zip(batch, task_ids):
@@ -290,6 +304,12 @@ def get_ingestion_service(
     run_transcript = _resolve_hook(
         "run_pipeline_for_transcript", _BASE_RUN_PIPELINE_FOR_TRANSCRIPT
     )
+
+    cli_source = cli_ingest
+    if ingest_module is not None:
+        route_cli = getattr(ingest_module, "cli_ingest", None)
+        if route_cli is not None:
+            cli_source = route_cli
 
     return IngestionService(
         settings=settings,

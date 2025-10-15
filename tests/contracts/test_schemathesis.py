@@ -19,7 +19,9 @@ from schemathesis.schemas import BaseSchema
 
 os.environ.setdefault("THEO_DISABLE_AI_SETTINGS", "1")
 os.environ.setdefault("THEO_AUTH_ALLOW_ANONYMOUS", "1")
+os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
 os.environ.setdefault("SETTINGS_SECRET_KEY", "contract-test-secret")
+os.environ.setdefault("THEORIA_ENVIRONMENT", "development")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -120,7 +122,12 @@ def test_contract_endpoints(
 ) -> None:
     method_key = method.lower()
     operation = openapi_schema.get(path, method_key)[method_key]
-    case = operation.make_case()
+    if hasattr(operation, "make_case"):
+        case = operation.make_case()
+    elif hasattr(operation, "Case"):
+        case = operation.Case()
+    else:  # pragma: no cover - compatibility fallback
+        case = schemathesis.Case(operation)
     case.call_and_validate(
         session=contract_client,
         checks=(schemathesis.checks.not_a_server_error,),
