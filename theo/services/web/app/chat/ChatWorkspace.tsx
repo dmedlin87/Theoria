@@ -58,7 +58,8 @@ type ChatWorkspaceProps = {
 };
 
 const CHAT_SESSION_STORAGE_KEY = "theo.chat.lastSessionId";
-const INTRO_VIDEO_URL = "https://docs.theoria.app/getting-started/intro-video";
+// Use environment variable for intro video URL, fallback to default if not set
+const INTRO_VIDEO_URL = process.env.NEXT_PUBLIC_INTRO_VIDEO_URL || "https://docs.theoria.app/getting-started/intro-video";
 
 function createMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
