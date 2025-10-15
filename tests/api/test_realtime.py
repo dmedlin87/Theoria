@@ -24,6 +24,7 @@ class DummyWebSocket:
     def __init__(self, name: str) -> None:
         self.name = name
         self.accepted = 0
+        self.sent_messages: list[dict[str, object]] = []
 
     async def accept(self) -> None:
         self.accepted += 1
@@ -32,6 +33,7 @@ class DummyWebSocket:
         # The broker may attempt to send messages during broadcast tests.
         # These tests focus on connection bookkeeping, so sending is a no-op.
         self.last_message = message
+        self.sent_messages.append(message)
 
 
 async def test_disconnect_removes_empty_connection_sets() -> None:
@@ -62,6 +64,41 @@ async def test_disconnect_retains_non_empty_sets_until_last_connection_removed()
     await broker.disconnect("notebook-2", second)
 
     assert "notebook-2" not in broker._connections
+
+
+async def test_broadcast_increments_version_and_delivers_payload() -> None:
+    broker = NotebookEventBroker()
+    websocket = DummyWebSocket("ws-1")
+
+    await broker.connect("notebook-3", websocket)
+
+    assert broker.current_version("notebook-3") == 0
+
+    await broker.broadcast("notebook-3", {"payload": "data"})
+
+    assert broker.current_version("notebook-3") == 1
+    assert websocket.last_message["type"] == "notebook.update"
+    assert websocket.last_message["version"] == 1
+    assert websocket.last_message["payload"] == "data"
+
+
+async def test_broadcast_disconnects_failed_connections() -> None:
+    broker = NotebookEventBroker()
+    healthy = DummyWebSocket("ws-healthy")
+
+    class _FailingWebSocket(DummyWebSocket):
+        async def send_json(self, message):  # pragma: no cover - exercised in test
+            raise RuntimeError("cannot send")
+
+    failing = _FailingWebSocket("ws-failing")
+
+    await broker.connect("notebook-4", healthy)
+    await broker.connect("notebook-4", failing)
+
+    await broker.broadcast("notebook-4", {"payload": "info"})
+
+    assert broker._connections["notebook-4"] == {healthy}
+    assert healthy.last_message["payload"] == "info"
 
 
 @pytest.fixture()
