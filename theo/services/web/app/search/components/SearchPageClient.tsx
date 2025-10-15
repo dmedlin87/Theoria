@@ -9,6 +9,7 @@ import { useToast } from "../../components/Toast";
 import UiModeToggle from "../../components/UiModeToggle";
 import { buildPassageLink, formatAnchor } from "../../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../../lib/errorUtils";
+import { interpretApiError, type InterpretedApiError } from "../../lib/errorMessages";
 import type { components } from "../../lib/generated/api";
 import { emitTelemetry, submitFeedback } from "../../lib/telemetry";
 import type { FeedbackEventInput } from "../../lib/telemetry";
@@ -454,10 +455,56 @@ export default function SearchPageClient({
   );
   const [isSearching, setIsSearching] = useState(false);
   const [searchAbortController, setSearchAbortController] = useState<AbortController | null>(null);
-  const [error, setError] = useState<ErrorDetails | null>(initialError);
+  const [error, setError] = useState<InterpretedApiError | null>(
+    initialError
+      ? interpretApiError(initialError.message, {
+          feature: "search",
+          fallbackMessage: initialError.message,
+          traceId: initialError.traceId ?? null,
+        })
+      : null,
+  );
   const [hasSearched, setHasSearched] = useState(initialHasSearched);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [savedSearchName, setSavedSearchName] = useState("");
+  const exampleQueries = useMemo(
+    () =>
+      [
+        {
+          label: "Trace the Logos theme",
+          query: "Logos theology in early fathers",
+        },
+        {
+          label: "Compare creation prologues",
+          query: "creation prologue parallels",
+          osis: "John.1.1-5",
+        },
+        {
+          label: "Locate New Covenant passages",
+          query: "\"new covenant\" commentary",
+          osis: "Jer.31.31-34",
+        },
+      ] as const,
+    [],
+  );
+  const filterTips = useMemo(
+    () => [
+      "Toggle presets to jump between scholarly, devotional, or textual-critical modes.",
+      "Use collection facets to zero in on sets like the Church Fathers or Dead Sea Scrolls.",
+      "Enable variant and disputed filters to surface textual apparatus discussions.",
+    ],
+    [],
+  );
+  const topicLinks = useMemo(
+    () =>
+      DOMAIN_OPTIONS.filter((option) => option.value)
+        .slice(0, 3)
+        .map((option) => ({
+          label: option.label,
+          href: `/search?topicDomain=${encodeURIComponent(option.value)}`,
+        })),
+    [],
+  );
   const [diffSelection, setDiffSelection] = useState<string[]>([]);
   const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(
     initialHasSearched ? { ...initialFilters } : null,
@@ -523,7 +570,14 @@ export default function SearchPageClient({
             `Search failed with status ${response.status}`,
           );
           setGroups([]);
-          setError(errorDetails);
+          setError(
+            interpretApiError(errorDetails.message, {
+              feature: "search",
+              status: response.status,
+              traceId: errorDetails.traceId ?? null,
+              fallbackMessage: errorDetails.message,
+            }),
+          );
           renderEnd = perf ? perf.now() : null;
         } else {
           const payload = (await response.json()) as SearchResponse;
@@ -553,7 +607,13 @@ export default function SearchPageClient({
           typeof fetchError === "object" && fetchError && "traceId" in fetchError
             ? ((fetchError as { traceId?: string | null }).traceId ?? null)
             : null;
-        setError({ message, traceId });
+        setError(
+          interpretApiError(fetchError, {
+            feature: "search",
+            fallbackMessage: message,
+            traceId,
+          }),
+        );
         setGroups([]);
       } finally {
         setIsSearching(false);
@@ -1056,6 +1116,39 @@ export default function SearchPageClient({
     setQuery((current) => (current ? current : "atonement theology"));
   };
 
+  const handleExampleQueryClick = useCallback(
+    (
+      example: (typeof exampleQueries)[number],
+      index: number,
+    ) => {
+      if (example.query !== undefined) {
+        setQuery(example.query);
+      }
+      if (example.osis !== undefined) {
+        setOsis(example.osis);
+        osisInputRef.current?.focus();
+      } else {
+        queryInputRef.current?.focus();
+      }
+      void emitTelemetry(
+        [
+          {
+            event: "search.example_chip_click",
+            durationMs: 0,
+            metadata: {
+              index,
+              label: example.label,
+              hasQuery: Boolean(example.query),
+              hasOsis: Boolean(example.osis),
+            },
+          },
+        ],
+        { page: "search" },
+      );
+    },
+    [setQuery, setOsis],
+  );
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem(SAVED_SEARCH_STORAGE_KEY);
@@ -1321,11 +1414,61 @@ export default function SearchPageClient({
           <ErrorCallout
             message={error.message}
             traceId={error.traceId}
+            retryLabel={error.retryLabel ?? undefined}
+            helpLink={error.helpLink}
+            helpLabel={error.helpLabel}
             onRetry={handleRetrySearch}
             onShowDetails={handleShowErrorDetails}
             detailsLabel="Show details"
+            telemetry={{
+              source: "search_page",
+              page: "search",
+              errorCategory: error.category,
+              metadata: {
+                ...(typeof error.status === "number" ? { status: error.status } : {}),
+              },
+            }}
           />
         </div>
+      )}
+      {!isSearching && !hasSearched && !error && (
+        <section className={styles["search-first-run"]} aria-label="Search quick start">
+          <div className={styles["search-first-run__column"]}>
+            <h3 className={styles["search-first-run__title"]}>Try an example search</h3>
+            <p className={styles["search-first-run__subtitle"]}>
+              Load a starter query to see how Theo highlights relevant passages and metadata.
+            </p>
+            <ul className={styles["search-first-run__chips"]}>
+              {exampleQueries.map((example, index) => (
+                <li key={example.label}>
+                  <button
+                    type="button"
+                    className={styles["search-first-run__chip"]}
+                    onClick={() => handleExampleQueryClick(example, index)}
+                  >
+                    {example.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className={styles["search-first-run__column"]}>
+            <h3 className={styles["search-first-run__title"]}>Tune filters faster</h3>
+            <ul className={styles["search-first-run__tips"]}>
+              {filterTips.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+            <p className={styles["search-first-run__subtitle"]}>Jump to a topic collection:</p>
+            <ul className={styles["search-first-run__links"]}>
+              {topicLinks.map((topic) => (
+                <li key={topic.href}>
+                  <Link href={topic.href}>{topic.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       )}
       {!isSearching && hasSearched && !error && groups.length === 0 && (
         <p className={styles["search-no-results"]}>No results found for the current query.</p>

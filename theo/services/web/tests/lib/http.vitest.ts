@@ -1,5 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const hoisted = vi.hoisted(() => ({
+  resolveAuthHeadersMock: vi.fn<Record<string, string>, []>(() => ({})),
+}));
+
+vi.mock("../../app/lib/api-config-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../app/lib/api-config-store")>();
+  return {
+    ...actual,
+    resolveAuthHeaders: hoisted.resolveAuthHeadersMock,
+  };
+});
+
+const resolveAuthHeadersMock = hoisted.resolveAuthHeadersMock;
+
 import {
   TheoApiError,
   buildErrorMessage,
@@ -46,6 +60,7 @@ describe("createHttpClient", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    resolveAuthHeadersMock.mockReset();
     if (originalFetch) {
       globalThis.fetch = originalFetch;
     } else {
@@ -91,6 +106,27 @@ describe("createHttpClient", () => {
           "Content-Type": "application/json",
           Authorization: "Bearer token",
         }),
+      }),
+    );
+  });
+
+  it("merges stored authorization headers into every request", async () => {
+    resolveAuthHeadersMock.mockReturnValueOnce({ Authorization: "Bearer stored" });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    globalThis.fetch = fetchMock;
+
+    const client = createHttpClient("https://api.test");
+    await client.request("/features/");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.test/features/",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer stored" }),
       }),
     );
   });

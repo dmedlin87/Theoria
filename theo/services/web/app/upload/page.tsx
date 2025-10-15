@@ -3,20 +3,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout from "../components/ErrorCallout";
+import { ConnectionStatusIndicatorDisplay } from "../components/ConnectionStatusIndicator";
 import { useToast } from "../components/Toast";
+import { useApiHealth } from "../lib/useApiHealth";
 import { getApiBaseUrl } from "../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../lib/errorUtils";
+import { interpretApiError, type InterpretedApiError } from "../lib/errorMessages";
 import FileUploadForm from "./components/FileUploadForm";
 import JobsTable from "./components/JobsTable";
 import SimpleIngestForm, { type SimpleIngestEvent } from "./components/SimpleIngestForm";
 import UrlIngestForm from "./components/UrlIngestForm";
 
-type UploadStatus = {
-  kind: "success" | "error" | "info";
-  message: string;
-  traceId: string | null;
-  source?: "file" | "url";
-};
+type UploadStatus =
+  | {
+      kind: "success" | "info";
+      message: string;
+      traceId: string | null;
+      source?: "file" | "url";
+    }
+  | ({
+      kind: "error";
+      source?: "file" | "url";
+    } & InterpretedApiError);
 
 type JobStatus = {
   id: string;
@@ -34,6 +42,8 @@ async function readErrorDetails(response: Response, fallback: string): Promise<E
 }
 
 export default function UploadPage(): JSX.Element {
+  const apiHealth = useApiHealth();
+  const isApiUnavailable = apiHealth.status === "offline" || apiHealth.status === "unauthenticated";
   const [simpleProgress, setSimpleProgress] = useState<SimpleIngestEvent[]>([]);
   const [simpleError, setSimpleError] = useState<string | null>(null);
   const [simpleSuccess, setSimpleSuccess] = useState<string | null>(null);
@@ -44,8 +54,10 @@ export default function UploadPage(): JSX.Element {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isSubmittingUrl, setIsSubmittingUrl] = useState(false);
   const [jobs, setJobs] = useState<JobStatus[]>([]);
-  const [jobError, setJobError] = useState<ErrorDetails | null>(null);
+  const [jobError, setJobError] = useState<InterpretedApiError | null>(null);
   const fetchJobsRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const hasJobs = jobs.length > 0;
+  const ingestionDocsUrl = process.env.NEXT_PUBLIC_INGESTION_DOCS_URL ?? "https://docs.theoria.app/ingestion";
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const { addToast } = useToast();
@@ -85,7 +97,14 @@ export default function UploadPage(): JSX.Element {
         if (!response.ok) {
           const details = await readErrorDetails(response, "Unable to load jobs");
           if (isMounted) {
-            setJobError(details);
+            setJobError(
+              interpretApiError(details.message, {
+                feature: "upload",
+                status: response.status,
+                traceId: details.traceId ?? null,
+                fallbackMessage: details.message,
+              }),
+            );
           }
           return;
         }
@@ -98,15 +117,12 @@ export default function UploadPage(): JSX.Element {
         if (isMounted) {
           const fallbackMessage =
             error instanceof Error && error.message ? error.message : "Unable to load jobs";
-          const message =
-            error instanceof TypeError && /fetch/i.test(error.message)
-              ? "Unable to reach the ingestion service. Please verify the API is running."
-              : fallbackMessage;
-          const traceId =
-            typeof error === "object" && error && "traceId" in error
-              ? ((error as { traceId?: string | null }).traceId ?? null)
-              : null;
-          setJobError({ message, traceId });
+          setJobError(
+            interpretApiError(error, {
+              feature: "upload",
+              fallbackMessage,
+            }),
+          );
         }
       }
     };
@@ -295,7 +311,13 @@ export default function UploadPage(): JSX.Element {
 
       if (!response.ok) {
         const { message, traceId } = await readErrorDetails(response, "Upload failed");
-        setStatus({ kind: "error", message, traceId, source: "file" });
+        const interpreted = interpretApiError(message, {
+          feature: "upload",
+          status: response.status,
+          traceId: traceId ?? null,
+          fallbackMessage: message,
+        });
+        setStatus({ kind: "error", source: "file", ...interpreted });
         return;
       }
 
@@ -317,11 +339,11 @@ export default function UploadPage(): JSX.Element {
           : typeof error === "string"
             ? error
             : "Upload failed";
-      const message =
-        error instanceof TypeError && /fetch/i.test(error.message)
-          ? "Unable to reach the ingestion service. Please verify the API is running."
-          : fallbackMessage;
-      setStatus({ kind: "error", message, traceId: null, source: "file" });
+      const interpreted = interpretApiError(error, {
+        feature: "upload",
+        fallbackMessage,
+      });
+      setStatus({ kind: "error", source: "file", ...interpreted });
     } finally {
       setIsUploadingFile(false);
     }
@@ -364,7 +386,13 @@ export default function UploadPage(): JSX.Element {
 
       if (!response.ok) {
         const { message, traceId } = await readErrorDetails(response, "URL ingestion failed");
-        setStatus({ kind: "error", message, traceId, source: "url" });
+        const interpreted = interpretApiError(message, {
+          feature: "upload",
+          status: response.status,
+          traceId: traceId ?? null,
+          fallbackMessage: message,
+        });
+        setStatus({ kind: "error", source: "url", ...interpreted });
         return;
       }
 
@@ -386,11 +414,11 @@ export default function UploadPage(): JSX.Element {
           : typeof error === "string"
             ? error
             : "URL ingestion failed";
-      const message =
-        error instanceof TypeError && /fetch/i.test(error.message)
-          ? "Unable to reach the ingestion service. Please verify the API is running."
-          : fallbackMessage;
-      setStatus({ kind: "error", message, traceId: null, source: "url" });
+      const interpreted = interpretApiError(error, {
+        feature: "upload",
+        fallbackMessage,
+      });
+      setStatus({ kind: "error", source: "url", ...interpreted });
     } finally {
       setIsSubmittingUrl(false);
     }
@@ -404,6 +432,52 @@ export default function UploadPage(): JSX.Element {
         the advanced settings to tweak metadata or post-batch operations. Manual file and URL uploads remain available
         below.
       </p>
+      <div className="upload-status-indicator" role="note" aria-live="polite">
+        <ConnectionStatusIndicatorDisplay
+          health={apiHealth}
+          showMessage
+          announce={false}
+          variant="inline"
+        />
+        {isApiUnavailable ? (
+          <p className="upload-status-hint">
+            Verify your credentials and API server before running new ingests. Actions are paused until the connection
+            recovers.
+          </p>
+        ) : null}
+      </div>
+
+      {!hasJobs && (
+        <section className="upload-hero" aria-label="Supported sources overview">
+          <div className="upload-hero__content">
+            <h2>Bring your first sources online</h2>
+            <p>
+              Theo parses scholarly formats out of the box. Upload a single file or point the simple ingest pipeline at a
+              directory to queue a batch.
+            </p>
+            <ul className="upload-hero__details">
+              <li>
+                <strong>File types:</strong> PDF, DOCX, Markdown, TXT, HTML, and YouTube transcripts.
+              </li>
+              <li>
+                <strong>Size limits:</strong> Up to 50&nbsp;MB per file. Larger corpora run best through the simple ingest
+                worker.
+              </li>
+              <li>
+                <strong>Metadata:</strong> Attach JSON frontmatter or enrich sources post-upload in the jobs table.
+              </li>
+            </ul>
+            <a
+              className="upload-hero__cta"
+              href={ingestionDocsUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Read ingestion docs
+            </a>
+          </div>
+        </section>
+      )}
 
       <SimpleIngestForm
         onSubmit={handleSimpleIngestSubmit}
@@ -423,8 +497,20 @@ export default function UploadPage(): JSX.Element {
             <ErrorCallout
               message={status.message}
               traceId={status.traceId}
+              retryLabel={status.retryLabel ?? undefined}
+              helpLink={status.helpLink}
+              helpLabel={status.helpLabel}
               onShowDetails={handleShowTraceDetails}
               detailsLabel="Show details"
+              telemetry={{
+                source: status.source === "file" ? "upload_file" : "upload_url",
+                page: "upload",
+                errorCategory: status.category,
+                metadata: {
+                  ...(status.source ? { source: status.source } : {}),
+                  ...(typeof status.status === "number" ? { status: status.status } : {}),
+                },
+              }}
             />
           ) : (
             status && (
@@ -443,9 +529,20 @@ export default function UploadPage(): JSX.Element {
             <ErrorCallout
               message={jobError.message}
               traceId={jobError.traceId}
+              retryLabel={jobError.retryLabel ?? undefined}
+              helpLink={jobError.helpLink}
+              helpLabel={jobError.helpLabel}
               onRetry={handleRetryJobs}
               onShowDetails={handleShowTraceDetails}
               detailsLabel="Show details"
+              telemetry={{
+                source: "upload_jobs",
+                page: "upload",
+                errorCategory: jobError.category,
+                metadata: {
+                  ...(typeof jobError.status === "number" ? { status: jobError.status } : {}),
+                },
+              }}
             />
           </div>
         )}

@@ -1,126 +1,123 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import ApiAccessForm from "./components/ApiAccessForm";
+import ProviderRegistrationForm from "./components/ProviderRegistrationForm";
+import ProviderSettingsCard from "./components/ProviderSettingsCard";
+import {
+  type ProviderSettingsResponse,
+  createTheoApiClient,
+} from "../lib/api-client";
 import styles from "./settings.module.css";
 
-export default function SettingsPage() {
-  const [apiKey, setApiKey] = useState(() => {
-    // Load API key from localStorage on mount
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("theoria.apiKey") || "";
-    }
-    return "";
-  });
-  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [saved, setSaved] = useState(false);
+type LoadingState = "idle" | "loading" | "error" | "loaded";
 
-  const handleSave = () => {
-    localStorage.setItem("theoria.apiKey", apiKey);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+export default function SettingsPage(): JSX.Element {
+  const client = useMemo(() => createTheoApiClient(), []);
+  const [providers, setProviders] = useState<ProviderSettingsResponse[]>([]);
+  const [state, setState] = useState<LoadingState>("idle");
+  const [error, setError] = useState<string | null>(null);
 
-  const handleTestConnection = async () => {
-    setTestStatus("testing");
-    try {
-      const response = await fetch("/api/health", {
-        headers: apiKey ? { "X-API-Key": apiKey } : {},
-        cache: "no-store"
-      });
-      setTestStatus(response.ok ? "success" : "error");
-    } catch {
-      setTestStatus("error");
-    }
-    setTimeout(() => setTestStatus("idle"), 3000);
+  useEffect(() => {
+    let cancelled = false;
+    const loadProviders = async () => {
+      setState("loading");
+      setError(null);
+      try {
+        const response = await client.listProviderSettings();
+        if (!cancelled) {
+          setProviders(response);
+          setState("loaded");
+        }
+      } catch (loadError) {
+        if (cancelled) {
+          return;
+        }
+        const message =
+          loadError instanceof Error && loadError.message
+            ? loadError.message
+            : "Unable to load provider settings";
+        setError(message);
+        setState("error");
+      }
+    };
+    loadProviders();
+    return () => {
+      cancelled = true;
+    };
+  }, [client]);
+
+  const sortedProviders = useMemo(() => {
+    return [...providers].sort((a, b) => a.provider.localeCompare(b.provider));
+  }, [providers]);
+
+  const handleProviderChange = (next: ProviderSettingsResponse) => {
+    setProviders((current) => {
+      const existingIndex = current.findIndex((entry) => entry.provider === next.provider);
+      if (existingIndex >= 0) {
+        const updated = [...current];
+        updated[existingIndex] = next;
+        return updated;
+      }
+      return [...current, next];
+    });
   };
 
   return (
-    <section className={styles.page}>
-      <div className={styles.header}>
-        <h1>Settings</h1>
-        <p className={styles.subtitle}>Configure your Theoria research workspace</p>
-      </div>
-      
-      <div className={styles.section}>
+    <div className={styles.page}>
+      <section className={styles.section} aria-labelledby="api-access-title">
         <div className={styles.sectionHeader}>
-          <h2>API Configuration</h2>
-          <p className={styles.sectionDescription}>
-            Configure your API credentials to access Theoria services
-          </p>
+          <h1 id="api-access-title" className={styles.sectionTitle}>
+            API access
+          </h1>
+          <span className={styles.sectionTag}>Local override</span>
         </div>
-
-        <div className={styles.field}>
-          <label htmlFor="api-key">API Key</label>
-          <input
-            id="api-key"
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Enter your API key"
-            className={styles.input}
-          />
-          <p className={styles.help}>
-            Required to access Theoria services. Leave blank for anonymous mode (development only).
-          </p>
+        <p className={styles.sectionDescription}>
+          Store credentials in your browser so every request to the Theoria API includes the correct
+          Authorization or API key headers.
+        </p>
+        <div className={styles.sectionBody}>
+          <ApiAccessForm />
         </div>
-        
-        <div className={styles.actions}>
-          <button 
-            onClick={handleSave} 
-            className={styles.buttonPrimary}
-            disabled={saved}
-          >
-            {saved ? "✓ Saved" : "Save"}
-          </button>
+      </section>
 
-          <button 
-            onClick={handleTestConnection} 
-            className={styles.buttonSecondary}
-            disabled={testStatus === "testing"}
-          >
-            {testStatus === "testing" ? "Testing..." : "Test Connection"}
-          </button>
-        </div>
-        
-        {testStatus === "success" && (
-          <div className={styles.success}>✓ Connection successful - API is reachable</div>
-        )}
-        {testStatus === "error" && (
-          <div className={styles.error}>✗ Connection failed - Check your API key and network</div>
-        )}
-      </div>
-
-      <div className={styles.section}>
+      <section className={styles.section} aria-labelledby="providers-title">
         <div className={styles.sectionHeader}>
-          <h2>AI Providers</h2>
-          <p className={styles.sectionDescription}>
-            Configure provider-specific credentials (OpenAI, Anthropic, etc.)
-          </p>
+          <h2 id="providers-title" className={styles.sectionTitle}>
+            AI provider credentials
+          </h2>
         </div>
-        <p className={styles.muted}>Coming soon: Provider-specific API key management</p>
-      </div>
+        <div className={styles.sectionBody}>
+          {state === "loading" ? (
+            <p className={styles.helperText}>Loading providers…</p>
+          ) : null}
+          {state === "error" && error ? (
+            <p className={`${styles.status} ${styles.statusError}`} role="alert">
+              {error}
+            </p>
+          ) : null}
+          {state === "loaded" && sortedProviders.length === 0 ? (
+            <div className={styles.emptyState} role="status">
+              No providers registered yet. Add one below to wire credentials and defaults.
+            </div>
+          ) : null}
+          {sortedProviders.length > 0 ? (
+            <div className={styles.cardGrid}>
+              {sortedProviders.map((provider) => (
+                <ProviderSettingsCard
+                  key={provider.provider}
+                  provider={provider}
+                  client={client}
+                  onChange={handleProviderChange}
+                />
+              ))}
+            </div>
+          ) : null}
 
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2>Preferences</h2>
-          <p className={styles.sectionDescription}>
-            Customize your research workspace defaults
-          </p>
+          <ProviderRegistrationForm client={client} onCreated={handleProviderChange} />
         </div>
-        <p className={styles.muted}>Coming soon: Default mode, search filters, export templates</p>
-      </div>
-
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2>About</h2>
-        </div>
-        <div className={styles.about}>
-          <p><strong>Theoria</strong> - Research engine for theology</p>
-          <p className={styles.muted}>
-            A modern workspace for scripture-anchored research with AI-powered assistance
-          </p>
-        </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

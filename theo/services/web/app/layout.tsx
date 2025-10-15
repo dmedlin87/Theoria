@@ -10,6 +10,8 @@ import Link from "next/link";
 import { AppShell, type AppShellNavSection } from "./components/AppShell";
 import { ToastProvider } from "./components/Toast";
 import { WelcomeModal } from "./components/WelcomeModal";
+import { ApiConfigProvider } from "./lib/api-config";
+import { OnboardingOverlay } from "./components/onboarding/OnboardingOverlay";
 
 export const metadata = {
   title: "Theoria",
@@ -93,57 +95,62 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <a className="skip-link" href="#main-content">
           Skip to main content
         </a>
-        <ModeProvider initialMode={initialMode}>
-          <ToastProvider>
-            <WelcomeModal />
-            {enableUiV2 ? (
-              <AppShell
-                navSections={navSections}
-                modeSwitcher={<ModeSwitcher />}
-                footerMeta={footerMeta}
-              >
-                {children}
-              </AppShell>
-            ) : (
-              <>
-                <header className="site-header">
-                  <div className="container site-header__content">
-                    <Link href="/" className="brand">
-                      Theoria
-                    </Link>
-                    <nav className="site-nav" aria-label="Primary">
-                      {[...NAV_LINKS, ...adminLinks].map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          prefetch={true}
-                          className={
-                            item.variant === "primary" ? "nav-link nav-link--primary" : "nav-link"
-                          }
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-                    </nav>
-                  </div>
-                </header>
-                <section className="mode-banner" aria-label="Research mode selection">
-                  <div className="container">
-                    <ModeSwitcher />
-                  </div>
-                </section>
-                <main className="site-main" id="main-content">
-                  <div className="container">{children}</div>
-                </main>
-                <footer className="site-footer">
-                  <div className="container">
-                    <p>Built to help researchers explore theological corpora faster.</p>
-                  </div>
-                </footer>
-              </>
-            )}
-          </ToastProvider>
-        </ModeProvider>
+        <ApiConfigProvider>
+          <ModeProvider initialMode={initialMode}>
+            <ToastProvider>
+              <WelcomeModal />
+              {enableUiV2 ? (
+                <AppShell
+                  navSections={navSections}
+                  modeSwitcher={<ModeSwitcher />}
+                  footerMeta={footerMeta}
+                >
+                  <>
+                    {children}
+                    <OnboardingOverlay />
+                  </>
+                </AppShell>
+              ) : (
+                <>
+                  <header className="site-header">
+                    <div className="container site-header__content">
+                      <Link href="/" className="brand">
+                        Theoria
+                      </Link>
+                      <nav className="site-nav" aria-label="Primary">
+                        {[...NAV_LINKS, ...adminLinks].map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            prefetch={true}
+                            className={
+                              item.variant === "primary" ? "nav-link nav-link--primary" : "nav-link"
+                            }
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </nav>
+                    </div>
+                  </header>
+                  <section className="mode-banner" aria-label="Research mode selection">
+                    <div className="container">
+                      <ModeSwitcher />
+                    </div>
+                  </section>
+                  <main className="site-main" id="main-content">
+                    <div className="container">{children}</div>
+                  </main>
+                  <footer className="site-footer">
+                    <div className="container">
+                      <p>Built to help researchers explore theological corpora faster.</p>
+                    </div>
+                  </footer>
+                </>
+              )}
+            </ToastProvider>
+          </ModeProvider>
+        </ApiConfigProvider>
       </body>
     </html>
   );

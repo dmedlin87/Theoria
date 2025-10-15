@@ -21,9 +21,11 @@ function classNames(
 }
 
 import CommandPalette from "./CommandPalette";
+import ConnectionStatusIndicator from "./ConnectionStatusIndicator";
 import { ThemeToggle } from "./ThemeToggle";
 import OfflineIndicator from "./OfflineIndicator";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { HelpMenu } from "./help/HelpMenu";
 
 export type AppShellNavItem = {
   href: string;
@@ -258,6 +260,7 @@ export function AppShell({
             <span className={styles.commandTriggerText}>Quick actions...</span>
             <kbd className={styles.commandTriggerKbd}>⌘K</kbd>
           </button>
+          <ConnectionStatusIndicator className={styles.statusIndicator} />
           <div
             className={styles.commandActions}
             aria-label="Quick actions"
@@ -297,7 +300,10 @@ export function AppShell({
           <ConnectionStatus />
           <div className={styles.footerMeta}>
             <span>{footerMeta}</span>
-            <ThemeToggle />
+            <div className={styles.footerControls}>
+              <ThemeToggle />
+              <HelpMenu />
+            </div>
           </div>
           {footerLinks.length > 0 ? (
             <div className={styles.footerLinks}>

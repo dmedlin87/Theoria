@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import "./CommandPalette.css";
 
+import { openKeyboardShortcutsDialog } from "./help/KeyboardShortcutsDialog";
+import { HELP_RESOURCES, KEYBOARD_SHORTCUTS_RESOURCE } from "./help/resources";
+
 interface CommandEntry {
   label: string;
-  href: string;
+  href?: string;
   description?: string;
   shortcut?: string;
   keywords?: string;
+  external?: boolean;
+  action?: () => void;
 }
 
 const NAVIGATION_COMMANDS: CommandEntry[] = [
@@ -20,7 +25,32 @@ const NAVIGATION_COMMANDS: CommandEntry[] = [
   { label: "Search workspace", href: "/search", keywords: "find query" },
   { label: "Upload sources", href: "/upload", keywords: "ingest import" },
   { label: "Export center", href: "/export", keywords: "deliverable" },
-  { label: "Settings", href: "/settings", keywords: "config preferences api key" },
+  { label: "Settings", href: "/settings", keywords: "config preferences api key configuration" },
+];
+
+const HELP_COMMANDS: CommandEntry[] = [
+  ...HELP_RESOURCES.map((resource) => ({
+    label: resource.label,
+    description: resource.description,
+    href: resource.href,
+    external: resource.external,
+    keywords: resource.keywords,
+    action: resource.href
+      ? () => {
+          if (resource.external) {
+            window.open(resource.href!, "_blank", "noopener,noreferrer");
+          } else {
+            window.location.assign(resource.href!);
+          }
+        }
+      : undefined,
+  })),
+  {
+    label: KEYBOARD_SHORTCUTS_RESOURCE.label,
+    description: KEYBOARD_SHORTCUTS_RESOURCE.description,
+    keywords: KEYBOARD_SHORTCUTS_RESOURCE.keywords,
+    action: openKeyboardShortcutsDialog,
+  },
 ];
 
 export default function CommandPalette(): JSX.Element {
@@ -63,7 +93,27 @@ export default function CommandPalette(): JSX.Element {
     return `Navigating to ${command.label}…`;
   }, [pendingHref]);
 
-  const handleSelect = (href: string) => {
+  const handleSelect = (command: CommandEntry) => {
+    if (command.action) {
+      command.action();
+      setPendingHref(null);
+      setOpen(false);
+      return;
+    }
+
+    const href = command.href;
+    if (!href) {
+      setOpen(false);
+      return;
+    }
+
+    if (command.external) {
+      window.open(href, "_blank", "noopener,noreferrer");
+      setPendingHref(null);
+      setOpen(false);
+      return;
+    }
+
     setPendingHref(href);
     setOpen(false);
     startTransition(() => {
@@ -104,11 +154,33 @@ export default function CommandPalette(): JSX.Element {
             <Command.Item
               key={command.href}
               value={`${command.label.toLowerCase()} ${command.keywords ?? ""}`.trim()}
-              onSelect={() => handleSelect(command.href)}
+              onSelect={() => handleSelect(command)}
               disabled={isPending}
             >
-              <span className="cmdk-item__label">{command.label}</span>
+              <span className="cmdk-item__label">
+                <span>{command.label}</span>
+                {command.description ? (
+                  <span className="cmdk-item__description">{command.description}</span>
+                ) : null}
+              </span>
               {command.shortcut ? <span className="cmdk-item__shortcut">{command.shortcut}</span> : null}
+            </Command.Item>
+          ))}
+        </Command.Group>
+        <Command.Group heading="Help">
+          {HELP_COMMANDS.map((command) => (
+            <Command.Item
+              key={command.label}
+              value={`${command.label.toLowerCase()} ${command.keywords ?? ""}`.trim()}
+              onSelect={() => handleSelect(command)}
+              disabled={isPending && Boolean(command.href) && !command.external}
+            >
+              <span className="cmdk-item__label">
+                <span>{command.label}</span>
+                {command.description ? (
+                  <span className="cmdk-item__description">{command.description}</span>
+                ) : null}
+              </span>
             </Command.Item>
           ))}
         </Command.Group>

@@ -1,0 +1,800 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`SearchPageClient empty state renders the first-run panel when no search has been issued 1`] = `
+<DocumentFragment>
+  <section
+    class="search-page"
+  >
+    <div
+      aria-atomic="true"
+      aria-live="polite"
+      class="visually-hidden"
+      role="status"
+    />
+    <h2>
+      Search
+    </h2>
+    <p>
+      Hybrid search with lexical, vector, and OSIS-aware filtering.
+    </p>
+    <div
+      class="search-ui-mode-wrapper"
+    >
+      <fieldset
+        class="ui-mode-toggle"
+      >
+        <legend
+          class="ui-mode-toggle__legend"
+        >
+          Workspace mode
+        </legend>
+        <div
+          class="ui-mode-toggle__buttons"
+        >
+          <button
+            aria-pressed="true"
+            class="ui-mode-toggle__button ui-mode-toggle__button--active"
+            type="button"
+          >
+            Simple
+          </button>
+          <button
+            aria-pressed="false"
+            class="ui-mode-toggle__button"
+            type="button"
+          >
+            Advanced
+          </button>
+        </div>
+        <p
+          class="ui-mode-toggle__description"
+        >
+          Simple mode keeps only the core query fields visible. Switch to advanced when you need presets, facets, or workflow-specific controls.
+        </p>
+      </fieldset>
+    </div>
+    <form
+      aria-label="Search corpus"
+      class="search-form"
+    >
+      <div
+        class="search-form__fields"
+      >
+        <div
+          aria-label="Guided search suggestions"
+          class="search-guided-chips"
+        >
+          <button
+            class="search-guided-chip"
+            type="button"
+          >
+            Search by passage
+          </button>
+          <button
+            class="search-guided-chip"
+            type="button"
+          >
+            Search by topic
+          </button>
+        </div>
+        <label
+          class="search-form__label"
+        >
+          <span
+            class="search-form__label-text"
+          >
+            Query
+          </span>
+          <input
+            class="search-form__input"
+            name="q"
+            placeholder="Search corpus"
+            type="text"
+            value=""
+          />
+        </label>
+        <label
+          class="search-form__label"
+        >
+          <span
+            class="search-form__label-text"
+          >
+            OSIS reference
+          </span>
+          <input
+            class="search-form__input"
+            name="osis"
+            placeholder="John.1.1-5"
+            type="text"
+            value=""
+          />
+        </label>
+      </div>
+      <p
+        class="search-simple-mode-hint"
+      >
+        Simple mode shows only the essentials. Use the advanced panel when you need presets, saved searches, or guardrail filters.
+      </p>
+      <details
+        class="search-advanced-details"
+      >
+        <summary
+          class="search-advanced-summary"
+        >
+          Advanced
+        </summary>
+        <p
+          class="search-advanced-help"
+        >
+          Expand to tune presets, guardrail filters, and dataset facets. Saved search tools live here too.
+        </p>
+        <div
+          class="search-advanced-controls"
+        >
+          <div>
+            <label
+              class="search-form__label"
+            >
+              <span
+                class="search-form__label-text"
+              >
+                Mode preset
+              </span>
+              <select
+                aria-busy="false"
+                class="search-form__select"
+                name="preset"
+              >
+                <option
+                  value="custom"
+                >
+                  Manual configuration
+                </option>
+                <option
+                  value="scholar"
+                >
+                  Scholarly exegesis
+                </option>
+                <option
+                  value="devotional"
+                >
+                  Devotional overview
+                </option>
+                <option
+                  value="textual-critical"
+                >
+                  Textual criticism
+                </option>
+              </select>
+            </label>
+            <p
+              class="search-advanced-help presetDescription"
+            >
+              Start with an empty slate and tune filters yourself.
+            </p>
+          </div>
+          <label
+            class="search-form__label"
+          >
+            <span
+              class="search-form__label-text"
+            >
+              Collection
+            </span>
+            <input
+              class="search-form__input"
+              name="collection"
+              placeholder="Gospels"
+              type="text"
+              value=""
+            />
+          </label>
+          <label
+            class="search-form__label"
+          >
+            <span
+              class="search-form__label-text"
+            >
+              Author
+            </span>
+            <input
+              class="search-form__input"
+              name="author"
+              placeholder="Jane Doe"
+              type="text"
+              value=""
+            />
+          </label>
+          <label
+            class="search-form__label"
+          >
+            <span
+              class="search-form__label-text"
+            >
+              Source type
+            </span>
+            <select
+              class="search-form__select"
+              name="source_type"
+            >
+              <option
+                value=""
+              >
+                Any source
+              </option>
+              <option
+                value="pdf"
+              >
+                PDF
+              </option>
+              <option
+                value="markdown"
+              >
+                Markdown
+              </option>
+              <option
+                value="youtube"
+              >
+                YouTube
+              </option>
+              <option
+                value="transcript"
+              >
+                Transcript
+              </option>
+            </select>
+          </label>
+          <label
+            class="search-form__label"
+          >
+            <span
+              class="search-form__label-text"
+            >
+              Theological tradition
+            </span>
+            <select
+              class="search-form__select"
+              name="theological_tradition"
+            >
+              <option
+                value=""
+              >
+                Any tradition
+              </option>
+              <option
+                value="anglican"
+              >
+                Anglican Communion
+              </option>
+              <option
+                value="baptist"
+              >
+                Baptist
+              </option>
+              <option
+                value="catholic"
+              >
+                Roman Catholic
+              </option>
+              <option
+                value="orthodox"
+              >
+                Eastern Orthodox
+              </option>
+              <option
+                value="reformed"
+              >
+                Reformed
+              </option>
+              <option
+                value="wesleyan"
+              >
+                Wesleyan/Methodist
+              </option>
+            </select>
+          </label>
+          <label
+            class="search-form__label"
+          >
+            <span
+              class="search-form__label-text"
+            >
+              Topic domain
+            </span>
+            <select
+              class="search-form__select"
+              name="topic_domain"
+            >
+              <option
+                value=""
+              >
+                Any topic
+              </option>
+              <option
+                value="christology"
+              >
+                Christology
+              </option>
+              <option
+                value="soteriology"
+              >
+                Soteriology
+              </option>
+              <option
+                value="ecclesiology"
+              >
+                Ecclesiology
+              </option>
+              <option
+                value="sacramental"
+              >
+                Sacramental Theology
+              </option>
+              <option
+                value="biblical-theology"
+              >
+                Biblical Theology
+              </option>
+              <option
+                value="ethics"
+              >
+                Christian Ethics
+              </option>
+            </select>
+          </label>
+          <fieldset
+            class="search-fieldset"
+          >
+            <legend
+              class="search-fieldset__legend"
+            >
+              Collection facets
+            </legend>
+            <div
+              class="search-fieldset__grid"
+            >
+              <label
+                class="search-fieldset__checkbox-label"
+              >
+                <input
+                  type="checkbox"
+                />
+                Dead Sea Scrolls
+              </label>
+              <label
+                class="search-fieldset__checkbox-label"
+              >
+                <input
+                  type="checkbox"
+                />
+                Nag Hammadi
+              </label>
+              <label
+                class="search-fieldset__checkbox-label"
+              >
+                <input
+                  type="checkbox"
+                />
+                Church Fathers
+              </label>
+              <label
+                class="search-fieldset__checkbox-label"
+              >
+                <input
+                  type="checkbox"
+                />
+                Second Temple
+              </label>
+            </div>
+          </fieldset>
+          <fieldset
+            class="search-fieldset"
+          >
+            <legend
+              class="search-fieldset__legend"
+            >
+              Dataset facets
+            </legend>
+            <div
+              class="search-fieldset__grid"
+            >
+              <label
+                class="search-dataset-item"
+              >
+                <span
+                  class="search-dataset-item__header"
+                >
+                  <input
+                    type="checkbox"
+                  />
+                  <strong>
+                    Dead Sea Scrolls
+                  </strong>
+                </span>
+                <span
+                  class="search-dataset-item__desc"
+                >
+                  Qumran fragments and related parallels
+                </span>
+              </label>
+              <label
+                class="search-dataset-item"
+              >
+                <span
+                  class="search-dataset-item__header"
+                >
+                  <input
+                    type="checkbox"
+                  />
+                  <strong>
+                    Nag Hammadi Codices
+                  </strong>
+                </span>
+                <span
+                  class="search-dataset-item__desc"
+                >
+                  Gnostic corpus for comparative study
+                </span>
+              </label>
+            </div>
+          </fieldset>
+          <fieldset
+            class="search-fieldset"
+          >
+            <legend
+              class="search-fieldset__legend"
+            >
+              Variant focus
+            </legend>
+            <div
+              class="search-fieldset__grid"
+            >
+              <label
+                class="search-fieldset__checkbox-label"
+              >
+                <input
+                  type="checkbox"
+                />
+                Disputed readings
+              </label>
+              <label
+                class="search-fieldset__checkbox-label"
+              >
+                <input
+                  type="checkbox"
+                />
+                Harmonized expansions
+              </label>
+              <label
+                class="search-fieldset__checkbox-label"
+              >
+                <input
+                  type="checkbox"
+                />
+                Orthographic shifts
+              </label>
+            </div>
+          </fieldset>
+          <div
+            class="search-date-fields"
+          >
+            <label
+              class="search-form__label"
+            >
+              <span
+                class="search-form__label-text"
+              >
+                Date from
+              </span>
+              <input
+                class="search-form__input"
+                name="date_start"
+                type="date"
+                value=""
+              />
+            </label>
+            <label
+              class="search-form__label"
+            >
+              <span
+                class="search-form__label-text"
+              >
+                Date to
+              </span>
+              <input
+                class="search-form__input"
+                name="date_end"
+                type="date"
+                value=""
+              />
+            </label>
+          </div>
+          <div
+            class="search-fieldset__grid"
+          >
+            <label
+              class="search-fieldset__checkbox-label"
+            >
+              <input
+                name="variants"
+                type="checkbox"
+              />
+              Include textual variants
+            </label>
+            <label
+              class="search-fieldset__checkbox-label"
+            >
+              <input
+                name="disputed"
+                type="checkbox"
+              />
+              Include disputed readings
+            </label>
+          </div>
+        </div>
+      </details>
+      <button
+        aria-label="Search corpus"
+        class="search-form__button"
+        type="submit"
+      >
+        Search
+      </button>
+    </form>
+    <details
+      class="search-advanced-details savedSearchesDetails"
+    >
+      <summary
+        class="search-advanced-summary"
+      >
+        Saved searches
+      </summary>
+      <p
+        class="search-advanced-help"
+      >
+        Expand to store or recall presets. Saved searches remember every active filter.
+      </p>
+      <form
+        class="form"
+      >
+        <label
+          for="saved-search-name"
+          style="border: 0px; height: 1px; margin: -1px; overflow: hidden; padding: 0px; position: absolute; width: 1px; white-space: nowrap;"
+        >
+          Saved search name
+        </label>
+        <input
+          class="search-saved-input"
+          id="saved-search-name"
+          placeholder="Name this search"
+          type="text"
+          value=""
+        />
+        <button
+          disabled=""
+          type="submit"
+        >
+          Save current filters
+        </button>
+      </form>
+      <p
+        class="search-saved-empty"
+      >
+        No saved searches yet. Configure filters and click save to store a preset.
+      </p>
+    </details>
+    <div
+      class="sortControlsWrapper"
+    >
+      <fieldset
+        aria-label="Sort search results"
+        class="fieldset"
+        role="radiogroup"
+      >
+        <legend
+          class="legend"
+        >
+          Sort results
+        </legend>
+        <div
+          class="optionsContainer"
+        >
+          <label
+            class="optionLabel active"
+          >
+            <input
+              aria-describedby="sort-rank-description"
+              checked=""
+              class="radioInput"
+              name="sort"
+              type="radio"
+              value="rank"
+            />
+            <span>
+              <span
+                class="optionTitle"
+              >
+                Rank
+              </span>
+              <span
+                class="optionDescription"
+                id="sort-rank-description"
+              >
+                Prioritize editorial rank when available.
+              </span>
+            </span>
+          </label>
+          <label
+            class="optionLabel "
+          >
+            <input
+              aria-describedby="sort-score-description"
+              class="radioInput"
+              name="sort"
+              type="radio"
+              value="score"
+            />
+            <span>
+              <span
+                class="optionTitle"
+              >
+                Score
+              </span>
+              <span
+                class="optionDescription"
+                id="sort-score-description"
+              >
+                Sort by highest document score first.
+              </span>
+            </span>
+          </label>
+          <label
+            class="optionLabel "
+          >
+            <input
+              aria-describedby="sort-title-description"
+              class="radioInput"
+              name="sort"
+              type="radio"
+              value="title"
+            />
+            <span>
+              <span
+                class="optionTitle"
+              >
+                Title
+              </span>
+              <span
+                class="optionDescription"
+                id="sort-title-description"
+              >
+                Order alphabetically by document title.
+              </span>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+    </div>
+    <section
+      aria-label="Search quick start"
+      class="search-first-run"
+    >
+      <div
+        class="search-first-run__column"
+      >
+        <h3
+          class="search-first-run__title"
+        >
+          Try an example search
+        </h3>
+        <p
+          class="search-first-run__subtitle"
+        >
+          Load a starter query to see how Theo highlights relevant passages and metadata.
+        </p>
+        <ul
+          class="search-first-run__chips"
+        >
+          <li>
+            <button
+              class="search-first-run__chip"
+              type="button"
+            >
+              Trace the Logos theme
+            </button>
+          </li>
+          <li>
+            <button
+              class="search-first-run__chip"
+              type="button"
+            >
+              Compare creation prologues
+            </button>
+          </li>
+          <li>
+            <button
+              class="search-first-run__chip"
+              type="button"
+            >
+              Locate New Covenant passages
+            </button>
+          </li>
+        </ul>
+      </div>
+      <div
+        class="search-first-run__column"
+      >
+        <h3
+          class="search-first-run__title"
+        >
+          Tune filters faster
+        </h3>
+        <ul
+          class="search-first-run__tips"
+        >
+          <li>
+            Toggle presets to jump between scholarly, devotional, or textual-critical modes.
+          </li>
+          <li>
+            Use collection facets to zero in on sets like the Church Fathers or Dead Sea Scrolls.
+          </li>
+          <li>
+            Enable variant and disputed filters to surface textual apparatus discussions.
+          </li>
+        </ul>
+        <p
+          class="search-first-run__subtitle"
+        >
+          Jump to a topic collection:
+        </p>
+        <ul
+          class="search-first-run__links"
+        >
+          <li>
+            <a
+              href="/search?topicDomain=christology"
+            >
+              Christology
+            </a>
+          </li>
+          <li>
+            <a
+              href="/search?topicDomain=soteriology"
+            >
+              Soteriology
+            </a>
+          </li>
+          <li>
+            <a
+              href="/search?topicDomain=ecclesiology"
+            >
+              Ecclesiology
+            </a>
+          </li>
+        </ul>
+      </div>
+    </section>
+    <div
+      class="search-results"
+    />
+  </section>
+  <div
+    aria-label="Notifications (F8)"
+    role="region"
+    style="pointer-events: none;"
+    tabindex="-1"
+  >
+    <ol
+      class="viewport"
+      tabindex="-1"
+    />
+  </div>
+  <div
+    aria-atomic="false"
+    aria-label="Notifications"
+    aria-live="polite"
+    class="toast-container"
+    role="region"
+  />
+</DocumentFragment>
+`;
