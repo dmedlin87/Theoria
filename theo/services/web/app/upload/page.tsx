@@ -46,6 +46,8 @@ export default function UploadPage(): JSX.Element {
   const [jobs, setJobs] = useState<JobStatus[]>([]);
   const [jobError, setJobError] = useState<ErrorDetails | null>(null);
   const fetchJobsRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const hasJobs = jobs.length > 0;
+  const ingestionDocsUrl = "https://docs.theoria.app/ingestion";
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const { addToast } = useToast();
@@ -404,6 +406,38 @@ export default function UploadPage(): JSX.Element {
         the advanced settings to tweak metadata or post-batch operations. Manual file and URL uploads remain available
         below.
       </p>
+
+      {!hasJobs && (
+        <section className="upload-hero" aria-label="Supported sources overview">
+          <div className="upload-hero__content">
+            <h2>Bring your first sources online</h2>
+            <p>
+              Theo parses scholarly formats out of the box. Upload a single file or point the simple ingest pipeline at a
+              directory to queue a batch.
+            </p>
+            <ul className="upload-hero__details">
+              <li>
+                <strong>File types:</strong> PDF, DOCX, Markdown, TXT, HTML, and YouTube transcripts.
+              </li>
+              <li>
+                <strong>Size limits:</strong> Up to 50&nbsp;MB per file. Larger corpora run best through the simple ingest
+                worker.
+              </li>
+              <li>
+                <strong>Metadata:</strong> Attach JSON frontmatter or enrich sources post-upload in the jobs table.
+              </li>
+            </ul>
+            <a
+              className="upload-hero__cta"
+              href={ingestionDocsUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Read ingestion docs
+            </a>
+          </div>
+        </section>
+      )}
 
       <SimpleIngestForm
         onSubmit={handleSimpleIngestSubmit}

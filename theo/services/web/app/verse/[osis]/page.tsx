@@ -118,6 +118,17 @@ function getTimelineWindow(searchParams: Record<string, string | string[] | unde
   return "month";
 }
 
+function isLikelyOsis(value: string | undefined): value is string {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    return false;
+  }
+  return /^[A-Za-z0-9]+\.[0-9]/.test(normalized);
+}
+
 function buildMentionFilterQuery(searchParams: Record<string, string | string[] | undefined> | undefined) {
   const params = new URLSearchParams();
   if (!searchParams) {
@@ -308,9 +319,13 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   let graphError: string | null = null;
   let featuresError: string | null = null;
 
+  const rawOsis = resolvedParams.osis?.trim() ?? "";
+  const hasPresetOsis = isLikelyOsis(rawOsis);
+  const effectiveOsis = hasPresetOsis ? rawOsis : "John.1.1";
+
   try {
     const [mentionsResponse, featureResult] = await Promise.all([
-      fetchMentions(resolvedParams.osis, normalizedSearchParams),
+      fetchMentions(effectiveOsis, normalizedSearchParams),
       fetchResearchFeatures(),
     ]);
     data = mentionsResponse;
@@ -322,7 +337,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
   }
 
   try {
-    graph = await fetchGraph(resolvedParams.osis, normalizedSearchParams);
+    graph = await fetchGraph(effectiveOsis, normalizedSearchParams);
   } catch (graphErr) {
     console.error("Failed to load verse graph", graphErr);
     graphError = graphErr instanceof Error ? graphErr.message : "Unknown error";
@@ -330,7 +345,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
 
   if (!error && features.verse_timeline) {
     try {
-      timeline = await fetchTimeline(resolvedParams.osis, normalizedSearchParams, windowParam);
+      timeline = await fetchTimeline(effectiveOsis, normalizedSearchParams, windowParam);
     } catch (timelineErr) {
       console.error("Failed to load verse timeline", timelineErr);
       timelineError =
@@ -338,7 +353,7 @@ export default async function VersePage({ params, searchParams }: VersePageProps
     }
   }
 
-  const osis = data?.osis ?? resolvedParams.osis;
+  const osis = data?.osis ?? effectiveOsis;
   const mentions = data?.mentions ?? [];
   const total = data?.total ?? 0;
   const deliverableFilters: Record<string, string> = {};
@@ -373,6 +388,26 @@ export default async function VersePage({ params, searchParams }: VersePageProps
             ]}
           />
           <h2>Verse Mentions</h2>
+          {!hasPresetOsis && (
+            <div className={styles.promptBanner} role="status">
+              <p>
+                Pick a starting passage to explore mentions. We’ve loaded <strong>{osis}</strong> as a primer.
+              </p>
+              <ul>
+                {[
+                  { label: "John 1:1", value: "John.1.1" },
+                  { label: "Genesis 1:1", value: "Gen.1.1" },
+                  { label: "Psalm 23", value: "Ps.23" },
+                ].map((suggestion) => (
+                  <li key={suggestion.value}>
+                    <Link href={`/verse/${encodeURIComponent(suggestion.value)}`}>
+                      {suggestion.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p>
             Aggregated references for <strong>{osis}</strong>
           </p>

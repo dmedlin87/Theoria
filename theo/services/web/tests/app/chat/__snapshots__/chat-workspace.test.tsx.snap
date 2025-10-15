@@ -1,0 +1,539 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`ChatWorkspace renders empty-state CTAs for new sessions 1`] = `
+<DocumentFragment>
+  <div
+    aria-live="polite"
+    class="workspace"
+  >
+    <section
+      aria-label="Chat overview"
+      class="hero"
+    >
+      <div
+        class="heroContent"
+      >
+        <p
+          class="heroEyebrow"
+        >
+          Theoria Copilot
+        </p>
+        <h2>
+          Ask with Balanced stance
+        </h2>
+        <p>
+          We’ll keep the conversation aligned to 
+          <strong>
+            balanced
+          </strong>
+           emphasis while grounding every answer with citations you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
+        </p>
+        <div
+          aria-label="Quick navigation"
+          class="heroActions"
+        >
+          <a
+            class="heroAction"
+            href="/search"
+          >
+            <span
+              class="heroActionIcon"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-search icon icon--lg"
+                fill="none"
+                focusable="false"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="m21 21-4.34-4.34"
+                />
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+              </svg>
+            </span>
+            <span
+              class="heroActionCopy"
+            >
+              <strong>
+                Search the library
+              </strong>
+              <span>
+                Jump into cross-references
+              </span>
+            </span>
+            <span
+              class="heroActionArrow"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-arrow-right icon icon--md"
+                fill="none"
+                focusable="false"
+                height="20"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="20"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="m12 5 7 7-7 7"
+                />
+              </svg>
+            </span>
+          </a>
+          <a
+            class="heroAction"
+            href="/verse"
+          >
+            <span
+              class="heroActionIcon"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-book-open icon icon--lg"
+                fill="none"
+                focusable="false"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 7v14"
+                />
+                <path
+                  d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+                />
+              </svg>
+            </span>
+            <span
+              class="heroActionCopy"
+            >
+              <strong>
+                Trace a passage
+              </strong>
+              <span>
+                Explore every verse connection
+              </span>
+            </span>
+            <span
+              class="heroActionArrow"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-arrow-right icon icon--md"
+                fill="none"
+                focusable="false"
+                height="20"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="20"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="m12 5 7 7-7 7"
+                />
+              </svg>
+            </span>
+          </a>
+          <a
+            class="heroAction"
+            href="/upload"
+          >
+            <span
+              class="heroActionIcon"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-upload icon icon--lg"
+                fill="none"
+                focusable="false"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 3v12"
+                />
+                <path
+                  d="m17 8-5-5-5 5"
+                />
+                <path
+                  d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                />
+              </svg>
+            </span>
+            <span
+              class="heroActionCopy"
+            >
+              <strong>
+                Enrich your corpus
+              </strong>
+              <span>
+                Upload documents for future chats
+              </span>
+            </span>
+            <span
+              class="heroActionArrow"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-arrow-right icon icon--md"
+                fill="none"
+                focusable="false"
+                height="20"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="20"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="m12 5 7 7-7 7"
+                />
+              </svg>
+            </span>
+          </a>
+        </div>
+      </div>
+      <ul
+        aria-label="What this workspace offers"
+        class="heroHighlights"
+      >
+        <li
+          class="heroHighlight"
+        >
+          <span
+            class="heroHighlightIcon"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-circle-check-big icon icon--lg"
+              fill="none"
+              focusable="false"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M21.801 10A10 10 0 1 1 17 3.335"
+              />
+              <path
+                d="m9 11 3 3L22 4"
+              />
+            </svg>
+          </span>
+          <div>
+            <p
+              class="heroHighlightTitle"
+            >
+              Grounded answers
+            </p>
+            <p
+              class="heroHighlightText"
+            >
+              Every response links back to trusted sources.
+            </p>
+          </div>
+        </li>
+        <li
+          class="heroHighlight"
+        >
+          <span
+            class="heroHighlightIcon"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-globe icon icon--lg"
+              fill="none"
+              focusable="false"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <path
+                d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"
+              />
+              <path
+                d="M2 12h20"
+              />
+            </svg>
+          </span>
+          <div>
+            <p
+              class="heroHighlightTitle"
+            >
+              Perspective aware
+            </p>
+            <p
+              class="heroHighlightText"
+            >
+              Tune the stance to match your research context.
+            </p>
+          </div>
+        </li>
+        <li
+          class="heroHighlight"
+        >
+          <span
+            class="heroHighlightIcon"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-file-text icon icon--lg"
+              fill="none"
+              focusable="false"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M14 2v4a2 2 0 0 0 2 2h4"
+              />
+              <path
+                d="M10 9H8"
+              />
+              <path
+                d="M16 13H8"
+              />
+              <path
+                d="M16 17H8"
+              />
+            </svg>
+          </span>
+          <div>
+            <p
+              class="heroHighlightTitle"
+            >
+              Export ready
+            </p>
+            <p
+              class="heroHighlightText"
+            >
+              Capture threads and build shareable briefs effortlessly.
+            </p>
+          </div>
+        </li>
+      </ul>
+    </section>
+    <div
+      aria-label="Chat transcript"
+      class="transcript"
+      role="log"
+    >
+      <div
+        class="emptyState"
+      >
+        <h3>
+          Start the conversation
+        </h3>
+        <p>
+          Ask about a passage, doctrine, or theme and we’ll respond with cited insights.
+        </p>
+        <ul
+          class="emptyStateActions"
+        >
+          <li>
+            <button
+              class="emptyStateChip"
+              type="button"
+            >
+              How does John 1:1 connect with Genesis 1?
+            </button>
+          </li>
+          <li>
+            <button
+              class="emptyStateChip"
+              type="button"
+            >
+              What does Romans 8 teach about life in the Spirit?
+            </button>
+          </li>
+          <li>
+            <button
+              class="emptyStateChip"
+              type="button"
+            >
+              Summarize the Beatitudes in Matthew 5.
+            </button>
+          </li>
+          <li>
+            <button
+              class="emptyStateChip"
+              type="button"
+            >
+              Where else does Scripture describe the New Covenant?
+            </button>
+          </li>
+        </ul>
+        <div
+          class="emptyStateCtas"
+        >
+          <button
+            class="emptyStateCta"
+            type="button"
+          >
+            Upload your first document
+          </button>
+          <button
+            class="emptyStateCtaSecondary"
+            type="button"
+          >
+            Open search examples
+          </button>
+          <button
+            class="emptyStateCtaTertiary"
+            type="button"
+          >
+            Watch intro video
+          </button>
+        </div>
+        <p
+          class="emptyStateLinks"
+        >
+          Prefer browsing? Explore the 
+          <a
+            href="/search"
+          >
+            Search
+          </a>
+           and 
+          <a
+            href="/verse"
+          >
+            Verse explorer
+          </a>
+          .
+        </p>
+      </div>
+    </div>
+    <div
+      aria-label="Session history controls"
+      class="container"
+    >
+      <button
+        aria-expanded="false"
+        aria-haspopup="menu"
+        class="trigger"
+        data-state="closed"
+        disabled=""
+        id="radix-_r_0_"
+        type="button"
+      >
+        Session actions
+      </button>
+    </div>
+    <div
+      aria-hidden="true"
+    />
+    <form
+      aria-label="Chat input"
+      class="form"
+    >
+      <label
+        for="chat-question"
+      >
+        Ask Theoria
+      </label>
+      <textarea
+        aria-describedby="chat-shortcuts"
+        id="chat-question"
+        name="question"
+        placeholder="How does John 1:1 connect with Genesis 1?"
+        required=""
+        rows="4"
+      />
+      <p
+        class="shortcuts"
+        id="chat-shortcuts"
+      >
+        Press 
+        <kbd>
+          Ctrl+Enter
+        </kbd>
+         (or 
+        <kbd>
+          ⌘+Enter
+        </kbd>
+        ) to send
+      </p>
+      <div
+        class="formActions"
+      >
+        <button
+          disabled=""
+          type="submit"
+        >
+          Send
+        </button>
+      </div>
+    </form>
+    <p
+      class="footnote"
+    >
+      Responses cite the passages and sources that shaped the answer.
+    </p>
+  </div>
+</DocumentFragment>
+`;
