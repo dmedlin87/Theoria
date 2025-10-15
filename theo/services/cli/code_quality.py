@@ -10,6 +10,8 @@ from typing import Iterable, Sequence
 
 import click
 
+from theo.services.bootstrap import resolve_application
+
 
 @dataclass(frozen=True)
 class CheckRequest:
@@ -40,6 +42,9 @@ DEFAULT_MYPY_PATHS: tuple[Path, ...] = (Path("mcp_server"),)
 
 _ALLOWED_EXECUTABLES: frozenset[str] = frozenset({"ruff", "pytest", "mypy"})
 
+
+# Ensure CLI piggybacks on the platform bootstrap wiring.
+resolve_application()
 
 def _stringify_path(path: Path | str) -> str:
     """Convert :class:`~pathlib.Path` objects to POSIX strings."""
