@@ -45,6 +45,38 @@ def _coerce_scores(raw: object) -> list[float]:
     return [float(raw)]
 
 
+def _infer_positive_class_index(classes: Sequence[object]) -> int | None:
+    """Best-effort inference of the "positive" class index.
+
+    This favours numeric maxima, then semantic labels such as "relevant" or
+    "positive". If no heuristic matches, ``None`` is returned so callers can
+    fall back to alternative strategies.
+    """
+
+    if not classes:
+        return None
+
+    # Numeric classes – favour the highest value.
+    if all(isinstance(entry, (int, float, bool)) for entry in classes):
+        max_value = max(classes)
+        try:
+            return classes.index(max_value)
+        except ValueError:
+            return None
+
+    # String-like labels – look for semantically "positive" names.
+    def _normalise(label: object) -> str:
+        text = str(label).lower()
+        return "".join(ch for ch in text if ch.isalnum())
+
+    positive_keywords = {"relevant", "positive", "true", "yes"}
+    for index, label in enumerate(classes):
+        if _normalise(label) in positive_keywords:
+            return index
+
+    return None
+
+
 class Reranker:
     """Wrapper around a scikit-learn compatible estimator."""
 
@@ -65,10 +97,48 @@ class Reranker:
             proba = estimator.predict_proba(feature_matrix)
             if hasattr(proba, "tolist"):
                 proba = proba.tolist()
+            classes: Sequence[object] | None = getattr(estimator, "classes_", None)
+            class_list: list[object] | None = None
+            positive_index: int | None = None
+            if classes is not None:
+                try:
+                    class_list = list(classes)
+                except TypeError:
+                    class_list = None
+            if class_list:
+                positive_index = _infer_positive_class_index(class_list)
+            predictions: Sequence[object] | None = None
+            if (
+                positive_index is None
+                and class_list is not None
+                and hasattr(estimator, "predict")
+            ):
+                raw_predictions = estimator.predict(feature_matrix)
+                if hasattr(raw_predictions, "tolist"):
+                    raw_predictions = raw_predictions.tolist()
+                if isinstance(raw_predictions, Sequence):
+                    predictions = raw_predictions
             scores: list[float] = []
-            for row in proba:
+            for index, row in enumerate(proba):
                 if isinstance(row, (list, tuple)):
-                    scores.append(float(row[-1]))
+                    target_index: int | None = None
+                    if positive_index is not None and positive_index < len(row):
+                        target_index = positive_index
+                    elif (
+                        predictions is not None
+                        and class_list is not None
+                        and index < len(predictions)
+                    ):
+                        predicted_label = predictions[index]
+                        try:
+                            predicted_index = class_list.index(predicted_label)
+                        except ValueError:
+                            predicted_index = None
+                        if predicted_index is not None and predicted_index < len(row):
+                            target_index = predicted_index
+                    if target_index is None or target_index >= len(row):
+                        target_index = len(row) - 1
+                    scores.append(float(row[target_index]))
                 else:
                     scores.append(float(row))
             return scores
