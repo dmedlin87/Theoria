@@ -42,9 +42,10 @@ function parseHeaders(value: string): Record<string, string> | null {
         if (invalidKeys.has(key)) {
           throw new Error(`Invalid header key: ${key}`);
         }
-        if (typeof value === "string") {
-          headers[key] = value;
+        if (typeof value !== "string") {
+          throw new Error(`Header value for key "${key}" must be a string, got ${typeof value}`);
         }
+        headers[key] = value;
       }
       return headers;
     }
