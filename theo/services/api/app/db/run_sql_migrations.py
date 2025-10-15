@@ -459,12 +459,6 @@ def run_sql_migrations(
                     _execute_autocommit(engine, sql)
                 else:
                     connection = session.connection()
-                    if (
-                        dialect_name == "sqlite"
-                        and is_sqlite_perspective_migration
-                        and sqlite_missing_perspective
-                    ):
-                        connection.exec_driver_sql("DROP TABLE IF EXISTS contradiction_seeds")
                     if dialect_name == "sqlite":
                         for statement in _split_sql_statements(sql):
                             if _sqlite_add_column_exists(connection, statement):
