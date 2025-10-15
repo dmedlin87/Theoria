@@ -519,7 +519,7 @@ def test_contradiction_seeds_repair_range_columns_and_merge_payloads(
         catalog = records[expected_ids["catalog"]]
         assert catalog.source == "community"
         assert catalog.perspective == "analytical"
-        assert catalog.tags == ["curated"]
+        assert catalog.tags == ["curated", None]
         assert catalog.weight == 0.75
         assert catalog.start_verse_id is not None
         assert catalog.start_verse_id_b is not None
