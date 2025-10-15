@@ -20,6 +20,7 @@ const NAVIGATION_COMMANDS: CommandEntry[] = [
   { label: "Search workspace", href: "/search", keywords: "find query" },
   { label: "Upload sources", href: "/upload", keywords: "ingest import" },
   { label: "Export center", href: "/export", keywords: "deliverable" },
+  { label: "Settings", href: "/settings", keywords: "config preferences api key" },
 ];
 
 export default function CommandPalette(): JSX.Element {

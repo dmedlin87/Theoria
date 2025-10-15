@@ -1,0 +1,40 @@
+.status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  padding: 0.5rem;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.status[data-status="connected"] .dot {
+  background: var(--color-positive);
+  box-shadow: 0 0 8px var(--color-positive-alpha-50);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status[data-status="disconnected"] .dot {
+  background: var(--color-danger);
+  box-shadow: 0 0 8px var(--color-danger-alpha-50);
+}
+
+.label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}

@@ -9,6 +9,7 @@ import "./globals.css";
 import Link from "next/link";
 import { AppShell, type AppShellNavSection } from "./components/AppShell";
 import { ToastProvider } from "./components/Toast";
+import { WelcomeModal } from "./components/WelcomeModal";
 
 export const metadata = {
   title: "Theoria",
@@ -47,7 +48,7 @@ const adminLinks: NavItem[] =
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const initialMode = DEFAULT_MODE_ID;
-  const enableUiV2 = process.env.NEXT_PUBLIC_ENABLE_UI_V2 === "true";
+  const enableUiV2 = true; // UI v2 enabled - modern AppShell with command palette and sidebar
   const navSections: AppShellNavSection[] = [
     {
       label: "Workspace",
@@ -66,6 +67,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     {
       label: "Corpora",
       items: [{ href: "/upload", label: "Uploads", match: "/upload" }],
+    },
+    {
+      label: "System",
+      items: [{ href: "/settings", label: "Settings", match: "/settings" }],
     },
   ];
 
@@ -90,6 +95,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </a>
         <ModeProvider initialMode={initialMode}>
           <ToastProvider>
+            <WelcomeModal />
             {enableUiV2 ? (
               <AppShell
                 navSections={navSections}

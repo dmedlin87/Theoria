@@ -22,6 +22,8 @@ function classNames(
 
 import CommandPalette from "./CommandPalette";
 import { ThemeToggle } from "./ThemeToggle";
+import OfflineIndicator from "./OfflineIndicator";
+import { ConnectionStatus } from "./ConnectionStatus";
 
 export type AppShellNavItem = {
   href: string;
@@ -236,6 +238,7 @@ export function AppShell({
       </aside>
       <div className={styles.workspace}>
         <CommandPalette />
+        <OfflineIndicator />
         <div className={styles.commandBar} role="banner">
           <button
             type="button"
@@ -291,6 +294,7 @@ export function AppShell({
           {children}
         </main>
         <footer className={styles.footer}>
+          <ConnectionStatus />
           <div className={styles.footerMeta}>
             <span>{footerMeta}</span>
             <ThemeToggle />

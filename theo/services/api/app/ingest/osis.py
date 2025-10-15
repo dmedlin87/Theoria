@@ -8,7 +8,11 @@ from typing import Sequence
 import pythonbible as pb
 from pythonbible import NormalizedReference
 
-from theo.domain.research.osis import expand_osis_reference, format_osis
+from theo.domain.research.osis import (
+    expand_osis_reference,
+    format_osis,
+    osis_to_readable,
+)
 
 
 @dataclass
@@ -67,6 +71,20 @@ def detect_osis_references(text: str) -> DetectedOsis:
     primary_ref = combine_references(normalized)
     primary = format_osis(primary_ref) if primary_ref else all_refs[0]
     return DetectedOsis(primary=primary, all=all_refs)
+
+
+def _osis_to_readable(reference: str) -> str:
+    """Convert an OSIS string into a pythonbible-friendly textual form.
+
+    Historically this helper lived in the ingest layer; keep the name (and guard)
+    so older callers continue to function while delegating to the shared domain
+    implementation.
+    """
+
+    try:
+        return osis_to_readable(reference)
+    except Exception:  # pragma: no cover - defensive: fall back to original text
+        return reference
 
 
 def canonical_verse_range(
