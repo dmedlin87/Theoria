@@ -248,6 +248,7 @@ def _ensure_perspective_column(
     dataset_label: str,
     *,
     required_columns: Iterable[str] | None = None,
+    allow_repair: bool = False,
 ) -> bool:
     """Verify the ``perspective`` column exists before reading from ``table``."""
 
@@ -266,6 +267,17 @@ def _ensure_perspective_column(
             return True
     else:
         missing_dependencies = list(dependencies) if dependencies else []
+
+    if allow_repair:
+        _rebuild_perspective_column(
+            session,
+            table,
+            dataset_label=dataset_label,
+            log_suffix=f"retrying {dataset_label} seeds",
+        )
+        if _table_has_column(session, table.name, "perspective", schema=table.schema):
+            return True
+        # Fall through to warning path when the repair did not restore the column.
 
     session.rollback()
     logger.warning(
@@ -422,6 +434,7 @@ def seed_contradiction_claims(session: Session) -> None:
             required_columns=("created_at",)
             if hasattr(ContradictionSeed, "created_at")
             else None,
+            allow_repair=True,
         )
     except OperationalError as exc:
         if _handle_missing_perspective_error(session, "contradiction", exc):
@@ -587,6 +600,7 @@ def seed_harmony_claims(session: Session) -> None:
         table,
         "harmony",
         required_columns=("created_at",) if hasattr(HarmonySeed, "created_at") else None,
+        allow_repair=True,
     ):
         return
 
@@ -747,6 +761,7 @@ def seed_commentary_excerpts(session: Session) -> None:
         required_columns=("created_at",)
         if hasattr(CommentaryExcerptSeed, "created_at")
         else None,
+        allow_repair=True,
     ):
         return
     if not _ensure_range_columns(

@@ -287,7 +287,7 @@ class ProviderSettingsResponse(APIModel):
 
 class VerseCopilotRequest(ModeAliasMixin, APIModel):
     osis: str | None = None
-    passage: str | None = None
+    passage: str | None = Field(None, max_length=200)
     question: str | None = None
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     model: str | None = None

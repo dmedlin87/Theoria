@@ -616,7 +616,9 @@ def chat_turn(
         intent_tags=intent_tags,
     )
     memory_focus = focus_metadata.to_focus()
-    memory_context = _prepare_memory_context(memory_entries, focus=memory_focus)
+    memory_context = _prepare_memory_context(
+        memory_entries, query=question, focus=memory_focus
+    )
 
     if memory_context:
         budget_remaining = CHAT_SESSION_TOTAL_CHAR_BUDGET - total_message_chars
