@@ -9,6 +9,7 @@ import { useToast } from "../../components/Toast";
 import UiModeToggle from "../../components/UiModeToggle";
 import { buildPassageLink, formatAnchor } from "../../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../../lib/errorUtils";
+import { interpretApiError, type InterpretedApiError } from "../../lib/errorMessages";
 import type { components } from "../../lib/generated/api";
 import { emitTelemetry, submitFeedback } from "../../lib/telemetry";
 import type { FeedbackEventInput } from "../../lib/telemetry";
@@ -454,7 +455,15 @@ export default function SearchPageClient({
   );
   const [isSearching, setIsSearching] = useState(false);
   const [searchAbortController, setSearchAbortController] = useState<AbortController | null>(null);
-  const [error, setError] = useState<ErrorDetails | null>(initialError);
+  const [error, setError] = useState<InterpretedApiError | null>(
+    initialError
+      ? interpretApiError(initialError.message, {
+          feature: "search",
+          fallbackMessage: initialError.message,
+          traceId: initialError.traceId ?? null,
+        })
+      : null,
+  );
   const [hasSearched, setHasSearched] = useState(initialHasSearched);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [savedSearchName, setSavedSearchName] = useState("");
@@ -523,7 +532,14 @@ export default function SearchPageClient({
             `Search failed with status ${response.status}`,
           );
           setGroups([]);
-          setError(errorDetails);
+          setError(
+            interpretApiError(errorDetails.message, {
+              feature: "search",
+              status: response.status,
+              traceId: errorDetails.traceId ?? null,
+              fallbackMessage: errorDetails.message,
+            }),
+          );
           renderEnd = perf ? perf.now() : null;
         } else {
           const payload = (await response.json()) as SearchResponse;
@@ -553,7 +569,13 @@ export default function SearchPageClient({
           typeof fetchError === "object" && fetchError && "traceId" in fetchError
             ? ((fetchError as { traceId?: string | null }).traceId ?? null)
             : null;
-        setError({ message, traceId });
+        setError(
+          interpretApiError(fetchError, {
+            feature: "search",
+            fallbackMessage: message,
+            traceId,
+          }),
+        );
         setGroups([]);
       } finally {
         setIsSearching(false);
@@ -1321,9 +1343,20 @@ export default function SearchPageClient({
           <ErrorCallout
             message={error.message}
             traceId={error.traceId}
+            retryLabel={error.retryLabel ?? undefined}
+            helpLink={error.helpLink}
+            helpLabel={error.helpLabel}
             onRetry={handleRetrySearch}
             onShowDetails={handleShowErrorDetails}
             detailsLabel="Show details"
+            telemetry={{
+              source: "search_page",
+              page: "search",
+              errorCategory: error.category,
+              metadata: {
+                ...(typeof error.status === "number" ? { status: error.status } : {}),
+              },
+            }}
           />
         </div>
       )}

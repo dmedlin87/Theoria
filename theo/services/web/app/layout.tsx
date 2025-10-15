@@ -10,6 +10,7 @@ import Link from "next/link";
 import { AppShell, type AppShellNavSection } from "./components/AppShell";
 import { ToastProvider } from "./components/Toast";
 import { ApiConfigProvider } from "./lib/api-config";
+import { OnboardingOverlay } from "./components/onboarding/OnboardingOverlay";
 
 export const metadata = {
   title: "Theoria",
@@ -39,7 +40,6 @@ const NAV_LINKS: NavItem[] = [
   { href: "/verse/John.1.1", label: "Verse explorer" },
   { href: "/copilot", label: "Copilot" },
   { href: "/upload", label: "Upload" },
-  { href: "/settings", label: "Settings" },
 ];
 
 const adminLinks: NavItem[] =
@@ -49,7 +49,7 @@ const adminLinks: NavItem[] =
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const initialMode = DEFAULT_MODE_ID;
-  const enableUiV2 = process.env.NEXT_PUBLIC_ENABLE_UI_V2 === "true";
+  const enableUiV2 = true; // UI v2 enabled - modern AppShell with command palette and sidebar
   const navSections: AppShellNavSection[] = [
     {
       label: "Workspace",
@@ -70,7 +70,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       items: [{ href: "/upload", label: "Uploads", match: "/upload" }],
     },
     {
-      label: "Configuration",
+      label: "System",
       items: [{ href: "/settings", label: "Settings", match: "/settings" }],
     },
   ];
@@ -103,7 +103,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   modeSwitcher={<ModeSwitcher />}
                   footerMeta={footerMeta}
                 >
-                  {children}
+                  <>
+                    {children}
+                    <OnboardingOverlay />
+                  </>
                 </AppShell>
               ) : (
                 <>
@@ -113,21 +116,21 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                         Theoria
                       </Link>
                       <nav className="site-nav" aria-label="Primary">
-                      {[...NAV_LINKS, ...adminLinks].map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          prefetch={true}
-                          className={
-                            item.variant === "primary" ? "nav-link nav-link--primary" : "nav-link"
-                          }
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-                    </nav>
-                  </div>
-                </header>
+                        {[...NAV_LINKS, ...adminLinks].map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            prefetch={true}
+                            className={
+                              item.variant === "primary" ? "nav-link nav-link--primary" : "nav-link"
+                            }
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </nav>
+                    </div>
+                  </header>
                   <section className="mode-banner" aria-label="Research mode selection">
                     <div className="container">
                       <ModeSwitcher />
