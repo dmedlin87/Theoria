@@ -4,36 +4,78 @@ export type ApiCredentials = {
 };
 
 const STORAGE_KEY = "theo.api.credentials";
+const ENCRYPTED_PREFIX = "enc-v1:";
+const MIN_PASSPHRASE_LENGTH = 12;
 
-// Encryption settings
-// Retrieve encryption passphrase from runtime configuration (e.g., injected global variable)
-const ENCRYPTION_PASSPHRASE: string = (window as any).THEO_API_ENCRYPTION_PASSPHRASE;
-if (!ENCRYPTION_PASSPHRASE || typeof ENCRYPTION_PASSPHRASE !== "string" || ENCRYPTION_PASSPHRASE.length < 12) {
-  throw new Error("Encryption passphrase not set. Please provide a strong passphrase via window.THEO_API_ENCRYPTION_PASSPHRASE.");
+let cachedCredentials: ApiCredentials | null = null;
+let cachedCryptoKey: CryptoKey | null = null;
+let cachedCryptoPassphrase: string | null = null;
+
+type RuntimeCryptoContext = {
+  crypto: Crypto;
+  passphrase: string;
+};
+
+function getRuntimeCrypto(): RuntimeCryptoContext | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const runtimePassphrase = (window as any)?.THEO_API_ENCRYPTION_PASSPHRASE;
+  if (
+    typeof runtimePassphrase !== "string" ||
+    runtimePassphrase.length < MIN_PASSPHRASE_LENGTH
+  ) {
+    return null;
+  }
+
+  const runtimeCrypto = window.crypto;
+  if (!runtimeCrypto || !runtimeCrypto.subtle) {
+    return null;
+  }
+
+  return {
+    crypto: runtimeCrypto,
+    passphrase: runtimePassphrase,
+  };
 }
 
-// Utility to derive or import a key for AES-GCM encryption
-async function getAesKey(passphrase: string): Promise<CryptoKey> {
-  const enc = new TextEncoder();
-  const keyMaterial = await window.crypto.subtle.importKey(
-    "raw",
-    enc.encode(passphrase),
-    {name: "PBKDF2"},
-    false,
-    ["deriveKey"]
-  );
-  return await window.crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: enc.encode("theo-api-credentials"),
-      iterations: 100000,
-      hash: "SHA-256"
-    },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"]
-  );
+async function getAesKey(context: RuntimeCryptoContext): Promise<CryptoKey | null> {
+  if (cachedCryptoKey && cachedCryptoPassphrase === context.passphrase) {
+    return cachedCryptoKey;
+  }
+
+  const encoder = new TextEncoder();
+  try {
+    const keyMaterial = await context.crypto.subtle.importKey(
+      "raw",
+      encoder.encode(context.passphrase),
+      { name: "PBKDF2" },
+      false,
+      ["deriveKey"],
+    );
+
+    const derivedKey = await context.crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: encoder.encode("theo-api-credentials"),
+        iterations: 100000,
+        hash: "SHA-256",
+      },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"],
+    );
+
+    cachedCryptoKey = derivedKey;
+    cachedCryptoPassphrase = context.passphrase;
+    return derivedKey;
+  } catch {
+    cachedCryptoKey = null;
+    cachedCryptoPassphrase = null;
+    return null;
+  }
 }
 
 function bufferToBase64(buffer: ArrayBuffer): string {
@@ -56,34 +98,73 @@ function base64ToBuffer(str: string): ArrayBuffer {
 
 // Encrypts a JS object, returns base64 string containing IV and ciphertext
 async function encryptData(data: object): Promise<string> {
-  const json = JSON.stringify(data);
-  const enc = new TextEncoder();
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const key = await getAesKey(ENCRYPTION_PASSPHRASE);
-  const ciphertext = await window.crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: iv },
-    key,
-    enc.encode(json)
-  );
-  // Store as base64 IV + ':' + base64 ciphertext
-  return bufferToBase64(iv.buffer) + ":" + bufferToBase64(ciphertext);
+  const context = getRuntimeCrypto();
+  if (!context) {
+    return JSON.stringify(data);
+  }
+
+  const key = await getAesKey(context);
+  if (!key) {
+    return JSON.stringify(data);
+  }
+
+  try {
+    const payload = JSON.stringify(data);
+    const encoder = new TextEncoder();
+    const iv = context.crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await context.crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      encoder.encode(payload),
+    );
+
+    return `${ENCRYPTED_PREFIX}${bufferToBase64(iv.buffer)}:${bufferToBase64(ciphertext)}`;
+  } catch {
+    return JSON.stringify(data);
+  }
 }
 
-// Decrypts a base64 string containing IV and ciphertext, returns JS object
+// Decrypts an encrypted payload (or plain JSON), returns JS object
 async function decryptData(encrypted: string): Promise<object | null> {
-  const [ivB64, ctB64] = encrypted.split(":");
-  if (!ivB64 || !ctB64) return null;
-  const iv = new Uint8Array(base64ToBuffer(ivB64));
-  const ciphertext = base64ToBuffer(ctB64);
-  const key = await getAesKey(ENCRYPTION_PASSPHRASE);
+  if (!encrypted) {
+    return null;
+  }
+
   try {
-    const decrypted = await window.crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: iv },
+    const parsed = JSON.parse(encrypted);
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+  } catch {
+    // Not plain JSON; attempt to decrypt as AES-GCM payload
+  }
+
+  const context = getRuntimeCrypto();
+  if (!context) {
+    return null;
+  }
+
+  const token = encrypted.startsWith(ENCRYPTED_PREFIX)
+    ? encrypted.slice(ENCRYPTED_PREFIX.length)
+    : encrypted;
+  const [ivB64, ctB64] = token.split(":");
+  if (!ivB64 || !ctB64) {
+    return null;
+  }
+
+  const key = await getAesKey(context);
+  if (!key) {
+    return null;
+  }
+
+  try {
+    const decrypted = await context.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: new Uint8Array(base64ToBuffer(ivB64)) },
       key,
-      ciphertext
+      base64ToBuffer(ctB64),
     );
-    const dec = new TextDecoder();
-    return JSON.parse(dec.decode(decrypted));
+    const decoder = new TextDecoder();
+    return JSON.parse(decoder.decode(decrypted));
   } catch {
     return null;
   }
@@ -124,7 +205,7 @@ export async function readCredentialsFromStorage(): Promise<ApiCredentials | nul
     if (!raw) {
       return null;
     }
-    // DECRYPT before parsing
+    // Attempt to decrypt (or parse plain JSON) before using the stored payload
     const parsed = await decryptData(raw) as Partial<ApiCredentials> | null;
     if (!parsed || typeof parsed !== "object") {
       return null;

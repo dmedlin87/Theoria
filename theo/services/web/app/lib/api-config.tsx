@@ -38,11 +38,6 @@ function getDefaultCredentials(): ApiCredentials {
   if (cached) {
     return cached;
   }
-  const stored = typeof window !== "undefined" ? readCredentialsFromStorage() : null;
-  if (stored) {
-    setCachedCredentials(stored);
-    return stored;
-  }
   return { authorization: null, apiKey: null };
 }
 
@@ -54,31 +49,49 @@ export function ApiConfigProvider({ children }: { children: ReactNode }): JSX.El
     if (typeof window === "undefined") {
       return;
     }
+
+    let isMounted = true;
+
     if (!hasHydrated) {
-      const stored = readCredentialsFromStorage();
-      if (stored) {
-        setCredentialsState(stored);
-        setCachedCredentials(stored);
-      }
-      setHasHydrated(true);
+      void readCredentialsFromStorage()
+        .then((stored) => {
+          if (stored && isMounted) {
+            setCredentialsState(stored);
+            setCachedCredentials(stored);
+          }
+        })
+        .finally(() => {
+          if (isMounted) {
+            setHasHydrated(true);
+          }
+        });
     }
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key && event.key !== STORAGE_KEY) {
         return;
       }
-      const storedCredentials = readCredentialsFromStorage();
-      if (storedCredentials) {
-        setCredentialsState(storedCredentials);
-        setCachedCredentials(storedCredentials);
-      } else {
-        setCredentialsState({ authorization: null, apiKey: null });
-        setCachedCredentials(null);
-      }
+
+      void readCredentialsFromStorage().then((storedCredentials) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (storedCredentials) {
+          setCredentialsState(storedCredentials);
+          setCachedCredentials(storedCredentials);
+        } else {
+          setCredentialsState({ authorization: null, apiKey: null });
+          setCachedCredentials(null);
+        }
+      });
     };
 
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("storage", handleStorage);
+    };
   }, [hasHydrated]);
 
   useEffect(() => {
@@ -86,7 +99,7 @@ export function ApiConfigProvider({ children }: { children: ReactNode }): JSX.El
     if (!hasHydrated || typeof window === "undefined") {
       return;
     }
-    writeCredentialsToStorage(credentials);
+    void writeCredentialsToStorage(credentials);
   }, [credentials, hasHydrated]);
 
   const setCredentials = useCallback((next: ApiCredentials) => {
