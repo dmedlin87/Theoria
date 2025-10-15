@@ -5,7 +5,88 @@ export type ApiCredentials = {
 
 const STORAGE_KEY = "theo.api.credentials";
 
+// Encryption settings
+const ENCRYPTION_PASSPHRASE = "ChangeMeToAStrongRandomPassphrase!"; // In production, use a per-user/pass session solution!
+const ENCRYPTION_KEY_NAME = "theo.api.credentials.key";
+
 let cachedCredentials: ApiCredentials | null = null;
+
+// Utility to derive or import a key for AES-GCM encryption
+async function getAesKey(passphrase: string): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw",
+    enc.encode(passphrase),
+    {name: "PBKDF2"},
+    false,
+    ["deriveKey"]
+  );
+  return await window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: enc.encode("theo-api-credentials"),
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToBuffer(str: string): ArrayBuffer {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+// Encrypts a JS object, returns base64 string containing IV and ciphertext
+async function encryptData(data: object): Promise<string> {
+  const json = JSON.stringify(data);
+  const enc = new TextEncoder();
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const key = await getAesKey(ENCRYPTION_PASSPHRASE);
+  const ciphertext = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv },
+    key,
+    enc.encode(json)
+  );
+  // Store as base64 IV + ':' + base64 ciphertext
+  return bufferToBase64(iv.buffer) + ":" + bufferToBase64(ciphertext);
+}
+
+// Decrypts a base64 string containing IV and ciphertext, returns JS object
+async function decryptData(encrypted: string): Promise<object | null> {
+  const [ivB64, ctB64] = encrypted.split(":");
+  if (!ivB64 || !ctB64) return null;
+  const iv = new Uint8Array(base64ToBuffer(ivB64));
+  const ciphertext = base64ToBuffer(ctB64);
+  const key = await getAesKey(ENCRYPTION_PASSPHRASE);
+  try {
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: iv },
+      key,
+      ciphertext
+    );
+    const dec = new TextDecoder();
+    return JSON.parse(dec.decode(decrypted));
+  } catch {
+    return null;
+  }
+}
 
 function normalizeValue(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
@@ -32,7 +113,8 @@ export function setCachedCredentials(credentials: ApiCredentials | null): void {
   cachedCredentials = credentials ? normalizeCredentials(credentials) : null;
 }
 
-export function readCredentialsFromStorage(): ApiCredentials | null {
+// Returns a promise for credentials; must be awaited by caller!
+export async function readCredentialsFromStorage(): Promise<ApiCredentials | null> {
   if (typeof window === "undefined") {
     return null;
   }
@@ -41,7 +123,8 @@ export function readCredentialsFromStorage(): ApiCredentials | null {
     if (!raw) {
       return null;
     }
-    const parsed = JSON.parse(raw) as Partial<ApiCredentials> | null;
+    // DECRYPT before parsing
+    const parsed = await decryptData(raw) as Partial<ApiCredentials> | null;
     if (!parsed || typeof parsed !== "object") {
       return null;
     }
@@ -55,7 +138,8 @@ export function readCredentialsFromStorage(): ApiCredentials | null {
   }
 }
 
-export function writeCredentialsToStorage(credentials: ApiCredentials): void {
+// Returns a promise; must be awaited if caller cares about completion!
+export async function writeCredentialsToStorage(credentials: ApiCredentials): Promise<void> {
   if (typeof window === "undefined") {
     return;
   }
@@ -65,7 +149,8 @@ export function writeCredentialsToStorage(credentials: ApiCredentials): void {
     return;
   }
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    const encrypted = await encryptData(normalized);
+    window.localStorage.setItem(STORAGE_KEY, encrypted);
   } catch {
     // Ignore storage errors (private browsing, quota issues, etc.)
   }
