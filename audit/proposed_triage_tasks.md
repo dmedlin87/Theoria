@@ -38,7 +38,7 @@
 ## Ensure decrypted credentials helper returns a defined value on failure
 - **Location**: `theo/services/web/app/lib/api-config-store.ts`
 - **Issue**: `decryptData()` logs an error when AES-GCM decryption fails but exits without returning anything, so callers receive `undefined` even though the signature promises `object | null`.
-- **Why it matters**: The mismatch can surface as flaky behaviour if future callers rely on the declared return type, so we should explicitly return `null` on failure.
+- **Why it matters**: The mismatch can surface as flaky behavior if future callers rely on the declared return type, so we should explicitly return `null` on failure.
 - **Suggested fix**: Update the catch block to return `null` (and add a test) so the helper always fulfils its contract.
 - **References**: [`theo/services/web/app/lib/api-config-store.ts`](../theo/services/web/app/lib/api-config-store.ts) lines 120-171. 【F:theo/services/web/app/lib/api-config-store.ts†L120-L171】
 
