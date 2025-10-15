@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BookOpen,
@@ -58,6 +59,8 @@ type ChatWorkspaceProps = {
 };
 
 const CHAT_SESSION_STORAGE_KEY = "theo.chat.lastSessionId";
+// Use environment variable for intro video URL, fallback to default if not set
+const INTRO_VIDEO_URL = process.env.NEXT_PUBLIC_INTRO_VIDEO_URL || "https://docs.theoria.app/getting-started/intro-video";
 
 function createMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -71,6 +74,7 @@ export default function ChatWorkspace({
   initialPrompt,
   autoSubmit = false,
 }: ChatWorkspaceProps): JSX.Element {
+  const router = useRouter();
   const { mode } = useMode();
   const handleGuardrailSuggestion = useGuardrailActions();
   const [fallbackClient] = useState(() => createTheoApiClient());
@@ -618,6 +622,20 @@ export default function ChatWorkspace({
     setSessionId(null);
   }, []);
 
+  const handleUploadCta = useCallback(() => {
+    router.push("/upload");
+  }, [router]);
+
+  const handleSearchExamplesCta = useCallback(() => {
+    router.push("/search?examples=1");
+  }, [router]);
+
+  const handleIntroVideoClick = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.open(INTRO_VIDEO_URL, "_blank", "noopener");
+    }
+  }, []);
+
   return (
     <div className={styles.workspace} aria-live="polite">
       <section className={styles.hero} aria-label="Chat overview">
@@ -808,6 +826,17 @@ export default function ChatWorkspace({
                 </li>
               ))}
             </ul>
+            <div className={styles.emptyStateCtas}>
+              <button type="button" onClick={handleUploadCta} className={styles.emptyStateCta}>
+                Upload your first document
+              </button>
+              <button type="button" onClick={handleSearchExamplesCta} className={styles.emptyStateCtaSecondary}>
+                Open search examples
+              </button>
+              <button type="button" onClick={handleIntroVideoClick} className={styles.emptyStateCtaTertiary}>
+                Watch intro video
+              </button>
+            </div>
             <p className={styles.emptyStateLinks}>
               Prefer browsing? Explore the <Link href="/search">Search</Link> and
               {" "}

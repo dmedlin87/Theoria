@@ -1,0 +1,121 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`UploadPage empty state hero highlights supported formats before any jobs exist 1`] = `
+<DocumentFragment>
+  <section
+    aria-labelledby="upload-page-title"
+    class="upload-page"
+  >
+    <h1
+      class="page-title"
+      id="upload-page-title"
+    >
+      Upload
+    </h1>
+    <p
+      class="page-description"
+    >
+      Start with a quick ingest: paste server paths or canonical URLs and let Theo apply sensible defaults. Expand the advanced settings to tweak metadata or post-batch operations. Manual file and URL uploads remain available below.
+    </p>
+    <section
+      aria-label="Supported sources overview"
+      class="upload-hero"
+    >
+      <div
+        class="upload-hero__content"
+      >
+        <h2>
+          Bring your first sources online
+        </h2>
+        <p>
+          Theo parses scholarly formats out of the box. Upload a single file or point the simple ingest pipeline at a directory to queue a batch.
+        </p>
+        <ul
+          class="upload-hero__details"
+        >
+          <li>
+            <strong>
+              File types:
+            </strong>
+             PDF, DOCX, Markdown, TXT, HTML, and YouTube transcripts.
+          </li>
+          <li>
+            <strong>
+              Size limits:
+            </strong>
+             Up to 50 MB per file. Larger corpora run best through the simple ingest worker.
+          </li>
+          <li>
+            <strong>
+              Metadata:
+            </strong>
+             Attach JSON frontmatter or enrich sources post-upload in the jobs table.
+          </li>
+        </ul>
+        <a
+          class="upload-hero__cta"
+          href="https://docs.theoria.app/ingestion"
+          rel="noreferrer"
+          target="_blank"
+        >
+          Read ingestion docs
+        </a>
+      </div>
+    </section>
+    <div
+      data-testid="simple-ingest-form"
+    />
+    <details
+      class="upload-manual-section"
+    >
+      <summary
+        class="upload-manual-summary"
+      >
+        Manual uploads
+      </summary>
+      <div
+        class="upload-manual-forms"
+      >
+        <div
+          data-testid="file-upload-form"
+        />
+        <div
+          data-testid="url-ingest-form"
+        />
+      </div>
+    </details>
+    <section
+      aria-labelledby="upload-jobs-heading"
+      class="upload-jobs-section"
+    >
+      <h2
+        class="section-title"
+        id="upload-jobs-heading"
+      >
+        Recent jobs
+      </h2>
+      <div
+        data-testid="jobs-table"
+      />
+    </section>
+  </section>
+  <div
+    aria-label="Notifications (F8)"
+    role="region"
+    style="pointer-events: none;"
+    tabindex="-1"
+  >
+    <ol
+      class="viewport"
+      tabindex="-1"
+    />
+  </div>
+  <div
+    aria-atomic="false"
+    aria-label="Notifications"
+    aria-live="polite"
+    class="toast-container"
+    role="region"
+  />
+</DocumentFragment>
+`;

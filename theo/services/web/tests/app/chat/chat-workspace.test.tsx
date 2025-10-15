@@ -12,6 +12,10 @@ import ChatWorkspace from "../../../app/chat/ChatWorkspace";
 import { TheoApiError } from "../../../app/lib/api-client";
 import { emitTelemetry, submitFeedback } from "../../../app/lib/telemetry";
 
+const pushMock = jest.fn();
+const replaceMock = jest.fn();
+const INTRO_VIDEO_URL = "https://docs.theoria.app/getting-started/intro-video";
+
 jest.mock("../../../app/lib/telemetry", () => ({
   submitFeedback: jest.fn(),
   emitTelemetry: jest.fn(),
@@ -19,8 +23,8 @@ jest.mock("../../../app/lib/telemetry", () => ({
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
+    push: pushMock,
+    replace: replaceMock,
   }),
 }));
 
@@ -61,9 +65,45 @@ const STORAGE_KEY = "theo.chat.lastSessionId";
 const INPUT_LABEL = "Ask Theoria";
 
 describe("ChatWorkspace", () => {
+  beforeAll(() => {
+    Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: jest.fn(),
+    });
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
+  });
+
+  it("renders empty-state CTAs for new sessions", () => {
+    const client: ChatWorkflowClient = {
+      runChatWorkflow: jest.fn(),
+      fetchChatSession: jest.fn(async () => null),
+    };
+    const originalOpen = window.open;
+    const openMock = jest.fn();
+    window.open = openMock as typeof window.open;
+
+    const { asFragment } = render(<ChatWorkspace client={client} />);
+
+    expect(screen.getByRole("button", { name: "Upload your first document" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open search examples" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Watch intro video" })).toBeInTheDocument();
+    expect(asFragment()).toMatchSnapshot();
+
+    fireEvent.click(screen.getByRole("button", { name: "Upload your first document" }));
+    expect(pushMock).toHaveBeenCalledWith("/upload");
+
+    pushMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Open search examples" }));
+    expect(pushMock).toHaveBeenCalledWith("/search?examples=1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Watch intro video" }));
+    expect(openMock).toHaveBeenCalledWith(INTRO_VIDEO_URL, "_blank", "noopener");
+
+    window.open = originalOpen;
   });
 
   it("prefills the textarea when a sample question chip is clicked", () => {
