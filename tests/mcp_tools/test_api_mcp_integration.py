@@ -130,28 +130,27 @@ class TestHandleNoteWrite:
         assert preview_draft.osis == "John.3.16"
         assert response.body == payload["body"]
 
-    def test_doc_id_used_when_osis_missing(self, fake_service, monkeypatch):
+    def test_doc_id_used_when_osis_missing(self, fake_service):
         payload = _build_payload(osis="   ", doc_id="doc-77")
         session = SimpleNamespace()
 
-        monkeypatch.setattr(
-            tools,
-            "_resolve_document_osis",
-            lambda sess, doc_id: "Gen.1.1" if doc_id == "doc-77" else None,
-        )
+        def fake_resolver(sess, doc_id):
+            return "Gen.1.1" if doc_id == "doc-77" else None
 
-        tools.handle_note_write(session, payload)
+        tools.handle_note_write(session, payload, resolve_document_osis=fake_resolver)
 
         draft, _ = fake_service.created[-1]
         assert draft.osis == "Gen.1.1"
 
-    def test_missing_osis_raises_error(self, fake_service, monkeypatch):
+    def test_missing_osis_raises_error(self, fake_service):
         payload = _build_payload(osis="", doc_id=None)
         session = SimpleNamespace()
-        monkeypatch.setattr(tools, "_resolve_document_osis", lambda *_, **__: None)
+
+        def always_none_resolver(*_, **__):
+            return None
 
         with pytest.raises(MCPToolError) as exc:
-            tools.handle_note_write(session, payload)
+            tools.handle_note_write(session, payload, resolve_document_osis=always_none_resolver)
 
         assert "OSIS reference" in str(exc.value)
 
