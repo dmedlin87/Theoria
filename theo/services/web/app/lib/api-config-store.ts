@@ -12,8 +12,6 @@ if (!ENCRYPTION_PASSPHRASE || typeof ENCRYPTION_PASSPHRASE !== "string" || ENCRY
   throw new Error("Encryption passphrase not set. Please provide a strong passphrase via window.THEO_API_ENCRYPTION_PASSPHRASE.");
 }
 
-let cachedCredentials: ApiCredentials | null = null;
-
 // Utility to derive or import a key for AES-GCM encryption
 async function getAesKey(passphrase: string): Promise<CryptoKey> {
   const enc = new TextEncoder();
