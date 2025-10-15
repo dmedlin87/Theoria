@@ -8,6 +8,8 @@ import {
   FileText,
   Globe,
   Search,
+  ThumbsDown,
+  ThumbsUp,
   Upload as UploadIcon,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,7 +19,6 @@ import { Icon } from "../components/Icon";
 import type { ChatWorkflowClient } from "../lib/chat-client";
 import { createTheoApiClient, TheoApiError } from "../lib/api-client";
 import type {
-  HybridSearchFilters,
   ChatSessionState,
   ChatWorkflowStreamEvent,
   ChatWorkflowMessage,
@@ -33,11 +34,10 @@ import {
   type Reaction,
   type ConversationEntry,
   type AssistantConversationEntry,
-  type GuardrailState,
 } from "./useChatWorkspaceState";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
 import { SessionControls } from "./components/SessionControls";
-import { ChatTranscript, type TranscriptEntry } from "./components/transcript/ChatTranscript";
+import type { TranscriptEntry } from "./components/transcript/ChatTranscript";
 import { useChatSessionState } from "./hooks/useChatSessionState";
 
 import styles from "./ChatWorkspace.module.css";

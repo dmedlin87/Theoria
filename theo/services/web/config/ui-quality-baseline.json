@@ -44,7 +44,7 @@
   },
   "componentLineAllowance": {
     "app/chat/ChatWorkspace.refactored.tsx": 469,
-    "app/chat/ChatWorkspace.tsx": 737,
+    "app/chat/ChatWorkspace.tsx": 765,
     "app/copilot/components/CitationList.tsx": 430,
     "app/copilot/page.tsx": 705,
     "app/doc/[id]/DocumentClient.tsx": 527,

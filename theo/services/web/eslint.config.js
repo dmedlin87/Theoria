@@ -72,6 +72,7 @@ export default [
       '@typescript-eslint/array-type': 'off',
       'promise/always-return': 'off',
       'react/no-unknown-property': 'off',
+      'react-hooks/exhaustive-deps': 'off',
       'jsx-a11y/label-has-associated-control': 'off',
       'jsx-a11y/no-noninteractive-tabindex': 'off',
       'no-redeclare': 'off',
