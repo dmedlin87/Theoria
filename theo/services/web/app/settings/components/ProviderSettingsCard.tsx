@@ -35,12 +35,18 @@ function parseHeaders(value: string): Record<string, string> | null {
   }
   try {
     const parsed = JSON.parse(trimmed) as unknown;
-    if (parsed && typeof parsed === "object") {
-      const entries = Object.entries(parsed as Record<string, unknown>).filter((entry): entry is [
-        string,
-        string,
-      ] => typeof entry[1] === "string");
-      return Object.fromEntries(entries);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const invalidKeys = new Set(["__proto__", "prototype", "constructor"]);
+      const headers = Object.create(null) as Record<string, string>;
+      for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+        if (invalidKeys.has(key)) {
+          throw new Error(`Invalid header key: ${key}`);
+        }
+        if (typeof value === "string") {
+          headers[key] = value;
+        }
+      }
+      return headers;
     }
     throw new Error("Headers must be a JSON object");
   } catch (error) {
