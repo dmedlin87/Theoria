@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider, useToast } from "../../app/components/Toast";
 
@@ -31,8 +31,16 @@ describe("ToastProvider", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Trigger toast" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Toast message");
+    const toastDescription = await screen.findByText("Toast message", { selector: "div" });
+    expect(toastDescription).toBeInTheDocument();
     expect(screen.getByText("Notification")).toBeInTheDocument();
+
+    const liveRegion = screen
+      .getAllByRole("status")
+      .find((element) => element.textContent?.includes("Toast message"));
+
+    expect(liveRegion).toBeDefined();
+    expect(liveRegion).toHaveAttribute("aria-live", "polite");
   });
 
   it("allows toasts to be dismissed manually", async () => {
@@ -43,28 +51,26 @@ describe("ToastProvider", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Trigger toast" }));
-    await screen.findByRole("alert");
+    await screen.findByText("Toast message", { selector: "div" });
     fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("Toast message", { selector: "div" })).not.toBeInTheDocument();
+    });
   });
 
   it("auto-dismisses toasts after the provided duration", async () => {
-    vi.useFakeTimers();
-
     render(
       <ToastProvider>
-        <ToastTester duration={1000} />
+        <ToastTester duration={50} />
       </ToastProvider>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Trigger toast" }));
 
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    await screen.findByText("Toast message", { selector: "div" });
 
-    act(() => {
-      vi.advanceTimersByTime(1100);
+    await waitFor(() => {
+      expect(screen.queryByText("Toast message", { selector: "div" })).not.toBeInTheDocument();
     });
-
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
