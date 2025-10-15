@@ -7,7 +7,7 @@ import type { components } from "../lib/generated/api";
 type SearchResponse = components["schemas"]["HybridSearchResponse"];
 
 type SearchPageProps = {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 type InitialSearchData = {
@@ -18,7 +18,7 @@ type InitialSearchData = {
   hasSearched: boolean;
 };
 
-function buildQueryString(params: SearchPageProps["searchParams"]): string {
+function buildQueryString(params: Record<string, string | string[] | undefined>): string {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (Array.isArray(value)) {
@@ -37,7 +37,7 @@ function buildQueryString(params: SearchPageProps["searchParams"]): string {
 }
 
 async function fetchInitialSearchData(
-  params: SearchPageProps["searchParams"],
+  params: Record<string, string | string[] | undefined>,
 ): Promise<InitialSearchData> {
   const queryString = buildQueryString(params);
   const filters = parseSearchParams(queryString);
@@ -108,7 +108,8 @@ async function fetchInitialSearchData(
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const initialData = await fetchInitialSearchData(searchParams);
+  const resolvedSearchParams = await searchParams;
+  const initialData = await fetchInitialSearchData(resolvedSearchParams);
   return (
     <SearchPageClient
       initialFilters={initialData.filters}
