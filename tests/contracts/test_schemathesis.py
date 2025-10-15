@@ -19,7 +19,9 @@ from schemathesis.schemas import BaseSchema
 
 os.environ.setdefault("THEO_DISABLE_AI_SETTINGS", "1")
 os.environ.setdefault("THEO_AUTH_ALLOW_ANONYMOUS", "1")
+os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
 os.environ.setdefault("SETTINGS_SECRET_KEY", "contract-test-secret")
+os.environ.setdefault("THEORIA_ENVIRONMENT", "development")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:

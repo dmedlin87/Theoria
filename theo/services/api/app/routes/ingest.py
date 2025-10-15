@@ -27,8 +27,10 @@ from ..models.documents import (
     UrlIngestRequest,
 )
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
-from theo.services.cli import ingest_folder as cli_ingest
+from ..utils.imports import LazyImportModule
 from ..services.ingestion_service import IngestionService, get_ingestion_service
+
+cli_ingest = LazyImportModule("theo.services.cli.ingest_folder")
 
 # Backwards-compatible shims that mirror the previous direct pipeline imports.
 # Older tests and extensions reach into ``routes.ingest`` and replace these

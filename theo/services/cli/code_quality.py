@@ -10,7 +10,6 @@ from typing import Iterable, Sequence
 
 import click
 
-from theo.services.bootstrap import resolve_application
 
 @dataclass(frozen=True)
 class CheckRequest:
@@ -38,8 +37,6 @@ class CheckOutcome:
 DEFAULT_RUFF_PATHS: tuple[Path, ...] = (Path("mcp_server"),)
 DEFAULT_PYTEST_PATHS: tuple[Path, ...] = (Path("tests/mcp_tools"),)
 DEFAULT_MYPY_PATHS: tuple[Path, ...] = (Path("mcp_server"),)
-
-_APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
 
 _ALLOWED_EXECUTABLES: frozenset[str] = frozenset({"ruff", "pytest", "mypy"})
 
