@@ -2,6 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable
+
+import pythonbible as pb
+
+from theo.services.api.app.ingest.osis import expand_osis_reference, format_osis
 
 from .datasets import scripture_dataset
 
@@ -33,18 +38,9 @@ def fetch_passage(osis: str, translation: str | None = None) -> list[Verse]:
     if "." not in osis:
         raise ValueError("OSIS references must include book and chapter segments")
 
-    if "-" not in osis:
+    verse_keys = _expand_osis_to_keys(osis)
+    if not verse_keys:
         verse_keys = [osis]
-    else:
-        start, end = osis.split("-", 1)
-        if "." not in end:
-            end = f"{start.rsplit('.', 1)[0]}.{end}"
-        book_chapter = start.rsplit(".", 1)[0]
-        start_verse = int(start.split(".")[-1])
-        end_verse = int(end.split(".")[-1])
-        verse_keys = [
-            f"{book_chapter}.{idx}" for idx in range(start_verse, end_verse + 1)
-        ]
 
     verses: list[Verse] = []
     for key in verse_keys:
@@ -64,6 +60,39 @@ def fetch_passage(osis: str, translation: str | None = None) -> list[Verse]:
     if not verses:
         raise KeyError(f"No scripture data available for '{osis}'")
     return verses
+
+
+def _expand_osis_to_keys(osis: str) -> list[str]:
+    """Expand *osis* into individual verse keys in canonical order."""
+
+    verse_ids = expand_osis_reference(osis)
+    if not verse_ids and "-" in osis:
+        start, end = osis.split("-", 1)
+        start_ids = expand_osis_reference(start)
+        end_ids = expand_osis_reference(end)
+        if start_ids and end_ids:
+            lower = min(min(start_ids), min(end_ids))
+            upper = max(max(start_ids), max(end_ids))
+            verse_ids = frozenset(
+                verse_id
+                for verse_id in range(lower, upper + 1)
+                if pb.is_valid_verse_id(verse_id)
+            )
+    if not verse_ids:
+        return []
+
+    sorted_ids = sorted(set(verse_ids))
+    return list(_verse_ids_to_osis(sorted_ids))
+
+
+def _verse_ids_to_osis(verse_ids: Iterable[int]) -> Iterable[str]:
+    """Yield OSIS strings for each verse identifier in *verse_ids*."""
+
+    for verse_id in verse_ids:
+        references = pb.convert_verse_ids_to_references([verse_id])
+        if not references:
+            continue
+        yield format_osis(references[0])
 
 
 __all__ = ["Verse", "fetch_passage"]
