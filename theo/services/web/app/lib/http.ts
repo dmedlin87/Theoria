@@ -1,5 +1,39 @@
 import { getApiBaseUrl } from "./api";
 
+type HttpErrorListener = (error: TheoApiError | NetworkError) => void;
+
+const httpErrorListeners = new Set<HttpErrorListener>();
+const notifiedSymbol = Symbol("theo.httpErrorNotified");
+
+function notifyHttpError(error: unknown): void {
+  if (!(error instanceof TheoApiError || error instanceof NetworkError)) {
+    return;
+  }
+
+  const typed = error as TheoApiError & { [notifiedSymbol]?: boolean };
+  if (typed[notifiedSymbol]) {
+    return;
+  }
+  typed[notifiedSymbol] = true;
+
+  httpErrorListeners.forEach((listener) => {
+    try {
+      listener(error);
+    } catch (listenerError) {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("HTTP error listener threw", listenerError);
+      }
+    }
+  });
+}
+
+export function subscribeToHttpErrors(listener: HttpErrorListener): () => void {
+  httpErrorListeners.add(listener);
+  return () => {
+    httpErrorListeners.delete(listener);
+  };
+}
+
 export class TheoApiError extends Error {
   readonly status: number;
   readonly payload: unknown;
@@ -103,7 +137,7 @@ async function handleResponse<T>(response: Response, parseJson: boolean): Promis
     }
     
     const error = new TheoApiError(message, response.status, response.url, payload ?? bodyText);
-    
+
     // Log API errors in development for debugging
     if (process.env.NODE_ENV === "development") {
       console.error(`[API Error] ${response.status} ${response.url}:`, {
@@ -112,7 +146,8 @@ async function handleResponse<T>(response: Response, parseJson: boolean): Promis
         status: response.status,
       });
     }
-    
+
+    notifyHttpError(error);
     throw error;
   }
   if (!parseJson) {
@@ -182,15 +217,17 @@ export function createHttpClient(baseUrl?: string): HttpClient {
 
         // Don't retry if cancelled or if it's the last attempt
         if (signal?.aborted || attempt === maxAttempts - 1) {
+          notifyHttpError(error);
           throw error;
         }
 
         // Only retry on network errors or retryable API errors
-        const shouldRetry = 
+        const shouldRetry =
           error instanceof NetworkError ||
           (error instanceof TheoApiError && error.isRetryable);
 
         if (!shouldRetry) {
+          notifyHttpError(error);
           throw error;
         }
 
@@ -209,7 +246,9 @@ export function createHttpClient(baseUrl?: string): HttpClient {
     }
 
     // Should never reach here, but TypeScript needs it
-    throw lastError ?? new NetworkError("Request failed");
+    const finalError = lastError ?? new NetworkError("Request failed");
+    notifyHttpError(finalError);
+    throw finalError;
   }
 
   return { baseUrl: resolved, request };
