@@ -334,6 +334,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   background: var(--color-command-surface);
   border-bottom: 1px solid var(--color-command-border);
@@ -342,7 +344,8 @@
 }
 
 .commandTrigger {
-  flex: 1;
+  flex: 1 1 16rem;
+  min-width: 12rem;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -395,6 +398,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  margin-left: auto;
 }
 
 .actionButton {
@@ -408,6 +412,10 @@
   cursor: pointer;
   box-shadow: var(--shadow-md);
   transition: all var(--transition-base);
+}
+
+.statusIndicator {
+  flex-shrink: 0;
 }
 
 .actionButton:hover,

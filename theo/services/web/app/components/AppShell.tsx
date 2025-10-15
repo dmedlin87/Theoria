@@ -21,6 +21,7 @@ function classNames(
 }
 
 import CommandPalette from "./CommandPalette";
+import ConnectionStatusIndicator from "./ConnectionStatusIndicator";
 import { ThemeToggle } from "./ThemeToggle";
 
 export type AppShellNavItem = {
@@ -255,6 +256,7 @@ export function AppShell({
             <span className={styles.commandTriggerText}>Quick actions...</span>
             <kbd className={styles.commandTriggerKbd}>⌘K</kbd>
           </button>
+          <ConnectionStatusIndicator className={styles.statusIndicator} />
           <div
             className={styles.commandActions}
             aria-label="Quick actions"

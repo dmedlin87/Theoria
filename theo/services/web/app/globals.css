@@ -1894,6 +1894,18 @@ section + section {
   line-height: 1.6;
 }
 
+.upload-status-indicator {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.upload-status-hint {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.875rem;
+}
+
 .section-title {
   font-size: 1.5rem;
   font-weight: 600;
