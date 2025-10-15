@@ -11,7 +11,6 @@ const ENCRYPTION_PASSPHRASE: string = (window as any).THEO_API_ENCRYPTION_PASSPH
 if (!ENCRYPTION_PASSPHRASE || typeof ENCRYPTION_PASSPHRASE !== "string" || ENCRYPTION_PASSPHRASE.length < 12) {
   throw new Error("Encryption passphrase not set. Please provide a strong passphrase via window.THEO_API_ENCRYPTION_PASSPHRASE.");
 }
-const ENCRYPTION_KEY_NAME = "theo.api.credentials.key";
 
 let cachedCredentials: ApiCredentials | null = null;
 
