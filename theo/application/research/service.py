@@ -188,7 +188,9 @@ class ResearchService:
         min_fallacy_confidence: float = 0.0,
     ) -> ResearchReport:
         templates = report_templates_dataset()
-        template = templates.get(stance.lower()) or templates.get("default", {})
+        stance_key = stance.lower()
+        stance_key = {"skeptical": "critical"}.get(stance_key, stance_key)
+        template = templates.get(stance_key) or templates.get("default", {})
         summary_template = str(
             template.get("summary", "Research briefing for {osis} ({stance}).")
         )
