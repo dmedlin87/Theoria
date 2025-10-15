@@ -82,40 +82,40 @@ jobs:
         working-directory: theo/services/web
         run: npm test
 
-    - name: Run Vitest unit tests with coverage
-      working-directory: theo/services/web
-      run: npm run test:vitest
+      - name: Run Vitest unit tests with coverage
+        working-directory: theo/services/web
+        run: npm run test:vitest
 
-    - name: Show Vitest output tree
-      if: always()
-      run: |
-        ls -la theo/services/web || true
-        ls -la theo/services/web/coverage || true
+      - name: Show Vitest output tree
+        if: always()
+        run: |
+          ls -la theo/services/web || true
+          ls -la theo/services/web/coverage || true
 
-    - name: Run Playwright E2E suite
-      working-directory: theo/services/web
-      run: npm run test:e2e:full
+      - name: Run Playwright E2E suite
+        working-directory: theo/services/web
+        run: npm run test:e2e:full
 
-    - name: Show Playwright outputs
-      if: always()
-      run: |
-        ls -la theo/services/web/playwright-report || true
-        ls -la theo/services/web/playwright-artifacts || true
+      - name: Show Playwright outputs
+        if: always()
+        run: |
+          ls -la theo/services/web/playwright-report || true
+          ls -la theo/services/web/playwright-artifacts || true
 
-    - name: Run pytest suite
-      run: pytest --cov=theo --cov=tests --cov-report=xml --cov-report=term --cov-fail-under=80
+      - name: Run pytest suite
+        run: pytest --cov=theo --cov=tests --cov-report=xml --cov-report=term --cov-fail-under=80
 
-    - name: Show pytest coverage presence
-      if: always()
-      run: ls -la coverage.xml || true
+      - name: Show pytest coverage presence
+        if: always()
+        run: ls -la coverage.xml || true
 
-    - name: Upload pytest coverage report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: pytest-coverage
-        path: coverage.xml
-        if-no-files-found: warn
+      - name: Upload pytest coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-coverage
+          path: coverage.xml
+          if-no-files-found: warn
 
       - name: Enforce critical coverage thresholds
         run: python scripts/security/verify_critical_coverage.py
@@ -220,13 +220,12 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}
       SETTINGS_SECRET_KEY: geo-ci-secret
       FIXTURES_ROOT: ${{ github.workspace }}/fixtures
+      PERCY_TOKEN: ${{ secrets.PERCY_TOKEN || '' }}
     steps:
       - name: Verify Percy token
         id: verify-token
-        env:
-          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN || '' }}
         run: |
-          if [ -z "${PERCY_TOKEN}" ]; then
+          if [ -z "${PERCY_TOKEN:-}" ]; then
             echo "::warning::PERCY_TOKEN is not configured. Skipping visual regression tests."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
@@ -268,7 +267,6 @@ jobs:
         if: steps.verify-token.outputs.skip != 'true'
         working-directory: theo/services/web
         env:
-          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
           NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:8000"
           THEO_ALLOW_INSECURE_STARTUP: "1"
           THEO_AUTH_ALLOW_ANONYMOUS: "1"

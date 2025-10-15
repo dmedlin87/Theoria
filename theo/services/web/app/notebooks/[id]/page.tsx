@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import Breadcrumbs from "../../components/Breadcrumbs";
 import DeliverableExportAction, {
   type DeliverableRequestPayload,
 } from "../../components/DeliverableExportAction";
@@ -56,7 +55,8 @@ interface NotebookResponse {
 }
 
 interface NotebookPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 async function fetchNotebook(id: string): Promise<NotebookResponse> {
@@ -153,7 +153,8 @@ function renderEntry(entry: NotebookEntry) {
 }
 
 export default async function NotebookPage({ params }: NotebookPageProps) {
-  const notebook = await fetchNotebook(params.id);
+  const { id } = await params;
+  const notebook = await fetchNotebook(id);
   const osisRefs = collectOsis(notebook);
   const { features: fetchedFeatures, error: researchFeaturesError } = osisRefs.length
     ? await fetchResearchFeatures()
