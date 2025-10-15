@@ -8,8 +8,8 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Query, Session
 
 from theo.application.facades import settings as settings_module
+from theo.application.facades.research import get_research_service
 from theo.services.api.app.main import app
-from theo.services.api.app.research.notes import get_notes_for_osis
 
 
 def test_scripture_endpoint_returns_range() -> None:
@@ -471,7 +471,8 @@ def test_get_notes_tag_filter_executes_with_postgres_dialect() -> None:
     engine = create_engine("sqlite://")
     try:
         with Session(engine) as session:
-            results = get_notes_for_osis(session, osis="John.1.1", tag="Prologue")
+            service = get_research_service(session)
+            results = service.list_notes(osis="John.1.1", tag="Prologue")
             assert results == []
     finally:
         Query.all = original_all

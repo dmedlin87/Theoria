@@ -44,9 +44,7 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
     )
 
     def _build_research_service_factory() -> Callable[[Session], ResearchService]:
-        from theo.services.api.app.compat.research.dss_links import (
-            fetch_dss_links as compat_fetch_dss_links,
-        )
+        from theo.domain.research import fetch_dss_links
 
         repository_factory = registry.resolve("research_notes_repository_factory")
 
@@ -54,7 +52,7 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
             repository = repository_factory(session)
             return ResearchService(
                 repository,
-                fetch_dss_links_func=compat_fetch_dss_links,
+                fetch_dss_links_func=fetch_dss_links,
             )
 
         return _factory

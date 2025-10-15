@@ -31,7 +31,7 @@ from theo.services.api.app.models.search import (
     HybridSearchResult,
 )
 from theo.services.api.app.models.verses import VerseMentionsFilters
-from theo.services.api.app.research.scripture import fetch_passage
+from theo.domain.research import fetch_passage
 from theo.services.api.app.retriever.hybrid import hybrid_search
 from theo.services.api.app.retriever.verses import get_verse_timeline
 

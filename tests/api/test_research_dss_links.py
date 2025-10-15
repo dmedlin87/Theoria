@@ -45,7 +45,7 @@ def test_dss_links_endpoint_handles_missing_osis() -> None:
 
 
 def test_dss_links_endpoint_ignores_malformed_records(monkeypatch) -> None:
-    from theo.services.api.app.research import dss_links as module
+    from theo.domain.research import dss_links as module
 
     def fake_dataset() -> dict[str, list[dict[str, str]]]:
         return {

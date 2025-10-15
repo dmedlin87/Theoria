@@ -1,11 +1,38 @@
 from __future__ import annotations
 
-from theo.services.api.app.research import (
-    fallacy_detect,
-    historicity_search,
-    report_build,
-    variants_apparatus,
-)
+from theo.application.research import ResearchService
+from theo.domain.research import fallacy_detect, historicity_search, variants_apparatus
+
+
+class _StubResearchNoteRepository:
+    """Minimal repository implementation for research service tests."""
+
+    def create(self, draft, *, commit: bool = True):  # pragma: no cover - not used
+        raise NotImplementedError("create should not be invoked in helper tests")
+
+    def preview(self, draft):  # pragma: no cover - not used
+        raise NotImplementedError("preview should not be invoked in helper tests")
+
+    def list_for_osis(
+        self,
+        osis: str,
+        *,
+        stance: str | None = None,
+        claim_type: str | None = None,
+        tag: str | None = None,
+        min_confidence: float | None = None,
+    ) -> list:
+        return []
+
+    def update(self, note_id, changes, *, evidences=None):  # pragma: no cover - not used
+        raise NotImplementedError("update should not be invoked in helper tests")
+
+    def delete(self, note_id):  # pragma: no cover - not used
+        raise NotImplementedError("delete should not be invoked in helper tests")
+
+
+def _research_service() -> ResearchService:
+    return ResearchService(_StubResearchNoteRepository())
 
 
 def test_variants_apparatus_returns_entries_for_single_verse() -> None:
@@ -43,7 +70,8 @@ def test_fallacy_detect_thresholds_matches() -> None:
 
 
 def test_report_build_combines_sections() -> None:
-    report = report_build(
+    service = _research_service()
+    report = service.report_build(
         "John.1.1",
         stance="apologetic",
         claims=[{"statement": "The Logos is divine."}],

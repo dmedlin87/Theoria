@@ -10,12 +10,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from theo.application.facades.database import Base
+from theo.application.facades.research import (
+    ResearchNoteDraft,
+    ResearchNoteEvidenceDraft,
+    get_research_service,
+)
 from theo.services.api.app.db.models import NoteEvidence, ResearchNote
 from theo.services.api.app.mcp.tools import handle_note_write
-from theo.services.api.app.research.notes import (
-    create_research_note,
-    generate_research_note_preview,
-)
 
 
 @pytest.fixture()
@@ -59,8 +60,42 @@ def _note_payload() -> Mapping[str, object]:
     }
 
 
+def _draft_from_payload(payload: Mapping[str, object]) -> ResearchNoteDraft:
+    tags = payload.get("tags")
+    tags_tuple = tuple(tags) if isinstance(tags, list) else None
+    evidences_payload = payload.get("evidences")
+    evidence_drafts: tuple[ResearchNoteEvidenceDraft, ...] = ()
+    if isinstance(evidences_payload, list):
+        evidence_drafts = tuple(
+            ResearchNoteEvidenceDraft(
+                source_type=evidence.get("source_type"),
+                source_ref=evidence.get("source_ref"),
+                osis_refs=tuple(evidence.get("osis_refs") or []) or None,
+                citation=evidence.get("citation"),
+                snippet=evidence.get("snippet"),
+                meta=evidence.get("meta"),
+            )
+            for evidence in evidences_payload
+        )
+
+    confidence = payload.get("confidence")
+    confidence_value = float(confidence) if confidence is not None else None
+
+    return ResearchNoteDraft(
+        osis=str(payload.get("osis")),
+        body=str(payload.get("body")),
+        title=payload.get("title"),
+        stance=payload.get("stance"),
+        claim_type=payload.get("claim_type"),
+        confidence=confidence_value,
+        tags=tags_tuple,
+        evidences=evidence_drafts,
+    )
+
+
 def test_generate_research_note_preview_does_not_persist(session: Session) -> None:
-    preview = generate_research_note_preview(session, **_note_payload())
+    service = get_research_service(session)
+    preview = service.preview_note(_draft_from_payload(_note_payload()))
 
     assert preview.osis == "John.1.1"
     assert preview.body.startswith("In the beginning")
@@ -72,7 +107,8 @@ def test_generate_research_note_preview_does_not_persist(session: Session) -> No
 
 
 def test_create_research_note_commit_persists(session: Session) -> None:
-    note = create_research_note(session, **_note_payload(), commit=True)
+    service = get_research_service(session)
+    note = service.create_note(_draft_from_payload(_note_payload()), commit=True)
 
     stored = session.get(ResearchNote, note.id)
     assert stored is not None
