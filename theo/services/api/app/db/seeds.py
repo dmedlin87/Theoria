@@ -253,9 +253,8 @@ def _ensure_perspective_column(
 
     dependencies = tuple(required_columns or ())
     if _table_has_column(session, table.name, "perspective", schema=table.schema):
-        return True
-
-    if dependencies:
+        if not dependencies:
+            return True
         missing_dependencies = [
             column
             for column in dependencies
@@ -263,13 +262,10 @@ def _ensure_perspective_column(
                 session, table.name, column, schema=table.schema
             )
         ]
-        if missing_dependencies:
-            session.rollback()
-            logger.warning(
-                "Skipping %s seeds because 'perspective' column is missing",
-                dataset_label,
-            )
-            return False
+        if not missing_dependencies:
+            return True
+    else:
+        missing_dependencies = list(dependencies) if dependencies else []
 
     session.rollback()
     logger.warning(
@@ -316,6 +312,7 @@ def _ensure_range_columns(
         formatted,
     )
     return False
+
 
 
 def _handle_missing_perspective_error(
@@ -915,27 +912,33 @@ def seed_geo_places(session: Session) -> None:
     _run_with_sqlite_lock_retry(session, "geo place", _load)
 
 
+
+
+def _repair_missing_perspective_columns(session: Session) -> None:
+    repairs: tuple[tuple[Table, str, str], ...] = (
+        (ContradictionSeed.__table__, "contradiction", "contradiction seeds"),
+        (HarmonySeed.__table__, "harmony", "harmony seeds"),
+        (
+            CommentaryExcerptSeed.__table__,
+            "commentary excerpt",
+            "commentary excerpts",
+        ),
+    )
+    for table, dataset_label, log_label in repairs:
+        if _recreate_seed_table_if_missing_column(
+            session, table, "perspective", dataset_label=dataset_label
+        ):
+            logger.info(
+                "Rebuilt %s table missing 'perspective' column; reseeding %s",
+                table.name,
+                log_label,
+            )
+
+
 def seed_reference_data(session: Session) -> None:
     """Entry point for loading all bundled reference datasets."""
 
-    _rebuild_perspective_column(
-        session,
-        ContradictionSeed.__table__,
-        dataset_label="contradiction",
-        log_suffix="reseeding contradiction seeds",
-    )
-    _rebuild_perspective_column(
-        session,
-        HarmonySeed.__table__,
-        dataset_label="harmony",
-        log_suffix="reseeding harmony seeds",
-    )
-    _rebuild_perspective_column(
-        session,
-        CommentaryExcerptSeed.__table__,
-        dataset_label="commentary excerpt",
-        log_suffix="reseeding commentary excerpts",
-    )
+    _repair_missing_perspective_columns(session)
     _run_seed_with_perspective_guard(session, seed_contradiction_claims, "contradiction")
     _run_seed_with_perspective_guard(session, seed_harmony_claims, "harmony")
     _run_seed_with_perspective_guard(session, seed_commentary_excerpts, "commentary excerpt")

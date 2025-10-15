@@ -120,7 +120,12 @@ def test_contract_endpoints(
 ) -> None:
     method_key = method.lower()
     operation = openapi_schema.get(path, method_key)[method_key]
-    case = operation.make_case()
+    if hasattr(operation, "make_case"):
+        case = operation.make_case()
+    elif hasattr(operation, "Case"):
+        case = operation.Case()
+    else:  # pragma: no cover - compatibility fallback
+        case = schemathesis.Case(operation)
     case.call_and_validate(
         session=contract_client,
         checks=(schemathesis.checks.not_a_server_error,),

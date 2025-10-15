@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 import re
 from collections.abc import Callable
 from functools import lru_cache
@@ -11,6 +12,10 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .runtime import allow_insecure_startup
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -481,6 +486,12 @@ def get_settings_cipher() -> Fernet | None:
     """Return a cached Fernet instance for encrypting persisted settings."""
 
     secret = get_settings().settings_secret_key
-    if not secret:
-        return None
-    return Fernet(_derive_fernet_key(secret))
+    if secret:
+        return Fernet(_derive_fernet_key(secret))
+    if allow_insecure_startup():
+        fallback = "theoria-insecure-test-secret"
+        LOGGER.warning(
+            "SETTINGS_SECRET_KEY not configured; using insecure fallback for tests",
+        )
+        return Fernet(_derive_fernet_key(fallback))
+    return None

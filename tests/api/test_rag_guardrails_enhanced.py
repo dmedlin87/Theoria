@@ -29,7 +29,7 @@ def test_guardrail_blocks_sql_injection():
     malicious = "'; DROP TABLE users; --"
     with pytest.raises(GuardrailError) as exc:
         ensure_completion_safe(malicious)
-    assert "SQL" in str(exc.value).lower()
+    assert "sql" in str(exc.value).lower()
 
 
 def test_guardrail_blocks_sql_statement_chaining():
