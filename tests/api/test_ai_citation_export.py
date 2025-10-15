@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,7 +20,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.application.facades import database as database_module
 from theo.application.facades.database import configure_engine, get_engine, get_session
-from theo.services.api.app.db.models import Document, Passage, PassageVerse
+from theo.services.api.app.db.models import (
+    ContradictionSeed,
+    Document,
+    Passage,
+    PassageVerse,
+)
 from theo.services.api.app.db.seeds import CONTRADICTION_NAMESPACE
 from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.main import app
@@ -113,84 +119,9 @@ def test_api_startup_recovers_missing_perspective_column(
         }
     )
 
-    bootstrap_engine = create_engine(database_url, future=True)
-    try:
-        with bootstrap_engine.begin() as connection:
-            connection.exec_driver_sql(
-                """
-                CREATE TABLE IF NOT EXISTS app_settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
-            connection.exec_driver_sql(
-                """
-                INSERT INTO app_settings (key, value, created_at, updated_at)
-                VALUES (:key, :value, :created, :updated)
-                ON CONFLICT(key) DO UPDATE SET
-                    value = excluded.value,
-                    created_at = excluded.created_at,
-                    updated_at = excluded.updated_at
-                """,
-                {
-                    "key": "db:migration:20250129_add_perspective_to_contradiction_seeds.sql",
-                    "value": ledger_value,
-                    "created": "2024-01-01T00:00:00+00:00",
-                    "updated": "2024-01-01T00:00:00+00:00",
-                },
-            )
-            connection.exec_driver_sql(
-                """
-                CREATE TABLE contradiction_seeds (
-                    id TEXT PRIMARY KEY,
-                    osis_a TEXT NOT NULL,
-                    osis_b TEXT NOT NULL,
-                    summary TEXT,
-                    source TEXT,
-                    tags TEXT,
-                    weight REAL DEFAULT 1.0,
-                    start_verse_id_a INTEGER,
-                    end_verse_id_a INTEGER,
-                    start_verse_id INTEGER,
-                    end_verse_id INTEGER,
-                    start_verse_id_b INTEGER,
-                    end_verse_id_b INTEGER,
-                    created_at TEXT NOT NULL
-                )
-                """
-            )
-            connection.exec_driver_sql(
-                """
-                INSERT INTO contradiction_seeds (
-                    id, osis_a, osis_b, summary, source, tags, weight,
-                    start_verse_id_a, end_verse_id_a,
-                    start_verse_id, end_verse_id,
-                    start_verse_id_b, end_verse_id_b,
-                    created_at
-                ) VALUES (
-                    :id, :osis_a, :osis_b, :summary, :source, :tags, :weight,
-                    NULL, NULL,
-                    NULL, NULL,
-                    NULL, NULL,
-                    :created_at
-                )
-                """,
-                {
-                    "id": legacy_identifier,
-                    "osis_a": osis_a,
-                    "osis_b": osis_b,
-                    "summary": first_entry.get("summary"),
-                    "source": source,
-                    "tags": json.dumps(first_entry.get("tags")),
-                    "weight": float(first_entry.get("weight", 1.0)),
-                    "created_at": "2024-01-01T00:00:00+00:00",
-                },
-            )
-    finally:
-        bootstrap_engine.dispose()
+    _bootstrap_legacy_contradiction_database(
+        database_url, ledger_value, first_entry, legacy_identifier
+    )
 
     previous_engine = database_module._engine
     previous_session_factory = database_module._SessionLocal
@@ -266,6 +197,87 @@ def test_api_startup_recovers_missing_perspective_column(
             )
 
             assert response.status_code == 200
+    finally:
+        if database_module._engine is not None:
+            database_module._engine.dispose()
+        database_module._engine = previous_engine
+        database_module._SessionLocal = previous_session_factory
+
+
+@pytest.mark.enable_migrations
+def test_api_startup_handles_operational_error_from_missing_columns(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "legacy-error.sqlite"
+    database_url = f"sqlite:///{database_path}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+
+    contradictions_path = PROJECT_ROOT / "data" / "seeds" / "contradictions.json"
+    legacy_payload = json.loads(contradictions_path.read_text(encoding="utf-8"))
+    assert legacy_payload, "Expected bundled contradiction seeds to be present"
+    first_entry = legacy_payload[0]
+    osis_a = first_entry["osis_a"]
+    osis_b = first_entry["osis_b"]
+    source = first_entry.get("source") or "community"
+    perspective = (first_entry.get("perspective") or "skeptical").strip().lower()
+    legacy_identifier = str(
+        uuid5(
+            CONTRADICTION_NAMESPACE,
+            "|".join([osis_a.lower(), osis_b.lower(), source.lower(), perspective]),
+        )
+    )
+
+    ledger_value = json.dumps(
+        {
+            "applied_at": "2024-01-01T00:00:00+00:00",
+            "filename": "20250129_add_perspective_to_contradiction_seeds.sql",
+        }
+    )
+
+    _bootstrap_legacy_contradiction_database(
+        database_url, ledger_value, first_entry, legacy_identifier
+    )
+
+    previous_engine = database_module._engine
+    previous_session_factory = database_module._SessionLocal
+
+    failure_state = {"raised": False}
+    original_get = Session.get
+
+    def _raising_get(self, entity, ident, **kwargs):  # type: ignore[override]
+        if not failure_state["raised"] and entity is ContradictionSeed:
+            failure_state["raised"] = True
+            raise OperationalError(
+                "SELECT * FROM contradiction_seeds",  # nosec B608 - test-only literal
+                {},
+                sqlite3.OperationalError(
+                    "no such column: contradiction_seeds.created_at"
+                ),
+            )
+        return original_get(self, entity, ident, **kwargs)
+
+    monkeypatch.setattr(Session, "get", _raising_get)
+
+    try:
+        configure_engine(database_url)
+        with TestClient(app) as test_client:
+            response = test_client.get("/health")
+            assert response.status_code == 200
+
+        inspector = inspect(get_engine())
+        columns = inspector.get_columns("contradiction_seeds")
+        column_names = {column["name"] for column in columns}
+        assert "perspective" in column_names
+        assert "created_at" in column_names
+        assert failure_state["raised"], "Expected patched Session.get to raise"
+
+        with Session(get_engine()) as session:
+            session.execute(
+                text(
+                    "SELECT perspective FROM contradiction_seeds WHERE id = :identifier"
+                ),
+                {"identifier": legacy_identifier},
+            ).fetchall()
     finally:
         if database_module._engine is not None:
             database_module._engine.dispose()
@@ -497,3 +509,85 @@ def test_sqlite_migration_backfills_contradiction_perspective(
         settings_module.get_settings.cache_clear()
         database_module._engine = None  # type: ignore[attr-defined]
         database_module._SessionLocal = None  # type: ignore[attr-defined]
+def _bootstrap_legacy_contradiction_database(
+    database_url: str, ledger_value: str, entry: dict, legacy_identifier: str
+) -> None:
+    bootstrap_engine = create_engine(database_url, future=True)
+    try:
+        with bootstrap_engine.begin() as connection:
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.exec_driver_sql(
+                """
+                INSERT INTO app_settings (key, value, created_at, updated_at)
+                VALUES (:key, :value, :created, :updated)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    created_at = excluded.created_at,
+                    updated_at = excluded.updated_at
+                """,
+                {
+                    "key": "db:migration:20250129_add_perspective_to_contradiction_seeds.sql",
+                    "value": ledger_value,
+                    "created": "2024-01-01T00:00:00+00:00",
+                    "updated": "2024-01-01T00:00:00+00:00",
+                },
+            )
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE contradiction_seeds (
+                    id TEXT PRIMARY KEY,
+                    osis_a TEXT NOT NULL,
+                    osis_b TEXT NOT NULL,
+                    summary TEXT,
+                    source TEXT,
+                    tags TEXT,
+                    weight REAL DEFAULT 1.0,
+                    start_verse_id_a INTEGER,
+                    end_verse_id_a INTEGER,
+                    start_verse_id INTEGER,
+                    end_verse_id INTEGER,
+                    start_verse_id_b INTEGER,
+                    end_verse_id_b INTEGER,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.exec_driver_sql(
+                """
+                INSERT INTO contradiction_seeds (
+                    id, osis_a, osis_b, summary, source, tags, weight,
+                    start_verse_id_a, end_verse_id_a,
+                    start_verse_id, end_verse_id,
+                    start_verse_id_b, end_verse_id_b,
+                    created_at
+                ) VALUES (
+                    :id, :osis_a, :osis_b, :summary, :source, :tags, :weight,
+                    NULL, NULL,
+                    NULL, NULL,
+                    NULL, NULL,
+                    :created_at
+                )
+                """,
+                {
+                    "id": legacy_identifier,
+                    "osis_a": entry["osis_a"],
+                    "osis_b": entry["osis_b"],
+                    "summary": entry.get("summary"),
+                    "source": entry.get("source") or "community",
+                    "tags": json.dumps(entry.get("tags")),
+                    "weight": float(entry.get("weight", 1.0)),
+                    "created_at": "2024-01-01T00:00:00+00:00",
+                },
+            )
+    finally:
+        bootstrap_engine.dispose()
+
