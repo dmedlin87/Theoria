@@ -223,6 +223,25 @@ def _recreate_seed_table_if_missing_column(
     return True
 
 
+def _rebuild_perspective_column(
+    session: Session,
+    table: Table,
+    *,
+    dataset_label: str,
+    log_suffix: str,
+) -> None:
+    """Drop and recreate *table* when ``perspective`` is absent, logging the repair."""
+
+    if _recreate_seed_table_if_missing_column(
+        session, table, "perspective", dataset_label=dataset_label
+    ):
+        logger.info(
+            "Rebuilt %s table missing 'perspective' column; %s",
+            table.name,
+            log_suffix,
+        )
+
+
 def _ensure_perspective_column(
     session: Session,
     table: Table,
