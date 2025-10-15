@@ -64,6 +64,10 @@ def search_contradictions(
     if not windows:
         return []
 
+    # Unconditionally query both seed tables. This ensures that range filters are applied
+    # symmetrically to both ContradictionSeed and HarmonySeed, and that any additional
+    # filtering (e.g., by perspective or topic) happens later. This prevents subtle bugs
+    # and avoids reintroducing conditional queries that could break the logic.
     contradiction_seeds = query_pair_seed_rows(session, windows, ContradictionSeed)
     harmony_seeds = query_pair_seed_rows(session, windows, HarmonySeed)
     topic_lower = topic.lower() if topic else None
