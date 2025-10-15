@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, TypeVar
+from typing import Any, Iterable, TypeVar
 
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
@@ -136,20 +136,34 @@ def query_pair_seed_rows(
     if not windows:
         return []
 
-    start_a = getattr(model, "start_verse_id", None)
-    end_a = getattr(model, "end_verse_id", None)
-    start_b = getattr(model, "start_verse_id_b", None)
-    end_b = getattr(model, "end_verse_id_b", None)
+    range_pairs: list[tuple[Any, Any]] = []
+    seen_pairs: set[tuple[str, str]] = set()
+    for start_attr, end_attr in (
+        ("start_verse_id_a", "end_verse_id_a"),
+        ("start_verse_id", "end_verse_id"),
+        ("start_verse_id_b", "end_verse_id_b"),
+    ):
+        start_column = getattr(model, start_attr, None)
+        end_column = getattr(model, end_attr, None)
+        if start_column is None or end_column is None:
+            continue
+        pair_key = (
+            getattr(start_column, "key", start_attr),
+            getattr(end_column, "key", end_attr),
+        )
+        if pair_key in seen_pairs:
+            continue
+        seen_pairs.add(pair_key)
+        range_pairs.append((start_column, end_column))
 
     window_conditions = []
     for start, end in _merge_numeric_windows(windows):
-        per_window: list = []
-        condition_a = _range_condition(start_a, end_a, start, end)
-        if condition_a is not None:
-            per_window.append(condition_a)
-        condition_b = _range_condition(start_b, end_b, start, end)
-        if condition_b is not None:
-            per_window.append(condition_b)
+        per_window = [
+            condition
+            for start_column, end_column in range_pairs
+            if (condition := _range_condition(start_column, end_column, start, end))
+            is not None
+        ]
         if per_window:
             window_conditions.append(or_(*per_window))
 

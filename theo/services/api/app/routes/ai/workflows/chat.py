@@ -241,7 +241,6 @@ def _prepare_memory_context(
     ranked_entries: list[ChatMemoryEntry] = []
     seen_ids: set[int] = set()
 
-    query_embedding: list[float] | None = None
     if query:
         memory_index = memory_index_module.get_memory_index()
         try:
@@ -249,29 +248,28 @@ def _prepare_memory_context(
         except Exception:  # pragma: no cover - defensive guardrail
             LOGGER.debug("Failed to embed chat query for memory ranking", exc_info=True)
             query_embedding = None
-        if query_embedding:
-            scored: list[tuple[float, ChatMemoryEntry]] = []
-            for entry in entries:
-                if not entry.embedding:
-                    continue
-                score = memory_index.score_similarity(query_embedding, entry.embedding)
-                if score is None:
-                    continue
-                scored.append((score, entry))
-            scored.sort(key=lambda item: item[0], reverse=True)
-            for _, entry in scored:
-                if len(ranked_entries) >= _MAX_CONTEXT_SNIPPETS:
-                    break
-                entry_id = id(entry)
-                if entry_id in seen_ids:
-                    continue
-                ranked_entries.append(entry)
-                seen_ids.add(entry_id)
+        else:
+            if query_embedding:
+                scored: list[tuple[float, ChatMemoryEntry]] = []
+                for entry in entries:
+                    if not entry.embedding:
+                        continue
+                    score = memory_index.score_similarity(
+                        query_embedding, entry.embedding
+                    )
+                    if score is None:
+                        continue
+                    scored.append((score, entry))
+                scored.sort(key=lambda item: item[0], reverse=True)
+                for _, entry in scored:
+                    if len(ranked_entries) >= _MAX_CONTEXT_SNIPPETS:
+                        break
+                    entry_id = id(entry)
+                    if entry_id in seen_ids:
+                        continue
+                    ranked_entries.append(entry)
+                    seen_ids.add(entry_id)
 
-    ordered = sorted(entries, key=lambda entry: entry.created_at, reverse=True)
-    if focus:
-        matched = [entry for entry in ordered if focus.matches(entry)]
-        remainder = [entry for entry in ordered if not focus.matches(entry)]
     ordered = sorted(entries, key=lambda entry: entry.created_at, reverse=True)
     if focus:
         matched: list[ChatMemoryEntry] = []
@@ -302,12 +300,6 @@ def _prepare_memory_context(
             entry.answer,
             answer_summary=entry.answer_summary,
         )
-    remaining = CHAT_SESSION_MEMORY_CHAR_BUDGET
-    selected: list[tuple[ChatMemoryEntry, str]] = []
-    for entry in candidates:
-        answer_text = (entry.answer_summary or entry.answer or "").strip()
-        question_text = entry.question.strip()
-        base = f"Q: {question_text} | A: {answer_text}"
         extras: list[str] = []
         key_entities = getattr(entry, "key_entities", None) or []
         if key_entities:
@@ -315,9 +307,8 @@ def _prepare_memory_context(
         recommended_actions = getattr(entry, "recommended_actions", None) or []
         if recommended_actions:
             extras.append(f"Next: {recommended_actions[0]}")
-        if extras:
-            base = f"{base} | {' | '.join(extras)}"
-        snippet = _truncate_text(base, min(_MEMORY_TEXT_LIMIT * 2, remaining))
+        snippet = base if not extras else f"{base} | {' | '.join(extras)}"
+        snippet = _truncate_text(snippet, min(_MEMORY_TEXT_LIMIT * 2, remaining))
         if not snippet:
             continue
         if len(snippet) > remaining and selected:
@@ -334,8 +325,8 @@ def _prepare_memory_context(
     if focus:
         matched_pairs = [pair for pair in selected if focus.matches(pair[0])]
         remainder_pairs = [pair for pair in selected if not focus.matches(pair[0])]
-        matched_pairs.sort(key=lambda pair: pair[0].created_at)
-        remainder_pairs.sort(key=lambda pair: pair[0].created_at)
+        matched_pairs.sort(key=lambda pair: pair[0].created_at, reverse=True)
+        remainder_pairs.sort(key=lambda pair: pair[0].created_at, reverse=True)
         ordered_pairs = matched_pairs + remainder_pairs
     else:
         ordered_pairs = selected

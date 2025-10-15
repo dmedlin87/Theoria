@@ -451,25 +451,33 @@ def run_sql_migrations(
                     )
                     should_execute = False
 
-            if should_execute:
-                logger.info("Applying SQL migration: %s", migration_name)
-                if dialect_name == "postgresql" and _requires_autocommit(sql):
-                    session.flush()
-                    session.commit()
-                    _execute_autocommit(engine, sql)
-                else:
-                    connection = session.connection()
-                    if dialect_name == "sqlite":
-                        for statement in _split_sql_statements(sql):
-                            if _sqlite_add_column_exists(connection, statement):
-                                logger.debug(
-                                    "Skipping SQLite migration statement; column already exists: %s",
-                                    statement.strip(),
-                                )
-                                continue
-                            connection.exec_driver_sql(statement)
+                if should_execute:
+                    logger.info("Applying SQL migration: %s", migration_name)
+                    if dialect_name == "postgresql" and _requires_autocommit(sql):
+                        session.flush()
+                        session.commit()
+                        _execute_autocommit(engine, sql)
                     else:
-                        connection.exec_driver_sql(sql)
+                        connection = session.connection()
+                        if (
+                            dialect_name == "sqlite"
+                            and is_sqlite_perspective_migration
+                            and sqlite_missing_perspective
+                        ):
+                            connection.exec_driver_sql(
+                                "DROP TABLE IF EXISTS contradiction_seeds"
+                            )
+                        if dialect_name == "sqlite":
+                            for statement in _split_sql_statements(sql):
+                                if _sqlite_add_column_exists(connection, statement):
+                                    logger.debug(
+                                        "Skipping SQLite migration statement; column already exists: %s",
+                                        statement.strip(),
+                                    )
+                                    continue
+                                connection.exec_driver_sql(statement)
+                        else:
+                            connection.exec_driver_sql(sql)
 
                 if is_sqlite_perspective_migration:
                     try:

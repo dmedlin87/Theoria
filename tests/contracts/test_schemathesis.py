@@ -120,7 +120,7 @@ def test_contract_endpoints(
 ) -> None:
     method_key = method.lower()
     operation = openapi_schema.get(path, method_key)[method_key]
-    case = operation.make_case()
+    case = operation.Case()
     case.call_and_validate(
         session=contract_client,
         checks=(schemathesis.checks.not_a_server_error,),

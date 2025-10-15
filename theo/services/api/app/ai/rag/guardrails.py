@@ -48,9 +48,15 @@ _DISALLOWED_COMPLETION_PATTERNS: tuple[tuple[Pattern[str], str], ...] = (
     (re.compile(r"javascript\s*:", re.IGNORECASE), "javascript protocol"),
     (re.compile(r"on\w+\s*=\s*[\"']", re.IGNORECASE), "inline event handler"),
     # Credential leakage
-    (re.compile(r"password\s*[:=]", re.IGNORECASE), "credential disclosure"),
+    (
+        re.compile(r"password\s*(?:[:=]|is\b)", re.IGNORECASE),
+        "credential disclosure",
+    ),
     (re.compile(r"api[-_\s]*key\s*[:=]", re.IGNORECASE), "credential disclosure"),
-    (re.compile(r"access\s*token\s*[:=]", re.IGNORECASE), "credential disclosure"),
+    (
+        re.compile(r"access(?:[-_\s]*token)\s*[:=]", re.IGNORECASE),
+        "credential disclosure",
+    ),
     (re.compile(r"secret\s*(?:key|token)\s*[:=]", re.IGNORECASE), "credential disclosure"),
     (re.compile(r"bearer\s+[a-zA-Z0-9_\-\.]{20,}", re.IGNORECASE), "bearer token"),
     # Command injection
