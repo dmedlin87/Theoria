@@ -13,9 +13,6 @@ from ..models.research import ContradictionItem
 
 PERSPECTIVE_CHOICES: tuple[str, ...] = ("apologetic", "skeptical", "neutral")
 
-_CONTRADICTION_PERSPECTIVES = {"skeptical", "neutral"}
-_HARMONY_PERSPECTIVES = {"apologetic", "neutral"}
-
 
 @dataclass(slots=True)
 class _ScoredSeed:
@@ -67,25 +64,12 @@ def search_contradictions(
     if not windows:
         return []
 
-    include_contradictions = (
-        not allowed_perspectives
-        or bool(allowed_perspectives & _CONTRADICTION_PERSPECTIVES)
-    )
-    include_harmonies = (
-        not allowed_perspectives
-        or bool(allowed_perspectives & _HARMONY_PERSPECTIVES)
-    )
-
-    contradiction_seeds = (
-        query_pair_seed_rows(session, windows, ContradictionSeed)
-        if include_contradictions
-        else []
-    )
-    harmony_seeds = (
-        query_pair_seed_rows(session, windows, HarmonySeed)
-        if include_harmonies
-        else []
-    )
+    # Unconditionally query both seed tables. This ensures that range filters are applied
+    # symmetrically to both ContradictionSeed and HarmonySeed, and that any additional
+    # filtering (e.g., by perspective or topic) happens later. This prevents subtle bugs
+    # and avoids reintroducing conditional queries that could break the logic.
+    contradiction_seeds = query_pair_seed_rows(session, windows, ContradictionSeed)
+    harmony_seeds = query_pair_seed_rows(session, windows, HarmonySeed)
     topic_lower = topic.lower() if topic else None
     scored: list[_ScoredSeed] = []
 
