@@ -16,7 +16,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_engine
-from .models import AppSetting
+from .models import AppSetting, ContradictionSeed
 
 logger = logging.getLogger(__name__)
 
@@ -459,13 +459,32 @@ def run_sql_migrations(
                     _execute_autocommit(engine, sql)
                 else:
                     connection = session.connection()
+                    sqlite_recreated_table = False
                     if (
                         dialect_name == "sqlite"
                         and is_sqlite_perspective_migration
                         and sqlite_missing_perspective
                     ):
-                        connection.exec_driver_sql("DROP TABLE IF EXISTS contradiction_seeds")
-                    if dialect_name == "sqlite":
+                        connection.exec_driver_sql(
+                            "DROP TABLE IF EXISTS contradiction_seeds"
+                        )
+                        ContradictionSeed.__table__.create(
+                            bind=connection, checkfirst=False
+                        )
+                        # Recreating the contradiction seeds table from the ORM definition
+                        # ensures the refreshed schema includes the ``perspective`` column.
+                        # Once the table has been rebuilt there is nothing left for the raw
+                        # ALTER TABLE statement to operate on, so we skip executing the SQL
+                        # file entirely and allow the subsequent seeding pass to repopulate the
+                        # table with the bundled data.
+                        sqlite_recreated_table = True
+
+                    if sqlite_recreated_table:
+                        logger.debug(
+                            "Skipped executing %s after rebuilding contradiction_seeds table",
+                            migration_name,
+                        )
+                    elif dialect_name == "sqlite":
                         for statement in _split_sql_statements(sql):
                             if _sqlite_add_column_exists(connection, statement):
                                 logger.debug(
