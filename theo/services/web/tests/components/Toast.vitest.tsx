@@ -35,11 +35,8 @@ describe("ToastProvider", () => {
     expect(toastDescription).toBeInTheDocument();
     expect(screen.getByText("Notification")).toBeInTheDocument();
 
-    const liveRegion = screen
-      .getAllByRole("status")
-      .find((element) => element.textContent?.includes("Toast message"));
+    const liveRegion = await screen.findByRole("status", { name: "Toast message" });
 
-    expect(liveRegion).toBeDefined();
     expect(liveRegion).toHaveAttribute("aria-live", "polite");
   });
 
