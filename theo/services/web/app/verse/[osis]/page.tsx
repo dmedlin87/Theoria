@@ -126,7 +126,7 @@ function isLikelyOsis(value: string | undefined): value is string {
   if (!normalized) {
     return false;
   }
-  return /^[A-Za-z0-9]+\.[0-9]/.test(normalized);
+  return /^[A-Za-z0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9]+(\.[0-9]+)?)?$/.test(normalized);
 }
 
 function buildMentionFilterQuery(searchParams: Record<string, string | string[] | undefined> | undefined) {
