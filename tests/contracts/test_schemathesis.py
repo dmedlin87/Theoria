@@ -122,14 +122,12 @@ def test_contract_endpoints(
 ) -> None:
     method_key = method.lower()
     operation = openapi_schema.get(path, method_key)[method_key]
-    make_case = getattr(operation, "make_case", None)
-    if callable(make_case):
-        case = make_case()
-    else:
-        schema_make_case = getattr(openapi_schema, "make_case", None)
-        if schema_make_case is None:  # pragma: no cover - sanity guard for future APIs
-            raise AttributeError("Schemathesis API does not expose a case factory")
-        case = schema_make_case(operation=operation)
+    if hasattr(operation, "make_case"):
+        case = operation.make_case()
+    elif hasattr(operation, "Case"):
+        case = operation.Case()
+    else:  # pragma: no cover - compatibility fallback
+        case = schemathesis.Case(operation)
     case.call_and_validate(
         session=contract_client,
         checks=(schemathesis.checks.not_a_server_error,),

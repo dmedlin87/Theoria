@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+import inspect
 
 import click
 try:  # pragma: no cover - datasets is optional for unit tests
@@ -404,7 +405,8 @@ def rag_eval(
             "rag_eval: using deterministic fake LLM responses (no API key detected).",
             err=True,
         )
-        evaluate_kwargs["llm"] = llm_override
+        if "llm" in inspect.signature(ragas_evaluate).parameters:
+            evaluate_kwargs["llm"] = llm_override
         using_fake_models = True
     embeddings_override = _resolve_embeddings()
     if embeddings_override is not None:
@@ -412,7 +414,8 @@ def rag_eval(
             "rag_eval: using fake embeddings (no API key detected).",
             err=True,
         )
-        evaluate_kwargs["embeddings"] = embeddings_override
+        if "embeddings" in inspect.signature(ragas_evaluate).parameters:
+            evaluate_kwargs["embeddings"] = embeddings_override
         using_fake_models = True
     try:
         result = ragas_evaluate(dataset, **evaluate_kwargs)
@@ -434,9 +437,6 @@ def rag_eval(
 
     baseline_scores, baseline_tolerance = _load_baseline(baseline_path)
     allowed_tolerance = tolerance if tolerance is not None else baseline_tolerance
-    if using_fake_models:
-        allowed_tolerance = float("inf")
-
     failing_rows: list[dict[str, Any]] = []
     for entry in per_sample:
         for metric, minimum in DEFAULT_THRESHOLDS.items():
@@ -496,6 +496,17 @@ def rag_eval(
             " informational only."
         )
     _write_summary(output_path, summary)
+
+    if failing_rows:
+        raise click.ClickException("Low-scoring queries detected.")
+
+    if regressions and not using_fake_models:
+        messages = [
+            f"{item['metric']} {item['current']:.3f} < {item['baseline']:.3f}"
+            for item in regressions
+        ]
+        joined = "; ".join(messages)
+        raise click.ClickException(f"Metric regression detected: {joined}")
 
     if update_baseline:
         _save_baseline(baseline_path, overall_scores, allowed_tolerance)

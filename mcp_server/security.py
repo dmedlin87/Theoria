@@ -13,7 +13,6 @@ from typing import Deque, Dict, Iterable, Literal, MutableMapping, Tuple
 from fastapi import status
 
 from . import schemas
-from .errors import AuthorizationError, RateLimitError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -98,8 +97,9 @@ class WriteSecurityPolicy:
                 return
         actor_id = next(iter(self._actors(tenant_id, end_user_id)), "unknown")
         self._log_security_event("access_denied", tool, actor=actor_id)
-        raise AuthorizationError(
-            f"Writes to {tool} are not allowed for the supplied identity"
+        raise WriteSecurityError(
+            f"Writes to {tool} are not allowed for the supplied identity",
+            status_code=status.HTTP_403_FORBIDDEN,
         )
 
     def enforce_rate_limit(
@@ -108,7 +108,7 @@ class WriteSecurityPolicy:
         if not commit:
             return
         limit = self.rate_limits.get(tool)
-        if not limit:
+        if limit is None:
             return
         actor = next(iter(self._actors(tenant_id, end_user_id)), None)
         if actor is None:
@@ -125,9 +125,9 @@ class WriteSecurityPolicy:
                 bucket.popleft()
             if len(bucket) >= limit:
                 self._log_security_event("rate_limit_exceeded", tool, actor=actor)
-                raise RateLimitError(
+                raise WriteSecurityError(
                     f"Rate limit exceeded for {tool}",
-                    retry_after=self.window_seconds,
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
             bucket.append(now)
 
@@ -204,7 +204,7 @@ class ReadSecurityPolicy:
     def enforce_rate_limit(self, tool: str, end_user_id: str) -> None:
         """Enforce rate limits on read operations."""
         limit = self.rate_limits.get(tool)
-        if not limit:
+        if limit is None:
             return
         if not end_user_id:
             self._log_security_event("rate_limit_missing_user", tool)
@@ -220,9 +220,9 @@ class ReadSecurityPolicy:
                 bucket.popleft()
             if len(bucket) >= limit:
                 self._log_security_event("rate_limit_exceeded", tool, actor=end_user_id)
-                raise RateLimitError(
+                raise WriteSecurityError(
                     f"Rate limit exceeded for {tool}",
-                    retry_after=self.window_seconds,
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
             bucket.append(now)
 

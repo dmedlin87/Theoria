@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Callable, Iterator, Sequence
 
 from fastapi import Depends, status
@@ -30,6 +32,21 @@ DocumentLike = Any
 _BASE_RUN_PIPELINE_FOR_FILE = run_pipeline_for_file
 _BASE_RUN_PIPELINE_FOR_URL = run_pipeline_for_url
 _BASE_RUN_PIPELINE_FOR_TRANSCRIPT = run_pipeline_for_transcript
+
+_CLI_INGEST_MODULE: ModuleType | None = None
+
+
+def _load_cli_ingest_module() -> ModuleType:
+    """Import the CLI ingest module lazily to avoid circular imports."""
+
+    global _CLI_INGEST_MODULE
+
+    if _CLI_INGEST_MODULE is not None:
+        return _CLI_INGEST_MODULE
+
+    module = importlib.import_module("theo.services.cli.ingest_folder")
+    _CLI_INGEST_MODULE = module
+    return module
 
 
 @dataclass
@@ -299,6 +316,16 @@ def get_ingestion_service(
         run_file_pipeline=run_file,
         run_url_pipeline=run_url,
         run_transcript_pipeline=run_transcript,
-        cli_module=cli_source,
+        cli_module=_load_cli_ingest_module(),
         log_workflow=log_workflow_event,
     )
+
+
+def __getattr__(name: str) -> Any:
+    """Provide lazy access to the CLI ingest module for test hooks."""
+
+    if name == "cli_ingest":
+        module = _load_cli_ingest_module()
+        globals()[name] = module
+        return module
+    raise AttributeError(name)

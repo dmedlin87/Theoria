@@ -223,6 +223,25 @@ def _recreate_seed_table_if_missing_column(
     return True
 
 
+def _rebuild_perspective_column(
+    session: Session,
+    table: Table,
+    *,
+    dataset_label: str,
+    log_suffix: str,
+) -> None:
+    """Drop and recreate *table* when ``perspective`` is absent, logging the repair."""
+
+    if _recreate_seed_table_if_missing_column(
+        session, table, "perspective", dataset_label=dataset_label
+    ):
+        logger.info(
+            "Rebuilt %s table missing 'perspective' column; %s",
+            table.name,
+            log_suffix,
+        )
+
+
 def _ensure_perspective_column(
     session: Session,
     table: Table,
@@ -233,13 +252,9 @@ def _ensure_perspective_column(
     """Verify the ``perspective`` column exists before reading from ``table``."""
 
     dependencies = tuple(required_columns or ())
-    initially_missing = not _table_has_column(
-        session, table.name, "perspective", schema=table.schema
-    )
-    if not initially_missing:
-        return True
-
-    if dependencies:
+    if _table_has_column(session, table.name, "perspective", schema=table.schema):
+        if not dependencies:
+            return True
         missing_dependencies = [
             column
             for column in dependencies
@@ -247,91 +262,10 @@ def _ensure_perspective_column(
                 session, table.name, column, schema=table.schema
             )
         ]
-        if missing_dependencies:
-            session.rollback()
-            logger.warning(
-                "Skipping %s seeds because 'perspective' column is missing",
-                dataset_label,
-            )
-            return False
-
-    bind = session.get_bind()
-    dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
-    if dialect_name == "sqlite" and bind is not None:
-        connection, should_close = _get_session_connection(session)
-        try:
-            if connection is None:
-                session.rollback()
-                logger.warning(
-                    "Skipping %s seeds because SQLite connection could not be established",  # noqa: E501
-                    dataset_label,
-                )
-                return False
-
-            escaped_table = table.name.replace('"', '""')
-            alter_statement = f'ALTER TABLE "{escaped_table}" ADD COLUMN perspective TEXT'
-            try:
-                connection.exec_driver_sql(alter_statement)
-            except OperationalError as exc:  # pragma: no cover - duplicate column
-                message = str(getattr(exc, "orig", exc)).lower()
-                duplicate_indicators = ("duplicate column", "already exists")
-                if not any(indicator in message for indicator in duplicate_indicators):
-                    logger.debug(
-                        "Failed to create perspective column for %s seeds: %s",
-                        dataset_label,
-                        exc,
-                    )
-                    session.rollback()
-                    return False
-            except Exception as exc:  # pragma: no cover - defensive
-                logger.debug(
-                    "Unexpected error while creating perspective column for %s seeds: %s",
-                    dataset_label,
-                    exc,
-                )
-                session.rollback()
-                return False
-
-            if not _table_has_column(session, table.name, "perspective", schema=table.schema):
-                session.rollback()
-                logger.warning(
-                    "Skipping %s seeds because 'perspective' column is missing", dataset_label
-                )
-                return False
-
-            update_statement = (
-                f'UPDATE "{escaped_table}" '  # noqa: S608
-                "SET perspective = COALESCE(perspective, 'skeptical') "
-                "WHERE perspective IS NULL"
-            )
-            try:
-                connection.exec_driver_sql(update_statement)
-            except OperationalError as exc:  # pragma: no cover - defensive
-                logger.debug(
-                    "Failed to backfill perspective column for %s seeds: %s",
-                    dataset_label,
-                    exc,
-                )
-                session.rollback()
-                return False
-            except Exception as exc:  # pragma: no cover - defensive
-                logger.debug(
-                    "Unexpected error while backfilling perspective column for %s seeds: %s",
-                    dataset_label,
-                    exc,
-                )
-                session.rollback()
-                return False
-
-            try:
-                session.commit()
-            except Exception:  # pragma: no cover - defensive
-                session.rollback()
-                raise
+        if not missing_dependencies:
             return True
-        finally:
-            if should_close and connection is not None:
-                connection.close()
+    else:
+        missing_dependencies = list(dependencies) if dependencies else []
 
     session.rollback()
     logger.warning(
@@ -378,6 +312,7 @@ def _ensure_range_columns(
         formatted,
     )
     return False
+
 
 
 def _handle_missing_perspective_error(
@@ -647,13 +582,6 @@ def seed_harmony_claims(session: Session) -> None:
     """Load harmony seeds from bundled YAML/JSON files."""
 
     table = HarmonySeed.__table__
-    if _recreate_seed_table_if_missing_column(
-        session, table, "perspective", dataset_label="harmony"
-    ):
-        logger.info(
-            "Rebuilt %s table missing 'perspective' column; reseeding harmony seeds",
-            table.name,
-        )
     if not _ensure_perspective_column(
         session,
         table,
@@ -812,13 +740,6 @@ def seed_commentary_excerpts(session: Session) -> None:
     """Seed curated commentary excerpts into the catalogue."""
 
     table = CommentaryExcerptSeed.__table__
-    if _recreate_seed_table_if_missing_column(
-        session, table, "perspective", dataset_label="commentary excerpt"
-    ):
-        logger.info(
-            "Rebuilt %s table missing 'perspective' column; reseeding commentary excerpts",
-            table.name,
-        )
     if not _ensure_perspective_column(
         session,
         table,
@@ -991,9 +912,33 @@ def seed_geo_places(session: Session) -> None:
     _run_with_sqlite_lock_retry(session, "geo place", _load)
 
 
+
+
+def _repair_missing_perspective_columns(session: Session) -> None:
+    repairs: tuple[tuple[Table, str, str], ...] = (
+        (ContradictionSeed.__table__, "contradiction", "contradiction seeds"),
+        (HarmonySeed.__table__, "harmony", "harmony seeds"),
+        (
+            CommentaryExcerptSeed.__table__,
+            "commentary excerpt",
+            "commentary excerpts",
+        ),
+    )
+    for table, dataset_label, log_label in repairs:
+        if _recreate_seed_table_if_missing_column(
+            session, table, "perspective", dataset_label=dataset_label
+        ):
+            logger.info(
+                "Rebuilt %s table missing 'perspective' column; reseeding %s",
+                table.name,
+                log_label,
+            )
+
+
 def seed_reference_data(session: Session) -> None:
     """Entry point for loading all bundled reference datasets."""
 
+    _repair_missing_perspective_columns(session)
     _run_seed_with_perspective_guard(session, seed_contradiction_claims, "contradiction")
     _run_seed_with_perspective_guard(session, seed_harmony_claims, "harmony")
     _run_seed_with_perspective_guard(session, seed_commentary_excerpts, "commentary excerpt")
