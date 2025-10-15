@@ -31,8 +31,8 @@ function GraphSectionSkeleton(): JSX.Element {
 }
 
 interface VersePageProps {
-  params: { osis: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ osis: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 interface VerseMention {
@@ -73,7 +73,7 @@ interface VerseTimelineResponse {
 
 async function fetchGraph(
   osis: string,
-  searchParams: VersePageProps["searchParams"],
+  searchParams: Record<string, string | string[] | undefined> | undefined,
 ): Promise<VerseGraphResponse> {
   try {
     const params = buildMentionFilterQuery(searchParams);
@@ -100,7 +100,7 @@ async function fetchGraph(
 }
 
 function getParamValue(
-  searchParams: VersePageProps["searchParams"],
+  searchParams: Record<string, string | string[] | undefined> | undefined,
   key: string,
 ): string | undefined {
   if (!searchParams) {
@@ -110,7 +110,7 @@ function getParamValue(
   return typeof value === "string" ? value : undefined;
 }
 
-function getTimelineWindow(searchParams: VersePageProps["searchParams"]): TimelineWindow {
+function getTimelineWindow(searchParams: Record<string, string | string[] | undefined> | undefined): TimelineWindow {
   const candidate = getParamValue(searchParams, "window");
   if (candidate && TIMELINE_WINDOWS.includes(candidate as TimelineWindow)) {
     return candidate as TimelineWindow;
@@ -118,7 +118,7 @@ function getTimelineWindow(searchParams: VersePageProps["searchParams"]): Timeli
   return "month";
 }
 
-function buildMentionFilterQuery(searchParams: VersePageProps["searchParams"]) {
+function buildMentionFilterQuery(searchParams: Record<string, string | string[] | undefined> | undefined) {
   const params = new URLSearchParams();
   if (!searchParams) {
     return params;
@@ -141,7 +141,7 @@ function buildMentionFilterQuery(searchParams: VersePageProps["searchParams"]) {
 
 async function fetchMentions(
   osis: string,
-  searchParams: VersePageProps["searchParams"],
+  searchParams: Record<string, string | string[] | undefined> | undefined,
 ): Promise<VerseMentionsResponse> {
   try {
     const params = buildMentionFilterQuery(searchParams);
@@ -167,7 +167,7 @@ async function fetchMentions(
 
 async function fetchTimeline(
   osis: string,
-  searchParams: VersePageProps["searchParams"],
+  searchParams: Record<string, string | string[] | undefined> | undefined,
   window: TimelineWindow,
 ): Promise<VerseTimelineResponse | null> {
   try {
@@ -200,7 +200,7 @@ async function fetchTimeline(
 const STUDY_MODES = ["apologetic", "skeptical"] as const;
 type StudyMode = (typeof STUDY_MODES)[number];
 
-function getActiveMode(searchParams: VersePageProps["searchParams"]): StudyMode {
+function getActiveMode(searchParams: Record<string, string | string[] | undefined> | undefined): StudyMode {
   const candidate = getParamValue(searchParams, "mode")?.toLowerCase();
   return (STUDY_MODES.find((mode) => mode === candidate) ?? "apologetic") as StudyMode;
 }
