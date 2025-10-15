@@ -163,25 +163,35 @@ class TestHandleNoteWrite:
 
 
 class TestResolveDocumentOsis:
-    def test_prefers_primary_reference(self):
+    def test_prefers_primary_reference(self, monkeypatch):
         rows = [
             SimpleNamespace(osis_ref="Gen.1.1", meta={"osis_primary": "Gen.1.2"}),
             SimpleNamespace(osis_ref="Gen.1.3", meta={}),
         ]
         session = _FakeSession(rows)
+        monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
+        payload = _build_payload(osis=" ", doc_id="doc-1")
+        # Patch the session used by _resolve_document_osis
+        monkeypatch.setattr(tools, "_resolve_document_osis", lambda sess, doc_id: tools._resolve_document_osis(session, doc_id))
+        result = tools.handle_note_write(session, payload)
+        assert result.osis == "Gen.1.2"
 
-        assert tools._resolve_document_osis(session, "doc-1") == "Gen.1.2"
-
-    def test_falls_back_to_first_osis(self):
+    def test_falls_back_to_first_osis(self, monkeypatch):
         rows = [
             SimpleNamespace(osis_ref="Gen.1.4", meta=None),
             SimpleNamespace(osis_ref="Gen.1.5", meta="not-a-mapping"),
         ]
         session = _FakeSession(rows)
+        monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
+        payload = _build_payload(osis=" ", doc_id="doc-2")
+        monkeypatch.setattr(tools, "_resolve_document_osis", lambda sess, doc_id: tools._resolve_document_osis(session, doc_id))
+        result = tools.handle_note_write(session, payload)
+        assert result.osis == "Gen.1.4"
 
-        assert tools._resolve_document_osis(session, "doc-2") == "Gen.1.4"
-
-    def test_returns_none_when_no_rows(self):
+    def test_returns_none_when_no_rows(self, monkeypatch):
         session = _FakeSession([])
-
-        assert tools._resolve_document_osis(session, "doc-3") is None
+        monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
+        payload = _build_payload(osis=" ", doc_id="doc-3")
+        monkeypatch.setattr(tools, "_resolve_document_osis", lambda sess, doc_id: tools._resolve_document_osis(session, doc_id))
+        with pytest.raises(MCPToolError):
+            tools.handle_note_write(session, payload)
