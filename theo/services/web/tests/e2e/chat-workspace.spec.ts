@@ -46,7 +46,8 @@ test.describe("Chat workspace", () => {
     await page.fill("textarea[name='question']", "How does patience shape study?");
     await page.click("button[type='submit']");
 
-    await expect(page.getByText("Generating response…")).toBeVisible();
+    // Check for typing indicator animation
+    await expect(page.locator(".typingIndicator")).toBeVisible();
     await expect(page.getByText("Patience rewarded.")).toBeVisible();
   });
 
@@ -122,5 +123,28 @@ test.describe("Chat workspace", () => {
     await expect(page.getByText("messages cannot be empty")).toBeVisible();
     await expect(page.getByRole("button", { name: "Search related passages" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Upload supporting documents" })).toBeVisible();
+  });
+
+  test("@smoke supports Ctrl+Enter keyboard shortcut", async ({ page }) => {
+    await page.route("**/ai/workflows/chat", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session_id: "keyboard-session",
+          answer: { summary: "Keyboard shortcuts improve efficiency.", citations: [] },
+        }),
+      });
+    });
+
+    await page.goto("/chat");
+    const textarea = page.locator("textarea[name='question']");
+    await textarea.fill("Does Ctrl+Enter work?");
+    
+    // Press Ctrl+Enter (or Cmd+Enter on Mac)
+    await textarea.press("Control+Enter");
+
+    // Verify the response appears
+    await expect(page.getByText("Keyboard shortcuts improve efficiency.")).toBeVisible();
   });
 });

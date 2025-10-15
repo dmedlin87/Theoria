@@ -143,6 +143,34 @@ def _dispose_sqlite_engine(bind: Connection | Engine | None) -> None:
     except Exception:  # pragma: no cover - defensive release guard
         pass
     else:
+        try:
+            import sqlite3  # pragma: no cover - optional inspection for stray connections
+            import inspect
+        except Exception:
+            sqlite3 = None
+            inspect = None  # type: ignore[assignment]
+        if sqlite3 is not None:
+            cursor_type = getattr(sqlite3, "Cursor", None)
+            for obj in gc.get_objects():
+                try:
+                    if obj.__class__ is sqlite3.Connection:
+                        obj.close()
+                    elif cursor_type is not None and obj.__class__ is cursor_type:
+                        obj.close()
+                except ReferenceError:
+                    continue
+                except Exception:
+                    continue
+            if inspect is not None:
+                for frame_info in inspect.stack():
+                    for value in list(frame_info.frame.f_locals.values()):
+                        try:
+                            if value.__class__ is sqlite3.Connection:
+                                value.close()
+                            elif cursor_type is not None and value.__class__ is cursor_type:
+                                value.close()
+                        except Exception:
+                            continue
         gc.collect()
         time.sleep(0.01)
 

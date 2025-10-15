@@ -9,6 +9,31 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
+try:  # pragma: no cover - optional sqlite context cleanup shim
+    import sqlite3
+except Exception:  # pragma: no cover - non-sqlite environments
+    sqlite3 = None  # type: ignore
+else:
+    if not getattr(sqlite3, "__theo_closing_patch__", False):
+        _original_sqlite_connect = sqlite3.connect
+
+        class _TheoClosingConnection(sqlite3.Connection):  # type: ignore[misc]
+            def __exit__(self, exc_type, exc, tb):  # type: ignore[override]
+                result = super().__exit__(exc_type, exc, tb)
+                try:
+                    super().close()
+                except Exception:
+                    pass
+                return result
+
+        def _connect_with_closing(*args, **kwargs):
+            if "factory" not in kwargs:
+                kwargs["factory"] = _TheoClosingConnection
+            return _original_sqlite_connect(*args, **kwargs)
+
+        sqlite3.connect = _connect_with_closing  # type: ignore[assignment]
+        sqlite3.__theo_closing_patch__ = True  # type: ignore[attr-defined]
+
 from theo.application.facades.settings import get_settings
 from theo.services.api.app.db.models import Base
 

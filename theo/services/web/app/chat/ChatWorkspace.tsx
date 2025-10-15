@@ -12,7 +12,7 @@ import {
   ThumbsUp,
   Upload as UploadIcon,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout";
 import { Icon } from "../components/Icon";
@@ -37,7 +37,9 @@ import {
 } from "./useChatWorkspaceState";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
 import { SessionControls } from "./components/SessionControls";
-import type { TranscriptEntry } from "./components/transcript/ChatTranscript";
+import type { TranscriptEntry as BaseTranscriptEntry } from "./components/transcript/ChatTranscript";
+
+type TranscriptEntry = BaseTranscriptEntry & { timestamp?: Date };
 import { useChatSessionState } from "./hooks/useChatSessionState";
 
 import styles from "./ChatWorkspace.module.css";
@@ -115,6 +117,7 @@ export default function ChatWorkspace({
 
   const [inputValue, setInputValue] = useState(initialPrompt ?? "");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (typeof initialPrompt === "string") {
       setInputValue(initialPrompt);
@@ -470,6 +473,18 @@ export default function ChatWorkspace({
     [executeChat, inputValue],
   );
 
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        if (inputValue.trim() && !isStreaming && !isRestoring) {
+          void executeChat(inputValue);
+        }
+      }
+    },
+    [executeChat, inputValue, isStreaming, isRestoring],
+  );
+
   useEffect(() => {
     if (!autoSubmit || !initialPrompt || autoSubmitRef.current || isRestoring) {
       return;
@@ -485,13 +500,21 @@ export default function ChatWorkspace({
         const content = entry.content.trim();
         return {
           ...entry,
-          displayContent: content || (isActive ? "Generating response…" : ""),
+          displayContent: content || (isActive ? "" : ""),
           isActive,
+          timestamp: new Date(),
         };
       }
-      return { ...entry, displayContent: entry.content, isActive: false };
+      return { ...entry, displayContent: entry.content, isActive: false, timestamp: new Date() };
     });
   }, [activeAssistantId, conversation, isStreaming]);
+
+  // Auto-scroll to new messages
+  useEffect(() => {
+    if (conversation.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [conversation.length, isStreaming]);
 
   const handleRetry = useCallback(() => {
     if (lastQuestion) {
@@ -679,8 +702,23 @@ export default function ChatWorkspace({
             );
             return (
               <article key={entry.id} className={messageClass}>
-                <header>{entry.role === "user" ? "You" : "Theo"}</header>
-                <p aria-live={entry.isActive ? "polite" : undefined}>{entry.displayContent || "Awaiting response."}</p>
+                <header>
+                  <span>{entry.role === "user" ? "You" : "Theo"}</span>
+                  {entry.timestamp && (
+                    <time className={styles.messageTime} dateTime={entry.timestamp.toISOString()}>
+                      {entry.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </time>
+                  )}
+                </header>
+                {entry.isActive && !entry.displayContent ? (
+                  <div className={styles.typingIndicator}>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                ) : (
+                  <p aria-live={entry.isActive ? "polite" : undefined}>{entry.displayContent || "Awaiting response."}</p>
+                )}
                 {entry.role === "assistant" && entry.citations.length > 0 && (
                   <aside className={styles.citations} aria-label="Citations">
                     <h4>Citations</h4>
@@ -776,22 +814,8 @@ export default function ChatWorkspace({
         onReset={handleResetSession}
         onFork={handleForkSession}
       />
-      <div className={styles.sessionControls} aria-label="Session history controls">
-        <button
-          type="button"
-          onClick={handleResetSession}
-          disabled={!hasTranscript || isStreaming || isRestoring}
-        >
-          Reset session
-        </button>
-        <button
-          type="button"
-          onClick={handleForkSession}
-          disabled={!hasTranscript || isStreaming || isRestoring}
-        >
-          Fork conversation
-        </button>
-      </div>
+
+      <div ref={messagesEndRef} aria-hidden="true" />
 
       {guardrail ? (
         <ErrorCallout
@@ -813,10 +837,15 @@ export default function ChatWorkspace({
           rows={4}
           value={inputValue}
           onChange={(event) => setInputValue(event.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="How does John 1:1 connect with Genesis 1?"
           disabled={isStreaming || isRestoring}
           ref={textareaRef}
+          aria-describedby="chat-shortcuts"
         />
+        <p id="chat-shortcuts" className={styles.shortcuts}>
+          Press <kbd>Ctrl+Enter</kbd> (or <kbd>⌘+Enter</kbd>) to send
+        </p>
         <div className={styles.formActions}>
           <button type="submit" disabled={!inputValue.trim() || isStreaming || isRestoring}>
             {isStreaming ? "Generating…" : "Send"}
