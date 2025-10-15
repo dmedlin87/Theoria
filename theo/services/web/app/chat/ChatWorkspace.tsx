@@ -18,6 +18,7 @@ import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout
 import { Icon } from "../components/Icon";
 import type { ChatWorkflowClient } from "../lib/chat-client";
 import { createTheoApiClient, TheoApiError } from "../lib/api-client";
+import { interpretApiError } from "../lib/errorMessages";
 import type {
   ChatSessionState,
   ChatWorkflowStreamEvent,
@@ -91,7 +92,7 @@ export default function ChatWorkspace({
       isStreaming,
       activeAssistantId,
       guardrail,
-      errorMessage,
+      errorMessage: apiError,
       lastQuestion,
     },
     setters: {
@@ -105,7 +106,7 @@ export default function ChatWorkspace({
       setIsStreaming,
       setActiveAssistantId,
       setGuardrail,
-      setErrorMessage,
+      setErrorMessage: setApiError,
       setLastQuestion,
     },
     selectors: { hasTranscript },
@@ -372,7 +373,7 @@ export default function ChatWorkspace({
       setConversation([...baseConversation, userEntry, assistantEntry]);
       setActiveAssistantId(assistantId);
       setGuardrail(null);
-      setErrorMessage(null);
+      setApiError(null);
       setLastQuestion(trimmed);
       setInputValue("");
       setIsStreaming(true);
@@ -439,11 +440,10 @@ export default function ChatWorkspace({
               reason: error.message,
             },
           });
-          setErrorMessage(null);
+          setApiError(null);
         } else {
-          const message =
-            error instanceof Error ? error.message : "We couldn’t complete that chat request.";
-          setErrorMessage(message);
+          const interpreted = interpretApiError(error, { feature: "chat" });
+          setApiError(interpreted);
         }
       } finally {
         setIsStreaming(false);
@@ -516,12 +516,20 @@ export default function ChatWorkspace({
     }
   }, [conversation.length, isStreaming]);
 
-  const handleRetry = useCallback(() => {
+  const handleGuardrailRetry = useCallback(() => {
     if (lastQuestion) {
       setInputValue(lastQuestion);
     }
     setGuardrail(null);
   }, [lastQuestion]);
+
+  const handleRetryRequest = useCallback(() => {
+    if (!lastQuestion || isStreaming || isRestoring) {
+      return;
+    }
+    setInputValue(lastQuestion);
+    void executeChat(lastQuestion);
+  }, [executeChat, isRestoring, isStreaming, lastQuestion]);
 
   const handleAssistantFeedback = useCallback(
     async (entryId: string, action: Reaction) => {
@@ -564,7 +572,7 @@ export default function ChatWorkspace({
 
   const guardrailActions: Partial<Pick<ErrorCalloutProps, "onRetry" | "actions">> = {};
   if (lastQuestion) {
-    guardrailActions.onRetry = handleRetry;
+    guardrailActions.onRetry = handleGuardrailRetry;
   }
   if (guardrail && guardrail.suggestions.length) {
     guardrailActions.actions = (
@@ -593,7 +601,7 @@ export default function ChatWorkspace({
     setPendingFeedbackIds(new Set());
     setSessionId(null);
     setGuardrail(null);
-    setErrorMessage(null);
+    setApiError(null);
     setLastQuestion(null);
     setIsStreaming(false);
     setDefaultFilters(null);
@@ -826,7 +834,24 @@ export default function ChatWorkspace({
         />
       ) : null}
 
-      {errorMessage ? <ErrorCallout message={errorMessage} /> : null}
+      {apiError ? (
+        <ErrorCallout
+          message={apiError.message}
+          traceId={apiError.traceId}
+          retryLabel={apiError.retryLabel ?? undefined}
+          helpLink={apiError.helpLink}
+          helpLabel={apiError.helpLabel}
+          onRetry={lastQuestion ? handleRetryRequest : undefined}
+          telemetry={{
+            source: "chat_workspace",
+            page: "chat",
+            errorCategory: apiError.category,
+            metadata: {
+              ...(typeof apiError.status === "number" ? { status: apiError.status } : {}),
+            },
+          }}
+        />
+      ) : null}
 
       <form className={styles.form} onSubmit={handleSubmit} aria-label="Chat input">
         <label htmlFor="chat-question">Ask Theoria</label>

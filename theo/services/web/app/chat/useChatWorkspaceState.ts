@@ -2,6 +2,7 @@ import { useReducer, useCallback, Dispatch } from "react";
 import type { RAGCitation } from "../copilot/components/types";
 import type { HybridSearchFilters } from "../lib/guardrails";
 import type { GuardrailFailureMetadata, GuardrailSuggestion } from "../lib/guardrails";
+import type { InterpretedApiError } from "../lib/errorMessages";
 
 export type ConversationEntry =
   | { id: string; role: "user"; content: string }
@@ -49,7 +50,7 @@ export type ChatWorkspaceState = {
   
   // Errors
   guardrail: GuardrailState;
-  errorMessage: string | null;
+  errorMessage: InterpretedApiError | null;
   lastQuestion: string | null;
 };
 
@@ -79,7 +80,7 @@ export type ChatWorkspaceAction =
   | { type: "REMOVE_ENTRY"; entryId: string }
   | { type: "SET_GUARDRAIL"; guardrail: GuardrailState }
   | { type: "CLEAR_GUARDRAIL" }
-  | { type: "SET_ERROR"; error: string | null }
+  | { type: "SET_ERROR"; error: InterpretedApiError | null }
   | { type: "SET_FEEDBACK_PENDING"; entryId: string; pending: boolean }
   | { type: "SET_FEEDBACK_SELECTION"; entryId: string; reaction: Reaction }
   | { type: "SET_SESSION_ID"; sessionId: string | null }
@@ -353,7 +354,7 @@ export function useChatWorkspaceState() {
     dispatch({ type: "CLEAR_GUARDRAIL" });
   }, []);
 
-  const setError = useCallback((error: string | null) => {
+  const setError = useCallback((error: InterpretedApiError | null) => {
     dispatch({ type: "SET_ERROR", error });
   }, []);
 
