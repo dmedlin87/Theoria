@@ -31,7 +31,7 @@ const DEFAULT_STATE: Omit<ApiHealthSnapshot, "refresh"> = {
   lastError: null,
 };
 
-function normaliseStatus(value: string): ApiHealthStatus | null {
+function normalizeStatus(value: string): ApiHealthStatus | null {
   const label = value.toLowerCase();
   if (["ok", "pass", "healthy", "up"].includes(label)) {
     return "healthy";
