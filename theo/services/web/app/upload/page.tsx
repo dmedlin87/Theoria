@@ -6,17 +6,23 @@ import ErrorCallout from "../components/ErrorCallout";
 import { useToast } from "../components/Toast";
 import { getApiBaseUrl } from "../lib/api";
 import { type ErrorDetails, parseErrorResponse } from "../lib/errorUtils";
+import { interpretApiError, type InterpretedApiError } from "../lib/errorMessages";
 import FileUploadForm from "./components/FileUploadForm";
 import JobsTable from "./components/JobsTable";
 import SimpleIngestForm, { type SimpleIngestEvent } from "./components/SimpleIngestForm";
 import UrlIngestForm from "./components/UrlIngestForm";
 
-type UploadStatus = {
-  kind: "success" | "error" | "info";
-  message: string;
-  traceId: string | null;
-  source?: "file" | "url";
-};
+type UploadStatus =
+  | {
+      kind: "success" | "info";
+      message: string;
+      traceId: string | null;
+      source?: "file" | "url";
+    }
+  | ({
+      kind: "error";
+      source?: "file" | "url";
+    } & InterpretedApiError);
 
 type JobStatus = {
   id: string;
@@ -44,7 +50,7 @@ export default function UploadPage(): JSX.Element {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isSubmittingUrl, setIsSubmittingUrl] = useState(false);
   const [jobs, setJobs] = useState<JobStatus[]>([]);
-  const [jobError, setJobError] = useState<ErrorDetails | null>(null);
+  const [jobError, setJobError] = useState<InterpretedApiError | null>(null);
   const fetchJobsRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
@@ -85,7 +91,14 @@ export default function UploadPage(): JSX.Element {
         if (!response.ok) {
           const details = await readErrorDetails(response, "Unable to load jobs");
           if (isMounted) {
-            setJobError(details);
+            setJobError(
+              interpretApiError(details.message, {
+                feature: "upload",
+                status: response.status,
+                traceId: details.traceId ?? null,
+                fallbackMessage: details.message,
+              }),
+            );
           }
           return;
         }
@@ -98,15 +111,12 @@ export default function UploadPage(): JSX.Element {
         if (isMounted) {
           const fallbackMessage =
             error instanceof Error && error.message ? error.message : "Unable to load jobs";
-          const message =
-            error instanceof TypeError && /fetch/i.test(error.message)
-              ? "Unable to reach the ingestion service. Please verify the API is running."
-              : fallbackMessage;
-          const traceId =
-            typeof error === "object" && error && "traceId" in error
-              ? ((error as { traceId?: string | null }).traceId ?? null)
-              : null;
-          setJobError({ message, traceId });
+          setJobError(
+            interpretApiError(error, {
+              feature: "upload",
+              fallbackMessage,
+            }),
+          );
         }
       }
     };
@@ -295,7 +305,13 @@ export default function UploadPage(): JSX.Element {
 
       if (!response.ok) {
         const { message, traceId } = await readErrorDetails(response, "Upload failed");
-        setStatus({ kind: "error", message, traceId, source: "file" });
+        const interpreted = interpretApiError(message, {
+          feature: "upload",
+          status: response.status,
+          traceId: traceId ?? null,
+          fallbackMessage: message,
+        });
+        setStatus({ kind: "error", source: "file", ...interpreted });
         return;
       }
 
@@ -317,11 +333,11 @@ export default function UploadPage(): JSX.Element {
           : typeof error === "string"
             ? error
             : "Upload failed";
-      const message =
-        error instanceof TypeError && /fetch/i.test(error.message)
-          ? "Unable to reach the ingestion service. Please verify the API is running."
-          : fallbackMessage;
-      setStatus({ kind: "error", message, traceId: null, source: "file" });
+      const interpreted = interpretApiError(error, {
+        feature: "upload",
+        fallbackMessage,
+      });
+      setStatus({ kind: "error", source: "file", ...interpreted });
     } finally {
       setIsUploadingFile(false);
     }
@@ -364,7 +380,13 @@ export default function UploadPage(): JSX.Element {
 
       if (!response.ok) {
         const { message, traceId } = await readErrorDetails(response, "URL ingestion failed");
-        setStatus({ kind: "error", message, traceId, source: "url" });
+        const interpreted = interpretApiError(message, {
+          feature: "upload",
+          status: response.status,
+          traceId: traceId ?? null,
+          fallbackMessage: message,
+        });
+        setStatus({ kind: "error", source: "url", ...interpreted });
         return;
       }
 
@@ -386,11 +408,11 @@ export default function UploadPage(): JSX.Element {
           : typeof error === "string"
             ? error
             : "URL ingestion failed";
-      const message =
-        error instanceof TypeError && /fetch/i.test(error.message)
-          ? "Unable to reach the ingestion service. Please verify the API is running."
-          : fallbackMessage;
-      setStatus({ kind: "error", message, traceId: null, source: "url" });
+      const interpreted = interpretApiError(error, {
+        feature: "upload",
+        fallbackMessage,
+      });
+      setStatus({ kind: "error", source: "url", ...interpreted });
     } finally {
       setIsSubmittingUrl(false);
     }
@@ -423,8 +445,20 @@ export default function UploadPage(): JSX.Element {
             <ErrorCallout
               message={status.message}
               traceId={status.traceId}
+              retryLabel={status.retryLabel ?? undefined}
+              helpLink={status.helpLink}
+              helpLabel={status.helpLabel}
               onShowDetails={handleShowTraceDetails}
               detailsLabel="Show details"
+              telemetry={{
+                source: status.source === "file" ? "upload_file" : "upload_url",
+                page: "upload",
+                errorCategory: status.category,
+                metadata: {
+                  ...(status.source ? { source: status.source } : {}),
+                  ...(typeof status.status === "number" ? { status: status.status } : {}),
+                },
+              }}
             />
           ) : (
             status && (
@@ -443,9 +477,20 @@ export default function UploadPage(): JSX.Element {
             <ErrorCallout
               message={jobError.message}
               traceId={jobError.traceId}
+              retryLabel={jobError.retryLabel ?? undefined}
+              helpLink={jobError.helpLink}
+              helpLabel={jobError.helpLabel}
               onRetry={handleRetryJobs}
               onShowDetails={handleShowTraceDetails}
               detailsLabel="Show details"
+              telemetry={{
+                source: "upload_jobs",
+                page: "upload",
+                errorCategory: jobError.category,
+                metadata: {
+                  ...(typeof jobError.status === "number" ? { status: jobError.status } : {}),
+                },
+              }}
             />
           </div>
         )}
