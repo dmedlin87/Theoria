@@ -22,6 +22,7 @@ function classNames(
 
 import CommandPalette from "./CommandPalette";
 import { ThemeToggle } from "./ThemeToggle";
+import { HelpMenu } from "./help/HelpMenu";
 
 export type AppShellNavItem = {
   href: string;
@@ -293,7 +294,10 @@ export function AppShell({
         <footer className={styles.footer}>
           <div className={styles.footerMeta}>
             <span>{footerMeta}</span>
-            <ThemeToggle />
+            <div className={styles.footerControls}>
+              <ThemeToggle />
+              <HelpMenu />
+            </div>
           </div>
           {footerLinks.length > 0 ? (
             <div className={styles.footerLinks}>

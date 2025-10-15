@@ -2,6 +2,8 @@
 
 import { FormEvent, useRef, useState } from "react";
 
+import { HelpTooltip, TooltipList, TooltipParagraph } from "../../components/help/HelpTooltip";
+
 interface UrlIngestFormProps {
   onIngest: (url: string, sourceType: string, frontmatter: string) => Promise<void>;
   isSubmitting: boolean;
@@ -37,6 +39,19 @@ export default function UrlIngestForm({
         <div className="form-field">
           <label htmlFor="url-input" className="form-label">
             URL
+            <HelpTooltip
+              label="Supported URLs"
+              description={
+                <>
+                  <TooltipParagraph>
+                    Provide a public HTTP(S) URL. Private intranet addresses and unsupported protocols are rejected.
+                  </TooltipParagraph>
+                  <TooltipParagraph>
+                    For PDF downloads, use the direct file link when possible so ingestion retains the original filename.
+                  </TooltipParagraph>
+                </>
+              }
+            />
           </label>
           <input
             id="url-input"
@@ -52,6 +67,20 @@ export default function UrlIngestForm({
         <div className="form-field">
           <label htmlFor="url-source-type" className="form-label">
             Source type
+            <HelpTooltip
+              label="Override detection"
+              description={
+                <>
+                  <TooltipParagraph>
+                    Choose this when automatic detection picks the wrong parser. Options map to the ingest pipeline:
+                  </TooltipParagraph>
+                  <TooltipList items={["YouTube – Captures transcripts and metadata", "Web page – Scrapes readable HTML"]} />
+                  <TooltipParagraph>
+                    Leave on automatic detection for most URLs.
+                  </TooltipParagraph>
+                </>
+              }
+            />
           </label>
           <select
             id="url-source-type"
@@ -71,6 +100,20 @@ export default function UrlIngestForm({
         <div className="form-field">
           <label htmlFor="url-frontmatter" className="form-label">
             Frontmatter (JSON)
+            <HelpTooltip
+              label="Frontmatter format"
+              description={
+                <>
+                  <TooltipParagraph>
+                    Attach optional JSON metadata. Keep values simple strings or arrays to ensure ingest succeeds.
+                  </TooltipParagraph>
+                  <TooltipList items={["collection", "author", "tags", "language"]} />
+                  <TooltipParagraph>
+                    If left blank, metadata is inferred from the source when available.
+                  </TooltipParagraph>
+                </>
+              }
+            />
           </label>
           <textarea
             id="url-frontmatter"
