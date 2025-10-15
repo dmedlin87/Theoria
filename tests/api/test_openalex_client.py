@@ -78,7 +78,7 @@ def test_fetch_topics_title_search_without_concepts_returns_empty() -> None:
 
 def test_fetch_topics_falls_back_to_title_on_http_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        if "https://doi.org/" in request.url.path:
+        if request.url.path.startswith("/works/https://doi.org/"):
             response = httpx.Response(500, request=request)
             raise httpx.HTTPStatusError("boom", request=request, response=response)
         payload = {
