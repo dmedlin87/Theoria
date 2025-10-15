@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
-
 import pythonbible as pb
 
-from theo.services.api.app.ingest.osis import expand_osis_reference, format_osis
+from .osis import expand_osis_reference, verse_ids_to_osis
 
 from .datasets import scripture_dataset
 
@@ -82,17 +80,7 @@ def _expand_osis_to_keys(osis: str) -> list[str]:
         return []
 
     sorted_ids = sorted(set(verse_ids))
-    return list(_verse_ids_to_osis(sorted_ids))
-
-
-def _verse_ids_to_osis(verse_ids: Iterable[int]) -> Iterable[str]:
-    """Yield OSIS strings for each verse identifier in *verse_ids*."""
-
-    for verse_id in verse_ids:
-        references = pb.convert_verse_ids_to_references([verse_id])
-        if not references:
-            continue
-        yield format_osis(references[0])
+    return list(verse_ids_to_osis(sorted_ids))
 
 
 __all__ = ["Verse", "fetch_passage"]

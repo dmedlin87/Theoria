@@ -44,55 +44,6 @@ textarea {
   color: inherit;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 .container {
   width: min(var(--layout-max-width), 100%);
   margin: 0 auto;
@@ -641,65 +592,6 @@ textarea {
 
 /* Search Page Styles */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -711,16 +603,7 @@ textarea {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
+/* Diff Panel Components */
 
 .diff-panel {
   margin: var(--space-3) 0;
@@ -770,25 +653,6 @@ textarea {
 .diff-panel__empty {
   margin-top: var(--space-2);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* Skeleton Loading States */
 .skeleton {
@@ -1060,7 +924,7 @@ section + section {
   max-width: 52ch;
 }
 
-
+/* Chat Components */
 
 .chat-message {
   display: grid;
@@ -1130,15 +994,6 @@ section + section {
   box-shadow: var(--shadow-md);
   outline: none;
 }
-
-
-
-
-
-
-
-
-
 
 /* ==========================================================================
    Utility Classes
@@ -1973,7 +1828,8 @@ section + section {
 }
 
 /* Accessibility Utilities */
-.sr-only {
+.sr-only,
+.visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2207,49 +2063,7 @@ section + section {
   background: var(--color-surface-muted);
 }
 
-/* Badge components for job status */
-.badge {
-  display: inline-block;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  text-transform: capitalize;
-}
-
-.badge-success {
-  background: var(--color-positive-soft);
-  color: var(--color-positive);
-}
-
-.badge-danger {
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-}
-
-.badge-secondary {
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
-}
-
-/* Spinner for loading states */
-.spinner {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid var(--color-border-subtle);
-  border-top-color: var(--color-accent);
-  border-radius: 50%;
-  animation: spinner-spin 0.6s linear infinite;
-  margin-right: var(--space-1);
-  vertical-align: middle;
-}
-
-@keyframes spinner-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* Badge and spinner styles are defined earlier in this file - see lines 1673-1873 */
 
 /* Navigation loading spinner */
 

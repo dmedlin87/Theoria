@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, get_engine
 from theo.application.facades.runtime import allow_insecure_startup
 from theo.application.facades.settings import get_settings
@@ -119,17 +120,31 @@ else:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     engine = get_engine()
-    Base.metadata.create_all(bind=engine)
-    run_sql_migrations(engine)
-    with Session(engine) as session:
+    try:
+        Base.metadata.create_all(bind=engine)
+        run_sql_migrations(engine)
+        with Session(engine) as session:
+            try:
+                seed_reference_data(session)
+            except OperationalError as exc:  # pragma: no cover - defensive startup guard
+                session.rollback()
+                logger.warning(
+                    "Skipping reference data seeding due to database error", exc_info=exc
+                )
+        yield
+    finally:
         try:
-            seed_reference_data(session)
-        except OperationalError as exc:  # pragma: no cover - defensive startup guard
-            session.rollback()
-            logger.warning(
-                "Skipping reference data seeding due to database error", exc_info=exc
-            )
-    yield
+            engine.dispose()
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.debug("Error disposing database engine during shutdown", exc_info=exc)
+        else:
+            import gc as _gc
+            import time as _time
+
+            _gc.collect()
+            _time.sleep(0.01)
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
 def create_app() -> FastAPI:

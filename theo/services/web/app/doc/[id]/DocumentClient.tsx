@@ -103,11 +103,12 @@ export default function DocumentClient({ initialDocument }: Props): JSX.Element 
     note: "Note",
   };
 
+  // Using CSS custom properties for theme compatibility
   const typeBadgeStyles: Record<DocumentAnnotationType, { background: string; color: string }> = {
-    claim: { background: "#f97316", color: "#fff" },
-    evidence: { background: "#2563eb", color: "#fff" },
-    question: { background: "#14b8a6", color: "#fff" },
-    note: { background: "#94a3b8", color: "#111827" },
+    claim: { background: "var(--color-warning)", color: "var(--color-text-inverse)" },
+    evidence: { background: "var(--color-accent)", color: "var(--color-text-inverse)" },
+    question: { background: "var(--color-info)", color: "var(--color-text-inverse)" },
+    note: { background: "var(--color-text-muted)", color: "var(--color-text-primary)" },
   };
 
   useEffect(() => {

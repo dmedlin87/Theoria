@@ -19,7 +19,7 @@ from ..db.models import (
     GeoModernLocation,
     GeoPlaceVerse,
 )
-from ..ingest.osis import format_osis, _osis_to_readable
+from theo.domain.research.osis import format_osis, osis_to_readable
 from ..models.research import (
     GeoAttribution,
     GeoLocationItem,
@@ -224,7 +224,7 @@ def lookup_geo_places(
 
 def _normalize_osis(reference: str) -> list[str]:
     try:
-        normalized = pb.get_references(_osis_to_readable(reference))
+        normalized = pb.get_references(osis_to_readable(reference))
     except Exception:  # pragma: no cover - pythonbible parsing safety net
         return [reference]
     if not normalized:

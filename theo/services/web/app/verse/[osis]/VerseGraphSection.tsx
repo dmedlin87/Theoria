@@ -55,27 +55,27 @@ function asStringArray(value: unknown): string[] | null {
   return coerced.length > 0 ? coerced : null;
 }
 
-function edgeColour(edge: VerseGraphEdge): string {
+function edgeColour(edge: VerseGraphEdge, colors: ColorMap): string {
   switch (edge.kind) {
     case "contradiction":
-      return "#ef4444";
+      return colors.danger;
     case "harmony":
-      return "#22c55e";
+      return colors.positive;
     case "commentary":
-      return "#fb923c";
+      return colors.warning;
     default:
-      return "#60a5fa";
+      return colors.accent;
   }
 }
 
-function nodeFill(node: VerseGraphNode): string {
+function nodeFill(node: VerseGraphNode, colors: ColorMap): string {
   switch (node.kind) {
     case "verse":
-      return "#1d4ed8";
+      return colors.accent;
     case "commentary":
-      return "#fb923c";
+      return colors.warning;
     default:
-      return "#10b981";
+      return colors.positive;
   }
 }
 
@@ -111,6 +111,47 @@ interface VerseGraphSectionProps {
   graph: VerseGraphResponse | null;
 }
 
+interface ColorMap {
+  accent: string;
+  danger: string;
+  positive: string;
+  warning: string;
+  textPrimary: string;
+  textSecondary: string;
+  shadowColor: string;
+}
+
+function useThemeColors(): ColorMap {
+  // Using lazy initializer to avoid cascading renders
+  const [colors] = useState<ColorMap>(() => {
+    if (typeof window === "undefined") {
+      // SSR fallback
+      return {
+        accent: "#6366f1",
+        danger: "#ef4444",
+        positive: "#22c55e",
+        warning: "#fb923c",
+        textPrimary: "#0f172a",
+        textSecondary: "#334155",
+        shadowColor: "#0f172a",
+      };
+    }
+    const root = document.documentElement;
+    const computedStyle = getComputedStyle(root);
+    return {
+      accent: computedStyle.getPropertyValue("--color-accent").trim() || "#6366f1",
+      danger: computedStyle.getPropertyValue("--color-danger").trim() || "#ef4444",
+      positive: computedStyle.getPropertyValue("--color-positive").trim() || "#22c55e",
+      warning: computedStyle.getPropertyValue("--color-warning").trim() || "#fb923c",
+      textPrimary: computedStyle.getPropertyValue("--color-text-primary").trim() || "#0f172a",
+      textSecondary: computedStyle.getPropertyValue("--color-text-secondary").trim() || "#334155",
+      shadowColor: computedStyle.getPropertyValue("--color-text-primary").trim() || "#0f172a",
+    };
+  });
+
+  return colors;
+}
+
 export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
   const [layout, setLayout] = useState<{ nodes: LayoutNode[]; links: LayoutLink[] } | null>(
     null,
@@ -118,6 +159,7 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
   const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([]);
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<string[]>([]);
   const [, startTransition] = useTransition();
+  const colors = useThemeColors();
 
   useEffect(() => {
     if (!graph) {
@@ -342,7 +384,7 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
             >
               <defs>
                 <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#0f172a" floodOpacity="0.15" />
+                  <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor={colors.shadowColor} floodOpacity="0.15" />
                 </filter>
               </defs>
               {visibleLinks.map((link) => {
@@ -359,7 +401,7 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke={edgeColour(link.raw)}
+                    stroke={edgeColour(link.raw, colors)}
                     strokeWidth={link.raw.kind === "mention" ? 2 : 3}
                     strokeOpacity={0.85}
                   >
@@ -408,8 +450,8 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
                     cx={x}
                     cy={y}
                     r={radius}
-                    fill={nodeFill(node.raw)}
-                    stroke="#0f172a"
+                    fill={nodeFill(node.raw, colors)}
+                    stroke={colors.shadowColor}
                     strokeOpacity={0.2}
                     filter="url(#node-shadow)"
                   >
@@ -439,7 +481,7 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
                       y={y - radius - 8}
                       textAnchor="middle"
                       fontSize={12}
-                      fill="#0f172a"
+                      fill={colors.textPrimary}
                     >
                       {node.raw.label}
                     </text>
@@ -449,7 +491,7 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
                         y={y + radius + 14}
                         textAnchor="middle"
                         fontSize={11}
-                        fill="#334155"
+                        fill={colors.textSecondary}
                       >
                         {excerpt.length > 40 ? `${excerpt.slice(0, 37)}…` : excerpt}
                       </text>
@@ -460,7 +502,7 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
                         y={y + radius + 14}
                         textAnchor="middle"
                         fontSize={11}
-                        fill="#334155"
+                        fill={colors.textSecondary}
                       >
                         {authors.join(", ")}
                       </text>

@@ -670,10 +670,10 @@ export default function CopilotPage(): JSX.Element {
 
         .advanced-tool-drawer {
           margin-top: 2rem;
-          border: 1px solid #e2e8f0;
+          border: 1px solid var(--color-border-subtle);
           border-radius: 0.75rem;
           padding: 1.25rem;
-          background: #fff;
+          background: var(--color-surface);
           display: grid;
           gap: 1rem;
         }
@@ -699,7 +699,9 @@ export default function CopilotPage(): JSX.Element {
         .drawer-input input {
           padding: 0.5rem 0.75rem;
           border-radius: 0.5rem;
-          border: 1px solid #cbd5f5;
+          border: 1px solid var(--color-border-subtle);
+          background: var(--color-surface);
+          color: var(--color-text-primary);
         }
 
         .sr-only {

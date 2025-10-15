@@ -13,6 +13,7 @@ from types import ModuleType
 from typing import Iterable
 
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_engine
@@ -213,7 +214,21 @@ def _sqlite_table_has_column(connection, table: str, column: str) -> bool:
     column = _sqlite_normalize_identifier(column)
     escaped_table = table.replace('"', '""')
     result = connection.exec_driver_sql(f'PRAGMA table_info("{escaped_table}")')
-    for row in result:
+    try:
+        rows = list(result)
+    finally:
+        result.close()
+    if not rows:
+        exists_result = connection.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?", (table,)
+        )
+        try:
+            exists = exists_result.fetchone()
+        finally:
+            exists_result.close()
+        if not exists:
+            raise NoSuchTableError(table)
+    for row in rows:
         if len(row) > 1 and row[1] == column:
             return True
     return False

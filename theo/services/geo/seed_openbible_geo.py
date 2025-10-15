@@ -23,7 +23,7 @@ from theo.services.api.app.db.models import (
     GeoModernLocation,
     GeoPlaceVerse,
 )
-from theo.services.api.app.ingest.osis import format_osis, _osis_to_readable
+from theo.domain.research.osis import format_osis, osis_to_readable
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ def _normalize_osis(reference: str | None) -> list[str]:
     if not reference:
         return []
     try:
-        normalized = pb.get_references(_osis_to_readable(reference))
+        normalized = pb.get_references(osis_to_readable(reference))
     except Exception:  # pragma: no cover - pythonbible parsing guard
         return []
     if not normalized:

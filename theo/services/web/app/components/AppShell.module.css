@@ -216,6 +216,110 @@
   border-radius: var(--radius-full);
 }
 
+/* Global nav classes used in AppShell component */
+:global(.app-shell-v2__nav-content) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+:global(.app-shell-v2__nav-groups) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+:global(.app-shell-v2__nav-group) {
+  display: grid;
+  gap: var(--space-1);
+}
+
+:global(.app-shell-v2__nav-label) {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+:global(.app-shell-v2__nav-list) {
+  display: grid;
+  gap: var(--space-0-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:global(.app-shell-v2__nav-link) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  transition: all var(--transition-base);
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+:global(.app-shell-v2__nav-link)::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.45;
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+:global(.app-shell-v2__nav-link):hover,
+:global(.app-shell-v2__nav-link):focus-visible {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  text-decoration: none;
+  transform: var(--motion-hover-translate-x-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+:global(.app-shell-v2__nav-link.is-active) {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--color-accent-glow), var(--shadow-sm);
+}
+
+:global(.app-shell-v2__nav-link.is-active)::before {
+  opacity: 1;
+  transform: var(--motion-hover-scale-indicator);
+}
+
+:global(.app-shell-v2__nav-link.is-loading) {
+  opacity: 0.65;
+  pointer-events: none;
+  cursor: not-allowed;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+:global(.app-shell-v2__mode) {
+  margin-top: auto;
+}
+
+:global(.nav-loading-spinner) {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-left: var(--space-1);
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
 .workspace {
   display: flex;
   flex-direction: column;
@@ -437,12 +541,41 @@
     transform: translateY(0);
   }
 
+  /* Global nav content responsive styles */
+  :global(.app-shell-v2__nav-content) {
+    width: 100%;
+    gap: var(--space-3);
+    max-height: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    overflow: hidden;
+    transform: translateY(-0.5rem);
+    transition: max-height var(--transition-base), opacity var(--transition-base),
+      transform var(--transition-base);
+  }
+
+  :global(.app-shell-v2__nav-content[data-open="true"]) {
+    max-height: 100vh;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    overflow: visible;
+    transform: translateY(0);
+  }
+
   .navGroups {
     flex-direction: column;
     gap: var(--space-2);
   }
 
-  .mode {
+  :global(.app-shell-v2__nav-groups) {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .mode,
+  :global(.app-shell-v2__mode) {
     width: 100%;
   }
 

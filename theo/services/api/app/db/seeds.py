@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import time
@@ -123,6 +124,27 @@ def _get_session_connection(session: Session) -> tuple[Connection | None, bool]:
         return (session.connection(), False)
 
     return (bind, False)
+
+
+def _dispose_sqlite_engine(bind: Connection | Engine | None) -> None:
+    """Dispose SQLite engines to release file handles promptly."""
+
+    engine: Engine | None = None
+    if isinstance(bind, Connection):
+        engine = bind.engine
+    elif isinstance(bind, Engine):
+        engine = bind
+    if engine is None:
+        return
+    if getattr(getattr(engine, "dialect", None), "name", None) != "sqlite":
+        return
+    try:
+        engine.dispose()
+    except Exception:  # pragma: no cover - defensive release guard
+        pass
+    else:
+        gc.collect()
+        time.sleep(0.01)
 
 
 def _table_has_column(session: Session, table_name: str, column_name: str, *, schema: str | None = None) -> bool:
@@ -382,11 +404,14 @@ def _run_with_sqlite_lock_retry(
         try:
             action(working_session)
             working_session.commit()
+            bind = working_session.get_bind()
+            _dispose_sqlite_engine(bind)
             if working_session is not session:
                 working_session.close()
             return True
         except OperationalError as exc:
             if _handle_missing_perspective_error(working_session, dataset_label, exc):
+                _dispose_sqlite_engine(working_session.get_bind())
                 if working_session is not session:
                     working_session.close()
                 return False
@@ -400,16 +425,19 @@ def _run_with_sqlite_lock_retry(
                     max_attempts,
                 )
                 working_session.rollback()
+                _dispose_sqlite_engine(working_session.get_bind())
                 if working_session is not session:
                     working_session.close()
                 time.sleep(backoff * (attempt + 1))
                 continue
             working_session.rollback()
+            _dispose_sqlite_engine(working_session.get_bind())
             if working_session is not session:
                 working_session.close()
             raise
         except Exception:
             working_session.rollback()
+            _dispose_sqlite_engine(working_session.get_bind())
             if working_session is not session:
                 working_session.close()
             raise
@@ -446,7 +474,7 @@ def seed_contradiction_claims(session: Session) -> None:
             required_columns=("created_at",)
             if hasattr(ContradictionSeed, "created_at")
             else None,
-            allow_repair=True,
+            allow_repair=False,
         )
     except OperationalError as exc:
         if _handle_missing_perspective_error(session, "contradiction", exc):
@@ -612,7 +640,7 @@ def seed_harmony_claims(session: Session) -> None:
         table,
         "harmony",
         required_columns=("created_at",) if hasattr(HarmonySeed, "created_at") else None,
-        allow_repair=True,
+        allow_repair=False,
     ):
         return
 
@@ -773,7 +801,7 @@ def seed_commentary_excerpts(session: Session) -> None:
         required_columns=("created_at",)
         if hasattr(CommentaryExcerptSeed, "created_at")
         else None,
-        allow_repair=True,
+        allow_repair=False,
     ):
         return
     if not _ensure_range_columns(
@@ -951,15 +979,47 @@ def _repair_missing_perspective_columns(session: Session) -> None:
             "commentary excerpts",
         ),
     )
+    bind = session.get_bind()
+    engine = bind.engine if isinstance(bind, Connection) else bind
+    dialect_name = getattr(getattr(engine, "dialect", None), "name", None)
     for table, dataset_label, log_label in repairs:
-        if _recreate_seed_table_if_missing_column(
+        if _table_has_column(session, table.name, "perspective", schema=table.schema):
+            continue
+
+        repaired = False
+        if dialect_name == "sqlite" and engine is not None:
+            statement = f'ALTER TABLE "{table.name}" ADD COLUMN perspective TEXT'
+            session.rollback()
+            try:
+                with engine.begin() as connection:
+                    connection.exec_driver_sql(statement)
+            except OperationalError as exc:
+                message = str(getattr(exc, "orig", exc)).lower()
+                duplicate_indicators = ("duplicate column name", "already exists")
+                if not any(indicator in message for indicator in duplicate_indicators):
+                    logger.warning(
+                        "Failed to add perspective column to %s via ALTER TABLE: %s",
+                        table.name,
+                        exc,
+                    )
+                else:
+                    repaired = True
+            else:
+                repaired = True
+        if not repaired and _recreate_seed_table_if_missing_column(
             session, table, "perspective", dataset_label=dataset_label
         ):
+            repaired = True
+
+        if repaired:
             logger.info(
                 "Rebuilt %s table missing 'perspective' column; reseeding %s",
                 table.name,
                 log_label,
             )
+            session.expire_all()
+            if engine is not None:
+                engine.dispose()
 
 
 def seed_reference_data(session: Session) -> None:
