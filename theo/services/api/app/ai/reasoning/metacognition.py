@@ -97,7 +97,6 @@ _STOPWORDS = {
     "hence",
     "thus",
     "also",
-    "into",
     "upon",
     "unto",
     "about",
@@ -843,7 +842,7 @@ def _select_revision_citations(
             seen_ids.add(id(citation))
             break
 
-    for citation, record in valid_citations:
+    for citation, _record in valid_citations:
         if id(citation) in seen_ids:
             continue
         selected.append(citation)
