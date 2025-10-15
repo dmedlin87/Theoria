@@ -129,12 +129,30 @@ def ensure_url_allowed(settings, url: str) -> None:
             allowed_hosts = {item.lower() for item in settings.ingest_url_allowed_hosts}
             if normalised_host in allowed_hosts:
                 try:
-                    _resolve_host_addresses(normalised_host)
+                    addresses = _resolve_host_addresses(normalised_host)
                 except UnsupportedSourceError:
                     # Allow-listed hosts intentionally bypass private-network checks.
                     # Resolution failures from private ranges are swallowed so ingest
                     # can proceed for explicitly trusted destinations.
-                    pass
+                    return
+
+                blocked_networks = ingest_network.cached_blocked_networks(
+                    tuple(settings.ingest_url_blocked_ip_networks)
+                )
+
+                for resolved in addresses:
+                    for network in blocked_networks:
+                        if any(
+                            getattr(network, attr, False)
+                            for attr in ("is_private", "is_loopback", "is_link_local", "is_reserved")
+                        ):
+                            continue
+
+                        if resolved in network:
+                            raise UnsupportedSourceError(
+                                "URL target is not allowed for ingestion"
+                            )
+
                 return
         raise
     finally:
