@@ -23,6 +23,8 @@ export type {
 export { TheoApiError } from "./http";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
+export type ProviderSettingsRequest = components["schemas"]["ProviderSettingsRequest"];
+export type ProviderSettingsResponse = components["schemas"]["ProviderSettingsResponse"];
 
 export type PerspectiveCitation = {
   document_id?: string | null;

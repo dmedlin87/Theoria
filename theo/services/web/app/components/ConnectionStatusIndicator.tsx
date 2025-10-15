@@ -15,7 +15,7 @@ import styles from "./ConnectionStatusIndicator.module.css";
 type ToastType = "success" | "warning" | "error" | "info";
 
 interface BaseIndicatorProps {
-  className?: string;
+  className?: string | undefined;
   /** Render the status message inline next to the badge */
   showMessage?: boolean;
   /** Visual density for the badge */
