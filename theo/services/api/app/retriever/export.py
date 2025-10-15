@@ -259,6 +259,7 @@ def _mentions_to_export_response(
     limit = request.limit or request.k
     cursor_found = request.cursor is None
     after_cursor: list[SearchExportRow] = []
+    all_rows: list[SearchExportRow] = []
 
     for idx, mention in enumerate(mentions, start=1):
         passage = mention.passage
@@ -288,11 +289,16 @@ def _mentions_to_export_response(
             document=summary,
             snippet=mention.context_snippet,
         )
-        if not cursor_found and passage.id == request.cursor:
-            cursor_found = True
+        all_rows.append(row)
+        if not cursor_found:
+            if passage.id == request.cursor:
+                cursor_found = True
             continue
         if cursor_found:
             after_cursor.append(row)
+
+    if request.cursor and not cursor_found:
+        after_cursor = all_rows
 
     returned_rows = after_cursor[:limit]
     next_cursor = None
