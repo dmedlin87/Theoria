@@ -12,6 +12,7 @@ from theo.application.facades.settings import get_settings
 from theo.services.api.app.main import app
 from theo.services.api.app.models.search import HybridSearchResult
 from theo.services.api.app.ranking.features import FEATURE_NAMES, extract_features
+from theo.services.api.app.ranking.re_ranker import Reranker
 from theo.services.api.app.routes import search as search_route
 from theo.services.api.app.services import retrieval_service as retrieval_service_module
 
@@ -22,6 +23,22 @@ class _WeightedModel:
 
     def predict(self, features: list[list[float]]) -> list[float]:
         return [row[self._index] for row in features]
+
+
+class _ProbabilisticModel:
+    classes_ = ["relevant", "irrelevant"]
+
+    def predict_proba(self, features: list[list[float]]) -> list[list[float]]:
+        probabilities = [
+            [0.9, 0.1],
+            [0.2, 0.8],
+            [0.6, 0.4],
+        ]
+        return probabilities[: len(features)]
+
+    def predict(self, features: list[list[float]]) -> list[str]:
+        labels = ["relevant", "irrelevant", "relevant"]
+        return labels[: len(features)]
 
 
 def _build_result(
@@ -153,3 +170,9 @@ def test_extract_features_returns_dense_matrix() -> None:
         [0.1, 0.0, 0.7, 0.6, 1.0, 2.0, 3.0],
     ]
     assert FEATURE_NAMES[2] == "lexical_score"
+
+
+def test_reranker_predict_proba_uses_relevant_class() -> None:
+    reranker = Reranker(_ProbabilisticModel())
+    scores = reranker.score(_stub_results())
+    assert scores == pytest.approx([0.9, 0.2, 0.6])
