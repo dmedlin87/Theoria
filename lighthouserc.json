@@ -1,10 +1,21 @@
 {
   "ci": {
     "collect": {
+      "url": [
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3000/verse/John.3.16",
+        "http://127.0.0.1:3000/search"
+      ],
       "numberOfRuns": 1,
       "startServerCommand": "",
       "settings": {
-        "chromeFlags": "--headless=new --no-sandbox --disable-dev-shm-usage"
+        "preset": "desktop",
+        "chromeFlags": "--headless=new --no-sandbox --disable-dev-shm-usage",
+        "throttling": {
+          "rttMs": 40,
+          "throughputKbps": 10240,
+          "cpuSlowdownMultiplier": 1
+        }
       }
     },
     "assert": {
@@ -35,6 +46,57 @@
     "upload": {
       "target": "filesystem",
       "outputDir": ".lighthouseci"
-    }
+    },
+    "budgets": [
+      {
+        "path": "/*",
+        "resourceSizes": [
+          {
+            "resourceType": "script",
+            "budget": 300
+          },
+          {
+            "resourceType": "stylesheet",
+            "budget": 75
+          },
+          {
+            "resourceType": "image",
+            "budget": 200
+          },
+          {
+            "resourceType": "font",
+            "budget": 100
+          },
+          {
+            "resourceType": "total",
+            "budget": 800
+          }
+        ],
+        "resourceCounts": [
+          {
+            "resourceType": "script",
+            "budget": 15
+          },
+          {
+            "resourceType": "stylesheet",
+            "budget": 5
+          },
+          {
+            "resourceType": "third-party",
+            "budget": 10
+          }
+        ],
+        "timings": [
+          {
+            "metric": "interactive",
+            "budget": 3500
+          },
+          {
+            "metric": "first-contentful-paint",
+            "budget": 1500
+          }
+        ]
+      }
+    ]
   }
 }
