@@ -20,7 +20,7 @@
 .meta {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--muted-foreground, #6b7280);
+  color: var(--color-text-muted);
 }
 
 .title {
@@ -29,7 +29,7 @@
 
 .subtitle {
   margin: 0;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
 }
 
 .description {
@@ -55,7 +55,7 @@
 
 .sectionDescription {
   margin: 0;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
 }
 
 .entriesList {
@@ -65,14 +65,14 @@
 
 .emptyState {
   margin: 0;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
 }
 
 .entry {
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.75rem;
   padding: 1rem;
-  background: var(--background, #ffffff);
+  background: var(--color-surface);
   display: grid;
   gap: 0.75rem;
 }
@@ -89,13 +89,13 @@
 
 .entryMeta {
   margin: 0.25rem 0;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
 }
 
 .entryLink {
   font-size: 0.9rem;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
 }
 
 .entryBody {
@@ -112,7 +112,7 @@
 
 .entryFooterLabel {
   font-size: 0.85rem;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
 }
 
 .entryFooterLink {
@@ -133,19 +133,19 @@
 
 .mentionText {
   font-size: 0.9rem;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
 }
 
 .researchAlert {
-  background: var(--muted, #fef2f2);
-  color: var(--muted-foreground, #b91c1c);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
   margin: 0;
 }
 
 .featureGroup {
-  border-top: 1px solid var(--border, #e5e7eb);
+  border-top: 1px solid var(--color-border-subtle);
   padding-top: 1rem;
 }
 
@@ -155,7 +155,7 @@
 
 .researchFallback {
   margin: 0;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
 }
 
 .collaboratorList {
@@ -167,7 +167,7 @@
 }
 
 .collaboratorItem {
-  background: var(--muted, #f1f5f9);
+  background: var(--color-surface-muted);
   padding: 0.75rem;
   border-radius: 0.75rem;
   display: flex;
@@ -178,7 +178,7 @@
 
 .collaboratorMeta {
   margin: 0;
-  color: var(--muted-foreground, #4b5563);
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
 }
 

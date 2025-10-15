@@ -172,6 +172,17 @@
   --color-info: hsl(199 89% 48%);
   --color-info-soft: hsla(199 89% 48% / 0.12);
 
+  --color-success-bg: hsla(152 78% 42% / 0.1);
+  --color-warning-bg: hsla(38 92% 52% / 0.1);
+  --color-danger-bg: hsla(0 83% 58% / 0.1);
+  --color-info-bg: hsla(199 89% 48% / 0.1);
+
+  --color-overlay: hsla(var(--neutral-hue) var(--neutral-saturation) 8% / 0.5);
+  --color-overlay-light: hsla(var(--neutral-hue) var(--neutral-saturation) var(--surface-lightness) / 0.9);
+
+  --color-badge-orange: hsl(27 96% 61%);
+  --color-badge-teal: hsl(173 80% 40%);
+
   --shadow-xs: 0 1px 2px hsla(var(--shadow-color) / var(--shadow-key-opacity));
   --shadow-sm: 0 2px 8px hsla(var(--shadow-color) / var(--shadow-ambient-opacity)),
     0 1px 3px hsla(var(--shadow-color) / calc(var(--shadow-ambient-opacity) * 0.6));
@@ -254,6 +265,9 @@
     --background-surface-weight: 55%;
     --background-mid-weight: 62%;
     --background-accent-weight: 26%;
+
+    --color-overlay: hsla(var(--neutral-hue) var(--neutral-saturation) 8% / 0.6);
+    --color-overlay-light: hsla(var(--neutral-hue) var(--neutral-saturation) var(--surface-lightness) / 0.9);
   }
 }
 
@@ -294,4 +308,7 @@
   --background-surface-weight: 55%;
   --background-mid-weight: 62%;
   --background-accent-weight: 26%;
+
+  --color-overlay: hsla(var(--neutral-hue) var(--neutral-saturation) 8% / 0.6);
+  --color-overlay-light: hsla(var(--neutral-hue) var(--neutral-saturation) var(--surface-lightness) / 0.9);
 }

@@ -329,7 +329,7 @@
 }
 
 .highlightDifferent {
-  background: rgba(248, 113, 113, 0.2);
+  background: var(--color-danger-soft);
   border-radius: 0.35rem;
   padding: 0.125rem 0.35rem;
   display: inline-block;
