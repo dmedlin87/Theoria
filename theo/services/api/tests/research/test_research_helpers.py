@@ -92,3 +92,20 @@ def test_report_build_combines_sections() -> None:
     assert variant_count > 0
     assert citation_count >= 1
     assert fallacy_count >= 0
+
+
+def test_report_build_skeptical_uses_critical_template() -> None:
+    service = _research_service()
+    report = service.report_build("John.1.1", stance="skeptical")
+
+    assert (
+        report.summary
+        == "Critical briefing for John.1.1: surface tensions, disputed readings, and historiographical cautions."
+    )
+
+    section_titles = {section.title for section in report.sections}
+    assert {
+        "Disputed Readings",
+        "Critical References",
+        "Contested Claims",
+    }.issubset(section_titles)
