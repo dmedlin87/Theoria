@@ -28,6 +28,26 @@ def test_scripture_endpoint_returns_range() -> None:
         ]
 
 
+def test_scripture_endpoint_unknown_translation_returns_404() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/scripture",
+            params={"osis": "John.1.1", "translation": "FAKE"},
+        )
+        assert response.status_code == 404
+        assert response.json()["detail"].startswith("Unknown translation")
+
+
+def test_scripture_endpoint_malformed_osis_returns_422() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/research/scripture",
+            params={"osis": "John1"},
+        )
+        assert response.status_code == 422
+        assert response.json()["detail"].startswith("OSIS references must include")
+
+
 def test_crossrefs_endpoint_returns_ranked_results() -> None:
     with TestClient(app) as client:
         response = client.get(

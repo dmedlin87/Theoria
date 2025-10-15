@@ -84,7 +84,14 @@ def get_scripture(
     ),
     service: ResearchService = Depends(_research_service),
 ) -> ScriptureResponse:
-    verses = service.fetch_passage(osis, translation)
+    try:
+        verses = service.fetch_passage(osis, translation)
+    except KeyError as exc:  # unknown translation or missing passage
+        detail = exc.args[0] if exc.args else str(exc)
+        raise HTTPException(status_code=404, detail=detail) from exc
+    except ValueError as exc:  # malformed osis input
+        detail = exc.args[0] if exc.args else str(exc)
+        raise HTTPException(status_code=422, detail=detail) from exc
     translation_code = verses[0].translation if verses else (translation or "SBLGNT")
     return ScriptureResponse(
         osis=osis,
