@@ -167,7 +167,9 @@ async function decryptData(encrypted: string): Promise<object | null> {
     return JSON.parse(decoder.decode(decrypted));
   } catch (err) {
     console.error("Failed to decrypt API credentials:", err);
+    return null;
   }
+  return null;
 }
 
 function normalizeValue(value: string | null | undefined): string | null {
@@ -221,10 +223,13 @@ export async function readCredentialsFromStorage(): Promise<ApiCredentials | nul
 }
 
 // Returns a promise; must be awaited if caller cares about completion!
+let latestWriteGeneration = 0;
+
 export async function writeCredentialsToStorage(credentials: ApiCredentials): Promise<void> {
   if (typeof window === "undefined") {
     return;
   }
+  const generation = ++latestWriteGeneration;
   const normalized = normalizeCredentials(credentials);
   if (!normalized.authorization && !normalized.apiKey) {
     window.localStorage.removeItem(STORAGE_KEY);
@@ -232,7 +237,9 @@ export async function writeCredentialsToStorage(credentials: ApiCredentials): Pr
   }
   try {
     const encrypted = await encryptData(normalized);
-    window.localStorage.setItem(STORAGE_KEY, encrypted);
+    if (generation === latestWriteGeneration) {
+      window.localStorage.setItem(STORAGE_KEY, encrypted);
+    }
   } catch {
     // Ignore storage errors (private browsing, quota issues, etc.)
   }
@@ -242,6 +249,7 @@ export function clearCredentialsStorage(): void {
   if (typeof window === "undefined") {
     return;
   }
+  latestWriteGeneration++;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
   } catch {
