@@ -122,7 +122,6 @@ def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
 
 def test_run_pipeline_for_file_records_span_metrics(tmp_path, monkeypatch) -> None:
     """File ingestion records span metrics alongside persistence."""
-
     _prepare_database(tmp_path)
     engine = get_engine()
 
