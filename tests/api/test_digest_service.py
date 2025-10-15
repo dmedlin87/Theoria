@@ -88,3 +88,77 @@ def test_ensure_latest_regenerates_when_expired(monkeypatch):
 
     assert result is refreshed
     assert calls == ["generate", "upsert", "store"]
+
+
+def test_ensure_latest_generates_when_cache_missing(monkeypatch):
+    ttl = timedelta(minutes=45)
+    service = DigestService(session=object(), ttl=ttl)
+    regenerated = _build_digest(generated_at=datetime.now(UTC))
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        digest_service_module, "load_topic_digest", lambda session: None
+    )
+
+    from theo.services.api.app.routes import ai as ai_module
+
+    def _generate(session):
+        calls.append("generate")
+        return regenerated
+
+    def _upsert(session, digest):
+        calls.append("upsert")
+        assert digest is regenerated
+
+    def _store(session, digest):
+        calls.append("store")
+        assert digest is regenerated
+
+    monkeypatch.setattr(ai_module, "generate_topic_digest", _generate)
+    monkeypatch.setattr(ai_module, "upsert_digest_document", _upsert)
+    monkeypatch.setattr(ai_module, "store_topic_digest", _store)
+
+    result = service.ensure_latest()
+
+    assert result is regenerated
+    assert calls == ["generate", "upsert", "store"]
+
+
+def test_refresh_generates_with_requested_lookback(monkeypatch):
+    fixed_now = datetime(2024, 5, 1, 12, 0, tzinfo=UTC)
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            assert tz is UTC
+            return fixed_now
+
+    monkeypatch.setattr(digest_service_module, "datetime", _FrozenDatetime)
+
+    ttl = timedelta(hours=6)
+    service = DigestService(session=object(), ttl=ttl)
+    regenerated = _build_digest(generated_at=fixed_now)
+    captured: dict[str, object] = {}
+
+    from theo.services.api.app.routes import ai as ai_module
+
+    def _generate(session, since):
+        captured["since"] = since
+        return regenerated
+
+    def _upsert(session, digest):
+        captured["upsert"] = digest
+
+    def _store(session, digest):
+        captured["store"] = digest
+
+    monkeypatch.setattr(ai_module, "generate_topic_digest", _generate)
+    monkeypatch.setattr(ai_module, "upsert_digest_document", _upsert)
+    monkeypatch.setattr(ai_module, "store_topic_digest", _store)
+
+    result = service.refresh(hours=12)
+
+    assert result is regenerated
+    assert captured["since"] == fixed_now - timedelta(hours=12)
+    assert captured["upsert"] is regenerated
+    assert captured["store"] is regenerated
