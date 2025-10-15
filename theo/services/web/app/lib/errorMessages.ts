@@ -1,4 +1,4 @@
-import { NetworkError, TheoApiError } from "./http";
+import { NetworkError, TheoApiError } from "./api-client";
 
 export type ErrorFeature = "chat" | "search" | "upload";
 
