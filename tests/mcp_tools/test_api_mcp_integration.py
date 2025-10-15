@@ -112,7 +112,7 @@ class TestHandleNoteWrite:
         assert fake_service.created, "create_note should be invoked"
         draft, commit_flag = fake_service.created[-1]
         assert commit_flag is True
-        assert draft.tags == ("grace", "love")
+        assert list(draft.tags) == ["grace", "love"]
         assert len(draft.evidences) == 1
         evidence = draft.evidences[0]
         assert evidence.osis_refs == ("John.3.16",)
