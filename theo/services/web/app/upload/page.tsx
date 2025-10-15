@@ -47,7 +47,7 @@ export default function UploadPage(): JSX.Element {
   const [jobError, setJobError] = useState<ErrorDetails | null>(null);
   const fetchJobsRef = useRef<(() => Promise<void>) | undefined>(undefined);
   const hasJobs = jobs.length > 0;
-  const ingestionDocsUrl = "https://docs.theoria.app/ingestion";
+  const ingestionDocsUrl = process.env.NEXT_PUBLIC_INGESTION_DOCS_URL ?? "https://docs.theoria.app/ingestion";
 
   const baseUrl = useMemo(() => getApiBaseUrl().replace(/\/$/, ""), []);
   const { addToast } = useToast();
