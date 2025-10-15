@@ -6,7 +6,7 @@ import type {
   GuardrailState,
   Reaction,
 } from "../useChatWorkspaceState";
-import type { HybridSearchFilters } from "../lib/api-client";
+import type { HybridSearchFilters } from "../../lib/api-client";
 
 export type ChatSessionState = {
   conversation: ConversationEntry[];
