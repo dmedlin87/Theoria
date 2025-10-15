@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import logging
 import random
-import re
 import time
 from typing import Any, Protocol
 import uuid
@@ -727,18 +726,38 @@ class EchoClient:
                 continue
             if not stripped or not stripped.startswith("["):
                 break
-            match = re.match(
-                r"^\[(?P<index>\d+)]\s+(?P<snippet>.+?)\s*\(OSIS\s+(?P<osis>[^,]+),\s*(?P<anchor>[^)]+)\)\s*$",
-                stripped,
-            )
-            if not match:
+            if not stripped.endswith(")"):
                 continue
+
+            index_close = stripped.find("]")
+            if index_close <= 1:
+                continue
+            index_value = stripped[1:index_close].strip()
+            remainder = stripped[index_close + 1 :].strip()
+            if not index_value or not remainder:
+                continue
+
+            if remainder.count(" (OSIS ") != 1:
+                continue
+            snippet_part, metadata = remainder.rsplit(" (OSIS ", 1)
+            snippet_value = snippet_part.strip()
+            if not snippet_value or not metadata:
+                continue
+
+            if "," not in metadata:
+                continue
+            osis_part, anchor_part = metadata.split(",", 1)
+            anchor_part = anchor_part.rstrip(")").strip()
+            osis_value = osis_part.strip()
+            if not osis_value or not anchor_part:
+                continue
+
             passages.append(
                 {
-                    "index": match.group("index"),
-                    "snippet": match.group("snippet").strip(),
-                    "osis": match.group("osis").strip(),
-                    "anchor": match.group("anchor").strip(),
+                    "index": index_value,
+                    "snippet": snippet_value,
+                    "osis": osis_value,
+                    "anchor": anchor_part,
                 }
             )
 
