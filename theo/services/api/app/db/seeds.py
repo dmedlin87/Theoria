@@ -300,7 +300,7 @@ def _ensure_perspective_column(
                 return False
 
             update_statement = (
-                f'UPDATE "{escaped_table}" '
+                f'UPDATE "{escaped_table}" '  # noqa: S608
                 "SET perspective = COALESCE(perspective, 'skeptical') "
                 "WHERE perspective IS NULL"
             )

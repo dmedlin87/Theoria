@@ -127,7 +127,7 @@ class InsightDetector:
         # If 3+ different books, flag as cross-reference insight
         if len(books) >= 3:
             book_list = ", ".join(sorted(books))
-            book_hash = hashlib.sha1(book_list.encode("utf-8")).hexdigest()[:10]
+            book_hash = hashlib.blake2b(book_list.encode("utf-8"), digest_size=5).hexdigest()
             insights.append(
                 Insight(
                     id=f"cross-ref-{book_hash}",
