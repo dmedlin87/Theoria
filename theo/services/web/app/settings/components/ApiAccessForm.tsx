@@ -125,7 +125,7 @@ export default function ApiAccessForm(): JSX.Element {
             spellCheck={false}
           />
           <p className={styles.helperText}>
-            Provide the complete Authorization header value, including the <code>Bearer</code> prefix.
+            Provide the complete Authorization header value, including the <kbd>Bearer</kbd> prefix.
           </p>
         </div>
 
