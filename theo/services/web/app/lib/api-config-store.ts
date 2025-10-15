@@ -95,18 +95,26 @@ function pickEnvValue(names: string[]): string | null {
   return null;
 }
 
+const PUBLIC_AUTHORIZATION_ENV_VARS = ["NEXT_PUBLIC_API_AUTHORIZATION"];
+const SERVER_AUTHORIZATION_ENV_VARS = [
+  "API_AUTHORIZATION",
+  "THEO_API_AUTHORIZATION",
+];
+const PUBLIC_API_KEY_ENV_VARS = ["NEXT_PUBLIC_API_KEY"];
+const SERVER_API_KEY_ENV_VARS = ["API_KEY", "THEO_SEARCH_API_KEY"];
+
 export function getEnvCredentials(): ApiCredentials {
+  const isBrowser = typeof window !== "undefined";
+  const authorizationNames = isBrowser
+    ? PUBLIC_AUTHORIZATION_ENV_VARS
+    : [...PUBLIC_AUTHORIZATION_ENV_VARS, ...SERVER_AUTHORIZATION_ENV_VARS];
+  const apiKeyNames = isBrowser
+    ? PUBLIC_API_KEY_ENV_VARS
+    : [...PUBLIC_API_KEY_ENV_VARS, ...SERVER_API_KEY_ENV_VARS];
+
   return {
-    authorization: pickEnvValue([
-      "NEXT_PUBLIC_API_AUTHORIZATION",
-      "API_AUTHORIZATION",
-      "THEO_API_AUTHORIZATION",
-    ]),
-    apiKey: pickEnvValue([
-      "NEXT_PUBLIC_API_KEY",
-      "API_KEY",
-      "THEO_SEARCH_API_KEY",
-    ]),
+    authorization: pickEnvValue(authorizationNames),
+    apiKey: pickEnvValue(apiKeyNames),
   };
 }
 
