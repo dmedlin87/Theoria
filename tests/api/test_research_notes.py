@@ -84,9 +84,9 @@ def _draft_from_payload(payload: Mapping[str, object]) -> ResearchNoteDraft:
     return ResearchNoteDraft(
         osis=str(payload.get("osis")),
         body=str(payload.get("body")),
-        title=payload.get("title") if isinstance(payload.get("title"), str) else payload.get("title"),
-        stance=payload.get("stance") if isinstance(payload.get("stance"), str) else payload.get("stance"),
-        claim_type=payload.get("claim_type") if isinstance(payload.get("claim_type"), str) else payload.get("claim_type"),
+        title=payload.get("title"),
+        stance=payload.get("stance"),
+        claim_type=payload.get("claim_type"),
         confidence=confidence_value,
         tags=tags_tuple,
         evidences=evidence_drafts,
