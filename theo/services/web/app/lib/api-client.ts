@@ -98,6 +98,13 @@ type TheoApiClientShape = {
   deleteWatchlist(watchlistId: string): Promise<void>;
   runWatchlist(watchlistId: string, type: "preview" | "run"): Promise<WatchlistRunResponse>;
   fetchWatchlistEvents(watchlistId: string, since?: string): Promise<WatchlistRunResponse[]>;
+  listProviderSettings(): Promise<ProviderSettingsResponse[]>;
+  getProviderSettings(provider: string): Promise<ProviderSettingsResponse>;
+  upsertProviderSettings(
+    provider: string,
+    payload: ProviderSettingsRequest,
+  ): Promise<ProviderSettingsResponse>;
+  deleteProviderSettings(provider: string): Promise<void>;
 };
 
 export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
@@ -243,6 +250,25 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
       return request<WatchlistRunResponse[]>(
         `/ai/digest/watchlists/${watchlistId}/events${query}`,
       );
+    },
+    listProviderSettings() {
+      return request<ProviderSettingsResponse[]>("/settings/ai/providers");
+    },
+    getProviderSettings(provider) {
+      return request<ProviderSettingsResponse>(`/settings/ai/providers/${provider}`);
+    },
+    upsertProviderSettings(provider, payload) {
+      return request<ProviderSettingsResponse>(`/settings/ai/providers/${provider}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    deleteProviderSettings(provider) {
+      return request(`/settings/ai/providers/${provider}`, {
+        method: "DELETE",
+        parseJson: false,
+      });
     },
   } satisfies TheoApiClientShape;
 }

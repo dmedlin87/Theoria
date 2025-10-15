@@ -9,6 +9,7 @@ import "./globals.css";
 import Link from "next/link";
 import { AppShell, type AppShellNavSection } from "./components/AppShell";
 import { ToastProvider } from "./components/Toast";
+import { ApiConfigProvider } from "./lib/api-config";
 
 export const metadata = {
   title: "Theoria",
@@ -38,6 +39,7 @@ const NAV_LINKS: NavItem[] = [
   { href: "/verse/John.1.1", label: "Verse explorer" },
   { href: "/copilot", label: "Copilot" },
   { href: "/upload", label: "Upload" },
+  { href: "/settings", label: "Settings" },
 ];
 
 const adminLinks: NavItem[] =
@@ -67,6 +69,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       label: "Corpora",
       items: [{ href: "/upload", label: "Uploads", match: "/upload" }],
     },
+    {
+      label: "Configuration",
+      items: [{ href: "/settings", label: "Settings", match: "/settings" }],
+    },
   ];
 
   if (adminLinks.length > 0) {
@@ -88,24 +94,25 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <a className="skip-link" href="#main-content">
           Skip to main content
         </a>
-        <ModeProvider initialMode={initialMode}>
-          <ToastProvider>
-            {enableUiV2 ? (
-              <AppShell
-                navSections={navSections}
-                modeSwitcher={<ModeSwitcher />}
-                footerMeta={footerMeta}
-              >
-                {children}
-              </AppShell>
-            ) : (
-              <>
-                <header className="site-header">
-                  <div className="container site-header__content">
-                    <Link href="/" className="brand">
-                      Theoria
-                    </Link>
-                    <nav className="site-nav" aria-label="Primary">
+        <ApiConfigProvider>
+          <ModeProvider initialMode={initialMode}>
+            <ToastProvider>
+              {enableUiV2 ? (
+                <AppShell
+                  navSections={navSections}
+                  modeSwitcher={<ModeSwitcher />}
+                  footerMeta={footerMeta}
+                >
+                  {children}
+                </AppShell>
+              ) : (
+                <>
+                  <header className="site-header">
+                    <div className="container site-header__content">
+                      <Link href="/" className="brand">
+                        Theoria
+                      </Link>
+                      <nav className="site-nav" aria-label="Primary">
                       {[...NAV_LINKS, ...adminLinks].map((item) => (
                         <Link
                           key={item.href}
@@ -121,23 +128,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     </nav>
                   </div>
                 </header>
-                <section className="mode-banner" aria-label="Research mode selection">
-                  <div className="container">
-                    <ModeSwitcher />
-                  </div>
-                </section>
-                <main className="site-main" id="main-content">
-                  <div className="container">{children}</div>
-                </main>
-                <footer className="site-footer">
-                  <div className="container">
-                    <p>Built to help researchers explore theological corpora faster.</p>
-                  </div>
-                </footer>
-              </>
-            )}
-          </ToastProvider>
-        </ModeProvider>
+                  <section className="mode-banner" aria-label="Research mode selection">
+                    <div className="container">
+                      <ModeSwitcher />
+                    </div>
+                  </section>
+                  <main className="site-main" id="main-content">
+                    <div className="container">{children}</div>
+                  </main>
+                  <footer className="site-footer">
+                    <div className="container">
+                      <p>Built to help researchers explore theological corpora faster.</p>
+                    </div>
+                  </footer>
+                </>
+              )}
+            </ToastProvider>
+          </ModeProvider>
+        </ApiConfigProvider>
       </body>
     </html>
   );
