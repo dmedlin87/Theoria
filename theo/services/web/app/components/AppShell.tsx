@@ -21,7 +21,6 @@ function classNames(
 }
 
 import CommandPalette from "./CommandPalette";
-import OfflineIndicator from "./OfflineIndicator";
 import { ThemeToggle } from "./ThemeToggle";
 
 export type AppShellNavItem = {
