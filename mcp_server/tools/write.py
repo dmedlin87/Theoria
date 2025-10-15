@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import Annotated, Any, Dict, Iterator, Mapping, cast
+from typing import Annotated, Any, Dict, Iterator, Mapping, Sequence, cast
 from uuid import uuid4
 
 from fastapi import Header, HTTPException
 from fastapi.params import Header as HeaderInfo
 from opentelemetry import trace
+from sqlalchemy.orm import Session
 
 from .. import schemas
 from ..security import WriteSecurityError, get_write_security_policy
@@ -23,9 +24,10 @@ from ..validators import (
 )
 from .read import _session_scope
 from theo.services.api.app.models.jobs import HNSWRefreshJobRequest
-from theo.services.api.app.research.notes import (
-    create_research_note,
-    generate_research_note_preview,
+from theo.application.facades.research import (
+    ResearchNoteDraft,
+    ResearchNoteEvidenceDraft,
+    get_research_service,
 )
 from theo.services.api.app.research.evidence_cards import (
     create_evidence_card,
@@ -116,6 +118,107 @@ def _evidence_preview_payload(payload: Mapping[str, Any]) -> Dict[str, Any]:
     return preview
 
 
+def _to_evidence_drafts(
+    evidences: Sequence[Mapping[str, Any]] | None,
+) -> tuple[ResearchNoteEvidenceDraft, ...]:
+    if not evidences:
+        return ()
+
+    drafts: list[ResearchNoteEvidenceDraft] = []
+    for evidence in evidences:
+        drafts.append(
+            ResearchNoteEvidenceDraft(
+                source_type=evidence.get("source_type"),
+                source_ref=evidence.get("source_ref"),
+                osis_refs=tuple(evidence.get("osis_refs") or []) or None,
+                citation=evidence.get("citation"),
+                snippet=evidence.get("snippet"),
+                meta=evidence.get("meta"),
+            )
+        )
+    return tuple(drafts)
+
+
+def _note_draft_from_inputs(
+    *,
+    osis: str,
+    body: str,
+    title: str | None = None,
+    stance: str | None = None,
+    claim_type: str | None = None,
+    confidence: float | None = None,
+    tags: Sequence[str] | None = None,
+    evidences: Sequence[Mapping[str, Any]] | None = None,
+    request_id: str | None = None,
+    end_user_id: str | None = None,
+    tenant_id: str | None = None,
+) -> ResearchNoteDraft:
+    return ResearchNoteDraft(
+        osis=osis,
+        body=body,
+        title=title,
+        stance=stance,
+        claim_type=claim_type,
+        confidence=confidence,
+        tags=tuple(tags or []) or None,
+        evidences=_to_evidence_drafts(evidences),
+        request_id=request_id,
+        end_user_id=end_user_id,
+        tenant_id=tenant_id,
+    )
+
+
+def create_research_note(
+    session: Session,
+    *,
+    commit: bool = True,
+    draft: ResearchNoteDraft | None = None,
+    **kwargs: Any,
+):
+    """Compatibility helper retained for tests that monkeypatch note creation."""
+
+    service = get_research_service(session)
+    note_draft = draft or _note_draft_from_inputs(
+        osis=str(kwargs.get("osis", "")),
+        body=str(kwargs.get("body", "")),
+        title=kwargs.get("title"),
+        stance=kwargs.get("stance"),
+        claim_type=kwargs.get("claim_type"),
+        confidence=kwargs.get("confidence"),
+        tags=kwargs.get("tags"),
+        evidences=kwargs.get("evidences"),
+        request_id=kwargs.get("request_id"),
+        end_user_id=kwargs.get("end_user_id"),
+        tenant_id=kwargs.get("tenant_id"),
+    )
+    return service.create_note(note_draft, commit=commit)
+
+
+def generate_research_note_preview(
+    session: Session,
+    *,
+    draft: ResearchNoteDraft | None = None,
+    **kwargs: Any,
+):
+    """Compatibility helper retained for tests that monkeypatch previews."""
+
+    service = get_research_service(session)
+    note_draft = draft or _note_draft_from_inputs(
+        osis=str(kwargs.get("osis", "")),
+        body=str(kwargs.get("body", "")),
+        title=kwargs.get("title"),
+        stance=kwargs.get("stance"),
+        claim_type=kwargs.get("claim_type"),
+        confidence=kwargs.get("confidence"),
+        tags=kwargs.get("tags"),
+        evidences=kwargs.get("evidences"),
+        request_id=kwargs.get("request_id"),
+        end_user_id=kwargs.get("end_user_id"),
+        tenant_id=kwargs.get("tenant_id"),
+    )
+    return service.preview_note(note_draft)
+
+
 async def note_write(
     request: schemas.NoteWriteRequest,
     end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
@@ -153,17 +256,32 @@ async def note_write(
         span,
     ):
         with _session_scope() as session:
+            draft = _note_draft_from_inputs(
+                osis=request.osis,
+                body=request.body,
+                title=request.title,
+                stance=request.stance,
+                claim_type=request.claim_type,
+                confidence=getattr(request, "confidence", None),
+                tags=request.tags,
+                evidences=request.evidences,
+                request_id=request.request_id,
+                end_user_id=validated_user_id,
+                tenant_id=validated_tenant_id,
+            )
             if request.commit:
                 note = create_research_note(
                     session,
+                    commit=True,
+                    draft=draft,
                     osis=request.osis,
                     body=request.body,
                     title=request.title,
                     stance=request.stance,
                     claim_type=request.claim_type,
+                    confidence=getattr(request, "confidence", None),
                     tags=request.tags,
                     evidences=request.evidences,
-                    commit=True,
                     request_id=request.request_id,
                     end_user_id=validated_user_id,
                     tenant_id=validated_tenant_id,
@@ -179,13 +297,18 @@ async def note_write(
             else:
                 preview = generate_research_note_preview(
                     session,
+                    draft=draft,
                     osis=request.osis,
                     body=request.body,
                     title=request.title,
                     stance=request.stance,
                     claim_type=request.claim_type,
+                    confidence=getattr(request, "confidence", None),
                     tags=request.tags,
                     evidences=request.evidences,
+                    request_id=request.request_id,
+                    end_user_id=validated_user_id,
+                    tenant_id=validated_tenant_id,
                 )
                 response = schemas.NoteWriteResponse(
                     request_id=request.request_id,

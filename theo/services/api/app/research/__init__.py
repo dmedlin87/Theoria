@@ -1,45 +1,15 @@
-"""Research data access helpers for scripture, cross-references, and notes."""
+"""Research helper exports maintained for legacy imports."""
 
 from .commentaries import search_commentaries
 from .contradictions import search_contradictions
-from .crossrefs import fetch_cross_references
-from .fallacies import fallacy_detect
-from .geo import lookup_geo_places, places_for_osis
-from .morphology import fetch_morphology
-from .notes import (
-    create_research_note,
-    delete_research_note,
-    generate_research_note_preview,
-    get_notes_for_osis,
-    update_research_note,
-)
 from .evidence_cards import create_evidence_card, preview_evidence_card
-from .overview import build_reliability_overview
-from .reports import report_build
-from .scripture import fetch_passage
-from .variants import variants_apparatus
-from .historicity import historicity_search
-from .dss_links import fetch_dss_links
+from .geo import lookup_geo_places, places_for_osis
 
 __all__ = [
-    "fetch_passage",
-    "fetch_cross_references",
-    "fetch_morphology",
-    "create_research_note",
-    "generate_research_note_preview",
-    "get_notes_for_osis",
-    "update_research_note",
-    "delete_research_note",
-    "create_evidence_card",
-    "preview_evidence_card",
     "search_contradictions",
     "search_commentaries",
+    "create_evidence_card",
+    "preview_evidence_card",
     "lookup_geo_places",
     "places_for_osis",
-    "variants_apparatus",
-    "historicity_search",
-    "fallacy_detect",
-    "report_build",
-    "build_reliability_overview",
-    "fetch_dss_links",
 ]

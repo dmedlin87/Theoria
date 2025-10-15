@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from pydantic import ValidationError
@@ -15,7 +15,11 @@ from ..models.research import (
     ResearchNote as ResearchNoteSchema,
     ResearchNoteCreate,
 )
-from ..research.notes import create_research_note, generate_research_note_preview
+from theo.application.facades.research import (
+    ResearchNoteDraft,
+    ResearchNoteEvidenceDraft,
+    get_research_service,
+)
 
 
 class MCPToolError(ValueError):
@@ -53,12 +57,26 @@ def _resolve_document_osis(session: Session, document_id: str) -> str | None:
     return primary or fallback
 
 
-def _serialize_evidences(
+def _to_evidence_drafts(
     evidences: Sequence[NoteEvidenceCreate] | None,
-) -> Iterable[dict[str, Any]] | None:
+) -> tuple[ResearchNoteEvidenceDraft, ...]:
     if evidences is None:
-        return None
-    return [evidence.model_dump() for evidence in evidences]
+        return ()
+
+    drafts: list[ResearchNoteEvidenceDraft] = []
+    for evidence in evidences:
+        payload = evidence.model_dump()
+        drafts.append(
+            ResearchNoteEvidenceDraft(
+                source_type=payload.get("source_type"),
+                source_ref=payload.get("source_ref"),
+                osis_refs=tuple(payload.get("osis_refs") or []) or None,
+                citation=payload.get("citation"),
+                snippet=payload.get("snippet"),
+                meta=payload.get("meta"),
+            )
+        )
+    return tuple(drafts)
 
 
 def handle_note_write(
@@ -85,32 +103,22 @@ def handle_note_write(
     commit_flag = payload.get("commit")
     commit = True if commit_flag is None else bool(commit_flag)
 
-    if commit:
-        note = create_research_note(
-            session,
-            osis=osis,
-            body=note_payload.body,
-            title=note_payload.title,
-            stance=note_payload.stance,
-            claim_type=note_payload.claim_type,
-            confidence=note_payload.confidence,
-            tags=note_payload.tags,
-            evidences=_serialize_evidences(note_payload.evidences),
-            commit=True,
-        )
-        return ResearchNoteSchema.model_validate(note)
-
-    preview = generate_research_note_preview(
-        session,
+    service = get_research_service(session)
+    draft = ResearchNoteDraft(
         osis=osis,
         body=note_payload.body,
         title=note_payload.title,
         stance=note_payload.stance,
         claim_type=note_payload.claim_type,
-        confidence=note_payload.confidence,
-        tags=note_payload.tags,
-        evidences=_serialize_evidences(note_payload.evidences),
+        tags=tuple(note_payload.tags or []) or None,
+        evidences=_to_evidence_drafts(note_payload.evidences),
     )
+
+    if commit:
+        note = service.create_note(draft, commit=True)
+        return ResearchNoteSchema.model_validate(note)
+
+    preview = service.preview_note(draft)
     return preview
 
 

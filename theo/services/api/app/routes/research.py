@@ -12,6 +12,7 @@ from theo.application.facades.research import (
     ResearchService,
     get_research_service,
 )
+from theo.domain.research import ResearchNoteNotFoundError
 from theo.application.facades.settings import get_settings
 from ..models.research import (
     CommentarySearchResponse,
@@ -281,11 +282,14 @@ def patch_note(
         raw_evidences = payload.evidences
         evidence_drafts = _to_evidence_drafts(raw_evidences)
         update_data.pop("evidences", None)
-    note = service.update_note(
-        note_id,
-        update_data,
-        evidences=evidence_drafts,
-    )
+    try:
+        note = service.update_note(
+            note_id,
+            update_data,
+            evidences=evidence_drafts,
+        )
+    except ResearchNoteNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Research note not found") from exc
     return ResearchNoteResponse(note=ResearchNote.model_validate(note))
 
 
@@ -294,7 +298,10 @@ def delete_note(
     note_id: str,
     service: ResearchService = Depends(_research_service),
 ) -> Response:
-    service.delete_note(note_id)
+    try:
+        service.delete_note(note_id)
+    except ResearchNoteNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Research note not found") from exc
     return Response(status_code=204)
 
 
