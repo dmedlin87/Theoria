@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, useTransition } from "react";
 import styles from "./PageTransition.module.css";
 
 interface PageTransitionProps {
@@ -11,25 +11,45 @@ interface PageTransitionProps {
 export function PageTransition({ children }: PageTransitionProps) {
   const pathname = usePathname();
   const [displayPath, setDisplayPath] = useState(pathname);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previousPathnameRef = useRef(pathname);
 
+  // Clean up timeout on unmount
   useEffect(() => {
-    if (pathname !== displayPath) {
-      setIsTransitioning(true);
-      
-      // Brief delay to show exit animation
-      const exitTimer = setTimeout(() => {
-        setDisplayPath(pathname);
-        setIsTransitioning(false);
-      }, 150);
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
-      return () => clearTimeout(exitTimer);
+  // Handle pathname changes with React's transition API
+  // Use ref to avoid unnecessary effect runs
+  useEffect(() => {
+    // Skip if pathname hasn't actually changed
+    if (pathname === previousPathnameRef.current) {
+      return;
     }
-  }, [pathname, displayPath]);
+
+    previousPathnameRef.current = pathname;
+
+    // Clear any pending timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Use transition for the update after a brief delay
+    timeoutRef.current = setTimeout(() => {
+      startTransition(() => {
+        setDisplayPath(pathname);
+      });
+    }, 150);
+  }, [pathname, startTransition]);
 
   return (
     <div
-      className={isTransitioning ? `${styles.transition} ${styles.exiting}` : styles.transition}
+      className={isPending ? `${styles.transition} ${styles.exiting}` : styles.transition}
       data-path={displayPath}
     >
       {children}
