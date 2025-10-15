@@ -71,7 +71,7 @@ def _stub_address_resolution(monkeypatch: pytest.MonkeyPatch, address: str = "20
     monkeypatch.setattr(
         network_module,
         "ensure_resolved_addresses_allowed",
-        lambda _settings, _addresses: None,
+        lambda _settings, _addresses, **_kwargs: None,
     )
 
 
@@ -117,6 +117,26 @@ def test_pipeline_allowlist_bypasses_private_network(monkeypatch: pytest.MonkeyP
     # The pipeline fallback should treat allow-listed hosts as trusted even when
     # they resolve to private addresses.
     pipeline_module.ensure_url_allowed(settings, "https://allowed.example/doc")
+
+
+def test_pipeline_allowlist_respects_blocked_networks(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings()
+    settings.ingest_url_block_private_networks = True
+    settings.ingest_url_allowed_hosts = ["allowed.example"]
+    settings.ingest_url_blocked_ip_networks = ["93.184.216.0/24"]
+
+    def failing_url_check(_settings, _url):
+        raise pipeline_module.UnsupportedSourceError("private network disallowed")
+
+    monkeypatch.setattr(network_module, "ensure_url_allowed", failing_url_check)
+    monkeypatch.setattr(
+        pipeline_module,
+        "_resolve_host_addresses",
+        lambda _host: (ip_address("93.184.216.34"),),
+    )
+
+    with pytest.raises(pipeline_module.UnsupportedSourceError):
+        pipeline_module.ensure_url_allowed(settings, "https://allowed.example/doc")
 
 
 def test_ingest_file_streams_large_upload_without_buffering(

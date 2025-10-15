@@ -129,12 +129,18 @@ def ensure_url_allowed(settings, url: str) -> None:
             allowed_hosts = {item.lower() for item in settings.ingest_url_allowed_hosts}
             if normalised_host in allowed_hosts:
                 try:
-                    _resolve_host_addresses(normalised_host)
+                    addresses = _resolve_host_addresses(normalised_host)
                 except UnsupportedSourceError:
                     # Allow-listed hosts intentionally bypass private-network checks.
                     # Resolution failures from private ranges are swallowed so ingest
                     # can proceed for explicitly trusted destinations.
                     pass
+                else:
+                    ingest_network.ensure_resolved_addresses_allowed(
+                        settings,
+                        addresses,
+                        skip_private_network_checks=True,
+                    )
                 return
         raise
     finally:

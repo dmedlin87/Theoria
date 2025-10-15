@@ -84,7 +84,12 @@ def resolve_host_addresses(host: str) -> tuple[IPAddress, ...]:
     return unique
 
 
-def ensure_resolved_addresses_allowed(settings, addresses: tuple[IPAddress, ...]) -> None:
+def ensure_resolved_addresses_allowed(
+    settings,
+    addresses: tuple[IPAddress, ...],
+    *,
+    skip_private_network_checks: bool = False,
+) -> None:
     if not addresses:
         raise UnsupportedSourceError("URL target is not allowed for ingestion")
 
@@ -93,16 +98,27 @@ def ensure_resolved_addresses_allowed(settings, addresses: tuple[IPAddress, ...]
     )
 
     for resolved in addresses:
-        if settings.ingest_url_block_private_networks and (
-            resolved.is_loopback
-            or resolved.is_private
-            or resolved.is_reserved
-            or resolved.is_link_local
+        if (
+            not skip_private_network_checks
+            and settings.ingest_url_block_private_networks
+            and (
+                resolved.is_loopback
+                or resolved.is_private
+                or resolved.is_reserved
+                or resolved.is_link_local
+            )
         ):
             raise UnsupportedSourceError("URL target is not allowed for ingestion")
 
         for network in blocked_networks:
             if resolved in network:
+                if skip_private_network_checks and (
+                    resolved.is_loopback
+                    or resolved.is_private
+                    or resolved.is_reserved
+                    or resolved.is_link_local
+                ):
+                    continue
                 raise UnsupportedSourceError("URL target is not allowed for ingestion")
 
 
