@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from ipaddress import ip_address
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,7 @@ from theo.services.api.app.db.models import (  # noqa: E402
     Document,
     Passage,
 )
+from theo.services.api.app.ingest import network as ingest_network  # noqa: E402
 from theo.services.api.app.ingest import pipeline  # noqa: E402
 from theo.services.api.app.ingest.exceptions import UnsupportedSourceError  # noqa: E402
 from theo.services.api.app.ingest.parsers import TranscriptSegment  # noqa: E402
@@ -901,3 +903,70 @@ def test_run_pipeline_for_url_rejects_oversized_responses(monkeypatch) -> None:
             )
     finally:
         settings.ingest_web_max_bytes = original_max_bytes
+
+
+def test_ensure_url_allowed_allows_allowlisted_private_network(monkeypatch) -> None:
+    """Allow-listed hosts bypass private-network failures from network checks."""
+
+    settings = get_settings()
+    original_allowed_hosts = list(settings.ingest_url_allowed_hosts)
+    original_blocked_networks = list(settings.ingest_url_blocked_ip_networks)
+    original_block_private = settings.ingest_url_block_private_networks
+
+    settings.ingest_url_allowed_hosts = ["trusted.example"]
+    settings.ingest_url_blocked_ip_networks = ["10.0.0.0/8"]
+    settings.ingest_url_block_private_networks = True
+
+    ingest_network.cached_blocked_networks.cache_clear()
+
+    def failing_network_check(_settings, _url):
+        raise UnsupportedSourceError("blocked by primary check")
+
+    monkeypatch.setattr(ingest_network, "ensure_url_allowed", failing_network_check)
+    monkeypatch.setattr(
+        pipeline,
+        "_resolve_host_addresses",
+        lambda host: (ip_address("10.0.0.1"),),
+    )
+
+    try:
+        pipeline.ensure_url_allowed(settings, "https://trusted.example/resource")
+    finally:
+        settings.ingest_url_allowed_hosts = original_allowed_hosts
+        settings.ingest_url_blocked_ip_networks = original_blocked_networks
+        settings.ingest_url_block_private_networks = original_block_private
+        ingest_network.cached_blocked_networks.cache_clear()
+
+
+def test_ensure_url_allowed_blocks_allowlisted_blocked_network(monkeypatch) -> None:
+    """Allow-listed hosts remain blocked when resolving to forbidden networks."""
+
+    settings = get_settings()
+    original_allowed_hosts = list(settings.ingest_url_allowed_hosts)
+    original_blocked_networks = list(settings.ingest_url_blocked_ip_networks)
+    original_block_private = settings.ingest_url_block_private_networks
+
+    settings.ingest_url_allowed_hosts = ["trusted.example"]
+    settings.ingest_url_blocked_ip_networks = ["205.0.0.0/24"]
+    settings.ingest_url_block_private_networks = False
+
+    ingest_network.cached_blocked_networks.cache_clear()
+
+    def failing_network_check(_settings, _url):
+        raise UnsupportedSourceError("blocked by primary check")
+
+    monkeypatch.setattr(ingest_network, "ensure_url_allowed", failing_network_check)
+    monkeypatch.setattr(
+        pipeline,
+        "_resolve_host_addresses",
+        lambda host: (ip_address("205.0.0.10"),),
+    )
+
+    try:
+        with pytest.raises(UnsupportedSourceError):
+            pipeline.ensure_url_allowed(settings, "https://trusted.example/resource")
+    finally:
+        settings.ingest_url_allowed_hosts = original_allowed_hosts
+        settings.ingest_url_blocked_ip_networks = original_blocked_networks
+        settings.ingest_url_block_private_networks = original_block_private
+        ingest_network.cached_blocked_networks.cache_clear()
