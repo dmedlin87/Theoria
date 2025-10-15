@@ -19,7 +19,9 @@ from schemathesis.schemas import BaseSchema
 
 os.environ.setdefault("THEO_DISABLE_AI_SETTINGS", "1")
 os.environ.setdefault("THEO_AUTH_ALLOW_ANONYMOUS", "1")
+os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
 os.environ.setdefault("SETTINGS_SECRET_KEY", "contract-test-secret")
+os.environ.setdefault("THEORIA_ENVIRONMENT", "development")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -120,7 +122,14 @@ def test_contract_endpoints(
 ) -> None:
     method_key = method.lower()
     operation = openapi_schema.get(path, method_key)[method_key]
-    case = operation.make_case()
+    make_case = getattr(operation, "make_case", None)
+    if callable(make_case):
+        case = make_case()
+    else:
+        schema_make_case = getattr(openapi_schema, "make_case", None)
+        if schema_make_case is None:  # pragma: no cover - sanity guard for future APIs
+            raise AttributeError("Schemathesis API does not expose a case factory")
+        case = schema_make_case(operation=operation)
     case.call_and_validate(
         session=contract_client,
         checks=(schemathesis.checks.not_a_server_error,),
