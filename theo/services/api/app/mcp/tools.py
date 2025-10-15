@@ -65,15 +65,14 @@ def _to_evidence_drafts(
 
     drafts: list[ResearchNoteEvidenceDraft] = []
     for evidence in evidences:
-        payload = evidence.model_dump()
         drafts.append(
             ResearchNoteEvidenceDraft(
-                source_type=payload.get("source_type"),
-                source_ref=payload.get("source_ref"),
-                osis_refs=tuple(payload.get("osis_refs") or []) or None,
-                citation=payload.get("citation"),
-                snippet=payload.get("snippet"),
-                meta=payload.get("meta"),
+                source_type=evidence.source_type,
+                source_ref=evidence.source_ref,
+                osis_refs=tuple(evidence.osis_refs or []) or None,
+                citation=evidence.citation,
+                snippet=evidence.snippet,
+                meta=evidence.meta,
             )
         )
     return tuple(drafts)
