@@ -32,3 +32,21 @@ def test_mentions_export_with_invalid_cursor_returns_results() -> None:
     assert [row.passage.id for row in response.results] == ["passage-1", "passage-2"]
     assert response.total_results == len(mentions)
     assert response.next_cursor == "passage-2"
+    assert len(response.results) == request.limit
+
+
+def test_mentions_export_with_valid_cursor_skips_anchor() -> None:
+    mentions = [_build_mention(idx) for idx in range(1, 5)]
+    request = HybridSearchRequest(
+        query="test",
+        osis="John.3.16",
+        mode="mentions",
+        cursor="passage-2",
+        limit=2,
+    )
+
+    response = _mentions_to_export_response(mentions, request)
+
+    assert [row.passage.id for row in response.results] == ["passage-3", "passage-4"]
+    assert response.total_results == 2
+    assert response.next_cursor is None

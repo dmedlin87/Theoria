@@ -260,6 +260,7 @@ def _mentions_to_export_response(
     cursor_found = request.cursor is None
     after_cursor: list[SearchExportRow] = []
     all_rows: list[SearchExportRow] = []
+    cursor_index = 0 if cursor_found else None
 
     for idx, mention in enumerate(mentions, start=1):
         passage = mention.passage
@@ -290,12 +291,13 @@ def _mentions_to_export_response(
             snippet=mention.context_snippet,
         )
         all_rows.append(row)
-        if not cursor_found:
-            if passage.id == request.cursor:
-                cursor_found = True
-            continue
-        if cursor_found:
-            after_cursor.append(row)
+        if not cursor_found and passage.id == request.cursor:
+            cursor_found = True
+            cursor_index = len(all_rows)
+
+    if cursor_found:
+        start_index = cursor_index or 0
+        after_cursor = all_rows[start_index:]
 
     if request.cursor and not cursor_found:
         after_cursor = all_rows
