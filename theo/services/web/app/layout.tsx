@@ -9,6 +9,7 @@ import "./globals.css";
 import Link from "next/link";
 import { AppShell, type AppShellNavSection } from "./components/AppShell";
 import { ToastProvider } from "./components/Toast";
+import { OnboardingOverlay } from "./components/onboarding/OnboardingOverlay";
 
 export const metadata = {
   title: "Theoria",
@@ -96,7 +97,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 modeSwitcher={<ModeSwitcher />}
                 footerMeta={footerMeta}
               >
-                {children}
+                <>
+                  {children}
+                  <OnboardingOverlay />
+                </>
               </AppShell>
             ) : (
               <>
