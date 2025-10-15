@@ -6,6 +6,7 @@ import json
 import sys
 import logging
 import importlib
+import textwrap
 from pathlib import Path
 
 import anyio
@@ -354,4 +355,174 @@ def test_api_boots_contradiction_seeding_without_migrations(
         database_module._engine.dispose()  # type: ignore[attr-defined]
     database_module._engine = None  # type: ignore[attr-defined]
     database_module._SessionLocal = None  # type: ignore[attr-defined]
+
+
+def test_contradiction_seeds_repair_range_columns_and_merge_payloads(
+    tmp_path, monkeypatch
+) -> None:
+    """Ensure contradiction seeds handle legacy schemas and mixed payload sources."""
+
+    seed_dir = tmp_path / "seeds"
+    seed_dir.mkdir()
+
+    _write_seed(
+        seed_dir / "contradictions.json",
+        [
+            {
+                "osis_a": "Gen.1.1",
+                "osis_b": "Gen.1.2",
+                "summary": "json entry",
+                "source": "Test Source",
+                "tags": ["one", "two"],
+                "weight": 2,
+                "perspective": "Skeptical",
+            }
+        ],
+    )
+    _write_seed(
+        seed_dir / "contradictions_additional.json",
+        [
+            {
+                "osis_a": "Gen.1.3",
+                "osis_b": "Gen.1.4",
+                "summary": "additional entry",
+                "source": "Another",
+                "tags": "solo",
+            }
+        ],
+    )
+    (seed_dir / "contradictions_catalog.yaml").write_text(
+        textwrap.dedent(
+            """
+            alpha:
+              osis_a: Gen.1.5
+              osis_b: Gen.1.6
+              summary: catalog entry
+              perspective: Analytical
+              weight: 0.75
+              tags:
+                - curated
+                - null
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(seeds, "SEED_ROOT", seed_dir)
+
+    database_path = tmp_path / "legacy-contradictions.sqlite"
+    engine = create_engine(f"sqlite:///{database_path}", future=True)
+
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE contradiction_seeds (
+                    id TEXT PRIMARY KEY,
+                    osis_a TEXT NOT NULL,
+                    osis_b TEXT NOT NULL,
+                    summary TEXT,
+                    source TEXT,
+                    tags TEXT,
+                    weight FLOAT NOT NULL DEFAULT 1.0,
+                    perspective TEXT,
+                    created_at TIMESTAMP NOT NULL
+                )
+                """
+            )
+
+        with Session(engine) as session:
+            seeds.seed_contradiction_claims(session)
+
+        with engine.connect() as connection:
+            column_names = {
+                row[1]
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info('contradiction_seeds')"
+                )
+            }
+            assert {
+                "start_verse_id_a",
+                "end_verse_id_a",
+                "start_verse_id",
+                "end_verse_id",
+                "start_verse_id_b",
+                "end_verse_id_b",
+            }.issubset(column_names)
+
+        expected_ids = {
+            "primary": str(
+                seeds.uuid5(
+                    seeds.CONTRADICTION_NAMESPACE,
+                    "|".join(
+                        [
+                            "gen.1.1",
+                            "gen.1.2",
+                            "test source",
+                            "skeptical",
+                        ]
+                    ),
+                )
+            ),
+            "additional": str(
+                seeds.uuid5(
+                    seeds.CONTRADICTION_NAMESPACE,
+                    "|".join(
+                        [
+                            "gen.1.3",
+                            "gen.1.4",
+                            "another",
+                            "skeptical",
+                        ]
+                    ),
+                )
+            ),
+            "catalog": str(
+                seeds.uuid5(
+                    seeds.CONTRADICTION_NAMESPACE,
+                    "|".join(
+                        [
+                            "gen.1.5",
+                            "gen.1.6",
+                            "community",
+                            "analytical",
+                        ]
+                    ),
+                )
+            ),
+        }
+
+        with Session(engine) as session:
+            records = {
+                record.id: record
+                for record in session.scalars(select(ContradictionSeed))
+            }
+
+        assert set(records) == set(expected_ids.values())
+
+        primary = records[expected_ids["primary"]]
+        assert primary.source == "Test Source"
+        assert primary.perspective == "skeptical"
+        assert primary.tags == ["one", "two"]
+        assert primary.weight == 2.0
+        assert primary.start_verse_id_a == primary.start_verse_id
+        assert primary.end_verse_id_a == primary.end_verse_id
+
+        additional = records[expected_ids["additional"]]
+        assert additional.perspective == "skeptical"
+        assert additional.tags == ["solo"]
+        assert additional.weight == 1.0
+        assert additional.start_verse_id_b is not None
+        assert additional.end_verse_id_b is not None
+
+        catalog = records[expected_ids["catalog"]]
+        assert catalog.source == "community"
+        assert catalog.perspective == "analytical"
+        assert catalog.tags == ["curated", None]
+        assert catalog.weight == 0.75
+        assert catalog.start_verse_id is not None
+        assert catalog.start_verse_id_b is not None
+    finally:
+        engine.dispose()
 
