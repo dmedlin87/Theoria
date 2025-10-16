@@ -15,6 +15,9 @@ function buildAuthHeaders(request: NextRequest): Headers {
       headers.set("X-API-Key", apiKey);
     }
   }
+  const contentType = request.headers.get("content-type");
+  if (contentType) {
+    headers.set("content-type", contentType);
   const requestContentType = request.headers.get("content-type");
   if (requestContentType) {
     headers.set("content-type", requestContentType);

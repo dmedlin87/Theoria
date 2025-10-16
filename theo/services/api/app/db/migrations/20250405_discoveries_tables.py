@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
+from sqlalchemy.engine import Engine
 
 
 def _json_type(engine: Engine) -> JSON:

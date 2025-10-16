@@ -11,6 +11,8 @@ from .models import (
     PatternDiscovery,
 )
 
+"""Discovery engine that clusters embeddings to surface corpus patterns."""
+
 
 """Discovery engine that clusters embeddings to surface corpus patterns."""
 
