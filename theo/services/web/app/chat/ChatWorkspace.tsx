@@ -347,6 +347,7 @@ export default function ChatWorkspace({
           content: event.response.answer.summary,
           citations: event.response.answer.citations ?? [],
           fallacyWarnings: event.response.answer.fallacy_warnings ?? [],
+          reasoningTrace: event.response.answer.reasoning_trace ?? null,
         }));
         setActiveAssistantId(null);
         return;
@@ -377,6 +378,7 @@ export default function ChatWorkspace({
         citations: [],
         fallacyWarnings: [],
         prompt: trimmed,
+        reasoningTrace: null,
       };
 
       setConversation([...baseConversation, userEntry, assistantEntry]);
@@ -423,6 +425,7 @@ export default function ChatWorkspace({
             content: result.answer.summary,
             citations: result.answer.citations ?? [],
             fallacyWarnings: result.answer.fallacy_warnings ?? [],
+            reasoningTrace: result.answer.reasoning_trace ?? null,
           }));
         } else if (result.kind === "guardrail") {
           removeEntryById(assistantId);

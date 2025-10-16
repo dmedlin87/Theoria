@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { useState } from "react";
 
 import FallacyWarnings from "../../../components/FallacyWarnings";
+import ReasoningTrace from "../../../components/ReasoningTrace";
 import { Icon } from "../../../components/Icon";
 import type { Reaction, AssistantConversationEntry } from "../../useChatWorkspaceState";
 
@@ -33,6 +35,8 @@ export function ChatTranscript({
   sampleQuestions,
   onSampleQuestionClick,
 }: ChatTranscriptProps): JSX.Element {
+  const [expandedReasoning, setExpandedReasoning] = useState<Record<string, boolean>>({});
+
   if (!hasTranscript) {
     return (
       <div className="chat-empty-state">
@@ -66,6 +70,12 @@ export function ChatTranscript({
         const feedbackPending = pendingFeedbackIds.has(entry.id);
         const feedbackDisabled = feedbackPending || entry.isActive;
         const isAssistant = entry.role === "assistant";
+        const reasoningTrace = isAssistant ? entry.reasoningTrace : null;
+        const hasReasoningTrace = Boolean(
+          reasoningTrace && Array.isArray(reasoningTrace.steps) && reasoningTrace.steps.length > 0,
+        );
+        const expanded = expandedReasoning[entry.id] ?? false;
+        const reasoningPanelId = `reasoning-trace-${entry.id}`;
         return (
           <article key={entry.id} className={`chat-message chat-message--${entry.role}`}>
             <header>{entry.role === "user" ? "You" : "Theo"}</header>
@@ -102,6 +112,27 @@ export function ChatTranscript({
                 </ol>
               </aside>
             )}
+            {isAssistant && hasReasoningTrace ? (
+              <div className="chat-reasoning-trace__section">
+                <button
+                  type="button"
+                  className={`chat-reasoning-trace__toggle${expanded ? " chat-reasoning-trace__toggle--expanded" : ""}`}
+                  aria-expanded={expanded}
+                  aria-controls={reasoningPanelId}
+                  onClick={() =>
+                    setExpandedReasoning((previous) => ({
+                      ...previous,
+                      [entry.id]: !expanded,
+                    }))
+                  }
+                >
+                  {expanded ? "Hide reasoning" : "Show reasoning"}
+                </button>
+                <div id={reasoningPanelId} hidden={!expanded} className="chat-reasoning-trace__panel">
+                  <ReasoningTrace trace={reasoningTrace} />
+                </div>
+              </div>
+            ) : null}
             {isAssistant && (
               <div className="chat-feedback-controls">
                 <button

@@ -1,5 +1,6 @@
 import { useReducer, useCallback, Dispatch } from "react";
 import type { RAGCitation, FallacyWarningModel } from "../copilot/components/types";
+import type { ReasoningTrace } from "../lib/reasoning-trace";
 import type { HybridSearchFilters } from "../lib/guardrails";
 import type { GuardrailFailureMetadata, GuardrailSuggestion } from "../lib/guardrails";
 import type { InterpretedApiError } from "../lib/errorMessages";
@@ -13,6 +14,7 @@ export type ConversationEntry =
       citations: RAGCitation[];
       fallacyWarnings: FallacyWarningModel[];
       prompt?: string;
+      reasoningTrace: ReasoningTrace | null;
     };
 
 export type AssistantConversationEntry = Extract<ConversationEntry, { role: "assistant" }>;
@@ -77,6 +79,7 @@ export type ChatWorkspaceAction =
       content: string;
       citations: RAGCitation[];
       fallacyWarnings: FallacyWarningModel[];
+      reasoningTrace: ReasoningTrace | null;
     }}
   | { type: "STREAMING_COMPLETE"; sessionId: string | null }
   | { type: "REMOVE_ENTRY"; entryId: string }
@@ -187,6 +190,7 @@ function chatWorkspaceReducer(
             content: action.payload.content,
             citations: action.payload.citations,
             fallacyWarnings: action.payload.fallacyWarnings,
+            reasoningTrace: action.payload.reasoningTrace,
           };
         }
         return entry;
@@ -340,11 +344,12 @@ export function useChatWorkspaceState() {
       content: string,
       citations: RAGCitation[],
       fallacyWarnings: FallacyWarningModel[],
+      reasoningTrace: ReasoningTrace | null,
     ) => {
       dispatch({
         type: "UPDATE_ASSISTANT_COMPLETE",
         assistantId,
-        payload: { content, citations, fallacyWarnings },
+        payload: { content, citations, fallacyWarnings, reasoningTrace },
       });
     },
     []

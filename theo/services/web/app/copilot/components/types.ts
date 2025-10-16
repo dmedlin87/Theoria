@@ -1,4 +1,5 @@
 import type { components } from "../../lib/generated/api";
+import type { ReasoningTrace } from "../../lib/reasoning-trace";
 
 export type FeatureFlags = {
   ai_copilot?: boolean;
@@ -16,6 +17,7 @@ export type FallacyWarningModel = {
 
 export type RAGAnswer = components["schemas"]["RAGAnswer"] & {
   fallacy_warnings?: FallacyWarningModel[];
+  reasoning_trace?: ReasoningTrace | null;
 };
 
 export type { GuardrailSuggestion } from "../../lib/guardrails";

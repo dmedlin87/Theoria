@@ -4,11 +4,16 @@ import type {
   GuardrailSuggestion,
   HybridSearchFilters,
 } from "./guardrails";
+import {
+  normaliseReasoningTrace,
+  type ReasoningTrace,
+} from "./reasoning-trace";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
 type RAGAnswer = import("../copilot/components/types").RAGAnswer;
 type RAGCitation = import("../copilot/components/types").RAGCitation;
 type FallacyWarningModel = import("../copilot/components/types").FallacyWarningModel;
+type ReasoningTraceType = ReasoningTrace;
 
 export type ChatSessionPreferencesPayload = {
   mode?: string | null;
@@ -23,6 +28,7 @@ export type ChatSessionMemoryEntry = {
   citations: RAGCitation[];
   documentIds: string[];
   createdAt: string;
+  reasoningTrace?: ReasoningTraceType | null;
 };
 
 export type ChatSessionState = {
@@ -326,6 +332,9 @@ export function normaliseAnswer(value: unknown): RAGAnswer | null {
   const fallacyWarnings = fallacySources
     .map((entry) => normaliseFallacyWarning(entry))
     .filter((entry): entry is FallacyWarningModel => entry !== null);
+  const reasoningTrace = normaliseReasoningTrace(
+    record.reasoning_trace ?? record.reasoningTrace ?? null,
+  );
 
   return {
     summary,
@@ -334,6 +343,7 @@ export function normaliseAnswer(value: unknown): RAGAnswer | null {
     model_output: modelOutput ?? null,
     guardrail_profile: guardrailProfile,
     fallacy_warnings: fallacyWarnings,
+    reasoning_trace: reasoningTrace as ReasoningTraceType | null,
   };
 }
 
@@ -389,6 +399,9 @@ export function normaliseChatSessionState(payload: unknown): ChatSessionState | 
     const citations: RAGCitation[] = citationsRaw
       .map((citation) => normaliseCitation(citation))
       .filter((value): value is RAGCitation => value != null);
+    const reasoningTrace = normaliseReasoningTrace(
+      data.reasoning_trace ?? data.reasoningTrace ?? null,
+    );
     const documentIdsEntry = coerceStringList(data.document_ids ?? data.documentIds);
     memory.push({
       question,
@@ -397,6 +410,7 @@ export function normaliseChatSessionState(payload: unknown): ChatSessionState | 
       citations,
       documentIds: documentIdsEntry,
       createdAt: created,
+      reasoningTrace,
     });
   }
 

@@ -2291,3 +2291,199 @@ section + section {
   font-weight: 600;
   color: var(--color-text-strong);
 }
+
+.chat-reasoning-trace__section {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.chat-reasoning-trace__toggle {
+  justify-self: flex-start;
+  border: 1.5px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.chat-reasoning-trace__toggle:hover,
+.chat-reasoning-trace__toggle:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: var(--shadow-xs);
+  outline: none;
+}
+
+.chat-reasoning-trace__toggle--expanded {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.chat-reasoning-trace__panel[hidden] {
+  display: none;
+}
+
+.chat-reasoning-trace {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--color-border-subtle);
+  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-xs);
+}
+
+.chat-reasoning-trace__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.chat-reasoning-trace__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.chat-reasoning-trace__strategy {
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.chat-reasoning-trace__summary {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.chat-reasoning-trace__steps {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.chat-reasoning-trace__steps--nested {
+  margin-top: 0.75rem;
+  border-left: 1px dashed color-mix(in srgb, var(--color-border-subtle) 70%, transparent);
+  padding-left: 1rem;
+}
+
+.chat-reasoning-trace__step {
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.chat-reasoning-trace__stepHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.chat-reasoning-trace__stepIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.chat-reasoning-trace__stepMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.chat-reasoning-trace__stepLabel {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.chat-reasoning-trace__status {
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.chat-reasoning-trace__status--positive {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+
+.chat-reasoning-trace__status--negative {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+
+.chat-reasoning-trace__status--active {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.chat-reasoning-trace__status--pending,
+.chat-reasoning-trace__status--uncertain,
+.chat-reasoning-trace__status--complete {
+  color: var(--color-text-muted);
+}
+
+.chat-reasoning-trace__detail,
+.chat-reasoning-trace__outcome,
+.chat-reasoning-trace__confidence,
+.chat-reasoning-trace__citations {
+  margin: 0;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+.chat-reasoning-trace__label {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.chat-reasoning-trace__evidence {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--color-text-secondary);
+}
+
+.chat-reasoning-trace__evidenceItem {
+  list-style: disc;
+}
+
+.chat-reasoning-trace__evidenceLabel {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.chat-reasoning-trace__evidenceCitations {
+  margin-left: 0.35rem;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
