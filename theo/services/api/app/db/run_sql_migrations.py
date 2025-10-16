@@ -192,6 +192,10 @@ _SQLITE_ADD_COLUMN_RE = re.compile(
     r"^ALTER\s+TABLE\s+(?P<table>[^\s]+)\s+ADD\s+COLUMN\s+(?P<column>[^\s]+)",
     re.IGNORECASE | re.DOTALL,
 )
+_INGESTION_JOBS_TABLE_RE = re.compile(
+    r"\bingestion_jobs\b",
+    re.IGNORECASE,
+)
 
 
 def _sqlite_normalize_identifier(identifier: str) -> str:

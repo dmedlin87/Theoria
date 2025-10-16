@@ -1,0 +1,180 @@
+{
+  "overall": {
+    "faithfulness": 1.0,
+    "groundedness": 0.7465718080160485,
+    "context_precision": 0.9999999999555556,
+    "context_recall": 1.0,
+    "answer_relevance": 0.009950724164912134
+  },
+  "per_sample": [
+    {
+      "id": "dev-001",
+      "question": "What is the greatest commandment according to Jesus?",
+      "answer": "Jesus teaches that the greatest commandment is to love God with all your heart and to love your neighbour as yourself.",
+      "contexts": [
+        "[1] You shall love the Lord your God with all your heart and with all your soul and with all your mind. This is the great and first commandment.",
+        "[2] And a second is like it: You shall love your neighbour as yourself."
+      ],
+      "ground_truth": [
+        "Jesus summarises the law as loving God fully and loving one's neighbour (Matthew 22:37-39)."
+      ],
+      "citations": [
+        {
+          "index": 1,
+          "osis": "Matt 22:37",
+          "anchor": "context",
+          "snippet": "You shall love the Lord your God with all your heart and with all your soul and with all your mind.",
+          "source_url": "/doc/matthew?passage-1"
+        },
+        {
+          "index": 2,
+          "osis": "Matt 22:39",
+          "anchor": "context",
+          "snippet": "And a second is like it: You shall love your neighbour as yourself.",
+          "source_url": "/doc/matthew?passage-2"
+        }
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "groundedness": 0.7353183428868799,
+        "context_precision": 0.99999999995,
+        "context_recall": 1.0,
+        "answer_relevance": 0.01468884212673624
+      },
+      "dataset_row": {
+        "question": "What is the greatest commandment according to Jesus?",
+        "answer": "Jesus teaches that the greatest commandment is to love God with all your heart and to love your neighbour as yourself.",
+        "contexts": [
+          "[1] You shall love the Lord your God with all your heart and with all your soul and with all your mind. This is the great and first commandment.",
+          "[2] And a second is like it: You shall love your neighbour as yourself."
+        ],
+        "ground_truth": "Jesus summarises the law as loving God fully and loving one's neighbour (Matthew 22:37-39)."
+      }
+    },
+    {
+      "id": "dev-002",
+      "question": "Summarise Paul's teaching on grace in Ephesians 2",
+      "answer": "Paul emphasises that salvation is a gift by grace through faith, not earned by works.",
+      "contexts": [
+        "[1] For by grace you have been saved through faith. And this is not your own doing; it is the gift of God.",
+        "[2] Not a result of works, so that no one may boast."
+      ],
+      "ground_truth": [
+        "Ephesians 2:8-9 states salvation is by grace through faith and not by works."
+      ],
+      "citations": [
+        {
+          "index": 1,
+          "osis": "Eph 2:8",
+          "anchor": "context",
+          "snippet": "For by grace you have been saved through faith.",
+          "source_url": "/doc/ephesians?passage-1"
+        },
+        {
+          "index": 2,
+          "osis": "Eph 2:9",
+          "anchor": "context",
+          "snippet": "Not a result of works, so that no one may boast.",
+          "source_url": "/doc/ephesians?passage-2"
+        }
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "groundedness": 0.7607522571391417,
+        "context_precision": 0.99999999995,
+        "context_recall": 1.0,
+        "answer_relevance": 0.006341601971875319
+      },
+      "dataset_row": {
+        "question": "Summarise Paul's teaching on grace in Ephesians 2",
+        "answer": "Paul emphasises that salvation is a gift by grace through faith, not earned by works.",
+        "contexts": [
+          "[1] For by grace you have been saved through faith. And this is not your own doing; it is the gift of God.",
+          "[2] Not a result of works, so that no one may boast."
+        ],
+        "ground_truth": "Ephesians 2:8-9 states salvation is by grace through faith and not by works."
+      }
+    },
+    {
+      "id": "trace-20240101-1",
+      "question": "How does Psalm 23 describe God's guidance?",
+      "answer": "Psalm 23 portrays God as a shepherd who leads, protects, and comforts through every valley.",
+      "contexts": [
+        "[1] The Lord is my shepherd; I shall not want.",
+        "[2] He leads me beside still waters. He restores my soul. He leads me in paths of righteousness for his name's sake.",
+        "[3] Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me; your rod and your staff, they comfort me."
+      ],
+      "ground_truth": [
+        "Psalm 23:1-4 depicts the Lord guiding, providing, and comforting as a shepherd."
+      ],
+      "citations": [
+        {
+          "index": 1,
+          "osis": "Ps 23:1",
+          "anchor": "context",
+          "snippet": "The Lord is my shepherd; I shall not want.",
+          "source_url": "/doc/psalms?passage-1"
+        },
+        {
+          "index": 2,
+          "osis": "Ps 23:2",
+          "anchor": "context",
+          "snippet": "He leads me beside still waters. He restores my soul.",
+          "source_url": "/doc/psalms?passage-2"
+        },
+        {
+          "index": 3,
+          "osis": "Ps 23:4",
+          "anchor": "context",
+          "snippet": "Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me; your rod and your staff, they comfort me.",
+          "source_url": "/doc/psalms?passage-3"
+        }
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "groundedness": 0.7436448240221237,
+        "context_precision": 0.9999999999666667,
+        "context_recall": 1.0,
+        "answer_relevance": 0.00882172839612484
+      },
+      "dataset_row": {
+        "question": "How does Psalm 23 describe God's guidance?",
+        "answer": "Psalm 23 portrays God as a shepherd who leads, protects, and comforts through every valley.",
+        "contexts": [
+          "[1] The Lord is my shepherd; I shall not want.",
+          "[2] He leads me beside still waters. He restores my soul. He leads me in paths of righteousness for his name's sake.",
+          "[3] Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me; your rod and your staff, they comfort me."
+        ],
+        "ground_truth": "Psalm 23:1-4 depicts the Lord guiding, providing, and comforting as a shepherd."
+      }
+    }
+  ],
+  "failing_rows": [
+    "dev-001",
+    "dev-002",
+    "trace-20240101-1"
+  ],
+  "regressions": [
+    {
+      "metric": "groundedness",
+      "baseline": 0.9,
+      "current": 0.7465718080160485,
+      "tolerance": 0.02
+    },
+    {
+      "metric": "answer_relevance",
+      "baseline": 0.9,
+      "current": 0.009950724164912134,
+      "tolerance": 0.02
+    }
+  ],
+  "baseline": {
+    "faithfulness": 0.92,
+    "groundedness": 0.9,
+    "context_precision": 0.88,
+    "context_recall": 0.9,
+    "answer_relevance": 0.9
+  },
+  "tolerance": 0.02,
+  "notes": "Evaluation ran with deterministic fake LLM/embeddings; metrics are informational only."
+}
