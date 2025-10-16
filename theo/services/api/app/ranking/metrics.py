@@ -25,7 +25,12 @@ def ndcg(
 ) -> float:
     """Compute Normalized Discounted Cumulative Gain for ranked identifiers."""
 
-    limit = k or len(ranked_ids)
+    if k is None:
+        limit = len(ranked_ids)
+    else:
+        if k <= 0:
+            return 0.0
+        limit = k
     observed = [float(relevance.get(item, 0.0)) for item in ranked_ids[:limit]]
     ideal = sorted((float(value) for value in relevance.values()), reverse=True)[:limit]
     ideal_dcg = dcg(ideal)
