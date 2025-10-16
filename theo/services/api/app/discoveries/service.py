@@ -11,10 +11,13 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from theo.domain.discoveries import (
+    AnomalyDiscoveryEngine,
+    ConnectionDiscoveryEngine,
     ContradictionDiscoveryEngine,
     CorpusSnapshotSummary,
     DiscoveryType,
     DocumentEmbedding,
+    GapDiscoveryEngine,
     PatternDiscoveryEngine,
     TrendDiscoveryEngine,
 )
@@ -52,11 +55,17 @@ class DiscoveryService:
         pattern_engine: PatternDiscoveryEngine | None = None,
         contradiction_engine: ContradictionDiscoveryEngine | None = None,
         trend_engine: TrendDiscoveryEngine | None = None,
+        anomaly_engine: AnomalyDiscoveryEngine | None = None,
+        connection_engine: ConnectionDiscoveryEngine | None = None,
+        gap_engine: GapDiscoveryEngine | None = None,
     ):
         self.session = session
         self.pattern_engine = pattern_engine or PatternDiscoveryEngine()
         self.contradiction_engine = contradiction_engine or ContradictionDiscoveryEngine()
         self.trend_engine = trend_engine or TrendDiscoveryEngine()
+        self.anomaly_engine = anomaly_engine or AnomalyDiscoveryEngine()
+        self.connection_engine = connection_engine or ConnectionDiscoveryEngine()
+        self.gap_engine = gap_engine or GapDiscoveryEngine()
 
     def list(
         self,
@@ -99,7 +108,7 @@ class DiscoveryService:
         
         # Run pattern detection
         pattern_candidates, snapshot = self.pattern_engine.detect(documents)
-        
+
         # Run contradiction detection
         contradiction_candidates = self.contradiction_engine.detect(documents)
 
@@ -110,6 +119,28 @@ class DiscoveryService:
         trend_candidates = self.trend_engine.detect([*historical_snapshots, snapshot])
 
         # Delete old discoveries (patterns, contradictions, and trends)
+        # Run anomaly detection
+        anomaly_candidates = self.anomaly_engine.detect(documents)
+
+        # Delete old discoveries (both patterns and contradictions)
+        self.session.execute(
+            delete(Discovery).where(
+                Discovery.user_id == user_id,
+                Discovery.discovery_type.in_(
+                    [
+                        DiscoveryType.PATTERN.value,
+                        DiscoveryType.CONTRADICTION.value,
+                        DiscoveryType.ANOMALY.value,
+                    ]
+                ),
+        # Run connection detection
+        connection_candidates = self.connection_engine.detect(documents)
+
+        # Delete old discoveries (patterns, contradictions, and connections)
+        # Run gap detection
+        gap_candidates = self.gap_engine.detect(documents)
+
+        # Delete old discoveries (patterns, contradictions, and gaps)
         self.session.execute(
             delete(Discovery).where(
                 Discovery.user_id == user_id,
@@ -117,6 +148,8 @@ class DiscoveryService:
                     DiscoveryType.PATTERN.value,
                     DiscoveryType.CONTRADICTION.value,
                     DiscoveryType.TREND.value,
+                    DiscoveryType.CONNECTION.value,
+                    DiscoveryType.GAP.value,
                 ]),
             )
         )
@@ -169,6 +202,28 @@ class DiscoveryService:
             record = Discovery(
                 user_id=user_id,
                 discovery_type=DiscoveryType.TREND.value,
+        # Persist anomaly discoveries
+        for candidate in anomaly_candidates:
+            record = Discovery(
+                user_id=user_id,
+                discovery_type=DiscoveryType.ANOMALY.value,
+        # Persist connection discoveries
+        for candidate in connection_candidates:
+            record = Discovery(
+                user_id=user_id,
+                discovery_type=DiscoveryType.CONNECTION.value,
+        # Persist gap discoveries
+        for candidate in gap_candidates:
+            metadata = {
+                "reference_topic": candidate.reference_topic,
+                "missing_keywords": list(candidate.missing_keywords),
+                "shared_keywords": list(candidate.shared_keywords),
+                "related_documents": list(candidate.related_documents),
+            }
+            metadata.update(dict(candidate.metadata))
+            record = Discovery(
+                user_id=user_id,
+                discovery_type=DiscoveryType.GAP.value,
                 title=candidate.title,
                 description=candidate.description,
                 confidence=float(candidate.confidence),
