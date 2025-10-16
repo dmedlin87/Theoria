@@ -232,7 +232,7 @@ class GapDiscoveryEngine:
         if isinstance(raw, str):
             raw_values = [raw]
         elif isinstance(raw, Mapping):
-            raw_values = [value for value in raw.values() if isinstance(value, str)]
+            raw_values = [item for item in list(raw.keys()) + list(raw.values()) if isinstance(item, str)]
         elif isinstance(raw, Sequence):
             raw_values = [item for item in raw if isinstance(item, str)]
         else:
