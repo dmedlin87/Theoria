@@ -163,7 +163,7 @@ class ConnectionDiscoveryEngine:
                 (doc.title.strip() if isinstance(doc.title, str) else "") for doc in docs
             ]
             fallbacks = [doc.document_id for doc in docs]
-            resolved_titles = [title or fallback for title, fallback in zip(cleaned_titles, fallbacks, strict=False)]
+            resolved_titles = [title or fallback for title, fallback in zip(cleaned_titles, fallbacks, strict=True)]
             if len(docs) == 2:
                 title = (
                     f"Connection between {resolved_titles[0]} and {resolved_titles[1]}"
