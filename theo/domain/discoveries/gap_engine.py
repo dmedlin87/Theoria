@@ -117,7 +117,7 @@ class GapDiscoveryEngine:
             missing_keywords = sorted(ref_keywords - best_shared)
             shared_keywords = sorted(best_shared)
             gap_ratio = 0.0
-            if self.min_similarity > 0:
+            if self.min_similarity != 0.0:
                 gap_ratio = min(1.0, max(self.min_similarity - best_similarity, 0.0) / self.min_similarity)
             confidence = round(min(0.95, 0.5 + 0.45 * gap_ratio), 4)
             missing_ratio = len(missing_keywords) / max(len(ref_keywords), 1)
