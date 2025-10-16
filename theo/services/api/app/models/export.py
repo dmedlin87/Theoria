@@ -13,7 +13,7 @@ from .documents import DocumentDetailResponse
 from .search import HybridSearchFilters
 
 
-CitationStyleLiteral = Literal["csl-json", "apa", "chicago"]
+CitationStyleLiteral = Literal["csl-json", "apa", "chicago", "sbl", "bibtex"]
 
 
 class ExportedDocumentSummary(APIModel):

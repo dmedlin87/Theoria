@@ -5,7 +5,16 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Sequence, TYPE_CHECKING, Literal, cast
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Mapping,
+    Sequence,
+    TYPE_CHECKING,
+    Literal,
+    cast,
+)
 
 from ..models.export import ExportManifest
 from .formatters import build_manifest
@@ -13,7 +22,7 @@ from .formatters import build_manifest
 if TYPE_CHECKING:  # pragma: no cover - import for type checking only
     from ..models.documents import DocumentDetailResponse
 
-CitationStyle = Literal["csl-json", "apa", "chicago"]
+CitationStyle = Literal["csl-json", "apa", "chicago", "sbl", "bibtex"]
 
 
 @dataclass
@@ -313,6 +322,32 @@ def _chicago_author(author: dict[str, str]) -> str:
     return literal or ""
 
 
+def _join_with_and(values: Sequence[str], *, use_oxford_comma: bool = True) -> str:
+    entries = [entry.strip() for entry in values if entry and entry.strip()]
+    if not entries:
+        return ""
+    if len(entries) == 1:
+        return entries[0]
+    if len(entries) == 2:
+        return " and ".join(entries)
+    prefix = ", ".join(entries[:-1])
+    suffix = entries[-1]
+    if use_oxford_comma:
+        return f"{prefix}, and {suffix}"
+    return f"{prefix} and {suffix}"
+
+
+def _sbl_author(author: dict[str, str], *, primary: bool) -> str:
+    given = author.get("given")
+    family = author.get("family")
+    if given and family:
+        if primary:
+            return f"{family}, {given}"
+        return f"{given} {family}"
+    literal = author.get("literal")
+    return literal or ""
+
+
 def _format_anchor_summary(anchors: Sequence[Mapping[str, Any]]) -> str:
     labels: list[str] = []
     for entry in anchors:
@@ -474,6 +509,139 @@ def _format_chicago(source: CitationSource, anchors: Sequence[Mapping[str, Any]]
     return body
 
 
+def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) -> str:
+    raw_authors = [_normalise_author(name) for name in source.authors or []]
+    formatted_authors = [
+        _sbl_author(author, primary=index == 0)
+        for index, author in enumerate(raw_authors)
+    ]
+    formatted_authors = [author for author in formatted_authors if author]
+    if not formatted_authors and source.publisher:
+        formatted_authors = [source.publisher]
+
+    title = source.title or "Untitled"
+    venue_or_collection = source.venue or source.collection
+
+    details_parts: list[str] = []
+    if venue_or_collection:
+        details_parts.append(str(venue_or_collection).strip())
+
+    publication_bits: list[str] = []
+    if source.publisher:
+        publication_bits.append(source.publisher)
+    if source.location:
+        publication_bits.append(source.location)
+    year_text = str(source.year) if source.year else "n.d."
+    if publication_bits:
+        publication_bits.append(year_text)
+        details_parts.append(f"({', '.join(publication_bits)})")
+    else:
+        details_parts.append(year_text)
+
+    if source.volume and source.issue:
+        details_parts.append(f"{source.volume} ({source.issue})")
+    elif source.volume:
+        details_parts.append(str(source.volume))
+
+    details_text = " ".join(part for part in details_parts if part)
+    if source.pages:
+        if details_text:
+            details_text = f"{details_text}: {source.pages}"
+        else:
+            details_text = source.pages
+
+    segments: list[str] = []
+    authors_segment = _join_with_and(formatted_authors)
+    if authors_segment:
+        segments.append(f"{authors_segment}.")
+    segments.append(f'"{title}."')
+    if details_text:
+        if not details_text.endswith(('.', '!', '?')):
+            details_text = details_text.rstrip('.') + "."
+        segments.append(details_text)
+
+    if source.doi:
+        segments.append(f"{source.doi}.")
+    elif source.source_url:
+        segments.append(f"{source.source_url}.")
+
+    anchor_entries = _format_anchor_summary(anchors)
+    if anchor_entries:
+        segments.append(f"Anchors: {anchor_entries}.")
+
+    return " ".join(segment.strip() for segment in segments if segment and segment.strip())
+
+
+def _map_bibtex_type(csl_type: str) -> str:
+    mapping = {
+        "article-journal": "article",
+        "book": "book",
+        "motion_picture": "misc",
+        "song": "misc",
+        "speech": "misc",
+        "webpage": "misc",
+        "manuscript": "unpublished",
+    }
+    return mapping.get(csl_type, "misc")
+
+
+def _bibtex_author(author: dict[str, str]) -> str:
+    given = author.get("given")
+    family = author.get("family")
+    if given and family:
+        return f"{family}, {given}"
+    literal = author.get("literal")
+    return literal or ""
+
+
+def _format_bibtex(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) -> str:
+    csl_type = _infer_csl_type(source.source_type)
+    entry_type = _map_bibtex_type(csl_type)
+    authors = [
+        _bibtex_author(_normalise_author(name)) for name in source.authors or []
+    ]
+    authors = [author for author in authors if author]
+
+    fields: "OrderedDict[str, str]" = OrderedDict()
+    fields["title"] = source.title or "Untitled"
+    if authors:
+        fields["author"] = " and ".join(authors)
+    if source.year:
+        fields["year"] = str(source.year)
+    if source.venue:
+        fields["journal"] = source.venue
+    elif source.collection:
+        fields["booktitle"] = source.collection
+    if source.publisher:
+        fields["publisher"] = source.publisher
+    if source.location:
+        fields["address"] = source.location
+    if source.volume:
+        fields["volume"] = source.volume
+    if source.issue:
+        fields["number"] = source.issue
+    if source.pages:
+        fields["pages"] = source.pages
+    if source.doi:
+        fields["doi"] = source.doi
+    if source.source_url:
+        fields["url"] = source.source_url
+    if source.abstract:
+        fields["abstract"] = source.abstract
+
+    anchor_entries = _format_anchor_summary(anchors)
+    if anchor_entries:
+        fields["note"] = f"Anchors: {anchor_entries}"
+
+    entries = [(key, value) for key, value in fields.items() if value]
+    lines = [f"@{entry_type}{{{source.document_id},"]
+    for index, (key, value) in enumerate(entries):
+        suffix = "," if index < len(entries) - 1 else ""
+        lines.append(f"  {key} = {{{value}}}{suffix}")
+    lines.append("}")
+    return "\n".join(lines)
+
+
 def format_citation(
     source: CitationSource,
     *,
@@ -486,6 +654,10 @@ def format_citation(
         citation_text = json.dumps(csl_entry, ensure_ascii=False)
     elif style == "chicago":
         citation_text = _format_chicago(source, anchor_entries)
+    elif style == "sbl":
+        citation_text = _format_sbl(source, anchor_entries)
+    elif style == "bibtex":
+        citation_text = _format_bibtex(source, anchor_entries)
     else:
         citation_text = _format_apa(source, anchor_entries)
     return citation_text, csl_entry
@@ -498,6 +670,7 @@ def build_citation_export(
     anchors: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     filters: Mapping[str, Any] | None = None,
     export_id: str | None = None,
+    zotero_callback: Callable[[dict[str, Any], CitationSource], None] | None = None,
 ) -> tuple[ExportManifest, list[OrderedDict[str, Any]], list[dict[str, Any]]]:
     """Return a manifest, serialisable records, and CSL payloads for *documents*."""
 
@@ -525,6 +698,8 @@ def build_citation_export(
             source, style=style, anchors=anchor_entries
         )
         csl_entries.append(csl_entry)
+        if zotero_callback:
+            zotero_callback(csl_entry, source)
         record = OrderedDict()
         record["kind"] = "citation"
         record["document_id"] = source.document_id

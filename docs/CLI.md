@@ -96,6 +96,14 @@ and `--mypy-arg` flags.
 
 Bulk exports are available via `theo.services.cli.export_data`.
 
+### Citation exports
+
+The citation exporter now supports APA, Chicago, SBL, BibTeX, and CSL JSON styles. When invoking the
+CLI you can select a style with `--style`; the value must be one of `apa`, `chicago`, `sbl`, `bibtex`, or
+`csl-json`. The UI reuses the `CitationExport` component (`theo/services/web/app/components/CitationExport.tsx`),
+which exposes the same styles, download formats, and an optional Zotero hook for research workflows. Embed the
+component inside other pages to inherit the ready-made form logic and download handling.
+
 ## Retrieval benchmarking
 
 Use the `rag_eval` command to benchmark reranker candidates or intent-aware prompt
