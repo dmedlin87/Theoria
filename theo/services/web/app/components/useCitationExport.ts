@@ -249,8 +249,9 @@ export function useCitationExport(options: UseCitationExportOptions = {}): UseCi
       const fallbackName = `theo-citations.${formatExtension}`;
       const filename = parseFilename(response.headers.get('Content-Disposition'), fallbackName);
       const contentEncoding = response.headers.get('Content-Encoding');
+      const isGzipEncoded = (encoding: string | null): boolean => !!encoding && /gzip/i.test(encoding);
       const resolvedFilename =
-        contentEncoding && /gzip/i.test(contentEncoding) ? filename.replace(/\.gz$/i, '') || fallbackName : filename;
+        isGzipEncoded(contentEncoding) ? filename.replace(/\.gz$/i, '') || fallbackName : filename;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
