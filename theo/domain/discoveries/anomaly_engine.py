@@ -87,7 +87,7 @@ class AnomalyDiscoveryEngine:
             confidence = min(0.95, round(0.5 + 0.4 * normalised, 4))
             relevance = min(0.95, round(0.35 + 0.5 * normalised, 4))
 
-            top_topics = [topic for topic in doc.topics if topic][:3]
+            top_topics = [topic.strip() for topic in doc.topics if topic and topic.strip()][:3]
             topic_fragment = (
                 f" focusing on {', '.join(top_topics)}" if top_topics else ""
             )
