@@ -82,7 +82,7 @@ class TrendDiscoveryEngine:
             if baseline == 0.0 and latest > 0.0:
                 percent_change = round(latest * 100, 2)
             else:
-                percent_change = round(change_fraction * 100, 2)
+                percent_change = round((change_fraction / baseline) * 100, 2)
             if abs(percent_change) < self.min_percent_change:
                 continue
 
