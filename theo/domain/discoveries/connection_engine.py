@@ -181,7 +181,7 @@ class ConnectionDiscoveryEngine:
                 )
             if shared_topics:
                 description_parts.append(
-                    "Common themes: " + ", ".join(topic.title() for topic in shared_topics)
+                    f"Common themes: {', '.join(topic.title() for topic in shared_topics)}"
                 )
 
             metadata: dict[str, object] = {
