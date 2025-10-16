@@ -556,6 +556,35 @@ class NoteEvidence(Base):
     )
 
 
+class Hypothesis(Base):
+    """Hypothesis generated and tracked during research workflows."""
+
+    __tablename__ = "hypotheses"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
+    )
+    trail_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("agent_trails.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    claim: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active", index=True)
+    supporting_passage_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    contradicting_passage_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    perspective_scores: Mapped[dict[str, float] | None] = mapped_column(JSON, nullable=True)
+    details: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
 class EvidenceCard(Base):
     """Evidence card records authored via MCP."""
 

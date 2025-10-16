@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -243,6 +243,58 @@ class ResearchNotesResponse(APIModel):
 
 class ResearchNoteResponse(APIModel):
     note: ResearchNote
+
+
+HypothesisStatus = Literal["active", "confirmed", "refuted", "uncertain"]
+
+
+class HypothesisBase(APIModel):
+    claim: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    status: HypothesisStatus = "active"
+    trail_id: str | None = None
+    supporting_passage_ids: list[str] | None = None
+    contradicting_passage_ids: list[str] | None = None
+    perspective_scores: dict[str, float] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class HypothesisCreate(HypothesisBase):
+    pass
+
+
+class HypothesisUpdate(APIModel):
+    claim: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    status: HypothesisStatus | None = None
+    trail_id: str | None = None
+    supporting_passage_ids: list[str] | None = None
+    contradicting_passage_ids: list[str] | None = None
+    perspective_scores: dict[str, float] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class Hypothesis(APIModel):
+    id: str
+    claim: str
+    confidence: float
+    status: HypothesisStatus
+    trail_id: str | None = None
+    supporting_passage_ids: list[str] | None = None
+    contradicting_passage_ids: list[str] | None = None
+    perspective_scores: dict[str, float] | None = None
+    metadata: dict[str, Any] | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class HypothesisListResponse(APIModel):
+    hypotheses: list[Hypothesis] = Field(default_factory=list)
+    total: int
+
+
+class HypothesisResponse(APIModel):
+    hypothesis: Hypothesis
 
 
 class ContradictionItem(APIModel):

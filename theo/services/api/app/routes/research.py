@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 from theo.application.facades.research import (
+    HypothesisDraft,
     ResearchNoteDraft,
     ResearchNoteEvidenceDraft,
     ResearchService,
     get_research_service,
 )
-from theo.domain.research import ResearchNoteNotFoundError
+from theo.domain.research import HypothesisNotFoundError, ResearchNoteNotFoundError
 from theo.application.facades.settings import get_settings
 from ..models.research import (
     CommentarySearchResponse,
@@ -24,6 +25,12 @@ from ..models.research import (
     FallacyDetectRequest,
     FallacyDetectResponse,
     FallacyDetection,
+    Hypothesis,
+    HypothesisCreate,
+    HypothesisStatus,
+    HypothesisListResponse,
+    HypothesisResponse,
+    HypothesisUpdate,
     GeoPlaceSearchResponse,
     GeoVerseResponse,
     HistoricityEntry,
@@ -76,6 +83,19 @@ def _to_evidence_drafts(
     )
 
 
+def _to_hypothesis_draft(payload: HypothesisCreate) -> HypothesisDraft:
+    return HypothesisDraft(
+        claim=payload.claim.strip(),
+        confidence=payload.confidence,
+        status=payload.status,
+        trail_id=payload.trail_id,
+        supporting_passage_ids=tuple(payload.supporting_passage_ids or []) or None,
+        contradicting_passage_ids=tuple(payload.contradicting_passage_ids or []) or None,
+        perspective_scores=payload.perspective_scores,
+        metadata=payload.metadata,
+    )
+
+
 @router.get("/scripture", response_model=ScriptureResponse)
 def get_scripture(
     osis: str = Query(..., description="OSIS reference or range"),
@@ -99,6 +119,67 @@ def get_scripture(
         verses=[ScriptureVerse.model_validate(verse) for verse in verses],
         meta={"count": len(verses)},
     )
+
+
+@router.get("/hypotheses", response_model=HypothesisListResponse)
+def list_hypotheses(
+    status: list[HypothesisStatus] | None = Query(
+        default=None,
+        description="Optional status filters (active, confirmed, refuted, uncertain)",
+    ),
+    min_confidence: float | None = Query(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence threshold inclusive",
+    ),
+    q: str | None = Query(
+        default=None,
+        min_length=1,
+        description="Substring search against hypothesis claims",
+    ),
+    service: ResearchService = Depends(_research_service),
+) -> HypothesisListResponse:
+    statuses = tuple(status) if status else None
+    hypotheses = service.list_hypotheses(
+        statuses=statuses,
+        min_confidence=min_confidence,
+        query=q,
+    )
+    return HypothesisListResponse(
+        hypotheses=[Hypothesis.model_validate(item) for item in hypotheses],
+        total=len(hypotheses),
+    )
+
+
+@router.post("/hypotheses", response_model=HypothesisResponse, status_code=201)
+def create_hypothesis(
+    payload: HypothesisCreate,
+    service: ResearchService = Depends(_research_service),
+) -> HypothesisResponse:
+    if not payload.claim.strip():
+        raise HTTPException(status_code=422, detail="Hypothesis claim cannot be empty")
+    draft = _to_hypothesis_draft(payload)
+    hypothesis = service.create_hypothesis(draft)
+    return HypothesisResponse(hypothesis=Hypothesis.model_validate(hypothesis))
+
+
+@router.patch("/hypotheses/{hypothesis_id}", response_model=HypothesisResponse)
+def update_hypothesis(
+    hypothesis_id: str,
+    payload: HypothesisUpdate,
+    service: ResearchService = Depends(_research_service),
+) -> HypothesisResponse:
+    changes = payload.model_dump(exclude_unset=True)
+    if "claim" in changes and changes["claim"] is not None:
+        if not str(changes["claim"]).strip():
+            raise HTTPException(status_code=422, detail="Hypothesis claim cannot be empty")
+        changes["claim"] = str(changes["claim"]).strip()
+    try:
+        hypothesis = service.update_hypothesis(hypothesis_id, changes)
+    except HypothesisNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Hypothesis not found") from exc
+    return HypothesisResponse(hypothesis=Hypothesis.model_validate(hypothesis))
 
 
 @router.get("/crossrefs", response_model=CrossReferenceResponse)

@@ -8,6 +8,8 @@ from theo.domain import (
     CrossReferenceEntry,
     DssLinkEntry,
     FallacyHit,
+    Hypothesis,
+    HypothesisDraft,
     HistoricityEntry,
     MorphToken,
     ReliabilityOverview,
@@ -25,7 +27,7 @@ from theo.domain import (
     historicity_search,
     variants_apparatus,
 )
-from theo.domain.repositories import ResearchNoteRepository
+from theo.domain.repositories import HypothesisRepository, ResearchNoteRepository
 from theo.domain.research.datasets import report_templates_dataset
 
 
@@ -52,9 +54,11 @@ class ResearchService:
         self,
         notes_repository: ResearchNoteRepository,
         *,
+        hypothesis_repository: HypothesisRepository | None = None,
         fetch_dss_links_func: Callable[[str], list[DssLinkEntry]] = fetch_dss_links,
     ):
         self._notes_repository = notes_repository
+        self._hypothesis_repository = hypothesis_repository
         self._fetch_dss_links = fetch_dss_links_func
 
     # Dataset backed lookups -------------------------------------------------
@@ -102,6 +106,35 @@ class ResearchService:
         min_confidence: float = 0.0,
     ) -> list[FallacyHit]:
         return fallacy_detect(text, min_confidence=min_confidence)
+
+    # Hypotheses -------------------------------------------------------------
+
+    def list_hypotheses(
+        self,
+        *,
+        statuses: tuple[str, ...] | None = None,
+        min_confidence: float | None = None,
+        query: str | None = None,
+    ) -> list[Hypothesis]:
+        if not self._hypothesis_repository:
+            return []
+        return self._hypothesis_repository.list(
+            statuses=statuses,
+            min_confidence=min_confidence,
+            query=query,
+        )
+
+    def create_hypothesis(self, draft: HypothesisDraft) -> Hypothesis:
+        if not self._hypothesis_repository:
+            raise RuntimeError("Hypothesis repository is not configured")
+        return self._hypothesis_repository.create(draft)
+
+    def update_hypothesis(
+        self, hypothesis_id: str, changes: Mapping[str, object]
+    ) -> Hypothesis:
+        if not self._hypothesis_repository:
+            raise RuntimeError("Hypothesis repository is not configured")
+        return self._hypothesis_repository.update(hypothesis_id, changes)
 
     # Research notes ---------------------------------------------------------
 

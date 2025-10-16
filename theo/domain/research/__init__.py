@@ -1,5 +1,8 @@
 """Research domain exports."""
 from .entities import (
+    Hypothesis,
+    HypothesisDraft,
+    HypothesisNotFoundError,
     ResearchNote,
     ResearchNoteDraft,
     ResearchNoteEvidence,
@@ -19,6 +22,9 @@ __all__ = [
     "CrossReferenceEntry",
     "DssLinkEntry",
     "FallacyHit",
+    "Hypothesis",
+    "HypothesisDraft",
+    "HypothesisNotFoundError",
     "HistoricityEntry",
     "MorphToken",
     "OverviewBullet",

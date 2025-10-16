@@ -4,13 +4,18 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from theo.application.research import ResearchService
-from theo.domain.research import ResearchNoteDraft, ResearchNoteEvidenceDraft
+from theo.domain.research import (
+    HypothesisDraft,
+    ResearchNoteDraft,
+    ResearchNoteEvidenceDraft,
+)
 from theo.services.bootstrap import resolve_application
 
 __all__ = [
     "ResearchService",
     "ResearchNoteDraft",
     "ResearchNoteEvidenceDraft",
+    "HypothesisDraft",
     "get_research_service",
 ]
 
