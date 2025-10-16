@@ -131,3 +131,76 @@ def test_gap_engine_detect_with_no_reference_topics(sample_documents):
     engine = GapDiscoveryEngine(topic_model=FakeTopicModel(), reference_topics=[])
 
     assert engine.detect(sample_documents) == []
+
+
+def test_gap_engine_coerce_keywords_handles_varied_inputs():
+    engine = GapDiscoveryEngine(topic_model=FakeTopicModel(), reference_topics=[])
+
+    assert engine._coerce_keywords("  Grace  ") == ["grace"]
+
+    sequence_result = engine._coerce_keywords([
+        " Grace ",
+        "faith",
+        "Faith",
+        123,
+        None,
+        "hope",
+    ])
+    assert sequence_result == ["grace", "faith", "hope"]
+
+    mapping_result = engine._coerce_keywords(
+        {"Trinity": "Persons", "Godhead": 1, " persons ": "Communion"}
+    )
+    assert mapping_result == ["trinity", "godhead", "persons", "communion"]
+
+
+def test_gap_engine_prepare_document_text_prefers_title_and_abstract():
+    document = DocumentEmbedding(
+        document_id="doc-title",
+        title="  Grace and Faith ",
+        abstract=" Exploring doctrine ",
+        topics=["grace", "faith"],
+        verse_ids=[],
+        embedding=[],
+        metadata=None,
+    )
+
+    prepared = GapDiscoveryEngine._prepare_document_text(document)
+
+    assert prepared == "Grace and Faith Exploring doctrine"
+
+
+def test_gap_engine_prepare_document_text_falls_back_to_topics():
+    document = DocumentEmbedding(
+        document_id="doc-topics",
+        title="  ",
+        abstract=None,
+        topics=["Grace", "Faith", ""],
+        verse_ids=[],
+        embedding=[],
+        metadata=None,
+    )
+
+    prepared = GapDiscoveryEngine._prepare_document_text(document)
+
+    assert prepared == "Grace Faith"
+
+
+def test_gap_engine_normalise_reference_topic_handles_alternate_fields():
+    engine = GapDiscoveryEngine(topic_model=FakeTopicModel(), reference_topics=[])
+
+    result = engine._normalise_reference_topic(
+        {
+            "name": "  Trinity  ",
+            "summary": "  God is three persons ",
+            "tags": ["Trinity", "Godhead", ""],
+            "references": [" Matthew 28:19 ", None, 123],
+        }
+    )
+
+    assert result == {
+        "name": "Trinity",
+        "summary": "God is three persons",
+        "keywords": ["trinity", "godhead"],
+        "scriptures": ["Matthew 28:19"],
+    }
