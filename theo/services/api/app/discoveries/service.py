@@ -12,9 +12,11 @@ from sqlalchemy.orm import Session
 
 from theo.domain.discoveries import (
     ContradictionDiscoveryEngine,
+    CorpusSnapshotSummary,
     DiscoveryType,
     DocumentEmbedding,
     PatternDiscoveryEngine,
+    TrendDiscoveryEngine,
 )
 
 from ..db.models import CorpusSnapshot, Discovery, Document, Passage
@@ -49,10 +51,12 @@ class DiscoveryService:
         session: Session,
         pattern_engine: PatternDiscoveryEngine | None = None,
         contradiction_engine: ContradictionDiscoveryEngine | None = None,
+        trend_engine: TrendDiscoveryEngine | None = None,
     ):
         self.session = session
         self.pattern_engine = pattern_engine or PatternDiscoveryEngine()
         self.contradiction_engine = contradiction_engine or ContradictionDiscoveryEngine()
+        self.trend_engine = trend_engine or TrendDiscoveryEngine()
 
     def list(
         self,
@@ -99,13 +103,20 @@ class DiscoveryService:
         # Run contradiction detection
         contradiction_candidates = self.contradiction_engine.detect(documents)
 
-        # Delete old discoveries (both patterns and contradictions)
+        # Prepare trend analysis using historical snapshots including the new run
+        historical_snapshots = self._load_recent_snapshots(
+            user_id, limit=self.trend_engine.history_window - 1
+        )
+        trend_candidates = self.trend_engine.detect([*historical_snapshots, snapshot])
+
+        # Delete old discoveries (patterns, contradictions, and trends)
         self.session.execute(
             delete(Discovery).where(
                 Discovery.user_id == user_id,
                 Discovery.discovery_type.in_([
                     DiscoveryType.PATTERN.value,
                     DiscoveryType.CONTRADICTION.value,
+                    DiscoveryType.TREND.value,
                 ]),
             )
         )
@@ -148,6 +159,22 @@ class DiscoveryService:
                     "contradiction_type": candidate.contradiction_type,
                     **candidate.metadata,
                 },
+                created_at=datetime.now(UTC),
+            )
+            self.session.add(record)
+            persisted.append(record)
+
+        # Persist trend discoveries
+        for candidate in trend_candidates:
+            record = Discovery(
+                user_id=user_id,
+                discovery_type=DiscoveryType.TREND.value,
+                title=candidate.title,
+                description=candidate.description,
+                confidence=float(candidate.confidence),
+                relevance_score=float(candidate.relevance_score),
+                viewed=False,
+                meta=dict(candidate.metadata),
                 created_at=datetime.now(UTC),
             )
             self.session.add(record)
@@ -237,6 +264,30 @@ class DiscoveryService:
                 )
             )
         return result
+
+    def _load_recent_snapshots(
+        self, user_id: str, *, limit: int | None = None
+    ) -> list[CorpusSnapshotSummary]:
+        stmt = (
+            select(CorpusSnapshot)
+            .where(CorpusSnapshot.user_id == user_id)
+            .order_by(CorpusSnapshot.snapshot_date.desc())
+        )
+        if limit is not None and limit > 0:
+            stmt = stmt.limit(limit)
+        rows = list(self.session.scalars(stmt))
+        snapshots = [
+            CorpusSnapshotSummary(
+                snapshot_date=row.snapshot_date,
+                document_count=row.document_count,
+                verse_coverage=row.verse_coverage or {},
+                dominant_themes=row.dominant_themes or {},
+                metadata=row.meta or {},
+            )
+            for row in rows
+        ]
+        snapshots.reverse()
+        return snapshots
 
     @staticmethod
     def _average_vectors(vectors: Sequence[Sequence[float]]) -> list[float]:

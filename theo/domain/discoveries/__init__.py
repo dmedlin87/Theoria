@@ -2,6 +2,7 @@
 
 from .contradiction_engine import ContradictionDiscovery, ContradictionDiscoveryEngine
 from .engine import PatternDiscoveryEngine
+from .trend_engine import TrendDiscovery, TrendDiscoveryEngine
 from .models import (
     CorpusSnapshotSummary,
     DiscoveryType,
@@ -17,4 +18,6 @@ __all__ = [
     "DocumentEmbedding",
     "PatternDiscovery",
     "PatternDiscoveryEngine",
+    "TrendDiscovery",
+    "TrendDiscoveryEngine",
 ]
