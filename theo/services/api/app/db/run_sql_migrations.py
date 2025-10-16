@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 MIGRATIONS_PATH = Path(__file__).resolve().parent / "migrations"
 _MIGRATION_KEY_PREFIX = "db:migration:"
-_INGESTION_JOBS_TABLE_RE = re.compile(r"\bINGESTION_JOBS\b", re.IGNORECASE)
 
 
 _SUPPORTED_EXTENSIONS = {".sql", ".py"}
