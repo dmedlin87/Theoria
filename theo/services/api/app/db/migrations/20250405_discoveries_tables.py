@@ -18,21 +18,22 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
+from sqlalchemy.engine import Engine
 
 
-def _json_type(engine) -> JSON:
+def _json_type(engine: Engine) -> JSON:
     if engine.dialect.name == "postgresql":
         return postgresql.JSONB(astext_type=Text())
     return JSON
 
 
-def _boolean_default(engine) -> text:
+def _boolean_default(engine: Engine) -> text:
     if engine.dialect.name == "postgresql":
         return text("false")
     return text("0")
 
 
-def upgrade(*, session: Session, engine) -> None:  # pragma: no cover - executed via migration runner
+def upgrade(*, session: Session, engine: Engine) -> None:  # pragma: no cover - executed via migration runner
     metadata = MetaData()
     json_type = _json_type(engine)
     bool_default = _boolean_default(engine)

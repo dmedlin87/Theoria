@@ -5,7 +5,7 @@ import { forwardTraceHeaders } from "../../../trace";
 import { createProxyErrorResponse } from "../../../utils/proxyError";
 import { fetchWithTimeout } from "../../../utils/fetchWithTimeout";
 
-function buildAuthHeaders(): Headers {
+function buildAuthHeaders(request: NextRequest): Headers {
   const headers = new Headers({ Accept: "application/json" });
   const apiKey = process.env.THEO_SEARCH_API_KEY?.trim();
   if (apiKey) {
@@ -15,7 +15,10 @@ function buildAuthHeaders(): Headers {
       headers.set("X-API-Key", apiKey);
     }
   }
-  headers.set("content-type", "application/json");
+  const incomingContentType = request.headers.get("content-type");
+  if (incomingContentType) {
+    headers.set("content-type", incomingContentType);
+  }
   return headers;
 }
 
@@ -29,7 +32,7 @@ export async function POST(
     `/discoveries/${encodeURIComponent(id)}/feedback`,
     `${baseUrl}/api`
   );
-  const headers = buildAuthHeaders();
+  const headers = buildAuthHeaders(request);
   forwardTraceHeaders(request.headers, headers);
 
   let body: string;
