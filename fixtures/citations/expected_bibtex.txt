@@ -1,0 +1,20 @@
+@article{doc-1,
+  title = {Theology of Grace},
+  author = {Doe, Jane and Smith, John},
+  year = {2020},
+  journal = {Journal of Theology},
+  publisher = {Faith Press},
+  address = {New York},
+  pages = {1-12},
+  doi = {https://doi.org/10.1234/example},
+  url = {https://example.test/grace},
+  note = {Anchors: John.1.1 (p.5)}
+}
+
+@misc{doc-2,
+  title = {Sermon on Love},
+  author = {Johnson, Mary},
+  booktitle = {sermons},
+  url = {https://example.test/love},
+  note = {Anchors: John.3.16 (12s)}
+}

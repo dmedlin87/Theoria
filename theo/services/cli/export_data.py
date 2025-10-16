@@ -254,7 +254,13 @@ def export_search_command(
 @export.command("citations")
 @click.option(
     "--style",
-    type=click.Choice(["apa", "chicago", "csl-json"], case_sensitive=False),
+    type=click.Choice([
+        "apa",
+        "chicago",
+        "sbl",
+        "bibtex",
+        "csl-json",
+    ], case_sensitive=False),
     default="apa",
     show_default=True,
     help="Citation style to render.",

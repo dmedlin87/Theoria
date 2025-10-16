@@ -1,5 +1,3 @@
-/* Export Page Styles */
-
 .container {
   max-width: 960px;
   margin: 0 auto;
@@ -16,7 +14,6 @@
   margin-bottom: 1.5rem;
 }
 
-/* Form Section */
 .formSection {
   display: grid;
   gap: 1rem;
@@ -64,7 +61,6 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
-/* Buttons */
 .buttonGroup {
   display: flex;
   gap: 1rem;
@@ -112,7 +108,6 @@
   cursor: not-allowed;
 }
 
-/* Status Messages */
 .errorMessage {
   color: var(--color-danger);
   margin-bottom: 1.5rem;
@@ -123,7 +118,6 @@
   margin-bottom: 1.5rem;
 }
 
-/* Preview Section */
 .previewSection {
   display: grid;
   gap: 1rem;
@@ -157,7 +151,6 @@
   color: var(--color-text-muted);
 }
 
-/* Responsive adjustments */
 @media (max-width: 640px) {
   .container {
     padding: 1.5rem 1rem;
