@@ -91,7 +91,7 @@ class TrendDiscoveryEngine:
                     "date": snapshot.snapshot_date.astimezone(UTC).isoformat(),
                     "share": round(value * 100, 2),
                 }
-                for snapshot, value in zip(ordered, series, strict=False)
+                for snapshot, value in zip(ordered, series, strict=True)
             ]
             display_topic = labels.get(topic, topic.title())
             direction = "rising" if percent_change > 0 else "declining"
