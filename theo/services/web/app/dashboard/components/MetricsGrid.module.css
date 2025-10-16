@@ -1,0 +1,106 @@
+.section {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  align-items: baseline;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+}
+
+.caption {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-4);
+}
+
+.card {
+  padding: var(--spacing-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.cardLabel {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cardValue {
+  font-size: var(--font-size-3xl);
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-1);
+}
+
+.unit {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.cardDelta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.deltaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--spacing-2);
+  height: 28px;
+}
+
+.delta-up {
+  background: color-mix(in srgb, var(--color-success-200) 40%, transparent);
+  color: var(--color-success-700);
+}
+
+.delta-down {
+  background: color-mix(in srgb, var(--color-danger-200) 40%, transparent);
+  color: var(--color-danger-700);
+}
+
+.delta-flat {
+  background: var(--color-surface-stronger);
+  color: var(--color-text-secondary);
+}
+
+.deltaLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.empty {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
