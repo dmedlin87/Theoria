@@ -6,7 +6,7 @@ interface ProfileSummaryProps {
 }
 
 function formatLastLogin(lastLogin: string | null) {
-  if (!lastLogin) return "Sign in to personalise";
+  if (!lastLogin) return "Sign in to personalize";
   const date = new Date(lastLogin);
   if (Number.isNaN(date.getTime())) return "Active recently";
   return `Last active ${date.toLocaleString(undefined, {
