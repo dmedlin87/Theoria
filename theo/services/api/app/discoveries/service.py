@@ -14,6 +14,7 @@ from theo.domain.discoveries import (
     ContradictionDiscoveryEngine,
     DiscoveryType,
     DocumentEmbedding,
+    GapDiscoveryEngine,
     PatternDiscoveryEngine,
 )
 
@@ -49,10 +50,12 @@ class DiscoveryService:
         session: Session,
         pattern_engine: PatternDiscoveryEngine | None = None,
         contradiction_engine: ContradictionDiscoveryEngine | None = None,
+        gap_engine: GapDiscoveryEngine | None = None,
     ):
         self.session = session
         self.pattern_engine = pattern_engine or PatternDiscoveryEngine()
         self.contradiction_engine = contradiction_engine or ContradictionDiscoveryEngine()
+        self.gap_engine = gap_engine or GapDiscoveryEngine()
 
     def list(
         self,
@@ -95,17 +98,21 @@ class DiscoveryService:
         
         # Run pattern detection
         pattern_candidates, snapshot = self.pattern_engine.detect(documents)
-        
+
         # Run contradiction detection
         contradiction_candidates = self.contradiction_engine.detect(documents)
 
-        # Delete old discoveries (both patterns and contradictions)
+        # Run gap detection
+        gap_candidates = self.gap_engine.detect(documents)
+
+        # Delete old discoveries (patterns, contradictions, and gaps)
         self.session.execute(
             delete(Discovery).where(
                 Discovery.user_id == user_id,
                 Discovery.discovery_type.in_([
                     DiscoveryType.PATTERN.value,
                     DiscoveryType.CONTRADICTION.value,
+                    DiscoveryType.GAP.value,
                 ]),
             )
         )
@@ -148,6 +155,29 @@ class DiscoveryService:
                     "contradiction_type": candidate.contradiction_type,
                     **candidate.metadata,
                 },
+                created_at=datetime.now(UTC),
+            )
+            self.session.add(record)
+            persisted.append(record)
+
+        # Persist gap discoveries
+        for candidate in gap_candidates:
+            metadata = {
+                "reference_topic": candidate.reference_topic,
+                "missing_keywords": list(candidate.missing_keywords),
+                "shared_keywords": list(candidate.shared_keywords),
+                "related_documents": list(candidate.related_documents),
+            }
+            metadata.update(dict(candidate.metadata))
+            record = Discovery(
+                user_id=user_id,
+                discovery_type=DiscoveryType.GAP.value,
+                title=candidate.title,
+                description=candidate.description,
+                confidence=float(candidate.confidence),
+                relevance_score=float(candidate.relevance_score),
+                viewed=False,
+                meta=metadata,
                 created_at=datetime.now(UTC),
             )
             self.session.add(record)
