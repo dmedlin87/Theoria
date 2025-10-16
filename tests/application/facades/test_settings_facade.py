@@ -1,0 +1,132 @@
+import base64
+from cryptography.fernet import Fernet
+
+import pytest
+
+from theo.application.facades import settings as settings_module
+from theo.application.facades.runtime import allow_insecure_startup
+
+
+@pytest.fixture(autouse=True)
+def reset_settings_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure settings caches and relevant environment variables are isolated."""
+
+    for variable in (
+        "SETTINGS_SECRET_KEY",
+        "THEO_ALLOW_INSECURE_STARTUP",
+        "THEORIA_ENVIRONMENT",
+        "THEO_ENVIRONMENT",
+        "ENVIRONMENT",
+        "THEORIA_PROFILE",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+
+    settings_module.get_settings.cache_clear()
+    settings_module.get_settings_cipher.cache_clear()
+    allow_insecure_startup.cache_clear()
+
+    yield
+
+    settings_module.get_settings.cache_clear()
+    settings_module.get_settings_cipher.cache_clear()
+    allow_insecure_startup.cache_clear()
+
+
+def test_derive_fernet_key_is_deterministic() -> None:
+    first = settings_module._derive_fernet_key("super-secret")
+    second = settings_module._derive_fernet_key("super-secret")
+
+    assert first == second
+    assert isinstance(first, bytes)
+    # SHA256 produces 32 bytes; urlsafe base64 encoding yields 44 characters
+    assert len(first) == 44
+    # Encoded value should round-trip through base64 decoding without padding errors
+    assert base64.urlsafe_b64decode(first) == base64.urlsafe_b64decode(second)
+
+
+@pytest.mark.parametrize(
+    ("value", "kwargs", "expected"),
+    [
+        ("alpha, beta,, gamma", {}, ["alpha", "beta", "gamma"]),
+        (
+            '["One", "Two", " "]',
+            {"transform": lambda item: item.upper()},
+            ["ONE", "TWO"],
+        ),
+        (["first", "", "second"], {}, ["first", "second"]),
+        (None, {"default": ["fallback"]}, ["fallback"]),
+        ("  \n  ", {"default": ["fallback"]}, ["fallback"]),
+    ],
+)
+def test_parse_json_or_comma_collection_handles_variants(
+    value: object, kwargs: dict[str, object], expected: list[str]
+) -> None:
+    result = settings_module.Settings._parse_json_or_comma_collection(value, **kwargs)
+
+    assert result == expected
+
+
+def test_parse_json_or_comma_collection_invalid_type_raises() -> None:
+    with pytest.raises(ValueError):
+        settings_module.Settings._parse_json_or_comma_collection(42)
+
+
+def test_get_settings_cipher_uses_configured_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SETTINGS_SECRET_KEY", "application-secret")
+
+    cipher = settings_module.get_settings_cipher()
+
+    assert cipher is not None
+    token = cipher.encrypt(b"theoria")
+    mirror = Fernet(settings_module._derive_fernet_key("application-secret"))
+    assert mirror.decrypt(token) == b"theoria"
+
+
+def test_get_settings_cipher_returns_none_without_secret() -> None:
+    cipher = settings_module.get_settings_cipher()
+
+    assert cipher is None
+
+
+def test_get_settings_cipher_uses_insecure_fallback_when_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("THEO_ALLOW_INSECURE_STARTUP", "true")
+    monkeypatch.setenv("THEORIA_ENVIRONMENT", "development")
+    allow_insecure_startup.cache_clear()
+
+    cipher = settings_module.get_settings_cipher()
+
+    assert cipher is not None
+    token = cipher.encrypt(b"theoria")
+    fallback_key = settings_module._derive_fernet_key("theoria-insecure-test-secret")
+    mirror = Fernet(fallback_key)
+    assert mirror.decrypt(token) == b"theoria"
+
+
+def test_get_settings_cipher_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SETTINGS_SECRET_KEY", "cache-secret")
+    call_count = 0
+
+    class DummyFernet:
+        def __init__(self, key: bytes) -> None:
+            nonlocal call_count
+            call_count += 1
+            self.key = key
+
+        def encrypt(self, payload: bytes) -> bytes:  # pragma: no cover - not exercised
+            return payload
+
+        def decrypt(self, payload: bytes) -> bytes:  # pragma: no cover - not exercised
+            return payload
+
+    monkeypatch.setattr(settings_module, "Fernet", DummyFernet)
+
+    first = settings_module.get_settings_cipher()
+    second = settings_module.get_settings_cipher()
+
+    assert first is second
+    assert first.key == settings_module._derive_fernet_key("cache-secret")
+    assert call_count == 1
