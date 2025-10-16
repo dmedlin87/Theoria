@@ -197,7 +197,7 @@ class DiscoveryService:
 
     @staticmethod
     def _average_vectors(vectors: Sequence[Sequence[float]]) -> list[float]:
-        array = np.array(list(vectors), dtype=float)
+        array = np.array(vectors, dtype=float)
         if not np.isfinite(array).all():
             array = array[np.isfinite(array).all(axis=1)]
         if len(array) == 0:

@@ -1,7 +1,4 @@
-"""Discovery engine that clusters embeddings to surface corpus patterns."""
-
 from __future__ import annotations
-"""Core discovery engine building pattern-based insights."""
 
 from collections import Counter
 from typing import Iterable, Sequence
@@ -14,6 +11,8 @@ from .models import (
     DocumentEmbedding,
     PatternDiscovery,
 )
+
+"""Discovery engine that clusters embeddings to surface corpus patterns."""
 
 
 def _normalise_topics(topics: Sequence[str]) -> list[str]:
