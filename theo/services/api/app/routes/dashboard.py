@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Iterable
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, func, or_, select, and_, false
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
