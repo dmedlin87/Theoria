@@ -15,6 +15,13 @@ os.environ.setdefault("THEO_AUTH_ALLOW_ANONYMOUS", "1")
 os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
 os.environ.setdefault("THEORIA_ENVIRONMENT", "development")
 
+
+@pytest.fixture(autouse=True)
+def ensure_settings_secret_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Guarantee ``SETTINGS_SECRET_KEY`` is present for every test."""
+
+    monkeypatch.setenv("SETTINGS_SECRET_KEY", "test-secret-key")
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -79,3 +86,4 @@ def configure_redteam_environment(
             os.environ["THEO_API_KEYS"] = original_api_keys
 
         settings_module.get_settings.cache_clear()
+
