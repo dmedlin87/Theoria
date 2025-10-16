@@ -10,6 +10,16 @@ from theo.domain.discoveries.contradiction_engine import (
 from theo.domain.discoveries.models import DocumentEmbedding
 
 
+def _has_transformers() -> bool:
+    """Check if transformers library is available."""
+    try:
+        import transformers  # noqa: F401
+        import torch  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 @pytest.fixture
 def sample_documents():
     """Sample documents with contradictory claims."""
@@ -217,16 +227,6 @@ def test_check_contradiction_direct():
     assert 0.0 <= result["confidence"] <= 1.0
     assert "scores" in result
     assert "contradiction" in result["scores"]
-
-
-def _has_transformers() -> bool:
-    """Check if transformers library is available."""
-    try:
-        import transformers  # noqa: F401
-        import torch  # noqa: F401
-        return True
-    except ImportError:
-        return False
 
 
 if __name__ == "__main__":

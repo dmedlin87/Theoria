@@ -1,11 +1,6 @@
 {
   "ci": {
     "collect": {
-      "url": [
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3000/verse/John.3.16",
-        "http://127.0.0.1:3000/search"
-      ],
       "numberOfRuns": 1,
       "startServerCommand": "",
       "settings": {

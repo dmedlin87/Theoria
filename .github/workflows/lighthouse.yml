@@ -97,6 +97,7 @@ jobs:
           mkdir -p .lighthouseci
           npm run start -- --hostname 127.0.0.1 --port "$APP_PORT" \
             > .lighthouseci/server.log 2>&1 &
+          echo "Server PID: $!" >> .lighthouseci/server.log
 
       - name: Wait for server
         if: ${{ github.event.inputs.target != 'staging' }}
@@ -145,27 +146,34 @@ jobs:
       - name: Run Lighthouse CI
         if: ${{ github.event.inputs.target != 'staging' || steps.ping.outputs.reachable == 'true' }}
         env:
-          LHCI_COLLECT__URL: |
-            [
-              "${{ steps.select.outputs.app_origin }}",
-              "${{ steps.select.outputs.app_origin }}/verse/John.3.16",
-              "${{ steps.select.outputs.app_origin }}/search"
-            ]
+          LHCI_COLLECT__URL: '["${{ steps.select.outputs.app_origin }}","${{ steps.select.outputs.app_origin }}/verse/John.3.16","${{ steps.select.outputs.app_origin }}/search"]'
         run: |
-          npx --yes @lhci/cli@0.14.0 autorun --config ../../../lighthouserc.json
+          npx --yes @lhci/cli@0.15.1 autorun --config ../../../lighthouserc.json
 
       - name: Summarize Lighthouse delta
         if: ${{ github.event.inputs.target != 'staging' || steps.ping.outputs.reachable == 'true' }}
         shell: bash
         run: |
           set -eo pipefail
-          mkdir -p .lighthouseci/current
-          if [ -f .lighthouseci/manifest.json ]; then
-            cp .lighthouseci/manifest.json .lighthouseci/current/manifest.json
+          
+          # Check if current manifest exists
+          if [ ! -f .lighthouseci/manifest.json ]; then
+            echo "⚠️ No manifest.json generated - LHCI may have failed" >&2
+            echo "Check LHCI output above for errors" >&2
+            exit 1
           fi
+          
+          # Check if baseline exists
+          if [ ! -f ../../../.lighthouseci/baseline/manifest.json ]; then
+            echo "⚠️ No baseline found - skipping comparison" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "Run 'node scripts/lighthouse-init-baseline.mjs' to create baseline" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          
+          # Run comparison
           node ../../../scripts/compare-lighthouse-baseline.mjs \
             ../../../.lighthouseci/baseline/manifest.json \
-            .lighthouseci/current/manifest.json | tee -a "$GITHUB_STEP_SUMMARY"
+            .lighthouseci/manifest.json | tee -a "$GITHUB_STEP_SUMMARY"
           {
             echo "";
             echo "**Action items**";
