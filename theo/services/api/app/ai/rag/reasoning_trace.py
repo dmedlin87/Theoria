@@ -86,14 +86,24 @@ def build_reasoning_trace_from_completion(
 
 
 def _extract_citations(detail: str) -> list[int]:
+    """
+    Extract citation indices from a reasoning step detail string.
+
+    Assumes citations in the model output are 1-based (e.g., [1], [2], ...).
+    If citations are not 1-based, this function may produce incorrect indices.
+    Only positive citation numbers are considered valid.
+    """
     unique_indices: set[int] = set()
     for match in _CITATION_PATTERN.finditer(detail):
         try:
-            citation_number = int(match.group(1)) - 1
+            raw_number = int(match.group(1))
         except ValueError:
             continue
-        if citation_number >= 0:
-            unique_indices.add(citation_number)
+        if raw_number < 1:
+            # Invalid citation number; skip and optionally log or warn
+            continue
+        citation_index = raw_number - 1
+        unique_indices.add(citation_index)
     return sorted(unique_indices)
 
 
