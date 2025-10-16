@@ -329,8 +329,7 @@ def _join_with_and(values: Sequence[str], *, use_oxford_comma: bool = True) -> s
     if len(entries) == 1:
         return entries[0]
     if len(entries) == 2:
-        conjunction = ", and " if use_oxford_comma else " and "
-        return conjunction.join(entries)
+        return " and ".join(entries)
     prefix = ", ".join(entries[:-1])
     suffix = entries[-1]
     if use_oxford_comma:
