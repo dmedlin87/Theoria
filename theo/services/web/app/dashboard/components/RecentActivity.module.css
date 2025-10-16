@@ -1,0 +1,114 @@
+.section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-6);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-4);
+}
+
+.title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.viewAll {
+  font-size: var(--font-size-sm);
+  color: var(--color-primary-500);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.viewAll:hover {
+  color: var(--color-primary-600);
+  text-decoration: underline;
+}
+
+.loading {
+  padding: var(--spacing-8);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.empty {
+  padding: var(--spacing-8);
+  text-align: center;
+}
+
+.empty p {
+  margin: 0 0 var(--spacing-2) 0;
+  color: var(--color-text-secondary);
+}
+
+.emptyHint {
+  font-size: var(--font-size-sm);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.activity {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  background: var(--color-surface-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.activity:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  transform: translateX(4px);
+}
+
+.activity--blue:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.activity--green:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.activity--purple:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.icon {
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activityTitle {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timestamp {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}

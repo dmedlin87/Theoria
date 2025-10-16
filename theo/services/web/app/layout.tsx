@@ -55,6 +55,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     {
       label: "Workspace",
       items: [
+        { href: "/dashboard", label: "Dashboard", match: "/dashboard" },
         { href: "/chat", label: "Chat studio", match: "/chat" },
         { href: "/copilot", label: "Copilot" },
       ],

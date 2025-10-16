@@ -1,3 +1,5 @@
-export { metadata } from "./chat/page";
+import { redirect } from "next/navigation";
 
-export { default } from "./chat/page";
+export default function HomePage() {
+  redirect("/dashboard");
+}
