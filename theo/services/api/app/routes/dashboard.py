@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Iterable
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
@@ -29,6 +29,103 @@ def _principal_from_request(request: Request) -> dict | None:
     if isinstance(principal, dict):
         return principal
     return None
+
+
+def _principal_subject(principal: dict | None) -> str | None:
+    if not principal:
+        return None
+    for key in ("subject", "sub", "user_id", "id"):
+        value = principal.get(key)
+        if value:
+            return str(value)
+    return None
+
+
+def _principal_team_ids(principal: dict | None) -> tuple[str, ...]:
+    if not principal:
+        return ()
+
+    claims = principal.get("claims") or {}
+    teams: object = (
+        claims.get("teams")
+        or claims.get("team_ids")
+        or principal.get("teams")
+        or principal.get("team_ids")
+    )
+    if not teams:
+        return ()
+    if isinstance(teams, (str, bytes)):
+        teams = [teams]
+    return tuple(str(team) for team in teams if team)
+
+
+def _principal_tenant_ids(principal: dict | None) -> tuple[str, ...]:
+    if not principal:
+        return ()
+
+    claims = principal.get("claims") or {}
+    candidates: list[object] = [
+        principal.get("tenant_id"),
+        principal.get("tenant"),
+        claims.get("tenant_id"),
+        claims.get("tenant"),
+        claims.get("tenants"),
+    ]
+
+    tenant_ids: list[str] = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        if isinstance(candidate, (str, bytes)):
+            tenant_ids.append(str(candidate))
+        elif isinstance(candidate, (list, tuple, set)):
+            tenant_ids.extend(str(item) for item in candidate if item)
+
+    return tuple({tenant for tenant in tenant_ids if tenant})
+
+
+def _ownership_predicate(model, principal: dict | None):
+    """Return a SQLAlchemy predicate restricting ``model`` to the principal."""
+
+    if not principal:
+        return None
+
+    subject = _principal_subject(principal)
+    teams = _principal_team_ids(principal)
+    tenants = _principal_tenant_ids(principal)
+
+    expressions = []
+
+    if subject:
+        for attribute in ("created_by", "user_id", "owner_id", "author_id"):
+            column = getattr(model, attribute, None)
+            if column is not None:
+                expressions.append(column == subject)
+
+    if teams:
+        for attribute in ("team_id", "owner_team_id", "group_id"):
+            column = getattr(model, attribute, None)
+            if column is not None:
+                expressions.append(column.in_(teams))
+
+    if tenants:
+        column = getattr(model, "tenant_id", None)
+        if column is not None:
+            expressions.append(column.in_(tenants))
+
+    if not expressions:
+        return None
+
+    if len(expressions) == 1:
+        return expressions[0]
+    return or_(*expressions)
+
+
+def _apply_scope(stmt: Select, model, principal: dict | None) -> Select:
+    predicate = _ownership_predicate(model, principal)
+    if predicate is not None:
+        stmt = stmt.where(predicate)
+    return stmt
 
 
 def _parse_datetime(value: object) -> datetime | None:
@@ -59,18 +156,23 @@ def _period_counts(
     model,
     column,
     *,
+    principal: dict | None,
     current_start: datetime,
     previous_start: datetime,
 ) -> tuple[int, int]:
     """Return counts for the current and previous periods using ``column`` timestamps."""
 
-    current_count = session.execute(
-        select(func.count()).select_from(model).where(column >= current_start)
-    ).scalar_one()
+    current_stmt = select(func.count()).select_from(model).where(column >= current_start)
+    current_stmt = _apply_scope(current_stmt, model, principal)
+    current_count = session.execute(current_stmt).scalar_one()
 
-    previous_count = session.execute(
-        select(func.count()).select_from(model).where(column >= previous_start, column < current_start)
-    ).scalar_one()
+    previous_stmt = (
+        select(func.count())
+        .select_from(model)
+        .where(column >= previous_start, column < current_start)
+    )
+    previous_stmt = _apply_scope(previous_stmt, model, principal)
+    previous_count = session.execute(previous_stmt).scalar_one()
 
     return int(current_count or 0), int(previous_count or 0)
 
@@ -112,19 +214,26 @@ def _build_metric(
     )
 
 
-def _count_total(session: Session, model) -> int:
+def _count_total(session: Session, model, *, principal: dict | None) -> int:
     stmt: Select[int] = select(func.count()).select_from(model)
+    stmt = _apply_scope(stmt, model, principal)
     return int(session.execute(stmt).scalar_one() or 0)
 
 
-def _collect_activities(session: Session, limit: int = 8) -> list[DashboardActivity]:
+def _collect_activities(
+    session: Session, *, principal: dict | None, limit: int = 8
+) -> list[DashboardActivity]:
     """Gather a blended feed from recent domain artefacts."""
 
     activities: list[DashboardActivity] = []
 
-    document_rows = session.execute(
-        select(models.Document).order_by(models.Document.created_at.desc()).limit(limit)
-    ).scalars()
+    document_stmt = (
+        select(models.Document)
+        .order_by(models.Document.created_at.desc())
+        .limit(limit)
+    )
+    document_stmt = _apply_scope(document_stmt, models.Document, principal)
+    document_rows = session.execute(document_stmt).scalars()
     for document in document_rows:
         activities.append(
             DashboardActivity(
@@ -137,9 +246,13 @@ def _collect_activities(session: Session, limit: int = 8) -> list[DashboardActiv
             )
         )
 
-    note_rows = session.execute(
-        select(models.ResearchNote).order_by(models.ResearchNote.created_at.desc()).limit(limit)
-    ).scalars()
+    note_stmt = (
+        select(models.ResearchNote)
+        .order_by(models.ResearchNote.created_at.desc())
+        .limit(limit)
+    )
+    note_stmt = _apply_scope(note_stmt, models.ResearchNote, principal)
+    note_rows = session.execute(note_stmt).scalars()
     for note in note_rows:
         activities.append(
             DashboardActivity(
@@ -152,9 +265,13 @@ def _collect_activities(session: Session, limit: int = 8) -> list[DashboardActiv
             )
         )
 
-    discovery_rows = session.execute(
-        select(models.Discovery).order_by(models.Discovery.created_at.desc()).limit(limit)
-    ).scalars()
+    discovery_stmt = (
+        select(models.Discovery)
+        .order_by(models.Discovery.created_at.desc())
+        .limit(limit)
+    )
+    discovery_stmt = _apply_scope(discovery_stmt, models.Discovery, principal)
+    discovery_rows = session.execute(discovery_stmt).scalars()
     for discovery in discovery_rows:
         activities.append(
             DashboardActivity(
@@ -167,9 +284,13 @@ def _collect_activities(session: Session, limit: int = 8) -> list[DashboardActiv
             )
         )
 
-    notebook_rows = session.execute(
-        select(models.Notebook).order_by(models.Notebook.updated_at.desc()).limit(limit)
-    ).scalars()
+    notebook_stmt = (
+        select(models.Notebook)
+        .order_by(models.Notebook.updated_at.desc())
+        .limit(limit)
+    )
+    notebook_stmt = _apply_scope(notebook_stmt, models.Notebook, principal)
+    notebook_rows = session.execute(notebook_stmt).scalars()
     for notebook in notebook_rows:
         activities.append(
             DashboardActivity(
@@ -225,6 +346,8 @@ def get_dashboard_summary(
 ) -> DashboardSummary:
     """Return personalised dashboard content for the active user."""
 
+    principal = _principal_from_request(request)
+
     now = datetime.now(UTC)
     current_start = now - timedelta(days=7)
     previous_start = current_start - timedelta(days=7)
@@ -233,6 +356,7 @@ def get_dashboard_summary(
         session,
         models.Document,
         models.Document.created_at,
+        principal=principal,
         current_start=current_start,
         previous_start=previous_start,
     )
@@ -240,6 +364,7 @@ def get_dashboard_summary(
         session,
         models.ResearchNote,
         models.ResearchNote.created_at,
+        principal=principal,
         current_start=current_start,
         previous_start=previous_start,
     )
@@ -247,6 +372,7 @@ def get_dashboard_summary(
         session,
         models.Discovery,
         models.Discovery.created_at,
+        principal=principal,
         current_start=current_start,
         previous_start=previous_start,
     )
@@ -254,6 +380,7 @@ def get_dashboard_summary(
         session,
         models.Notebook,
         models.Notebook.updated_at,
+        principal=principal,
         current_start=current_start,
         previous_start=previous_start,
     )
@@ -262,34 +389,34 @@ def get_dashboard_summary(
         _build_metric(
             metric_id="documents",
             label="Documents indexed",
-            value=_count_total(session, models.Document),
+            value=_count_total(session, models.Document, principal=principal),
             unit=None,
             delta=_percentage_delta(documents_current, documents_previous),
         ),
         _build_metric(
             metric_id="notes",
             label="Research notes",
-            value=_count_total(session, models.ResearchNote),
+            value=_count_total(session, models.ResearchNote, principal=principal),
             unit=None,
             delta=_percentage_delta(notes_current, notes_previous),
         ),
         _build_metric(
             metric_id="discoveries",
             label="Discoveries surfaced",
-            value=_count_total(session, models.Discovery),
+            value=_count_total(session, models.Discovery, principal=principal),
             unit=None,
             delta=_percentage_delta(discoveries_current, discoveries_previous),
         ),
         _build_metric(
             metric_id="notebooks",
             label="Active notebooks",
-            value=_count_total(session, models.Notebook),
+            value=_count_total(session, models.Notebook, principal=principal),
             unit=None,
             delta=_percentage_delta(notebooks_current, notebooks_previous),
         ),
     ]
 
-    activity = _collect_activities(session)
+    activity = _collect_activities(session, principal=principal)
     quick_actions = _quick_actions()
     user = _resolve_user_summary(request)
 

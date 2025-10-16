@@ -96,13 +96,14 @@ def _seed_dashboard_records(session: Session, now: datetime) -> None:
         osis="John.3.16",
         title="Love of God",
         body="Observation",
+        created_by="test",
         created_at=last_week,
         updated_at=last_week,
     )
 
     discovery = models.Discovery(
         id=1,
-        user_id="test-user",
+        user_id="test",
         discovery_type="theme",
         title="Pauline emphasis",
         description="New cross-reference surfaced",
