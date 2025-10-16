@@ -106,7 +106,7 @@ function normaliseEvidence(
     return null;
   }
   const citationIds = Array.isArray(record.citation_ids ?? record.citationIds)
-    ? (record.citation_ids ?? record.citationIds ?? [])
+    ? (record.citation_ids ?? record.citationIds)
         .map((item: unknown) =>
           typeof item === "number" && Number.isFinite(item) ? Math.trunc(item) : null
         )
