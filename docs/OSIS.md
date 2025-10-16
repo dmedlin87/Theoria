@@ -1,6 +1,6 @@
 # OSIS Normalization
 
-Theo Engine uses the [OSIS](https://www.bibletechnologies.net/) schema to
+Theoria uses the [OSIS](https://www.bibletechnologies.net/) schema to
 normalize Bible references across the corpus.
 
 ## Detection Pipeline

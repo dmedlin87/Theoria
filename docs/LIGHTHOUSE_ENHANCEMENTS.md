@@ -241,7 +241,7 @@ Workflow skips LHCI if staging is down (by design):
 
 ```
 Note skip (staging unreachable)
-Skipping LHCI; https://staging.theoengine.com unreachable.
+Skipping LHCI; https://staging.Theoria.com unreachable.
 ```
 
 Staging tests are optional - localhost tests always run.

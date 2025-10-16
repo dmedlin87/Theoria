@@ -1,10 +1,10 @@
 # Performance Monitoring Policy
 
-This guide outlines how the Theo Engine team evaluates web performance in CI and how those lab runs relate to production data. Use it to interpret Lighthouse reports, understand why the numbers differ from Core Web Vitals collected in the field, and know when to open follow-up issues.
+This guide outlines how the Theoria team evaluates web performance in CI and how those lab runs relate to production data. Use it to interpret Lighthouse reports, understand why the numbers differ from Core Web Vitals collected in the field, and know when to open follow-up issues.
 
 ## Lab (Lighthouse) versus Field (RUM) data
 
-Theo Engine's CI pipeline runs Lighthouse against controlled builds of the web UI. These synthetic measurements are:
+Theoria's CI pipeline runs Lighthouse against controlled builds of the web UI. These synthetic measurements are:
 
 - **Deterministic hardware/network** – Each run uses a standardized CPU throttle, network shaping, and cold cache to keep comparisons fair across commits.
 - **Isolated test pages** – We evaluate key flows (landing page, authenticated dashboard, document reader) without background tabs or user interaction noise.
@@ -116,4 +116,4 @@ Document the affected route, suspected cause, and mitigation plan in the issue. 
 The CI summary reiterates the hypotheses and load-test reminders to keep the team aligned whenever thresholds are close to
 failing. Use it as a prompt to document unknowns immediately instead of waiting until post-merge triage.
 
-Keeping both lab and field metrics healthy ensures Theo Engine delivers responsive study experiences across devices and networks.
+Keeping both lab and field metrics healthy ensures Theoria delivers responsive study experiences across devices and networks.

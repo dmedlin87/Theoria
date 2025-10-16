@@ -4,7 +4,7 @@
 Proposed
 
 ## Context
-Theo Engine is adding Model Context Protocol (MCP) tools to expose the
+Theoria is adding Model Context Protocol (MCP) tools to expose the
 established FastAPI capabilities through the Apps SDK. The API already delivers
 search, research, and background job management functionality that we intend to
 wrap with MCP tools so that first- and third-party experiences can reuse the
@@ -72,7 +72,7 @@ FastAPI layer using the existing authentication strategy:
    before GA, with telemetry monitored through the shared logger and job metrics.
 
 ## Consequences
-* Apps SDK consumers can reuse Theo Engine capabilities without reimplementing
+* Apps SDK consumers can reuse Theoria capabilities without reimplementing
   business logic, ensuring consistent validation and throttling.
 * Maintenance cost drops because JSON schemas and input validation stay unified
   between HTTP and MCP surfaces.

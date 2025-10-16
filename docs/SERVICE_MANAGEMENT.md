@@ -2,7 +2,7 @@
 
 ## Overview
 
-The TheoEngine service launcher (`start-theoria.ps1`) is an intelligent orchestration system that manages the full-stack application lifecycle with built-in resilience, monitoring, and diagnostic capabilities.
+The Theoria service launcher (`start-theoria.ps1`) is an intelligent orchestration system that manages the full-stack application lifecycle with built-in resilience, monitoring, and diagnostic capabilities.
 
 ## Key Features
 
@@ -483,4 +483,4 @@ To improve the service management system:
 
 ## License
 
-Part of the TheoEngine project. See root LICENSE file.
+Part of the Theoria project. See root LICENSE file.

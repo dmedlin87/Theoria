@@ -1,10 +1,10 @@
-# Theo Engine Web UI Overhaul Proposal
+# Theoria Web UI Overhaul Proposal
 
 ## Executive summary
 
 The current Next.js front end (see `theo/services/web/app/layout.tsx` and `theo/services/web/app/globals.css`) delivers a stable research workspace, yet its structure still resembles the first production-ready iteration. The navigation is a simple horizontal list, the body content is constrained to a single column, and key workflows (chat, search, verse explorer, copilot, upload) each implement their own layout patterns. A comprehensive redesign can elevate the product into a modern, sleek application that feels purpose-built for theological research, while preserving the mature data and workflow foundations already in place.
 
-This proposal outlines a holistic overhaul that introduces a cohesive design system, adaptive information architecture, multi-pane research workspaces, and premium interaction polish. The intent is to ship the redesign incrementally without destabilising existing features, while enabling a new visual language that reflects Theo Engine's credibility and focus on grounded scholarship.
+This proposal outlines a holistic overhaul that introduces a cohesive design system, adaptive information architecture, multi-pane research workspaces, and premium interaction polish. The intent is to ship the redesign incrementally without destabilising existing features, while enabling a new visual language that reflects Theoria's credibility and focus on grounded scholarship.
 
 ## Goals and non-goals
 
@@ -166,4 +166,4 @@ Deliverable: Public launch of redesigned UI with supporting documentation and re
 2. Create a component inventory audit documenting current styles vs. target tokens.
 3. Kick off Phase 1 implementation with shell scaffolding behind feature flag and begin usability testing with internal theologians.
 
-With this roadmap, Theo Engine's interface can evolve into a refined, modern research environment that matches the sophistication of its underlying retrieval and generative systems.
+With this roadmap, Theoria's interface can evolve into a refined, modern research environment that matches the sophistication of its underlying retrieval and generative systems.

@@ -1,6 +1,6 @@
 # Chunking Strategy
 
-Theo Engine distinguishes between paginated sources (PDF, DOCX) and temporal
+Theoria distinguishes between paginated sources (PDF, DOCX) and temporal
 sources (audio, video transcripts). Chunking must preserve citation anchors and
 minimize verse boundary splits.
 

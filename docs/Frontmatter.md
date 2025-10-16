@@ -1,6 +1,6 @@
 # Frontmatter Conventions
 
-Theo Engine optionally reads YAML or JSON frontmatter blocks to enrich metadata
+Theoria optionally reads YAML or JSON frontmatter blocks to enrich metadata
 and deduplicate documents.
 
 ## Supported Keys

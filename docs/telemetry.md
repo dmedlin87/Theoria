@@ -1,6 +1,6 @@
 # Telemetry Quickstart
 
-Theo Engine workflows now emit traces, metrics, and structured logs so you can
+Theoria workflows now emit traces, metrics, and structured logs so you can
 observe each run end-to-end. This guide walks through enabling the local
 console exporter, generating a sample workflow run, and inspecting the emitted
 signals.
@@ -80,6 +80,6 @@ histogram `theo_workflow_latency_seconds`.
   [End-to-End Debugging Guide](./debugging-guide.md) for step-by-step tracing
   instructions that build on the new trace propagation hooks.
 
-With these steps you can locally validate that Theo Engine workflows expose
+With these steps you can locally validate that Theoria workflows expose
 healthy telemetry before wiring them into a full observability stack.
 

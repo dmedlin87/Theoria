@@ -1,6 +1,6 @@
 # Search API Authentication
 
-Theo Engine's search endpoints are protected by the same authentication layer as the rest of the FastAPI service. This guide walks through configuring credentials, choosing the correct headers, and wiring local tooling so every search request is accepted by the API gateway.
+Theoria's search endpoints are protected by the same authentication layer as the rest of the FastAPI service. This guide walks through configuring credentials, choosing the correct headers, and wiring local tooling so every search request is accepted by the API gateway.
 
 ## Configure credentials
 

@@ -1,7 +1,7 @@
 # End-to-End Debugging Guide
 
 This guide explains how to follow a user request from the front-end through the
-Theo Engine API telemetry and into the persistence layer. The instructions lean
+Theoria API telemetry and into the persistence layer. The instructions lean
 on the trace propagation work that surfaces a single identifier across the UI,
 structured API logs, emitted spans, and database records.
 
@@ -88,5 +88,5 @@ By carrying the `debug_report_id` (trace ID) from the UI into your log search
 and telemetry tooling, you can pivot from a failed front-end action straight to
 its API request metadata, correlated spans, Prometheus metrics, and finally the
 database rows that record the canonical state. This end-to-end propagation is
-now part of the default Theo Engine stack, so you can debug issues quickly
+now part of the default Theoria stack, so you can debug issues quickly
 without having to reproduce them manually.

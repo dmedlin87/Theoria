@@ -4,7 +4,7 @@
 
 ### What We Built
 
-A comprehensive reasoning framework that transforms the TheoEngine agent from a reactive RAG system into an autonomous theological detective with:
+A comprehensive reasoning framework that transforms the Theoria agent from a reactive RAG system into an autonomous theological detective with:
 
 ✅ **Logical fallacy detection** - 9 fallacy types with suggestions  
 ✅ **Chain-of-thought scaffolding** - 4 reasoning modes (detective, critic, apologist, synthesizer)  

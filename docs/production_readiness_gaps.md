@@ -14,7 +14,7 @@ This document captures the highest-risk items currently blocking a production-re
 
 ## 3. Security contact GPG key is missing
 - **Impact:** Medium – Coordinated disclosure cannot be encrypted as promised in the security policy, eroding trust with external reporters.
-- **Evidence:** `SECURITY.md` references a pending `docs/keys/security.asc` artifact for the `security@theoengine.com` address, but the key directory is absent from the repository.【F:SECURITY.md†L12-L28】【c9db24†L1-L3】
+- **Evidence:** `SECURITY.md` references a pending `docs/keys/security.asc` artifact for the `security@Theoria.com` address, but the key directory is absent from the repository.【F:SECURITY.md†L12-L28】【c9db24†L1-L3】
 - **Remediation:** Publish the referenced ASCII-armored GPG key (or update the policy with an alternate secure channel) and ensure the disclosure process is verifiable.
 
 ## Next Steps

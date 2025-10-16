@@ -1,6 +1,6 @@
-# Theoria (TheoEngine) — Project Instruction Prompt (v0.9)
+# Theoria (Theoria) — Project Instruction Prompt (v0.9)
 
-> **Scope:** This is the master instruction prompt for *Theoria* (formerly “TheoEngine”). Anywhere you see “TheoEngine” or “Theoria,” treat them as synonyms for the same app. Use this to orchestrate research runs, enforce schemas, choose models/tools, and protect quality (no regressions).
+> **Scope:** This is the master instruction prompt for *Theoria* (formerly “Theoria”). Anywhere you see “Theoria” or “Theoria,” treat them as synonyms for the same app. Use this to orchestrate research runs, enforce schemas, choose models/tools, and protect quality (no regressions).
 
 ---
 
@@ -108,7 +108,7 @@ Log inputs/outputs (sans PII) in `run_logs.tools[]`.
 {
   "run_meta": {
     "app": "Theoria",
-    "app_alias": ["TheoEngine"],
+    "app_alias": ["Theoria"],
     "rubric_version": "2025-10-12",
     "schema_version": "2025-10-12",
     "model_final": "gpt-5",

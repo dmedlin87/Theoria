@@ -23,7 +23,7 @@ This guide turns the high-level MCP integration plan into a concrete runbook for
 ## 2. Activate MCP server with stable schema URLs
 
 1. Start the MCP FastAPI application defined at `mcp_server/server.py`. For Docker-based workflows, add a new service that runs `uvicorn mcp_server.server:app --host 0.0.0.0 --port 8081` with the same environment file used by the API.
-2. Set `MCP_SCHEMA_BASE_URL` to the externally reachable base URL of the MCP deployment (for example `https://theoengine.example.com/mcp`). This value is used to build `$id` and `$ref` fields inside `/metadata` responses so ChatGPT can dereference schemas.
+2. Set `MCP_SCHEMA_BASE_URL` to the externally reachable base URL of the MCP deployment (for example `https://Theoria.example.com/mcp`). This value is used to build `$id` and `$ref` fields inside `/metadata` responses so ChatGPT can dereference schemas.
 3. Document the required headers for connector clients. Every request to `/tools/*` must include:
    - `X-End-User-Id` (string UUID or opaque identifier for the ChatGPT session).
    - Optional `X-Tenant-Id` if multi-tenant separation is required.

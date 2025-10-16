@@ -1,6 +1,6 @@
-# Theo Engine API
+# Theoria API
 
-Theo Engine exposes a FastAPI application located at
+Theoria exposes a FastAPI application located at
 `theo/services/api/app`. The service is designed around JSON responses and
 multipart uploads for binary content.
 
@@ -865,7 +865,7 @@ the 0–1 range for consistent UI rendering.
 
 ## Reference datasets & seeds
 
-Theo Engine bundles starter datasets to light up the research dock without
+Theoria bundles starter datasets to light up the research dock without
 external dependencies:
 
 - `data/seeds/contradictions.json` – community-curated tensions/harmonies.
@@ -882,7 +882,7 @@ intersections.
 
 ## AI routing and guardrails
 
-Theo Engine's `/ai/*` workflows call a routing service layered on top of the LLM
+Theoria's `/ai/*` workflows call a routing service layered on top of the LLM
 registry. Each registered model can optionally include three metadata
 containers:
 

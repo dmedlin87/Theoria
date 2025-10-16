@@ -13,14 +13,15 @@
 - ⚡ **Fast** – GPU-accelerated animations, optimized performance
 - 🔌 **MCP Integration** – Connect to ChatGPT and other AI tools
 
-## 📚 Quick Links
+## 📚 Documentation
 
-- **[System Architecture](docs/BLUEPRINT.md)** – Complete design and architecture
-- **[Codebase Review](docs/CODEBASE_REVIEW.md)** – Current implementation overview and documentation index
-- **[Getting Started](#quick-start)** – Run locally in minutes
-- **[UI Demo](http://localhost:3000/demo-animations)** – See animations live (after starting dev server)
-- **[API Documentation](http://localhost:8000/docs)** – Interactive API explorer
-- **[Case Builder v4](case%20builder%20v4.md)** – Latest specifications
+- **[📖 Documentation Index](docs/INDEX.md)** – Complete documentation organized by topic
+- **[🚀 Getting Started](#quick-start)** – Run locally in minutes
+- **[🏗️ System Architecture](docs/BLUEPRINT.md)** – Complete design and architecture
+- **[🔍 Codebase Review](docs/CODEBASE_REVIEW.md)** – Current implementation overview
+- **[🎨 UI Demo](http://localhost:3000/demo-animations)** – See animations live (after starting dev server)
+- **[📡 API Documentation](http://localhost:8000/docs)** – Interactive API explorer
+- **[🧩 Case Builder](docs/CASE_BUILDER.md)** – Feature specification and roadmap
 
 ## 🎉 What's New
 
@@ -32,7 +33,7 @@
 - 📱 **PWA Manifest** – Install Theoria as a native app on any device
 - ♿ **Accessibility** – Full WCAG 2.1 AA compliance with reduced motion support
 
-See [ANIMATION_ENHANCEMENTS_COMPLETE.md](ANIMATION_ENHANCEMENTS_COMPLETE.md) for complete details.
+See [docs/archive/2025-10/](docs/archive/2025-10/) for implementation details and [docs/UI_NAVIGATION_LOADING_IMPROVEMENTS.md](docs/UI_NAVIGATION_LOADING_IMPROVEMENTS.md) for ongoing UI guidelines.
 
 ## Features
 

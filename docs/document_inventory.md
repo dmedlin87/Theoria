@@ -18,7 +18,7 @@ This inventory lists every Markdown/PDF document tracked in the repository as of
 | `FRONTEND_PERFORMANCE_IMPROVEMENTS.md` | # Frontend Performance & Error Handling Improvements | 2025-10-15 | Archive or consolidate once knowledge is captured. |
 | `HANDOFF_DISCOVERY_AND_ROADMAP.md` | # 🔄 Handoff Document - Discovery Feature & Future Roadmap | 2025-10-15 | Keep actively maintained; ensure contents stay current. |
 | `LANGCHAIN_SECURITY_NOTE.md` | # LangChain Text Splitters Security Advisory | 2025-10-15 | Keep actively maintained; ensure contents stay current. |
-| `MEMORY_LEAK_REVIEW.md` | # Memory Leak Review - TheoEngine | 2025-10-12 | Keep actively maintained; ensure contents stay current. |
+| `MEMORY_LEAK_REVIEW.md` | # Memory Leak Review - Theoria | 2025-10-12 | Keep actively maintained; ensure contents stay current. |
 | `MORE_ANIMATIONS_ADDED.md` | # More Animations Added - Bounce, Pulse & More! | 2025-10-13 | Archive or consolidate once knowledge is captured. |
 | `NAVIGATION_IMPROVEMENTS.md` | # Navigation Button Improvements - Theoria | 2025-10-12 | Archive or consolidate once knowledge is captured. |
 | `PYTEST_FIX_SUMMARY.md` | # Pytest Test Discovery Fix | 2025-10-12 | Archive or consolidate once knowledge is captured. |
@@ -76,8 +76,8 @@ This inventory lists every Markdown/PDF document tracked in the repository as of
 | --- | --- | --- | --- |
 | `docs/AGENT_CONFINEMENT.md` | # Agent Confinement Framework | 2025-10-12 | Needs manual triage for relevance. |
 | `docs/AGENT_THINKING_ENHANCEMENT.md` | # AI Agent Thinking Scaffolding Enhancement | 2025-10-12 | Needs manual triage for relevance. |
-| `docs/API.md` | # Theo Engine API | 2025-10-12 | Keep actively maintained; ensure contents stay current. |
-| `docs/BLUEPRINT.md` | # Theo Engine — Final Build Spec (Standalone) | 2025-10-12 | Review & refresh against current roadmap. |
+| `docs/API.md` | # Theoria API | 2025-10-12 | Keep actively maintained; ensure contents stay current. |
+| `docs/BLUEPRINT.md` | # Theoria — Final Build Spec (Standalone) | 2025-10-12 | Review & refresh against current roadmap. |
 | `docs/CLI.md` | # Bulk ingestion CLI | 2025-10-10 | Needs manual triage for relevance. |
 | `docs/CODEBASE_REVIEW.md` | # Theoria Codebase Review | 2025-10-13 | Keep actively maintained; ensure contents stay current. |
 | `docs/Chunking.md` | # Chunking Strategy | 2025-09-27 | Needs manual triage for relevance. |
@@ -96,7 +96,7 @@ This inventory lists every Markdown/PDF document tracked in the repository as of
 | `docs/SERVICE_MANAGEMENT.md` | # Service Management & Health Monitoring | 2025-10-12 | Needs manual triage for relevance. |
 | `docs/STRATEGIC_ROADMAP.pdf` | (PDF document) | 2025-09-27 | Manually review PDF contents; likely strategic artifact. |
 | `docs/UI_NAVIGATION_LOADING_IMPROVEMENTS.md` | # Web UI Navigation and Loading States Improvements | 2025-10-12 | Archive or consolidate once knowledge is captured. |
-| `docs/adr/0001-expose-theoengine-via-mcp.md` | # ADR 0001: Expose Theoria via the Model Context Protocol | 2025-10-11 | Needs manual triage for relevance. |
+| `docs/adr/0001-expose-Theoria-via-mcp.md` | # ADR 0001: Expose Theoria via the Model Context Protocol | 2025-10-11 | Needs manual triage for relevance. |
 | `docs/adr/0001-hexagonal-architecture.md` | # ADR 0001: Adopt Hexagonal Architecture with Domain-Centric Modules | 2025-10-12 | Keep actively maintained; ensure contents stay current. |
 | `docs/adr/0001-mcp-tools-and-apps-sdk.md` | # ADR 0001: MCP Tools and Apps SDK Integration | 2025-10-07 | Needs manual triage for relevance. |
 | `docs/adr/0002-ci-security-guardrails.md` | # ADR 0002: Harden CI/CD with Security Gates | 2025-10-12 | Keep actively maintained; ensure contents stay current. |
@@ -133,12 +133,12 @@ This inventory lists every Markdown/PDF document tracked in the repository as of
 | `docs/telemetry.md` | # Telemetry Quickstart | 2025-09-28 | Needs manual triage for relevance. |
 | `docs/testing/TEST_MAP.md` | # Theoria Test Map | 2025-10-11 | Keep actively maintained; ensure contents stay current. |
 | `docs/theo_engine_case_builder_buddy_convergence_triggers_blueprint.md` | # Theoria – Case Builder Buddy: Convergence Triggers Blueprint | 2025-10-11 | Review & refresh against current roadmap. |
-| `docs/theoria_instruction_prompt.md` | # Theoria (TheoEngine) — Project Instruction Prompt (v0.9) | 2025-10-12 | Needs manual triage for relevance. |
+| `docs/theoria_instruction_prompt.md` | # Theoria (Theoria) — Project Instruction Prompt (v0.9) | 2025-10-12 | Needs manual triage for relevance. |
 | `docs/triage_tasks.md` | # Potential Maintenance Tasks | 2025-10-12 | Needs manual triage for relevance. |
 | `docs/typing-standards.md` | # Typing standards rollout communication | 2025-10-11 | Keep actively maintained; ensure contents stay current. |
 | `docs/ui-quality-gates.md` | # UI Quality Gates Reference | 2025-10-12 | Needs manual triage for relevance. |
 | `docs/ui_guidelines.md` | # Theoria UI Guidelines | 2025-10-11 | Keep actively maintained; ensure contents stay current. |
-| `docs/ui_overhaul_proposal.md` | # Theo Engine Web UI Overhaul Proposal | 2025-09-30 | Review & refresh against current roadmap. |
+| `docs/ui_overhaul_proposal.md` | # Theoria Web UI Overhaul Proposal | 2025-09-30 | Review & refresh against current roadmap. |
 
 ## fixtures
 | Path | First heading / line | Last commit | Suggested action |
