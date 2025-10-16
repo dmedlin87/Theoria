@@ -51,6 +51,9 @@ def search_contradictions(
     if not candidates:
         return []
 
+    if limit <= 0:
+        return []
+
     allowed_perspectives = {
         p.strip().lower()
         for p in (perspectives or [])
@@ -64,21 +67,8 @@ def search_contradictions(
     if not windows:
         return []
 
-    perspective_filter_active = bool(allowed_perspectives)
-    include_contradictions = not perspective_filter_active or bool(
-        allowed_perspectives & {"skeptical", "neutral"}
-    )
-    include_harmonies = not perspective_filter_active or bool(
-        allowed_perspectives & {"apologetic", "neutral"}
-    )
-
-    contradiction_seeds: list[ContradictionSeed] = []
-    harmony_seeds: list[HarmonySeed] = []
-
-    if include_contradictions:
-        contradiction_seeds = query_pair_seed_rows(session, windows, ContradictionSeed)
-    if include_harmonies:
-        harmony_seeds = query_pair_seed_rows(session, windows, HarmonySeed)
+    contradiction_seeds = query_pair_seed_rows(session, windows, ContradictionSeed)
+    harmony_seeds = query_pair_seed_rows(session, windows, HarmonySeed)
     topic_lower = topic.lower() if topic else None
     scored: list[_ScoredSeed] = []
 
