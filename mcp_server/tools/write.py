@@ -274,6 +274,9 @@ async def note_write(
                     session,
                     commit=True,
                     draft=draft,
+                    request_id=request.request_id,
+                    end_user_id=validated_user_id,
+                    tenant_id=validated_tenant_id,
                 )
                 response = schemas.NoteWriteResponse(
                     request_id=request.request_id,
@@ -287,6 +290,9 @@ async def note_write(
                 preview = generate_research_note_preview(
                     session,
                     draft=draft,
+                    request_id=request.request_id,
+                    end_user_id=validated_user_id,
+                    tenant_id=validated_tenant_id,
                 )
                 response = schemas.NoteWriteResponse(
                     request_id=request.request_id,
