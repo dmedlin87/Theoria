@@ -162,7 +162,7 @@ def resolve_passage_reference(passage: str) -> str:
 
     if not passage or not passage.strip():
         raise PassageResolutionError("Provide a passage to analyse.")
-    
+
     # Prevent ReDoS attacks by rejecting overly long inputs
     if len(passage) > 200:
         raise PassageResolutionError("Passage reference too long (max 200 characters).")

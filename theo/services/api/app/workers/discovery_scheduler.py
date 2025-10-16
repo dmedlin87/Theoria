@@ -4,19 +4,38 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
+
+from theo.services.bootstrap import resolve_application
 
 from ..db.models import Document
 from ..discoveries import DiscoveryService
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-
 logger = logging.getLogger(__name__)
+
+
+_APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+_SESSION_FACTORY: sessionmaker[Session] | None = None
+
+
+def _get_session_factory() -> sessionmaker[Session]:
+    """Lazily initialise and cache the session factory via platform bootstrap."""
+
+    global _SESSION_FACTORY
+    if _SESSION_FACTORY is None:
+        engine = _ADAPTER_REGISTRY.resolve("engine")
+        _SESSION_FACTORY = sessionmaker(
+            bind=engine,
+            autoflush=False,
+            autocommit=False,
+            expire_on_commit=False,
+            future=True,
+        )
+    return _SESSION_FACTORY
 
 
 class DiscoveryScheduler:
@@ -68,9 +87,7 @@ class DiscoveryScheduler:
 
     def _refresh_all_users(self):
         """Background task to refresh discoveries for all active users."""
-        from theo.application.facades.database import get_session_factory
-
-        session_factory = get_session_factory()
+        session_factory = _get_session_factory()
         session = session_factory()
 
         try:

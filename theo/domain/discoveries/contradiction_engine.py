@@ -28,7 +28,7 @@ class ContradictionDiscovery:
 
 class ContradictionDiscoveryEngine:
     """Detect contradictions between documents using NLI (Natural Language Inference).
-    
+
     This engine uses a pre-trained NLI model to compare claims from different documents
     and identify contradictions. It's particularly useful for theological research where
     different authors may have conflicting interpretations.
@@ -42,7 +42,7 @@ class ContradictionDiscoveryEngine:
         min_confidence: float = 0.6,
     ):
         """Initialize the contradiction detection engine.
-        
+
         Args:
             model_name: HuggingFace model for NLI (default: DeBERTa-v3-base-mnli)
             contradiction_threshold: Minimum score to consider a contradiction (0.0-1.0)
@@ -74,10 +74,10 @@ class ContradictionDiscoveryEngine:
         self, documents: Sequence[DocumentEmbedding]
     ) -> list[ContradictionDiscovery]:
         """Detect contradictions between documents.
-        
+
         Args:
             documents: List of documents with embeddings and metadata
-            
+
         Returns:
             List of contradiction discoveries sorted by confidence (highest first)
         """
@@ -119,7 +119,7 @@ class ContradictionDiscoveryEngine:
         self, documents: Sequence[DocumentEmbedding]
     ) -> list[dict[str, object]]:
         """Extract claims from documents for comparison.
-        
+
         For now, we use document abstracts or titles as proxy claims.
         Future: Extract actual claims using claim extraction models.
         """
@@ -149,11 +149,11 @@ class ContradictionDiscoveryEngine:
 
     def _check_contradiction(self, text_a: str, text_b: str) -> dict[str, object]:
         """Check if two texts contradict each other using NLI.
-        
+
         Args:
             text_a: First text (premise)
             text_b: Second text (hypothesis)
-            
+
         Returns:
             Dict with keys: is_contradiction (bool), confidence (float), scores (dict)
         """

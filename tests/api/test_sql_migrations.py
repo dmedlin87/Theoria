@@ -336,6 +336,14 @@ def test_sqlite_startup_restores_missing_perspective_column(
     get_settings.cache_clear()
     database_module._engine = None  # type: ignore[attr-defined]
     database_module._SessionLocal = None  # type: ignore[attr-defined]
+    def _repair_only(session: Session) -> None:
+        seeds_module._repair_missing_perspective_columns(session)
+
+    monkeypatch.setattr(seeds_module, "seed_reference_data", _repair_only)
+    monkeypatch.setattr(
+        "theo.services.api.app.main.seed_reference_data",
+        _repair_only,
+    )
 
     try:
         with TestClient(app):

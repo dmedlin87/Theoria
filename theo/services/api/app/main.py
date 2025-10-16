@@ -121,7 +121,7 @@ else:
 async def lifespan(_: FastAPI):
     engine = get_engine()
     discovery_scheduler = None
-    
+
     try:
         Base.metadata.create_all(bind=engine)
         run_sql_migrations(engine)
@@ -133,7 +133,7 @@ async def lifespan(_: FastAPI):
                 logger.warning(
                     "Skipping reference data seeding due to database error", exc_info=exc
                 )
-        
+
         # Start background discovery scheduler
         try:
             from .workers.discovery_scheduler import start_discovery_scheduler
@@ -142,7 +142,7 @@ async def lifespan(_: FastAPI):
             logger.info("Discovery scheduler started successfully")
         except Exception as exc:
             logger.warning("Failed to start discovery scheduler", exc_info=exc)
-        
+
         yield
     finally:
         # Stop discovery scheduler
@@ -153,7 +153,7 @@ async def lifespan(_: FastAPI):
                 logger.info("Discovery scheduler stopped")
             except Exception as exc:
                 logger.debug("Error stopping discovery scheduler", exc_info=exc)
-        
+
         try:
             engine.dispose()
         except Exception as exc:  # pragma: no cover - defensive guard
