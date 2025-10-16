@@ -18,6 +18,8 @@ function buildAuthHeaders(request: NextRequest): Headers {
   const contentType = request.headers.get("content-type");
   if (contentType) {
     headers.set("content-type", contentType);
+  } else {
+    headers.set("content-type", "application/json");
   }
   return headers;
 }
