@@ -6,6 +6,7 @@ from .registry import RouterRegistration, register_router
 from ..routes import (
     ai,
     analytics,
+    dashboard,
     creators,
     discoveries,
     documents,
@@ -69,6 +70,11 @@ _DEFAULT_REGISTRATIONS = (
         router=analytics.router,
         prefix="/analytics",
         tags=("analytics",),
+    ),
+    RouterRegistration(
+        router=dashboard.router,
+        prefix="/dashboard",
+        tags=("dashboard",),
     ),
     RouterRegistration(router=ai.router, prefix="/ai", tags=("ai",)),
     RouterRegistration(router=ai.settings_router, prefix=None, tags=("ai-settings",)),
