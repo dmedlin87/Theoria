@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getApiBaseUrl } from "../../../lib/api";
+import { forwardAuthHeaders } from "../../auth";
 import { forwardTraceHeaders } from "../../trace";
 import { createProxyErrorResponse } from "../../utils/proxyError";
 import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
@@ -9,6 +10,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const formData = await request.formData();
   const baseUrl = getApiBaseUrl().replace(/\/$/, "");
   const outboundHeaders = new Headers();
+  forwardAuthHeaders(request.headers, outboundHeaders);
   forwardTraceHeaders(request.headers, outboundHeaders);
 
   try {
