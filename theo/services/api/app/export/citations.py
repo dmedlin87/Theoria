@@ -322,13 +322,44 @@ def _chicago_author(author: dict[str, str]) -> str:
     return literal or ""
 
 
-def _join_with_and(values: Sequence[str], *, use_oxford_comma: bool = True) -> str:
+def _join_with_and(
+    values: Sequence[str], *, use_oxford_comma: bool = True, comma_for_pairs: bool = False
+) -> str:
+    """
+    Join a sequence of strings with 'and', optionally using the Oxford comma and/or a comma for pairs.
+
+    Args:
+        values: Sequence of strings to join.
+        use_oxford_comma: If True, include a comma before 'and' in lists of three or more items (Oxford comma).
+        comma_for_pairs: If True, include a comma before 'and' when joining exactly two items.
+
+    Behavior:
+        - For a single entry, returns the entry.
+        - For two entries:
+            - If comma_for_pairs is True: returns "A, and B"
+            - If comma_for_pairs is False: returns "A and B"
+        - For three or more entries:
+            - If use_oxford_comma is True: returns "A, B, and C"
+            - If use_oxford_comma is False: returns "A, B and C"
+
+    Examples:
+        >>> _join_with_and(["Alice", "Bob"], use_oxford_comma=True, comma_for_pairs=False)
+        'Alice and Bob'
+        >>> _join_with_and(["Alice", "Bob"], use_oxford_comma=True, comma_for_pairs=True)
+        'Alice, and Bob'
+        >>> _join_with_and(["Alice", "Bob", "Carol"], use_oxford_comma=True)
+        'Alice, Bob, and Carol'
+        >>> _join_with_and(["Alice", "Bob", "Carol"], use_oxford_comma=False)
+        'Alice, Bob and Carol'
+    """
     entries = [entry.strip() for entry in values if entry and entry.strip()]
     if not entries:
         return ""
     if len(entries) == 1:
         return entries[0]
     if len(entries) == 2:
+        if comma_for_pairs:
+            return f"{entries[0]}, and {entries[1]}"
         return " and ".join(entries)
     prefix = ", ".join(entries[:-1])
     suffix = entries[-1]
@@ -551,7 +582,10 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
             details_text = source.pages
 
     segments: list[str] = []
-    authors_segment = _join_with_and(formatted_authors)
+    authors_segment = _join_with_and(
+        formatted_authors,
+        comma_for_pairs=True,
+    )
     if authors_segment:
         segments.append(f"{authors_segment}.")
     segments.append(f'"{title}."')
