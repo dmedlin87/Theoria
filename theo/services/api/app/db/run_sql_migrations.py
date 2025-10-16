@@ -252,6 +252,19 @@ def _sqlite_has_column(engine: Engine, table: str, column: str) -> bool:
         return _sqlite_table_has_column(connection, table, column)
 
 
+def _sqlite_table_exists(connection, table: str) -> bool:
+    """Return ``True`` if the SQLite database defines *table*."""
+
+    table = _sqlite_normalize_identifier(table)
+    result = connection.exec_driver_sql(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name = ?", (table,)
+    )
+    try:
+        return result.fetchone() is not None
+    finally:
+        result.close()
+
+
 _SQLITE_ADD_COLUMN_RE = re.compile(
     r"^\s*ALTER\s+TABLE\s+(?P<table>[^\s]+)\s+ADD\s+COLUMN\s+(?P<column>[^\s]+)",
     re.IGNORECASE,
@@ -501,6 +514,14 @@ def run_sql_migrations(
                         )
                     elif dialect_name == "sqlite":
                         for statement in _split_sql_statements(sql):
+                            if "INGESTION_JOBS" in statement.upper() and not _sqlite_table_exists(
+                                connection, "ingestion_jobs"
+                            ):
+                                logger.debug(
+                                    "Skipping SQLite migration statement; missing table ingestion_jobs: %s",
+                                    statement.strip(),
+                                )
+                                continue
                             if _sqlite_add_column_exists(connection, statement):
                                 logger.debug(
                                     "Skipping SQLite migration statement; column already exists: %s",
