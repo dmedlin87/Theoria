@@ -514,7 +514,7 @@ def run_sql_migrations(
                         )
                     elif dialect_name == "sqlite":
                         for statement in _split_sql_statements(sql):
-                            if "INGESTION_JOBS" in statement.upper() and not _sqlite_table_exists(
+                            if _INGESTION_JOBS_TABLE_RE.search(statement) and not _sqlite_table_exists(
                                 connection, "ingestion_jobs"
                             ):
                                 logger.debug(
