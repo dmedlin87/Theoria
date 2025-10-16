@@ -130,27 +130,40 @@ class TestHandleNoteWrite:
         assert preview_draft.osis == "John.3.16"
         assert response.body == payload["body"]
 
-    def test_doc_id_used_when_osis_missing(self, fake_service):
+    def test_doc_id_used_when_osis_missing(self, fake_service, monkeypatch):
         payload = _build_payload(osis="   ", doc_id="doc-77")
         session = SimpleNamespace()
 
-        def fake_resolver(sess, doc_id):
-            return "Gen.1.1" if doc_id == "doc-77" else None
+        orig_resolver = tools._resolve_document_osis
 
-        tools.handle_note_write(session, payload, resolve_document_osis=fake_resolver)
+        def fake_resolver(sess, doc_id):
+            assert sess is session
+            if doc_id == "doc-77":
+                return "Gen.1.1"
+            return orig_resolver(sess, doc_id)
+
+        monkeypatch.setattr(tools, "_resolve_document_osis", fake_resolver)
+
+        tools.handle_note_write(session, payload)
 
         draft, _ = fake_service.created[-1]
         assert draft.osis == "Gen.1.1"
 
-    def test_missing_osis_raises_error(self, fake_service):
+    def test_missing_osis_raises_error(self, fake_service, monkeypatch):
         payload = _build_payload(osis="", doc_id=None)
         session = SimpleNamespace()
 
-        def always_none_resolver(*_, **__):
+        orig_resolver = tools._resolve_document_osis
+
+        def always_none_resolver(sess, doc_id):
+            if isinstance(doc_id, str):
+                return orig_resolver(sess, doc_id)
             return None
 
+        monkeypatch.setattr(tools, "_resolve_document_osis", always_none_resolver)
+
         with pytest.raises(MCPToolError) as exc:
-            tools.handle_note_write(session, payload, resolve_document_osis=always_none_resolver)
+            tools.handle_note_write(session, payload)
 
         assert "OSIS reference" in str(exc.value)
 
@@ -171,8 +184,13 @@ class TestResolveDocumentOsis:
         session = _FakeSession(rows)
         monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
         payload = _build_payload(osis=" ", doc_id="doc-1")
-        # Patch the session used by _resolve_document_osis
-        monkeypatch.setattr(tools, "_resolve_document_osis", lambda sess, doc_id: tools._resolve_document_osis(session, doc_id))
+        orig_resolver = tools._resolve_document_osis
+
+        def patched_resolver(sess, doc_id):
+            assert sess is session
+            return orig_resolver(sess, doc_id)
+
+        monkeypatch.setattr(tools, "_resolve_document_osis", patched_resolver)
         result = tools.handle_note_write(session, payload)
         assert result.osis == "Gen.1.2"
 
@@ -184,7 +202,13 @@ class TestResolveDocumentOsis:
         session = _FakeSession(rows)
         monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
         payload = _build_payload(osis=" ", doc_id="doc-2")
-        monkeypatch.setattr(tools, "_resolve_document_osis", lambda sess, doc_id: tools._resolve_document_osis(session, doc_id))
+        orig_resolver = tools._resolve_document_osis
+
+        def patched_resolver(sess, doc_id):
+            assert sess is session
+            return orig_resolver(sess, doc_id)
+
+        monkeypatch.setattr(tools, "_resolve_document_osis", patched_resolver)
         result = tools.handle_note_write(session, payload)
         assert result.osis == "Gen.1.4"
 
@@ -192,6 +216,12 @@ class TestResolveDocumentOsis:
         session = _FakeSession([])
         monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
         payload = _build_payload(osis=" ", doc_id="doc-3")
-        monkeypatch.setattr(tools, "_resolve_document_osis", lambda sess, doc_id: tools._resolve_document_osis(session, doc_id))
+        orig_resolver = tools._resolve_document_osis
+
+        def patched_resolver(sess, doc_id):
+            assert sess is session
+            return orig_resolver(sess, doc_id)
+
+        monkeypatch.setattr(tools, "_resolve_document_osis", patched_resolver)
         with pytest.raises(MCPToolError):
             tools.handle_note_write(session, payload)
