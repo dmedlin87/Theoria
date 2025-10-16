@@ -5,6 +5,7 @@ import socket
 from pathlib import Path
 import sys
 from ipaddress import ip_address
+from urllib.error import ContentTooShortError
 
 import pytest
 from fastapi import status
@@ -766,6 +767,127 @@ def test_ingest_url_detects_redirect_loop(
         == "Review the URL and ensure it meets ingestion requirements."
     )
     assert call_counter["count"] == 1
+
+
+def test_ingest_url_streams_enforce_byte_limit(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+) -> None:
+    settings = Settings()
+    settings.ingest_web_timeout_seconds = 1.0
+    settings.ingest_web_max_bytes = 10
+    settings.ingest_web_max_redirects = 3
+
+    class _StreamingResponse:
+        def __init__(self) -> None:
+            self.headers = _FakeHeaders()
+            self._chunks = [b"a" * 6, b"b" * 6, b""]
+
+        def geturl(self) -> str:
+            return "https://stream.example.com"
+
+        def read(self, size: int | None = None) -> bytes:  # noqa: ARG002
+            if not self._chunks:
+                return b""
+            return self._chunks.pop(0)
+
+        def close(self) -> None:
+            pass
+
+    class _StreamingOpener:
+        def __init__(self, handler):  # noqa: ANN001
+            self.handler = handler
+            self.addheaders = []
+
+        def open(self, request, timeout=None):  # noqa: ANN001, D401
+            return _StreamingResponse()
+
+    call_counter = _install_url_pipeline_stub(
+        monkeypatch,
+        settings,
+        lambda *handlers: _StreamingOpener(handlers[0]),
+        expected_failure_message=(
+            "Fetched content exceeded maximum allowed size of 10 bytes"
+        ),
+    )
+
+    response = api_client.post(
+        "/ingest/url", json={"url": "https://stream.example.com"}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    payload = response.json()
+    assert payload.get("error", {}).get("code") == "INGESTION_UNSUPPORTED_SOURCE"
+    assert (
+        payload.get("error", {}).get("message")
+        == "Fetched content exceeded maximum allowed size of 10 bytes"
+    )
+    assert payload.get("error", {}).get("severity") == "user"
+    assert (
+        payload.get("error", {}).get("hint")
+        == "Review the URL and ensure it meets ingestion requirements."
+    )
+    assert call_counter["count"] == 1
+
+
+def test_ingest_url_reports_incomplete_read(
+    monkeypatch: pytest.MonkeyPatch, api_client: TestClient
+) -> None:
+    settings = Settings()
+    settings.ingest_web_timeout_seconds = 1.0
+    settings.ingest_web_max_bytes = 1024
+    settings.ingest_web_max_redirects = 3
+
+    class _PartialResponse:
+        headers = _FakeHeaders()
+
+        def __init__(self) -> None:
+            self._called = False
+
+        def geturl(self) -> str:
+            return "https://partial.example.com"
+
+        def read(self, size: int | None = None) -> bytes:  # noqa: ARG002
+            if not self._called:
+                self._called = True
+                raise ContentTooShortError("partial", b"chunk")
+            return b""
+
+        def close(self) -> None:
+            pass
+
+    class _PartialOpener:
+        def __init__(self, handler):  # noqa: ANN001
+            self.handler = handler
+            self.addheaders = []
+
+        def open(self, request, timeout=None):  # noqa: ANN001, D401
+            return _PartialResponse()
+
+    call_counter = _install_url_pipeline_stub(
+        monkeypatch,
+        settings,
+        lambda *handlers: _PartialOpener(handlers[0]),
+        expected_failure_message=(
+            "Network connection ended before the response completed"
+        ),
+    )
+
+    response = api_client.post(
+        "/ingest/url", json={"url": "https://partial.example.com"}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    payload = response.json()
+    assert payload.get("error", {}).get("code") == "INGESTION_UNSUPPORTED_SOURCE"
+    assert (
+        payload.get("error", {}).get("message")
+        == "Network connection ended before the response completed"
+    )
+    assert payload.get("error", {}).get("severity") == "user"
+    assert (
+        payload.get("error", {}).get("hint")
+        == "Review the URL and ensure it meets ingestion requirements."
+    )
+    assert call_counter["count"] == 1
+
 
 def test_ingest_file_rejects_password_protected_pdf(api_client: TestClient) -> None:
     pdf_path = PROJECT_ROOT / "fixtures" / "pdf" / "password_protected.pdf"

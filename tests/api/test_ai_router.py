@@ -853,6 +853,42 @@ def test_wait_for_inflight_replays_preserved_after_restart_for_new_waiter(tmp_pa
     assert record.output == "shared-output"
 
 
+def test_wait_for_inflight_delivers_preserved_after_error_message(tmp_path):
+    ledger_path = tmp_path / "preserved-after-error.db"
+    ledger = SharedLedger(str(ledger_path))
+    ledger.reset()
+    cache_key = "cache-key"
+
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+    with ledger.transaction() as txn:
+        txn.mark_inflight_success(
+            cache_key,
+            model_name="model",
+            workflow="workflow",
+            output="shared-output",
+            latency_ms=7.0,
+            cost=0.25,
+        )
+    with ledger.transaction() as txn:
+        txn.create_inflight(cache_key, model_name="model", workflow="workflow")
+    with ledger.transaction() as txn:
+        txn.mark_inflight_error(
+            cache_key, "Deduplicated generation completed without a result"
+        )
+
+    start = time.perf_counter()
+    record = ledger.wait_for_inflight(
+        cache_key,
+        poll_interval=0.01,
+        timeout=1.0,
+    )
+    elapsed = time.perf_counter() - start
+
+    assert record.output == "shared-output"
+    assert elapsed < 0.5
+
+
 def test_wait_for_inflight_returns_empty_output(tmp_path):
     ledger_path = tmp_path / "empty-output.db"
     ledger = SharedLedger(str(ledger_path))
