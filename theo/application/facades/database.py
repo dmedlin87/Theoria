@@ -65,6 +65,7 @@ __all__ = ["Base", "configure_engine", "get_engine", "get_session"]
 
 _engine: Engine | None = None
 _SessionLocal: sessionmaker[Session] | None = None
+_engine_url_override: str | None = None
 
 
 class _TheoSession(Session):
@@ -116,10 +117,17 @@ def _create_engine(database_url: str) -> Engine:
 def configure_engine(database_url: str | None = None) -> Engine:
     """Create (or recreate) the global SQLAlchemy engine."""
 
-    global _engine, _SessionLocal
+    global _engine, _SessionLocal, _engine_url_override
 
     if database_url is None:
         database_url = get_settings().database_url
+    else:
+        _engine_url_override = database_url
+
+    # Track the last explicit database URL so subsequent calls to ``get_engine``
+    # can reuse it even after the engine has been disposed (e.g. during
+    # application shutdown).
+    _engine_url_override = database_url
 
     if _engine is not None:
         _engine.dispose()
@@ -139,9 +147,10 @@ def configure_engine(database_url: str | None = None) -> Engine:
 def get_engine() -> Engine:
     """Return the configured SQLAlchemy engine, creating it on demand."""
 
-    global _engine
+    global _engine, _engine_url_override
     if _engine is None:
-        _engine = configure_engine(get_settings().database_url)
+        database_url = _engine_url_override or get_settings().database_url
+        _engine = configure_engine(database_url)
     return _engine
 
 
