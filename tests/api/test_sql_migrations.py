@@ -297,7 +297,8 @@ def test_sqlite_seed_loader_handles_disabled_migrations(
 
         with engine.connect() as connection:
             result = connection.exec_driver_sql("PRAGMA table_info('contradiction_seeds')")
-            assert any(row[1] == "perspective" for row in result)
+            rows = result.fetchall()
+        assert any(row[1] == "perspective" for row in rows)
     finally:
         engine.dispose()
         database_module._engine = None  # type: ignore[attr-defined]

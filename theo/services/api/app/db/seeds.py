@@ -460,6 +460,23 @@ def _ensure_perspective_column(
         for column in required
         if not _table_has_column(session, table.name, column, schema=table.schema)
     ]
+    if "perspective" in missing:
+        if _add_missing_column(
+            session,
+            table,
+            "perspective",
+            dataset_label=dataset_label,
+        ):
+            missing = [
+                column
+                for column in required
+                if not _table_has_column(
+                    session, table.name, column, schema=table.schema
+                )
+            ]
+            if not missing:
+                return True
+
     if not missing:
         return True
 
@@ -739,12 +756,18 @@ def _run_seed_with_perspective_guard(
 ) -> None:
     """Execute *seed_fn* while gracefully handling missing perspective columns."""
 
-    try:
-        seed_fn(session)
-    except OperationalError as exc:
-        if _handle_missing_perspective_error(session, dataset_label, exc):
+    attempts = 0
+    while True:
+        try:
+            seed_fn(session)
             return
-        raise
+        except OperationalError as exc:
+            handled = _handle_missing_perspective_error(session, dataset_label, exc)
+            if not handled:
+                raise
+            attempts += 1
+            if attempts >= 2:
+                return
 
 
 def seed_contradiction_claims(session: Session) -> None:
