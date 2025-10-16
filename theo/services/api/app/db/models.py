@@ -28,6 +28,9 @@ from theo.application.facades.settings import get_settings
 from .types import IntArrayType, TSVectorType, VectorType
 
 
+_JSONB = postgresql.JSONB(astext_type=Text()).with_variant(JSON, "sqlite")
+
+
 if TYPE_CHECKING:
 
     class DeclarativeBase:
@@ -1690,6 +1693,57 @@ class CaseUserAction(Base):
     )
 
 
+class Discovery(Base):
+    """ML-generated insight surfaced to an end user."""
+
+    __tablename__ = "discoveries"
+    __table_args__ = (
+        Index("ix_discoveries_user_id", "user_id"),
+        Index("ix_discoveries_created_at", "created_at"),
+        Index("ix_discoveries_discovery_type", "discovery_type"),
+        Index("ix_discoveries_viewed", "viewed"),
+        {"extend_existing": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    discovery_type: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    relevance_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    viewed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    user_reaction: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    meta: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+
+
+class CorpusSnapshot(Base):
+    """Summarised view of the documents analysed for a user."""
+
+    __tablename__ = "corpus_snapshots"
+    __table_args__ = (
+        Index("ix_corpus_snapshots_user_id", "user_id"),
+        {"extend_existing": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    snapshot_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    document_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    verse_coverage: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+    dominant_themes: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+    meta: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+
+
 __all__ = [
     "Base",
     "Document",
@@ -1721,4 +1775,6 @@ __all__ = [
     "CaseEdgeKind",
     "CaseInsightType",
     "CaseUserActionType",
+    "Discovery",
+    "CorpusSnapshot",
 ]
