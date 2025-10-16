@@ -95,6 +95,7 @@ export function useSessionRestoration(
               role: "assistant",
               content: entry.answer,
               citations: entry.citations ?? [],
+              fallacyWarnings: [],
               prompt: entry.question,
             });
           });

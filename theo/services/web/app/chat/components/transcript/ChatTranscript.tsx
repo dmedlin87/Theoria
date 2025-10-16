@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 
+import FallacyWarnings from "../../../components/FallacyWarnings";
 import { Icon } from "../../../components/Icon";
 import type { Reaction, AssistantConversationEntry } from "../../useChatWorkspaceState";
 
@@ -71,6 +72,9 @@ export function ChatTranscript({
             <p aria-live={entry.isActive ? "polite" : undefined}>
               {entry.displayContent || "Awaiting response."}
             </p>
+            {isAssistant && entry.fallacyWarnings?.length ? (
+              <FallacyWarnings warnings={entry.fallacyWarnings} />
+            ) : null}
             {isAssistant && entry.citations.length > 0 && (
               <aside className="chat-citations" aria-label="Citations">
                 <h4>Citations</h4>

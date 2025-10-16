@@ -1,5 +1,5 @@
 import { useReducer, useCallback, Dispatch } from "react";
-import type { RAGCitation } from "../copilot/components/types";
+import type { RAGCitation, FallacyWarningModel } from "../copilot/components/types";
 import type { HybridSearchFilters } from "../lib/guardrails";
 import type { GuardrailFailureMetadata, GuardrailSuggestion } from "../lib/guardrails";
 import type { InterpretedApiError } from "../lib/errorMessages";
@@ -11,6 +11,7 @@ export type ConversationEntry =
       role: "assistant";
       content: string;
       citations: RAGCitation[];
+      fallacyWarnings: FallacyWarningModel[];
       prompt?: string;
     };
 
@@ -75,6 +76,7 @@ export type ChatWorkspaceAction =
   | { type: "UPDATE_ASSISTANT_COMPLETE"; assistantId: string; payload: {
       content: string;
       citations: RAGCitation[];
+      fallacyWarnings: FallacyWarningModel[];
     }}
   | { type: "STREAMING_COMPLETE"; sessionId: string | null }
   | { type: "REMOVE_ENTRY"; entryId: string }
@@ -184,6 +186,7 @@ function chatWorkspaceReducer(
             ...entry,
             content: action.payload.content,
             citations: action.payload.citations,
+            fallacyWarnings: action.payload.fallacyWarnings,
           };
         }
         return entry;
@@ -332,11 +335,16 @@ export function useChatWorkspaceState() {
   );
 
   const updateAssistantComplete = useCallback(
-    (assistantId: string, content: string, citations: RAGCitation[]) => {
+    (
+      assistantId: string,
+      content: string,
+      citations: RAGCitation[],
+      fallacyWarnings: FallacyWarningModel[],
+    ) => {
       dispatch({
         type: "UPDATE_ASSISTANT_COMPLETE",
         assistantId,
-        payload: { content, citations },
+        payload: { content, citations, fallacyWarnings },
       });
     },
     []
