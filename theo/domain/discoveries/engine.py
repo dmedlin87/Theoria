@@ -1,13 +1,12 @@
-"""Discovery engine that clusters embeddings to surface corpus patterns."""
-
 from __future__ import annotations
-"""Core discovery engine building pattern-based insights."""
 
 from collections import Counter
 from typing import Iterable, Sequence
 
 import numpy as np
 from sklearn.cluster import DBSCAN
+
+"""Discovery engine that clusters embeddings to surface corpus patterns."""
 
 from .models import (
     CorpusSnapshotSummary,
