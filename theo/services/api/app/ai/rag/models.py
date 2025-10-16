@@ -29,6 +29,7 @@ class RAGAnswer(APIModel):
     model_name: str | None = None
     model_output: str | None = None
     guardrail_profile: dict[str, str] | None = None
+    fallacy_warnings: list["FallacyWarningModel"] = Field(default_factory=list)
     critique: "ReasoningCritique | None" = None
     revision: "RevisionDetails | None" = None
 

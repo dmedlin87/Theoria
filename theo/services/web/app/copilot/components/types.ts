@@ -6,7 +6,17 @@ export type FeatureFlags = {
 
 export type RAGCitation = components["schemas"]["RAGCitation-Output"];
 
-export type RAGAnswer = components["schemas"]["RAGAnswer"];
+export type FallacyWarningModel = {
+  fallacy_type: string;
+  severity: string;
+  description: string;
+  matched_text: string;
+  suggestion?: string | null;
+};
+
+export type RAGAnswer = components["schemas"]["RAGAnswer"] & {
+  fallacy_warnings?: FallacyWarningModel[];
+};
 
 export type { GuardrailSuggestion } from "../../lib/guardrails";
 

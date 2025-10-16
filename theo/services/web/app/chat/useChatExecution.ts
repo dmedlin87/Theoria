@@ -69,6 +69,7 @@ export function useChatExecution(
           payload: {
             content: event.response.answer.summary,
             citations: event.response.answer.citations ?? [],
+            fallacyWarnings: event.response.answer.fallacy_warnings ?? [],
           },
         });
         dispatch({ type: "STREAMING_COMPLETE", sessionId: event.response.sessionId });
@@ -97,6 +98,7 @@ export function useChatExecution(
         role: "assistant",
         content: "",
         citations: [],
+        fallacyWarnings: [],
         prompt: trimmed,
       };
 
@@ -151,6 +153,7 @@ export function useChatExecution(
             payload: {
               content: result.answer.summary,
               citations: result.answer.citations ?? [],
+              fallacyWarnings: result.answer.fallacy_warnings ?? [],
             },
           });
         } else if (result.kind === "guardrail") {
