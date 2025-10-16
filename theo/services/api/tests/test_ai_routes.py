@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import configure_engine, get_engine, get_session
-from theo.services.api.app.db.models import AgentTrail, Document, Passage
+from theo.services.api.app.db.models import AgentTrail, ChatSession, Document, Passage
 from theo.services.api.app.main import app
 from theo.services.api.app.workers import tasks as worker_tasks
 from theo.services.cli.batch_intel import main as batch_intel_main
@@ -266,6 +266,75 @@ def test_chat_turn_guardrail_failure_returns_422() -> None:
         assert isinstance(metadata, dict)
         assert metadata.get("suggested_action") in {"search", "upload"}
         assert metadata.get("guardrail") in {"retrieval", "generation", "safety", "ingest", "unknown"}
+
+
+def test_chat_request_rejects_unknown_reasoning_mode() -> None:
+    _seed_corpus()
+    with _api_client() as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {"role": "user", "content": "Explain Romans 8"}
+                ],
+                "mode_id": "balanced",
+            },
+        )
+        assert response.status_code == 422
+        payload = response.json()
+        detail = payload.get("detail")
+        if isinstance(detail, list):
+            messages = [str(item.get("msg", "")) for item in detail if isinstance(item, dict)]
+            assert any("reasoning mode" in message.lower() for message in messages)
+        elif isinstance(detail, dict):
+            message = str(detail.get("message") or detail.get("msg") or "")
+            assert "reasoning mode" in message.lower()
+        else:
+            assert "reasoning mode" in str(detail).lower()
+
+
+def test_chat_persists_selected_reasoning_mode() -> None:
+    _seed_corpus()
+    with _api_client() as client:
+        _register_echo_model(client)
+        response = client.post(
+            "/ai/chat",
+            json={
+                "messages": [
+                    {"role": "user", "content": "Summarise John 1:1"}
+                ],
+                "mode_id": "detective",
+            },
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["session_id"]
+
+        with Session(get_engine()) as session:
+            trail = (
+                session.execute(
+                    select(AgentTrail)
+                    .where(AgentTrail.workflow == "chat")
+                    .order_by(AgentTrail.started_at.desc())
+                )
+                .scalars()
+                .first()
+            )
+            assert trail is not None
+            assert trail.mode == "detective"
+
+            chat_session = (
+                session.execute(
+                    select(ChatSession).order_by(ChatSession.created_at.desc())
+                )
+                .scalars()
+                .first()
+            )
+            assert chat_session is not None
+            assert chat_session.stance == "detective"
+            preferences = chat_session.preferences or {}
+            assert preferences.get("mode") == "detective"
 
 
 def test_provider_settings_crud_flow() -> None:

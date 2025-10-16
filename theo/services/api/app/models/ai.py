@@ -64,6 +64,14 @@ CHAT_SESSION_TOTAL_CHAR_BUDGET = 32_000
 CHAT_SESSION_MEMORY_CHAR_BUDGET = 4_000
 
 
+REASONING_MODE_IDS = {
+    "detective",
+    "critic",
+    "apologist",
+    "synthesizer",
+}
+
+
 class ChatSessionMessage(APIModel):
     role: Literal["user", "assistant", "system"]
     content: str
@@ -153,6 +161,12 @@ class ChatSessionRequest(ModeAliasMixin, APIModel):
     stance: str | None = None
     mode_id: str | None = None
     preferences: ChatSessionPreferences | None = None
+
+    @model_validator(mode="after")
+    def _validate_reasoning_mode(self) -> "ChatSessionRequest":
+        if self.mode_id and self.mode_id not in REASONING_MODE_IDS:
+            raise ValueError(f"Unknown reasoning mode id '{self.mode_id}'")
+        return self
 
     @model_validator(mode="after")
     def _enforce_message_lengths(self) -> "ChatSessionRequest":

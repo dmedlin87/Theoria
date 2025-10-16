@@ -24,9 +24,9 @@ describe("getActiveMode", () => {
 
   it("returns the requested mode when the cookie contains a valid id", () => {
     cookiesMock.mockReturnValue({
-      get: () => ({ value: "investigative" }),
+      get: () => ({ value: "critic" }),
     });
 
-    expect(getActiveMode()).toBe(RESEARCH_MODES.investigative);
+    expect(getActiveMode()).toBe(RESEARCH_MODES.critic);
   });
 });

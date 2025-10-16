@@ -133,6 +133,8 @@ class DiscoveryService:
                         DiscoveryType.ANOMALY.value,
                     ]
                 ),
+            )
+        )
         # Run connection detection
         connection_candidates = self.connection_engine.detect(documents)
 

@@ -31,6 +31,7 @@ import {
   useGuardrailActions,
 } from "../lib/guardrails";
 import { useMode } from "../mode-context";
+import { formatEmphasisSummary } from "../mode-config";
 import { emitTelemetry, submitFeedback } from "../lib/telemetry";
 import {
   type Reaction,
@@ -75,7 +76,7 @@ export default function ChatWorkspace({
   autoSubmit = false,
 }: ChatWorkspaceProps): JSX.Element {
   const router = useRouter();
-  const { mode } = useMode();
+  const { mode, modes, setMode } = useMode();
   const handleGuardrailSuggestion = useGuardrailActions();
   const [fallbackClient] = useState(() => createTheoApiClient());
   const activeClient = client ?? fallbackClient;
@@ -144,6 +145,8 @@ export default function ChatWorkspace({
     ],
     [],
   );
+
+  const heroEmphasis = useMemo(() => formatEmphasisSummary(mode), [mode]);
 
   const handleSampleQuestionClick = (prompt: string, index: number) => {
     setInputValue(prompt);
@@ -641,11 +644,72 @@ export default function ChatWorkspace({
       <section className={styles.hero} aria-label="Chat overview">
         <div className={styles.heroContent}>
           <p className={styles.heroEyebrow}>Theoria Copilot</p>
-          <h2>Ask with {mode.label} stance</h2>
+          <h2>
+            Ask with <span aria-hidden="true">{mode.icon}</span> {mode.label} reasoning
+          </h2>
           <p>
-            We’ll keep the conversation aligned to <strong>{mode.label.toLowerCase()}</strong> emphasis while grounding
-            every answer with citations you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
+            We follow the {mode.label.toLowerCase()} playbook. {mode.tagline} Every answer stays grounded with citations
+            you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
           </p>
+          <p className={styles.heroSummary}>{heroEmphasis}</p>
+          <div className={styles.modeSelector} aria-label="Reasoning mode selector">
+            <fieldset className={styles.modeSelectorFieldset}>
+              <legend className={styles.modeSelectorLegend}>Choose how Theo reasons</legend>
+              <p className={styles.modeSelectorHint}>
+                Switch modes to steer upcoming answers. Your selection is saved for future chats.
+              </p>
+              <div className={styles.modeSelectorOptions}>
+                {modes.map((option) => {
+                  const summaryId = `mode-summary-${option.id}`;
+                  const taglineId = `mode-tagline-${option.id}`;
+                  const guardrailId = `mode-guardrail-${option.id}`;
+                  const guardrailDescription = option.suppressions[0] ?? null;
+                  const guardrailDetail = guardrailDescription
+                    ? `${guardrailDescription.charAt(0).toLowerCase()}${guardrailDescription.slice(1)}`
+                    : null;
+                  const describedBy = [taglineId, summaryId];
+                  if (guardrailDetail) {
+                    describedBy.push(guardrailId);
+                  }
+                  const isActive = option.id === mode.id;
+                  return (
+                    <label key={option.id} className={styles.modeOption} htmlFor={`mode-radio-${option.id}`}>
+                      <input
+                        id={`mode-radio-${option.id}`}
+                        type="radio"
+                        name="chat-reasoning-mode"
+                        value={option.id}
+                        checked={isActive}
+                        onChange={() => setMode(option.id)}
+                        aria-describedby={describedBy.join(" ")}
+                      />
+                      <div className={styles.modeOptionContent} aria-live={isActive ? "polite" : undefined}>
+                        <div className={styles.modeOptionHeader}>
+                          <span className={styles.modeOptionIcon} aria-hidden="true">
+                            {option.icon}
+                          </span>
+                          <span className={styles.modeOptionLabel}>{option.label}</span>
+                          {isActive ? <span className={styles.modeOptionBadge}>Active</span> : null}
+                        </div>
+                        <p id={taglineId} className={styles.modeOptionTagline}>
+                          {option.tagline}
+                        </p>
+                        <p id={summaryId} className={styles.modeOptionSummary}>
+                          {formatEmphasisSummary(option)}
+                        </p>
+                        {guardrailDetail ? (
+                          <p id={guardrailId} className={styles.modeOptionGuardrail}>
+                            Keeps {guardrailDetail} in check.
+                          </p>
+                        ) : null}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </div>
+
           <div className={styles.heroActions} aria-label="Quick navigation">
             <Link href="/search" className={styles.heroAction}>
               <span className={styles.heroActionIcon}>

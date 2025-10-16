@@ -60,7 +60,7 @@ describe("createChatClient", () => {
     const client = createClient();
     const result = await client.runChatWorkflow({
       messages: [{ role: "user", content: "Tell me about Genesis" }],
-      modeId: "balanced",
+      modeId: "synthesizer",
     });
 
     expect(result.kind).toBe("guardrail");
@@ -104,7 +104,7 @@ describe("createChatClient", () => {
     const result = await client.runChatWorkflow(
       {
         messages: [{ role: "user", content: "Summarise Genesis 1" }],
-        modeId: "balanced",
+        modeId: "synthesizer",
       },
       {
         onEvent(event) {

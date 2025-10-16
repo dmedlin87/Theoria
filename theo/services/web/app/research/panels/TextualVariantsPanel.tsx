@@ -186,13 +186,13 @@ function buildSummary(readings: VariantReading[], mode: ResearchMode): string | 
     );
   }
 
-  if (mode.id === "investigative") {
+  if (mode.id === "critic") {
     summaryParts.push(
-      "Investigative mode highlights these tensions for deeper textual comparison.",
+      "Critic mode highlights these tensions for deeper textual comparison.",
     );
-  } else if (mode.id === "devotional") {
+  } else if (mode.id === "apologist") {
     summaryParts.push(
-      "Devotional mode treats the mainstream reading as the stable baseline while noting alternatives for reflection.",
+      "Apologist mode foregrounds the mainstream reading while noting alternatives that may need harmonisation.",
     );
   }
 

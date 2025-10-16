@@ -1,7 +1,8 @@
 /** @jest-environment jsdom */
 
 import "@testing-library/jest-dom";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import type {
   ChatWorkflowClient,
@@ -180,7 +181,7 @@ describe("ChatWorkspace", () => {
       expect(window.localStorage.getItem(STORAGE_KEY)).toBe("session-1");
     });
     expect(client.runChatWorkflow).toHaveBeenCalledWith(
-      expect.objectContaining({ modeId: "balanced" }),
+      expect.objectContaining({ modeId: "synthesizer" }),
       expect.objectContaining({ onEvent: expect.any(Function) }),
     );
   });
@@ -248,8 +249,8 @@ describe("ChatWorkspace", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Network offline");
+    const message = await screen.findByText(/Theo couldn’t reach the API service|Network offline/i);
+    expect(message).toBeInTheDocument();
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(screen.queryByText(sampleAnswer.summary)).not.toBeInTheDocument();
   });
@@ -412,10 +413,18 @@ describe("ChatWorkspace", () => {
       expect(window.localStorage.getItem(STORAGE_KEY)).toBe("session-reset");
     });
 
-    const resetButton = screen.getByRole("button", { name: "Reset session" });
-    await waitFor(() => expect(resetButton).not.toBeDisabled());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Session actions" }));
 
-    fireEvent.click(resetButton);
+    const resetMenuItem = await screen.findByRole("menuitem", { name: "Reset session" });
+    await waitFor(() =>
+      expect(resetMenuItem).not.toHaveAttribute("aria-disabled", "true"),
+    );
+    await user.click(resetMenuItem);
+
+    const dialog = await screen.findByRole("dialog", { name: "Reset this session?" });
+    const confirmButton = within(dialog).getByRole("button", { name: "Reset session" });
+    await user.click(confirmButton);
 
     await waitFor(() => {
       expect(screen.queryByText(sampleAnswer.summary)).not.toBeInTheDocument();
@@ -455,10 +464,14 @@ describe("ChatWorkspace", () => {
       expect(window.localStorage.getItem(STORAGE_KEY)).toBe("session-fork");
     });
 
-    const forkButton = screen.getByRole("button", { name: "Fork conversation" });
-    await waitFor(() => expect(forkButton).not.toBeDisabled());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Session actions" }));
+    const forkMenuItem = await screen.findByRole("menuitem", { name: "Fork conversation" });
+    await waitFor(() =>
+      expect(forkMenuItem).not.toHaveAttribute("aria-disabled", "true"),
+    );
 
-    fireEvent.click(forkButton);
+    await user.click(forkMenuItem);
 
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(screen.getByText(sampleAnswer.summary)).toBeInTheDocument();

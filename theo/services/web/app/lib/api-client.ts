@@ -20,7 +20,7 @@ export type {
   ChatWorkflowStreamEvent,
   ChatWorkflowSuccess,
 } from "./chat-client";
-export { TheoApiError } from "./http";
+export { TheoApiError, NetworkError } from "./http";
 
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
 export type ProviderSettingsRequest = components["schemas"]["ProviderSettingsRequest"];

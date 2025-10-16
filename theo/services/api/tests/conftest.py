@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import types
 from collections.abc import Generator
 from pathlib import Path
 
@@ -15,6 +16,27 @@ os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("THEO_API_KEYS", "[\"pytest-default-key\"]")
 os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
 os.environ.setdefault("THEORIA_ENVIRONMENT", "development")
+
+_DISCOVERIES_MODULE = types.ModuleType("theo.services.api.app.discoveries")
+_DISCOVERY_TASKS_MODULE = types.ModuleType("theo.services.api.app.discoveries.tasks")
+
+
+def _noop_schedule_discovery_refresh(*_: object, **__: object) -> None:
+    return None
+
+
+_DISCOVERY_TASKS_MODULE.schedule_discovery_refresh = _noop_schedule_discovery_refresh  # type: ignore[attr-defined]
+
+
+class _DiscoveryServiceStub:
+    def __init__(self, *_: object, **__: object) -> None:
+        raise RuntimeError("Discovery service is not available in this test environment")
+
+
+_DISCOVERIES_MODULE.DiscoveryService = _DiscoveryServiceStub  # type: ignore[attr-defined]
+_DISCOVERIES_MODULE.tasks = _DISCOVERY_TASKS_MODULE  # type: ignore[attr-defined]
+sys.modules.setdefault("theo.services.api.app.discoveries", _DISCOVERIES_MODULE)
+sys.modules.setdefault("theo.services.api.app.discoveries.tasks", _DISCOVERY_TASKS_MODULE)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 if str(PROJECT_ROOT) not in sys.path:

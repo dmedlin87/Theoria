@@ -57,6 +57,126 @@
   line-height: 1.7;
 }
 
+.heroSummary {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+}
+
+.modeSelector {
+  margin-top: var(--space-3);
+}
+
+.modeSelectorFieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.modeSelectorLegend {
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.modeSelectorHint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.modeSelectorOptions {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.modeOption {
+  position: relative;
+  display: block;
+}
+
+.modeOption input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modeOptionContent {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--color-border-subtle);
+  background: var(--color-surface-muted);
+  transition: all var(--transition-base);
+  cursor: pointer;
+  min-height: 100%;
+}
+
+.modeOptionContent:hover {
+  border-color: var(--color-border-default);
+  box-shadow: var(--shadow-sm);
+  transform: var(--motion-hover-translate-y-sm);
+}
+
+.modeOption input:checked + .modeOptionContent {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-muted));
+  box-shadow: 0 0 0 2px var(--color-accent-glow), var(--shadow-md);
+}
+
+.modeOption input:focus-visible + .modeOptionContent {
+  outline: 2px solid var(--color-focus-ring, var(--color-accent));
+  outline-offset: 3px;
+}
+
+.modeOptionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.modeOptionIcon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.modeOptionLabel {
+  font-weight: 650;
+  font-size: 1.05rem;
+  color: var(--color-text-primary);
+}
+
+.modeOptionBadge {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.modeOptionTagline {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.modeOptionSummary,
+.modeOptionGuardrail {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.modeOptionGuardrail {
+  font-style: italic;
+}
+
 .heroActions {
   display: flex;
   flex-wrap: wrap;

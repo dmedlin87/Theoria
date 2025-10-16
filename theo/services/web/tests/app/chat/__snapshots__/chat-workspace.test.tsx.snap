@@ -19,15 +19,248 @@ exports[`ChatWorkspace renders empty-state CTAs for new sessions 1`] = `
           Theoria Copilot
         </p>
         <h2>
-          Ask with Balanced stance
+          Ask with 
+          <span
+            aria-hidden="true"
+          >
+            📊
+          </span>
+           Synthesizer reasoning
         </h2>
         <p>
-          We’ll keep the conversation aligned to 
-          <strong>
-            balanced
-          </strong>
-           emphasis while grounding every answer with citations you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
+          We follow the synthesizer playbook. Maps the landscape to show agreements, tensions, and next steps. Every answer stays grounded with citations you can inspect. Follow threads, branch ideas, and stay rooted in scripture.
         </p>
+        <p
+          class="heroSummary"
+        >
+          Synthesizer reasoning spotlights Comparative viewpoints across traditions, Key agreements and tensions, Suggested follow-up research paths while softening Single-perspective bias, Premature conclusions without sources.
+        </p>
+        <div
+          aria-label="Reasoning mode selector"
+          class="modeSelector"
+        >
+          <fieldset
+            class="modeSelectorFieldset"
+          >
+            <legend
+              class="modeSelectorLegend"
+            >
+              Choose how Theo reasons
+            </legend>
+            <p
+              class="modeSelectorHint"
+            >
+              Switch modes to steer upcoming answers. Your selection is saved for future chats.
+            </p>
+            <div
+              class="modeSelectorOptions"
+            >
+              <label
+                class="modeOption"
+                for="mode-radio-detective"
+              >
+                <input
+                  aria-describedby="mode-tagline-detective mode-summary-detective mode-guardrail-detective"
+                  id="mode-radio-detective"
+                  name="chat-reasoning-mode"
+                  type="radio"
+                  value="detective"
+                />
+                <div
+                  class="modeOptionContent"
+                >
+                  <div
+                    class="modeOptionHeader"
+                  >
+                    <span
+                      aria-hidden="true"
+                      class="modeOptionIcon"
+                    >
+                      🔍
+                    </span>
+                    <span
+                      class="modeOptionLabel"
+                    >
+                      Detective
+                    </span>
+                  </div>
+                  <p
+                    class="modeOptionTagline"
+                    id="mode-tagline-detective"
+                  >
+                    Investigates step-by-step and documents every inference.
+                  </p>
+                  <p
+                    class="modeOptionSummary"
+                    id="mode-summary-detective"
+                  >
+                    Detective reasoning spotlights Step-by-step reasoning traces, Contradiction mapping, Source corroboration while softening Uncited leaps, Devotional speculation.
+                  </p>
+                  <p
+                    class="modeOptionGuardrail"
+                    id="mode-guardrail-detective"
+                  >
+                    Keeps uncited leaps in check.
+                  </p>
+                </div>
+              </label>
+              <label
+                class="modeOption"
+                for="mode-radio-critic"
+              >
+                <input
+                  aria-describedby="mode-tagline-critic mode-summary-critic mode-guardrail-critic"
+                  id="mode-radio-critic"
+                  name="chat-reasoning-mode"
+                  type="radio"
+                  value="critic"
+                />
+                <div
+                  class="modeOptionContent"
+                >
+                  <div
+                    class="modeOptionHeader"
+                  >
+                    <span
+                      aria-hidden="true"
+                      class="modeOptionIcon"
+                    >
+                      🤔
+                    </span>
+                    <span
+                      class="modeOptionLabel"
+                    >
+                      Critic
+                    </span>
+                  </div>
+                  <p
+                    class="modeOptionTagline"
+                    id="mode-tagline-critic"
+                  >
+                    Stress-tests claims by surfacing counterarguments and weak spots.
+                  </p>
+                  <p
+                    class="modeOptionSummary"
+                    id="mode-summary-critic"
+                  >
+                    Critic reasoning spotlights Counterarguments and critical questions, Textual variants and disputed readings, Scholarly disagreements while softening Unquestioned harmonisations, Pastoral glosses that skip evidence.
+                  </p>
+                  <p
+                    class="modeOptionGuardrail"
+                    id="mode-guardrail-critic"
+                  >
+                    Keeps unquestioned harmonisations in check.
+                  </p>
+                </div>
+              </label>
+              <label
+                class="modeOption"
+                for="mode-radio-apologist"
+              >
+                <input
+                  aria-describedby="mode-tagline-apologist mode-summary-apologist mode-guardrail-apologist"
+                  id="mode-radio-apologist"
+                  name="chat-reasoning-mode"
+                  type="radio"
+                  value="apologist"
+                />
+                <div
+                  class="modeOptionContent"
+                >
+                  <div
+                    class="modeOptionHeader"
+                  >
+                    <span
+                      aria-hidden="true"
+                      class="modeOptionIcon"
+                    >
+                      🛡️
+                    </span>
+                    <span
+                      class="modeOptionLabel"
+                    >
+                      Apologist
+                    </span>
+                  </div>
+                  <p
+                    class="modeOptionTagline"
+                    id="mode-tagline-apologist"
+                  >
+                    Builds coherent defences that harmonise tensions and reinforce trust.
+                  </p>
+                  <p
+                    class="modeOptionSummary"
+                    id="mode-summary-apologist"
+                  >
+                    Apologist reasoning spotlights Historical defences and doctrinal cohesion, Pastoral encouragement and hope, Integration of classical interpretations while softening Overly skeptical framings, Unresolved contradictions.
+                  </p>
+                  <p
+                    class="modeOptionGuardrail"
+                    id="mode-guardrail-apologist"
+                  >
+                    Keeps overly skeptical framings in check.
+                  </p>
+                </div>
+              </label>
+              <label
+                class="modeOption"
+                for="mode-radio-synthesizer"
+              >
+                <input
+                  aria-describedby="mode-tagline-synthesizer mode-summary-synthesizer mode-guardrail-synthesizer"
+                  checked=""
+                  id="mode-radio-synthesizer"
+                  name="chat-reasoning-mode"
+                  type="radio"
+                  value="synthesizer"
+                />
+                <div
+                  aria-live="polite"
+                  class="modeOptionContent"
+                >
+                  <div
+                    class="modeOptionHeader"
+                  >
+                    <span
+                      aria-hidden="true"
+                      class="modeOptionIcon"
+                    >
+                      📊
+                    </span>
+                    <span
+                      class="modeOptionLabel"
+                    >
+                      Synthesizer
+                    </span>
+                    <span
+                      class="modeOptionBadge"
+                    >
+                      Active
+                    </span>
+                  </div>
+                  <p
+                    class="modeOptionTagline"
+                    id="mode-tagline-synthesizer"
+                  >
+                    Maps the landscape to show agreements, tensions, and next steps.
+                  </p>
+                  <p
+                    class="modeOptionSummary"
+                    id="mode-summary-synthesizer"
+                  >
+                    Synthesizer reasoning spotlights Comparative viewpoints across traditions, Key agreements and tensions, Suggested follow-up research paths while softening Single-perspective bias, Premature conclusions without sources.
+                  </p>
+                  <p
+                    class="modeOptionGuardrail"
+                    id="mode-guardrail-synthesizer"
+                  >
+                    Keeps single-perspective bias in check.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </fieldset>
+        </div>
         <div
           aria-label="Quick navigation"
           class="heroActions"

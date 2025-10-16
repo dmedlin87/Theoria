@@ -107,6 +107,7 @@ class GuardedAnswerPipeline:
         filters: HybridSearchFilters | None = None,
         memory_context: Sequence[str] | None = None,
         allow_fallback: bool = False,
+        mode: str | None = None,
     ) -> RAGAnswer:
         ordered_results, guardrail_profile = apply_guardrail_profile(results, filters)
         citations = build_citations(ordered_results)
@@ -295,6 +296,8 @@ class GuardedAnswerPipeline:
                 "model": candidate.model,
                 "registry_name": candidate.name,
             }
+            if mode:
+                llm_payload["reasoning_mode"] = mode
             try:
                 with _RAG_TRACER.start_as_current_span("rag.execute_generation") as span:
                     span.set_attribute("rag.candidate", candidate.name)
@@ -308,6 +311,7 @@ class GuardedAnswerPipeline:
                             workflow="rag",
                             model=candidate,
                             prompt=prompt,
+                            reasoning_mode=mode,
                         )
                     except GenerationError as inner_exc:
                         span.record_exception(inner_exc)
@@ -608,6 +612,7 @@ def _guarded_answer(
     filters: HybridSearchFilters | None = None,
     memory_context: Sequence[str] | None = None,
     allow_fallback: bool = False,
+    mode: str | None = None,
 ) -> RAGAnswer:
     pipeline = GuardedAnswerPipeline(
         session,
@@ -622,6 +627,7 @@ def _guarded_answer(
         filters=filters,
         memory_context=memory_context,
         allow_fallback=allow_fallback,
+        mode=mode,
     )
 
 _REFUSAL_OSIS = "John.1.1"
@@ -731,6 +737,7 @@ def _guarded_answer_or_refusal(
     memory_context: Sequence[str] | None = None,
     osis: str | None = None,
     allow_fallback: bool | None = None,
+    mode: str | None = None,
 ) -> RAGAnswer:
     original_results = list(results)
     filtered_results = [result for result in original_results if result.osis_ref]
@@ -753,6 +760,7 @@ def _guarded_answer_or_refusal(
             filters=filters,
             memory_context=memory_context,
             allow_fallback=enable_fallback,
+            mode=mode,
         )
     except GuardrailError as exc:
         if not getattr(exc, "safe_refusal", False):
@@ -775,6 +783,7 @@ def run_guarded_chat(
     model_name: str | None = None,
     recorder: "TrailRecorder | None" = None,
     memory_context: Sequence[str] | None = None,
+    mode: str | None = None,
 ) -> RAGAnswer:
     filters = filters or HybridSearchFilters()
     with instrument_workflow(
@@ -787,6 +796,8 @@ def run_guarded_chat(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
+        if mode:
+            set_span_attribute(span, "workflow.reasoning_mode", mode)
         results = search_passages(session, query=question, osis=osis, filters=filters)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
@@ -827,6 +838,7 @@ def run_guarded_chat(
             filters=filters,
             memory_context=memory_context,
             osis=osis,
+            mode=mode,
         )
         record_used_citation_feedback(
             session,

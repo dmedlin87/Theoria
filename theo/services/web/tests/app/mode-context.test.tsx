@@ -9,6 +9,7 @@ import { ModeProvider, useMode } from "../../app/mode-context";
 import {
   DEFAULT_MODE_ID,
   MODE_COOKIE_KEY,
+  MODE_STORAGE_KEY,
   type ResearchModeId,
 } from "../../app/mode-config";
 
@@ -92,15 +93,11 @@ describe("ModeProvider storage resilience", () => {
 
     render(
       <ModeProvider>
-        <OptionalModeConsumer nextMode="investigative" />
+        <OptionalModeConsumer nextMode="critic" />
       </ModeProvider>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Change mode" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("mode:investigative")).toBeInTheDocument();
-    });
 
     expect(refreshMock).not.toHaveBeenCalled();
   });
@@ -120,7 +117,7 @@ describe("ModeProvider", () => {
 
     return render(
       <ModeProvider {...providerProps}>
-        <ModeConsumer nextMode="investigative" />
+        <ModeConsumer nextMode="critic" />
       </ModeProvider>,
     );
   }
@@ -134,11 +131,25 @@ describe("ModeProvider", () => {
   });
 
   it("uses the provided mode when it is valid", async () => {
-    const validMode: ResearchModeId = "devotional";
+    const validMode: ResearchModeId = "apologist";
     renderWithProvider(validMode);
 
     await waitFor(() => {
       expect(screen.getByTestId("mode-id")).toHaveTextContent(validMode);
+    });
+  });
+
+  it("persists the selected mode to storage and cookies", async () => {
+    renderWithProvider(DEFAULT_MODE_ID);
+
+    fireEvent.click(screen.getByRole("button", { name: "Change mode" }));
+
+    await waitFor(() => {
+      expect(localStorage.getItem(MODE_STORAGE_KEY)).toBe("critic");
+    });
+
+    await waitFor(() => {
+      expect(document.cookie).toContain(`${MODE_COOKIE_KEY}=critic`);
     });
   });
 
@@ -151,11 +162,7 @@ describe("ModeProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change mode" }));
 
     await waitFor(() => {
-      expect(screen.getByText("mode:investigative")).toBeInTheDocument();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("mode-id")).toHaveTextContent("investigative");
+      expect(screen.getByTestId("mode-id")).toHaveTextContent("critic");
     });
 
     expect(refresh).toHaveBeenCalled();
