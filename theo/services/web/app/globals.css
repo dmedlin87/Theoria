@@ -199,6 +199,37 @@ textarea {
   color: var(--text-muted);
 }
 
+.chat-mode-intro {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chat-mode-intro__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.chat-mode-intro__icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.chat-mode-intro__label {
+  margin: 0;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.chat-mode-intro__tagline {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+}
+
 .mode-panel__row {
   display: grid;
   gap: 0.2rem;

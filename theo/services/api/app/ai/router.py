@@ -149,6 +149,7 @@ class LLMRouterService:
         prompt: str,
         temperature: float = 0.2,
         max_output_tokens: int = 800,
+        reasoning_mode: str | None = None,
     ) -> RoutedGeneration:
         """Generate content using ``model`` if it meets routing constraints."""
 
@@ -160,6 +161,8 @@ class LLMRouterService:
             span.set_attribute("llm.temperature", temperature)
             span.set_attribute("llm.max_output_tokens", max_output_tokens)
             span.set_attribute("llm.prompt_tokens", prompt_tokens)
+            if reasoning_mode:
+                span.set_attribute("llm.reasoning_mode", reasoning_mode)
 
             config = self._workflow_config(model, workflow)
             ceiling = self._as_float(config.get("spend_ceiling"))
@@ -178,8 +181,9 @@ class LLMRouterService:
 
             cache_settings = self._cache_settings(config)
             # Use content-based hashing for better cache key collision handling
+            workflow_key = f"{workflow}:{reasoning_mode}" if reasoning_mode else workflow
             cache_key = self._generate_cache_key(
-                model.name, workflow, prompt, temperature, max_output_tokens
+                model.name, workflow_key, prompt, temperature, max_output_tokens
             )
             cache_status = "bypass"
             now = time.monotonic()

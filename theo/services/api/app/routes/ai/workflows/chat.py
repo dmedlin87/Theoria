@@ -704,12 +704,16 @@ def chat_turn(
             recorder_context = trail_service.start_trail(
                 workflow="chat",
                 plan_md=CHAT_PLAN,
-                mode="chat",
+                mode=payload.mode_id or payload.stance or "chat",
                 input_payload=payload.model_dump(mode="json"),
                 user_id=recorder_user_id,
             )
 
+        active_reasoning_mode = payload.mode_id or payload.stance
+
         with recorder_context as recorder:
+            if active_reasoning_mode:
+                recorder.trail.mode = active_reasoning_mode
             answer = run_guarded_chat(
                 session,
                 question=question,
@@ -718,6 +722,7 @@ def chat_turn(
                 model_name=payload.model,
                 recorder=recorder,
                 memory_context=memory_context,
+                mode=active_reasoning_mode,
             )
             ensure_completion_safe(answer.model_output or answer.summary)
 
@@ -728,7 +733,7 @@ def chat_turn(
                 existing=existing_session,
                 session_id=session_id,
                 user_id=recorder_user_id,
-                stance=payload.stance or payload.mode_id,
+                stance=active_reasoning_mode or payload.model,
                 question=question,
                 prompt=payload.prompt,
                 intent_tags=intent_tags,

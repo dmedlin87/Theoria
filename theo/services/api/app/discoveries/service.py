@@ -116,6 +116,31 @@ class DiscoveryService:
         )
         trend_candidates = self.trend_engine.detect([*historical_snapshots, snapshot])
 
+        # Delete old discoveries (patterns, contradictions, and trends)
+        # Run anomaly detection
+        anomaly_candidates = self.anomaly_engine.detect(documents)
+
+        # Delete old discoveries (both patterns and contradictions)
+        self.session.execute(
+            delete(Discovery).where(
+                Discovery.user_id == user_id,
+                Discovery.discovery_type.in_(
+                    [
+                        DiscoveryType.PATTERN.value,
+                        DiscoveryType.CONTRADICTION.value,
+                        DiscoveryType.ANOMALY.value,
+                    ]
+                ),
+            )
+        )
+        # Run connection detection
+        connection_candidates = self.connection_engine.detect(documents)
+
+        # Delete old discoveries (patterns, contradictions, and connections)
+        # Run gap detection
+        gap_candidates = self.gap_engine.detect(documents)
+
+        # Delete old discoveries (patterns, contradictions, and gaps)
         discovery_types_to_clear = [
             DiscoveryType.PATTERN.value,
             DiscoveryType.CONTRADICTION.value,

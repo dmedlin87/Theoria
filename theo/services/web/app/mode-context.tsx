@@ -108,9 +108,14 @@ export function ModeProvider({ initialMode, children }: ModeProviderProps) {
     [modeId],
   );
 
+  const availableModes = useMemo<ResearchMode[]>(
+    () => Object.values(RESEARCH_MODES) as ResearchMode[],
+    [],
+  );
+
   const value = useMemo<ModeContextValue>(
-    () => ({ mode: RESEARCH_MODES[modeId], setMode, modes: Object.values(RESEARCH_MODES) }),
-    [modeId, setMode],
+    () => ({ mode: RESEARCH_MODES[modeId], setMode, modes: availableModes }),
+    [modeId, setMode, availableModes],
   );
 
   return <ModeContext.Provider value={value}>{children}</ModeContext.Provider>;
@@ -125,12 +130,7 @@ export function useMode(): ModeContextValue {
 }
 
 function getModeSummary(mode: ResearchMode): string {
-  const summaries: Record<ResearchModeId, string> = {
-    balanced: "Blends critical & devotional perspectives",
-    investigative: "Surfaces variants, tensions & critical questions",
-    devotional: "Emphasizes pastoral insights & application",
-  };
-  return summaries[mode.id];
+  return `${mode.icon} ${mode.label} — ${mode.tagline}`;
 }
 
 export function ModeSwitcher(): JSX.Element {
@@ -143,7 +143,7 @@ export function ModeSwitcher(): JSX.Element {
       <div className="mode-switcher-compact" aria-live="polite">
         <div className="mode-switcher-compact__control">
           <label htmlFor="mode-selector" className="mode-switcher-compact__label">
-            Mode
+            Reasoning mode
           </label>
           <select
             id="mode-selector"
@@ -154,7 +154,7 @@ export function ModeSwitcher(): JSX.Element {
           >
             {modes.map((option) => (
               <option key={option.id} value={option.id}>
-                {option.label}
+                {`${option.icon} ${option.label}`}
               </option>
             ))}
           </select>
@@ -178,7 +178,9 @@ export function ModeSwitcher(): JSX.Element {
               align="end"
             >
               <div className="mode-switcher-compact__tooltip-header">
-                <h4 className="mode-switcher-compact__tooltip-title">{mode.label} mode</h4>
+                <h4 className="mode-switcher-compact__tooltip-title">
+                  <span aria-hidden="true">{mode.icon}</span> {mode.label} mode
+                </h4>
                 <button
                   type="button"
                   className="mode-switcher-compact__tooltip-close"
@@ -188,6 +190,9 @@ export function ModeSwitcher(): JSX.Element {
                   ×
                 </button>
               </div>
+              <p className="mode-switcher-compact__tooltip-desc">
+                <strong>{mode.tagline}</strong>
+              </p>
               <p className="mode-switcher-compact__tooltip-desc">{mode.description}</p>
               <dl className="mode-switcher-compact__tooltip-meta">
                 <div className="mode-switcher-compact__tooltip-row">
@@ -205,9 +210,7 @@ export function ModeSwitcher(): JSX.Element {
             </TooltipContent>
           </Tooltip>
         </div>
-        <p className="mode-switcher-compact__summary">
-          {mode.label} — {getModeSummary(mode)}
-        </p>
+        <p className="mode-switcher-compact__summary">{getModeSummary(mode)}</p>
       </div>
     </TooltipProvider>
   );
