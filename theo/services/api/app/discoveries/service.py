@@ -200,7 +200,7 @@ class DiscoveryService:
         array = np.array(list(vectors), dtype=float)
         if not np.isfinite(array).all():
             array = array[np.isfinite(array).all(axis=1)]
-        if not len(array):
+        if len(array) == 0:
             return []
         return array.mean(axis=0).tolist()
 
