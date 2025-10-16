@@ -192,9 +192,10 @@ function normaliseStatus(status: ReasoningTraceStep["status"]): ReasoningTraceSt
 }
 
 function formatCitationList(values: number[]): string {
+  const seen = new Set<number>();
   return values
     .map((value) => value + 1)
-    .filter((value, position, array) => array.indexOf(value) === position)
+    .filter((value) => seen.has(value) ? false : (seen.add(value), true))
     .sort((a, b) => a - b)
     .join(", ");
 }
