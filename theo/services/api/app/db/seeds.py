@@ -5,6 +5,7 @@ from __future__ import annotations
 import gc
 import json
 import logging
+import re
 import time
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ from sqlalchemy import Table, delete, inspect
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateColumn
 
 from theo.services.geo import seed_openbible_geo
 from ..ingest.osis import expand_osis_reference
@@ -34,6 +36,31 @@ HARMONY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/harmonies")
 COMMENTARY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/commentaries")
 
 logger = logging.getLogger(__name__)
+
+_DATASET_TABLES: dict[str, Table] = {
+    "contradiction": ContradictionSeed.__table__,
+    "harmony": HarmonySeed.__table__,
+    "commentary excerpt": CommentaryExcerptSeed.__table__,
+}
+
+_MISSING_COLUMN_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"no such column: (?:(?P<table>[\w\"'`]+)\.)?(?P<column>[\w\"'`]+)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"has no column named (?:(?P<table>[\w\"'`]+)\.)?(?P<column>[\w\"'`]+)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"column (?:(?P<table>[\w\"'`]+)\.)?(?P<column>[\w\"'`]+) does not exist",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"unknown column ['\"](?:(?P<table>[\w\"'`]+)\.)?(?P<column>[\w\"'`]+)",
+        re.IGNORECASE,
+    ),
+)
 
 
 def _load_structured(path: Path) -> list[dict]:
@@ -244,10 +271,13 @@ def _recreate_seed_table_if_missing_column(
     column_name: str,
     *,
     dataset_label: str,
+    force: bool = False,
 ) -> bool:
     """Drop and recreate ``table`` when ``column_name`` is absent."""
 
-    if _table_has_column(session, table.name, column_name, schema=table.schema):
+    if not force and _table_has_column(
+        session, table.name, column_name, schema=table.schema
+    ):
         return False
 
     bind = session.get_bind()
@@ -268,6 +298,7 @@ def _recreate_seed_table_if_missing_column(
         raise
 
     # Ensure subsequent ORM work reflects the rebuilt schema across connections.
+    inspect(engine).clear_cache()
     engine.dispose()
     session.expire_all()
     return True
@@ -383,13 +414,86 @@ def _ensure_range_columns(
     return False
 
 
+def _extract_missing_column_name(message: str, table_name: str) -> str | None:
+    """Best-effort extraction of the missing column name from *message*."""
+
+    normalized_table = table_name.strip("\"'`[]").lower()
+    for pattern in _MISSING_COLUMN_PATTERNS:
+        match = pattern.search(message)
+        if not match:
+            continue
+        column = match.group("column")
+        if not column:
+            continue
+        table_in_message = match.groupdict().get("table")
+        if table_in_message:
+            candidate_table = table_in_message.strip("\"'`[]").lower()
+            if candidate_table and candidate_table != normalized_table:
+                continue
+        return column.strip("\"'`[]")
+    return None
+
+
+def _add_missing_column(
+    session: Session, table: Table, column_name: str, *, dataset_label: str
+) -> bool:
+    """Attempt to add ``column_name`` to ``table`` via ``ALTER TABLE``."""
+
+    column = table.c.get(column_name)
+    if column is None:
+        return False
+
+    bind = session.get_bind()
+    if bind is None:
+        return False
+
+    engine = bind.engine if isinstance(bind, Connection) else bind
+    if engine is None:
+        return False
+
+    session.rollback()
+    statement = f'ALTER TABLE "{table.name}" ADD COLUMN '
+    try:
+        column_ddl = str(CreateColumn(column).compile(dialect=engine.dialect))
+    except Exception:
+        return False
+    statement += column_ddl
+
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(statement)
+    except OperationalError as exc:
+        message = str(getattr(exc, "orig", exc)).lower()
+        duplicate_indicators = ("duplicate column", "already exists")
+        if any(indicator in message for indicator in duplicate_indicators):
+            return True
+        logger.debug(
+            "Failed to add %s column to %s via ALTER TABLE: %s",
+            column_name,
+            table.name,
+            exc,
+        )
+        return False
+    else:
+        inspect(engine).clear_cache()
+        engine.dispose()
+        session.expire_all()
+        logger.info(
+            "Added missing '%s' column to %s table for %s seeds",
+            column_name,
+            table.name,
+            dataset_label,
+        )
+        return True
+
 
 def _handle_missing_perspective_error(
     session: Session, dataset_label: str, exc: OperationalError
 ) -> bool:
-    """Log and rollback when ``perspective`` column errors are encountered."""
+    """Log, attempt repair, and rollback when required columns are missing."""
 
-    message = str(getattr(exc, "orig", exc)).lower()
+    raw_message = str(getattr(exc, "orig", exc))
+    message = raw_message.lower()
     missing_indicators = (
         "no such column",
         "unknown column",
@@ -401,6 +505,37 @@ def _handle_missing_perspective_error(
         return False
 
     session.rollback()
+
+    table = _DATASET_TABLES.get(dataset_label)
+    if table is not None:
+        column_name = _extract_missing_column_name(raw_message, table.name)
+        if column_name:
+            try:
+                if _add_missing_column(
+                    session, table, column_name, dataset_label=dataset_label
+                ):
+                    return True
+                if _recreate_seed_table_if_missing_column(
+                    session,
+                    table,
+                    column_name,
+                    dataset_label=dataset_label,
+                    force=True,
+                ):
+                    logger.info(
+                        "Rebuilt %s table missing '%s' column after %s seed failure",
+                        table.name,
+                        column_name,
+                        dataset_label,
+                    )
+                    return True
+            except Exception:
+                logger.exception(
+                    "Failed to rebuild %s table after missing '%s' column",
+                    table.name,
+                    column_name,
+                )
+
     if "perspective" in message:
         logger.warning(
             "Skipping %s seeds because 'perspective' column is missing",
@@ -410,7 +545,7 @@ def _handle_missing_perspective_error(
         logger.warning(
             "Skipping %s seeds because a required column is missing (%s)",
             dataset_label,
-            message,
+            raw_message,
         )
     return True
 
@@ -439,10 +574,12 @@ def _run_with_sqlite_lock_retry(
             return True
         except OperationalError as exc:
             if _handle_missing_perspective_error(working_session, dataset_label, exc):
-                _dispose_sqlite_engine(working_session.get_bind())
+                bind = working_session.get_bind()
+                _dispose_sqlite_engine(bind)
                 if working_session is not session:
                     working_session.close()
-                return False
+                bind = session.get_bind()
+                continue
 
             message = str(getattr(exc, "orig", exc)).lower()
             if "database is locked" in message or "database is busy" in message:
