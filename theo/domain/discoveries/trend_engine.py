@@ -52,11 +52,18 @@ class TrendDiscoveryEngine:
 
         distributions: list[dict[str, float]] = []
         labels: dict[str, str] = {}
+        topic_occurrences: dict[str, int] = {}
+        fallback_occurrences: dict[str, int] = {}
         for snapshot in ordered:
-            dist, label_map = self._extract_distribution(snapshot)
+            dist, label_map, fallback_topics = self._extract_distribution(snapshot)
             distributions.append(dist)
             for key, value in label_map.items():
                 labels.setdefault(key, value)
+            for topic, value in dist.items():
+                if value > 0.0:
+                    topic_occurrences[topic] = topic_occurrences.get(topic, 0) + 1
+            for topic in fallback_topics:
+                fallback_occurrences[topic] = fallback_occurrences.get(topic, 0) + 1
 
         if not any(distribution for distribution in distributions):
             return []
@@ -65,12 +72,20 @@ class TrendDiscoveryEngine:
         if not topics:
             return []
 
+        fallback_only_topics = {
+            topic
+            for topic, count in fallback_occurrences.items()
+            if count >= topic_occurrences.get(topic, 0) > 0
+        }
+
         start_date = ordered[0].snapshot_date
         end_date = ordered[-1].snapshot_date
         timeframe = self._format_timeframe(start_date, end_date)
         trend_candidates: list[tuple[float, TrendDiscovery]] = []
 
         for topic in topics:
+            if topic in fallback_only_topics:
+                continue
             series = [dist.get(topic, 0.0) for dist in distributions]
             if not any(series):
                 continue
@@ -129,9 +144,10 @@ class TrendDiscoveryEngine:
 
     def _extract_distribution(
         self, snapshot: CorpusSnapshotSummary
-    ) -> tuple[dict[str, float], dict[str, str]]:
+    ) -> tuple[dict[str, float], dict[str, str], set[str]]:
         raw_values: dict[str, float] = {}
         label_map: dict[str, str] = {}
+        fallback_topics: set[str] = set()
         metadata = snapshot.metadata or {}
         dominant = snapshot.dominant_themes or {}
 
@@ -166,14 +182,15 @@ class TrendDiscoveryEngine:
                     continue
                 raw_values[normalised_topic] = raw_values.get(normalised_topic, 0.0) + 1.0
                 label_map.setdefault(normalised_topic, topic)
+                fallback_topics.add(normalised_topic)
 
         total = sum(raw_values.values())
         if total <= 0.0:
-            return {}, label_map
+            return {}, label_map, fallback_topics
         distribution = {
             topic: value / total for topic, value in raw_values.items() if value > 0.0
         }
-        return distribution, label_map
+        return distribution, label_map, fallback_topics
 
     @staticmethod
     def _coerce_float(value: object) -> float:

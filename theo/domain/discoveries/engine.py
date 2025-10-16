@@ -151,7 +151,21 @@ class PatternDiscoveryEngine:
         topic_counter: Counter[str] = Counter()
         for doc in documents:
             topic_counter.update(_normalise_topics(doc.topics))
-        snapshot_metadata = {"pattern_cluster_count": len(discoveries)}
+
+        topic_counts = {topic: count for topic, count in topic_counter.items() if count > 0}
+        total_mentions = sum(topic_counts.values())
+        topic_distribution = (
+            {topic: count / total_mentions for topic, count in topic_counts.items()}
+            if total_mentions > 0
+            else {}
+        )
+
+        snapshot_metadata: dict[str, object] = {"pattern_cluster_count": len(discoveries)}
+        if topic_counts:
+            snapshot_metadata["topic_counts"] = topic_counts
+        if topic_distribution:
+            snapshot_metadata["topic_distribution"] = topic_distribution
+            snapshot_metadata.setdefault("topic_frequencies", topic_distribution)
         return CorpusSnapshotSummary(
             document_count=len(documents),
             verse_coverage={
