@@ -65,9 +65,9 @@ export default function SearchResults({
           <div className="search-results__row stagger-item" data-last={index === groups.length - 1}>
             <article className="card card--interactive fade-in">
               <header className="stack-xs mb-3">
-                <h3 className="text-xl font-semibold mb-0">{group.title}</h3>
+                <h3 className="document-title">{group.title}</h3>
                 {group.score !== null && group.score !== undefined && (
-                  <p className="text-sm text-muted mb-0">
+                  <p className="text-meta mb-0">
                     Relevance: {Math.round(group.score * 100)}%
                   </p>
                 )}
@@ -88,18 +88,18 @@ export default function SearchResults({
                 >
                   <div className="stack-xs">
                     {passage.osis_ref && (
-                      <p className="text-sm font-semibold text-accent mb-0">
+                      <p className="verse-ref mb-0">
                         {passage.osis_ref}
                       </p>
                     )}
                     {anchor && (
-                      <p className="text-sm text-muted mb-0">{anchor}</p>
+                      <p className="text-caption mb-0">{anchor}</p>
                     )}
-                    <p className="mb-0">
+                    <p className="passage-text mb-0">
                       {highlightTokens(passage.text, queryTokens)}
                     </p>
                     {passage.rank !== null && passage.rank !== undefined && (
-                      <p className="text-xs text-muted mb-0">
+                      <p className="text-meta mb-0">
                         Rank: {passage.rank}
                       </p>
                     )}

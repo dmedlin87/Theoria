@@ -14,6 +14,7 @@ from theo.services.api.app.models.export import (
     DeliverableManifest,
     DeliverablePackage,
 )
+from theo.services.api.app.models.ai import SermonPrepRequest
 from theo.services.api.app.routes.ai.workflows import exports as exports_module
 
 
@@ -68,19 +69,30 @@ def api_client(api_engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 def test_sermon_export_returns_serialised_asset(
     api_client: TestClient, monkeypatch: pytest.MonkeyPatch, export_format: str
 ) -> None:
+    request_body = {"topic": "Hope", "osis": None, "filters": {}, "model": None}
+    expected_filters = SermonPrepRequest(**request_body).filters.model_dump(
+        exclude_none=True
+    )
     monkeypatch.setattr(
         exports_module,
         "generate_sermon_prep_outline",
         lambda *_, **__: object(),
     )
+    captured_filters: dict | None = None
+
+    def _capture_filters(response, *, formats, filters=None):
+        nonlocal captured_filters
+        captured_filters = filters
+        return _build_package("sermon", formats)
+
     monkeypatch.setattr(
         exports_module,
         "build_sermon_deliverable",
-        lambda response, *, formats, filters=None: _build_package("sermon", formats),
+        _capture_filters,
     )
     response = api_client.post(
         f"/ai/sermon-prep/export?format={export_format}",
-        json={"topic": "Hope", "osis": None, "filters": {}, "model": None},
+        json=request_body,
     )
     assert response.status_code == 200
     payload = response.json()
@@ -90,6 +102,7 @@ def test_sermon_export_returns_serialised_asset(
         if export_format == "pdf"
         else f"sermon-{export_format}-content"
     )
+    assert captured_filters == expected_filters
     assert payload == {
         "preset": f"sermon-{export_format}",
         "format": export_format,

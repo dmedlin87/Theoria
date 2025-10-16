@@ -87,8 +87,8 @@ export default function DiscoveriesPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.headerContent}>
-          <h1>🔍 Discoveries</h1>
-          <p className={styles.subtitle}>
+          <h1 className="text-heading-1">🔍 Discoveries</h1>
+          <p className={`${styles.subtitle} text-body-large`}>
             Auto-detected insights, patterns, and connections from your research corpus
           </p>
         </div>

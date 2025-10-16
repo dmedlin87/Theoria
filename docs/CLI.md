@@ -9,7 +9,7 @@ environment variables.
 
 ## Supported sources
 
-The CLI mirrors the API's file ingestion rules and recognises the following extensions:
+The CLI mirrors the API's file ingestion rules and recognizes the following extensions:
 
 - Markdown/text: `.md`, `.markdown`, `.txt`
 - General text files: `.html`, `.htm`, extensionless files

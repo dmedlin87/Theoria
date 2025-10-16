@@ -546,11 +546,11 @@ export default async function VersePage({ params, searchParams }: VersePageProps
                   >
                     <article className="stack-sm">
                       <header className="stack-xs">
-                        <h3 className="text-lg font-semibold mb-0">{documentTitle}</h3>
-                        {anchor && <p className="text-sm text-muted mb-0">{anchor}</p>}
-                        {mention.passage.osis_ref && <p className="text-sm text-muted mb-0">OSIS: {mention.passage.osis_ref}</p>}
+                        <h3 className="document-title mb-0">{documentTitle}</h3>
+                        {anchor && <p className="text-caption mb-0">{anchor}</p>}
+                        {mention.passage.osis_ref && <p className="verse-ref mb-0">{mention.passage.osis_ref}</p>}
                       </header>
-                      <p className="mb-0">{mention.context_snippet}</p>
+                      <p className="context-snippet mb-0">{mention.context_snippet}</p>
                       <footer>
                         <Link
                           href={buildPassageLink(mention.passage.document_id, mention.passage.id, {

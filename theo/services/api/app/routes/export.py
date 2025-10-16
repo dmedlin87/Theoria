@@ -391,12 +391,15 @@ def export_search(
             hint="Provide an OSIS reference when exporting verse mentions.",
         )
     field_set = _parse_fields(fields)
-    limit_value = limit or k
-    fetch_k = limit_value + 1 if limit_value is not None else k
+    limit_value = limit if limit is not None else k
+    if limit is not None:
+        fetch_k = min(k, limit + 1)
+    else:
+        fetch_k = k + 1
     search_request = HybridSearchRequest(
         query=q,
         osis=osis,
-        k=max(k, fetch_k),
+        k=fetch_k,
         limit=limit_value,
         cursor=cursor,
         mode=mode,

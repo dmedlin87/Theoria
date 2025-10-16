@@ -26,7 +26,7 @@
   --text-muted-saturation: 28%;
   --text-primary-lightness: 14%;
   --text-secondary-lightness: 36%;
-  --text-muted-lightness: 50%;
+  --text-muted-lightness: 42%;
   --text-inverse-lightness: 98%;
 
   --nav-surface-opacity: 88%;
@@ -249,7 +249,7 @@
     --text-muted-saturation: 20%;
     --text-primary-lightness: 92%;
     --text-secondary-lightness: 78%;
-    --text-muted-lightness: 66%;
+    --text-muted-lightness: 70%;
     --text-inverse-lightness: 14%;
 
     --nav-surface-opacity: 78%;
@@ -292,7 +292,7 @@
   --text-muted-saturation: 20%;
   --text-primary-lightness: 92%;
   --text-secondary-lightness: 78%;
-  --text-muted-lightness: 66%;
+  --text-muted-lightness: 70%;
   --text-inverse-lightness: 14%;
 
   --nav-surface-opacity: 78%;

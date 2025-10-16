@@ -1,0 +1,209 @@
+/**
+ * Typography utilities for reading-optimized content
+ * Optimized for scholarly research and long-form passage reading
+ */
+
+/* Passage content - optimized for sustained reading */
+.passage-content {
+  line-height: 1.8;
+  max-width: 65ch;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.passage-content p {
+  margin-bottom: 1em;
+}
+
+/* Passage text in cards and results */
+.passage-text {
+  line-height: 1.8;
+  max-width: 70ch;
+  color: var(--color-text-primary);
+  font-size: 0.9875rem;
+}
+
+/* Context snippets and excerpts */
+.context-snippet {
+  line-height: 1.75;
+  max-width: 75ch;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+/* Reading mode - full immersion */
+.reading-mode {
+  line-height: 1.9;
+  max-width: 60ch;
+  margin: 0 auto;
+  font-size: 1.0625rem;
+  padding: var(--space-4);
+}
+
+.reading-mode p + p {
+  margin-top: 1.5em;
+}
+
+/* Typography scale with improved hierarchy */
+.text-display {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.text-heading-1 {
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.text-heading-2 {
+  font-size: clamp(1.5rem, 3vw, 1.875rem);
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.text-heading-3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.text-body-large {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+}
+
+.text-body {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.text-body-small {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.text-caption {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.text-meta {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  letter-spacing: 0.01em;
+}
+
+/* Monospace for references and codes */
+.text-mono {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  letter-spacing: -0.01em;
+}
+
+/* Enhanced readability utilities */
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
+
+/* Prevent orphans in passages */
+.no-orphan {
+  text-wrap: balance;
+  min-width: 0;
+}
+
+/* Highlighting in passages */
+.passage-highlight {
+  background: var(--color-warning-bg);
+  color: var(--color-text-primary);
+  padding: 0.125em 0.25em;
+  border-radius: var(--radius-xs);
+  font-weight: 500;
+}
+
+/* Citation references in text */
+.citation-ref {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5em;
+  padding: 0 0.375em;
+  margin: 0 0.125em;
+  font-size: 0.8125em;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-xs);
+  text-decoration: none;
+  vertical-align: baseline;
+  transition: all var(--transition-fast);
+}
+
+.citation-ref:hover {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Link styles in passages */
+.passage-link {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent-soft);
+  text-underline-offset: 0.2em;
+  transition: all var(--transition-fast);
+}
+
+.passage-link:hover {
+  text-decoration-color: var(--color-accent);
+  color: var(--color-accent-hover);
+}
+
+/* Quote blocks in passages */
+.passage-quote {
+  margin: 1.5em 0;
+  padding-left: 1.5em;
+  border-left: 3px solid var(--color-accent-soft);
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+/* Verse reference formatting */
+.verse-ref {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+/* Document title in results */
+.document-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+  margin-bottom: 0.5em;
+}
+
+/* Improve focus visibility for reading content */
+.passage-content:focus-visible,
+.passage-text:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-xs);
+}

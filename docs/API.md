@@ -535,9 +535,13 @@ Found** error is returned when the identifier is unknown.
 
 ### `GET /documents/{document_id}/passages`
 
-Returns paginated passages for a specific document. Supports the same `limit`
-and `offset` parameters as the document list endpoint and responds with
+Returns paginated passages for a specific document. Accepts `limit` (default
+20, between 1 and 200) and `offset` (>= 0) query parameters and responds with
 `DocumentPassagesResponse`:
+
+> The passages endpoint allows a higher `limit` cap (200) than the document
+> list endpoint (100) so clients can page through larger documents without
+> additional round-trips.
 
 ```json
 {
