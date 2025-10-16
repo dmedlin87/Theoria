@@ -11,6 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from theo.domain.discoveries import (
+    AnomalyDiscoveryEngine,
     ContradictionDiscoveryEngine,
     DiscoveryType,
     DocumentEmbedding,
@@ -49,10 +50,12 @@ class DiscoveryService:
         session: Session,
         pattern_engine: PatternDiscoveryEngine | None = None,
         contradiction_engine: ContradictionDiscoveryEngine | None = None,
+        anomaly_engine: AnomalyDiscoveryEngine | None = None,
     ):
         self.session = session
         self.pattern_engine = pattern_engine or PatternDiscoveryEngine()
         self.contradiction_engine = contradiction_engine or ContradictionDiscoveryEngine()
+        self.anomaly_engine = anomaly_engine or AnomalyDiscoveryEngine()
 
     def list(
         self,
@@ -99,14 +102,20 @@ class DiscoveryService:
         # Run contradiction detection
         contradiction_candidates = self.contradiction_engine.detect(documents)
 
+        # Run anomaly detection
+        anomaly_candidates = self.anomaly_engine.detect(documents)
+
         # Delete old discoveries (both patterns and contradictions)
         self.session.execute(
             delete(Discovery).where(
                 Discovery.user_id == user_id,
-                Discovery.discovery_type.in_([
-                    DiscoveryType.PATTERN.value,
-                    DiscoveryType.CONTRADICTION.value,
-                ]),
+                Discovery.discovery_type.in_(
+                    [
+                        DiscoveryType.PATTERN.value,
+                        DiscoveryType.CONTRADICTION.value,
+                        DiscoveryType.ANOMALY.value,
+                    ]
+                ),
             )
         )
 
@@ -148,6 +157,22 @@ class DiscoveryService:
                     "contradiction_type": candidate.contradiction_type,
                     **candidate.metadata,
                 },
+                created_at=datetime.now(UTC),
+            )
+            self.session.add(record)
+            persisted.append(record)
+
+        # Persist anomaly discoveries
+        for candidate in anomaly_candidates:
+            record = Discovery(
+                user_id=user_id,
+                discovery_type=DiscoveryType.ANOMALY.value,
+                title=candidate.title,
+                description=candidate.description,
+                confidence=float(candidate.confidence),
+                relevance_score=float(candidate.relevance_score),
+                viewed=False,
+                meta=dict(candidate.metadata),
                 created_at=datetime.now(UTC),
             )
             self.session.add(record)
