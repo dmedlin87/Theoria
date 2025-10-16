@@ -7,6 +7,7 @@ from theo.domain import FallacyHit, HistoricityEntry, VariantEntry
 
 class _DummyNotesRepository:
     """Minimal repository stub for instantiating ``ResearchService``."""
+    pass
 
 
 @pytest.fixture
