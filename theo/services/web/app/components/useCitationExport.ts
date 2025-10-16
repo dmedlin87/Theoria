@@ -248,15 +248,18 @@ export function useCitationExport(options: UseCitationExportOptions = {}): UseCi
       const blob = await response.blob();
       const fallbackName = `theo-citations.${formatExtension}`;
       const filename = parseFilename(response.headers.get('Content-Disposition'), fallbackName);
+      const contentEncoding = response.headers.get('Content-Encoding');
+      const resolvedFilename =
+        contentEncoding && /gzip/i.test(contentEncoding) ? filename.replace(/\.gz$/i, '') || fallbackName : filename;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = filename;
+      anchor.download = resolvedFilename;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
-      setSuccess(`Downloaded ${filename}`);
+      setSuccess(`Downloaded ${resolvedFilename}`);
     } catch (downloadError: unknown) {
       if (isAbortError(downloadError)) {
         return;
