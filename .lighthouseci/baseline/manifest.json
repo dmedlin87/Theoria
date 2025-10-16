@@ -1,0 +1,38 @@
+[
+  {
+    "url": "http://127.0.0.1:3000/",
+    "isRepresentativeRun": true,
+    "htmlPath": "lhr-0.html",
+    "jsonPath": "lhr-0.json",
+    "summary": {
+      "performance": 0.9,
+      "accessibility": 0.95,
+      "best-practices": 0.95,
+      "seo": 0.9
+    }
+  },
+  {
+    "url": "http://127.0.0.1:3000/verse/John.3.16",
+    "isRepresentativeRun": true,
+    "htmlPath": "lhr-1.html",
+    "jsonPath": "lhr-1.json",
+    "summary": {
+      "performance": 0.9,
+      "accessibility": 0.95,
+      "best-practices": 0.95,
+      "seo": 0.9
+    }
+  },
+  {
+    "url": "http://127.0.0.1:3000/search",
+    "isRepresentativeRun": true,
+    "htmlPath": "lhr-2.html",
+    "jsonPath": "lhr-2.json",
+    "summary": {
+      "performance": 0.9,
+      "accessibility": 0.95,
+      "best-practices": 0.95,
+      "seo": 0.9
+    }
+  }
+]

@@ -105,14 +105,12 @@ class DiscoveryService:
 
     def refresh_user_discoveries(self, user_id: str) -> list[Discovery]:
         documents = self._load_document_embeddings(user_id)
-        
-        # Run pattern detection
         pattern_candidates, snapshot = self.pattern_engine.detect(documents)
-
-        # Run contradiction detection
         contradiction_candidates = self.contradiction_engine.detect(documents)
+        anomaly_candidates = self.anomaly_engine.detect(documents)
+        connection_candidates = self.connection_engine.detect(documents)
+        gap_candidates = self.gap_engine.detect(documents)
 
-        # Prepare trend analysis using historical snapshots including the new run
         historical_snapshots = self._load_recent_snapshots(
             user_id, limit=self.trend_engine.history_window - 1
         )
@@ -143,22 +141,23 @@ class DiscoveryService:
         gap_candidates = self.gap_engine.detect(documents)
 
         # Delete old discoveries (patterns, contradictions, and gaps)
+        discovery_types_to_clear = [
+            DiscoveryType.PATTERN.value,
+            DiscoveryType.CONTRADICTION.value,
+            DiscoveryType.TREND.value,
+            DiscoveryType.ANOMALY.value,
+            DiscoveryType.CONNECTION.value,
+            DiscoveryType.GAP.value,
+        ]
         self.session.execute(
             delete(Discovery).where(
                 Discovery.user_id == user_id,
-                Discovery.discovery_type.in_([
-                    DiscoveryType.PATTERN.value,
-                    DiscoveryType.CONTRADICTION.value,
-                    DiscoveryType.TREND.value,
-                    DiscoveryType.CONNECTION.value,
-                    DiscoveryType.GAP.value,
-                ]),
+                Discovery.discovery_type.in_(discovery_types_to_clear),
             )
         )
 
         persisted: list[Discovery] = []
-        
-        # Persist pattern discoveries
+
         for candidate in pattern_candidates:
             record = Discovery(
                 user_id=user_id,
@@ -173,9 +172,18 @@ class DiscoveryService:
             )
             self.session.add(record)
             persisted.append(record)
-        
-        # Persist contradiction discoveries
+
         for candidate in contradiction_candidates:
+            metadata = {
+                "document_a_id": candidate.document_a_id,
+                "document_b_id": candidate.document_b_id,
+                "document_a_title": candidate.document_a_title,
+                "document_b_title": candidate.document_b_title,
+                "claim_a": candidate.claim_a,
+                "claim_b": candidate.claim_b,
+                "contradiction_type": candidate.contradiction_type,
+            }
+            metadata.update(dict(candidate.metadata))
             record = Discovery(
                 user_id=user_id,
                 discovery_type=DiscoveryType.CONTRADICTION.value,
@@ -184,45 +192,66 @@ class DiscoveryService:
                 confidence=float(candidate.confidence),
                 relevance_score=float(candidate.relevance_score),
                 viewed=False,
-                meta={
-                    "document_a_id": candidate.document_a_id,
-                    "document_b_id": candidate.document_b_id,
-                    "document_a_title": candidate.document_a_title,
-                    "document_b_title": candidate.document_b_title,
-                    "claim_a": candidate.claim_a,
-                    "claim_b": candidate.claim_b,
-                    "contradiction_type": candidate.contradiction_type,
-                    **candidate.metadata,
-                },
+                meta=metadata,
                 created_at=datetime.now(UTC),
             )
             self.session.add(record)
             persisted.append(record)
 
-        # Persist trend discoveries
         for candidate in trend_candidates:
             record = Discovery(
                 user_id=user_id,
                 discovery_type=DiscoveryType.TREND.value,
-        # Persist anomaly discoveries
+                title=candidate.title,
+                description=candidate.description,
+                confidence=float(candidate.confidence),
+                relevance_score=float(candidate.relevance_score),
+                viewed=False,
+                meta=dict(candidate.metadata),
+                created_at=datetime.now(UTC),
+            )
+            self.session.add(record)
+            persisted.append(record)
+
         for candidate in anomaly_candidates:
+            metadata = dict(candidate.metadata)
+            metadata.setdefault("documentId", candidate.document_id)
+            metadata.setdefault("anomalyScore", candidate.anomaly_score)
             record = Discovery(
                 user_id=user_id,
                 discovery_type=DiscoveryType.ANOMALY.value,
-        # Persist connection discoveries
+                title=candidate.title,
+                description=candidate.description,
+                confidence=float(candidate.confidence),
+                relevance_score=float(candidate.relevance_score),
+                viewed=False,
+                meta=metadata,
+                created_at=datetime.now(UTC),
+            )
+            self.session.add(record)
+            persisted.append(record)
+
         for candidate in connection_candidates:
             record = Discovery(
                 user_id=user_id,
                 discovery_type=DiscoveryType.CONNECTION.value,
-        # Persist gap discoveries
+                title=candidate.title,
+                description=candidate.description,
+                confidence=float(candidate.confidence),
+                relevance_score=float(candidate.relevance_score),
+                viewed=False,
+                meta=dict(candidate.metadata),
+                created_at=datetime.now(UTC),
+            )
+            self.session.add(record)
+            persisted.append(record)
+
         for candidate in gap_candidates:
-            metadata = {
-                "reference_topic": candidate.reference_topic,
-                "missing_keywords": list(candidate.missing_keywords),
-                "shared_keywords": list(candidate.shared_keywords),
-                "related_documents": list(candidate.related_documents),
-            }
-            metadata.update(dict(candidate.metadata))
+            metadata = dict(candidate.metadata)
+            metadata.setdefault("referenceTopic", candidate.reference_topic)
+            metadata.setdefault("missingKeywords", list(candidate.missing_keywords))
+            metadata.setdefault("sharedKeywords", list(candidate.shared_keywords))
+            metadata.setdefault("relatedDocuments", list(candidate.related_documents))
             record = Discovery(
                 user_id=user_id,
                 discovery_type=DiscoveryType.GAP.value,
@@ -231,7 +260,7 @@ class DiscoveryService:
                 confidence=float(candidate.confidence),
                 relevance_score=float(candidate.relevance_score),
                 viewed=False,
-                meta=dict(candidate.metadata),
+                meta=metadata,
                 created_at=datetime.now(UTC),
             )
             self.session.add(record)
@@ -357,3 +386,4 @@ class DiscoveryService:
 
 
 __all__ = ["DiscoveryService"]
+
