@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from collections import Counter
 from typing import Iterable, Sequence
 
@@ -11,6 +10,9 @@ from .models import (
     DocumentEmbedding,
     PatternDiscovery,
 )
+
+"""Discovery engine that clusters embeddings to surface corpus patterns."""
+
 
 """Discovery engine that clusters embeddings to surface corpus patterns."""
 
