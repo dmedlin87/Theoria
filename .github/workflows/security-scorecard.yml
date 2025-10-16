@@ -11,6 +11,7 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  id-token: write  # Required for OIDC-based Sigstore signing
 
 jobs:
   analysis:
@@ -25,6 +26,7 @@ jobs:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
+          # OIDC signing is automatic with id-token: write permission
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v4
