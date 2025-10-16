@@ -7,7 +7,10 @@ from typing import Callable, Tuple
 from sqlalchemy.orm import Session
 
 from theo.adapters import AdapterRegistry
-from theo.adapters.research.sqlalchemy import SqlAlchemyResearchNoteRepositoryFactory
+from theo.adapters.research import (
+    SqlAlchemyHypothesisRepositoryFactory,
+    SqlAlchemyResearchNoteRepositoryFactory,
+)
 from theo.application import ApplicationContainer
 from theo.application.facades.database import get_engine
 from theo.application.facades.settings import get_settings
@@ -42,16 +45,23 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
         "research_notes_repository_factory",
         lambda: SqlAlchemyResearchNoteRepositoryFactory(),
     )
+    registry.register(
+        "hypotheses_repository_factory",
+        lambda: SqlAlchemyHypothesisRepositoryFactory(),
+    )
 
     def _build_research_service_factory() -> Callable[[Session], ResearchService]:
         from theo.domain.research import fetch_dss_links
 
-        repository_factory = registry.resolve("research_notes_repository_factory")
+        notes_factory = registry.resolve("research_notes_repository_factory")
+        hypotheses_factory = registry.resolve("hypotheses_repository_factory")
 
         def _factory(session: Session) -> ResearchService:
-            repository = repository_factory(session)
+            notes_repository = notes_factory(session)
+            hypotheses_repository = hypotheses_factory(session)
             return ResearchService(
-                repository,
+                notes_repository,
+                hypothesis_repository=hypotheses_repository,
                 fetch_dss_links_func=fetch_dss_links,
             )
 

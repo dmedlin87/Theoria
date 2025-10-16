@@ -72,10 +72,48 @@ class ResearchNoteNotFoundError(KeyError):
     """Raised when a requested research note cannot be located."""
 
 
+@dataclass(frozen=True, slots=True)
+class Hypothesis:
+    """Domain representation of a theological hypothesis."""
+
+    id: str
+    claim: str
+    confidence: float
+    status: str
+    trail_id: str | None = None
+    supporting_passage_ids: tuple[str, ...] | None = None
+    contradicting_passage_ids: tuple[str, ...] | None = None
+    perspective_scores: Mapping[str, float] | None = None
+    metadata: Mapping[str, object] | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class HypothesisDraft:
+    """Creation payload for hypotheses prior to persistence."""
+
+    claim: str
+    confidence: float
+    status: str
+    trail_id: str | None = None
+    supporting_passage_ids: tuple[str, ...] | None = None
+    contradicting_passage_ids: tuple[str, ...] | None = None
+    perspective_scores: Mapping[str, float] | None = None
+    metadata: Mapping[str, object] | None = None
+
+
+class HypothesisNotFoundError(KeyError):
+    """Raised when a hypothesis could not be located."""
+
+
 __all__ = [
     "ResearchNote",
     "ResearchNoteDraft",
     "ResearchNoteEvidence",
     "ResearchNoteEvidenceDraft",
     "ResearchNoteNotFoundError",
+    "Hypothesis",
+    "HypothesisDraft",
+    "HypothesisNotFoundError",
 ]

@@ -1,0 +1,212 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 1.75rem;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--theo-color-text-muted, #4b5563);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.statusFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.statusButton {
+  border-radius: 999px;
+  border: 1px solid var(--theo-color-border, #d1d5db);
+  padding: 0.35rem 0.75rem;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-transform: capitalize;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.statusButton[data-active="true"] {
+  border-color: var(--theo-color-accent, #2563eb);
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--theo-color-accent, #2563eb);
+}
+
+.filtersForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.searchInput {
+  min-width: 16rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--theo-color-border, #d1d5db);
+}
+
+.numberInput {
+  width: 6rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--theo-color-border, #d1d5db);
+}
+
+.primaryButton {
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.6rem;
+  background: var(--theo-color-accent, #2563eb);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.ghostButton {
+  padding: 0.45rem 0.8rem;
+  border-radius: 0.6rem;
+  background: transparent;
+  border: 1px solid var(--theo-color-border, #d1d5db);
+  cursor: pointer;
+}
+
+.list {
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  border-radius: 1rem;
+  border: 1px solid var(--theo-color-border, #e5e7eb);
+  padding: 1.25rem;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.claim {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.statusDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.statusActive {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.statusConfirmed {
+  color: #15803d;
+  background: rgba(21, 128, 61, 0.1);
+}
+
+.statusRefuted {
+  color: #b91c1c;
+  background: rgba(185, 28, 28, 0.1);
+}
+
+.statusUncertain {
+  color: #92400e;
+  background: rgba(146, 64, 14, 0.12);
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  color: var(--theo-color-text-muted, #4b5563);
+  font-size: 0.85rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.actionButton {
+  border-radius: 0.6rem;
+  border: 1px solid var(--theo-color-border, #d1d5db);
+  padding: 0.45rem 0.8rem;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.actionButton[data-variant="confirm"] {
+  border-color: #15803d;
+  color: #15803d;
+}
+
+.actionButton[data-variant="refute"] {
+  border-color: #b91c1c;
+  color: #b91c1c;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--theo-color-border, #d1d5db);
+  border-radius: 1rem;
+  color: var(--theo-color-text-muted, #4b5563);
+}
+
+.error {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(185, 28, 28, 0.3);
+  background: rgba(185, 28, 28, 0.08);
+  color: #991b1b;
+}
+
+.stats {
+  font-size: 0.9rem;
+  color: var(--theo-color-text-muted, #4b5563);
+}
