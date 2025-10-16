@@ -12,8 +12,8 @@ __all__ = ["sanitize_passage_text"]
 # model. The expressions aim to catch common prompt-injection templates without
 # being overly aggressive so that legitimate prose is preserved.
 _DANGEROUS_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
-    re.compile(r"(?is)<script[^>]*>.*?</script>"),
-    re.compile(r"(?is)<style[^>]*>.*?</style>"),
+    re.compile(r"(?is)<script[^>]*>.*?</script[^\>]*>"),
+    re.compile(r"(?is)<style[^>]*>.*?</style[^\>]*>"),
     re.compile(r"(?is)<meta[^>]+http-equiv[^>]*>"),
     re.compile(r"(?is)<!--.*?prompt-injection.*?-->"),
     re.compile(r"(?i)\bignore\s+(?:all\s+)?previous\s+instructions\b"),
