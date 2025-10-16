@@ -99,7 +99,7 @@ class TrendDiscoveryEngine:
             start_share = round(series[0] * 100, 2)
             end_share = round(latest * 100, 2)
             description = (
-                f"The emphasis on {display_topic!s} has {direction} over the analysed period. "
+                f"The emphasis on {display_topic!s} has {direction} over the analyzed period. "
                 f"It changed from {start_share:.2f}% to {end_share:.2f}% between {timeframe}."
             )
             magnitude = min(abs(percent_change) / 100.0, 1.0)
