@@ -8,12 +8,13 @@ from pathlib import Path
 from uuid import uuid4
 from typing import Any, AsyncIterator, Iterator
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 from theo.application.facades.settings import get_settings
+from ..discoveries.tasks import schedule_discovery_refresh
 from ..errors import IngestionError, Severity
 from ..ingest.exceptions import UnsupportedSourceError
 from ..ingest.pipeline import (
@@ -28,6 +29,7 @@ from ..models.documents import (
 )
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
 from ..utils.imports import LazyImportModule
+from ..security import Principal, require_principal
 from ..services.ingestion_service import IngestionService, get_ingestion_service
 
 cli_ingest = LazyImportModule("theo.services.cli.ingest_folder")
@@ -64,6 +66,27 @@ router = APIRouter()
 
 
 _UPLOAD_CHUNK_SIZE = 1024 * 1024
+
+
+def _principal_subject(principal: Principal | None) -> str | None:
+    if not principal:
+        return None
+    subject = principal.get("subject")
+    if isinstance(subject, str) and subject.strip():
+        return subject.strip()
+    return None
+
+
+def _frontmatter_with_owner(
+    frontmatter: dict[str, Any] | None, user_id: str | None
+) -> dict[str, Any] | None:
+    if not user_id:
+        return frontmatter
+    enriched = dict(frontmatter) if frontmatter else {}
+    enriched.setdefault("collection", user_id)
+    enriched.setdefault("owner_user_id", user_id)
+    enriched.setdefault("uploaded_by", user_id)
+    return enriched
 
 
 def _parse_frontmatter(raw: str | None) -> dict[str, Any] | None:
@@ -187,8 +210,10 @@ def _encode_event(event: dict[str, Any]) -> bytes:
     responses=_INGEST_ERROR_RESPONSES,
 )
 async def ingest_file(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     frontmatter: str | None = Form(default=None),
+    principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
     ingestion_service: IngestionService = Depends(
         _ingestion_service_with_overrides
@@ -200,6 +225,8 @@ async def ingest_file(
     tmp_path = _unique_safe_path(tmp_dir, file.filename, "upload.bin")
     settings = get_settings()
 
+    user_id = _principal_subject(principal)
+
     try:
         await _stream_upload_to_path(
             file,
@@ -207,12 +234,13 @@ async def ingest_file(
             max_bytes=getattr(settings, "ingest_upload_max_bytes", None),
         )
         parsed_frontmatter = _parse_frontmatter(frontmatter)
+        enriched_frontmatter = _frontmatter_with_owner(parsed_frontmatter, user_id)
         if ingestion_service.run_file_pipeline is _run_pipeline_for_file:
             ingestion_service.run_file_pipeline = run_pipeline_for_file
         document = ingestion_service.ingest_file(
             session,
             tmp_path,
-            parsed_frontmatter,
+            enriched_frontmatter,
         )
     except IngestionError:
         raise
@@ -232,6 +260,7 @@ async def ingest_file(
         except OSError:
             pass
 
+    schedule_discovery_refresh(background_tasks, user_id)
     return DocumentIngestResponse(document_id=document.id, status="processed")
 
 
@@ -241,12 +270,16 @@ async def ingest_file(
     responses=_INGEST_ERROR_RESPONSES,
 )
 async def ingest_url(
+    background_tasks: BackgroundTasks,
     payload: UrlIngestRequest,
+    principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
     ingestion_service: IngestionService = Depends(
         _ingestion_service_with_overrides
     ),
 ) -> DocumentIngestResponse:
+    user_id = _principal_subject(principal)
+    frontmatter = _frontmatter_with_owner(payload.frontmatter, user_id)
     try:
         if ingestion_service.run_url_pipeline is _run_pipeline_for_url:
             ingestion_service.run_url_pipeline = run_pipeline_for_url
@@ -254,7 +287,7 @@ async def ingest_url(
             session,
             payload.url,
             source_type=payload.source_type,
-            frontmatter=payload.frontmatter,
+            frontmatter=frontmatter,
         )
     except UnsupportedSourceError as exc:
         raise IngestionError(
@@ -274,6 +307,7 @@ async def ingest_url(
             data={"resilience": exc.metadata.to_dict()},
         ) from exc
 
+    schedule_discovery_refresh(background_tasks, user_id)
     return DocumentIngestResponse(document_id=document.id, status="processed")
 
 
@@ -317,9 +351,11 @@ async def simple_ingest(
     responses=_INGEST_ERROR_RESPONSES,
 )
 async def ingest_transcript(
+    background_tasks: BackgroundTasks,
     transcript: UploadFile = File(...),
     audio: UploadFile | None = File(default=None),
     frontmatter: str | None = Form(default=None),
+    principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
     ingestion_service: IngestionService = Depends(
         _ingestion_service_with_overrides
@@ -336,6 +372,8 @@ async def ingest_transcript(
     settings = get_settings()
     limit = getattr(settings, "ingest_upload_max_bytes", None)
 
+    user_id = _principal_subject(principal)
+
     try:
         await _stream_upload_to_path(transcript, transcript_path, max_bytes=limit)
 
@@ -344,13 +382,14 @@ async def ingest_transcript(
             await _stream_upload_to_path(audio, audio_path, max_bytes=limit)
 
         parsed_frontmatter = _parse_frontmatter(frontmatter)
+        enriched_frontmatter = _frontmatter_with_owner(parsed_frontmatter, user_id)
         if ingestion_service.run_transcript_pipeline is _run_pipeline_for_transcript:
             ingestion_service.run_transcript_pipeline = run_pipeline_for_transcript
 
         document = ingestion_service.ingest_transcript(
             session,
             transcript_path,
-            frontmatter=parsed_frontmatter,
+            frontmatter=enriched_frontmatter,
             audio_path=audio_path,
             transcript_filename=_normalise_upload_name(
                 transcript.filename, default="transcript.vtt"
@@ -381,5 +420,6 @@ async def ingest_transcript(
         except OSError:
             pass
 
+    schedule_discovery_refresh(background_tasks, user_id)
     return DocumentIngestResponse(document_id=document.id, status="processed")
 

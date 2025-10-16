@@ -1,33 +1,76 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+import { getApiBaseUrl } from "../../../../lib/api";
+import { forwardTraceHeaders } from "../../../trace";
+import { createProxyErrorResponse } from "../../../utils/proxyError";
+import { fetchWithTimeout } from "../../../utils/fetchWithTimeout";
+
+function buildAuthHeaders(request: NextRequest): Headers {
+  const headers = new Headers({ Accept: "application/json" });
+  const apiKey = process.env.THEO_SEARCH_API_KEY?.trim();
+  if (apiKey) {
+    if (/^Bearer\s+/i.test(apiKey)) {
+      headers.set("Authorization", apiKey);
+    } else {
+      headers.set("X-API-Key", apiKey);
+    }
+  }
+  const requestContentType = request.headers.get("content-type");
+  if (requestContentType) {
+    headers.set("content-type", requestContentType);
+  }
+  return headers;
+}
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
-) {
+): Promise<NextResponse> {
+  const { id } = params;
+  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+  const target = new URL(
+    `/discoveries/${encodeURIComponent(id)}/feedback`,
+    `${baseUrl}/api`
+  );
+  const headers = buildAuthHeaders(request);
+  forwardTraceHeaders(request.headers, headers);
+
+  let body: string;
   try {
-    const discoveryId = params.id;
-    const body = await request.json();
-    const { helpful } = body;
-
-    // TODO: Call the actual FastAPI backend endpoint
-    // const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
-    // const response = await fetch(`${backendUrl}/api/discoveries/${discoveryId}/feedback`, {
-    //   method: "POST",
-    //   headers: {
-    //     "Authorization": `Bearer ${process.env.THEO_SEARCH_API_KEY}`,
-    //     "Content-Type": "application/json",
-    //   },
-    //   body: JSON.stringify({ helpful }),
-    // });
-
-    console.log(`Recording feedback for discovery ${discoveryId}: ${helpful ? "helpful" : "not helpful"}`);
-
-    return NextResponse.json({ success: true });
+    body = await request.text();
   } catch (error) {
-    console.error("Error submitting feedback:", error);
-    return NextResponse.json(
-      { error: "Failed to submit feedback" },
-      { status: 500 }
-    );
+    return createProxyErrorResponse({
+      error,
+      logContext: "Failed to read feedback payload",
+      message: "Unable to submit feedback at this time.",
+    });
+  }
+
+  try {
+    const response = await fetchWithTimeout(target, {
+      method: "POST",
+      headers,
+      body,
+      cache: "no-store",
+    });
+    const responseBody = await response.text();
+    const proxyHeaders = new Headers();
+    forwardTraceHeaders(response.headers, proxyHeaders);
+    if (responseBody) {
+      proxyHeaders.set(
+        "content-type",
+        response.headers.get("content-type") ?? "application/json"
+      );
+    }
+    return new NextResponse(responseBody, {
+      status: response.status,
+      headers: proxyHeaders,
+    });
+  } catch (error) {
+    return createProxyErrorResponse({
+      error,
+      logContext: "Failed to submit discovery feedback",
+      message: "Unable to submit feedback at this time.",
+    });
   }
 }
