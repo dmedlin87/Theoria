@@ -911,6 +911,15 @@ class SharedLedger:
                     or row.completed_at is None
                     or row.completed_at < comparison_floor
                 ):
+                    if _can_use_preserved(include_unobserved=True):
+                        _record_event(
+                            "delivered",
+                            cache_key,
+                            source="preserved_after_error",
+                            status=row.status,
+                        )
+                        success_missing_output_since = None
+                        return preserved_record
                     # A transient failure was observed, but the owning router may
                     # still be retrying. Keep polling instead of clearing the row so
                     # all waiters eventually share the successful output.

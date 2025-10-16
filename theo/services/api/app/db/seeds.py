@@ -202,7 +202,45 @@ def _dispose_sqlite_engine(bind: Connection | Engine | None) -> None:
         time.sleep(0.01)
 
 
-def _table_has_column(session: Session, table_name: str, column_name: str, *, schema: str | None = None) -> bool:
+def _table_exists(
+    session: Session, table_name: str, *, schema: str | None = None
+) -> bool:
+    """Return ``True`` when ``table_name`` is present in the bound database."""
+
+    connection, should_close = _get_session_connection(session)
+    if connection is None:
+        return False
+
+    try:
+        dialect_name = getattr(getattr(connection, "dialect", None), "name", None)
+        if dialect_name == "sqlite":
+            try:
+                result = connection.exec_driver_sql(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (table_name,),
+                )
+            except Exception:  # pragma: no cover - defensive: unexpected SQLite errors
+                return False
+            return any(row and row[0] == table_name for row in result)
+
+        inspector = inspect(connection)
+        try:
+            return inspector.has_table(table_name, schema=schema)
+        except Exception:  # pragma: no cover - defensive: fall back to manual scan
+            try:
+                tables = inspector.get_table_names(schema=schema)
+            except Exception:
+                return False
+            normalized = table_name.lower()
+            return any((candidate or "").lower() == normalized for candidate in tables)
+    finally:
+        if should_close and connection is not None:
+            connection.close()
+
+
+def _table_has_column(
+    session: Session, table_name: str, column_name: str, *, schema: str | None = None
+) -> bool:
     """Check whether the bound database exposes ``column_name`` on ``table_name``."""
 
     connection, should_close = _get_session_connection(session)
@@ -645,6 +683,32 @@ def seed_contradiction_claims(session: Session) -> None:
         if _handle_missing_perspective_error(session, "contradiction", exc):
             return
         raise
+
+    table_exists = _table_exists(session, table.name, schema=table.schema)
+    if not perspective_ready and not table_exists:
+        try:
+            rebuilt = _recreate_seed_table_if_missing_column(
+                session,
+                table,
+                "perspective",
+                dataset_label="contradiction",
+                force=True,
+            )
+        except OperationalError:
+            session.rollback()
+            logger.warning(
+                "Skipping contradiction seeds because table recreation failed",
+                exc_info=True,
+            )
+            return
+        else:
+            if rebuilt:
+                logger.info(
+                    "Created contradiction_seeds table before seeding bundled data",
+                )
+            perspective_ready = _table_has_column(
+                session, table.name, "perspective", schema=table.schema
+            )
 
     if not perspective_ready:
         return

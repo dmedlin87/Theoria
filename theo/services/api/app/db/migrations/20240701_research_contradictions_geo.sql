@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS contradiction_seeds (
     source text,
     tags jsonb,
     weight real DEFAULT 1.0,
+    perspective text,
     created_at timestamptz DEFAULT now() NOT NULL
 );
 
