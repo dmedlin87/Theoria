@@ -1,9 +1,12 @@
 from __future__ import annotations
+
 from collections import Counter
 from typing import Iterable, Sequence
 
 import numpy as np
 from sklearn.cluster import DBSCAN
+
+"""Discovery engine that clusters embeddings to surface corpus patterns."""
 
 from .models import (
     CorpusSnapshotSummary,
