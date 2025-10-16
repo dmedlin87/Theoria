@@ -7,6 +7,7 @@ from ..routes import (
     ai,
     analytics,
     creators,
+    discoveries,
     documents,
     export,
     features,
@@ -28,6 +29,11 @@ _DEFAULT_REGISTRATIONS = (
     RouterRegistration(router=search.router, prefix="/search", tags=("search",)),
     RouterRegistration(router=export.router, prefix="/export", tags=("export",)),
     RouterRegistration(router=verses.router, prefix="/verses", tags=("verses",)),
+    RouterRegistration(
+        router=discoveries.router,
+        prefix="/discoveries",
+        tags=("discoveries",),
+    ),
     RouterRegistration(
         router=documents.router,
         prefix="/documents",
