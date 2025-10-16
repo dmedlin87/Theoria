@@ -70,6 +70,7 @@ export function useChatExecution(
             content: event.response.answer.summary,
             citations: event.response.answer.citations ?? [],
             fallacyWarnings: event.response.answer.fallacy_warnings ?? [],
+            reasoningTrace: event.response.answer.reasoning_trace ?? null,
           },
         });
         dispatch({ type: "STREAMING_COMPLETE", sessionId: event.response.sessionId });
@@ -100,6 +101,7 @@ export function useChatExecution(
         citations: [],
         fallacyWarnings: [],
         prompt: trimmed,
+        reasoningTrace: null,
       };
 
       dispatch({
@@ -154,6 +156,7 @@ export function useChatExecution(
               content: result.answer.summary,
               citations: result.answer.citations ?? [],
               fallacyWarnings: result.answer.fallacy_warnings ?? [],
+              reasoningTrace: result.answer.reasoning_trace ?? null,
             },
           });
         } else if (result.kind === "guardrail") {

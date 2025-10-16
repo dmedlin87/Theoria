@@ -59,10 +59,12 @@ from .models import (
     RAGAnswer,
     RAGCitation,
     ReasoningCritique,
+    ReasoningTrace,
     RevisionDetails,
     SermonPrepResponse,
     VerseCopilotResponse,
 )
+from .reasoning_trace import build_reasoning_trace_from_completion
 from ..reasoning.metacognition import (
     Critique,
     RevisionResult,
@@ -495,6 +497,13 @@ class GuardedAnswerPipeline:
                                 ),
                             )
 
+        reasoning_trace: ReasoningTrace | None = None
+        if model_output:
+            reasoning_trace = build_reasoning_trace_from_completion(
+                model_output,
+                mode=mode,
+            )
+
         answer = RAGAnswer(
             summary=summary_text,
             citations=citations,
@@ -506,6 +515,7 @@ class GuardedAnswerPipeline:
             ),
             critique=critique_schema,
             revision=revision_schema,
+            reasoning_trace=reasoning_trace,
         )
 
         if cache_key and model_output and validation_result and cache_status in {

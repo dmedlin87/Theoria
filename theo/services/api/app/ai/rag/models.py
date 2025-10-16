@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from collections.abc import MutableMapping
+from typing import Literal
 
 from pydantic import Field, model_serializer
 
@@ -32,15 +33,46 @@ class RAGAnswer(APIModel):
     fallacy_warnings: list["FallacyWarningModel"] = Field(default_factory=list)
     critique: "ReasoningCritique | None" = None
     revision: "RevisionDetails | None" = None
+    reasoning_trace: "ReasoningTrace | None" = None
 
     @model_serializer(mode="wrap")
     def _include_guardrail_profile(self, handler):
         """Ensure the ``guardrail_profile`` key is present in serialized output."""
 
         data = handler(self)
-        if isinstance(data, MutableMapping) and "guardrail_profile" not in data:
-            data["guardrail_profile"] = None
+        if isinstance(data, MutableMapping):
+            data.setdefault("guardrail_profile", None)
+            data.setdefault("reasoning_trace", None)
         return data
+
+
+class ReasoningTraceEvidence(APIModel):
+    id: str
+    text: str
+    label: str | None = None
+    citation_ids: list[int] = Field(default_factory=list)
+
+
+class ReasoningTraceStep(APIModel):
+    id: str
+    label: str
+    detail: str | None = None
+    outcome: str | None = None
+    status: Literal["pending", "in_progress", "supported", "contradicted", "uncertain", "complete"] | None = None
+    confidence: float | None = None
+    citations: list[int] = Field(default_factory=list)
+    evidence: list[ReasoningTraceEvidence] = Field(default_factory=list)
+    children: list["ReasoningTraceStep"] = Field(default_factory=list)
+
+
+class ReasoningTrace(APIModel):
+    summary: str | None = None
+    strategy: str | None = None
+    steps: list[ReasoningTraceStep] = Field(default_factory=list)
+
+
+ReasoningTraceStep.model_rebuild()
+ReasoningTrace.model_rebuild()
 
 
 class FallacyWarningModel(APIModel):
@@ -124,6 +156,9 @@ __all__ = [
     "DevotionalResponse",
     "FallacyWarningModel",
     "MultimediaDigestResponse",
+    "ReasoningTrace",
+    "ReasoningTraceEvidence",
+    "ReasoningTraceStep",
     "RAGAnswer",
     "RAGCitation",
     "ReasoningCritique",

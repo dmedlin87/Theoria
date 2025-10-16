@@ -46,6 +46,25 @@ const sampleAnswer = {
   model_name: null,
   model_output: null,
   guardrail_profile: null,
+  reasoning_trace: {
+    summary: "Reviewed the text and confirmed the Logos theme.",
+    steps: [
+      {
+        id: "s1",
+        label: "Examine passage",
+        detail: "Reviewed the language of John 1:1 to identify parallels with Genesis.",
+        status: "supported",
+        citations: [0],
+        evidence: [
+          {
+            id: "e1",
+            text: "The phrasing \"In the beginning\" mirrors Genesis 1:1.",
+            citationIds: [0],
+          },
+        ],
+      },
+    ],
+  },
 } satisfies import("../../../app/copilot/components/types").RAGAnswer;
 
 jest.mock("../../../app/mode-context", () => {
@@ -169,6 +188,14 @@ describe("ChatWorkspace", () => {
     await waitFor(() => {
       expect(screen.getByText(sampleAnswer.summary)).toBeInTheDocument();
     });
+
+    const reasoningToggle = screen.queryByRole("button", { name: /Show reasoning/i });
+    if (reasoningToggle) {
+      await userEvent.click(reasoningToggle);
+      expect(
+        screen.getByText("Reviewed the language of John 1:1 to identify parallels with Genesis.")
+      ).toBeInTheDocument();
+    }
 
     expect(
       screen.getByRole("link", { name: "Open John 1:1" })

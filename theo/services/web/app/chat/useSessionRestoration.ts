@@ -97,6 +97,7 @@ export function useSessionRestoration(
               citations: entry.citations ?? [],
               fallacyWarnings: [],
               prompt: entry.question,
+              reasoningTrace: entry.reasoningTrace ?? null,
             });
           });
         }
