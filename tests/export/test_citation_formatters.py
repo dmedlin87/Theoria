@@ -75,9 +75,8 @@ def test_build_citation_export_sbl(citation_fixture_data) -> None:
     expected = (
         fixtures_dir / "expected_sbl.txt"
     ).read_text("utf-8").strip().splitlines()
-    assert [record["citation"] for record in records] == expected
-
-
+    actual = [record["citation"] for record in records]
+    assert actual == expected
 def test_build_citation_export_bibtex(citation_fixture_data) -> None:
     documents, anchors, fixtures_dir = citation_fixture_data
     _, records, _ = build_citation_export(
