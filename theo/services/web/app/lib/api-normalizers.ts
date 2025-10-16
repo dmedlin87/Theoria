@@ -8,6 +8,7 @@ import type {
 type ExportDeliverableResponse = components["schemas"]["ExportDeliverableResponse"];
 type RAGAnswer = import("../copilot/components/types").RAGAnswer;
 type RAGCitation = import("../copilot/components/types").RAGCitation;
+type FallacyWarningModel = import("../copilot/components/types").FallacyWarningModel;
 
 export type ChatSessionPreferencesPayload = {
   mode?: string | null;
@@ -277,6 +278,31 @@ export function normaliseCitation(value: unknown): RAGCitation | null {
   };
 }
 
+export function normaliseFallacyWarning(value: unknown): FallacyWarningModel | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const fallacyType = toOptionalString(record.fallacy_type ?? record.fallacyType);
+  const description = toOptionalString(record.description);
+  const matchedText = toOptionalString(record.matched_text ?? record.matchedText);
+  if (!fallacyType || !description) {
+    return null;
+  }
+  const severityRaw = toOptionalString(record.severity)?.toLowerCase();
+  const severity = severityRaw === "high" || severityRaw === "low" || severityRaw === "medium"
+    ? severityRaw
+    : "medium";
+  const suggestion = toOptionalString(record.suggestion);
+  return {
+    fallacy_type: fallacyType,
+    severity,
+    description,
+    matched_text: matchedText ?? "",
+    suggestion,
+  } satisfies FallacyWarningModel;
+}
+
 export function normaliseAnswer(value: unknown): RAGAnswer | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -292,6 +318,14 @@ export function normaliseAnswer(value: unknown): RAGAnswer | null {
     record.guardrail_profile && typeof record.guardrail_profile === "object"
       ? (record.guardrail_profile as Record<string, string>)
       : null;
+  const fallacySources = Array.isArray(record.fallacy_warnings)
+    ? record.fallacy_warnings
+    : Array.isArray(record.fallacies_found)
+    ? record.fallacies_found
+    : [];
+  const fallacyWarnings = fallacySources
+    .map((entry) => normaliseFallacyWarning(entry))
+    .filter((entry): entry is FallacyWarningModel => entry !== null);
 
   return {
     summary,
@@ -299,6 +333,7 @@ export function normaliseAnswer(value: unknown): RAGAnswer | null {
     model_name: modelName ?? null,
     model_output: modelOutput ?? null,
     guardrail_profile: guardrailProfile,
+    fallacy_warnings: fallacyWarnings,
   };
 }
 

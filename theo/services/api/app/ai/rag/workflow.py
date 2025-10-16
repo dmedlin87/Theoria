@@ -501,6 +501,9 @@ class GuardedAnswerPipeline:
             model_name=model_name,
             model_output=model_output,
             guardrail_profile=guardrail_profile,
+            fallacy_warnings=(
+                critique_schema.fallacies_found if critique_schema else []
+            ),
             critique=critique_schema,
             revision=revision_schema,
         )

@@ -33,6 +33,15 @@ const sampleAnswer = {
   model_name: null,
   model_output: null,
   guardrail_profile: null,
+  fallacy_warnings: [
+    {
+      fallacy_type: "appeal_to_authority",
+      severity: "medium",
+      description: "The answer leans on authority figures without grounding in the cited passage.",
+      matched_text: "Renowned scholars agree without presenting the textual support.",
+      suggestion: "Tie the claim back to the cited verses or present additional evidence.",
+    },
+  ],
 } satisfies import("../copilot/components/types").RAGAnswer;
 
 function createStoryClient(

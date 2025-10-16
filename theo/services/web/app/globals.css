@@ -2203,3 +2203,91 @@ section + section {
   }
 }
 }
+
+.chat-fallacy-warnings {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--color-border-subtle);
+  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-xs);
+}
+
+.chat-fallacy-warnings--low,
+.chat-fallacy-warnings--medium {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+  background: color-mix(in srgb, var(--color-warning-bg) 65%, transparent);
+}
+
+.chat-fallacy-warnings--high {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+  background: color-mix(in srgb, var(--color-danger-bg) 65%, transparent);
+}
+
+.chat-fallacy-warnings__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.chat-fallacy-warnings__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.chat-fallacy-warnings__list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-fallacy-warnings__item {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-border-subtle) 80%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+}
+
+.chat-fallacy-warnings__itemHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.chat-fallacy-warnings__type {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.chat-fallacy-warnings__description {
+  margin: 0;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+.chat-fallacy-warnings__context,
+.chat-fallacy-warnings__suggestion {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.chat-fallacy-warnings__label {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
