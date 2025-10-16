@@ -11,6 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from theo.domain.discoveries import (
+    ContradictionDiscoveryEngine,
     DiscoveryType,
     DocumentEmbedding,
     PatternDiscoveryEngine,
@@ -43,9 +44,15 @@ def _coerce_topics(raw: object) -> list[str]:
 class DiscoveryService:
     """High-level API for working with discovery records."""
 
-    def __init__(self, session: Session, engine: PatternDiscoveryEngine | None = None):
+    def __init__(
+        self,
+        session: Session,
+        pattern_engine: PatternDiscoveryEngine | None = None,
+        contradiction_engine: ContradictionDiscoveryEngine | None = None,
+    ):
         self.session = session
-        self.engine = engine or PatternDiscoveryEngine()
+        self.pattern_engine = pattern_engine or PatternDiscoveryEngine()
+        self.contradiction_engine = contradiction_engine or ContradictionDiscoveryEngine()
 
     def list(
         self,
@@ -85,16 +92,27 @@ class DiscoveryService:
 
     def refresh_user_discoveries(self, user_id: str) -> list[Discovery]:
         documents = self._load_document_embeddings(user_id)
-        pattern_candidates, snapshot = self.engine.detect(documents)
+        
+        # Run pattern detection
+        pattern_candidates, snapshot = self.pattern_engine.detect(documents)
+        
+        # Run contradiction detection
+        contradiction_candidates = self.contradiction_engine.detect(documents)
 
+        # Delete old discoveries (both patterns and contradictions)
         self.session.execute(
             delete(Discovery).where(
                 Discovery.user_id == user_id,
-                Discovery.discovery_type == DiscoveryType.PATTERN.value,
+                Discovery.discovery_type.in_([
+                    DiscoveryType.PATTERN.value,
+                    DiscoveryType.CONTRADICTION.value,
+                ]),
             )
         )
 
         persisted: list[Discovery] = []
+        
+        # Persist pattern discoveries
         for candidate in pattern_candidates:
             record = Discovery(
                 user_id=user_id,
@@ -105,6 +123,31 @@ class DiscoveryService:
                 relevance_score=float(candidate.relevance_score),
                 viewed=False,
                 meta=dict(candidate.metadata),
+                created_at=datetime.now(UTC),
+            )
+            self.session.add(record)
+            persisted.append(record)
+        
+        # Persist contradiction discoveries
+        for candidate in contradiction_candidates:
+            record = Discovery(
+                user_id=user_id,
+                discovery_type=DiscoveryType.CONTRADICTION.value,
+                title=candidate.title,
+                description=candidate.description,
+                confidence=float(candidate.confidence),
+                relevance_score=float(candidate.relevance_score),
+                viewed=False,
+                meta={
+                    "document_a_id": candidate.document_a_id,
+                    "document_b_id": candidate.document_b_id,
+                    "document_a_title": candidate.document_a_title,
+                    "document_b_title": candidate.document_b_title,
+                    "claim_a": candidate.claim_a,
+                    "claim_b": candidate.claim_b,
+                    "contradiction_type": candidate.contradiction_type,
+                    **candidate.metadata,
+                },
                 created_at=datetime.now(UTC),
             )
             self.session.add(record)

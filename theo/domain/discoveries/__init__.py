@@ -1,5 +1,6 @@
 """Discovery domain package exposing analytics primitives."""
 
+from .contradiction_engine import ContradictionDiscovery, ContradictionDiscoveryEngine
 from .engine import PatternDiscoveryEngine
 from .models import (
     CorpusSnapshotSummary,
@@ -9,9 +10,11 @@ from .models import (
 )
 
 __all__ = [
-    "PatternDiscoveryEngine",
+    "ContradictionDiscovery",
+    "ContradictionDiscoveryEngine",
     "CorpusSnapshotSummary",
     "DiscoveryType",
     "DocumentEmbedding",
     "PatternDiscovery",
+    "PatternDiscoveryEngine",
 ]

@@ -66,10 +66,12 @@ This index provides a navigational overview of all Theoria documentation, organi
 - [docs/more_features.md](more_features.md) - Additional feature ideas
 
 ### Agent & MCP Integration
+- **[docs/AGENT_AND_PROMPTING_GUIDE.md](AGENT_AND_PROMPTING_GUIDE.md)** - **Comprehensive guide to agent architecture and prompting strategies**
+- [docs/AGENT_THINKING_ENHANCEMENT.md](AGENT_THINKING_ENHANCEMENT.md) - Agent reasoning improvements (full design doc)
+- [docs/IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) - Step-by-step implementation guide for reasoning framework
+- [docs/theoria_instruction_prompt.md](theoria_instruction_prompt.md) - System prompt engineering (TRO master prompt)
 - [docs/mcp_integration_guide.md](mcp_integration_guide.md) - Model Context Protocol integration
 - [docs/AGENT_CONFINEMENT.md](AGENT_CONFINEMENT.md) - Security framework for AI agents
-- [docs/AGENT_THINKING_ENHANCEMENT.md](AGENT_THINKING_ENHANCEMENT.md) - Agent reasoning improvements
-- [docs/theoria_instruction_prompt.md](theoria_instruction_prompt.md) - System prompt engineering
 - [docs/adr/0001-expose-theoria-via-mcp.md](adr/0001-expose-theoria-via-mcp.md) - ADR: MCP exposure decision
 - [docs/adr/0001-mcp-tools-and-apps-sdk.md](adr/0001-mcp-tools-and-apps-sdk.md) - ADR: MCP tools and SDK
 

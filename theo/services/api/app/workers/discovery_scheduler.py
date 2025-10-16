@@ -1,0 +1,134 @@
+"""Background scheduler for automatic discovery generation."""
+
+from __future__ import annotations
+
+import logging
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from sqlalchemy import select
+
+from ..db.models import Document
+from ..discoveries import DiscoveryService
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
+
+class DiscoveryScheduler:
+    """Manages background discovery generation tasks."""
+
+    def __init__(self):
+        self.scheduler = BackgroundScheduler(timezone="UTC")
+        self._running = False
+
+    def start(self):
+        """Start the background scheduler."""
+        if self._running:
+            logger.warning("Discovery scheduler already running")
+            return
+
+        # Run discovery refresh every 30 minutes
+        self.scheduler.add_job(
+            func=self._refresh_all_users,
+            trigger=IntervalTrigger(minutes=30),
+            id="discovery_refresh",
+            name="Refresh discoveries for all users",
+            replace_existing=True,
+        )
+
+        self.scheduler.start()
+        self._running = True
+        logger.info("Discovery scheduler started")
+
+    def stop(self):
+        """Stop the background scheduler."""
+        if not self._running:
+            return
+
+        self.scheduler.shutdown(wait=True)
+        self._running = False
+        logger.info("Discovery scheduler stopped")
+
+    def trigger_user_refresh(self, session: Session, user_id: str):
+        """Immediately trigger discovery refresh for a specific user."""
+        try:
+            logger.info(f"Triggering discovery refresh for user {user_id}")
+            service = DiscoveryService(session)
+            discoveries = service.refresh_user_discoveries(user_id)
+            logger.info(f"Generated {len(discoveries)} discoveries for user {user_id}")
+            return discoveries
+        except Exception as exc:
+            logger.exception(f"Failed to refresh discoveries for user {user_id}: {exc}")
+            return []
+
+    def _refresh_all_users(self):
+        """Background task to refresh discoveries for all active users."""
+        from theo.application.facades.database import get_session_factory
+
+        session_factory = get_session_factory()
+        session = session_factory()
+
+        try:
+            # Find users with recent document activity (last 7 days)
+            cutoff = datetime.now(UTC) - timedelta(days=7)
+            stmt = (
+                select(Document.collection)
+                .where(Document.created_at >= cutoff)
+                .distinct()
+            )
+            active_users = list(session.scalars(stmt))
+
+            logger.info(f"Refreshing discoveries for {len(active_users)} active users")
+
+            for user_id in active_users:
+                if not user_id:
+                    continue
+                try:
+                    self.trigger_user_refresh(session, user_id)
+                except Exception as exc:
+                    logger.exception(f"Failed to refresh user {user_id}: {exc}")
+                    continue
+
+            logger.info("Discovery refresh completed for all users")
+
+        except Exception as exc:
+            logger.exception(f"Discovery refresh task failed: {exc}")
+        finally:
+            session.close()
+
+
+# Global scheduler instance
+_scheduler: DiscoveryScheduler | None = None
+
+
+def get_scheduler() -> DiscoveryScheduler:
+    """Get or create the global discovery scheduler."""
+    global _scheduler
+    if _scheduler is None:
+        _scheduler = DiscoveryScheduler()
+    return _scheduler
+
+
+def start_discovery_scheduler():
+    """Start the global discovery scheduler."""
+    scheduler = get_scheduler()
+    scheduler.start()
+
+
+def stop_discovery_scheduler():
+    """Stop the global discovery scheduler."""
+    scheduler = get_scheduler()
+    scheduler.stop()
+
+
+__all__ = [
+    "DiscoveryScheduler",
+    "get_scheduler",
+    "start_discovery_scheduler",
+    "stop_discovery_scheduler",
+]

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import time
+from pathlib import Path
 from typing import Generator
 
 from sqlalchemy import create_engine
@@ -34,13 +37,48 @@ else:
         sqlite3.connect = _connect_with_closing  # type: ignore[assignment]
         sqlite3.__theo_closing_patch__ = True  # type: ignore[attr-defined]
 
+if os.name == "nt" and not getattr(Path, "__theo_unlink_retry__", False):
+    _original_unlink = Path.unlink
+
+    def _unlink_with_retry(self: Path, *args, **kwargs):  # type: ignore[override]
+        attempts = 200
+        delay = 0.05
+        import gc
+
+        for index in range(attempts):
+            try:
+                return _original_unlink(self, *args, **kwargs)
+            except PermissionError:
+                if index == attempts - 1:
+                    raise
+                gc.collect()
+                time.sleep(delay)
+
+    Path.unlink = _unlink_with_retry  # type: ignore[assignment]
+    Path.__theo_unlink_retry__ = True  # type: ignore[attr-defined]
+
 from theo.application.facades.settings import get_settings
 from theo.services.api.app.db.models import Base
+from theo.services.api.app.db.seeds import _dispose_sqlite_engine
 
 __all__ = ["Base", "configure_engine", "get_engine", "get_session"]
 
 _engine: Engine | None = None
 _SessionLocal: sessionmaker[Session] | None = None
+
+
+class _TheoSession(Session):
+    """Session subclass that aggressively releases SQLite handles on close."""
+
+    def close(self) -> None:  # type: ignore[override]
+        bind: Engine | None = None
+        try:
+            bind = self.get_bind()
+        except Exception:
+            bind = None
+        super().close()
+        if bind is not None:
+            _dispose_sqlite_engine(bind, dispose_engine=False)
 
 
 def _create_engine(database_url: str) -> Engine:
@@ -54,7 +92,25 @@ def _create_engine(database_url: str) -> Engine:
     }
     if database_url.startswith("sqlite"):
         engine_kwargs["poolclass"] = NullPool
-    return create_engine(database_url, **engine_kwargs)
+    engine = create_engine(database_url, **engine_kwargs)
+    if database_url.startswith("sqlite") and not getattr(
+        engine, "__theo_dispose_wrapped__", False
+    ):
+        original_dispose = engine.dispose
+
+        def _wrapped_dispose(*args, **kwargs):
+            def _call_original():
+                original_dispose(*args, **kwargs)
+
+            _dispose_sqlite_engine(
+                engine,
+                dispose_engine=True,
+                dispose_callable=_call_original,
+            )
+
+        engine.dispose = _wrapped_dispose  # type: ignore[assignment]
+        engine.__theo_dispose_wrapped__ = True  # type: ignore[attr-defined]
+    return engine
 
 
 def configure_engine(database_url: str | None = None) -> Engine:
@@ -75,6 +131,7 @@ def configure_engine(database_url: str | None = None) -> Engine:
         autocommit=False,
         expire_on_commit=False,
         future=True,
+        class_=_TheoSession,
     )
     return _engine
 

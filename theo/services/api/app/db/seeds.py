@@ -126,7 +126,12 @@ def _get_session_connection(session: Session) -> tuple[Connection | None, bool]:
     return (bind, False)
 
 
-def _dispose_sqlite_engine(bind: Connection | Engine | None) -> None:
+def _dispose_sqlite_engine(
+    bind: Connection | Engine | None,
+    *,
+    dispose_engine: bool = True,
+    dispose_callable: Callable[[], None] | None = None,
+) -> None:
     """Dispose SQLite engines to release file handles promptly."""
 
     engine: Engine | None = None
@@ -138,41 +143,93 @@ def _dispose_sqlite_engine(bind: Connection | Engine | None) -> None:
         return
     if getattr(getattr(engine, "dialect", None), "name", None) != "sqlite":
         return
-    try:
-        engine.dispose()
-    except Exception:  # pragma: no cover - defensive release guard
-        pass
-    else:
+    database_name = getattr(getattr(engine, "url", None), "database", None)
+    if dispose_engine:
         try:
-            import sqlite3  # pragma: no cover - optional inspection for stray connections
-            import inspect
-        except Exception:
-            sqlite3 = None
-            inspect = None  # type: ignore[assignment]
-        if sqlite3 is not None:
-            cursor_type = getattr(sqlite3, "Cursor", None)
-            for obj in gc.get_objects():
+            if dispose_callable is not None:
+                dispose_callable()
+            else:
+                engine.dispose()
+        except Exception:  # pragma: no cover - defensive release guard
+            return
+    try:
+        import sqlite3  # pragma: no cover - optional inspection for stray connections
+        import inspect
+    except Exception:
+        sqlite3 = None
+        inspect = None  # type: ignore[assignment]
+    if sqlite3 is not None:
+        cursor_type = getattr(sqlite3, "Cursor", None)
+        for obj in gc.get_objects():
+            try:
+                if isinstance(obj, sqlite3.Connection):
+                    obj.close()
+                elif cursor_type is not None and isinstance(obj, cursor_type):
+                    obj.close()
+            except ReferenceError:
+                continue
+            except Exception:
+                continue
+        if inspect is not None:
+            for frame_info in inspect.stack():
+                for value in list(frame_info.frame.f_locals.values()):
+                    try:
+                        if isinstance(value, sqlite3.Connection):
+                            value.close()
+                        elif cursor_type is not None and isinstance(value, cursor_type):
+                            value.close()
+                    except Exception:
+                        continue
+    gc.collect()
+    time.sleep(0.05)
+    if database_name and database_name != ":memory:":
+        db_path = Path(database_name)
+        candidates = [db_path]
+        candidates.extend(
+            db_path.parent / f"{db_path.name}{suffix}"
+            for suffix in ("-journal", "-wal", "-shm")
+        )
+        for candidate in candidates:
+            if not candidate.exists():
+                continue
+            for _ in range(100):
                 try:
-                    if obj.__class__ is sqlite3.Connection:
-                        obj.close()
-                    elif cursor_type is not None and obj.__class__ is cursor_type:
-                        obj.close()
-                except ReferenceError:
-                    continue
-                except Exception:
-                    continue
-            if inspect is not None:
-                for frame_info in inspect.stack():
-                    for value in list(frame_info.frame.f_locals.values()):
-                        try:
-                            if value.__class__ is sqlite3.Connection:
-                                value.close()
-                            elif cursor_type is not None and value.__class__ is cursor_type:
-                                value.close()
-                        except Exception:
-                            continue
-        gc.collect()
-        time.sleep(0.01)
+                    with candidate.open("rb"):
+                        break
+                except PermissionError:
+                    time.sleep(0.05)
+        if sqlite3 is not None and db_path.exists():
+            for _ in range(100):
+                try:
+                    with sqlite3.connect(
+                        f"file:{db_path}?mode=ro&cache=shared", uri=True
+                    ):
+                        break
+                except sqlite3.OperationalError:
+                    time.sleep(0.05)
+        try:
+            import psutil  # pragma: no cover - optional handle inspection
+        except Exception:
+            psutil = None  # type: ignore[assignment]
+        if psutil is not None:
+            process = psutil.Process()
+            target_paths = {str(path.resolve()) for path in candidates if path.exists()}
+            for _ in range(100):
+                open_entries = [
+                    entry for entry in process.open_files() if entry.path in target_paths
+                ]
+                if not open_entries:
+                    break
+                for entry in open_entries:
+                    try:
+                        import msvcrt  # pragma: no cover - windows-only
+                        import ctypes  # pragma: no cover - windows-only
+
+                        handle = msvcrt.get_osfhandle(entry.fd)
+                        ctypes.windll.kernel32.CloseHandle(int(handle))
+                    except Exception:
+                        continue
+                time.sleep(0.05)
 
 
 def _table_has_column(session: Session, table_name: str, column_name: str, *, schema: str | None = None) -> bool:
@@ -182,8 +239,33 @@ def _table_has_column(session: Session, table_name: str, column_name: str, *, sc
     if connection is None:
         return False
 
-    dialect_name = getattr(getattr(connection, "dialect", None), "name", None)
+    engine = None
+    if hasattr(connection, "engine"):
+        engine = connection.engine
+    elif isinstance(connection, Connection):
+        engine = connection
+    dialect = getattr(connection, "dialect", None)
+    dialect_name = getattr(dialect, "name", None)
     if dialect_name == "sqlite":
+        database_name = getattr(getattr(engine, "url", None), "database", None) if engine else None
+        if database_name and database_name != ":memory:":
+            try:
+                import sqlite3  # pragma: no cover - optional direct inspection
+            except Exception:
+                sqlite3 = None  # type: ignore[assignment]
+            if sqlite3 is not None:
+                try:
+                    with sqlite3.connect(database_name) as raw_connection:
+                        escaped_table = table_name.replace("'", "''")
+                        cursor = raw_connection.execute(
+                            f"PRAGMA table_info('{escaped_table}')"
+                        )
+                        for row in cursor:
+                            if len(row) > 1 and row[1] == column_name:
+                                return True
+                        return False
+                except Exception:  # pragma: no cover - defensive fallback
+                    pass
         try:
             escaped_table = table_name.replace("'", "''")
             result = connection.exec_driver_sql(
