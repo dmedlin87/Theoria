@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from theo.services.api.app.db.models import Document, TranscriptSegment, Video
 from theo.services.api.app.ingest.osis import expand_osis_reference
-from theo.services.api.app.transcripts.service import search_transcript_segments
+from theo.services.api.app.transcripts.service import (
+    build_source_ref,
+    canonical_primary_osis,
+    search_transcript_segments,
+)
 
 
 def _create_transcript_segment(
@@ -61,6 +65,20 @@ def _seed_minimal_video(session: Session, video_id: str) -> tuple[Document, Vide
     session.add(video)
     session.flush()
     return document, video
+
+
+def _make_segment(**overrides: object) -> TranscriptSegment:
+    """Return an in-memory transcript segment for pure function tests."""
+
+    base: dict[str, object] = {
+        "document_id": "doc",
+        "video_id": None,
+        "t_start": 0.0,
+        "t_end": 5.0,
+        "text": "segment",
+    }
+    base.update(overrides)
+    return TranscriptSegment(**base)
 
 
 def test_search_transcript_segments_filters_in_sql(sqlite_session: Session) -> None:
@@ -163,3 +181,54 @@ def test_search_transcript_segments_emits_overlap_clause(sqlite_session: Session
         if stmt.lstrip().upper().startswith("SELECT")
     ]
     assert any("json_each" in stmt or "&&" in stmt for stmt in overlap_statements)
+
+
+def test_build_source_ref_formats_known_platform_prefix() -> None:
+    """YouTube links should use the dedicated prefix with a mm:ss timestamp."""
+
+    video = Video(video_id="yt-123", url="https://www.youtube.com/watch?v=yt-123")
+
+    reference = build_source_ref(video, 125.9)
+
+    assert reference == "youtube:yt-123#t=02:05"
+
+
+def test_build_source_ref_returns_none_without_minimum_metadata() -> None:
+    """Missing identifiers or timestamps should short-circuit to ``None``."""
+
+    assert build_source_ref(None, 15.0) is None
+    assert build_source_ref(Video(video_id=None), 15.0) is None
+    assert build_source_ref(Video(video_id="clip"), None) is None
+
+    video = Video(video_id="clip", url="https://cdn.example.com/clip.mp4")
+
+    assert build_source_ref(video, 59.0) == "video:clip#t=00:59"
+
+
+def test_canonical_primary_osis_normalizes_primary_range() -> None:
+    """Ranges collapse to their first verse to keep identifiers stable."""
+
+    segment = _make_segment(primary_osis="John.3.16-John.3.17")
+
+    assert canonical_primary_osis(segment) == "John.3.16"
+
+
+def test_canonical_primary_osis_falls_back_to_verse_ids() -> None:
+    """Verse identifiers stored on the segment should seed canonical output."""
+
+    verse_ids = sorted(expand_osis_reference("John.3.16"))
+    segment = _make_segment(primary_osis=None, osis_verse_ids=list(verse_ids))
+
+    assert canonical_primary_osis(segment) == "John.3.16"
+
+
+def test_canonical_primary_osis_uses_additional_references_when_needed() -> None:
+    """Explicit OSIS references act as the final fallback for canonicalization."""
+
+    segment = _make_segment(
+        primary_osis=None,
+        osis_verse_ids=None,
+        osis_refs=["John.3.16", "John.3.17"],
+    )
+
+    assert canonical_primary_osis(segment) == "John.3.16"
