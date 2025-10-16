@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections import Counter
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 import numpy as np
 from sklearn.cluster import DBSCAN
@@ -35,10 +35,17 @@ def _top_keywords(documents: Sequence[DocumentEmbedding], limit: int = 5) -> lis
         counter.update(_normalise_topics(doc.topics))
         if doc.metadata:
             keywords = doc.metadata.get("keywords")
-            if isinstance(keywords, Iterable):
-                counter.update(
-                    _normalise_topics([str(value) for value in keywords if value])
-                )
+            if isinstance(keywords, str):
+                keyword_values: Iterable[object] = [keywords]
+            elif isinstance(keywords, Mapping):
+                keyword_values = keywords.values()
+            elif isinstance(keywords, Iterable):
+                keyword_values = keywords
+            else:
+                keyword_values = []
+            counter.update(
+                _normalise_topics([str(value) for value in keyword_values if value])
+            )
     return [keyword for keyword, _ in counter.most_common(limit)]
 
 
