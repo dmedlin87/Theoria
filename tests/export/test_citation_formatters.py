@@ -75,7 +75,9 @@ def test_build_citation_export_sbl(citation_fixture_data) -> None:
     expected = (
         fixtures_dir / "expected_sbl.txt"
     ).read_text("utf-8").strip().splitlines()
-    assert [record["citation"] for record in records] == expected
+    actual = [record["citation"] for record in records]
+    assert actual == expected
+    assert "Doe, Jane, and John Smith." in actual[0]
 
 
 def test_build_citation_export_bibtex(citation_fixture_data) -> None:

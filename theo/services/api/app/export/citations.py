@@ -322,13 +322,17 @@ def _chicago_author(author: dict[str, str]) -> str:
     return literal or ""
 
 
-def _join_with_and(values: Sequence[str], *, use_oxford_comma: bool = True) -> str:
+def _join_with_and(
+    values: Sequence[str], *, use_oxford_comma: bool = True, comma_for_pairs: bool = False
+) -> str:
     entries = [entry.strip() for entry in values if entry and entry.strip()]
     if not entries:
         return ""
     if len(entries) == 1:
         return entries[0]
     if len(entries) == 2:
+        if comma_for_pairs:
+            return f"{entries[0]}, and {entries[1]}"
         return " and ".join(entries)
     prefix = ", ".join(entries[:-1])
     suffix = entries[-1]
@@ -551,7 +555,10 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
             details_text = source.pages
 
     segments: list[str] = []
-    authors_segment = _join_with_and(formatted_authors)
+    authors_segment = _join_with_and(
+        formatted_authors,
+        comma_for_pairs=True,
+    )
     if authors_segment:
         segments.append(f"{authors_segment}.")
     segments.append(f'"{title}."')
