@@ -95,7 +95,7 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
           <p className={styles.greeting}>
             {greeting}, {data?.user.name ?? "Researcher"}
           </p>
-          <h1 className={styles.headline}>Your personalised research console</h1>
+          <h1 className={styles.headline}>Your personalized research console</h1>
           <p className={styles.subheadline}>
             Track progress across ingest, study notes, and AI surfaced discoveries.
           </p>
