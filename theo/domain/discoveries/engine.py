@@ -14,10 +14,7 @@ from .models import (
     PatternDiscovery,
 )
 
-"""Discovery engine that clusters embeddings to surface corpus patterns."""
-
-
-"""Discovery engine that clusters embeddings to surface corpus patterns."""
+__doc__ = """Discovery engine that clusters embeddings to surface corpus patterns."""
 
 
 def _normalise_topics(topics: Sequence[str]) -> list[str]:
