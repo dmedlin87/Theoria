@@ -250,7 +250,7 @@ export default function HypothesesDashboardClient({
                     onClick={() =>
                       handleStatusUpdate(hypothesis, {
                         status: "active",
-                        confidence: Math.min(0.5, hypothesis.confidence),
+                        confidence: Math.max(0.5, hypothesis.confidence),
                       })
                     }
                   >
