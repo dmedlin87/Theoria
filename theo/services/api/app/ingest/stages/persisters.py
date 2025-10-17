@@ -143,5 +143,5 @@ class CommentarySeedPersister(Persister):
         instrumentation.set("ingest.commentary_skipped", result.skipped)
         return {
             "commentary_result": result,
-            "commentary_records": result.records,
+            "commentary_record_ids": [r.id for r in result.records],
         }
