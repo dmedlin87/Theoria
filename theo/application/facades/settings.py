@@ -15,6 +15,7 @@ from pydantic import AliasChoices, BaseModel, Field, field_validator, model_vali
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .runtime import allow_insecure_startup
+from ..ports.secrets import SecretRequest, SecretRetrievalError, build_secrets_adapter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -193,6 +194,76 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("SETTINGS_SECRET_KEY", "settings_secret_key"),
         description="Secret used to derive the Fernet key for persisted settings",
+    )
+    settings_secret_backend: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SETTINGS_SECRET_BACKEND", "SETTINGS_SECRET_BACKEND"
+        ),
+        description="Secrets backend used to resolve the settings secret (e.g. vault, aws)",
+    )
+    settings_secret_name: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SETTINGS_SECRET_NAME", "SETTINGS_SECRET_NAME"
+        ),
+        description="Identifier used by the configured secrets backend to load the settings secret",
+    )
+    settings_secret_field: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SETTINGS_SECRET_FIELD", "SETTINGS_SECRET_FIELD"
+        ),
+        description="Optional field extracted from structured secrets (JSON payloads)",
+    )
+    secrets_vault_addr: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SECRETS_VAULT_ADDR", "SECRETS_VAULT_ADDR"
+        ),
+        description="Vault server address used for secret resolution",
+    )
+    secrets_vault_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SECRETS_VAULT_TOKEN", "SECRETS_VAULT_TOKEN"
+        ),
+        description="Vault access token used when querying secrets",
+    )
+    secrets_vault_namespace: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SECRETS_VAULT_NAMESPACE", "SECRETS_VAULT_NAMESPACE"
+        ),
+        description="Optional Vault namespace for secret lookups",
+    )
+    secrets_vault_mount_point: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SECRETS_VAULT_MOUNT_POINT", "SECRETS_VAULT_MOUNT_POINT"
+        ),
+        description="Vault KV v2 mount point containing the settings secret",
+    )
+    secrets_vault_verify: bool | str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SECRETS_VAULT_VERIFY", "SECRETS_VAULT_VERIFY"
+        ),
+        description="TLS verification flag or CA bundle path for Vault requests",
+    )
+    secrets_aws_profile: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SECRETS_AWS_PROFILE", "SECRETS_AWS_PROFILE"
+        ),
+        description="Optional AWS profile name for Secrets Manager",
+    )
+    secrets_aws_region: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "THEO_SECRETS_AWS_REGION", "SECRETS_AWS_REGION"
+        ),
+        description="AWS region hosting the configured secret",
     )
     api_keys: str | list[str] = Field(
         default="",
@@ -563,11 +634,80 @@ def _derive_fernet_key(secret: str) -> bytes:
     return base64.urlsafe_b64encode(digest)
 
 
+def _resolve_settings_secret_from_backend(settings: Settings) -> str | None:
+    backend = (settings.settings_secret_backend or "").strip()
+    if not backend:
+        return None
+    normalized = backend.lower()
+
+    identifier = settings.settings_secret_name or "settings-secret"
+    request = SecretRequest(
+        identifier=identifier,
+        field=settings.settings_secret_field,
+    )
+
+    try:
+        if normalized == "vault":
+            adapter = build_secrets_adapter(
+                backend,
+                url=settings.secrets_vault_addr,
+                token=settings.secrets_vault_token,
+                namespace=settings.secrets_vault_namespace,
+                mount_point=settings.secrets_vault_mount_point,
+                default_field=settings.settings_secret_field,
+                verify=settings.secrets_vault_verify,
+            )
+        elif normalized == "aws":
+            adapter = build_secrets_adapter(
+                backend,
+                profile_name=settings.secrets_aws_profile,
+                region_name=settings.secrets_aws_region,
+                default_field=settings.settings_secret_field,
+            )
+        else:
+            # For any other backend, attempt to build the adapter and let it raise ValueError if unsupported
+            adapter = build_secrets_adapter(backend)
+    except ValueError as exc:
+        LOGGER.error(
+            "Unsupported secrets backend '%s' configured: %s", backend, exc
+        )
+        return None
+    except Exception as exc:  # pragma: no cover - defensive logging path
+        LOGGER.error(
+            "Failed to configure a secrets backend: %s", exc
+        )
+        return None
+
+    try:
+        return adapter.get_secret(request)
+    except SecretRetrievalError as exc:
+        LOGGER.error(
+            "Secrets backend '%s' failed to resolve '%s': %s",
+            backend,
+            request.identifier,
+            exc,
+        )
+        return None
+
+
+@lru_cache
+def get_settings_secret() -> str | None:
+    """Return the resolved secret used for encrypting persisted settings."""
+
+    settings = get_settings()
+    secret = _resolve_settings_secret_from_backend(settings)
+    if secret:
+        return secret
+    if settings.settings_secret_key:
+        return settings.settings_secret_key
+    return None
+
+
 @lru_cache
 def get_settings_cipher() -> Fernet | None:
     """Return a cached Fernet instance for encrypting persisted settings."""
 
-    secret = get_settings().settings_secret_key
+    secret = get_settings_secret()
     if secret:
         return Fernet(_derive_fernet_key(secret))
     if allow_insecure_startup():
