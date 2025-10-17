@@ -49,6 +49,8 @@ def _average_vectors(vectors: Sequence[Sequence[float]]) -> list[float] | None:
 def _cosine_similarity(a: Sequence[float] | None, b: Sequence[float] | None) -> float:
     if not a or not b:
         return 0.0
+    if len(a) != len(b):
+        return 0.0
     dot = sum(x * y for x, y in zip(a, b, strict=True))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(y * y for y in b))

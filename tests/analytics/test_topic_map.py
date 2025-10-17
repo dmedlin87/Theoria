@@ -173,3 +173,29 @@ def test_refresh_topic_map_task_generates_snapshot(
     finally:
         engine.dispose()
         settings_module.get_settings.cache_clear()
+
+
+def test_topic_map_builder_handles_mismatched_dimensions(sqlite_session: Session) -> None:
+    _create_document(
+        sqlite_session,
+        title="Vector Four",
+        topics=["A"],
+        embedding=[1.0, 0.0, 0.0, 0.0],
+    )
+    _create_document(
+        sqlite_session,
+        title="Vector Three",
+        topics=["B"],
+        embedding=[0.5, 0.5, 0.5],
+    )
+    sqlite_session.commit()
+
+    builder = TopicMapBuilder(sqlite_session, similarity_threshold=0.2)
+
+    snapshot = builder.build()
+
+    assert snapshot.meta == {
+        "document_count": 2,
+        "topic_count": 2,
+    }
+    assert not snapshot.edges
