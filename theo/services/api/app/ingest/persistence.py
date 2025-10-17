@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import shutil
 import tempfile
 import logging
 from pathlib import Path
 from typing import Any, Sequence
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..case_builder import sync_passages_case_objects
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import (
+    CommentaryExcerptSeed,
     Creator,
     CreatorClaim,
     Document,
@@ -46,7 +48,12 @@ from .metadata import (
     serialise_frontmatter,
     truncate,
 )
-from .osis import canonical_verse_range, detect_osis_references, expand_osis_reference
+from .osis import (
+    ResolvedCommentaryAnchor,
+    canonical_verse_range,
+    detect_osis_references,
+    expand_osis_reference,
+)
 from .sanitizer import sanitize_passage_text
 
 
@@ -54,6 +61,19 @@ logger = logging.getLogger(__name__)
 
 
 from .stages import IngestContext
+
+
+COMMENTARY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/commentaries")
+
+
+@dataclass(slots=True)
+class CommentaryImportResult:
+    """Outcome for an OSIS commentary import run."""
+
+    inserted: int
+    updated: int
+    skipped: int
+    records: list[CommentaryExcerptSeed]
 
 
 def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
@@ -114,6 +134,128 @@ def refresh_creator_verse_rollups(
 
     service = CreatorVersePerspectiveService(session)
     service.refresh_many(sorted_refs)
+
+
+def _normalise_perspective(value: str | None) -> str:
+    text = (value or "neutral").strip().lower()
+    return text or "neutral"
+
+
+def _normalise_tags(tags: list[str] | None) -> list[str] | None:
+    if not tags:
+        return None
+    seen: set[str] = set()
+    normalised: list[str] = []
+    for tag in tags:
+        candidate = (tag or "").strip()
+        if not candidate:
+            continue
+        key = candidate.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalised.append(candidate)
+    return normalised or None
+
+
+def persist_commentary_entries(
+    session: Session,
+    *,
+    entries: Sequence[ResolvedCommentaryAnchor],
+) -> CommentaryImportResult:
+    """Persist resolved commentary anchors into ``commentary_excerpt_seeds``."""
+
+    inserted = 0
+    updated = 0
+    skipped = 0
+    records: list[CommentaryExcerptSeed] = []
+
+    for entry in entries:
+        osis = (entry.osis or "").strip()
+        excerpt = (entry.excerpt or "").strip()
+        if not osis or not excerpt:
+            skipped += 1
+            continue
+
+        source = (entry.source or "community").strip() or "community"
+        perspective = _normalise_perspective(entry.perspective)
+        tags = _normalise_tags(entry.tags)
+        title = entry.title.strip() if entry.title else None
+
+        anchor_token = (
+            (entry.note_id or "").strip().lower()
+            or excerpt[:64].lower()
+        )
+        identifier_seed = "|".join(
+            [osis.lower(), source.lower(), perspective, anchor_token]
+        )
+        identifier = str(uuid5(COMMENTARY_NAMESPACE, identifier_seed))
+
+        record = session.get(CommentaryExcerptSeed, identifier)
+        _, start_verse_id, end_verse_id = _collect_verse_metadata([osis])
+
+        if record is None:
+            record = CommentaryExcerptSeed(
+                id=identifier,
+                osis=osis,
+                title=title,
+                excerpt=excerpt,
+                source=source,
+                perspective=perspective,
+                tags=tags,
+                start_verse_id=start_verse_id,
+                end_verse_id=end_verse_id,
+            )
+            session.add(record)
+            inserted += 1
+        else:
+            changed = False
+            if record.osis != osis:
+                record.osis = osis
+                changed = True
+            if record.title != title:
+                record.title = title
+                changed = True
+            if record.excerpt != excerpt:
+                record.excerpt = excerpt
+                changed = True
+            if record.source != source:
+                record.source = source
+                changed = True
+            if record.perspective != perspective:
+                record.perspective = perspective
+                changed = True
+            if record.tags != tags:
+                record.tags = tags
+                changed = True
+            if record.start_verse_id != start_verse_id:
+                record.start_verse_id = start_verse_id
+                changed = True
+            if record.end_verse_id != end_verse_id:
+                record.end_verse_id = end_verse_id
+                changed = True
+
+            if changed:
+                session.add(record)
+                updated += 1
+            else:
+                skipped += 1
+
+        records.append(record)
+
+    try:
+        session.flush()
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+    return CommentaryImportResult(
+        inserted=inserted,
+        updated=updated,
+        skipped=skipped,
+        records=records,
+    )
 
 
 def get_or_create_creator(
