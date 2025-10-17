@@ -41,6 +41,8 @@ class ContradictionDiscoveryEngine:
         model_name: str = "microsoft/deberta-v3-base-mnli",
         contradiction_threshold: float = 0.7,
         min_confidence: float = 0.6,
+        max_results: int = 20,
+        embedding_similarity_threshold: float = 0.3,
     ):
         """Initialize the contradiction detection engine.
 
@@ -48,10 +50,14 @@ class ContradictionDiscoveryEngine:
             model_name: HuggingFace model for NLI (default: DeBERTa-v3-base-mnli)
             contradiction_threshold: Minimum score to consider a contradiction (0.0-1.0)
             min_confidence: Minimum confidence to include in results (0.0-1.0)
+            max_results: Maximum number of contradictions to return
+            embedding_similarity_threshold: Minimum cosine similarity to consider pair (0.0-1.0)
         """
         self.model_name = model_name
         self.contradiction_threshold = contradiction_threshold
         self.min_confidence = min_confidence
+        self.max_results = max_results
+        self.embedding_similarity_threshold = embedding_similarity_threshold
         self._model = None
         self._tokenizer = None
 
@@ -86,7 +92,6 @@ class ContradictionDiscoveryEngine:
         _CONTRADICTION_GROUPS = [
             {"divine", "human", "created", "creature"},
             {"equal", "coequal", "co-equal", "subordinate", "lesser", "greater"},
-            {"blue", "red", "green", "yellow", "black", "white"},
             {"true", "false"},
         ]
 
@@ -167,8 +172,10 @@ class ContradictionDiscoveryEngine:
         if len(claims) < 2:
             return []
 
-        # Compare all pairs of claims
+        # Compare all pairs of claims with embedding filtering
         contradictions: list[ContradictionDiscovery] = []
+        seen_pairs: set[frozenset[str]] = set()
+        
         for i in range(len(claims)):
             for j in range(i + 1, len(claims)):
                 claim_a = claims[i]
@@ -177,9 +184,25 @@ class ContradictionDiscoveryEngine:
                 # Skip if same document
                 if claim_a["document_id"] == claim_b["document_id"]:
                     continue
+                
+                # Skip if already seen (deduplication)
+                pair_key = frozenset([claim_a["document_id"], claim_b["document_id"]])
+                if pair_key in seen_pairs:
+                    continue
+                seen_pairs.add(pair_key)
 
-                # Check for contradiction using NLI
-                result = self._check_contradiction(claim_a["text"], claim_b["text"])
+                # Filter by embedding similarity (only check likely candidates)
+                similarity = self._cosine_similarity(
+                    claim_a.get("embedding", []),
+                    claim_b.get("embedding", [])
+                )
+                if similarity < self.embedding_similarity_threshold:
+                    continue
+
+                # Check for contradiction using bidirectional NLI
+                result = self._check_contradiction_bidirectional(
+                    claim_a["text"], claim_b["text"]
+                )
 
                 if result["is_contradiction"] and result["confidence"] >= self.min_confidence:
                     discovery = self._create_discovery(claim_a, claim_b, result)
@@ -188,8 +211,8 @@ class ContradictionDiscoveryEngine:
         # Sort by confidence (highest first)
         contradictions.sort(key=lambda x: x.confidence, reverse=True)
 
-        # Limit to top 20 to avoid overwhelming users
-        return contradictions[:20]
+        # Limit to configured max
+        return contradictions[:self.max_results]
 
     def _extract_claims(
         self, documents: Sequence[DocumentEmbedding]
@@ -208,8 +231,8 @@ class ContradictionDiscoveryEngine:
             if not text or len(text.strip()) < 10:
                 continue
 
-            # Truncate to reasonable length (NLI models have token limits)
-            text = text[:500]
+            # Truncate to reasonable length respecting sentence boundaries
+            text = self._truncate_text(text, max_length=500)
 
             claims.append(
                 {
@@ -217,6 +240,7 @@ class ContradictionDiscoveryEngine:
                     "title": doc.title,
                     "text": text,
                     "topics": doc.topics,
+                    "embedding": doc.embedding,
                     "metadata": doc.metadata,
                 }
             )
@@ -377,6 +401,78 @@ class ContradictionDiscoveryEngine:
 
         # Default to logical
         return "logical"
+
+    def _cosine_similarity(self, vec_a: list[float], vec_b: list[float]) -> float:
+        """Calculate cosine similarity between two vectors."""
+        if not vec_a or not vec_b or len(vec_a) != len(vec_b):
+            return 1.0  # If no embeddings, assume similar (don't filter out)
+        
+        import numpy as np
+        
+        a = np.array(vec_a)
+        b = np.array(vec_b)
+        
+        norm_a = np.linalg.norm(a)
+        norm_b = np.linalg.norm(b)
+        
+        if norm_a == 0 or norm_b == 0:
+            return 1.0
+        
+        return float(np.dot(a, b) / (norm_a * norm_b))
+
+    def _truncate_text(self, text: str, max_length: int = 500) -> str:
+        """Truncate text respecting sentence boundaries."""
+        if len(text) <= max_length:
+            return text
+        
+        # Try to cut at sentence boundary
+        truncated = text[:max_length]
+        
+        # Find last sentence-ending punctuation
+        for delimiter in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
+            last_sentence = truncated.rfind(delimiter)
+            if last_sentence > max_length * 0.6:  # At least 60% of max length
+                return truncated[:last_sentence + 1].strip()
+        
+        # No good sentence boundary found, use hard cutoff
+        return truncated.strip()
+
+    def _check_contradiction_bidirectional(
+        self, text_a: str, text_b: str
+    ) -> dict[str, object]:
+        """Check contradiction in both directions and average scores.
+        
+        NLI models are not symmetric: A→B may differ from B→A.
+        We check both directions and take the maximum contradiction score.
+        """
+        result_ab = self._check_contradiction(text_a, text_b)
+        result_ba = self._check_contradiction(text_b, text_a)
+        
+        # Take max contradiction score (most conservative approach)
+        max_contradiction = max(
+            result_ab["scores"]["contradiction"],
+            result_ba["scores"]["contradiction"]
+        )
+        
+        # Average other scores
+        avg_neutral = (
+            result_ab["scores"]["neutral"] + result_ba["scores"]["neutral"]
+        ) / 2
+        avg_entailment = (
+            result_ab["scores"]["entailment"] + result_ba["scores"]["entailment"]
+        ) / 2
+        
+        is_contradiction = max_contradiction >= self.contradiction_threshold
+        
+        return {
+            "is_contradiction": is_contradiction,
+            "confidence": max_contradiction,
+            "scores": {
+                "contradiction": max_contradiction,
+                "neutral": avg_neutral,
+                "entailment": avg_entailment,
+            },
+        }
 
 
 __all__ = ["ContradictionDiscovery", "ContradictionDiscoveryEngine"]
