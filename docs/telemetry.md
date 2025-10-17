@@ -83,3 +83,21 @@ histogram `theo_workflow_latency_seconds`.
 With these steps you can locally validate that Theoria workflows expose
 healthy telemetry before wiring them into a full observability stack.
 
+## MLflow defaults for CI and development
+
+Reranker training and evaluation scripts now emit metrics and artifacts to
+MLflow when it is available. Two optional environment variables control the
+client configuration:
+
+- `THEO_MLFLOW_TRACKING_URI` – points the CLI utilities and the API service at
+  a tracking server. When unset, MLflow falls back to the local `mlruns`
+  directory, which is suitable for developer laptops and ephemeral CI jobs.
+- `THEO_MLFLOW_REGISTRY_URI` – overrides the model registry host. Leave this
+  unset in local workflows so MLflow reuses the tracking URI's default
+  registry. Production deployments can bind it to a remote registry service if
+  one is available.
+
+When neither variable is defined, the training and evaluation scripts still run
+without MLflow installed; logging is silently skipped so CI remains fast and
+hermetic.
+
