@@ -74,6 +74,12 @@ class TrendDiscoveryEngine:
             series = [dist.get(topic, 0.0) for dist in distributions]
             if not any(series):
                 continue
+
+            non_zero_points = sum(1 for value in series if value > 0.0)
+            is_emerging_topic = series[-1] > 0.0 and sum(series[:-1]) == 0.0
+            if non_zero_points < 2 and not is_emerging_topic:
+                continue
+
             baseline = sum(series[:-1]) / max(len(series[:-1]), 1)
             latest = series[-1]
             if baseline == latest == 0.0:

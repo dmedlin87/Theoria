@@ -572,6 +572,10 @@ def rag_eval(
                     "tolerance": allowed_tolerance,
                 }
             )
+    regression_messages = [
+        f"{item['metric']} {item['current']:.3f} < {item['baseline']:.3f}"
+        for item in regressions
+    ]
 
     summary = {
         "overall": overall_scores,
@@ -587,30 +591,24 @@ def rag_eval(
             " informational only."
         )
     _write_summary(output_path, summary)
-
-    if failing_rows and not using_fake_models:
-        raise click.ClickException("Low-scoring queries detected.")
-
-    if regressions and not using_fake_models:
-        messages = [
-            f"{item['metric']} {item['current']:.3f} < {item['baseline']:.3f}"
-            for item in regressions
-        ]
-        joined = "; ".join(messages)
-        raise click.ClickException(f"Metric regression detected: {joined}")
+    issues: list[str] = []
+    if failing_rows:
+        issues.append("Low-scoring queries detected.")
+    if regressions:
+        regression_summary = "; ".join(regression_messages)
+        issues.append(f"Metric regression detected: {regression_summary}")
+    if issues:
+        if using_fake_models:
+            issues.append(
+                "Evaluation ran with deterministic fake LLM/embeddings; rerun with"
+                " production models to confirm."
+            )
+        raise click.ClickException(" ".join(issues))
 
     if update_baseline:
         _save_baseline(baseline_path, overall_scores, allowed_tolerance)
         click.echo(f"Baseline updated at {baseline_path}.")
         return
-
-    if regressions and not using_fake_models:
-        messages = [
-            f"{item['metric']} {item['current']:.3f} < {item['baseline']:.3f}"
-            for item in regressions
-        ]
-        joined = "; ".join(messages)
-        raise click.ClickException(f"Metric regression detected: {joined}")
 
     click.echo("All metrics are within the configured tolerances.")
 

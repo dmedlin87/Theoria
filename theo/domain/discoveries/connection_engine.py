@@ -47,12 +47,14 @@ class ConnectionDiscoveryEngine:
 
         verse_sets: dict[str, set[int]] = {}
         filtered: list[DocumentEmbedding] = []
+        document_rank: dict[str, int] = {}
         for doc in documents:
             verses = {verse for verse in doc.verse_ids if isinstance(verse, int)}
             if not verses:
                 continue
             verse_sets[doc.document_id] = verses
             filtered.append(doc)
+            document_rank[doc.document_id] = len(filtered) - 1
 
         if len(filtered) < self.min_documents:
             return []
@@ -91,11 +93,14 @@ class ConnectionDiscoveryEngine:
             if len(component_nodes) < self.min_documents:
                 continue
             subgraph = pruned.subgraph(component_nodes)
-            docs = [
-                bipartite_graph.nodes[node]["document"]
-                for node in component_nodes
-                if node in bipartite_graph
-            ]
+            docs = sorted(
+                (
+                    bipartite_graph.nodes[node]["document"]
+                    for node in component_nodes
+                    if node in bipartite_graph
+                ),
+                key=lambda doc: document_rank.get(doc.document_id, 0),
+            )
             if len(docs) < self.min_documents:
                 continue
 

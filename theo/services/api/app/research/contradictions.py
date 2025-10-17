@@ -67,8 +67,28 @@ def search_contradictions(
     if not windows:
         return []
 
-    contradiction_seeds = query_pair_seed_rows(session, windows, ContradictionSeed)
-    harmony_seeds = query_pair_seed_rows(session, windows, HarmonySeed)
+    fetch_contradictions = True
+    fetch_harmonies = True
+    if perspectives is not None:
+        fetch_contradictions = bool(
+            {"skeptical", "neutral"}.intersection(allowed_perspectives)
+        )
+        fetch_harmonies = bool(
+            {"apologetic", "neutral"}.intersection(allowed_perspectives)
+        )
+        if not fetch_contradictions and not fetch_harmonies:
+            return []
+
+    contradiction_seeds = (
+        query_pair_seed_rows(session, windows, ContradictionSeed)
+        if fetch_contradictions
+        else []
+    )
+    harmony_seeds = (
+        query_pair_seed_rows(session, windows, HarmonySeed)
+        if fetch_harmonies
+        else []
+    )
     topic_lower = topic.lower() if topic else None
     scored: list[_ScoredSeed] = []
 
