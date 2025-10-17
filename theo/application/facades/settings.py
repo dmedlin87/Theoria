@@ -53,6 +53,18 @@ class Settings(BaseSettings):
         default=None,
         description="Expected SHA256 digest for the configured reranker model",
     )
+    reranker_model_registry_uri: str | None = Field(
+        default=None,
+        description="MLflow registry URI for the reranker checkpoint (e.g. models:/theoria/Production)",
+    )
+    mlflow_tracking_uri: str | None = Field(
+        default=None,
+        description="Optional MLflow tracking server URI (defaults to MLflow's built-in client)",
+    )
+    mlflow_registry_uri: str | None = Field(
+        default=None,
+        description="Optional MLflow model registry URI for CI/dev environments",
+    )
     max_chunk_tokens: int = Field(default=900)
     doc_max_pages: int = Field(default=5000)
     transcript_max_window: float = Field(default=40.0)
@@ -348,6 +360,18 @@ class Settings(BaseSettings):
     def _validate_reranker_configuration(self) -> "Settings":
         # Only validate reranker configuration if reranker is enabled
         if not self.reranker_enabled:
+            return self
+
+        if self.reranker_model_path and self.reranker_model_registry_uri:
+            raise ValueError(
+                "Configure either reranker_model_path or reranker_model_registry_uri, not both"
+            )
+
+        if self.reranker_model_registry_uri:
+            if self.reranker_model_sha256:
+                raise ValueError(
+                    "reranker_model_sha256 is not supported with reranker_model_registry_uri"
+                )
             return self
 
         if self.reranker_model_path is None:

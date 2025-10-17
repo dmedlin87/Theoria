@@ -34,9 +34,23 @@ from .stages import (
     SourceFetcher,
 )
 from .stages.enrichers import DocumentEnricher
-from .stages.fetchers import FileSourceFetcher, TranscriptSourceFetcher, UrlSourceFetcher
-from .stages.parsers import FileParser, TranscriptParser, UrlParser
-from .stages.persisters import TextDocumentPersister, TranscriptDocumentPersister
+from .stages.fetchers import (
+    FileSourceFetcher,
+    OsisSourceFetcher,
+    TranscriptSourceFetcher,
+    UrlSourceFetcher,
+)
+from .stages.parsers import (
+    FileParser,
+    OsisCommentaryParser,
+    TranscriptParser,
+    UrlParser,
+)
+from .stages.persisters import (
+    CommentarySeedPersister,
+    TextDocumentPersister,
+    TranscriptDocumentPersister,
+)
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 
@@ -69,6 +83,7 @@ __all__ = [
     "run_pipeline_for_file",
     "run_pipeline_for_transcript",
     "run_pipeline_for_url",
+    "import_osis_commentary",
 ]
 
 
@@ -214,6 +229,43 @@ def _transcript_title_default(state: dict[str, Any]) -> str:
     if isinstance(path, Path):
         return path.stem
     return "Transcript"
+
+
+def import_osis_commentary(
+    session: Session,
+    path: Path,
+    frontmatter: dict[str, Any] | None = None,
+    *,
+    dependencies: PipelineDependencies | None = None,
+):
+    """Import commentary excerpts from an OSIS source file."""
+
+    frontmatter_payload = merge_metadata({}, load_frontmatter(frontmatter))
+    stages = [
+        OsisSourceFetcher(path=path, frontmatter=frontmatter_payload),
+        OsisCommentaryParser(),
+        CommentarySeedPersister(session=session),
+    ]
+
+    pipeline_dependencies = dependencies or PipelineDependencies()
+    with instrument_workflow(
+        "ingest.osis", source_path=str(path), source_name=path.name
+    ) as span:
+        context = pipeline_dependencies.build_context(span=span)
+        orchestrator = _default_orchestrator(stages)
+        result = orchestrator.run(context=context)
+        if result.status != "success":
+            if result.failures:
+                failure = result.failures[-1]
+                if failure.error:
+                    raise failure.error
+            raise UnsupportedSourceError("OSIS import failed")
+        import_result = result.state.get("commentary_result")
+        if import_result is None:
+            raise UnsupportedSourceError(
+                "OSIS import completed without a commentary result"
+            )
+        return import_result
 
 
 def run_pipeline_for_file(

@@ -1,9 +1,41 @@
-"""Utilities for detecting and formatting OSIS scripture references."""
+"""Utilities for detecting, normalising, and parsing OSIS content."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Iterable, Sequence
+
+try:  # pragma: no cover - exercised via regression tests when optional dep present
+    from defusedxml import ElementTree as ET
+    from defusedxml.common import DefusedXmlException
+except ModuleNotFoundError:  # pragma: no cover - fallback when ``defusedxml`` missing
+    import types
+    import xml.etree.ElementTree as _ET
+
+    class DefusedXmlException(RuntimeError):
+        """Raised when XML input contains disallowed constructs."""
+
+    def _ensure_safe_xml(payload: Any) -> None:
+        if isinstance(payload, (bytes, bytearray)):
+            haystack_bytes = bytes(payload).upper()
+            if b"<!DOCTYPE" in haystack_bytes or b"<!ENTITY" in haystack_bytes:
+                raise DefusedXmlException("Unsafe XML constructs are not supported")
+            return
+
+        haystack = str(payload).upper()
+        if "<!DOCTYPE" in haystack or "<!ENTITY" in haystack:
+            raise DefusedXmlException("Unsafe XML constructs are not supported")
+
+    def _secure_fromstring(text: Any, parser: Any | None = None):
+        _ensure_safe_xml(text)
+        if parser is None:
+            parser = _ET.XMLParser()
+        return _ET.fromstring(text, parser=parser)
+
+    ET = types.SimpleNamespace(  # type: ignore[assignment]
+        ParseError=_ET.ParseError,
+        fromstring=_secure_fromstring,
+    )
 
 import pythonbible as pb
 from pythonbible import NormalizedReference
@@ -19,6 +51,12 @@ __all__ = [
     "format_osis",
     "osis_to_readable",
     "DetectedOsis",
+    "OsisVerse",
+    "OsisCommentaryEntry",
+    "OsisDocument",
+    "ResolvedCommentaryAnchor",
+    "parse_osis_document",
+    "canonicalize_osis_id",
     "combine_references",
     "detect_osis_references",
     "canonical_verse_range",
@@ -33,6 +71,213 @@ class DetectedOsis:
 
     primary: str | None
     all: list[str]
+
+
+@dataclass(slots=True)
+class OsisVerse:
+    """Normalised OSIS verse payload."""
+
+    osis_id: str
+    text: str
+
+
+@dataclass(slots=True)
+class OsisCommentaryEntry:
+    """Commentary excerpt resolved from OSIS markup."""
+
+    excerpt: str
+    anchors: list[str]
+    title: str | None = None
+    note_id: str | None = None
+
+
+@dataclass(slots=True)
+class OsisDocument:
+    """Structured representation of an OSIS/XML document."""
+
+    work: str | None
+    title: str | None
+    verses: list[OsisVerse]
+    commentaries: list[OsisCommentaryEntry]
+    metadata: dict[str, Any]
+
+
+@dataclass(slots=True)
+class ResolvedCommentaryAnchor:
+    """Commentary excerpt anchored to a canonical OSIS reference."""
+
+    osis: str
+    excerpt: str
+    title: str | None = None
+    perspective: str | None = None
+    source: str | None = None
+    tags: list[str] | None = None
+    note_id: str | None = None
+
+
+def _strip_namespace(tag: str) -> str:
+    return tag.split("}", 1)[1] if "}" in tag else tag
+
+
+def _iter_text(node, exclude: set[str] | None = None) -> Iterable[str]:
+    tag = _strip_namespace(getattr(node, "tag", "")) if hasattr(node, "tag") else ""
+    if exclude and tag in exclude:
+        return
+    text = getattr(node, "text", None)
+    if text:
+        yield text
+    for child in getattr(node, "__iter__", lambda: [])():
+        yield from _iter_text(child, exclude)
+        tail = getattr(child, "tail", None)
+        if tail:
+            yield tail
+
+
+def _coalesce_text(node, *, exclude: set[str] | None = None) -> str:
+    parts = [segment.strip() for segment in _iter_text(node, exclude) if segment]
+    return " ".join(segment for segment in parts if segment)
+
+
+def _extract_title(node) -> str | None:
+    for child in getattr(node, "__iter__", lambda: [])():
+        if _strip_namespace(getattr(child, "tag", "")) == "title":
+            value = _coalesce_text(child)
+            if value:
+                return value
+    return None
+
+
+def _split_osis_tokens(value: str | None) -> list[str]:
+    if not value:
+        return []
+    tokens: list[str] = []
+    for token in value.replace(";", " ").split():
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        tokens.append(cleaned)
+    return tokens
+
+
+def canonicalize_osis_id(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    candidate = raw.strip()
+    if not candidate:
+        return None
+    if "!" in candidate:
+        candidate = candidate.split("!", 1)[0]
+    if not candidate:
+        return None
+    try:
+        verse_ids = expand_osis_reference(candidate)
+    except Exception:  # pragma: no cover - guard malformed values
+        return None
+    if not verse_ids:
+        return None
+    return candidate
+
+
+def _collect_commentary_anchors(node) -> list[str]:
+    anchors: list[str] = []
+    for attr in ("osisRef", "osisID", "target"):
+        anchors.extend(_split_osis_tokens(getattr(node, "attrib", {}).get(attr)))
+    for child in getattr(node, "__iter__", lambda: [])():
+        tag = _strip_namespace(getattr(child, "tag", ""))
+        if tag in {"ref", "reference"}:
+            anchors.extend(_split_osis_tokens(child.attrib.get("osisRef")))
+        anchors.extend(_collect_commentary_anchors(child))
+    canonical: list[str] = []
+    seen: set[str] = set()
+    for anchor in anchors:
+        normalized = canonicalize_osis_id(anchor)
+        if not normalized:
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        canonical.append(normalized)
+    return canonical
+
+
+def parse_osis_document(xml_text: str) -> OsisDocument:
+    """Parse an OSIS/XML payload into verses and commentary excerpts."""
+
+    try:
+        root = ET.fromstring(xml_text)
+    except (ET.ParseError, DefusedXmlException) as exc:  # pragma: no cover - defensive
+        raise ValueError("Invalid OSIS/XML payload") from exc
+
+    work: str | None = None
+    title: str | None = None
+    metadata: dict[str, Any] = {}
+
+    for element in getattr(root, "iter", lambda: [])():
+        if _strip_namespace(getattr(element, "tag", "")) == "osisText":
+            work = element.attrib.get("osisIDWork") or element.attrib.get("osisRefWork")
+            if element.attrib.get("xml:lang"):
+                metadata.setdefault("language", element.attrib.get("xml:lang"))
+            inner_title = _extract_title(element)
+            if inner_title and not title:
+                title = inner_title
+            break
+
+    if not title:
+        for element in getattr(root, "iter", lambda: [])():
+            if _strip_namespace(getattr(element, "tag", "")) == "title":
+                candidate = _coalesce_text(element)
+                if candidate:
+                    title = candidate
+                    break
+
+    verse_map: dict[str, OsisVerse] = {}
+    for element in getattr(root, "iter", lambda: [])():
+        if _strip_namespace(getattr(element, "tag", "")) != "verse":
+            continue
+        verse_text = _coalesce_text(element)
+        if not verse_text:
+            continue
+        tokens = _split_osis_tokens(element.attrib.get("osisID"))
+        if not tokens:
+            tokens = _split_osis_tokens(element.attrib.get("osisRef"))
+        for token in tokens:
+            canonical = canonicalize_osis_id(token)
+            if not canonical or canonical in verse_map:
+                continue
+            verse_map[canonical] = OsisVerse(osis_id=canonical, text=verse_text)
+
+    commentaries: list[OsisCommentaryEntry] = []
+    for element in getattr(root, "iter", lambda: [])():
+        tag = _strip_namespace(getattr(element, "tag", ""))
+        type_attr = element.attrib.get("type", "").lower()
+        if tag == "note" and "commentary" not in type_attr:
+            continue
+        if tag == "div" and type_attr and "commentary" not in type_attr:
+            continue
+        if tag not in {"note", "div", "p"}:
+            continue
+        anchors = _collect_commentary_anchors(element)
+        if not anchors:
+            continue
+        excerpt = _coalesce_text(element, exclude={"title"})
+        if not excerpt:
+            continue
+        commentaries.append(
+            OsisCommentaryEntry(
+                excerpt=excerpt,
+                anchors=anchors,
+                title=_extract_title(element),
+                note_id=element.attrib.get("osisID"),
+            )
+        )
+
+    return OsisDocument(
+        work=work,
+        title=title,
+        verses=list(verse_map.values()),
+        commentaries=commentaries,
+        metadata=metadata,
+    )
 
 
 def combine_references(

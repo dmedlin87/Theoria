@@ -33,7 +33,11 @@ export const metadata = {
   }
 };
 
-type NavItem = { href: string; label: string; variant?: "primary" };
+type NavItem = { href: string; label: string; variant?: "primary"; match?: string };
+
+function flagEnabled(value: string | undefined): boolean {
+  return typeof value === "string" && value.trim().toLowerCase() === "true";
+}
 
 const NAV_LINKS: NavItem[] = [
   { href: "/chat", label: "Chat", variant: "primary" },
@@ -43,10 +47,22 @@ const NAV_LINKS: NavItem[] = [
   { href: "/upload", label: "Upload" },
 ];
 
-const adminLinks: NavItem[] =
-  process.env.NEXT_PUBLIC_ENABLE_ADMIN === "true"
-    ? [{ href: "/admin/digests", label: "Admin" }]
-    : [];
+const enableAdmin = flagEnabled(process.env.NEXT_PUBLIC_ENABLE_ADMIN);
+const enableGraphQLExplorer = flagEnabled(
+  process.env.NEXT_PUBLIC_ENABLE_GRAPHQL_EXPLORER ??
+    process.env.ENABLE_GRAPHQL_EXPLORER ??
+    process.env.NEXT_PUBLIC_ENABLE_ADMIN_GRAPHQL ??
+    process.env.ENABLE_ADMIN_GRAPHQL,
+);
+
+const adminLinks: NavItem[] = enableAdmin
+  ? [
+      { href: "/admin/digests", label: "Admin digests", match: "/admin/digests" },
+      ...(enableGraphQLExplorer
+        ? [{ href: "/admin/graphql", label: "GraphQL explorer", match: "/admin/graphql" }]
+        : []),
+    ]
+  : [];
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const initialMode = DEFAULT_MODE_ID;
@@ -84,7 +100,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       items: adminLinks.map((item) => ({
         href: item.href,
         label: item.label,
-        match: item.href,
+        match: item.match ?? item.href,
       })),
     });
   }
