@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from inspect import isclass
 from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -1773,39 +1774,10 @@ class CorpusSnapshot(Base):
     meta: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
 
 
-__all__ = [
-    "Base",
-    "Document",
-    "Passage",
-    "AppSetting",
-    "DocumentAnnotation",
-    "IngestionJob",
-    "ResearchNote",
-    "NoteEvidence",
-    "CrossReference",
-    "ContradictionSeed",
-    "HarmonySeed",
-    "CommentaryExcerptSeed",
-    "AgentTrail",
-    "AgentStep",
-    "TrailSource",
-    "UserWatchlist",
-    "WatchlistEvent",
-    "GeoAncientPlace",
-    "GeoModernLocation",
-    "GeoPlaceVerse",
-    "GeoGeometry",
-    "GeoImage",
-    "GeoPlace",
-    "CaseSource",
-    "CaseObject",
-    "CaseEdge",
-    "CaseInsight",
-    "CaseUserAction",
-    "CaseObjectType",
-    "CaseEdgeKind",
-    "CaseInsightType",
-    "CaseUserActionType",
-    "Discovery",
-    "CorpusSnapshot",
-]
+__all__ = sorted(
+    name
+    for name, obj in globals().items()
+    if not name.startswith("_")
+    and isclass(obj)
+    and getattr(obj, "__module__", None) == __name__
+)
