@@ -13,6 +13,8 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
+from tests.fixtures import RegressionDataFactory
+
 try:  # pragma: no cover - optional dependency in local test harness
     import pytest_cov  # type: ignore  # noqa: F401
 
@@ -67,6 +69,13 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "asyncio: mark a test function as running with an asyncio event loop.",
     )
+
+
+@pytest.fixture
+def regression_factory() -> RegressionDataFactory:
+    """Provide a seeded factory for synthesising regression datasets."""
+
+    return RegressionDataFactory()
 
 
 @pytest.hookimpl(tryfirst=True)
