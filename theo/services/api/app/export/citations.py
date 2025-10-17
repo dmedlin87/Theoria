@@ -44,6 +44,7 @@ class CitationSource:
     pages: str | None = None
     volume: str | None = None
     issue: str | None = None
+    topics: list[str] | None = None
     metadata: dict[str, Any] | None = None
 
     @classmethod
@@ -86,6 +87,7 @@ class CitationSource:
             pages=_metadata_first(metadata, "pages", "page_range", "pagination"),
             volume=_metadata_first(metadata, "volume", "vol"),
             issue=_metadata_first(metadata, "issue", "number", "no"),
+            topics=_resolve_topics(obj, mapping, metadata),
             metadata=metadata or None,
         )
 
@@ -130,6 +132,24 @@ def _extract_metadata(obj: Any, mapping: Mapping[str, Any] | None) -> dict[str, 
         if isinstance(value, Mapping):
             return dict(value)
     return {}
+
+
+def _resolve_topics(
+    obj: Any,
+    mapping: Mapping[str, Any] | None,
+    metadata: Mapping[str, Any] | None,
+) -> list[str] | None:
+    raw_topics = _get_value(obj, mapping, "topics", "tags", "keywords", "subjects")
+    topics = _coerce_str_list(raw_topics)
+    if topics:
+        return topics
+    if metadata:
+        for key in ("topics", "tags", "keywords", "subjects"):
+            value = metadata.get(key)
+            topics = _coerce_str_list(value)
+            if topics:
+                return topics
+    return None
 
 
 def _metadata_first(metadata: Mapping[str, Any] | None, *keys: str) -> str | None:
@@ -456,16 +476,31 @@ def _infer_csl_type(source_type: str | None) -> str:
 
 
 def _format_apa(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) -> str:
-    authors = [_apa_author(_normalise_author(name)) for name in source.authors or []]
-    authors = [author for author in authors if author]
-    if not authors and source.publisher:
-        authors = [source.publisher]
-    if len(authors) > 1:
-        formatted_authors = ", ".join(authors[:-1]) + f", & {authors[-1]}"
-    elif authors:
-        formatted_authors = authors[0]
-    else:
-        formatted_authors = ""
+    raw_authors = (
+        [name for name in source.authors or [] if isinstance(name, str)] or []
+    )
+    trimmed_authors = [name.strip() for name in raw_authors if name and name.strip()]
+
+    formatted_authors = ""
+    if trimmed_authors and all("," not in name for name in trimmed_authors):
+        if len(trimmed_authors) > 1:
+            formatted_authors = (
+                ", ".join(trimmed_authors[:-1]) + f", & {trimmed_authors[-1]}"
+            )
+        else:
+            formatted_authors = trimmed_authors[0]
+
+    if not formatted_authors:
+        normalised = [
+            _apa_author(_normalise_author(name)) for name in trimmed_authors
+        ]
+        normalised = [author for author in normalised if author]
+        if len(normalised) > 1:
+            formatted_authors = ", ".join(normalised[:-1]) + f", & {normalised[-1]}"
+        elif normalised:
+            formatted_authors = normalised[0]
+        elif source.publisher:
+            formatted_authors = source.publisher
 
     year = str(source.year) if source.year else "n.d."
     title = source.title or "Untitled document"
@@ -760,6 +795,8 @@ def build_citation_export(
         record["pages"] = source.pages
         record["volume"] = source.volume
         record["issue"] = source.issue
+        if source.topics:
+            record["topics"] = source.topics
         if anchor_entries:
             record["anchors"] = anchor_entries
         passages = _extract_passages(document)

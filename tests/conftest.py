@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import inspect
 import os
 import sys
-from pathlib import Path
-
-import contextlib
 from collections.abc import Generator
+from pathlib import Path
 from typing import Iterator
 
 import pytest
@@ -57,6 +58,34 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         dest="use_pgvector",
         help="Back API tests with a Postgres+pgvector Testcontainer instead of SQLite.",
     )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Register custom markers used throughout the test suite."""
+
+    config.addinivalue_line(
+        "markers",
+        "asyncio: mark a test function as running with an asyncio event loop.",
+    )
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
+    """Execute ``async def`` tests without requiring pytest-asyncio."""
+
+    if not inspect.iscoroutinefunction(pyfuncitem.obj):
+        return None
+
+    if pyfuncitem.get_closest_marker("asyncio") is None:
+        return None
+
+    testargs = {
+        name: pyfuncitem.funcargs[name]
+        for name in pyfuncitem._fixtureinfo.argnames  # type: ignore[attr-defined]
+        if name in pyfuncitem.funcargs
+    }
+    asyncio.run(pyfuncitem.obj(**testargs))
+    return True
 
 
 os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")

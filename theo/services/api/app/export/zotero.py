@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any, Mapping, Sequence
 
@@ -228,6 +229,8 @@ async def export_to_zotero(
 
             if response.status_code == 200:
                 result = response.json()
+                if inspect.isawaitable(result):
+                    result = await result
                 successful = result.get("successful", {})
                 failed = result.get("failed", {})
                 
