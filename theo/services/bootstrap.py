@@ -243,8 +243,8 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
 
     registry.register("research_service_factory", _build_research_service_factory)
 
-    def _build_reasoner_factory() -> Callable[[], NeighborhoodReasoner]:
-        def _factory() -> NeighborhoodReasoner:
+    def _build_reasoner_factory() -> Callable[[Session], NeighborhoodReasoner]:
+        def _factory(session: Session) -> NeighborhoodReasoner:
             return NeighborhoodReasoner()
 
         return _factory
