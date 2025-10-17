@@ -52,3 +52,9 @@
   color: var(--color-text-secondary);
   line-height: 1;
 }
+
+.delta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
