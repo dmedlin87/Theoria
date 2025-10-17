@@ -207,7 +207,7 @@ class RegressionDataFactory:
                     "document_id": citation.document_id,
                     "document_title": citation.document_title,
                     "snippet": citation.snippet,
-                    "source_url": citation.source_url or "",
+                    "source_url": citation.source_url,
                 }
             )
         return payload
