@@ -242,8 +242,6 @@ def run_pipeline_for_file(
         else:
             set_span_attribute(span, "resilience.file_read.attempts", read_meta.attempts)
             set_span_attribute(span, "resilience.file_read.duration", read_meta.duration)
-        sha256 = hashlib.sha256(raw_bytes).hexdigest()
-
         merged_frontmatter = merge_metadata(
             {}, load_frontmatter(frontmatter)
         )
