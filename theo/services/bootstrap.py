@@ -76,7 +76,7 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
 
         return _factory
 
-    registry.register("reasoner_factory", _build_reasoner_factory())
+    registry.register("reasoner_factory", _build_reasoner_factory)
 
     container = bootstrap_application(
         registry=registry,
