@@ -32,7 +32,7 @@ class _StubRegistry:
 
 
 @pytest.fixture()
-def export_module(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> object:
+def export_module(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> ModuleType:
     """Import the CLI module with its bootstrap patched for testing."""
 
     module_name = "theo.services.cli.export_data"
