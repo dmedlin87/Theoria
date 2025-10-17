@@ -48,6 +48,7 @@ from ..telemetry import CITATION_DRIFT_EVENTS, log_workflow_event
 from ..ai import rag
 from ..ai.rag import GuardrailError, RAGCitation
 from theo.services.bootstrap import resolve_application
+from theo.application.reasoner.events import DocumentPersistedEvent
 
 
 APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
@@ -160,6 +161,38 @@ def on_case_object_upsert(case_object_id: str) -> None:
 
     logger.info(
         "Enqueued case object upsert", extra={"case_object_id": case_object_id}
+    )
+
+
+@celery.task(name="tasks.update_neighborhood_analytics")
+def update_neighborhood_analytics(event_payload: dict[str, Any]) -> None:
+    """Refresh doctrine/topic analytics after ingestion persists a document."""
+
+    try:
+        event = DocumentPersistedEvent.from_payload(event_payload)
+    except Exception:
+        logger.exception("Invalid neighborhood analytics payload", extra={"payload": event_payload})
+        return
+
+    logger.info(
+        "Updating neighborhood analytics",
+        extra={"document_id": event.document_id, "passages": event.passage_count},
+    )
+
+    reasoner_factory = _ADAPTER_REGISTRY.resolve("reasoner_factory")
+    engine = get_engine()
+
+    with Session(engine) as session:
+        reasoner = reasoner_factory(session)
+        result = reasoner.handle_document_persisted(session, event)
+        session.commit()
+
+    logger.info(
+        "Neighborhood analytics refreshed",
+        extra={
+            "document_id": event.document_id,
+            "updated_case_objects": result.updated_case_objects,
+        },
     )
 
 

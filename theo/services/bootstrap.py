@@ -20,6 +20,7 @@ from theo.application import ApplicationContainer
 from theo.application.facades.database import get_engine
 from theo.application.facades.settings import get_settings
 from theo.application.research import ResearchService
+from theo.application.reasoner import NeighborhoodReasoner
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.platform import bootstrap_application
 
@@ -242,6 +243,13 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
 
     registry.register("research_service_factory", _build_research_service_factory)
 
+    def _build_reasoner_factory() -> Callable[[Session], NeighborhoodReasoner]:
+        def _factory(session: Session) -> NeighborhoodReasoner:
+            return NeighborhoodReasoner()
+
+        return _factory
+
+    registry.register("reasoner_factory", _build_reasoner_factory)
     def _build_ingest_callable() -> Callable[[Document], DocumentId]:
         return lambda document: _ingest_document(registry, document)
 
