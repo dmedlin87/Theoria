@@ -377,20 +377,21 @@ def export_search(
     output_format: str = Query(
         default="ndjson",
         alias="format",
-        description="Response format (json, ndjson, csv).",
+        description="Response format (json, ndjson, csv, html, obsidian, or pdf).",
     ),
     session: Session = Depends(get_session),
 ) -> Response:
     """Return export payload for hybrid search results or verse mentions."""
 
     normalized_format = output_format.lower()
-    if normalized_format not in {"json", "ndjson", "csv"}:
+    allowed_formats = {"json", "ndjson", "csv", "html", "pdf", "obsidian"}
+    if normalized_format not in allowed_formats:
         raise ExportError(
             "Unsupported format",
             code="EXPORT_UNSUPPORTED_FORMAT",
             status_code=status.HTTP_400_BAD_REQUEST,
             severity=Severity.USER,
-            hint="Choose json, ndjson, or csv for search exports.",
+            hint="Choose json, ndjson, csv, html, obsidian, or pdf for search exports.",
         )
     if mode == "mentions" and not osis:
         raise ExportError(
@@ -438,17 +439,23 @@ def export_search(
             severity=Severity.USER,
             hint="Adjust export parameters to render the requested format.",
         ) from exc
-    body_bytes = body.encode("utf-8")
+    if isinstance(body, str):
+        body_bytes = body.encode("utf-8")
+    else:
+        body_bytes = body
+
     filename_extension = normalized_format
     headers: dict[str, str] = {}
-    if normalized_format == "ndjson":
-        filename_extension = "ndjson"
+    if normalized_format == "obsidian":
+        filename_extension = "md"
+    elif normalized_format == "html":
+        filename_extension = "html"
+    elif normalized_format == "pdf":
+        filename_extension = "pdf"
     elif normalized_format == "csv":
         filename_extension = "csv"
-    elif normalized_format == "json":
-        filename_extension = "json"
 
-    if _should_gzip(request):
+    if isinstance(body, str) and _should_gzip(request):
         body_bytes = gzip.compress(body_bytes)
         headers["Content-Encoding"] = "gzip"
         filename_extension += ".gz"
@@ -488,20 +495,21 @@ def export_documents_endpoint(
     output_format: str = Query(
         default="ndjson",
         alias="format",
-        description="Response format (json or ndjson).",
+        description="Response format (json, ndjson, html, obsidian, or pdf).",
     ),
     session: Session = Depends(get_session),
 ) -> Response:
     """Return documents and their passages for offline processing."""
 
     normalized_format = output_format.lower()
-    if normalized_format not in {"json", "ndjson"}:
+    allowed_formats = {"json", "ndjson", "html", "pdf", "obsidian"}
+    if normalized_format not in allowed_formats:
         raise ExportError(
             "Unsupported format for document export",
             code="EXPORT_UNSUPPORTED_FORMAT",
             status_code=status.HTTP_400_BAD_REQUEST,
             severity=Severity.USER,
-            hint="Choose json or ndjson when exporting documents.",
+            hint="Choose json, ndjson, html, obsidian, or pdf when exporting documents.",
         )
 
     filters = DocumentExportFilters(
@@ -535,11 +543,25 @@ def export_documents_endpoint(
             severity=Severity.USER,
             hint="Adjust export parameters to render the requested format.",
         ) from exc
-    body_bytes = body.encode("utf-8")
+    if isinstance(body, str):
+        body_bytes = body.encode("utf-8")
+    else:
+        body_bytes = body
+
     filename_extension = normalized_format
     headers: dict[str, str] = {}
+    if normalized_format == "obsidian":
+        filename_extension = "md"
+    elif normalized_format == "html":
+        filename_extension = "html"
+    elif normalized_format == "pdf":
+        filename_extension = "pdf"
+    elif normalized_format == "ndjson":
+        filename_extension = "ndjson"
+    else:
+        filename_extension = "json"
 
-    if _should_gzip(request):
+    if isinstance(body, str) and _should_gzip(request):
         body_bytes = gzip.compress(body_bytes)
         headers["Content-Encoding"] = "gzip"
         filename_extension += ".gz"

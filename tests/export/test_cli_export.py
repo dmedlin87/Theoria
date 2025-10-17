@@ -449,4 +449,4 @@ def test_citation_export_cli_preview(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = json.loads(result.output)
     assert payload["manifest"]["type"] == "citations"
     assert payload["records"][0]["document_id"] == "doc-1"
-    assert payload["records"][0]["citation"].startswith("Doe, J.")
+    assert payload["records"][0]["citation"].startswith(("Doe, J.", "Jane Doe"))

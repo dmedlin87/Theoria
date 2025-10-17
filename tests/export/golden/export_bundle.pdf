@@ -1,0 +1,112 @@
+%PDF-1.4
+%
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 958 >>
+stream
+BT
+/F1 11 Tf
+14 TL
+72 760 Td
+(Theo Export export-fixture) Tj
+T*
+(Schema Version: 2024-07-01) Tj
+T*
+(Created: 2024-01-01T00:00:00+00:00) Tj
+T*
+(Export Type: search) Tj
+T*
+() Tj
+T*
+(Manifest:) Tj
+T*
+({) Tj
+T*
+(  "export_id": "export-fixture",) Tj
+T*
+(  "schema_version": "2024-07-01",) Tj
+T*
+(  "created_at": "2024-01-01T00:00:00Z",) Tj
+T*
+(  "type": "search",) Tj
+T*
+(  "filters": {) Tj
+T*
+(    "query": "grace") Tj
+T*
+(  },) Tj
+T*
+(  "totals": {) Tj
+T*
+(    "results": 1,) Tj
+T*
+(    "returned": 1) Tj
+T*
+(  },) Tj
+T*
+(  "app_git_sha": "abc1234",) Tj
+T*
+(  "enrichment_version": 2,) Tj
+T*
+(  "cursor": "passage-1",) Tj
+T*
+(  "next_cursor": null,) Tj
+T*
+(  "mode": "results") Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(Records:) Tj
+T*
+([) Tj
+T*
+(  {) Tj
+T*
+(    "kind": "result",) Tj
+T*
+(    "rank": 1,) Tj
+T*
+(    "score": 0.87,) Tj
+T*
+(    "document_id": "doc-1",) Tj
+T*
+(    "title": "Example Document",) Tj
+T*
+(    "snippet": "Example snippet") Tj
+T*
+(  }) Tj
+T*
+(]) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Producer (Theo Exporter) /Creator (Theo Exporter) /Title (Theo Export export-fixture) /Subject (Schema 2024-07-01) /CreationDate (D:20240101000000+0000 )>>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000001256 00000 n 
+0000001326 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+startxref
+1501
+%%EOF

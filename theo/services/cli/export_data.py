@@ -7,7 +7,7 @@ from collections import OrderedDict
 from collections.abc import Mapping, Sequence as SequenceABC
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Sequence, cast
+from typing import IO, Any, Iterator, Sequence, cast
 
 import click
 from sqlalchemy import select
@@ -77,6 +77,28 @@ def _persist_state(manifest: ExportManifest) -> None:
     with path.open("w", encoding="utf-8") as fh:
         json.dump(manifest.model_dump(mode="json"), fh, indent=2, ensure_ascii=False)
         fh.write("\n")
+
+
+@contextmanager
+def _open_output_stream(path: str, binary: bool) -> Iterator[IO[Any]]:
+    """Yield a writable file handle for *path*, respecting binary formats."""
+
+    if path == "-":
+        stream = (
+            click.get_binary_stream("stdout")
+            if binary
+            else click.get_text_stream("stdout")
+        )
+        yield stream
+        return
+
+    mode = "wb" if binary else "w"
+    if binary:
+        with open(path, mode) as handle:
+            yield handle
+    else:
+        with open(path, mode, encoding="utf-8") as handle:
+            yield handle
 
 
 def _flatten_passages(
@@ -170,7 +192,10 @@ def export() -> None:
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["json", "ndjson", "csv"], case_sensitive=False),
+    type=click.Choice(
+        ["json", "ndjson", "csv", "html", "pdf", "obsidian"],
+        case_sensitive=False,
+    ),
     default="ndjson",
     show_default=True,
     help="Output format.",
@@ -186,9 +211,10 @@ def export() -> None:
 )
 @click.option(
     "--output",
-    type=click.File("w", encoding="utf-8"),
+    type=click.Path(dir_okay=False, allow_dash=True, path_type=str),
     default="-",
-    help="File to write to (defaults to stdout).",
+    show_default=True,
+    help="File path to write to (use '-' for stdout).",
 )
 def export_search_command(
     *,
@@ -205,7 +231,7 @@ def export_search_command(
     output_format: str,
     export_id: str | None,
     metadata_only: bool,
-    output,
+    output: str,
 ) -> None:
     """Export search results with their document metadata."""
 
@@ -245,9 +271,14 @@ def export_search_command(
         manifest.totals["returned"] = 0
 
     body, _ = render_bundle(manifest, records, output_format=output_format)
-    output.write(body)
-    if not body.endswith("\n"):
-        output.write("\n")
+    binary_payload = isinstance(body, (bytes, bytearray))
+    with _open_output_stream(output, binary=binary_payload) as stream:
+        if binary_payload:
+            stream.write(body)  # type: ignore[arg-type]
+        else:
+            stream.write(body)
+            if not body.endswith("\n"):
+                stream.write("\n")
     _persist_state(manifest)
 
 
@@ -268,7 +299,10 @@ def export_search_command(
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["markdown", "json", "ndjson", "csv"], case_sensitive=False),
+    type=click.Choice(
+        ["markdown", "json", "ndjson", "csv", "html", "pdf", "obsidian"],
+        case_sensitive=False,
+    ),
     default="markdown",
     show_default=True,
     help="Output format for the citation bundle.",
@@ -293,9 +327,10 @@ def export_search_command(
 @click.option("--export-id", type=str, default=None, help="Optional export identifier.")
 @click.option(
     "--output",
-    type=click.File("w", encoding="utf-8"),
+    type=click.Path(dir_okay=False, allow_dash=True, path_type=str),
     default="-",
-    help="File to write to (defaults to stdout).",
+    show_default=True,
+    help="File path to write to (use '-' for stdout).",
 )
 def export_citations_command(
     *,
@@ -308,7 +343,7 @@ def export_citations_command(
     source_type: str | None,
     limit: int | None,
     export_id: str | None,
-    output,
+    output: str,
 ) -> None:
     """Render citations for explicit documents or verse aggregator results."""
 
@@ -384,12 +419,20 @@ def export_citations_command(
 
     if normalized_format == "markdown":
         body = render_citation_markdown(manifest, records)
+        with _open_output_stream(output, binary=False) as stream:
+            stream.write(body)
+            if not body.endswith("\n"):
+                stream.write("\n")
     else:
         body, _ = render_bundle(manifest, records, output_format=normalized_format)
-
-    output.write(body)
-    if not body.endswith("\n"):
-        output.write("\n")
+        binary_payload = isinstance(body, (bytes, bytearray))
+        with _open_output_stream(output, binary=binary_payload) as stream:
+            if binary_payload:
+                stream.write(body)  # type: ignore[arg-type]
+            else:
+                stream.write(body)
+                if not body.endswith("\n"):
+                    stream.write("\n")
 
 
 @export.command("documents")
@@ -428,7 +471,7 @@ def export_citations_command(
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["json", "ndjson"], case_sensitive=False),
+    type=click.Choice(["json", "ndjson", "html", "pdf", "obsidian"], case_sensitive=False),
     default="ndjson",
     show_default=True,
     help="Output format.",
@@ -450,9 +493,10 @@ def export_citations_command(
 )
 @click.option(
     "--output",
-    type=click.File("w", encoding="utf-8"),
+    type=click.Path(dir_okay=False, allow_dash=True, path_type=str),
     default="-",
-    help="File to write to (defaults to stdout).",
+    show_default=True,
+    help="File path to write to (use '-' for stdout).",
 )
 def export_documents_command(
     *,
@@ -468,7 +512,7 @@ def export_documents_command(
     export_id: str | None,
     metadata_only: bool,
     passages_only: bool,
-    output,
+    output: str,
 ) -> None:
     """Export documents and optionally their passages."""
 
@@ -506,9 +550,14 @@ def export_documents_command(
         records = _flatten_passages(records)
 
     body, _ = render_bundle(manifest, records, output_format=output_format)
-    output.write(body)
-    if not body.endswith("\n"):
-        output.write("\n")
+    binary_payload = isinstance(body, (bytes, bytearray))
+    with _open_output_stream(output, binary=binary_payload) as stream:
+        if binary_payload:
+            stream.write(body)  # type: ignore[arg-type]
+        else:
+            stream.write(body)
+            if not body.endswith("\n"):
+                stream.write("\n")
     _persist_state(manifest)
 
 
