@@ -40,7 +40,7 @@ def test_batch_metrics_average_sequences():
 
 
 def test_dcg_and_ndcg_cover_additional_branches():
-    assert metrics.dcg_at_k([3, -1, 2], k=0) == 0.0
+    assert metrics.dcg_at_k([3, 2, 1], k=0) == 0.0
     assert metrics.ndcg_at_k([0, 0, 0], k=5) == 0.0
 
 
