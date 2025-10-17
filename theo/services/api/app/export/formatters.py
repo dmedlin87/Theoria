@@ -617,12 +617,15 @@ def _render_pdf_with_reportlab(
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
     pdf.setTitle(f"Theo Export {manifest.export_id}")
-    metadata = pdf._doc.info  # type: ignore[attr-defined]
-    metadata.title = f"Theo Export {manifest.export_id}"
-    metadata.subject = f"Schema {manifest.schema_version}"
-    metadata.creator = "Theo Exporter"
-    metadata.producer = "Theo Exporter"
-    metadata.creationDate = manifest.created_at.strftime("D:%Y%m%d%H%M%S%z")
+    pdf.setSubject(f"Schema {manifest.schema_version}")
+    pdf.setCreator("Theo Exporter")
+    # Set additional metadata if possible, but handle missing private attributes gracefully
+    try:
+        metadata = pdf._doc.info  # type: ignore[attr-defined]
+        metadata.producer = "Theo Exporter"
+        metadata.creationDate = manifest.created_at.strftime("D:%Y%m%d%H%M%S%z")
+    except AttributeError:
+        pass
     pdf.setFont("Helvetica", 11)
     width, height = letter
     y = height - 72
