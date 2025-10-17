@@ -1,6 +1,6 @@
 # Incomplete Logic and Features
 
-This document lists portions of the dashboard implementation that currently rely on placeholder logic and therefore represent incomplete product behaviour.
+This document lists portions of the dashboard implementation that currently rely on placeholder logic and therefore represent incomplete product behavior.
 
 ## Dashboard quick statistics
 
