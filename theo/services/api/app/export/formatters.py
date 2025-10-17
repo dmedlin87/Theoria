@@ -607,7 +607,7 @@ def _render_pdf_with_weasyprint(html_body: str):  # pragma: no cover - optional 
 
 def _render_pdf_with_reportlab(
     manifest: ExportManifest, content_lines: Sequence[str]
-):  # pragma: no cover - optional path
+) -> bytes | None:  # pragma: no cover - optional path
     try:
         from reportlab.lib.pagesizes import letter  # type: ignore
         from reportlab.pdfgen import canvas  # type: ignore
