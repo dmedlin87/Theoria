@@ -39,7 +39,7 @@ def emit_document_persisted_event(
 ) -> DocumentPersistedEvent:
     """Emit a structured event after ingestion persists a document."""
 
-    passage_ids = [getattr(passage, "id") for passage in passages if getattr(passage, "id", None)]
+    passage_ids = [passage.id for passage in passages if hasattr(passage, 'id') and passage.id is not None]
     event = DocumentPersistedEvent(
         document_id=str(document.id),
         passage_ids=passage_ids,
