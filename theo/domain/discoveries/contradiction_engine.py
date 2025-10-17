@@ -175,7 +175,7 @@ class ContradictionDiscoveryEngine:
         # Compare all pairs of claims with embedding filtering
         contradictions: list[ContradictionDiscovery] = []
         seen_pairs: set[frozenset[str]] = set()
-        
+
         for i in range(len(claims)):
             for j in range(i + 1, len(claims)):
                 claim_a = claims[i]
@@ -184,7 +184,7 @@ class ContradictionDiscoveryEngine:
                 # Skip if same document
                 if claim_a["document_id"] == claim_b["document_id"]:
                     continue
-                
+
                 # Skip if already seen (deduplication)
                 pair_key = frozenset([claim_a["document_id"], claim_b["document_id"]])
                 if pair_key in seen_pairs:
@@ -406,34 +406,34 @@ class ContradictionDiscoveryEngine:
         """Calculate cosine similarity between two vectors."""
         if not vec_a or not vec_b or len(vec_a) != len(vec_b):
             return 1.0  # If no embeddings, assume similar (don't filter out)
-        
+
         import numpy as np
-        
+
         a = np.array(vec_a)
         b = np.array(vec_b)
-        
+
         norm_a = np.linalg.norm(a)
         norm_b = np.linalg.norm(b)
-        
+
         if norm_a == 0 or norm_b == 0:
             return 1.0
-        
+
         return float(np.dot(a, b) / (norm_a * norm_b))
 
     def _truncate_text(self, text: str, max_length: int = 500) -> str:
         """Truncate text respecting sentence boundaries."""
         if len(text) <= max_length:
             return text
-        
+
         # Try to cut at sentence boundary
         truncated = text[:max_length]
-        
+
         # Find last sentence-ending punctuation
         for delimiter in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
             last_sentence = truncated.rfind(delimiter)
             if last_sentence > max_length * 0.6:  # At least 60% of max length
                 return truncated[:last_sentence + 1].strip()
-        
+
         # No good sentence boundary found, use hard cutoff
         return truncated.strip()
 
@@ -441,19 +441,19 @@ class ContradictionDiscoveryEngine:
         self, text_a: str, text_b: str
     ) -> dict[str, object]:
         """Check contradiction in both directions and average scores.
-        
+
         NLI models are not symmetric: A→B may differ from B→A.
         We check both directions and take the maximum contradiction score.
         """
         result_ab = self._check_contradiction(text_a, text_b)
         result_ba = self._check_contradiction(text_b, text_a)
-        
+
         # Take max contradiction score (most conservative approach)
         max_contradiction = max(
             result_ab["scores"]["contradiction"],
             result_ba["scores"]["contradiction"]
         )
-        
+
         # Average other scores
         avg_neutral = (
             result_ab["scores"]["neutral"] + result_ba["scores"]["neutral"]
@@ -461,9 +461,9 @@ class ContradictionDiscoveryEngine:
         avg_entailment = (
             result_ab["scores"]["entailment"] + result_ba["scores"]["entailment"]
         ) / 2
-        
+
         is_contradiction = max_contradiction >= self.contradiction_threshold
-        
+
         return {
             "is_contradiction": is_contradiction,
             "confidence": max_contradiction,

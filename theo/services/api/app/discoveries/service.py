@@ -105,7 +105,7 @@ class DiscoveryService:
 
     def refresh_user_discoveries(self, user_id: str) -> list[Discovery]:
         documents = self._load_document_embeddings(user_id)
-        
+
         # Run all discovery engines
         pattern_candidates, snapshot = self.pattern_engine.detect(documents)
         contradiction_candidates = self.contradiction_engine.detect(documents)
