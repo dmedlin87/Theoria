@@ -7,13 +7,14 @@ import shutil
 import tempfile
 import logging
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 from uuid import uuid4
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from theo.application.graph import GraphDocumentProjection
 from ..case_builder import sync_passages_case_objects
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import (
@@ -54,6 +55,55 @@ logger = logging.getLogger(__name__)
 
 
 from .stages import IngestContext
+
+
+def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values:
+        if value is None:
+            continue
+        cleaned = str(value).strip()
+        if not cleaned:
+            continue
+        if cleaned in seen:
+            continue
+        seen.add(cleaned)
+        ordered.append(cleaned)
+    return ordered
+
+
+def _project_document_if_possible(
+    context: IngestContext,
+    document: Document,
+    *,
+    verses: Iterable[str],
+    concepts: Iterable[str],
+) -> None:
+    projector = getattr(context, "graph_projector", None)
+    if projector is None:
+        return
+
+    verse_list = tuple(_dedupe_preserve_order(verses))
+    concept_list = tuple(_dedupe_preserve_order(concepts))
+    topic_domains = tuple(_dedupe_preserve_order(document.topic_domains or ()))
+
+    try:
+        projection = GraphDocumentProjection(
+            document_id=document.id,
+            title=document.title,
+            source_type=document.source_type,
+            verses=verse_list,
+            concepts=concept_list,
+            topic_domains=topic_domains,
+            theological_tradition=document.theological_tradition,
+        )
+        projector.project_document(projection)
+    except Exception:  # pragma: no cover - defensive guard
+        logger.exception(
+            "Graph projection failed",
+            extra={"document_id": document.id},
+        )
 
 
 def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
@@ -409,6 +459,10 @@ def persist_text_document(
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
+    collected_verse_refs: list[str] = []
+    seen_verse_refs: set[str] = set()
+    collected_verse_refs: list[str] = []
+    seen_verse_refs: set[str] = set()
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
@@ -439,6 +493,10 @@ def persist_text_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
+        for ref in normalized_refs:
+            if ref not in seen_verse_refs:
+                seen_verse_refs.add(ref)
+                collected_verse_refs.append(ref)
         verse_id_list, start_verse_id, end_verse_id = _collect_verse_metadata(
             normalized_refs
         )
@@ -516,6 +574,18 @@ def persist_text_document(
     )
 
     topics = collect_topics(document, frontmatter)
+    _project_document_if_possible(
+        context,
+        document,
+        verses=collected_verse_refs,
+        concepts=topics,
+    )
+    _project_document_if_possible(
+        context,
+        document,
+        verses=collected_verse_refs,
+        concepts=topics,
+    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):
@@ -857,6 +927,10 @@ def persist_transcript_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
+        for ref in normalized_refs:
+            if ref not in seen_verse_refs:
+                seen_verse_refs.add(ref)
+                collected_verse_refs.append(ref)
         verse_id_list, start_verse_id, end_verse_id = _collect_verse_metadata(
             normalized_refs
         )
@@ -934,6 +1008,12 @@ def persist_transcript_document(
     )
 
     topics = collect_topics(document, frontmatter)
+    _project_document_if_possible(
+        context,
+        document,
+        verses=collected_verse_refs,
+        concepts=topics,
+    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):

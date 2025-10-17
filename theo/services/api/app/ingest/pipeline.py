@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -9,6 +10,8 @@ from urllib.request import build_opener as _urllib_build_opener
 
 from sqlalchemy.orm import Session
 
+from theo.application.graph import GraphProjector, NullGraphProjector
+from theo.application.facades.graph import get_graph_projector
 from theo.application.facades.settings import Settings, get_settings
 from ..db.models import Document, TranscriptSegment
 from ..telemetry import instrument_workflow, set_span_attribute
@@ -35,6 +38,9 @@ from .stages.fetchers import FileSourceFetcher, TranscriptSourceFetcher, UrlSour
 from .stages.parsers import FileParser, TranscriptParser, UrlParser
 from .stages.persisters import TextDocumentPersister, TranscriptDocumentPersister
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
+
+
+logger = logging.getLogger(__name__)
 
 
 _parse_text_file = parse_text_file
@@ -76,17 +82,26 @@ class PipelineDependencies:
     settings: Settings | None = None
     embedding_service: EmbeddingServiceProtocol | None = None
     error_policy: ErrorPolicy | None = None
+    graph_projector: GraphProjector | None = None
 
     def build_context(self, *, span) -> IngestContext:
         settings = self.settings or get_settings()
         embedding = self.embedding_service or get_embedding_service()
         policy = self.error_policy or DefaultErrorPolicy()
+        projector = self.graph_projector
+        if projector is None:
+            try:
+                projector = get_graph_projector()
+            except Exception:  # pragma: no cover - defensive guard
+                logger.exception("Failed to resolve graph projector")
+                projector = NullGraphProjector()
         instrumentation = Instrumentation(span=span, setter=set_span_attribute)
         return IngestContext(
             settings=settings,
             embedding_service=embedding,
             instrumentation=instrumentation,
             error_policy=policy,
+            graph_projector=projector,
         )
 
 
