@@ -28,7 +28,7 @@ class FileSourceFetcher(SourceFetcher):
     frontmatter: dict[str, Any]
     name: str = "file_source_fetcher"
 
-    def fetch(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def fetch(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         instrumentation: Instrumentation = context.instrumentation
         raw_bytes = self.path.read_bytes()
         sha256 = hashlib.sha256(raw_bytes).hexdigest()
@@ -61,7 +61,7 @@ class UrlSourceFetcher(SourceFetcher):
     fetch_document_fn: Callable[[Any, str], tuple[str, dict[str, Any]]] | None = None
     name: str = "url_source_fetcher"
 
-    def fetch(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def fetch(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         instrumentation: Instrumentation = context.instrumentation
         settings = context.settings
         merged_frontmatter = merge_metadata({}, load_frontmatter(self.frontmatter))
@@ -134,7 +134,7 @@ class TranscriptSourceFetcher(SourceFetcher):
     audio_filename: str | None = None
     name: str = "transcript_source_fetcher"
 
-    def fetch(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def fetch(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         merged_frontmatter = merge_metadata({}, load_frontmatter(self.frontmatter))
         return {
             "transcript_path": self.transcript_path,

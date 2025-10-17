@@ -281,7 +281,7 @@ Then move to Phase 2: Expose Agent Reasoning in UI.
 All context is in the documentation:
 - Architecture: `IMPLEMENTATION_CONTEXT.md`
 - Roadmap: `HANDOFF_NEXT_PHASE.md`
-- Session summary: `HANDOFF_SESSION_2025_01_15.md`
+- Session summary: `HANDOFF_SESSION_2025_10_15.md`
 - Feature specs: `docs/DISCOVERY_FEATURE.md`
 - Agent guide: `docs/AGENT_AND_PROMPTING_GUIDE.md`
 

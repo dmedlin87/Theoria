@@ -84,7 +84,7 @@ def resolve_host_addresses(host: str) -> tuple[IPAddress, ...]:
     return unique
 
 
-def ensure_resolved_addresses_allowed(settings, addresses: tuple[IPAddress, ...]) -> None:
+def ensure_resolved_addresses_allowed(settings: Any, addresses: tuple[IPAddress, ...]) -> None:
     if not addresses:
         raise UnsupportedSourceError("URL target is not allowed for ingestion")
 
@@ -106,7 +106,7 @@ def ensure_resolved_addresses_allowed(settings, addresses: tuple[IPAddress, ...]
                 raise UnsupportedSourceError("URL target is not allowed for ingestion")
 
 
-def ensure_url_allowed(settings, url: str) -> None:
+def ensure_url_allowed(settings: Any, url: str) -> None:
     parsed = urlparse(url)
     if not parsed.scheme or not parsed.netloc:
         raise UnsupportedSourceError("URL must include a scheme and host")
@@ -155,14 +155,14 @@ def ensure_url_allowed(settings, url: str) -> None:
 class LoopDetectingRedirectHandler(HTTPRedirectHandler):
     """HTTP redirect handler that guards against loops and deep chains."""
 
-    def __init__(self, max_redirects: int, settings) -> None:
+    def __init__(self, max_redirects: int, settings: Any) -> None:
         super().__init__()
         self.max_redirects = max_redirects
         self.redirect_count = 0
         self.visited: set[str] = set()
         self._settings = settings
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+    def redirect_request(self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> Any:
         location = headers.get("Location") if headers else None
         if not location:
             raise UnsupportedSourceError("Redirect response missing Location header")
@@ -189,10 +189,10 @@ class LoopDetectingRedirectHandler(HTTPRedirectHandler):
 
 
 def fetch_web_document(
-    settings,
+    settings: Any,
     url: str,
     *,
-    opener_factory=build_opener,
+    opener_factory: Any = build_opener,
 ) -> tuple[str, dict[str, str | None]]:
     ensure_url_allowed(settings, url)
 
@@ -313,7 +313,7 @@ def fetch_web_document(
     return html, metadata
 
 
-def resolve_fixtures_dir(settings) -> Path | None:
+def resolve_fixtures_dir(settings: Any) -> Path | None:
     """Return the most suitable fixtures directory for the runtime settings."""
 
     candidates: list[Path] = []

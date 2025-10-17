@@ -11,7 +11,7 @@ from ..persistence import persist_text_document, persist_transcript_document
 from . import Persister
 
 
-def _set_chunk_metrics(context, parser_result) -> None:
+def _set_chunk_metrics(context: Any, parser_result: Any) -> None:
     chunk_count = len(parser_result.chunks)
     context.instrumentation.set("ingest.chunk_count", chunk_count)
     context.instrumentation.set("ingest.batch_size", min(chunk_count, 32))
@@ -24,7 +24,7 @@ class TextDocumentPersister(Persister):
     session: Session
     name: str = "text_document_persister"
 
-    def persist(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def persist(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         parser_result = state["parser_result"]
         _set_chunk_metrics(context, parser_result)
         cache_status = state.get("cache_status")
@@ -72,7 +72,7 @@ class TranscriptDocumentPersister(Persister):
     session: Session
     name: str = "transcript_document_persister"
 
-    def persist(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def persist(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         parser_result = state["parser_result"]
         _set_chunk_metrics(context, parser_result)
         cache_status = state.get("cache_status")

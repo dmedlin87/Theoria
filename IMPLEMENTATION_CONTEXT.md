@@ -675,7 +675,7 @@ console.log('State:', state);
 - `docs/AGENT_AND_PROMPTING_GUIDE.md` - Agent architecture
 - `docs/DISCOVERY_FEATURE.md` - Discovery system spec
 - `HANDOFF_NEXT_PHASE.md` - Development roadmap
-- `HANDOFF_SESSION_2025_01_15.md` - Latest session summary
+- `HANDOFF_SESSION_2025_10_15.md` - Latest session summary
 
 ### Code Examples
 - `theo/domain/discoveries/engine.py` - Pattern detection (reference)

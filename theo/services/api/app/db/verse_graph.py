@@ -96,7 +96,7 @@ def _merge_numeric_windows(windows: Iterable[VerseWindow]) -> list[tuple[int, in
     return [(start, end) for start, end in merged]
 
 
-def _range_condition(start_column, end_column, start: int, end: int):
+def _range_condition(start_column: Any, end_column: Any, start: int, end: int) -> Any:
     if start_column is None or end_column is None:
         return None
     return and_(

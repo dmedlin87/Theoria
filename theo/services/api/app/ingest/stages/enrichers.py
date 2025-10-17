@@ -15,7 +15,7 @@ class DocumentEnricher(Enricher):
     default_title_factory: Callable[[dict[str, Any]], str]
     name: str = "document_enricher"
 
-    def enrich(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def enrich(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         frontmatter = dict(state.get("frontmatter") or {})
         metadata = dict(state.get("document_metadata") or {})
         title = frontmatter.get("title") or self.default_title_factory(state)
@@ -36,5 +36,5 @@ class NoopEnricher(Enricher):
 
     name: str = "noop_enricher"
 
-    def enrich(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def enrich(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         return {}

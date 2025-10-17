@@ -36,7 +36,7 @@ class FileParser(Parser):
 
     name: str = "file_parser"
 
-    def parse(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def parse(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         settings = context.settings
         source_type = state["source_type"]
         path: Path = state["path"]
@@ -95,7 +95,7 @@ class WebPageParser(Parser):
 
     name: str = "web_page_parser"
 
-    def parse(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def parse(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         settings = context.settings
         html: str = state["html"]
         text_content = html_to_text(html)
@@ -121,7 +121,7 @@ class TranscriptParser(Parser):
 
     name: str = "transcript_parser"
 
-    def parse(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def parse(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         settings = context.settings
         segments = state.get("segments")
         if segments is None:
@@ -147,7 +147,7 @@ class UrlParser(Parser):
     transcript_parser: TranscriptParser = field(default_factory=TranscriptParser)
     web_parser: WebPageParser = field(default_factory=WebPageParser)
 
-    def parse(self, *, context, state: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    def parse(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         source_type = state.get("source_type")
         if source_type == "youtube":
             return self.transcript_parser.parse(context=context, state=state)
