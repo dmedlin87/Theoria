@@ -84,7 +84,7 @@ def _connected_component(adjacency: Mapping[str, set[str]], seed: str) -> set[st
 
 def _cluster_identifier(member_ids: Iterable[str]) -> str:
     joined = ",".join(sorted(member_ids))
-    digest = hashlib.sha1(joined.encode("utf-8")).hexdigest()[:16]
+    digest = hashlib.sha256(joined.encode("utf-8")).hexdigest()[:16]
     return f"cluster:{digest}"
 
 
