@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import tempfile
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
@@ -33,6 +34,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import joblib
 
 from ranking.metrics import batch_mrr, batch_ndcg_at_k, batch_recall_at_k
+from scripts.mlflow_tracking import mlflow_run
 
 
 Candidate = Dict[str, object]
@@ -201,15 +203,42 @@ def main(argv: Sequence[str] | None = None) -> int:
     print_metrics("Baseline", baseline_metrics)
     print_metrics("Reranked", reranked_metrics)
 
+    report_payload = {
+        "baseline": baseline_metrics,
+        "reranked": reranked_metrics,
+        "k": args.k,
+        "queries": len(reranked_rankings),
+    }
+
     if args.report_path:
         args.report_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "baseline": baseline_metrics,
-            "reranked": reranked_metrics,
-            "k": args.k,
-            "queries": len(reranked_rankings),
-        }
-        args.report_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        args.report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
+
+    with mlflow_run("eval_reranker", tags={"script": "eval_reranker"}) as tracking:
+        if tracking is not None:
+            tracking.log_params(
+                {
+                    "checkpoint": str(args.checkpoint),
+                    "holdout_path": str(args.holdout_path),
+                    "k": args.k,
+                    "queries": len(reranked_rankings),
+                }
+            )
+            metric_payload = {}
+            for key, value in baseline_metrics.items():
+                metric_payload[f"baseline_{key}"] = value
+            for key, value in reranked_metrics.items():
+                metric_payload[f"reranked_{key}"] = value
+            tracking.log_metrics(metric_payload)
+            if args.report_path:
+                tracking.log_artifact(str(args.report_path))
+            else:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    metrics_path = Path(tmpdir) / "evaluation_metrics.json"
+                    metrics_path.write_text(
+                        json.dumps(report_payload, indent=2), encoding="utf-8"
+                    )
+                    tracking.log_artifact(str(metrics_path), artifact_path="evaluation")
 
     return 0
 

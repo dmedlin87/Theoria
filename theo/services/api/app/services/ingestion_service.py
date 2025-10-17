@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Iterator, Sequence
@@ -12,6 +13,13 @@ from typing import Any, Callable, Iterator, Sequence
 from fastapi import Depends, status
 from sqlalchemy.orm import Session
 
+from theo.application.facades.events import get_event_publisher
+from theo.application.ports.events import (
+    DomainEvent,
+    EventDispatchError,
+    EventPublisher,
+    NullEventPublisher,
+)
 from theo.application.facades.settings import Settings, get_settings
 from ..ingest.pipeline import (
     PipelineDependencies,
@@ -34,6 +42,9 @@ _BASE_RUN_PIPELINE_FOR_URL = run_pipeline_for_url
 _BASE_RUN_PIPELINE_FOR_TRANSCRIPT = run_pipeline_for_transcript
 
 _CLI_INGEST_MODULE: ModuleType | None = None
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _load_cli_ingest_module() -> ModuleType:
@@ -59,6 +70,7 @@ class IngestionService:
     run_transcript_pipeline: Callable[..., DocumentLike]
     cli_module: Any
     log_workflow: Callable[..., None]
+    event_publisher: EventPublisher = field(default_factory=NullEventPublisher)
 
     def _get_cli_module(self) -> Any:
         module = self.cli_module
@@ -66,6 +78,59 @@ class IngestionService:
         if callable(loader):
             module = loader()
         return module
+
+    def _snapshot_document(self, document: Any) -> dict[str, Any]:
+        fields = (
+            "id",
+            "title",
+            "source_type",
+            "source_url",
+            "collection",
+            "sha256",
+            "created_at",
+            "updated_at",
+        )
+        snapshot: dict[str, Any] = {}
+        for name in fields:
+            value = getattr(document, name, None)
+            if value is not None:
+                snapshot[name] = value
+        return snapshot
+
+    def _publish_ingestion_event(
+        self,
+        document: Any,
+        *,
+        source: dict[str, Any],
+        frontmatter: dict[str, Any] | None,
+    ) -> None:
+        document_id = getattr(document, "id", None)
+        payload: dict[str, Any] = {
+            "document": self._snapshot_document(document),
+            "source": {key: value for key, value in source.items() if value is not None},
+        }
+        if frontmatter:
+            payload["frontmatter"] = frontmatter
+
+        event = DomainEvent(
+            type="theo.ingestion.completed",
+            payload=payload,
+            key=str(document_id) if document_id is not None else None,
+            metadata={"source_kind": source.get("kind")},
+        )
+        try:
+            self.event_publisher.publish(event)
+        except EventDispatchError as exc:
+            LOGGER.warning(
+                "One or more event sinks failed while publishing ingestion event for %s: %s",
+                document_id or "<unknown>",
+                exc,
+            )
+        except Exception:  # pragma: no cover - defensive guard for unexpected failures
+            LOGGER.exception(
+                "Unexpected error while publishing ingestion event for %s",
+                document_id or "<unknown>",
+            )
 
     def ingest_file(
         self,
@@ -75,12 +140,18 @@ class IngestionService:
     ) -> DocumentLike:
         """Persist *source_path* via the file ingestion pipeline."""
 
-        return self.run_file_pipeline(
+        document = self.run_file_pipeline(
             session,
             source_path,
             frontmatter,
             dependencies=PipelineDependencies(settings=self.settings),
         )
+        self._publish_ingestion_event(
+            document,
+            source={"kind": "file", "path": str(source_path)},
+            frontmatter=frontmatter,
+        )
+        return document
 
     def ingest_url(
         self,
@@ -92,13 +163,23 @@ class IngestionService:
     ) -> DocumentLike:
         """Persist *url* via the URL ingestion pipeline."""
 
-        return self.run_url_pipeline(
+        document = self.run_url_pipeline(
             session,
             url,
             source_type=source_type,
             frontmatter=frontmatter,
             dependencies=PipelineDependencies(settings=self.settings),
         )
+        self._publish_ingestion_event(
+            document,
+            source={
+                "kind": "url",
+                "url": url,
+                "requested_source_type": source_type,
+            },
+            frontmatter=frontmatter,
+        )
+        return document
 
     def ingest_transcript(
         self,
@@ -112,7 +193,7 @@ class IngestionService:
     ) -> DocumentLike:
         """Persist transcript and optional audio artefacts."""
 
-        return self.run_transcript_pipeline(
+        document = self.run_transcript_pipeline(
             session,
             transcript_path,
             frontmatter=frontmatter,
@@ -121,6 +202,16 @@ class IngestionService:
             audio_filename=audio_filename,
             dependencies=PipelineDependencies(settings=self.settings),
         )
+        self._publish_ingestion_event(
+            document,
+            source={
+                "kind": "transcript",
+                "transcript_path": str(transcript_path),
+                "audio_path": str(audio_path) if audio_path else None,
+            },
+            frontmatter=frontmatter,
+        )
+        return document
 
     def stream_simple_ingest(
         self, payload: SimpleIngestRequest
@@ -318,6 +409,7 @@ def get_ingestion_service(
         run_transcript_pipeline=run_transcript,
         cli_module=cli_source,
         log_workflow=log_workflow_event,
+        event_publisher=get_event_publisher(),
     )
 
 

@@ -5,17 +5,23 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from theo.application.facades.events import get_event_publisher
+from theo.application.ports.events import DomainEvent, EventDispatchError
 from theo.application.facades.settings_store import load_setting, save_setting
 from ..db.models import Document
 from ..models.base import APIModel
 from .openalex import OpenAlexClient
 
 SETTINGS_KEY = "topic-digest"
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _extract_topics(document: Document) -> list[str]:
@@ -170,6 +176,24 @@ def generate_topic_digest(
 
 def store_topic_digest(session: Session, digest: TopicDigest) -> None:
     save_setting(session, SETTINGS_KEY, digest.model_dump(mode="json"))
+    publisher = get_event_publisher()
+    event = DomainEvent(
+        type="theo.topic_digest.generated",
+        payload={
+            "digest": digest.model_dump(mode="json"),
+            "topic_count": len(digest.topics),
+        },
+        metadata={
+            "generated_at": digest.generated_at,
+            "window_start": digest.window_start,
+        },
+    )
+    try:
+        publisher.publish(event)
+    except EventDispatchError as exc:
+        LOGGER.warning("Digest event delivery reported failures: %s", exc)
+    except Exception:  # pragma: no cover - defensive guard for unexpected failures
+        LOGGER.exception("Unexpected error while publishing topic digest event")
 
 
 def load_topic_digest(session: Session) -> TopicDigest | None:

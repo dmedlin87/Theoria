@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,6 +11,7 @@ from theo.services.api.app.errors import IngestionError
 from theo.services.api.app.models.documents import SimpleIngestRequest
 from theo.services.api.app.services.ingestion_service import IngestionService
 from theo.services.api.app.ingest.pipeline import PipelineDependencies
+from theo.application.ports.events import DomainEvent
 
 
 class _StubItem:
@@ -103,6 +105,50 @@ def test_ingestion_service_ingest_file_invokes_pipeline(_settings: SimpleNamespa
     assert captured["session"] is session
     assert captured["path"] == source_path
     assert captured["frontmatter"] == frontmatter
+
+
+def test_ingestion_service_emits_event_after_ingest(_settings: SimpleNamespace) -> None:
+    captured: list[DomainEvent] = []
+
+    class _Publisher:
+        def publish(self, event: DomainEvent) -> None:
+            captured.append(event)
+
+    created_at = datetime(2024, 5, 1, tzinfo=UTC)
+
+    def _run_file(session, path: Path, frontmatter, *, dependencies=None):  # noqa: ANN001
+        return SimpleNamespace(
+            id="doc-99",
+            title="Example",
+            source_type="file",
+            source_url="https://example.com",
+            sha256="deadbeef",
+            created_at=created_at,
+        )
+
+    service = IngestionService(
+        settings=_settings,
+        run_file_pipeline=_run_file,
+        run_url_pipeline=lambda *a, **k: None,
+        run_transcript_pipeline=lambda *a, **k: None,
+        cli_module=_StubCLI([]),
+        log_workflow=lambda *a, **k: None,
+        event_publisher=_Publisher(),
+    )
+
+    session = object()
+    document = service.ingest_file(
+        session, Path("/tmp/example.txt"), {"title": "Override"}
+    )
+
+    assert document.id == "doc-99"
+    assert len(captured) == 1
+    event = captured[0]
+    assert event.type == "theo.ingestion.completed"
+    payload = event.to_message()["payload"]
+    assert payload["document"]["id"] == "doc-99"
+    assert payload["document"]["created_at"] == "2024-05-01T00:00:00+00:00"
+    assert payload["source"] == {"kind": "file", "path": "/tmp/example.txt"}
 
 
 def test_simple_ingest_api_mode_emits_expected_events(_settings: SimpleNamespace) -> None:

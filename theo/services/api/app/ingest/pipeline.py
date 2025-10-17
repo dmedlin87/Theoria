@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -9,6 +10,8 @@ from urllib.request import build_opener as _urllib_build_opener
 
 from sqlalchemy.orm import Session
 
+from theo.application.graph import GraphProjector, NullGraphProjector
+from theo.application.facades.graph import get_graph_projector
 from theo.application.facades.settings import Settings, get_settings
 from ..db.models import Document, TranscriptSegment
 from ..telemetry import instrument_workflow, set_span_attribute
@@ -31,10 +34,27 @@ from .stages import (
     SourceFetcher,
 )
 from .stages.enrichers import DocumentEnricher
-from .stages.fetchers import FileSourceFetcher, TranscriptSourceFetcher, UrlSourceFetcher
-from .stages.parsers import FileParser, TranscriptParser, UrlParser
-from .stages.persisters import TextDocumentPersister, TranscriptDocumentPersister
+from .stages.fetchers import (
+    FileSourceFetcher,
+    OsisSourceFetcher,
+    TranscriptSourceFetcher,
+    UrlSourceFetcher,
+)
+from .stages.parsers import (
+    FileParser,
+    OsisCommentaryParser,
+    TranscriptParser,
+    UrlParser,
+)
+from .stages.persisters import (
+    CommentarySeedPersister,
+    TextDocumentPersister,
+    TranscriptDocumentPersister,
+)
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
+
+
+logger = logging.getLogger(__name__)
 
 
 _parse_text_file = parse_text_file
@@ -63,6 +83,7 @@ __all__ = [
     "run_pipeline_for_file",
     "run_pipeline_for_transcript",
     "run_pipeline_for_url",
+    "import_osis_commentary",
 ]
 
 
@@ -76,17 +97,26 @@ class PipelineDependencies:
     settings: Settings | None = None
     embedding_service: EmbeddingServiceProtocol | None = None
     error_policy: ErrorPolicy | None = None
+    graph_projector: GraphProjector | None = None
 
     def build_context(self, *, span) -> IngestContext:
         settings = self.settings or get_settings()
         embedding = self.embedding_service or get_embedding_service()
         policy = self.error_policy or DefaultErrorPolicy()
+        projector = self.graph_projector
+        if projector is None:
+            try:
+                projector = get_graph_projector()
+            except Exception:  # pragma: no cover - defensive guard
+                logger.exception("Failed to resolve graph projector")
+                projector = NullGraphProjector()
         instrumentation = Instrumentation(span=span, setter=set_span_attribute)
         return IngestContext(
             settings=settings,
             embedding_service=embedding,
             instrumentation=instrumentation,
             error_policy=policy,
+            graph_projector=projector,
         )
 
 
@@ -199,6 +229,43 @@ def _transcript_title_default(state: dict[str, Any]) -> str:
     if isinstance(path, Path):
         return path.stem
     return "Transcript"
+
+
+def import_osis_commentary(
+    session: Session,
+    path: Path,
+    frontmatter: dict[str, Any] | None = None,
+    *,
+    dependencies: PipelineDependencies | None = None,
+):
+    """Import commentary excerpts from an OSIS source file."""
+
+    frontmatter_payload = merge_metadata({}, load_frontmatter(frontmatter))
+    stages = [
+        OsisSourceFetcher(path=path, frontmatter=frontmatter_payload),
+        OsisCommentaryParser(),
+        CommentarySeedPersister(session=session),
+    ]
+
+    pipeline_dependencies = dependencies or PipelineDependencies()
+    with instrument_workflow(
+        "ingest.osis", source_path=str(path), source_name=path.name
+    ) as span:
+        context = pipeline_dependencies.build_context(span=span)
+        orchestrator = _default_orchestrator(stages)
+        result = orchestrator.run(context=context)
+        if result.status != "success":
+            if result.failures:
+                failure = result.failures[-1]
+                if failure.error:
+                    raise failure.error
+            raise UnsupportedSourceError("OSIS import failed")
+        import_result = result.state.get("commentary_result")
+        if import_result is None:
+            raise UnsupportedSourceError(
+                "OSIS import completed without a commentary result"
+            )
+        return import_result
 
 
 def run_pipeline_for_file(
