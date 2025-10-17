@@ -90,7 +90,7 @@ def summarise_reranker_outcome(
         variant_score = variant_scores.get(identifier)
         if variant_score is None:
             continue
-        score_deltas[identifier] = baseline_score - variant_score
+        score_deltas[identifier] = variant_score - baseline_score
 
     ordering_changed = [
         str(getattr(result, "id", ""))
