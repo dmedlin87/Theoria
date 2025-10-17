@@ -106,7 +106,7 @@ class QueryRewriter:
         )
 
         if expanded_query is not None:
-            setattr(cloned, "query", expanded_query)
+            cloned = cloned.model_copy(update={"query": expanded_query}, deep=True)
 
         return QueryRewriteResult(request=cloned, metadata=metadata)
 
