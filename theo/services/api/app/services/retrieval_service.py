@@ -21,6 +21,7 @@ from ..analytics.experiments import (
     summarise_reranker_outcome,
 )
 from ..models.search import HybridSearchRequest, HybridSearchResult
+from ..ranking.mlflow_integration import is_mlflow_uri, mlflow_signature
 from ..ranking.re_ranker import Reranker, load_reranker
 from ..retriever.hybrid import hybrid_search
 from ..telemetry import SEARCH_RERANKER_EVENTS
@@ -39,7 +40,7 @@ class _RerankerCache:
     failed: bool = field(default=False, init=False)
     cooldown_seconds: float = 60.0
     _last_failure_at: float | None = field(default=None, init=False)
-    _artifact_signature: tuple[int, int] | None = field(default=None, init=False)
+    _artifact_signature: object | None = field(default=None, init=False)
     _cooldown_logged: bool = field(default=False, init=False)
 
     def reset(self) -> None:
@@ -144,7 +145,9 @@ class _RerankerCache:
             return self.reranker
 
     @staticmethod
-    def _snapshot_artifact(path: str) -> tuple[int, int] | None:
+    def _snapshot_artifact(path: str) -> object | None:
+        if is_mlflow_uri(path):
+            return mlflow_signature(path)
         try:
             stat = Path(path).stat()
         except OSError:
@@ -153,6 +156,47 @@ class _RerankerCache:
 
 
 _DEFAULT_RERANKER_CACHE = _RerankerCache(load_reranker)
+
+
+def _configure_mlflow_clients(settings: Settings) -> None:
+    try:  # pragma: no cover - exercised in environments without MLflow
+        import mlflow
+    except ModuleNotFoundError:  # pragma: no cover - optional dependency
+        return
+
+    if settings.mlflow_tracking_uri:
+        mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+    if settings.mlflow_registry_uri:
+        mlflow.set_registry_uri(settings.mlflow_registry_uri)
+
+
+def _iter_reranker_references(
+    settings: Settings,
+) -> list[tuple[str | Path, str | None]]:
+    references: list[tuple[str | Path, str | None]] = []
+    registry_uri = getattr(settings, "reranker_model_registry_uri", None)
+    if registry_uri:
+        references.append((registry_uri, None))
+    model_path = getattr(settings, "reranker_model_path", None)
+    if model_path:
+        references.append((model_path, getattr(settings, "reranker_model_sha256", None)))
+    return references
+
+
+def _format_reranker_header(reference: str | Path | None) -> str | None:
+    if reference is None:
+        return None
+    if is_mlflow_uri(reference):
+        text = str(reference).rstrip("/")
+        if "@" in text:
+            alias = text.split("@", 1)[1]
+            return alias.split("/", 1)[0]
+        segments = [segment for segment in text.split("/") if segment]
+        if segments:
+            return segments[-1]
+        return text
+    ref_path = Path(reference)
+    return ref_path.name or str(ref_path)
 
 
 @dataclass
@@ -254,13 +298,66 @@ class RetrievalService:
             rerank_applied=rerank_applied,
             reranker_header=reranker_header,
         )
+        if self._should_rerank():
+            _configure_mlflow_clients(self.settings)
+            reranker: Reranker | None = None
+            header_reference: str | Path | None = None
+            references = _iter_reranker_references(self.settings)
+
+            cached_key = self.reranker_cache.key
+            if (
+                cached_key
+                and self.reranker_cache.reranker is not None
+                and not self.reranker_cache.failed
+            ):
+                cached_path, cached_digest = cached_key
+                for index, (reference, digest) in enumerate(references):
+                    if str(reference) == cached_path and digest == cached_digest:
+                        if index != 0:
+                            references = [
+                                references[index],
+                                *references[:index],
+                                *references[index + 1 :],
+                            ]
+                        break
+
+            for reference, digest in references:
+                reranker = self.reranker_cache.resolve(reference, digest)
+                if reranker is not None:
+                    header_reference = reference
+                    break
+            else:
+                header_reference = None
+            if reranker is not None:
+                try:
+                    top_n = min(len(results), self.reranker_top_k)
+                    if top_n:
+                        reranked_head = reranker.rerank(results[:top_n])
+                        ordered = list(reranked_head) + results[top_n:]
+                        for index, item in enumerate(ordered, start=1):
+                            item.rank = index
+                        results = ordered
+                        reranker_header = _format_reranker_header(header_reference)
+                except Exception as exc:
+                    path_str = _format_reranker_header(header_reference) or "<unknown>"
+                    LOGGER.exception(
+                        "search.reranker_execution_failed",
+                        extra={
+                            "event": "search.reranker_execution_failed",
+                            "model_path": path_str,
+                            "error": str(exc),
+                        },
+                    )
+                    SEARCH_RERANKER_EVENTS.labels(event="execution_failed").inc()
 
         return results, reranker_header
 
     def _should_rerank(self) -> bool:
+        if not getattr(self.settings, "reranker_enabled", False):
+            return False
         return bool(
-            getattr(self.settings, "reranker_enabled", False)
-            and getattr(self.settings, "reranker_model_path", None)
+            getattr(self.settings, "reranker_model_registry_uri", None)
+            or getattr(self.settings, "reranker_model_path", None)
         )
 
     def _resolve_reranker_strategy(self, experiments: Mapping[str, str]) -> str:

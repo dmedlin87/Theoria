@@ -6,16 +6,50 @@ import hashlib
 import logging
 import re
 from collections.abc import Callable
+from typing import Annotated, Any, Literal
 from functools import lru_cache
 from pathlib import Path
 
 from cryptography.fernet import Fernet
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .runtime import allow_insecure_startup
 
 LOGGER = logging.getLogger(__name__)
+
+
+class _BaseEventSink(BaseModel):
+    """Common fields shared by event sink configurations."""
+
+    name: str | None = None
+    enabled: bool = True
+
+
+class KafkaEventSink(_BaseEventSink):
+    """Configuration for Kafka-based event sinks."""
+
+    backend: Literal["kafka"] = "kafka"
+    topic: str
+    bootstrap_servers: str
+    producer_config: dict[str, Any] = Field(default_factory=dict)
+    flush_timeout_seconds: float | None = Field(
+        default=1.0,
+        description="Optional timeout (in seconds) for producer flush operations.",
+    )
+
+
+class RedisStreamEventSink(_BaseEventSink):
+    """Configuration for Redis Streams sinks."""
+
+    backend: Literal["redis_stream"] = "redis_stream"
+    stream: str
+    redis_url: str | None = None
+    maxlen: int | None = None
+    approximate_trim: bool = True
+
+
+EventSink = Annotated[KafkaEventSink | RedisStreamEventSink, Field(discriminator="backend")]
 
 
 class Settings(BaseSettings):
@@ -52,6 +86,18 @@ class Settings(BaseSettings):
     reranker_model_sha256: str | None = Field(
         default=None,
         description="Expected SHA256 digest for the configured reranker model",
+    )
+    reranker_model_registry_uri: str | None = Field(
+        default=None,
+        description="MLflow registry URI for the reranker checkpoint (e.g. models:/theoria/Production)",
+    )
+    mlflow_tracking_uri: str | None = Field(
+        default=None,
+        description="Optional MLflow tracking server URI (defaults to MLflow's built-in client)",
+    )
+    mlflow_registry_uri: str | None = Field(
+        default=None,
+        description="Optional MLflow model registry URI for CI/dev environments",
     )
     max_chunk_tokens: int = Field(default=900)
     doc_max_pages: int = Field(default=5000)
@@ -91,6 +137,10 @@ class Settings(BaseSettings):
     notification_timeout_seconds: float = Field(
         default=10.0, description="HTTP timeout when delivering notifications"
     )
+    event_sinks: list[EventSink] = Field(
+        default_factory=list,
+        description="Collection of event sink configurations for domain events.",
+    )
     ingest_web_timeout_seconds: float = Field(
         default=10.0,
         description="HTTP timeout when fetching remote URLs for ingestion",
@@ -114,6 +164,26 @@ class Settings(BaseSettings):
     case_builder_notify_channel: str = Field(
         default="case_object_upsert",
         description="Postgres NOTIFY channel used for case object upsert events",
+    )
+    graph_projection_enabled: bool = Field(
+        default=False,
+        description="Enable projecting documents and relationships into a graph store",
+    )
+    graph_neo4j_uri: str | None = Field(
+        default=None,
+        description="Bolt URI for the Neo4j instance used for graph projection",
+    )
+    graph_neo4j_username: str | None = Field(
+        default=None,
+        description="Username for the Neo4j graph projection adapter",
+    )
+    graph_neo4j_password: str | None = Field(
+        default=None,
+        description="Password for the Neo4j graph projection adapter",
+    )
+    graph_neo4j_database: str | None = Field(
+        default=None,
+        description="Optional Neo4j database name for graph projection",
     )
     topic_digest_ttl_seconds: int = Field(
         default=3600,
@@ -328,6 +398,18 @@ class Settings(BaseSettings):
     def _validate_reranker_configuration(self) -> "Settings":
         # Only validate reranker configuration if reranker is enabled
         if not self.reranker_enabled:
+            return self
+
+        if self.reranker_model_path and self.reranker_model_registry_uri:
+            raise ValueError(
+                "Configure either reranker_model_path or reranker_model_registry_uri, not both"
+            )
+
+        if self.reranker_model_registry_uri:
+            if self.reranker_model_sha256:
+                raise ValueError(
+                    "reranker_model_sha256 is not supported with reranker_model_registry_uri"
+                )
             return self
 
         if self.reranker_model_path is None:
