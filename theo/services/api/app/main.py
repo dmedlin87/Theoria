@@ -48,6 +48,7 @@ from .routes import (
 )
 from .security import require_principal
 from .telemetry import configure_console_tracer
+from . import events as _app_events  # noqa: F401  (ensure handlers register)
 from .tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
 from .services import router_registry as _router_registry  # noqa: F401
 from .services.registry import RouterRegistration, iter_router_registrations
