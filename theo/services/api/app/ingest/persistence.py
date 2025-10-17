@@ -7,16 +7,21 @@ import shutil
 import tempfile
 import logging
 from pathlib import Path
+from typing import Any, Iterable, Sequence
+from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any, Sequence
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from theo.application.graph import GraphDocumentProjection
 from ..case_builder import sync_passages_case_objects
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..db.models import (
+    CommentaryExcerptSeed,
     Creator,
     CreatorClaim,
     Document,
@@ -30,6 +35,7 @@ from ..db.models import (
 )
 from .embeddings import lexical_representation
 from .exceptions import UnsupportedSourceError
+from .events import emit_document_persisted_event
 from .metadata import (
     build_source_ref,
     coerce_date,
@@ -46,7 +52,12 @@ from .metadata import (
     serialise_frontmatter,
     truncate,
 )
-from .osis import canonical_verse_range, detect_osis_references, expand_osis_reference
+from .osis import (
+    ResolvedCommentaryAnchor,
+    canonical_verse_range,
+    detect_osis_references,
+    expand_osis_reference,
+)
 from .sanitizer import sanitize_passage_text
 
 
@@ -54,6 +65,66 @@ logger = logging.getLogger(__name__)
 
 
 from .stages import IngestContext
+
+
+def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values:
+        if value is None:
+            continue
+        cleaned = str(value).strip()
+        if not cleaned:
+            continue
+        if cleaned in seen:
+            continue
+        seen.add(cleaned)
+        ordered.append(cleaned)
+    return ordered
+
+
+def _project_document_if_possible(
+    context: IngestContext,
+    document: Document,
+    *,
+    verses: Iterable[str],
+    concepts: Iterable[str],
+) -> None:
+    projector = getattr(context, "graph_projector", None)
+    if projector is None:
+        return
+
+    verse_list = tuple(_dedupe_preserve_order(verses))
+    concept_list = tuple(_dedupe_preserve_order(concepts))
+    topic_domains = tuple(_dedupe_preserve_order(document.topic_domains or ()))
+
+    try:
+        projection = GraphDocumentProjection(
+            document_id=document.id,
+            title=document.title,
+            source_type=document.source_type,
+            verses=verse_list,
+            concepts=concept_list,
+            topic_domains=topic_domains,
+            theological_tradition=document.theological_tradition,
+        )
+        projector.project_document(projection)
+    except Exception:  # pragma: no cover - defensive guard
+        logger.exception(
+            "Graph projection failed",
+            extra={"document_id": document.id},
+        )
+COMMENTARY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/commentaries")
+
+
+@dataclass(slots=True)
+class CommentaryImportResult:
+    """Outcome for an OSIS commentary import run."""
+
+    inserted: int
+    updated: int
+    skipped: int
+    records: list[CommentaryExcerptSeed]
 
 
 def ensure_unique_document_sha(session: Session, sha256: str | None) -> None:
@@ -114,6 +185,130 @@ def refresh_creator_verse_rollups(
 
     service = CreatorVersePerspectiveService(session)
     service.refresh_many(sorted_refs)
+
+
+def _normalise_perspective(value: str | None) -> str:
+    text = (value or "neutral").strip().lower()
+    return text or "neutral"
+
+
+def _normalise_tags(tags: list[str] | None) -> list[str] | None:
+    if not tags:
+        return None
+    seen: set[str] = set()
+    normalised: list[str] = []
+    for tag in tags:
+        candidate = (tag or "").strip()
+        if not candidate:
+            continue
+        key = candidate.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalised.append(candidate)
+    return normalised or None
+
+
+def persist_commentary_entries(
+    session: Session,
+    *,
+    entries: Sequence[ResolvedCommentaryAnchor],
+) -> CommentaryImportResult:
+    """Persist resolved commentary anchors into ``commentary_excerpt_seeds``."""
+
+    inserted = 0
+    updated = 0
+    skipped = 0
+    records: list[CommentaryExcerptSeed] = []
+
+    for entry in entries:
+        osis = (entry.osis or "").strip()
+        excerpt = (entry.excerpt or "").strip()
+        if not osis or not excerpt:
+            skipped += 1
+            continue
+
+        source = (entry.source or "community").strip() or "community"
+        perspective = _normalise_perspective(entry.perspective)
+        tags = _normalise_tags(entry.tags)
+        title = entry.title.strip() if entry.title else None
+
+        note_token = (entry.note_id or "").strip().lower()
+        if note_token:
+            anchor_token = note_token
+        else:
+            excerpt_hash = sha256(excerpt.encode("utf-8")).hexdigest()
+            anchor_token = f"excerpt:{excerpt_hash}"
+        identifier_seed = "|".join(
+            [osis.lower(), source.lower(), perspective, anchor_token]
+        )
+        identifier = str(uuid5(COMMENTARY_NAMESPACE, identifier_seed))
+
+        record = session.get(CommentaryExcerptSeed, identifier)
+        _, start_verse_id, end_verse_id = _collect_verse_metadata([osis])
+
+        if record is None:
+            record = CommentaryExcerptSeed(
+                id=identifier,
+                osis=osis,
+                title=title,
+                excerpt=excerpt,
+                source=source,
+                perspective=perspective,
+                tags=tags,
+                start_verse_id=start_verse_id,
+                end_verse_id=end_verse_id,
+            )
+            session.add(record)
+            inserted += 1
+        else:
+            changed = False
+            if record.osis != osis:
+                record.osis = osis
+                changed = True
+            if record.title != title:
+                record.title = title
+                changed = True
+            if record.excerpt != excerpt:
+                record.excerpt = excerpt
+                changed = True
+            if record.source != source:
+                record.source = source
+                changed = True
+            if record.perspective != perspective:
+                record.perspective = perspective
+                changed = True
+            if record.tags != tags:
+                record.tags = tags
+                changed = True
+            if record.start_verse_id != start_verse_id:
+                record.start_verse_id = start_verse_id
+                changed = True
+            if record.end_verse_id != end_verse_id:
+                record.end_verse_id = end_verse_id
+                changed = True
+
+            if changed:
+                session.add(record)
+                updated += 1
+            else:
+                skipped += 1
+
+        records.append(record)
+
+    try:
+        session.flush()
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+    return CommentaryImportResult(
+        inserted=inserted,
+        updated=updated,
+        skipped=skipped,
+        records=records,
+    )
 
 
 def get_or_create_creator(
@@ -409,6 +604,8 @@ def persist_text_document(
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
+    collected_verse_refs: list[str] = []
+    seen_verse_refs: set[str] = set()
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
@@ -439,6 +636,10 @@ def persist_text_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
+        for ref in normalized_refs:
+            if ref not in seen_verse_refs:
+                seen_verse_refs.add(ref)
+                collected_verse_refs.append(ref)
         verse_id_list, start_verse_id, end_verse_id = _collect_verse_metadata(
             normalized_refs
         )
@@ -516,6 +717,12 @@ def persist_text_document(
     )
 
     topics = collect_topics(document, frontmatter)
+    _project_document_if_possible(
+        context,
+        document,
+        verses=collected_verse_refs,
+        concepts=topics,
+    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):
@@ -695,6 +902,15 @@ def persist_text_document(
         document.storage_path = str(storage_dir)
         session.add(document)
         session.commit()
+        emit_document_persisted_event(
+            document=document,
+            passages=passages,
+            topics=topics,
+            topic_domains=topic_domains or [],
+            theological_tradition=tradition,
+            source_type=document.source_type,
+            metadata={"ingest_kind": "text"},
+        )
     except Exception:
         session.rollback()
         if moved_to_final:
@@ -827,6 +1043,8 @@ def persist_transcript_document(
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
+    collected_verse_refs: list[str] = []
+    seen_verse_refs: set[str] = set()
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
@@ -857,6 +1075,10 @@ def persist_transcript_document(
         if osis_value:
             osis_all.append(osis_value)
         normalized_refs = sorted({ref for ref in osis_all if ref})
+        for ref in normalized_refs:
+            if ref not in seen_verse_refs:
+                seen_verse_refs.add(ref)
+                collected_verse_refs.append(ref)
         verse_id_list, start_verse_id, end_verse_id = _collect_verse_metadata(
             normalized_refs
         )
@@ -934,6 +1156,12 @@ def persist_transcript_document(
     )
 
     topics = collect_topics(document, frontmatter)
+    _project_document_if_possible(
+        context,
+        document,
+        verses=collected_verse_refs,
+        concepts=topics,
+    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):
@@ -1114,6 +1342,15 @@ def persist_transcript_document(
         document.storage_path = str(storage_dir)
         session.add(document)
         session.commit()
+        emit_document_persisted_event(
+            document=document,
+            passages=passages,
+            topics=topics,
+            topic_domains=topic_domains or [],
+            theological_tradition=tradition,
+            source_type=document.source_type,
+            metadata={"ingest_kind": "transcript"},
+        )
     except Exception:
         session.rollback()
         if moved_to_final:

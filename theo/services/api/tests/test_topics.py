@@ -1,11 +1,18 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.analytics.openalex import OpenAlexClient
-from theo.services.api.app.analytics.topics import generate_topic_digest
+from theo.services.api.app.analytics.topics import (
+    TopicCluster,
+    TopicDigest,
+    generate_topic_digest,
+    store_topic_digest,
+)
 from theo.application.facades.database import get_engine
 from theo.adapters.persistence.models import Document
+from theo.application.ports.events import DomainEvent
 
 
 def test_topic_digest_deduplicates_document_ids() -> None:
@@ -85,3 +92,39 @@ def test_topic_digest_enriches_documents_with_openalex_topics() -> None:
 
         session.delete(document)
         session.commit()
+
+
+def test_store_topic_digest_emits_event(monkeypatch: pytest.MonkeyPatch) -> None:
+    engine = get_engine()
+    events: list[DomainEvent] = []
+
+    class _Publisher:
+        def publish(self, event: DomainEvent) -> None:
+            events.append(event)
+
+    monkeypatch.setattr(
+        "theo.services.api.app.analytics.topics.get_event_publisher",
+        lambda settings=None: _Publisher(),
+    )
+
+    digest = TopicDigest(
+        generated_at=datetime.now(UTC),
+        window_start=datetime.now(UTC) - timedelta(days=7),
+        topics=[
+            TopicCluster(
+                topic="Systematic Theology",
+                new_documents=2,
+                total_documents=5,
+                document_ids=["doc-1", "doc-2"],
+            )
+        ],
+    )
+
+    with Session(engine) as session:
+        store_topic_digest(session, digest)
+
+    assert len(events) == 1
+    message = events[0].to_message()
+    assert message["type"] == "theo.topic_digest.generated"
+    assert message["payload"]["topic_count"] == 1
+    assert message["payload"]["digest"]["topics"][0]["topic"] == "Systematic Theology"

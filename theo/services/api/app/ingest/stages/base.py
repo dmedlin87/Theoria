@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol, Sequence, runtime_checkable
+from typing import TYPE_CHECKING, Any, Callable, Protocol, Sequence, runtime_checkable
+
+if TYPE_CHECKING:  # pragma: no cover - typing helper
+    from theo.application.graph import GraphProjector
 
 
 class EmbeddingServiceProtocol(Protocol):
@@ -83,6 +86,7 @@ class IngestContext:
     embedding_service: EmbeddingServiceProtocol
     instrumentation: Instrumentation
     error_policy: ErrorPolicy = field(default_factory=DefaultErrorPolicy)
+    graph_projector: "GraphProjector | None" = None
 
 
 @runtime_checkable
