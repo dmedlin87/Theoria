@@ -214,11 +214,32 @@ class RetrievalService:
             _configure_mlflow_clients(self.settings)
             reranker: Reranker | None = None
             header_reference: str | Path | None = None
-            for reference, digest in _iter_reranker_references(self.settings):
+            references = _iter_reranker_references(self.settings)
+
+            cached_key = self.reranker_cache.key
+            if (
+                cached_key
+                and self.reranker_cache.reranker is not None
+                and not self.reranker_cache.failed
+            ):
+                cached_path, cached_digest = cached_key
+                for index, (reference, digest) in enumerate(references):
+                    if str(reference) == cached_path and digest == cached_digest:
+                        if index != 0:
+                            references = [
+                                references[index],
+                                *references[:index],
+                                *references[index + 1 :],
+                            ]
+                        break
+
+            for reference, digest in references:
                 reranker = self.reranker_cache.resolve(reference, digest)
                 if reranker is not None:
                     header_reference = reference
                     break
+            else:
+                header_reference = None
             if reranker is not None:
                 try:
                     top_n = min(len(results), self.reranker_top_k)
