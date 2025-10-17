@@ -674,7 +674,7 @@ def _resolve_settings_secret_from_backend(settings: Settings) -> str | None:
         return None
     except Exception as exc:  # pragma: no cover - defensive logging path
         LOGGER.error(
-            "Failed to configure secrets backend '%s': %s", backend, exc
+            "Failed to configure a secrets backend: %s", exc
         )
         return None
 
