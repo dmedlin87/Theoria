@@ -10,6 +10,11 @@ import joblib  # type: ignore[import]
 
 from ..models.search import HybridSearchResult
 from .features import extract_features
+from .mlflow_integration import (
+    MlflowResolutionError,
+    is_mlflow_uri,
+    resolve_mlflow_artifact,
+)
 
 
 def _compute_sha256(path: Path) -> str:
@@ -192,6 +197,13 @@ def load_reranker(
 ) -> Reranker:
     """Load a reranker model from disk."""
 
-    resolved = Path(path).resolve()
-    estimator = _load_model(resolved, expected_sha256=expected_sha256)
+    if is_mlflow_uri(path):
+        try:
+            artifact_path = resolve_mlflow_artifact(str(path))
+        except MlflowResolutionError as exc:
+            raise RerankerValidationError(str(exc)) from exc
+        estimator = _load_model(artifact_path.resolve(), expected_sha256=expected_sha256)
+    else:
+        resolved = Path(path).resolve()
+        estimator = _load_model(resolved, expected_sha256=expected_sha256)
     return Reranker(estimator)
