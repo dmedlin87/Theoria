@@ -10,24 +10,24 @@ class MlflowResolutionError(RuntimeError):
     """Raised when MLflow artifacts cannot be resolved."""
 
 
-def _normalise_scheme(model_uri: str, scheme: str) -> Optional[str]:
+def _normalize_scheme(model_uri: str, scheme: str) -> Optional[str]:
     if model_uri.startswith(scheme):
         return model_uri[len(scheme) :]
     return None
 
 
 def _strip_models_prefix(model_uri: str) -> Optional[str]:
-    remainder = _normalise_scheme(model_uri, "models://")
+    remainder = _normalize_scheme(model_uri, "models://")
     if remainder is not None:
         return remainder
-    return _normalise_scheme(model_uri, "models:/")
+    return _normalize_scheme(model_uri, "models:/")
 
 
 def _strip_runs_prefix(model_uri: str) -> Optional[str]:
-    remainder = _normalise_scheme(model_uri, "runs://")
+    remainder = _normalize_scheme(model_uri, "runs://")
     if remainder is not None:
         return remainder
-    return _normalise_scheme(model_uri, "runs:/")
+    return _normalize_scheme(model_uri, "runs:/")
 
 
 def is_mlflow_uri(reference: str | Path | None) -> bool:
