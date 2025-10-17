@@ -1774,6 +1774,32 @@ class CorpusSnapshot(Base):
     meta: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
 
 
+class AuditLog(Base):
+    """Append-only record of AI workflow activity."""
+
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_prompt_hash", "prompt_hash"),
+        Index("ix_audit_logs_workflow_created_at", "workflow", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workflow: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="generated")
+    prompt_hash: Mapped[str] = mapped_column(String, nullable=False)
+    model_preset: Mapped[str | None] = mapped_column(String, nullable=True)
+    inputs: Mapped[dict | list] = mapped_column(_JSONB, nullable=False, default=dict)
+    outputs: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+    citations: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        _JSONB, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
 __all__ = sorted(
     name
     for name, obj in globals().items()
