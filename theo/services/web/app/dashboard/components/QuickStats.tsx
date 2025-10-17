@@ -1,3 +1,5 @@
+"use client";
+
 import styles from "./QuickStats.module.css";
 import type { DashboardMetric } from "../types";
 
