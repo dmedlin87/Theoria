@@ -578,12 +578,6 @@ def persist_text_document(
         verses=collected_verse_refs,
         concepts=topics,
     )
-    _project_document_if_possible(
-        context,
-        document,
-        verses=collected_verse_refs,
-        concepts=topics,
-    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):
