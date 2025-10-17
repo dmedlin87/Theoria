@@ -212,3 +212,72 @@ def test_evaluate_agent_trails_counts_zero_llm_tokens(session: Session) -> None:
     assert report.average_llm_tokens_out == pytest.approx(0.0)
     assert report.tool_usage[0].tokens_in == 10
     assert report.tool_usage[0].tokens_out == 0
+
+
+def test_evaluate_agent_trails_returns_empty_for_empty_database(
+    session: Session,
+) -> None:
+    """When no trails exist the report should contain only zeroed metrics."""
+
+    report = evaluate_agent_trails(session)
+
+    assert report.total_trails == 0
+    assert report.tool_usage == []
+    assert report.average_llm_tokens_in == 0.0
+    assert report.average_llm_tokens_out == 0.0
+    assert report.retrieval_coverage == 0.0
+    assert report.plan_coverage == 0.0
+
+
+def test_evaluate_agent_trails_skips_when_workflows_empty(session: Session) -> None:
+    """Empty workflow filters should not execute a database query."""
+
+    trail = _make_trail(
+        workflow="verse_copilot",
+        status="completed",
+        started_at=datetime(2024, 7, 1, tzinfo=UTC),
+        plan_md=None,
+        steps=[AgentStep(step_index=0, tool="search.hybrid")],
+        snapshots=[],
+    )
+    session.add(trail)
+    session.commit()
+
+    report = evaluate_agent_trails(session, workflows=[])
+
+    assert report.total_trails == 0
+    assert report.tool_usage == []
+
+
+def test_evaluate_agent_trails_excludes_until_boundary(session: Session) -> None:
+    """The until window should be treated as an exclusive upper bound."""
+
+    base_time = datetime(2024, 8, 1, tzinfo=UTC)
+    inside_window = _make_trail(
+        workflow="verse_copilot",
+        status="completed",
+        started_at=base_time,
+        plan_md=None,
+        steps=[AgentStep(step_index=0, tool="search.hybrid")],
+        snapshots=[],
+    )
+    boundary_trail = _make_trail(
+        workflow="verse_copilot",
+        status="completed",
+        started_at=base_time + timedelta(days=7),
+        plan_md=None,
+        steps=[AgentStep(step_index=0, tool="search.hybrid")],
+        snapshots=[],
+    )
+    session.add_all([inside_window, boundary_trail])
+    session.commit()
+
+    report = evaluate_agent_trails(
+        session,
+        since=base_time - timedelta(days=1),
+        until=base_time + timedelta(days=7),
+        workflows=["verse_copilot"],
+    )
+
+    assert report.total_trails == 1
+    assert report.completed_trails == 1
