@@ -53,6 +53,11 @@
 ### Known Gaps / Deferrals
 - No automated load/perf benchmarking in CI (documented in ROADMAP).<br>- Geo services integration tests require large shapefiles; plan to stub via contract tests instead.<br>- Third-party API contract tests (OpenAlex, external sermon sources) to be covered via recorded cassettes in separate initiative.<br>- Accessibility snapshot tooling (axe) to be introduced after initial Playwright smoke coverage is stable.
 
+### Regression Data Factories
+- `tests/fixtures/regression_factory.py` synthesises documents, passages, and OSIS references using `Faker` and `pythonbible`.
+- Tests can request the `regression_factory` fixture (seeded to `2025`) to build deterministic RAG prompts, guardrail payloads, and other regression datasets.
+- Re-create golden/performance artefacts by instantiating `RegressionDataFactory` with the default seed; randomness is seeded so repeated runs produce identical output.
+
 ## Next Steps Checklist
 - [ ] Stand up reusable Postgres + pgvector Testcontainer fixtures.
 - [ ] Add Hypothesis-based property suites for OSIS parser and chunking heuristics.
