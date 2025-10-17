@@ -116,9 +116,11 @@ class QueryRewriter:
         lowered = query.lower()
         expansions: list[str] = []
         for token, synonyms in self._synonym_index.items():
-            if token in lowered:
+            # Use word-boundary regex to match token as a whole word
+            pattern = re.compile(r"\b{}\b".format(re.escape(token)), re.IGNORECASE)
+            if pattern.search(query):
                 for synonym in synonyms:
-                    if synonym and synonym.lower() not in lowered:
+                    if synonym and not re.search(r"\b{}\b".format(re.escape(synonym)), lowered):
                         expansions.append(synonym)
         return expansions
 
