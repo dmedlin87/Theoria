@@ -364,7 +364,7 @@ class RetrievalService:
             for item in results:
                 base_meta = dict(item.meta) if item.meta else {}
                 base_meta.setdefault("query_rewrite", rewrite_metadata)
-                item.meta = base_meta or None
+                item.meta = base_meta
 
         return results, reranker_header
 
