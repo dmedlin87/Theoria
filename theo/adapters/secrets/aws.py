@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Mapping
 from typing import Any, Protocol
 
 from theo.application.ports.secrets import SecretRequest, SecretRetrievalError, SecretsPort
@@ -61,6 +62,10 @@ class AWSSecretsAdapter(SecretsPort):
                     raise SecretRetrievalError(
                         "SecretString is not valid JSON for field extraction"
                     ) from exc
+                if not isinstance(parsed, Mapping):
+                    raise SecretRetrievalError(
+                        "SecretString JSON payload must be an object for field extraction"
+                    )
                 value = parsed.get(field)
                 if value is None:
                     raise SecretRetrievalError(
