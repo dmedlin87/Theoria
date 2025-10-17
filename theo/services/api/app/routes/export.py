@@ -16,7 +16,11 @@ from sqlalchemy.orm import Session
 from theo.application.facades.database import get_session
 from ..db.models import Document
 from ..errors import ExportError, Severity
-from ..export.citations import build_citation_export, render_citation_markdown
+from ..export.citations import (
+    build_citation_export,
+    CitationSource,
+    render_citation_markdown,
+)
 from ..export.formatters import (
     DEFAULT_FILENAME_PREFIX,
     build_document_export,
@@ -24,11 +28,14 @@ from ..export.formatters import (
     generate_export_id,
     render_bundle,
 )
+from ..export.zotero import export_to_zotero, verify_zotero_credentials, ZoteroExportError
 from ..models.export import (
     CitationExportRequest,
     DeliverableRequest,
     DeliverableResponse,
     DocumentExportFilters,
+    ZoteroExportRequest,
+    ZoteroExportResponse,
 )
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.export import export_documents, export_search_results
@@ -538,3 +545,84 @@ def export_documents_endpoint(
         f"attachment; filename={_build_filename('documents', filename_extension)}"
     )
     return Response(content=body_bytes, media_type=media_type, headers=headers)
+
+
+@router.post("/zotero", response_model=ZoteroExportResponse, responses=_BAD_REQUEST_RESPONSE)
+async def export_to_zotero_endpoint(
+    payload: ZoteroExportRequest,
+    session: Session = Depends(get_session),
+) -> ZoteroExportResponse:
+    """Export selected documents to a Zotero library.
+    
+    Requires a valid Zotero API key with write permissions.
+    Either user_id (for personal library) or group_id (for group library) must be provided.
+    """
+    
+    if not payload.user_id and not payload.group_id:
+        raise ExportError(
+            "Either user_id or group_id must be provided",
+            code="EXPORT_MISSING_ZOTERO_TARGET",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Specify your Zotero user ID for personal library or group ID for group library.",
+        )
+    
+    if not payload.document_ids:
+        raise ExportError(
+            "No documents selected for export",
+            code="EXPORT_NO_DOCUMENTS",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Select at least one document to export to Zotero.",
+        )
+    
+    # Fetch documents
+    rows = session.execute(
+        select(Document).where(Document.id.in_(payload.document_ids))
+    ).scalars()
+    document_index = {row.id: row for row in rows}
+    missing = [doc_id for doc_id in payload.document_ids if doc_id not in document_index]
+    
+    if missing:
+        raise ExportError(
+            f"Unknown document(s): {', '.join(sorted(missing))}",
+            code="EXPORT_UNKNOWN_DOCUMENT",
+            status_code=status.HTTP_404_NOT_FOUND,
+            severity=Severity.USER,
+            hint="Confirm the requested documents exist before exporting.",
+        )
+    
+    documents = [document_index[doc_id] for doc_id in payload.document_ids]
+    
+    # Build citation sources
+    _, records, csl_entries = build_citation_export(
+        documents,
+        style="csl-json",
+        anchors=None,
+        filters={},
+        export_id=None,
+    )
+    
+    # Extract citation sources
+    sources: list[CitationSource] = []
+    for doc in documents:
+        sources.append(CitationSource.from_object(doc))
+    
+    # Export to Zotero
+    try:
+        result = await export_to_zotero(
+            sources=sources,
+            csl_entries=csl_entries,
+            api_key=payload.api_key,
+            user_id=payload.user_id,
+            group_id=payload.group_id,
+        )
+        return ZoteroExportResponse(**result)
+    except ZoteroExportError as exc:
+        raise ExportError(
+            str(exc),
+            code="EXPORT_ZOTERO_FAILED",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            severity=Severity.USER,
+            hint="Check your Zotero API key and library ID, then try again.",
+        ) from exc

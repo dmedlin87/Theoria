@@ -587,8 +587,16 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
         comma_for_pairs=True,
     )
     if authors_segment:
-        segments.append(f"{authors_segment}.")
-    segments.append(f'"{title}."')
+        authors_segment = authors_segment.strip()
+        if authors_segment.endswith((".", "!", "?")):
+            segments.append(authors_segment)
+        else:
+            segments.append(f"{authors_segment}.")
+
+    title_segment = f'"{title}"'
+    if not str(title).rstrip().endswith((".", "!", "?")):
+        title_segment = f"{title_segment}."
+    segments.append(title_segment)
     if details_text:
         if not details_text.endswith(('.', '!', '?')):
             details_text = details_text.rstrip('.') + "."

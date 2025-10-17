@@ -208,3 +208,32 @@ class DeliverableRequest(APIModel):
     filters: HybridSearchFilters = Field(default_factory=HybridSearchFilters)
     model: str | None = None
     document_id: str | None = None
+
+
+class ZoteroExportRequest(APIModel):
+    """Parameters for exporting citations to Zotero."""
+
+    document_ids: list[str] = Field(
+        min_length=1,
+        description="Document identifiers to export to Zotero.",
+    )
+    api_key: str = Field(
+        description="Zotero API key with write permissions.",
+    )
+    user_id: str | None = Field(
+        default=None,
+        description="Zotero user ID for personal library export.",
+    )
+    group_id: str | None = Field(
+        default=None,
+        description="Zotero group ID for group library export.",
+    )
+
+
+class ZoteroExportResponse(APIModel):
+    """Response from Zotero export operation."""
+
+    success: bool
+    exported_count: int
+    failed_count: int = 0
+    errors: list[str] = Field(default_factory=list)
