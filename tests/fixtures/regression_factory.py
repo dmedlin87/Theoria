@@ -170,7 +170,7 @@ class RegressionDataFactory:
 
         citation_list = list(citations) if citations is not None else self.rag_citations(2)
         summary = " ".join(self._faker.sentences(nb=2))
-        detail = " \n\n".join(self._faker.paragraphs(nb=1))
+        detail = self._faker.paragraphs(nb=1)[0]
         model = model_name or "theo-regression-gpt"
         sources = ", ".join(
             f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citation_list
