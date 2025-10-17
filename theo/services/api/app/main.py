@@ -23,7 +23,7 @@ from starlette.responses import Response
 from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, get_engine
 from theo.application.facades.runtime import allow_insecure_startup
-from theo.application.facades.settings import get_settings
+from theo.application.facades.settings import get_settings, get_settings_secret
 from .db.run_sql_migrations import run_sql_migrations
 from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware
@@ -322,8 +322,7 @@ def _enforce_authentication_requirements() -> None:
 
 
 def _enforce_secret_requirements() -> None:
-    settings = get_settings()
-    if settings.settings_secret_key:
+    if get_settings_secret():
         return
     if allow_insecure_startup():
         logger.warning(

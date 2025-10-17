@@ -6,6 +6,7 @@ import pytest
 
 from theo.application.facades import settings as settings_module
 from theo.application.facades.runtime import allow_insecure_startup
+from theo.application.ports.secrets import SecretRequest
 
 
 @pytest.fixture(autouse=True)
@@ -14,6 +15,26 @@ def reset_settings_state(monkeypatch: pytest.MonkeyPatch) -> None:
 
     for variable in (
         "SETTINGS_SECRET_KEY",
+        "SETTINGS_SECRET_BACKEND",
+        "THEO_SETTINGS_SECRET_BACKEND",
+        "SETTINGS_SECRET_NAME",
+        "THEO_SETTINGS_SECRET_NAME",
+        "SETTINGS_SECRET_FIELD",
+        "THEO_SETTINGS_SECRET_FIELD",
+        "SECRETS_VAULT_ADDR",
+        "THEO_SECRETS_VAULT_ADDR",
+        "SECRETS_VAULT_TOKEN",
+        "THEO_SECRETS_VAULT_TOKEN",
+        "SECRETS_VAULT_NAMESPACE",
+        "THEO_SECRETS_VAULT_NAMESPACE",
+        "SECRETS_VAULT_MOUNT_POINT",
+        "THEO_SECRETS_VAULT_MOUNT_POINT",
+        "SECRETS_VAULT_VERIFY",
+        "THEO_SECRETS_VAULT_VERIFY",
+        "SECRETS_AWS_PROFILE",
+        "THEO_SECRETS_AWS_PROFILE",
+        "SECRETS_AWS_REGION",
+        "THEO_SECRETS_AWS_REGION",
         "THEO_ALLOW_INSECURE_STARTUP",
         "THEORIA_ENVIRONMENT",
         "THEO_ENVIRONMENT",
@@ -23,12 +44,14 @@ def reset_settings_state(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(variable, raising=False)
 
     settings_module.get_settings.cache_clear()
+    settings_module.get_settings_secret.cache_clear()
     settings_module.get_settings_cipher.cache_clear()
     allow_insecure_startup.cache_clear()
 
     yield
 
     settings_module.get_settings.cache_clear()
+    settings_module.get_settings_secret.cache_clear()
     settings_module.get_settings_cipher.cache_clear()
     allow_insecure_startup.cache_clear()
 
@@ -107,6 +130,31 @@ def test_get_settings_cipher_uses_configured_secret(
     token = cipher.encrypt(b"theoria")
     mirror = Fernet(settings_module._derive_fernet_key("application-secret"))
     assert mirror.decrypt(token) == b"theoria"
+
+
+def test_get_settings_cipher_uses_secrets_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[SecretRequest] = []
+
+    class DummyAdapter:
+        def get_secret(self, request: SecretRequest) -> str:
+            calls.append(request)
+            return "remote-secret"
+
+    monkeypatch.setenv("SETTINGS_SECRET_BACKEND", "vault")
+    monkeypatch.setenv("SETTINGS_SECRET_NAME", "theoria/app")
+    monkeypatch.setattr(
+        settings_module,
+        "build_secrets_adapter",
+        lambda backend, **kwargs: DummyAdapter(),
+    )
+
+    cipher = settings_module.get_settings_cipher()
+
+    assert cipher is not None
+    assert calls and calls[0].identifier == "theoria/app"
+    token = cipher.encrypt(b"secret")
+    mirror = Fernet(settings_module._derive_fernet_key("remote-secret"))
+    assert mirror.decrypt(token) == b"secret"
 
 
 def test_get_settings_cipher_returns_none_without_secret() -> None:

@@ -31,6 +31,7 @@ __all__ = [
     "migrate_secret_settings",
     "Settings",
     "get_settings",
+    "get_settings_secret",
     "get_settings_cipher",
     "SETTINGS_NAMESPACE",
     "SettingNotFoundError",
@@ -81,6 +82,10 @@ _ATTRIBUTE_EXPORTS = {
     ),
     "Settings": ("theo.application.facades.settings", "Settings"),
     "get_settings": ("theo.application.facades.settings", "get_settings"),
+    "get_settings_secret": (
+        "theo.application.facades.settings",
+        "get_settings_secret",
+    ),
     "get_settings_cipher": (
         "theo.application.facades.settings",
         "get_settings_cipher",
