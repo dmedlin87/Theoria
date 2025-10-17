@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from ..exceptions import UnsupportedSourceError
 from ..metadata import detect_source_type, load_frontmatter, merge_metadata
+from ..osis import parse_osis_document
 from ..network import (
     extract_youtube_video_id,
     fetch_web_document,
@@ -152,4 +153,42 @@ class TranscriptSourceFetcher(SourceFetcher):
                     merged_frontmatter.get("source_type") or "transcript"
                 ),
             },
+        }
+
+
+@dataclass(slots=True)
+class OsisSourceFetcher(SourceFetcher):
+    """Load an OSIS/XML payload and normalise its structure."""
+
+    path: Path
+    frontmatter: dict[str, Any]
+    name: str = "osis_source_fetcher"
+
+    def fetch(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
+        instrumentation: Instrumentation = context.instrumentation
+        raw_bytes = self.path.read_bytes()
+        sha256 = hashlib.sha256(raw_bytes).hexdigest()
+        xml_text = raw_bytes.decode("utf-8", errors="replace")
+        document = parse_osis_document(xml_text)
+        merged_frontmatter = merge_metadata({}, load_frontmatter(self.frontmatter))
+        instrumentation.set("ingest.source_type", "osis")
+        instrumentation.set("ingest.osis_commentary_count", len(document.commentaries))
+        instrumentation.set("ingest.osis_verse_count", len(document.verses))
+        metadata = {
+            "sha256": sha256,
+            "source_type": "osis",
+            "origin": str(self.path),
+        }
+        if document.work:
+            metadata["osis_work"] = document.work
+        return {
+            "path": self.path,
+            "raw_bytes": raw_bytes,
+            "sha256": sha256,
+            "frontmatter": merged_frontmatter,
+            "osis_document": document,
+            "source_type": "osis",
+            "raw_content": xml_text,
+            "raw_filename": self.path.name,
+            "document_metadata": metadata,
         }

@@ -14,7 +14,7 @@ from ..metadata import (
     prepare_transcript_chunks,
 )
 from ..exceptions import UnsupportedSourceError
-from ..metadata import html_to_text, parse_text_file
+from ..metadata import ensure_list, html_to_text, parse_text_file
 from ..parsers import (
     ParserResult,
     load_transcript,
@@ -22,6 +22,7 @@ from ..parsers import (
     parse_docx_document,
     parse_html_document,
 )
+from ..osis import OsisDocument, ResolvedCommentaryAnchor
 from . import Parser
 
 
@@ -152,3 +153,78 @@ class UrlParser(Parser):
         if source_type == "youtube":
             return self.transcript_parser.parse(context=context, state=state)
         return self.web_parser.parse(context=context, state=state)
+
+
+@dataclass(slots=True)
+class OsisCommentaryParser(Parser):
+    """Resolve commentary anchors from OSIS documents."""
+
+    name: str = "osis_commentary_parser"
+
+    def parse(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
+        document: OsisDocument = state["osis_document"]
+        frontmatter = dict(state.get("frontmatter") or {})
+
+        default_source = (
+            frontmatter.get("source")
+            or frontmatter.get("commentary_source")
+            or document.metadata.get("source")
+            or document.work
+            or "community"
+        )
+        perspective_raw = (
+            frontmatter.get("perspective")
+            or frontmatter.get("commentary_perspective")
+            or "neutral"
+        )
+        default_perspective = str(perspective_raw).strip().lower() or "neutral"
+        tag_source = frontmatter.get("tags") or frontmatter.get("commentary_tags")
+        default_tags = ensure_list(tag_source) or None
+
+        entries: list[ResolvedCommentaryAnchor] = []
+        seen: set[tuple[str, str]] = set()
+        anchor_counts: dict[str, int] = {}
+
+        for commentary in document.commentaries:
+            excerpt = commentary.excerpt.strip()
+            if not excerpt or not commentary.anchors:
+                continue
+            title = commentary.title or document.title
+            for anchor in commentary.anchors:
+                key = (anchor, excerpt)
+                if key in seen:
+                    continue
+                seen.add(key)
+                index = anchor_counts.get(anchor, 0)
+                anchor_counts[anchor] = index + 1
+                note_identifier = commentary.note_id or f"{anchor}#{index}"
+                entries.append(
+                    ResolvedCommentaryAnchor(
+                        osis=anchor,
+                        excerpt=excerpt,
+                        title=title,
+                        perspective=default_perspective,
+                        source=default_source,
+                        tags=default_tags,
+                        note_id=note_identifier,
+                    )
+                )
+
+        if not entries:
+            raise UnsupportedSourceError(
+                "OSIS payload did not contain any commentary anchors"
+            )
+
+        frontmatter.setdefault("source_type", "osis")
+        if document.work and "osis_work" not in frontmatter:
+            frontmatter["osis_work"] = document.work
+        if document.title and "title" not in frontmatter:
+            frontmatter["title"] = document.title
+
+        instrumentation = context.instrumentation
+        instrumentation.set("ingest.commentary_entries", len(entries))
+
+        return {
+            "commentary_entries": entries,
+            "frontmatter": frontmatter,
+        }
