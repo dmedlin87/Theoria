@@ -79,10 +79,12 @@ class DiscoveryScheduler:
             logger.info(f"Triggering discovery refresh for user {user_id}")
             service = DiscoveryService(session)
             discoveries = service.refresh_user_discoveries(user_id)
+            session.commit()
             logger.info(f"Generated {len(discoveries)} discoveries for user {user_id}")
             return discoveries
         except Exception as exc:
             logger.exception(f"Failed to refresh discoveries for user {user_id}: {exc}")
+            session.rollback()
             return []
 
     def _refresh_all_users(self):
@@ -106,15 +108,18 @@ class DiscoveryScheduler:
                 if not user_id:
                     continue
                 try:
+                    # Reuse session for all users in batch
                     self.trigger_user_refresh(session, user_id)
                 except Exception as exc:
                     logger.exception(f"Failed to refresh user {user_id}: {exc}")
+                    # Continue with next user after error
                     continue
 
             logger.info("Discovery refresh completed for all users")
 
         except Exception as exc:
             logger.exception(f"Discovery refresh task failed: {exc}")
+            session.rollback()
         finally:
             session.close()
 

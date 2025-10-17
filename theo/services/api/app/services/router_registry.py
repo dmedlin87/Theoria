@@ -29,6 +29,7 @@ _DEFAULT_REGISTRATIONS = (
     RouterRegistration(router=jobs.router, prefix="/jobs", tags=("jobs",)),
     RouterRegistration(router=search.router, prefix="/search", tags=("search",)),
     RouterRegistration(router=export.router, prefix="/export", tags=("export",)),
+    RouterRegistration(router=export.api_router, prefix=None, tags=("export",)),
     RouterRegistration(router=verses.router, prefix="/verses", tags=("verses",)),
     RouterRegistration(
         router=discoveries.router,

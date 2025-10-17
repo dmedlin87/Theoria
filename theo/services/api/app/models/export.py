@@ -218,6 +218,7 @@ class ZoteroExportRequest(APIModel):
         description="Document identifiers to export to Zotero.",
     )
     api_key: str = Field(
+        min_length=1,
         description="Zotero API key with write permissions.",
     )
     user_id: str | None = Field(

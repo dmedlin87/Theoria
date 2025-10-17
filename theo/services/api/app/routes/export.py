@@ -53,6 +53,7 @@ _DELIVERABLE_ERROR_RESPONSES = {
 
 
 router = APIRouter()
+api_router = APIRouter(prefix="/api")
 
 
 def _parse_fields(fields: str | None) -> set[str] | None:
@@ -626,3 +627,6 @@ async def export_to_zotero_endpoint(
             severity=Severity.USER,
             hint="Check your Zotero API key and library ID, then try again.",
         ) from exc
+
+
+api_router.include_router(router, prefix="/export")
