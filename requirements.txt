@@ -37,4 +37,4 @@ threadpoolctl>=3.1,<4
 defusedxml>=0.7.1,<0.8
 transformers>=4.30,<5
 torch>=2.0,<3
-sentencepiece>=0.1.99,<0.2
+sentencepiece>=0.2.0,<0.3
