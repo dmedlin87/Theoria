@@ -29,6 +29,7 @@ type ApiConfigContextValue = {
   setCredentials: (credentials: ApiCredentials) => void;
   updateCredentials: (credentials: Partial<ApiCredentials>) => void;
   clearCredentials: () => void;
+  graphqlExplorerEnabled: boolean;
 };
 
 const ApiConfigContext = createContext<ApiConfigContextValue | undefined>(undefined);
@@ -41,9 +42,34 @@ function getDefaultCredentials(): ApiCredentials {
   return { authorization: null, apiKey: null };
 }
 
+function resolveGraphQLExplorerEnabled(): boolean {
+  if (typeof process !== "undefined") {
+    const value =
+      process.env.NEXT_PUBLIC_ENABLE_GRAPHQL_EXPLORER ??
+      process.env.ENABLE_GRAPHQL_EXPLORER ??
+      process.env.NEXT_PUBLIC_ENABLE_ADMIN_GRAPHQL ??
+      process.env.ENABLE_ADMIN_GRAPHQL;
+    if (typeof value === "string") {
+      return value.trim().toLowerCase() === "true";
+    }
+  }
+  if (typeof window !== "undefined") {
+    const runtimeValue = (window as typeof window & { THEO_ENABLE_GRAPHQL_EXPLORER?: unknown })
+      .THEO_ENABLE_GRAPHQL_EXPLORER;
+    if (typeof runtimeValue === "boolean") {
+      return runtimeValue;
+    }
+    if (typeof runtimeValue === "string") {
+      return runtimeValue.trim().toLowerCase() === "true";
+    }
+  }
+  return false;
+}
+
 export function ApiConfigProvider({ children }: { children: ReactNode }): JSX.Element {
   const [credentials, setCredentialsState] = useState<ApiCredentials>(() => getDefaultCredentials());
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [graphqlExplorerEnabled] = useState(() => resolveGraphQLExplorerEnabled());
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -118,8 +144,14 @@ export function ApiConfigProvider({ children }: { children: ReactNode }): JSX.El
   }, []);
 
   const value = useMemo<ApiConfigContextValue>(
-    () => ({ credentials, setCredentials, updateCredentials, clearCredentials }),
-    [credentials, setCredentials, updateCredentials, clearCredentials],
+    () => ({
+      credentials,
+      setCredentials,
+      updateCredentials,
+      clearCredentials,
+      graphqlExplorerEnabled,
+    }),
+    [credentials, setCredentials, updateCredentials, clearCredentials, graphqlExplorerEnabled],
   );
 
   return <ApiConfigContext.Provider value={value}>{children}</ApiConfigContext.Provider>;
@@ -136,6 +168,11 @@ export function useApiConfig(): ApiConfigContextValue {
 export function useApiHeaders(): Record<string, string> {
   const { credentials } = useApiConfig();
   return useMemo(() => resolveAuthHeaders(credentials), [credentials]);
+}
+
+export function useGraphQLExplorerEnabled(): boolean {
+  const { graphqlExplorerEnabled } = useApiConfig();
+  return graphqlExplorerEnabled;
 }
 
 type ConnectionStatus =

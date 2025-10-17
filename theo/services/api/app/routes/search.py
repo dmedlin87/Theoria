@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
@@ -31,9 +31,25 @@ def reset_reranker_cache() -> None:
     clear_embedding_cache()
 
 
+def _parse_experiment_tokens(tokens: list[str]) -> dict[str, str]:
+    experiments: dict[str, str] = {}
+    for token in tokens:
+        if not token:
+            continue
+        if "=" in token:
+            key, value = token.split("=", 1)
+        elif ":" in token:
+            key, value = token.split(":", 1)
+        else:
+            key, value = token, "1"
+        experiments[key.strip().casefold()] = value.strip()
+    return experiments
+
+
 @router.get("/", response_model=HybridSearchResponse)
 def search(
     response: Response,
+    request: Request,
     q: str | None = Query(default=None, description="Keyword query"),
     osis: str | None = Query(default=None, description="Normalized OSIS reference"),
     collection: str | None = Query(
@@ -56,6 +72,11 @@ def search(
         description="Restrict to documents tagged with a topic domain",
     ),
     k: int = Query(default=10, ge=1, le=50),
+    experiment: list[str] | None = Query(
+        default=None,
+        alias="experiment",
+        description="Search experiment flags in key=value form",
+    ),
     session: Session = Depends(get_session),
     retrieval_service: RetrievalService = Depends(get_retrieval_service),
 ) -> HybridSearchResponse:
@@ -66,7 +87,7 @@ def search(
     if normalized_perspective in {"skeptical", "apologetic", "neutral"}:
         perspective_tradition = normalized_perspective
 
-    request = HybridSearchRequest(
+    request_payload = HybridSearchRequest(
         query=q,
         osis=osis,
         filters=HybridSearchFilters(
@@ -78,7 +99,19 @@ def search(
         ),
         k=k,
     )
-    results, reranker_header = retrieval_service.search(session, request)
+    experiment_tokens: list[str] = []
+    header_tokens = request.headers.get("X-Search-Experiments")
+    if header_tokens:
+        experiment_tokens.extend([token.strip() for token in header_tokens.split(",")])
+    if experiment:
+        experiment_tokens.extend(experiment)
+    experiments = _parse_experiment_tokens(experiment_tokens)
+
+    results, reranker_header = retrieval_service.search(
+        session,
+        request_payload,
+        experiments=experiments,
+    )
 
     if reranker_header:
         response.headers["X-Reranker"] = reranker_header

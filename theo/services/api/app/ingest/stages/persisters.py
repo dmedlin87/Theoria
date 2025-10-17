@@ -7,7 +7,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..persistence import persist_text_document, persist_transcript_document
+from ..exceptions import UnsupportedSourceError
+from ..persistence import (
+    CommentaryImportResult,
+    persist_commentary_entries,
+    persist_text_document,
+    persist_transcript_document,
+)
 from . import Persister
 
 
@@ -113,4 +119,29 @@ class TranscriptDocumentPersister(Persister):
         return {
             "document": document,
             "document_metadata": metadata,
+        }
+
+
+@dataclass(slots=True)
+class CommentarySeedPersister(Persister):
+    """Persist commentary excerpts derived from OSIS imports."""
+
+    session: Session
+    name: str = "commentary_seed_persister"
+
+    def persist(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
+        entries = state.get("commentary_entries")
+        if not entries:
+            raise UnsupportedSourceError("No commentary entries available for persistence")
+        result: CommentaryImportResult = persist_commentary_entries(
+            self.session,
+            entries=entries,
+        )
+        instrumentation = context.instrumentation
+        instrumentation.set("ingest.commentary_inserted", result.inserted)
+        instrumentation.set("ingest.commentary_updated", result.updated)
+        instrumentation.set("ingest.commentary_skipped", result.skipped)
+        return {
+            "commentary_result": result,
+            "commentary_record_ids": [r.id for r in result.records],
         }

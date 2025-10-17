@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import hashlib
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -83,6 +84,14 @@ def _stub_results() -> list[HybridSearchResult]:
     ]
 
 
+class _RecordingExperimentSink:
+    def __init__(self) -> None:
+        self.outcomes: list[object] = []
+
+    def record_reranker_outcome(self, outcome):  # type: ignore[no-untyped-def]
+        self.outcomes.append(outcome)
+
+
 @pytest.fixture(autouse=True)
 def _reset_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("RERANKER_ENABLED", raising=False)
@@ -141,6 +150,112 @@ def test_search_with_reranker_reorders_results(
     assert response.headers.get("X-Reranker") == model_path.name
     reranked_scores = [entry["score"] for entry in payload["results"]]
     assert reranked_scores[0] == pytest.approx(results[1].lexical_score)
+
+
+def test_experiment_header_can_disable_reranker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    storage_root = tmp_path / "storage"
+    reranker_root = storage_root / "rerankers"
+    reranker_root.mkdir(parents=True)
+    model_path = reranker_root / "stub.joblib"
+    joblib.dump(_WeightedModel(feature_index=2), model_path)
+    digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+
+    results = _stub_results()
+
+    def _fake_search(session, request):  # type: ignore[unused-argument]
+        return [item.model_copy(deep=True) for item in results]
+
+    sink = _RecordingExperimentSink()
+
+    monkeypatch.setattr(retrieval_service_module, "hybrid_search", _fake_search)
+    monkeypatch.setattr(
+        retrieval_service_module,
+        "get_experiment_analytics",
+        lambda: sink,
+    )
+    monkeypatch.setenv("RERANKER_ENABLED", "true")
+    monkeypatch.setenv("RERANKER_MODEL_PATH", str(model_path))
+    monkeypatch.setenv("RERANKER_MODEL_SHA256", digest)
+    monkeypatch.setenv("STORAGE_ROOT", str(storage_root))
+    get_settings.cache_clear()
+    search_route.reset_reranker_cache()
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/search",
+            params={"q": "query"},
+            headers={"X-Search-Experiments": "reranker=bm25"},
+        )
+
+    payload = response.json()
+    reordered_ids = [entry["id"] for entry in payload["results"]]
+    assert reordered_ids == [result.id for result in results]
+    assert "X-Reranker" not in response.headers
+    assert sink.outcomes
+    outcome = sink.outcomes[0]
+    assert getattr(outcome, "strategy", "") == "bm25"
+    assert getattr(outcome, "metadata", {}).get("applied") is False
+
+
+def test_experiment_query_param_uses_custom_reranker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    results = _stub_results()
+
+    def _fake_search(session, request):  # type: ignore[unused-argument]
+        return [item.model_copy(deep=True) for item in results]
+
+    sink = _RecordingExperimentSink()
+    monkeypatch.setattr(
+        retrieval_service_module,
+        "get_experiment_analytics",
+        lambda: sink,
+    )
+
+    settings = SimpleNamespace(
+        reranker_enabled=True,
+        reranker_model_path="/tmp/unused.bin",
+        reranker_model_sha256=None,
+    )
+    service = retrieval_service_module.RetrievalService(
+        settings=settings,
+        search_fn=_fake_search,
+        reranker_cache=retrieval_service_module._RerankerCache(lambda *_args, **_kwargs: None),
+        reranker_top_k=3,
+    )
+    service.experimental_reranker_loaders["cross-encoder"] = (
+        lambda _settings, _experiments: (
+            Reranker(_WeightedModel(feature_index=2)),
+            "cross-encoder",
+        )
+    )
+
+    app.dependency_overrides[retrieval_service_module.get_retrieval_service] = (
+        lambda: service
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                "/search",
+                params={"q": "query", "experiment": "reranker=cross-encoder"},
+            )
+    finally:
+        app.dependency_overrides.pop(
+            retrieval_service_module.get_retrieval_service, None
+        )
+
+    payload = response.json()
+    reordered_ids = [entry["id"] for entry in payload["results"]]
+    assert reordered_ids[0] == results[1].id
+    assert response.headers.get("X-Reranker") == "cross-encoder"
+    assert sink.outcomes
+    outcome = sink.outcomes[0]
+    assert getattr(outcome, "strategy", "") == "cross-encoder"
+    assert getattr(outcome, "ordering_changed", False) is True
+    assert getattr(outcome, "metadata", {}).get("applied") is True
 
 
 def test_extract_features_returns_dense_matrix() -> None:

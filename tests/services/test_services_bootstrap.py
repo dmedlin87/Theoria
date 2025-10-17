@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import pytest
 
 from theo.adapters import AdapterRegistry
 from theo.application import ApplicationContainer
+from theo.application.facades.database import Base, configure_engine, get_engine
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.services.bootstrap import resolve_application
 
@@ -22,7 +25,19 @@ def sample_document() -> Document:
     )
 
 
-def test_resolve_application_returns_container_and_registry(sample_document):
+@pytest.fixture
+def database(tmp_path):
+    db_path = tmp_path / "application.db"
+    configure_engine(f"sqlite:///{db_path}")
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+def test_resolve_application_returns_container_and_registry(sample_document, database):
     container, registry = resolve_application()
 
     assert isinstance(container, ApplicationContainer)
@@ -37,13 +52,30 @@ def test_resolve_application_returns_container_and_registry(sample_document):
     }
     assert expected_ports.issubset(registry.factories.keys())
 
-    assert container.bind_command()(sample_document) is None
-    container.bind_retire()(sample_document.id)
-    assert container.bind_get()(sample_document.id) is None
-    assert container.bind_list()() == []
+    command = container.bind_command()
+    retire = container.bind_retire()
+    getter = container.bind_get()
+    lister = container.bind_list()
+
+    assert lister() == []
+
+    ingested_id = command(sample_document)
+    assert ingested_id == sample_document.id
+
+    stored = getter(sample_document.id)
+    assert stored is not None
+    assert stored.metadata.title == sample_document.metadata.title
+    assert stored.metadata.source == sample_document.metadata.source
+    assert stored.scripture_refs == sample_document.scripture_refs
+
+    listed = lister(limit=5)
+    assert any(document.id == sample_document.id for document in listed)
+
+    retire(sample_document.id)
+    assert getter(sample_document.id) is None
 
 
-def test_resolve_application_results_are_cached(sample_document):
+def test_resolve_application_results_are_cached(sample_document, database):
     first_container, first_registry = resolve_application()
     second_container, second_registry = resolve_application()
 

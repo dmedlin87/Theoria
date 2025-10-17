@@ -27,6 +27,7 @@ from theo.application.facades.settings import get_settings
 from .db.run_sql_migrations import run_sql_migrations
 from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware
+from .graphql.router import graphql_router
 from .ingest.exceptions import UnsupportedSourceError
 from .errors import TheoError
 from .routes import (
@@ -260,6 +261,12 @@ def create_app() -> FastAPI:
         return _attach_trace_headers(response, trace_headers)
 
     security_dependencies = [Depends(require_principal)]
+    app.include_router(
+        graphql_router,
+        prefix="/graphql",
+        dependencies=security_dependencies,
+    )
+
     for registration in iter_router_registrations():
         include_kwargs: dict[str, object] = {
             "router": registration.router,
