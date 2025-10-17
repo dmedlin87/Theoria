@@ -30,7 +30,7 @@ class _StubReranker:
 
 
 class _StubCache:
-    def __init__(self, reranker: _StubReranker | None | dict[object, _StubReranker | None]):
+    def __init__(self, reranker: _StubReranker | None | dict[str, _StubReranker | None]):
         self._reranker = reranker
         self.calls: list[tuple[str | None, str | None]] = []
         self.key: tuple[str, str | None] | None = None
