@@ -1,88 +1,74 @@
-"use client";
-
-import { useState, useEffect } from "react";
 import styles from "./QuickStats.module.css";
+import type { DashboardMetric } from "../types";
 
-interface Stats {
-  documents: number;
-  verses: number;
-  discoveries: number;
-  sessions: number;
+interface QuickStatsProps {
+  metrics: DashboardMetric[];
+  loading: boolean;
 }
 
-export function QuickStats() {
-  const [stats, setStats] = useState<Stats>({
-    documents: 0,
-    verses: 0,
-    discoveries: 0,
-    sessions: 0,
-  });
-  const [loading, setLoading] = useState(true);
+const STAT_CONFIG = [
+  {
+    metricId: "documents",
+    label: "Documents indexed",
+    icon: "📚",
+  },
+  {
+    metricId: "notes",
+    label: "Research notes",
+    icon: "📝",
+  },
+  {
+    metricId: "discoveries",
+    label: "Discoveries surfaced",
+    icon: "✨",
+  },
+  {
+    metricId: "notebooks",
+    label: "Active notebooks",
+    icon: "📓",
+  },
+] as const;
 
-  useEffect(() => {
-    loadStats();
-  }, []);
+function formatValue(metric: DashboardMetric | undefined, loading: boolean) {
+  if (!metric) {
+    return loading ? "…" : "0";
+  }
 
-  const loadStats = async () => {
-    try {
-      // TODO: Replace with real API calls
-      // For now, use mock data
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setStats({
-        documents: 127,
-        verses: 8543,
-        discoveries: 12,
-        sessions: 34,
-      });
-    } catch (error) {
-      console.error("Error loading stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  return Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 0,
+  }).format(metric.value);
+}
 
-  const statItems = [
-    {
-      label: "Documents",
-      value: stats.documents,
-      icon: "📚",
-      color: "blue",
-    },
-    {
-      label: "Verses Indexed",
-      value: stats.verses.toLocaleString(),
-      icon: "📖",
-      color: "green",
-    },
-    {
-      label: "New Discoveries",
-      value: stats.discoveries,
-      icon: "🔍",
-      color: "purple",
-    },
-    {
-      label: "This Week",
-      value: `${stats.sessions} sessions`,
-      icon: "⚡",
-      color: "orange",
-    },
-  ];
+function formatDelta(metric: DashboardMetric | undefined) {
+  if (!metric || metric.delta_percentage === null) {
+    return "–";
+  }
 
+  const rounded = metric.delta_percentage.toFixed(1);
+  const prefix = metric.delta_percentage > 0 ? "+" : "";
+  return `${prefix}${rounded}% vs. last 7 days`;
+}
+
+export function QuickStats({ metrics, loading }: QuickStatsProps) {
   return (
-    <section className={styles.section}>
-      <h2 className={styles.title}>Quick Stats</h2>
+    <section className={styles.section} aria-busy={loading} aria-live="polite">
+      <h2 className={styles.title}>Quick stats</h2>
       <div className={styles.grid}>
-        {statItems.map((item) => (
-          <div key={item.label} className={styles.stat}>
-            <span className={styles.icon}>{item.icon}</span>
-            <div className={styles.content}>
-              <div className={styles.value}>
-                {loading ? "..." : item.value}
+        {STAT_CONFIG.map((config) => {
+          const metric = metrics.find((item) => item.id === config.metricId);
+          return (
+            <article key={config.metricId} className={styles.stat}>
+              <span className={styles.icon} aria-hidden>
+                {config.icon}
+              </span>
+              <div className={styles.content}>
+                <div className={styles.value}>{formatValue(metric, loading)}</div>
+                <div className={styles.label}>{config.label}</div>
+                <p className={styles.delta}>{formatDelta(metric)}</p>
               </div>
-              <div className={styles.label}>{item.label}</div>
-            </div>
-          </div>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

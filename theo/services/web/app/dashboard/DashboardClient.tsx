@@ -8,6 +8,7 @@ import { ActivityFeed } from "./components/ActivityFeed";
 import { MetricsGrid } from "./components/MetricsGrid";
 import { ProfileSummary } from "./components/ProfileSummary";
 import { QuickActionsPanel } from "./components/QuickActionsPanel";
+import { QuickStats } from "./components/QuickStats";
 import type { DashboardSummary } from "./types";
 
 interface DashboardClientProps {
@@ -136,6 +137,7 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
         </div>
         <div className={styles.sideColumn}>
           <ProfileSummary user={data?.user ?? null} />
+          <QuickStats metrics={data?.metrics ?? []} loading={status === "loading" && !data} />
           <QuickActionsPanel actions={data?.quick_actions ?? []} />
         </div>
       </div>
