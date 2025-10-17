@@ -52,7 +52,7 @@ class RedisStreamEventPublisher(EventPublisher):
         try:
             self._client.xadd(self._stream, arguments, **kwargs)
         except Exception as exc:  # pragma: no cover - logging for observability
-            LOGGER.exception("Failed to append event to Redis stream", exc_info=exc)
+            LOGGER.exception("Failed to append event to Redis stream")
             raise
 
 
