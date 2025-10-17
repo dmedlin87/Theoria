@@ -160,21 +160,30 @@ def purge_audit_logs(
     older_than: datetime | None = None,
     keep_latest: int | None = None,
 ) -> int:
-    rows = session.execute(
-        select(AuditLog.id, AuditLog.created_at).order_by(AuditLog.created_at.desc())
-    ).all()
+    # Build a subquery to select IDs to delete
+    ids_subq = None
     if keep_latest is not None and keep_latest > 0:
-        rows = rows[keep_latest:]
-    elif keep_latest is not None and keep_latest <= 0:
-        pass
-    if older_than is not None:
-        rows = [row for row in rows if row.created_at is not None and row.created_at < older_than]
-    ids = [row.id for row in rows]
-    if not ids:
+        # Select all IDs ordered by created_at DESC, skip the most recent `keep_latest`
+        ids_subq = (
+            select(AuditLog.id)
+            .order_by(AuditLog.created_at.desc())
+            .offset(keep_latest)
+        )
+        if older_than is not None:
+            ids_subq = ids_subq.where(AuditLog.created_at < older_than)
+    elif older_than is not None:
+        # Only filter by older_than
+        ids_subq = select(AuditLog.id).where(AuditLog.created_at < older_than)
+    else:
+        # Nothing to delete
         return 0
-    session.execute(delete(AuditLog).where(AuditLog.id.in_(ids)))
+
+    # Use the subquery in the delete statement
+    result = session.execute(
+        delete(AuditLog).where(AuditLog.id.in_(ids_subq))
+    )
     session.commit()
-    return len(ids)
+    return result.rowcount or 0
 
 
 __all__ = [
