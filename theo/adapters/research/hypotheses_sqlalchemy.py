@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from theo.domain.research import Hypothesis, HypothesisDraft, HypothesisNotFoundError
 from theo.domain.repositories import HypothesisRepository
-from theo.services.api.app.db.models import Hypothesis as HypothesisModel
+from theo.adapters.persistence.models import Hypothesis as HypothesisModel
 
 
 def _normalize_list(values: Sequence[str] | None) -> list[str] | None:

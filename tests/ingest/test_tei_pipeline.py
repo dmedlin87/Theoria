@@ -15,7 +15,7 @@ from theo.application.facades.database import (  # noqa: E402
     configure_engine,
     get_engine,
 )
-from theo.services.api.app.db.models import Document, Passage  # noqa: E402
+from theo.adapters.persistence.models import Document, Passage  # noqa: E402
 from theo.services.api.app.ingest.tei_pipeline import (  # noqa: E402
     HTRResult,
     ingest_pilot_corpus,

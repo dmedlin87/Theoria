@@ -10,7 +10,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import get_settings_cipher
-from theo.services.api.app.db.models import AppSetting
+from theo.adapters.persistence.models import AppSetting
 
 SETTINGS_NAMESPACE = "app"
 _ENCRYPTED_FIELD = "__encrypted__"

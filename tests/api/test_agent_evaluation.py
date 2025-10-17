@@ -14,7 +14,7 @@ from theo.services.api.app.analytics.agent_evaluation import (
     evaluate_agent_trails,
 )
 from theo.application.facades.database import Base
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     AgentStep,
     AgentTrail,
     TrailRetrievalSnapshot,

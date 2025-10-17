@@ -59,6 +59,17 @@ def test_application_depends_only_on_domain_and_platform() -> None:
             )
 
 
+def test_application_does_not_import_service_database() -> None:
+    forbidden_prefix = "theo.services.api.app.db"
+    for path in _iter_python_files("theo.application"):
+        for module in _gather_imports(path):
+            if not module.startswith("theo"):
+                continue
+            assert not module.startswith(forbidden_prefix), (
+                f"Application module {path} imports forbidden database dependency '{module}'"
+            )
+
+
 def test_adapters_do_not_cross_import() -> None:
     forbidden_edges = {
         "theo.adapters.interfaces": ("theo.adapters.persistence", "theo.adapters.search", "theo.adapters.ai"),

@@ -16,7 +16,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings_store import save_setting
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     GeoAncientPlace,
     GeoGeometry,
     GeoImage,

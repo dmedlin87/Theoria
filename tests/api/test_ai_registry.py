@@ -52,7 +52,7 @@ from theo.application.facades.settings_store import (  # noqa: E402
     load_setting,
     save_setting,
 )
-from theo.services.api.app.db.models import AppSetting  # noqa: E402
+from theo.adapters.persistence.models import AppSetting  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 
 

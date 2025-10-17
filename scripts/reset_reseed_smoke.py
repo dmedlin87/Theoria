@@ -43,7 +43,7 @@ def _load_settings():
 def _ensure_models_loaded() -> None:
     """Import model modules so SQLAlchemy metadata is populated."""
 
-    import theo.services.api.app.db.models  # noqa: F401  (side-effect import)
+    import theo.adapters.persistence.models  # noqa: F401  (side-effect import)
 
 
 def _run_sql_migrations(engine: Engine, migrations_dir: Path) -> None:

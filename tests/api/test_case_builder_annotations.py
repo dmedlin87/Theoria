@@ -18,7 +18,7 @@ from theo.application.facades.database import (  # noqa: E402
     get_engine,
     get_settings,
 )
-from theo.services.api.app.db.models import CaseObject, Document  # noqa: E402
+from theo.adapters.persistence.models import CaseObject, Document  # noqa: E402
 from theo.services.api.app.ingest import pipeline  # noqa: E402
 from theo.services.api.app.models.documents import (  # noqa: E402
     DocumentAnnotationCreate,

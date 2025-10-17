@@ -57,9 +57,8 @@ if os.name == "nt" and not getattr(Path, "__theo_unlink_retry__", False):
     Path.unlink = _unlink_with_retry  # type: ignore[assignment]
     Path.__theo_unlink_retry__ = True  # type: ignore[attr-defined]
 
+from theo.adapters.persistence import Base, dispose_sqlite_engine
 from theo.application.facades.settings import get_settings
-from theo.services.api.app.db.models import Base
-from theo.services.api.app.db.seeds import _dispose_sqlite_engine
 
 __all__ = ["Base", "configure_engine", "get_engine", "get_session"]
 
@@ -79,7 +78,7 @@ class _TheoSession(Session):
             bind = None
         super().close()
         if bind is not None:
-            _dispose_sqlite_engine(bind, dispose_engine=False)
+            dispose_sqlite_engine(bind, dispose_engine=False)
 
 
 def _create_engine(database_url: str) -> Engine:
@@ -103,7 +102,7 @@ def _create_engine(database_url: str) -> Engine:
             def _call_original():
                 original_dispose(*args, **kwargs)
 
-            _dispose_sqlite_engine(
+            dispose_sqlite_engine(
                 engine,
                 dispose_engine=True,
                 dispose_callable=_call_original,

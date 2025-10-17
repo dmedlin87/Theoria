@@ -11,7 +11,7 @@ from theo.services.api.app.creators.service import (
     fetch_creator_topic_profile,
     search_creators,
 )
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     Base,
     Creator,
     CreatorClaim,

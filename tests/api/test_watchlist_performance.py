@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, configure_engine, get_engine
-from theo.services.api.app.db.models import Document, WatchlistEvent
+from theo.adapters.persistence.models import Document, WatchlistEvent
 
 
 def _initialise_database(db_path: Path) -> tuple[Session, Engine]:

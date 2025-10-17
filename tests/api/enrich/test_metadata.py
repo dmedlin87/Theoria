@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
-from theo.services.api.app.db.models import Document
+from theo.adapters.persistence.models import Document
 from theo.services.api.app.enrich.metadata import (
     MetadataEnricher,
     _dedupe_preserve_order,

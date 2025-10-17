@@ -24,7 +24,7 @@ from ..validators import (
     validate_query,
 )
 from theo.application.facades.database import get_session
-from theo.services.api.app.db.models import Document, TranscriptQuote
+from theo.adapters.persistence.models import Document, TranscriptQuote
 from theo.services.api.app.models.search import (
     HybridSearchFilters,
     HybridSearchRequest,

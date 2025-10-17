@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_engine
-from theo.services.api.app.db.models import Document, DocumentAnnotation, Passage
+from theo.adapters.persistence.models import Document, DocumentAnnotation, Passage
 from theo.services.api.app.models.documents import DocumentAnnotationResponse
 from theo.services.api.app.models.search import HybridSearchRequest
 from theo.services.api.app.retriever.hybrid import (

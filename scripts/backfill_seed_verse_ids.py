@@ -29,7 +29,7 @@ def _load_settings():
 
 
 def _ensure_models_loaded() -> None:
-    import theo.services.api.app.db.models  # noqa: F401  (side-effect import)
+    import theo.adapters.persistence.models  # noqa: F401  (side-effect import)
 
 
 def _verse_range(reference: str) -> tuple[int, int] | None:
@@ -69,7 +69,7 @@ def _update_pair_seed(seed, osis_attr: str, start_attr: str, end_attr: str) -> b
 
 
 def _backfill(session: Session) -> tuple[int, int, int]:
-    from theo.services.api.app.db.models import (
+    from theo.adapters.persistence.models import (
         CommentaryExcerptSeed,
         ContradictionSeed,
         HarmonySeed,

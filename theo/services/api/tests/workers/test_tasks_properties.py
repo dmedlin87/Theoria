@@ -9,7 +9,7 @@ from hypothesis.strategies import DrawFn, composite
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.db.models import Base, IngestionJob
+from theo.adapters.persistence.models import Base, IngestionJob
 from theo.services.api.app.workers import tasks
 
 

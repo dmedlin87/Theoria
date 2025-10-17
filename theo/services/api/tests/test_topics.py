@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from theo.services.api.app.analytics.openalex import OpenAlexClient
 from theo.services.api.app.analytics.topics import generate_topic_digest
 from theo.application.facades.database import get_engine
-from theo.services.api.app.db.models import Document
+from theo.adapters.persistence.models import Document
 
 
 def test_topic_digest_deduplicates_document_ids() -> None:

@@ -19,7 +19,7 @@ from theo.application.facades.database import (  # noqa: E402
     get_engine,
     get_session,
 )
-from theo.services.api.app.db.models import (  # noqa: E402
+from theo.adapters.persistence.models import (  # noqa: E402
     FeedbackEvent,
     FeedbackEventAction,
 )

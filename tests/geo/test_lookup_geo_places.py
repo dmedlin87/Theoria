@@ -6,7 +6,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session, sessionmaker
 
 from theo.application.facades.database import Base
-from theo.services.api.app.db.models import GeoModernLocation
+from theo.adapters.persistence.models import GeoModernLocation
 from theo.services.api.app.research.geo import lookup_geo_places
 
 

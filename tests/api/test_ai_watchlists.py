@@ -21,7 +21,7 @@ from theo.application.facades.database import (  # noqa: E402
     get_engine,
     get_session,
 )
-from theo.services.api.app.db.models import UserWatchlist  # noqa: E402
+from theo.adapters.persistence.models import UserWatchlist  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.security import require_principal  # noqa: E402
 
