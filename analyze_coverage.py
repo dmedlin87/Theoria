@@ -34,12 +34,12 @@ def analyze_coverage(coverage_file='coverage.xml'):
     print("\n" + "=" * 80)
     print("PACKAGE COVERAGE (sorted by coverage rate)")
     print("=" * 80)
-    print(f"{'Package':<60} {'Coverage':>8} {'Files':>8}")
+    print(f"{'Package':<40} {'Coverage':>8} {'Files':>8}  Coverage Bar")
     print("-" * 80)
 
     for name, rate, file_count in package_data:
         coverage_bar = "█" * int(rate * 20) + "░" * (20 - int(rate * 20))
-        print(f"{name:<60} {rate:>7.1%} {file_count:>8}")
+        print(f"{name:<40} {rate:>7.1%} {file_count:>8}  {coverage_bar}")
 
     # Find packages below 50%
     low_coverage = [(n, r, f) for n, r, f in package_data if r < 0.5]
