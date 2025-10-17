@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 
 from sqlalchemy.orm import Session
 
-from theo.application.facades.settings import get_settings
+from theo.application.facades.settings import Settings, get_settings
 from ..db.models import Document
 
 LOGGER = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class MetadataEnricher:
 
     ENRICHMENT_VERSION = 1
 
-    def __init__(self, settings=None):
+    def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
     # Public API -----------------------------------------------------------
@@ -132,9 +132,6 @@ class MetadataEnricher:
         return None
 
     def _parse_openalex(self, data: dict[str, Any]) -> EnrichmentResult | None:
-        if not isinstance(data, dict):
-            return None
-
         doi = _normalise_doi(data.get("doi"))
         authors = _extract_authors_from_openalex(data.get("authorships"))
         venue = None
@@ -199,11 +196,9 @@ class MetadataEnricher:
         return payload
 
     def _parse_crossref(self, payload: dict[str, Any]) -> EnrichmentResult | None:
-        message = payload.get("message") if isinstance(payload, dict) else None
+        message = payload.get("message")
         if not isinstance(message, dict):
-            message = payload if isinstance(payload, dict) else None
-        if not isinstance(message, dict):
-            return None
+            message = payload
 
         items = message.get("items")
         if isinstance(items, list) and items:

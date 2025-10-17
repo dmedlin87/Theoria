@@ -283,7 +283,7 @@ def run_pipeline_for_url(
             self._text_persister = TextDocumentPersister(session=session)
             self._transcript_persister = TranscriptDocumentPersister(session=session)
 
-        def persist(self, *, context, state: dict[str, Any]):  # type: ignore[override]
+        def persist(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
             if state.get("source_type") == "youtube":
                 return self._transcript_persister.persist(context=context, state=state)
             return self._text_persister.persist(context=context, state=state)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Sequence
 
 from ...models.search import HybridSearchResult
 from ..rag.models import RAGCitation
@@ -32,7 +32,7 @@ def build_cot_prompt(
     question: str,
     citations: Sequence[RAGCitation],
     mode: str = "detective",
-    contradictions: list[dict] | None = None,
+    contradictions: list[dict[str, Any]] | None = None,
 ) -> str:
     """Build a chain-of-thought prompt for theological reasoning.
 
@@ -59,7 +59,7 @@ def build_cot_prompt(
 def _build_detective_prompt(
     question: str,
     citations: Sequence[RAGCitation],
-    contradictions: list[dict] | None = None,
+    contradictions: list[dict[str, Any]] | None = None,
 ) -> str:
     """Build prompt for detective mode."""
     passages_text = "\n".join(
@@ -107,7 +107,7 @@ Sources: [List all citations in format: [1] Osis.Ref (anchor); [2] Osis.Ref (anc
 def _build_critic_prompt(
     question: str,
     citations: Sequence[RAGCitation],
-    contradictions: list[dict] | None = None,
+    contradictions: list[dict[str, Any]] | None = None,
 ) -> str:
     """Build prompt for critic mode."""
     passages_text = "\n".join(
@@ -142,7 +142,7 @@ Sources: [Citations]
 def _build_apologist_prompt(
     question: str,
     citations: Sequence[RAGCitation],
-    contradictions: list[dict] | None = None,
+    contradictions: list[dict[str, Any]] | None = None,
 ) -> str:
     """Build prompt for apologist mode."""
     passages_text = "\n".join(
@@ -183,7 +183,7 @@ Sources: [Citations]
 def _build_synthesizer_prompt(
     question: str,
     citations: Sequence[RAGCitation],
-    contradictions: list[dict] | None = None,
+    contradictions: list[dict[str, Any]] | None = None,
 ) -> str:
     """Build prompt for neutral synthesizer mode."""
     passages_text = "\n".join(

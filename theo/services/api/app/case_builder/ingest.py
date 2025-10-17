@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Sequence
+from typing import Any, Sequence
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -51,18 +51,18 @@ def _extract_stability(passage: Passage) -> float | None:
     return None
 
 
-def _build_passage_metadata(passage: Passage) -> dict | None:
+def _build_passage_metadata(passage: Passage) -> dict[str, object] | None:
     meta = getattr(passage, "meta", None)
     if isinstance(meta, dict):
         # ``meta`` may be a custom mapping type – coerce to plain ``dict``.
         try:
             return dict(meta)
         except TypeError:
-            return {key: meta[key] for key in meta.keys()}  # type: ignore[index]
+            return {key: meta[key] for key in meta.keys()}
     return None
 
 
-def _source_meta(document: Document) -> dict | None:
+def _source_meta(document: Document) -> dict[str, Any] | None:
     payload: dict[str, object] = {}
     if document.authors:
         payload["authors"] = list(document.authors)

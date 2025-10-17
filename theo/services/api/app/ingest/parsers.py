@@ -447,7 +447,7 @@ class _HTMLExtractor(HTMLParser):
         self._body_chunks: list[str] = []
         self._skip_depth = 0
 
-    def handle_starttag(self, tag: str, attrs):  # type: ignore[override]
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         lower = tag.lower()
         if lower == "title":
             self._current_title = True
@@ -461,7 +461,7 @@ class _HTMLExtractor(HTMLParser):
         elif lower in self._BLOCK_TAGS:
             self._body_chunks.append("\n")
 
-    def handle_endtag(self, tag: str):  # type: ignore[override]
+    def handle_endtag(self, tag: str) -> None:
         lower = tag.lower()
         if lower == "title":
             self._current_title = False
@@ -474,7 +474,7 @@ class _HTMLExtractor(HTMLParser):
         if lower in self._BLOCK_TAGS and lower != "br":
             self._body_chunks.append("\n")
 
-    def handle_data(self, data: str):  # type: ignore[override]
+    def handle_data(self, data: str) -> None:
         if self._skip_depth:
             return
         stripped = data.strip()

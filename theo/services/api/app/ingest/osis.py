@@ -14,6 +14,18 @@ from theo.domain.research.osis import (
     osis_to_readable,
 )
 
+__all__ = [
+    "expand_osis_reference",
+    "format_osis",
+    "osis_to_readable",
+    "DetectedOsis",
+    "combine_references",
+    "detect_osis_references",
+    "canonical_verse_range",
+    "osis_intersects",
+    "classify_osis_matches",
+]
+
 
 @dataclass
 class DetectedOsis:
