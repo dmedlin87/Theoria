@@ -897,6 +897,8 @@ def persist_transcript_document(
     passages: list[Passage] = []
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
+    collected_verse_refs: list[str] = []
+    seen_verse_refs: set[str] = set()
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
