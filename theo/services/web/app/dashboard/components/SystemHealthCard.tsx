@@ -43,7 +43,13 @@ const ADAPTER_STATUS_CLASS: Record<AdapterStatus, string> = {
   unavailable: styles.adapterStatusUnavailable,
 };
 
-const REFRESH_INTERVAL_MS = 60_000;
+// You can configure the refresh interval via the NEXT_PUBLIC_REFRESH_INTERVAL_MS environment variable.
+const REFRESH_INTERVAL_MS =
+  typeof process !== "undefined" &&
+  process.env.NEXT_PUBLIC_REFRESH_INTERVAL_MS &&
+  !isNaN(Number(process.env.NEXT_PUBLIC_REFRESH_INTERVAL_MS))
+    ? Number(process.env.NEXT_PUBLIC_REFRESH_INTERVAL_MS)
+    : 60_000;
 
 function classNames(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
