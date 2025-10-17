@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-import json
 import logging
 from typing import Iterable, Sequence
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import get_settings
+from theo.platform.events import event_bus
+from theo.platform.events.types import CaseObjectsUpsertedEvent
 from ..db.models import (
     CaseObject,
     CaseSource,
@@ -215,25 +216,24 @@ def _update_case_object(
     return case_object, changed
 
 
-def emit_case_object_notifications(session: Session, case_object_ids: Iterable[str]) -> None:
-    """Emit Postgres notifications for the provided case object identifiers."""
+def emit_case_object_notifications(
+    session: Session,
+    case_object_ids: Iterable[str],
+    *,
+    document_id: str | None = None,
+) -> None:
+    """Publish case object notifications via the application event bus."""
 
-    ids = [identifier for identifier in case_object_ids if identifier]
+    ids = [str(identifier) for identifier in case_object_ids if identifier]
     if not ids:
         return
 
-    bind = session.get_bind()
-    if bind is None or bind.dialect.name != "postgresql":
-        return
-
-    settings = get_settings()
-    channel = settings.case_builder_notify_channel
-    for identifier in ids:
-        payload = json.dumps({"case_object_id": identifier})
-        session.execute(
-            text("SELECT pg_notify(:channel, :payload)"),
-            {"channel": channel, "payload": payload},
-        )
+    # ``session`` is retained in the signature for compatibility with existing
+    # call sites that expect to provide a database handle.  The event bus
+    # dispatch is independent of the underlying engine.
+    event_bus.publish(
+        CaseObjectsUpsertedEvent.from_ids(ids, document_id=document_id)
+    )
 
 
 def sync_passages_case_objects(
@@ -284,7 +284,11 @@ def sync_passages_case_objects(
             changed_ids.append(case_object.id)
 
     if changed_ids:
-        emit_case_object_notifications(session, changed_ids)
+        emit_case_object_notifications(
+            session,
+            changed_ids,
+            document_id=document.id,
+        )
     return changed_ids
 
 
@@ -338,5 +342,9 @@ def sync_annotation_case_object(
     )
 
     if changed:
-        emit_case_object_notifications(session, [case_object.id])
+        emit_case_object_notifications(
+            session,
+            [case_object.id],
+            document_id=document.id,
+        )
     return case_object.id

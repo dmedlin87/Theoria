@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, Sequence
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import Settings, get_settings
+from theo.platform.events import event_bus
+from theo.platform.events.types import CaseObjectsUpsertedEvent
 from ..db.models import (
     CaseObject,
     CaseObjectType,
@@ -131,32 +132,18 @@ def _get_or_create_source(session: Session, document: Document) -> CaseSource | 
     return source
 
 
-def _sanitise_channel(name: str) -> str:
-    if not name:
-        return "case_objects_changed"
-    cleaned = name.strip()
-    if not cleaned:
-        return "case_objects_changed"
-    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
-    if not set(cleaned) <= allowed:
-        return "case_objects_changed"
-    return cleaned
-
-
 def _notify_new_objects(
     session: Session,
     object_ids: Sequence[str],
     settings: Settings,
+    *,
+    document_id: str | None,
 ) -> None:
     if not object_ids:
         return
-    bind = session.get_bind()
-    if bind is None or bind.dialect.name != "postgresql":
-        return
-    channel = _sanitise_channel(getattr(settings, "case_builder_notify_channel", "case_objects_changed"))
-    statement = text(f"NOTIFY {channel}, :payload")
-    for object_id in object_ids:
-        session.execute(statement, {"payload": object_id})
+    event_bus.publish(
+        CaseObjectsUpsertedEvent.from_ids(object_ids, document_id=document_id)
+    )
 
 
 def sync_case_objects_for_document(
@@ -272,7 +259,11 @@ def sync_case_objects_for_document(
     if updated_objects:
         notified_ids.extend(obj.id for obj in updated_objects)
     if notified_ids:
-        _notify_new_objects(session, notified_ids, settings)
+        _notify_new_objects(
+            session,
+            notified_ids,
+            document_id=document.id,
+        )
     return created_objects
 
 

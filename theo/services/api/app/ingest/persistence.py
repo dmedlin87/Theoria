@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import tempfile
-import logging
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 from dataclasses import dataclass
@@ -17,6 +17,8 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from theo.platform.events import event_bus
+from theo.platform.events.types import DocumentIngestedEvent
 from theo.application.graph import GraphDocumentProjection
 from ..case_builder import sync_passages_case_objects
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
@@ -602,6 +604,7 @@ def persist_text_document(
     ) or sanitize_passage_text(text_content)
 
     passages: list[Passage] = []
+    case_object_ids: set[str] = set()
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     collected_verse_refs: list[str] = []
@@ -698,23 +701,30 @@ def persist_text_document(
         try:
             from ..case_builder import ingest as case_builder_ingest
 
-            case_builder_ingest.sync_case_objects_for_document(
+            created_objects = case_builder_ingest.sync_case_objects_for_document(
                 session,
                 document=document,
                 passages=passages,
                 settings=settings,
             )
+            for obj in created_objects:
+                identifier = getattr(obj, "id", None)
+                if identifier:
+                    case_object_ids.add(str(identifier))
         except Exception:  # pragma: no cover - defensive logging
             logger.exception(
                 "Case Builder sync failed during text ingestion",
                 extra={"document_id": document.id},
             )
-    sync_passages_case_objects(
+    passage_case_object_ids = sync_passages_case_objects(
         session,
         document=document,
         passages=passages,
         frontmatter=frontmatter,
     )
+    for identifier in passage_case_object_ids:
+        if identifier:
+            case_object_ids.add(str(identifier))
 
     topics = collect_topics(document, frontmatter)
     _project_document_if_possible(
@@ -902,6 +912,24 @@ def persist_text_document(
         document.storage_path = str(storage_dir)
         session.add(document)
         session.commit()
+
+        metadata: dict[str, object] = {}
+        if document.source_type:
+            metadata["source_type"] = document.source_type
+        if document.source_url:
+            metadata["source_url"] = document.source_url
+        if document.collection:
+            metadata["collection"] = document.collection
+        if document.storage_path:
+            metadata["storage_path"] = document.storage_path
+        event_bus.publish(
+            DocumentIngestedEvent.from_components(
+                document_id=str(document.id),
+                workflow="text",
+                passage_ids=[str(passage.id) for passage in passages],
+                case_object_ids=sorted(case_object_ids),
+                metadata=metadata or None,
+            )
         emit_document_persisted_event(
             document=document,
             passages=passages,
@@ -1137,23 +1165,30 @@ def persist_transcript_document(
         try:
             from ..case_builder import ingest as case_builder_ingest
 
-            case_builder_ingest.sync_case_objects_for_document(
+            created_objects = case_builder_ingest.sync_case_objects_for_document(
                 session,
                 document=document,
                 passages=passages,
                 settings=settings,
             )
+            for obj in created_objects:
+                identifier = getattr(obj, "id", None)
+                if identifier:
+                    case_object_ids.add(str(identifier))
         except Exception:  # pragma: no cover - defensive logging
             logger.exception(
                 "Case Builder sync failed during transcript ingestion",
                 extra={"document_id": document.id},
             )
-    sync_passages_case_objects(
+    passage_case_object_ids = sync_passages_case_objects(
         session,
         document=document,
         passages=passages,
         frontmatter=frontmatter,
     )
+    for identifier in passage_case_object_ids:
+        if identifier:
+            case_object_ids.add(str(identifier))
 
     topics = collect_topics(document, frontmatter)
     _project_document_if_possible(
@@ -1342,6 +1377,24 @@ def persist_transcript_document(
         document.storage_path = str(storage_dir)
         session.add(document)
         session.commit()
+
+        metadata: dict[str, object] = {}
+        if document.source_type:
+            metadata["source_type"] = document.source_type
+        if document.source_url:
+            metadata["source_url"] = document.source_url
+        if document.collection:
+            metadata["collection"] = document.collection
+        if document.storage_path:
+            metadata["storage_path"] = document.storage_path
+        event_bus.publish(
+            DocumentIngestedEvent.from_components(
+                document_id=str(document.id),
+                workflow="transcript",
+                passage_ids=[str(passage.id) for passage in passages],
+                case_object_ids=sorted(case_object_ids),
+                metadata=metadata or None,
+            )
         emit_document_persisted_event(
             document=document,
             passages=passages,
