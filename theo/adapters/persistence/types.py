@@ -149,3 +149,10 @@ class IntArrayType(_TypeDecorator[list[int] | None]):
             return [int(component) for component in list(value)]
         except (TypeError, ValueError):
             return None
+
+
+__all__ = [
+    "VectorType",
+    "TSVectorType",
+    "IntArrayType",
+]
