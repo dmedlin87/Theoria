@@ -100,7 +100,7 @@ class VaultSecretsAdapter(SecretsPort):
             return value if isinstance(value, str) else str(value)
 
         if len(data) == 1:
-            value = next(iter(data.values()))
+            value = list(data.values())[0]
             return value if isinstance(value, str) else str(value)
 
         raise SecretRetrievalError(
