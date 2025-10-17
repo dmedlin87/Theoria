@@ -1,4 +1,5 @@
 import base64
+from pathlib import Path
 from cryptography.fernet import Fernet
 
 import pytest
@@ -71,6 +72,30 @@ def test_parse_json_or_comma_collection_invalid_type_raises() -> None:
         settings_module.Settings._parse_json_or_comma_collection(42)
 
 
+def test_parse_string_collection_normalises_iterables() -> None:
+    """String collections accept varied iterable inputs."""
+
+    result_from_string = settings_module.Settings._parse_string_collection(
+        "alpha, beta , , gamma"
+    )
+    assert result_from_string == ["alpha", "beta", "gamma"]
+
+    result_from_tuple = settings_module.Settings._parse_string_collection(
+        (" first ", "second", "")
+    )
+    assert result_from_tuple == ["first", "second"]
+
+    result_from_set = settings_module.Settings._parse_string_collection(
+        {"gamma", "delta", "  epsilon  "}
+    )
+    assert set(result_from_set) == {"gamma", "delta", "epsilon"}
+
+
+def test_parse_string_collection_invalid_type_raises() -> None:
+    with pytest.raises(ValueError):
+        settings_module.Settings._parse_string_collection(42)
+
+
 def test_get_settings_cipher_uses_configured_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -130,3 +155,48 @@ def test_get_settings_cipher_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
     assert first is second
     assert first.key == settings_module._derive_fernet_key("cache-secret")
     assert call_count == 1
+
+
+def test_has_auth_jwt_credentials_detects_multiple_sources(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Any configured secret or key source should enable credentials."""
+
+    monkeypatch.setenv("AUTH_JWT_SECRET", "super-secret")
+    from_env_secret = settings_module.Settings()
+    assert from_env_secret.has_auth_jwt_credentials() is True
+
+    monkeypatch.delenv("AUTH_JWT_SECRET", raising=False)
+
+    monkeypatch.setenv("AUTH_JWT_PUBLIC_KEY", "  KEY  ")
+    inline_key = settings_module.Settings()
+    assert inline_key.has_auth_jwt_credentials() is True
+
+    monkeypatch.delenv("AUTH_JWT_PUBLIC_KEY", raising=False)
+
+    key_dir = tmp_path / "jwt"
+    key_dir.mkdir()
+    key_path = key_dir / "public.pem"
+    key_path.write_text("JWT KEY", encoding="utf-8")
+    monkeypatch.setenv("AUTH_JWT_PUBLIC_KEY_PATH", str(key_path))
+    from_path = settings_module.Settings()
+    assert from_path.has_auth_jwt_credentials() is True
+
+
+def test_has_auth_jwt_credentials_returns_false_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When no credentials are configured the helper should return False."""
+
+    for variable in [
+        "AUTH_JWT_SECRET",
+        "AUTH_JWT_PUBLIC_KEY",
+        "AUTH_JWT_PUBLIC_KEY_PATH",
+        "THEO_AUTH_JWT_SECRET",
+        "THEO_AUTH_JWT_PUBLIC_KEY",
+        "THEO_AUTH_JWT_PUBLIC_KEY_PATH",
+    ]:
+        monkeypatch.delenv(variable, raising=False)
+
+    empty = settings_module.Settings()
+    assert empty.has_auth_jwt_credentials() is False
