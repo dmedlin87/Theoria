@@ -26,14 +26,14 @@ def _build_zotero_item(
     source: CitationSource, csl_entry: dict[str, Any]
 ) -> dict[str, Any]:
     """Convert a citation source to Zotero item format.
-    
+
     Zotero uses a specific JSON schema for items. This maps our CSL data
     to Zotero's format.
-    
+
     Args:
         source: Normalized citation source
         csl_entry: CSL-JSON representation
-        
+
     Returns:
         Zotero-formatted item dictionary
     """
@@ -116,7 +116,7 @@ def _build_zotero_item(
         anchors = source.metadata.get("anchors")
         if anchors:
             notes.append(f"Anchors: {anchors}")
-    
+
     if notes:
         item["notes"] = [{"note": note} for note in notes]
 
@@ -125,10 +125,10 @@ def _build_zotero_item(
 
 def _map_csl_to_zotero_type(csl_type: str) -> str:
     """Map CSL item types to Zotero item types.
-    
+
     Args:
         csl_type: CSL item type string
-        
+
     Returns:
         Zotero item type string
     """
@@ -158,24 +158,24 @@ async def export_to_zotero(
     group_id: str | None = None,
 ) -> dict[str, Any]:
     """Export citation sources to Zotero library.
-    
+
     Uses the Zotero Write API to create items in a user's library.
     Requires a valid Zotero API key with write permissions.
-    
+
     Args:
         sources: List of citation sources to export
         csl_entries: Corresponding CSL-JSON entries
         api_key: Zotero API key with write access
         user_id: Zotero user ID (if personal library)
         group_id: Zotero group ID (if group library)
-        
+
     Returns:
         Dictionary with export results:
         - success: bool
         - exported_count: int
         - failed_count: int
         - errors: list of error messages
-        
+
     Raises:
         ZoteroExportError: If export fails critically
     """
@@ -233,7 +233,7 @@ async def export_to_zotero(
                     result = await result
                 successful = result.get("successful", {})
                 failed = result.get("failed", {})
-                
+
                 return {
                     "success": True,
                     "exported_count": len(successful),
@@ -264,14 +264,14 @@ async def verify_zotero_credentials(
     api_key: str, user_id: str | None = None, group_id: str | None = None
 ) -> bool:
     """Verify that Zotero API credentials are valid.
-    
+
     Makes a lightweight GET request to check access.
-    
+
     Args:
         api_key: Zotero API key
         user_id: Zotero user ID (if personal library)
         group_id: Zotero group ID (if group library)
-        
+
     Returns:
         True if credentials are valid, False otherwise
     """

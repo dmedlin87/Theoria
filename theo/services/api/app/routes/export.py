@@ -554,11 +554,11 @@ async def export_to_zotero_endpoint(
     session: Session = Depends(get_session),
 ) -> ZoteroExportResponse:
     """Export selected documents to a Zotero library.
-    
+
     Requires a valid Zotero API key with write permissions.
     Either user_id (for personal library) or group_id (for group library) must be provided.
     """
-    
+
     if not payload.user_id and not payload.group_id:
         raise ExportError(
             "Either user_id or group_id must be provided",
@@ -567,7 +567,7 @@ async def export_to_zotero_endpoint(
             severity=Severity.USER,
             hint="Specify your Zotero user ID for personal library or group ID for group library.",
         )
-    
+
     if not payload.document_ids:
         raise ExportError(
             "No documents selected for export",
@@ -576,14 +576,14 @@ async def export_to_zotero_endpoint(
             severity=Severity.USER,
             hint="Select at least one document to export to Zotero.",
         )
-    
+
     # Fetch documents
     rows = session.execute(
         select(Document).where(Document.id.in_(payload.document_ids))
     ).scalars()
     document_index = {row.id: row for row in rows}
     missing = [doc_id for doc_id in payload.document_ids if doc_id not in document_index]
-    
+
     if missing:
         raise ExportError(
             f"Unknown document(s): {', '.join(sorted(missing))}",
@@ -592,9 +592,9 @@ async def export_to_zotero_endpoint(
             severity=Severity.USER,
             hint="Confirm the requested documents exist before exporting.",
         )
-    
+
     documents = [document_index[doc_id] for doc_id in payload.document_ids]
-    
+
     # Build citation sources
     _, records, csl_entries = build_citation_export(
         documents,
@@ -603,12 +603,12 @@ async def export_to_zotero_endpoint(
         filters={},
         export_id=None,
     )
-    
+
     # Extract citation sources
     sources: list[CitationSource] = []
     for doc in documents:
         sources.append(CitationSource.from_object(doc))
-    
+
     # Export to Zotero
     try:
         result = await export_to_zotero(
