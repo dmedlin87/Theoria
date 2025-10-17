@@ -205,7 +205,7 @@ class RegressionDataFactory:
                     "anchor": citation.anchor,
                     "passage_id": citation.passage_id,
                     "document_id": citation.document_id,
-                    "document_title": citation.document_title or "",
+                    "document_title": citation.document_title,
                     "snippet": citation.snippet,
                     "source_url": citation.source_url or "",
                 }
