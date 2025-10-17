@@ -80,7 +80,9 @@ class AWSSecretsAdapter(SecretsPort):
             try:
                 decoded = base64.b64decode(response["SecretBinary"])
             except (TypeError, ValueError) as exc:
-                raise SecretRetrievalError("Unable to decode binary secret payload") from exc
-            return decoded.decode("utf-8")
-
+                raise SecretRetrievalError("Unable to base64-decode binary secret payload") from exc
+            try:
+                return decoded.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise SecretRetrievalError("Unable to decode binary secret payload as UTF-8") from exc
         raise SecretRetrievalError("Secret value not present in AWS response")
