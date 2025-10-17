@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import shutil
 import tempfile
 import logging
 from pathlib import Path
+from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any, Sequence
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
@@ -182,10 +183,12 @@ def persist_commentary_entries(
         tags = _normalise_tags(entry.tags)
         title = entry.title.strip() if entry.title else None
 
-        anchor_token = (
-            (entry.note_id or "").strip().lower()
-            or excerpt[:64].lower()
-        )
+        note_token = (entry.note_id or "").strip().lower()
+        if note_token:
+            anchor_token = note_token
+        else:
+            excerpt_hash = sha256(excerpt.encode("utf-8")).hexdigest()
+            anchor_token = f"excerpt:{excerpt_hash}"
         identifier_seed = "|".join(
             [osis.lower(), source.lower(), perspective, anchor_token]
         )
