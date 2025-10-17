@@ -42,3 +42,52 @@ def test_allow_insecure_startup_rejected_in_production(monkeypatch: pytest.Monke
 
     with pytest.raises(RuntimeError):
         runtime.allow_insecure_startup()
+
+
+def test_resolve_environment_prefers_theoria_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """THEORIA_ENVIRONMENT should take precedence over other environment hints."""
+
+    for name in [
+        "THEORIA_ENVIRONMENT",
+        "THEO_ENVIRONMENT",
+        "ENVIRONMENT",
+        "THEORIA_PROFILE",
+    ]:
+        monkeypatch.delenv(name, raising=False)
+
+    monkeypatch.setenv("THEORIA_ENVIRONMENT", " Development ")
+    monkeypatch.setenv("THEO_ENVIRONMENT", "staging")
+    monkeypatch.setenv("ENVIRONMENT", "qa")
+    monkeypatch.setenv("THEORIA_PROFILE", "local")
+
+    assert runtime._resolve_environment() == "development"
+
+
+def test_resolve_environment_uses_profile_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When other variables are unset, THEORIA_PROFILE should be used."""
+
+    for name in [
+        "THEORIA_ENVIRONMENT",
+        "THEO_ENVIRONMENT",
+        "ENVIRONMENT",
+        "THEORIA_PROFILE",
+    ]:
+        monkeypatch.delenv(name, raising=False)
+
+    monkeypatch.setenv("THEORIA_PROFILE", "Local")
+
+    assert runtime._resolve_environment() == "local"
+
+
+def test_resolve_environment_defaults_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    """If no environment variables are set, fall back to the production label."""
+
+    for name in [
+        "THEORIA_ENVIRONMENT",
+        "THEO_ENVIRONMENT",
+        "ENVIRONMENT",
+        "THEORIA_PROFILE",
+    ]:
+        monkeypatch.delenv(name, raising=False)
+
+    assert runtime._resolve_environment() == "production"
