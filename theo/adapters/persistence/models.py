@@ -1869,7 +1869,6 @@ class AnalyticsTopicMapNode(Base):
     incoming_edges: Mapped[list["AnalyticsTopicMapEdge"]] = relationship(
         "AnalyticsTopicMapEdge",
         back_populates="dst_node",
-        cascade="all, delete-orphan",
         foreign_keys="AnalyticsTopicMapEdge.dst_node_id",
     )
 
