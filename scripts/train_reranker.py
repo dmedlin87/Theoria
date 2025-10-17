@@ -33,6 +33,7 @@ import argparse
 import csv
 import json
 import os
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -47,6 +48,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import joblib
 
 from ranking.minimal_reranker import MinimalReranker, train_minimal_reranker
+from scripts.mlflow_tracking import mlflow_run
 
 try:  # scikit-learn is optional in some environments (e.g. minimal CI images)
     from sklearn.impute import SimpleImputer
@@ -293,7 +295,43 @@ def main(argv: Sequence[str] | None = None) -> int:
     model = train_model(dataset, random_state=args.random_state)
     save_checkpoint(model, dataset.feature_columns, args.model_output)
 
-    print(f"Trained on {len(dataset.labels)} examples from {len(recent_records)} feedback events.")
+    trained_examples = len(dataset.labels)
+    feature_count = len(dataset.feature_columns)
+    recent_event_count = len(recent_records)
+
+    with mlflow_run("train_reranker", tags={"script": "train_reranker"}) as tracking:
+        if tracking is not None:
+            tracking.log_params(
+                {
+                    "lookback_days": args.lookback_days,
+                    "random_state": args.random_state,
+                    "reference_time": reference_time.isoformat(),
+                    "feedback_events": len(all_records),
+                    "recent_feedback_events": recent_event_count,
+                    "feature_count": feature_count,
+                    "using_sklearn": bool(HAS_SKLEARN and not FORCE_FALLBACK),
+                }
+            )
+            tracking.log_metrics(
+                {
+                    "training_examples": trained_examples,
+                }
+            )
+            tracking.log_artifact(str(args.model_output))
+            with tempfile.TemporaryDirectory() as tmpdir:
+                summary_path = Path(tmpdir) / "dataset_summary.json"
+                summary_payload = {
+                    "feedback_events": len(all_records),
+                    "recent_feedback_events": recent_event_count,
+                    "training_examples": trained_examples,
+                    "feature_columns": dataset.feature_columns,
+                }
+                summary_path.write_text(
+                    json.dumps(summary_payload, indent=2), encoding="utf-8"
+                )
+                tracking.log_artifact(str(summary_path), artifact_path="dataset")
+
+    print(f"Trained on {trained_examples} examples from {recent_event_count} feedback events.")
     print(f"Feature columns: {', '.join(dataset.feature_columns)}")
     print(f"Checkpoint saved to {args.model_output}")
 

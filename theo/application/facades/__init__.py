@@ -14,6 +14,7 @@ from typing import Any
 __all__ = [
     "database",
     "research",
+    "events",
     "runtime",
     "secret_migration",
     "settings",
@@ -32,6 +33,8 @@ __all__ = [
     "Settings",
     "get_settings",
     "get_settings_cipher",
+    "get_event_publisher",
+    "reset_event_publisher_cache",
     "SETTINGS_NAMESPACE",
     "SettingNotFoundError",
     "load_setting",
@@ -43,6 +46,7 @@ __all__ = [
 _MODULE_EXPORTS = {
     "database": "theo.application.facades.database",
     "research": "theo.application.facades.research",
+    "events": "theo.application.facades.events",
     "runtime": "theo.application.facades.runtime",
     "secret_migration": "theo.application.facades.secret_migration",
     "settings": "theo.application.facades.settings",
@@ -70,6 +74,14 @@ _ATTRIBUTE_EXPORTS = {
     "ResearchNoteEvidenceDraft": (
         "theo.application.facades.research",
         "ResearchNoteEvidenceDraft",
+    ),
+    "get_event_publisher": (
+        "theo.application.facades.events",
+        "get_event_publisher",
+    ),
+    "reset_event_publisher_cache": (
+        "theo.application.facades.events",
+        "reset_event_publisher_cache",
     ),
     "get_research_service": (
         "theo.application.facades.research",
