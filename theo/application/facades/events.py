@@ -25,7 +25,7 @@ def _build_publishers(settings: Settings) -> list[EventPublisher]:
             publisher = build_event_publisher(sink, settings=settings)
         except Exception:  # pragma: no cover - configuration errors logged and skipped
             sink_name = getattr(sink, "name", None) or getattr(sink, "backend", "unknown")
-            LOGGER.exception("Failed to configure event sink %%s", sink_name)
+            LOGGER.exception("Failed to configure event sink %s", sink_name)
             continue
         publishers.append(publisher)
     return publishers
