@@ -13,7 +13,7 @@
 
 ### 1. Next.js API proxy routes (TypeScript)
 Multiple API handlers mirror each other when forwarding requests to backend services. Example clusters include:
-- `theo/services/web/app/api/ingest/url/route.ts` ↔ `theo/services/web/app/api/ingest/file|simple|export|analytics/.../route.ts` – repeated request forwarding, header plumbing, and error handling blocks.
+- `theo/services/web/app/api/ingest/url/route.ts` ↔ `theo/services/web/app/api/ingest/file, simple, export, analytics/.../route.ts` – repeated request forwarding, header plumbing, and error handling blocks.
 - `theo/services/web/app/api/discoveries/[id]/route.ts`, `/view/route.ts`, and `/feedback/route.ts` – nearly identical fetch logic for different endpoints.
 
 **Opportunity:** Extract a shared proxy helper that accepts the downstream path and optional payload preparation, reducing duplication of header forwarding, error responses, and response marshalling.
