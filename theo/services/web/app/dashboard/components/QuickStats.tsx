@@ -58,7 +58,7 @@ export function QuickStats({ metrics, loading }: QuickStatsProps) {
           const metric = metrics.find((item) => item.id === config.metricId);
           return (
             <article key={config.metricId} className={styles.stat}>
-              <span className={styles.icon} aria-hidden>
+              <span className={styles.icon} aria-hidden={true}>
                 {config.icon}
               </span>
               <div className={styles.content}>
