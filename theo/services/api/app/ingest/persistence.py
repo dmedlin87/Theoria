@@ -461,8 +461,6 @@ def persist_text_document(
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     collected_verse_refs: list[str] = []
     seen_verse_refs: set[str] = set()
-    collected_verse_refs: list[str] = []
-    seen_verse_refs: set[str] = set()
     for idx, chunk in enumerate(chunks):
         sanitized_text = (
             sanitized_texts[idx]
