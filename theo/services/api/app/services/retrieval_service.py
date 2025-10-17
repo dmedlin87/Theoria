@@ -300,7 +300,7 @@ class RetrievalService:
         )
         if self._should_rerank():
             _configure_mlflow_clients(self.settings)
-            reranker: Reranker | None = None
+            reranker = None
             header_reference: str | Path | None = None
             references = _iter_reranker_references(self.settings)
 
