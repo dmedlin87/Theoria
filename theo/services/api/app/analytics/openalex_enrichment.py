@@ -176,11 +176,13 @@ def _merge_topics(document: Document, concepts: list[dict[str, Any]]) -> bool:
     if not concept_names:
         return False
 
-    existing_topics: list[str] = []
+    # Normalize document.topics to a list of strings for consistent processing.
     if isinstance(document.topics, list):
         existing_topics = [str(item) for item in document.topics if item]
     elif isinstance(document.topics, dict):
         existing_topics = [str(value) for value in document.topics.values() if value]
+    else:
+        existing_topics = []
 
     merged = _dedupe(existing_topics + concept_names)
     if merged == existing_topics:
