@@ -101,7 +101,6 @@ def enrich_document_openalex_details(
 
         document.bib_json = bib_json
         session.add(document)
-        updated = True
         return updated
 
 
