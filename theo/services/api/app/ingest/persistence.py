@@ -30,6 +30,7 @@ from ..db.models import (
 )
 from .embeddings import lexical_representation
 from .exceptions import UnsupportedSourceError
+from .events import emit_document_persisted_event
 from .metadata import (
     build_source_ref,
     coerce_date,
@@ -695,6 +696,15 @@ def persist_text_document(
         document.storage_path = str(storage_dir)
         session.add(document)
         session.commit()
+        emit_document_persisted_event(
+            document=document,
+            passages=passages,
+            topics=topics,
+            topic_domains=topic_domains or [],
+            theological_tradition=tradition,
+            source_type=document.source_type,
+            metadata={"ingest_kind": "text"},
+        )
     except Exception:
         session.rollback()
         if moved_to_final:
@@ -1114,6 +1124,15 @@ def persist_transcript_document(
         document.storage_path = str(storage_dir)
         session.add(document)
         session.commit()
+        emit_document_persisted_event(
+            document=document,
+            passages=passages,
+            topics=topics,
+            topic_domains=topic_domains or [],
+            theological_tradition=tradition,
+            source_type=document.source_type,
+            metadata={"ingest_kind": "transcript"},
+        )
     except Exception:
         session.rollback()
         if moved_to_final:
