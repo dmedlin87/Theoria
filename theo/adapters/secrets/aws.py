@@ -85,6 +85,4 @@ class AWSSecretsAdapter(SecretsPort):
                 return decoded.decode("utf-8")
             except UnicodeDecodeError as exc:
                 raise SecretRetrievalError("Unable to decode binary secret payload (UTF-8 decoding failed)") from exc
-            except UnicodeDecodeError as exc:
-                raise SecretRetrievalError("Unable to decode binary secret payload as UTF-8") from exc
         raise SecretRetrievalError("Secret value not present in AWS response")
