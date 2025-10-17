@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -13,6 +14,11 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ai import run_guarded_chat
+from theo.services.api.app.ai.audit_logging import (
+    AuditLogWriter,
+    compute_prompt_hash,
+    serialise_citations,
+)
 from theo.services.api.app.ai import memory_index as memory_index_module
 from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer, ensure_completion_safe
 from theo.services.api.app.ai.trails import TrailService
@@ -596,6 +602,7 @@ def chat_turn(
 
     session_id = payload.session_id or str(uuid4())
     trail_service = TrailService(session)
+    audit_logger = AuditLogWriter.from_session(session)
 
     message: ChatSessionMessage | None = None
     answer: RAGAnswer | None = None
@@ -638,6 +645,28 @@ def chat_turn(
                 trimmed.append(adjusted)
                 remaining_budget -= len(adjusted)
             memory_context = list(reversed(trimmed)) if trimmed else []
+
+    log_inputs: dict[str, object] = {
+        "messages": [message.model_dump(mode="json") for message in payload.messages],
+        "filters": payload.filters.model_dump(exclude_none=True),
+    }
+    if payload.osis is not None:
+        log_inputs["osis"] = payload.osis
+    if payload.prompt is not None:
+        log_inputs["prompt"] = payload.prompt
+    if payload.model is not None:
+        log_inputs["model"] = payload.model
+    if payload.mode_id is not None:
+        log_inputs["mode_id"] = payload.mode_id
+    if payload.stance is not None:
+        log_inputs["stance"] = payload.stance
+    if payload.session_id is not None:
+        log_inputs["session_id"] = payload.session_id
+    if payload.recorder_metadata is not None:
+        log_inputs["recorder_metadata"] = payload.recorder_metadata.model_dump(
+            mode="json", exclude_none=True
+        )
+    prompt_hash = compute_prompt_hash(question, log_inputs)
 
     try:
         recorder_context = None
@@ -728,6 +757,23 @@ def chat_turn(
 
             message_text = extract_refusal_text(answer)
             message = ChatSessionMessage(role="assistant", content=message_text)
+            audit_logger.log(
+                workflow="chat",
+                prompt_hash=prompt_hash,
+                model_preset=(
+                    answer.model_name
+                    or payload.model
+                    or payload.mode_id
+                    or payload.stance
+                ),
+                inputs=log_inputs,
+                outputs={
+                    "message": message.model_dump(mode="json"),
+                    "answer": answer.model_dump(mode="json"),
+                },
+                citations=serialise_citations(answer.citations),
+                status="generated",
+            )
             _persist_chat_session(
                 session,
                 existing=existing_session,
@@ -759,13 +805,48 @@ def chat_turn(
                 status="running" if active_goal is not None else "completed",
             )
     except GuardrailError as exc:
-        return guardrail_http_exception(
+        response = guardrail_http_exception(
             exc,
             session=session,
             question=question,
             osis=payload.osis,
             filters=payload.filters,
         )
+        response_payload: dict[str, object] | None = None
+        try:
+            body = getattr(response, "body", b"")
+            if body:
+                response_payload = json.loads(body.decode("utf-8"))
+        except Exception:  # noqa: BLE001 - best effort logging
+            LOGGER.debug("Unable to decode guardrail response for audit logging", exc_info=True)
+            response_payload = None
+        citations_payload: list[dict[str, object]] | None = None
+        outputs_payload: dict[str, object] | None = None
+        if isinstance(response_payload, dict):
+            answer_payload = response_payload.get("answer")
+            if isinstance(answer_payload, dict):
+                raw_citations = answer_payload.get("citations")
+                if isinstance(raw_citations, list):
+                    citations_payload = [
+                        citation
+                        for citation in raw_citations
+                        if isinstance(citation, dict)
+                    ]
+            outputs_payload = {
+                key: value
+                for key, value in response_payload.items()
+                if key in {"detail", "message", "answer", "guardrail_advisory"}
+            }
+        audit_logger.log(
+            workflow="chat",
+            prompt_hash=prompt_hash,
+            model_preset=payload.model,
+            inputs=log_inputs,
+            outputs=outputs_payload or {"error": str(exc)},
+            citations=citations_payload,
+            status="refused",
+        )
+        return response
 
     if message is None or answer is None:
         raise AIWorkflowError(

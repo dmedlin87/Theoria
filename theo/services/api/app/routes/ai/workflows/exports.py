@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping, Sequence
 
 from fastapi import APIRouter, Depends, Query, status
@@ -12,6 +13,11 @@ from theo.services.api.app.ai import (
     build_sermon_deliverable,
     build_transcript_deliverable,
     generate_sermon_prep_outline,
+)
+from theo.services.api.app.ai.audit_logging import (
+    AuditLogWriter,
+    compute_prompt_hash,
+    serialise_citations,
 )
 from theo.services.api.app.ai.rag import GuardrailError, RAGCitation
 from theo.application.facades.database import get_session
@@ -176,6 +182,12 @@ def export_citations(
 ) -> CitationExportResponse:
     """Return CSL-JSON and manager payloads for the supplied citations."""
 
+    audit_logger = AuditLogWriter.from_session(session)
+    log_inputs = {
+        "request": payload.model_dump(mode="json", exclude_none=True),
+    }
+    prompt_hash = compute_prompt_hash(payload=log_inputs)
+
     if not payload.citations:
         raise AIWorkflowError(
             "citations cannot be empty",
@@ -308,13 +320,28 @@ def export_citations(
         "zotero": {"items": csl_entries},
         "mendeley": {"documents": csl_entries},
     }
-
-    return CitationExportResponse(
+    response = CitationExportResponse(
         manifest=manifest,
         records=record_dicts,
         csl=csl_entries,
         manager_payload=manager_payload,
     )
+
+    audit_logger.log(
+        workflow="export.citations",
+        prompt_hash=prompt_hash,
+        model_preset=manifest.model_preset,
+        inputs=log_inputs,
+        outputs={
+            "record_count": len(record_dicts),
+            "manifest": manifest.model_dump(mode="json"),
+            "manager_payload": manager_payload,
+        },
+        citations=serialise_citations(ordered_citations),
+        status="generated",
+    )
+
+    return response
 
 
 _SERMON_PRESET_MAP: dict[str, ExportPresetId] = {
@@ -339,6 +366,11 @@ def sermon_prep_export(
     ),
     session: Session = Depends(get_session),
 ) -> ExportDeliverableResponse:
+    audit_logger = AuditLogWriter.from_session(session)
+    log_inputs = payload.model_dump(mode="json", exclude_none=True)
+    log_inputs["format"] = format
+    prompt_hash = compute_prompt_hash(payload=log_inputs)
+
     try:
         response = generate_sermon_prep_outline(
             session,
@@ -348,13 +380,37 @@ def sermon_prep_export(
             model_name=payload.model,
         )
     except GuardrailError as exc:
-        return guardrail_http_exception(
+        guardrail_response = guardrail_http_exception(
             exc,
             session=session,
             question=None,
             osis=payload.osis,
             filters=payload.filters,
         )
+        response_payload: dict[str, object] | None = None
+        try:
+            body = getattr(guardrail_response, "body", b"")
+            if body:
+                response_payload = json.loads(body.decode("utf-8"))
+        except Exception:  # noqa: BLE001 - audit logging best effort
+            response_payload = None
+        outputs_payload: dict[str, object] | None = None
+        if isinstance(response_payload, dict):
+            outputs_payload = {
+                key: value
+                for key, value in response_payload.items()
+                if key in {"detail", "message", "answer", "guardrail_advisory"}
+            }
+        audit_logger.log(
+            workflow="export.sermon_prep",
+            prompt_hash=prompt_hash,
+            model_preset=payload.model,
+            inputs=log_inputs,
+            outputs=outputs_payload or {"error": str(exc)},
+            citations=None,
+            status="refused",
+        )
+        return guardrail_response
     normalized = format.lower()
     package = build_sermon_deliverable(
         response,
@@ -371,7 +427,7 @@ def sermon_prep_export(
             data={"format": normalized},
         ) from exc
     asset = package.get_asset(normalized)
-    return ExportDeliverableResponse(
+    deliverable = ExportDeliverableResponse(
         preset=preset,
         format=asset.format,
         filename=asset.filename,
@@ -379,18 +435,54 @@ def sermon_prep_export(
         content=serialise_asset_content(asset.content),
     )
 
+    citations_source = getattr(response, "answer", None)
+    audit_logger.log(
+        workflow="export.sermon_prep",
+        prompt_hash=prompt_hash,
+        model_preset=package.manifest.model_preset or payload.model,
+        inputs=log_inputs,
+        outputs={
+            "preset": preset,
+            "asset": {
+                "format": asset.format,
+                "filename": asset.filename,
+                "media_type": asset.media_type,
+            },
+            "manifest": package.manifest.model_dump(mode="json"),
+        },
+        citations=serialise_citations(
+            getattr(citations_source, "citations", []) if citations_source else []
+        ),
+        status="generated",
+    )
+
+    return deliverable
+
 
 @router.post("/transcript/export", response_model=ExportDeliverableResponse)
 def transcript_export(
     payload: TranscriptExportRequest,
     session: Session = Depends(get_session),
 ) -> ExportDeliverableResponse:
+    audit_logger = AuditLogWriter.from_session(session)
+    log_inputs = payload.model_dump(mode="json", exclude_none=True)
+    prompt_hash = compute_prompt_hash(payload=log_inputs)
+
     normalized = payload.format.lower()
     try:
         package = build_transcript_deliverable(
             session, payload.document_id, formats=[normalized]
         )
     except GuardrailError as exc:
+        audit_logger.log(
+            workflow="export.transcript",
+            prompt_hash=prompt_hash,
+            model_preset=None,
+            inputs=log_inputs,
+            outputs={"error": str(exc)},
+            citations=None,
+            status="refused",
+        )
         raise AIWorkflowError(
             str(exc),
             code="AI_EXPORT_GUARDRAIL_BLOCKED",
@@ -414,13 +506,33 @@ def transcript_export(
             data={"format": normalized},
         ) from exc
     asset = package.get_asset(normalized)
-    return ExportDeliverableResponse(
+    deliverable = ExportDeliverableResponse(
         preset=preset,
         format=asset.format,
         filename=asset.filename,
         media_type=asset.media_type,
         content=serialise_asset_content(asset.content),
     )
+
+    audit_logger.log(
+        workflow="export.transcript",
+        prompt_hash=prompt_hash,
+        model_preset=package.manifest.model_preset,
+        inputs=log_inputs,
+        outputs={
+            "preset": preset,
+            "asset": {
+                "format": asset.format,
+                "filename": asset.filename,
+                "media_type": asset.media_type,
+            },
+            "manifest": package.manifest.model_dump(mode="json"),
+        },
+        citations=None,
+        status="generated",
+    )
+
+    return deliverable
 
 
 __all__ = [
