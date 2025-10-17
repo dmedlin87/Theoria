@@ -190,11 +190,14 @@ class RetrievalService:
         reranker: Reranker | None = None
         model_path: Path | None = None
         top_n = min(len(results), self.reranker_top_k)
-        if (
-            top_n
-            and self._should_rerank()
-            and strategy not in {"none", "bm25", "off", "disabled"}
-        ):
+        reranker_requested = strategy not in {"none", "bm25", "off", "disabled"}
+        has_reranker_experiment = "reranker" in experiments
+        experiment_overrides_default = has_reranker_experiment and strategy != "default"
+        should_attempt_rerank = reranker_requested and (
+            self._should_rerank() or experiment_overrides_default
+        )
+
+        if top_n and should_attempt_rerank:
             reranker, reranker_header = self._load_reranker_for_strategy(strategy, experiments)
             if strategy == "default" and self.settings.reranker_model_path is not None:
                 model_path = Path(self.settings.reranker_model_path)
