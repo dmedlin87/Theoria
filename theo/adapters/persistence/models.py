@@ -1784,6 +1784,8 @@ __all__ = [
     "NoteEvidence",
     "CrossReference",
     "ContradictionSeed",
+    "HarmonySeed",
+    "CommentaryExcerptSeed",
     "AgentTrail",
     "AgentStep",
     "TrailSource",
