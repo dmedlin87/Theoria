@@ -20,7 +20,7 @@ Multiple API handlers mirror each other when forwarding requests to backend serv
 
 ### 2. React hooks and components (TS/TSX)
 Large swaths of UI logic are duplicated inside individual files or across related components:
-- `useSearchFiltersState.ts` repeats complex reducer logic in multiple branches; `useSearchFilters.ts` duplicates the same helper flows.
+- `useSearchFiltersState.ts` repeats complex reducer logic in multiple conditional branches within the same file; `useSearchFilters.ts` duplicates the same helper flows.
 - Chat workspace components (`ChatWorkspace.tsx`, `ChatWorkspace.refactored.tsx`, and transcript components) copy many sections of JSX and business logic.
 - Upload forms (`FileUploadForm.tsx` ↔ `UrlIngestForm.tsx`) and research panels share nearly identical JSX/CSS blocks.
 
