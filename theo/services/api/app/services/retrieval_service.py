@@ -14,6 +14,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import Settings, get_settings
+from theo.application.search import QueryRewriter
 from ..analytics.experiments import (
     ExperimentAnalyticsSink,
     RerankerExperimentOutcome,
@@ -156,6 +157,7 @@ class _RerankerCache:
 
 
 _DEFAULT_RERANKER_CACHE = _RerankerCache(load_reranker)
+_DEFAULT_QUERY_REWRITER = QueryRewriter()
 
 
 def _configure_mlflow_clients(settings: Settings) -> None:
@@ -207,6 +209,7 @@ class RetrievalService:
     search_fn: Callable[[Session, HybridSearchRequest], Sequence[HybridSearchResult]]
     reranker_cache: _RerankerCache = field(default_factory=lambda: _RerankerCache(load_reranker))
     reranker_top_k: int = _RERANKER_TOP_K
+    query_rewriter: QueryRewriter | None = None
     experiment_analytics: ExperimentAnalyticsSink | None = None
     experimental_reranker_loaders: MutableMapping[
         str, Callable[[Settings, Mapping[str, str]], tuple[Reranker | None, str | None]]
@@ -224,7 +227,14 @@ class RetrievalService:
     ) -> tuple[list[HybridSearchResult], str | None]:
         """Execute hybrid search and return results with optional reranker header."""
 
-        results = [item for item in self.search_fn(session, request)]
+        search_request = request
+        rewrite_metadata: dict[str, object] | None = None
+        if self.query_rewriter is not None:
+            rewrite_result = self.query_rewriter.rewrite(request)
+            search_request = rewrite_result.request
+            rewrite_metadata = rewrite_result.metadata
+
+        results = [item for item in self.search_fn(session, search_request)]
         baseline = [item.model_copy(deep=True) for item in results]
         reranker_header: str | None = None
         experiments = dict(experiments or {})
@@ -350,6 +360,12 @@ class RetrievalService:
                     )
                     SEARCH_RERANKER_EVENTS.labels(event="execution_failed").inc()
 
+        if rewrite_metadata and rewrite_metadata.get("rewrite_applied"):
+            for item in results:
+                base_meta = dict(item.meta) if item.meta else {}
+                base_meta.setdefault("query_rewrite", rewrite_metadata)
+                item.meta = base_meta
+
         return results, reranker_header
 
     def _should_rerank(self) -> bool:
@@ -469,6 +485,7 @@ def get_retrieval_service(
         settings=settings,
         search_fn=hybrid_search,
         reranker_cache=_DEFAULT_RERANKER_CACHE,
+        query_rewriter=_DEFAULT_QUERY_REWRITER,
     )
 
 
