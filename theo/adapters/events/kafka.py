@@ -61,7 +61,7 @@ class KafkaEventPublisher(EventPublisher):
             if self._flush_timeout is not None:
                 self._producer.flush(self._flush_timeout)
         except Exception as exc:  # pragma: no cover - logging for observability
-            LOGGER.exception("Failed to publish Kafka event", exc_info=exc)
+            LOGGER.exception("Failed to publish Kafka event")
             raise
 
 
