@@ -199,9 +199,22 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/health", tags=["diagnostics"], include_in_schema=False)
-    async def healthcheck() -> dict[str, str]:
-        """Return a simple readiness indicator for infrastructure monitors."""
-        return {"status": "ok"}
+    async def healthcheck() -> dict[str, object]:
+        """Return a summary health snapshot for infrastructure monitors."""
+
+        from .services.health import get_health_service
+
+        report = get_health_service().check()
+        return report.to_summary()
+
+    @app.get("/health/detail", tags=["diagnostics"], include_in_schema=False)
+    async def healthcheck_detail() -> dict[str, object]:
+        """Return detailed adapter health data for observability consoles."""
+
+        from .services.health import get_health_service
+
+        report = get_health_service().check()
+        return report.to_detail()
 
     def _attach_trace_headers(
         response: Response, trace_headers: dict[str, str] | None = None
