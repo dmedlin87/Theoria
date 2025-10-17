@@ -107,7 +107,7 @@ class TopicMapBuilder:
             for topic_key, original in zip(filtered_topics, embedding["raw_topics"], strict=True):
                 info = topic_documents[topic_key]
                 if not info["label"]:
-                    info["label"] = str(original).strip() or original
+                    info["label"] = str(original).strip() or topic_key.title()
                 info["documents"].add(embedding["document_id"])
                 info["embeddings"].append(embedding["vector"])
                 if embedding["title"]:
