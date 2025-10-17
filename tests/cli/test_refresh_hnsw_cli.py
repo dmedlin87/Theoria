@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+import importlib
+import sys
+from types import ModuleType, SimpleNamespace
+
+import pytest
+from click.testing import CliRunner
+
+
+@pytest.fixture()
+def refresh_cli_module(monkeypatch: pytest.MonkeyPatch):
+    """Import the refresh_hnsw CLI module with bootstrap patched out."""
+
+    monkeypatch.setattr(
+        "theo.services.bootstrap.resolve_application", lambda: None
+    )
+    fake_tasks_module = ModuleType("theo.services.api.app.workers.tasks")
+    fake_tasks_module.refresh_hnsw = SimpleNamespace(
+        delay=lambda *args, **kwargs: SimpleNamespace(id=None),
+        run=lambda *args, **kwargs: {},
+    )
+    monkeypatch.setitem(
+        sys.modules, "theo.services.api.app.workers.tasks", fake_tasks_module
+    )
+    monkeypatch.delitem(sys.modules, "theo.services.cli.refresh_hnsw", raising=False)
+    module = importlib.import_module("theo.services.cli.refresh_hnsw")
+    return module
+
+
+@pytest.fixture()
+def runner() -> CliRunner:
+    return CliRunner()
+
+
+class _FakeTask:
+    def __init__(self) -> None:
+        self.delay_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        self.run_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def delay(self, *args: object, **kwargs: object) -> SimpleNamespace:
+        self.delay_calls.append((args, kwargs))
+        return SimpleNamespace(id="job-123")
+
+    def run(self, *args: object, **kwargs: object) -> dict[str, object]:
+        self.run_calls.append((args, kwargs))
+        return {"status": "ok", "sampleQueries": kwargs.get("sample_queries")}
+
+
+def test_main_enqueues_task_by_default(
+    refresh_cli_module, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_task = _FakeTask()
+    monkeypatch.setattr(refresh_cli_module, "refresh_hnsw", fake_task)
+
+    result = runner.invoke(refresh_cli_module.main, [])
+
+    assert result.exit_code == 0
+    assert fake_task.delay_calls == [((None,), {"sample_queries": 25, "top_k": 10})]
+    assert fake_task.run_calls == []
+    assert "Queued refresh_hnsw task: job-123" in result.output
+
+
+def test_main_runs_task_inline_when_requested(
+    refresh_cli_module, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_task = _FakeTask()
+    monkeypatch.setattr(refresh_cli_module, "refresh_hnsw", fake_task)
+
+    result = runner.invoke(
+        refresh_cli_module.main,
+        ["--run-local", "--sample-queries", "17", "--top-k", "4"],
+    )
+
+    assert result.exit_code == 0
+    assert fake_task.delay_calls == []
+    assert fake_task.run_calls == [((None,), {"sample_queries": 17, "top_k": 4})]
+    assert "HNSW index refreshed synchronously." in result.output
+    assert '"sampleQueries": 17' in result.output
