@@ -65,7 +65,7 @@ def emit_document_persisted_event(
 def _dispatch_neighborhood_event(payload: dict[str, Any]) -> None:
     try:
         from ..workers import tasks as worker_tasks
-    except Exception:  # pragma: no cover - worker import optional in tests
+    except ImportError:  # pragma: no cover - worker import optional in tests
         LOGGER.debug("Workers unavailable; skipping neighborhood analytics dispatch")
         return
 
