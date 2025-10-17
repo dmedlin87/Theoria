@@ -183,7 +183,7 @@ def update_neighborhood_analytics(event_payload: dict[str, Any]) -> None:
     engine = get_engine()
 
     with Session(engine) as session:
-        reasoner = reasoner_factory()
+        reasoner = reasoner_factory(session)
         result = reasoner.handle_document_persisted(session, event)
         session.commit()
 
