@@ -80,17 +80,18 @@ def _load_structured(path: Path) -> list[dict]:
     raise ValueError(f"Unsupported seed format for {path}")
 
 
-def _coerce_list(value: object) -> list[str] | None:
+def _coerce_list(value: object) -> list[str | None] | None:
     if value is None:
         return None
     if isinstance(value, str):
         return [value]
     if isinstance(value, Iterable):
-        result: list[str] = []
+        result: list[str | None] = []
         for item in value:
             if item is None:
-                continue
-            result.append(str(item))
+                result.append(None)
+            else:
+                result.append(str(item))
         return result or None
     return None
 
@@ -170,7 +171,11 @@ def _dispose_sqlite_engine(
         return
     if getattr(getattr(engine, "dialect", None), "name", None) != "sqlite":
         return
-    database_name = getattr(getattr(engine, "url", None), "database", None)
+    url = getattr(engine, "url", None)
+    database_name = getattr(url, "database", None)
+    url_string = str(url) if url is not None else ""
+    if not database_name or database_name == ":memory:" or "mode=memory" in url_string:
+        return
     if dispose_engine:
         try:
             if dispose_callable is not None:
@@ -430,11 +435,16 @@ def _rebuild_perspective_column(
     *,
     dataset_label: str,
     log_suffix: str,
+    force: bool = False,
 ) -> None:
     """Drop and recreate *table* when ``perspective`` is absent, logging the repair."""
 
     if _recreate_seed_table_if_missing_column(
-        session, table, "perspective", dataset_label=dataset_label
+        session,
+        table,
+        "perspective",
+        dataset_label=dataset_label,
+        force=force,
     ):
         logger.info(
             "Rebuilt %s table missing 'perspective' column; %s",
@@ -486,6 +496,7 @@ def _ensure_perspective_column(
             table,
             dataset_label=dataset_label,
             log_suffix=f"retrying {dataset_label} seeds",
+            force=True,
         )
         missing = [
             column
@@ -974,7 +985,7 @@ def seed_harmony_claims(session: Session) -> None:
         table,
         "harmony",
         required_columns=("created_at",) if hasattr(HarmonySeed, "created_at") else None,
-        allow_repair=False,
+        allow_repair=True,
     ):
         return
 
@@ -1135,7 +1146,7 @@ def seed_commentary_excerpts(session: Session) -> None:
         required_columns=("created_at",)
         if hasattr(CommentaryExcerptSeed, "created_at")
         else None,
-        allow_repair=False,
+        allow_repair=True,
     ):
         return
     if not _ensure_range_columns(
