@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import csv
+import html
 import io
 import json
+import textwrap
 from collections import OrderedDict
 from datetime import UTC, datetime
 from typing import Any, Literal, Mapping, Sequence
@@ -400,6 +402,21 @@ def build_document_export(
     return manifest, records
 
 
+def _dump_manifest_json(manifest: ExportManifest) -> str:
+    """Return the manifest payload serialised as indented JSON."""
+
+    return json.dumps(
+        json.loads(manifest.model_dump_json()), ensure_ascii=False, indent=2
+    )
+
+
+def _dump_records_json(records: Sequence[Mapping[str, object]]) -> str:
+    """Serialise export records as pretty printed JSON."""
+
+    normalized = [dict(record) for record in records]
+    return json.dumps(normalized, ensure_ascii=False, indent=2)
+
+
 def render_json_bundle(manifest: ExportManifest, records: Sequence[dict]) -> str:
     payload = {
         "manifest": json.loads(manifest.model_dump_json()),
@@ -427,12 +444,275 @@ def render_csv_bundle(records: Sequence[OrderedDict[str, object]]) -> str:
     return buffer.getvalue()
 
 
+def _render_html_bundle(
+    manifest: ExportManifest, records: Sequence[OrderedDict[str, object]]
+) -> str:
+    """Render the export payload as a standalone HTML document."""
+
+    manifest_json = _dump_manifest_json(manifest)
+    records_json = _dump_records_json(records)
+    escaped_manifest = html.escape(manifest_json)
+    escaped_records = html.escape(records_json)
+    title = f"Theo Export {manifest.export_id}"
+    created_at = manifest.created_at.isoformat()
+    return """<!DOCTYPE html>
+<html lang=\"en\">
+  <head>
+    <meta charset=\"utf-8\" />
+    <title>{title}</title>
+    <meta name=\"generator\" content=\"Theo Exporter\" />
+    <meta name=\"theo:schema_version\" content=\"{manifest.schema_version}\" />
+    <script id=\"theo-export-manifest\" type=\"application/json\">{manifest_json}</script>
+    <script id=\"theo-export-records\" type=\"application/json\">{records_json}</script>
+    <style>
+      body {{
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 2rem;
+        line-height: 1.5;
+      }}
+      pre {{
+        background: #f5f5f5;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        overflow-x: auto;
+      }}
+      h1, h2 {{
+        color: #1a365d;
+      }}
+      .summary {{
+        margin-bottom: 2rem;
+      }}
+      .summary dt {{
+        font-weight: 600;
+      }}
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>{title}</h1>
+        <dl class=\"summary\">
+          <dt>Schema version</dt>
+          <dd>{manifest.schema_version}</dd>
+          <dt>Created</dt>
+          <dd>{created_at}</dd>
+          <dt>Export type</dt>
+          <dd>{manifest.type}</dd>
+        </dl>
+      </header>
+      <section id=\"manifest\">
+        <h2>Manifest</h2>
+        <pre>{escaped_manifest}</pre>
+      </section>
+      <section id=\"records\">
+        <h2>Records</h2>
+        <pre>{escaped_records}</pre>
+      </section>
+    </main>
+  </body>
+</html>
+""".format(
+        title=title,
+        manifest=manifest,
+        created_at=created_at,
+        manifest_json=manifest_json,
+        records_json=records_json,
+        escaped_manifest=escaped_manifest,
+        escaped_records=escaped_records,
+    )
+
+
+def _render_obsidian_markdown(
+    manifest: ExportManifest, records: Sequence[OrderedDict[str, object]]
+) -> str:
+    """Render the export payload as Obsidian-friendly Markdown."""
+
+    manifest_json = _dump_manifest_json(manifest)
+    records_json = _dump_records_json(records)
+    header_lines = [
+        "---",
+        f"title: Theo Export {manifest.export_id}",
+        f"schema_version: {manifest.schema_version}",
+        f"created_at: {manifest.created_at.isoformat()}",
+        f"export_type: {manifest.type}",
+        f"record_count: {len(records)}",
+        "---",
+        "",
+        "## Manifest",
+        "```json",
+        manifest_json,
+        "```",
+        "",
+        "## Records",
+        "```json",
+        records_json,
+        "```",
+        "",
+        "%% Theo export provenance manifest embedded above %%",
+        "",
+    ]
+    return "\n".join(header_lines)
+
+
+def _escape_pdf_text(value: str) -> str:
+    """Return *value* escaped for inclusion in a PDF text block."""
+
+    return (
+        value.replace("\\", r"\\\\").replace("(", r"\(").replace(")", r"\)")
+    )
+
+
+def _wrap_lines(lines: Sequence[str], width: int = 90) -> list[str]:
+    wrapped: list[str] = []
+    for line in lines:
+        if not line:
+            wrapped.append("")
+            continue
+        segments = textwrap.wrap(line, width=width) or [""]
+        wrapped.extend(segments)
+    return wrapped
+
+
+def _serialize_pdf_content(
+    manifest: ExportManifest, records: Sequence[OrderedDict[str, object]]
+) -> list[str]:
+    manifest_json = _dump_manifest_json(manifest)
+    records_json = _dump_records_json(records)
+    lines = [
+        f"Theo Export {manifest.export_id}",
+        f"Schema Version: {manifest.schema_version}",
+        f"Created: {manifest.created_at.isoformat()}",
+        f"Export Type: {manifest.type}",
+        "",
+        "Manifest:",
+    ]
+    lines.extend(manifest_json.splitlines())
+    lines.append("")
+    lines.append("Records:")
+    lines.extend(records_json.splitlines())
+    safe_lines = [
+        _escape_pdf_text(segment)
+        for segment in _wrap_lines(lines, width=90)
+    ]
+    return safe_lines
+
+
+def _render_pdf_with_weasyprint(html_body: str):  # pragma: no cover - optional path
+    try:
+        from weasyprint import HTML  # type: ignore
+    except ImportError:  # pragma: no cover - optional dependency
+        return None
+    return HTML(string=html_body).write_pdf()
+
+
+def _render_pdf_with_reportlab(
+    manifest: ExportManifest, content_lines: Sequence[str]
+) -> bytes | None:  # pragma: no cover - optional path
+    try:
+        from reportlab.lib.pagesizes import letter  # type: ignore
+        from reportlab.pdfgen import canvas  # type: ignore
+    except ImportError:  # pragma: no cover - optional dependency
+        return None
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    pdf.setTitle(f"Theo Export {manifest.export_id}")
+    pdf.setSubject(f"Schema {manifest.schema_version}")
+    pdf.setCreator("Theo Exporter")
+    # Set additional metadata if possible, but handle missing private attributes gracefully
+    try:
+        metadata = pdf._doc.info  # type: ignore[attr-defined]
+        metadata.producer = "Theo Exporter"
+        metadata.creationDate = manifest.created_at.strftime("D:%Y%m%d%H%M%S%z")
+    except AttributeError:
+        pass
+    pdf.setFont("Helvetica", 11)
+    width, height = letter
+    y = height - 72
+    for line in content_lines:
+        pdf.drawString(72, y, line)
+        y -= 14
+        if y < 72:
+            pdf.showPage()
+            pdf.setFont("Helvetica", 11)
+            y = height - 72
+    pdf.save()
+    return buffer.getvalue()
+
+
+def _render_minimal_pdf(
+    manifest: ExportManifest, content_lines: Sequence[str]
+) -> bytes:
+    """Render a deterministic PDF document without third-party dependencies."""
+
+    text_lines = [line for line in content_lines]
+    stream_parts = ["BT", "/F1 11 Tf", "14 TL", "72 760 Td"]
+    first_line = True
+    for line in text_lines:
+        if not first_line:
+            stream_parts.append("T*")
+        stream_parts.append(f"({line}) Tj")
+        first_line = False
+    stream_parts.append("ET")
+    stream = "\n".join(stream_parts)
+    stream_bytes = stream.encode("latin-1", "replace")
+
+    objects: list[bytes] = []
+    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+    objects.append(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
+    objects.append(
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> >> >>"
+    )
+    objects.append(
+        b"<< /Length "
+        + str(len(stream_bytes)).encode("ascii")
+        + b" >>\nstream\n"
+        + stream_bytes
+        + b"\nendstream"
+    )
+    objects.append(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    )
+    info_dict = (
+        "<< /Producer (Theo Exporter) /Creator (Theo Exporter) /Title ({})"
+        " /Subject (Schema {}) /CreationDate ({})>>".format(
+            _escape_pdf_text(f"Theo Export {manifest.export_id}"),
+            _escape_pdf_text(manifest.schema_version),
+            _escape_pdf_text(manifest.created_at.strftime("D:%Y%m%d%H%M%S%z")),
+        )
+    )
+    objects.append(info_dict.encode("latin-1", "replace"))
+
+    output = bytearray()
+    output.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = []
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(output))
+        output.extend(f"{index} 0 obj\n".encode("ascii"))
+        output.extend(obj)
+        output.extend(b"\nendobj\n")
+    xref_offset = len(output)
+    output.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    output.extend(b"0000000000 65535 f \n")
+    for offset in offsets:
+        output.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    output.extend(b"trailer\n")
+    output.extend(
+        f"<< /Size {len(objects) + 1} /Root 1 0 R /Info 6 0 R >>\n".encode("ascii")
+    )
+    output.extend(b"startxref\n")
+    output.extend(f"{xref_offset}\n".encode("ascii"))
+    output.extend(b"%%EOF\n")
+    return bytes(output)
+
+
 def render_bundle(
     manifest: ExportManifest,
     records: Sequence[OrderedDict[str, object]],
     *,
     output_format: str,
-) -> tuple[str, str]:
+) -> tuple[str | bytes, str]:
     normalized = output_format.lower()
     if normalized == "json":
         return (
@@ -450,6 +730,19 @@ def render_bundle(
         if csv_body:
             body += csv_body
         return body, "text/csv"
+    if normalized == "html":
+        return _render_html_bundle(manifest, records), "text/html"
+    if normalized in {"obsidian", "obsidian-markdown"}:
+        return _render_obsidian_markdown(manifest, records), "text/markdown"
+    if normalized == "pdf":
+        html_body = _render_html_bundle(manifest, records)
+        pdf_bytes = _render_pdf_with_weasyprint(html_body)
+        if pdf_bytes is None:
+            pdf_lines = _serialize_pdf_content(manifest, records)
+            pdf_bytes = _render_pdf_with_reportlab(manifest, pdf_lines)
+            if pdf_bytes is None:
+                pdf_bytes = _render_minimal_pdf(manifest, pdf_lines)
+        return pdf_bytes, "application/pdf"
     raise ValueError(f"Unsupported format: {output_format}")
 
 
