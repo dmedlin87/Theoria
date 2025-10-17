@@ -15,6 +15,7 @@ from celery.utils.log import get_task_logger
 from sqlalchemy import func, literal, select, text
 from sqlalchemy.orm import Session
 
+from ..analytics.openalex_enrichment import enrich_document_openalex_details
 from ..analytics.topics import (
     generate_topic_digest,
     store_topic_digest,
@@ -522,14 +523,27 @@ def enrich_document(document_id: str, job_id: str | None = None) -> None:
 
         try:
             enriched = enricher.enrich_document(session, document)
-            if not enriched:
+            session.commit()
+
+            document = session.get(Document, document_id)
+            openalex_updated = False
+            if document is not None:
+                openalex_updated = enrich_document_openalex_details(session, document)
+                if openalex_updated:
+                    session.commit()
+            else:
+                logger.warning(
+                    "Document missing after enrichment commit", extra={"document_id": document_id}
+                )
+
+            if not (enriched or openalex_updated):
                 logger.info(
                     "No enrichment data available", extra={"document_id": document_id}
                 )
-            session.commit()
+
             if job_id:
                 _update_job_status(
-                    session, job_id, status="completed", document_id=document.id
+                    session, job_id, status="completed", document_id=document_id
                 )
                 session.commit()
         except Exception:  # pragma: no cover - defensive logging
