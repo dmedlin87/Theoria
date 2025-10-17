@@ -29,7 +29,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback when ``defusedxml`` m
     def _secure_fromstring(text: Any, parser: Any | None = None):
         _ensure_safe_xml(text)
         if parser is None:
-            parser = _ET.XMLParser(resolve_entities=False)
+            parser = _ET.XMLParser()
         return _ET.fromstring(text, parser=parser)
 
     ET = types.SimpleNamespace(  # type: ignore[assignment]
