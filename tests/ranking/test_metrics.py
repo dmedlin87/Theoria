@@ -21,6 +21,11 @@ def test_recall_at_k_binary_labels():
     assert metrics.recall_at_k(relevances, k=3) == 1.0
 
 
+def test_recall_at_k_handles_edge_cases():
+    assert metrics.recall_at_k([0, 0, 0], k=2) == 0.0
+    assert metrics.recall_at_k([1, 0, 1], k=0) == 0.0
+
+
 def test_batch_metrics_average_sequences():
     rankings = [[1, 0, 0], [0, 1, 0]]
     assert metrics.batch_ndcg_at_k(rankings, 3) == pytest.approx(
@@ -32,4 +37,22 @@ def test_batch_metrics_average_sequences():
     assert metrics.batch_recall_at_k(rankings, 3) == pytest.approx(
         (metrics.recall_at_k(rankings[0], 3) + metrics.recall_at_k(rankings[1], 3)) / 2
     )
+
+
+def test_dcg_and_ndcg_cover_additional_branches():
+    assert metrics.dcg_at_k([3, 2, 1], k=0) == 0.0
+    assert metrics.ndcg_at_k([0, 0, 0], k=5) == 0.0
+
+
+def test_batch_metrics_handle_empty_sequences():
+    assert metrics.batch_ndcg_at_k([], 5) == 0.0
+    assert metrics.batch_mrr([]) == 0.0
+    assert metrics.batch_recall_at_k([], 5) == 0.0
+
+
+def test_metric_functions_validate_input_types():
+    with pytest.raises(TypeError):
+        metrics.dcg_at_k(None, 3)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        metrics.ndcg_at_k(None, 3)  # type: ignore[arg-type]
 
