@@ -262,7 +262,6 @@ def sync_case_objects_for_document(
         _notify_new_objects(
             session,
             notified_ids,
-            settings,
             document_id=document.id,
         )
     return created_objects
