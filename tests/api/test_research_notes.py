@@ -15,7 +15,7 @@ from theo.application.facades.research import (
     ResearchNoteEvidenceDraft,
     get_research_service,
 )
-from theo.services.api.app.db.models import NoteEvidence, ResearchNote
+from theo.adapters.persistence.models import NoteEvidence, ResearchNote
 from theo.services.api.app.mcp.tools import handle_note_write
 
 

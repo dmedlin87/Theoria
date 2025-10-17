@@ -15,7 +15,7 @@ from theo.services.api.app.ai import (
 )
 from theo.services.api.app.ai.rag import GuardrailError, RAGCitation
 from theo.application.facades.database import get_session
-from theo.services.api.app.db.models import Document, Passage
+from theo.adapters.persistence.models import Document, Passage
 from theo.services.api.app.export import citations as citation_exports
 from theo.services.api.app.export.citations import build_citation_export
 from theo.services.api.app.models.ai import (

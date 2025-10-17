@@ -19,7 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.application.facades.database import Base
 from theo.services.api.app.db import seeds
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     CommentaryExcerptSeed,
     ContradictionSeed,
     GeoPlace,

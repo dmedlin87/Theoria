@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     Base,
     CommentaryExcerptSeed,
     ContradictionSeed,

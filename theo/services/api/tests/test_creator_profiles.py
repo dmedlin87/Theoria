@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 import pytest
 from fastapi.testclient import TestClient
 
-from theo.services.api.app.db.models import TranscriptSegment
+from theo.adapters.persistence.models import TranscriptSegment
 from theo.services.api.app.main import app
 from theo.application.facades import settings as settings_module
 

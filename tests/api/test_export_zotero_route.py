@@ -17,7 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.application.facades.database import get_session
-from theo.services.api.app.db.models import Document
+from theo.adapters.persistence.models import Document
 from theo.services.api.app.main import app
 
 

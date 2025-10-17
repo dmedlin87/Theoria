@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from theo.application.facades.database import Base
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     Creator,
     CreatorClaim,
     CreatorVerseRollup,

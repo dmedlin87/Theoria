@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.application.facades.database import Base
 from theo.services.api.app.db.feedback import record_feedback_event
-from theo.services.api.app.db.models import FeedbackEvent, FeedbackEventAction
+from theo.adapters.persistence.models import FeedbackEvent, FeedbackEventAction
 
 
 @pytest.fixture()

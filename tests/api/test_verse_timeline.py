@@ -18,7 +18,7 @@ from theo.application.facades.database import (  # noqa: E402  # import after pa
     configure_engine,
     get_engine,
 )
-from theo.services.api.app.db.models import Document, Passage, PassageVerse  # noqa: E402
+from theo.adapters.persistence.models import Document, Passage, PassageVerse  # noqa: E402
 from theo.services.api.app.ingest.osis import expand_osis_reference  # noqa: E402
 from theo.services.api.app.models.verses import VerseMentionsFilters  # noqa: E402
 from theo.services.api.app.retriever.verses import (  # noqa: E402

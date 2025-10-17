@@ -42,7 +42,7 @@ from theo.application.facades.database import (  # noqa: E402  (import after pat
     get_engine,
     get_settings,
 )
-from theo.services.api.app.db.models import (  # noqa: E402
+from theo.adapters.persistence.models import (  # noqa: E402
     ChatSession,
     Document,
     IngestionJob,

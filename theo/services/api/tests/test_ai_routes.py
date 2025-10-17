@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import configure_engine, get_engine, get_session
-from theo.services.api.app.db.models import AgentTrail, ChatSession, Document, Passage
+from theo.adapters.persistence.models import AgentTrail, ChatSession, Document, Passage
 from theo.services.api.app.main import app
 from theo.services.api.app.workers import tasks as worker_tasks
 from theo.services.cli.batch_intel import main as batch_intel_main

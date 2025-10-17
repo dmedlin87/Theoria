@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_engine
-from theo.services.api.app.db.models import Document
+from theo.adapters.persistence.models import Document
 from theo.services.api.app.main import app
 
 

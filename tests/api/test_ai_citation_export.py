@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.application.facades import database as database_module
 from theo.application.facades.database import configure_engine, get_engine, get_session
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     ContradictionSeed,
     Document,
     Passage,

@@ -17,7 +17,7 @@ from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, configure_engine, get_engine
 from theo.application.facades.settings import get_settings
 from theo.services.api.app.db import seeds as seeds_module
-from theo.services.api.app.db.models import AppSetting
+from theo.adapters.persistence.models import AppSetting
 from theo.services.api.app.main import app
 import theo.services.api.app.db.run_sql_migrations as migrations_module
 from theo.services.api.app.db.run_sql_migrations import (

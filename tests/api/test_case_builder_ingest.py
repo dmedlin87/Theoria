@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from theo.services.api.app.case_builder import sync_case_objects_for_document
 from theo.application.facades import settings as settings_module
 from theo.application.facades.database import Base
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     CaseObject,
     CaseSource,
     Document,

@@ -6,7 +6,7 @@ import pytest
 from theo.application.facades.database import get_engine
 from theo.services.api.app.ingest.osis import _osis_to_readable, osis_intersects
 from theo.services.api.app.transcripts.service import _matches_osis
-from theo.services.api.app.db.models import TranscriptSegment
+from theo.adapters.persistence.models import TranscriptSegment
 
 
 @pytest.fixture(autouse=True)

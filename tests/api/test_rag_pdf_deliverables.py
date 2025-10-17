@@ -9,7 +9,7 @@ from theo.services.api.app.ai.rag import (
     build_sermon_deliverable,
     build_transcript_deliverable,
 )
-from theo.services.api.app.db.models import Document, Passage
+from theo.adapters.persistence.models import Document, Passage
 
 
 def _sermon_response() -> SermonPrepResponse:

@@ -18,7 +18,7 @@ from theo.services.api.app.ai.registry import (
     _registry_from_payload,
     save_llm_registry,
 )
-from theo.services.api.app.db.models import AppSetting
+from theo.adapters.persistence.models import AppSetting
 
 logger = logging.getLogger(__name__)
 

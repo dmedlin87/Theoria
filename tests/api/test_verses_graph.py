@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.main import app
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     CommentaryExcerptSeed,
     ContradictionSeed,
     Document,

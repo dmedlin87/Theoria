@@ -14,7 +14,7 @@ from theo.domain.research import (
     ResearchNoteNotFoundError,
 )
 from theo.domain.repositories import ResearchNoteRepository
-from theo.services.api.app.db.models import NoteEvidence, ResearchNote as ResearchNoteModel
+from theo.adapters.persistence.models import NoteEvidence, ResearchNote as ResearchNoteModel
 
 
 def _normalize_tags(tags: tuple[str, ...] | None) -> list[str] | None:

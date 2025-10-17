@@ -11,6 +11,7 @@ from sqlalchemy import Column, Integer, MetaData, Table, create_engine
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.db import seeds
+from theo.adapters.persistence import sqlite as sqlite_utils
 
 
 @pytest.fixture
@@ -28,9 +29,9 @@ def sqlite_engine():
 def patch_resource_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub expensive resource cleanup helpers invoked by ``_dispose_sqlite_engine``."""
 
-    monkeypatch.setattr(seeds.gc, "get_objects", lambda: [])
-    monkeypatch.setattr(seeds.gc, "collect", lambda: None)
-    monkeypatch.setattr(seeds.time, "sleep", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(sqlite_utils.gc, "get_objects", lambda: [])
+    monkeypatch.setattr(sqlite_utils.gc, "collect", lambda: None)
+    monkeypatch.setattr(sqlite_utils.time, "sleep", lambda *_args, **_kwargs: None)
     fake_inspect = types.SimpleNamespace(stack=lambda: [])
     monkeypatch.setitem(sys.modules, "inspect", fake_inspect)
 

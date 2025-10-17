@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session, sessionmaker
 
-from theo.services.api.app.db.models import Document, TranscriptSegment, Video
+from theo.adapters.persistence.models import Document, TranscriptSegment, Video
 from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.transcripts.service import (
     build_source_ref,

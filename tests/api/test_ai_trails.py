@@ -18,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.ai.trails import TrailService, TrailStepDigest
 from theo.application.facades.database import Base
-from theo.services.api.app.db.models import AgentTrail, ChatSession
+from theo.adapters.persistence.models import AgentTrail, ChatSession
 from theo.services.api.app.models.ai import ChatGoalState, ChatMemoryEntry
 
 

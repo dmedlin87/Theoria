@@ -22,7 +22,7 @@ from theo.services.api.app.ai.memory_metadata import (
 )
 from theo.application.facades.database import get_session
 from theo.application.facades.settings import get_settings
-from theo.services.api.app.db.models import ChatSession
+from theo.adapters.persistence.models import ChatSession
 from theo.services.api.app.intent.tagger import get_intent_tagger
 from theo.services.api.app.models.ai import (
     ChatGoalProgress,
