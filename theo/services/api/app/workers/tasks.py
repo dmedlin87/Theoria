@@ -15,6 +15,7 @@ from celery.utils.log import get_task_logger
 from sqlalchemy import func, literal, select, text
 from sqlalchemy.orm import Session
 
+from ..analytics.topic_map import TopicMapBuilder
 from ..analytics.topics import (
     generate_topic_digest,
     store_topic_digest,
@@ -80,6 +81,15 @@ celery.conf.beat_schedule.setdefault(
         "task": "tasks.validate_citations",
         "schedule": crontab(hour="2", minute="30"),
         "kwargs": {"limit": 50},
+    },
+)
+
+celery.conf.beat_schedule.setdefault(
+    "refresh-topic-map-nightly",
+    {
+        "task": "tasks.refresh_topic_map",
+        "schedule": crontab(hour="1", minute="45"),
+        "kwargs": {"scope": "global"},
     },
 )
 
@@ -707,6 +717,32 @@ def send_topic_digest_notification(
 send_topic_digest_notification_task = cast(
     CeleryTask, send_topic_digest_notification
 )
+
+
+@celery.task(name="tasks.refresh_topic_map")
+def refresh_topic_map(scope: str = "global") -> dict[str, object]:
+    """Rebuild the analytics topic neighborhood graph for the given *scope*."""
+
+    engine = get_engine()
+    with Session(engine) as session:
+        builder = TopicMapBuilder(session)
+        snapshot = builder.build(scope=scope)
+        node_count = len(snapshot.nodes)
+        edge_count = len(snapshot.edges)
+        generated_at = snapshot.generated_at
+        session.commit()
+
+    metrics = {
+        "scope": scope,
+        "topic_count": node_count,
+        "edge_count": edge_count,
+        "generated_at": generated_at.isoformat(),
+    }
+    logger.info(
+        "Analytics topic map refreshed",
+        extra={"scope": scope, "topics": node_count, "edges": edge_count},
+    )
+    return metrics
 
 
 @celery.task(name="tasks.generate_topic_digest")

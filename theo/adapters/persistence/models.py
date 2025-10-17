@@ -1774,6 +1774,169 @@ class CorpusSnapshot(Base):
     meta: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
 
 
+class TopicMapNodeType(str, Enum):
+    """Kinds of nodes persisted in the analytics topic map."""
+
+    TOPIC = "topic"
+
+
+class TopicMapEdgeType(str, Enum):
+    """Relationship types connecting nodes within the topic map."""
+
+    SEMANTIC = "semantic"
+    CO_OCCURRENCE = "co_occurrence"
+
+
+class AnalyticsTopicMapSnapshot(Base):
+    """Snapshot of the global topic relationship graph."""
+
+    __tablename__ = "analytics_topic_map_snapshots"
+    __table_args__ = ({"extend_existing": True},)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scope: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+        index=True,
+    )
+    parameters: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+    meta: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+
+    nodes: Mapped[list["AnalyticsTopicMapNode"]] = relationship(
+        "AnalyticsTopicMapNode",
+        back_populates="snapshot",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="AnalyticsTopicMapNode.node_key",
+    )
+    edges: Mapped[list["AnalyticsTopicMapEdge"]] = relationship(
+        "AnalyticsTopicMapEdge",
+        back_populates="snapshot",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="AnalyticsTopicMapEdge.src_node_id",
+    )
+
+
+class AnalyticsTopicMapNode(Base):
+    """Node representation within the analytics topic map graph."""
+
+    __tablename__ = "analytics_topic_map_nodes"
+    __table_args__ = (
+        UniqueConstraint("snapshot_id", "node_key", name="uq_topic_map_node_key"),
+        {"extend_existing": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("analytics_topic_map_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    node_key: Mapped[str] = mapped_column(String, nullable=False)
+    node_type: Mapped[TopicMapNodeType] = mapped_column(
+        SQLEnum(TopicMapNodeType, name="analytics_topic_map_node_type"),
+        nullable=False,
+    )
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        VectorType(get_settings().embedding_dim), nullable=True
+    )
+    meta: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    snapshot: Mapped[AnalyticsTopicMapSnapshot] = relationship(
+        "AnalyticsTopicMapSnapshot", back_populates="nodes"
+    )
+    outgoing_edges: Mapped[list["AnalyticsTopicMapEdge"]] = relationship(
+        "AnalyticsTopicMapEdge",
+        back_populates="src_node",
+        cascade="all, delete-orphan",
+        foreign_keys="AnalyticsTopicMapEdge.src_node_id",
+    )
+    incoming_edges: Mapped[list["AnalyticsTopicMapEdge"]] = relationship(
+        "AnalyticsTopicMapEdge",
+        back_populates="dst_node",
+        cascade="all, delete-orphan",
+        foreign_keys="AnalyticsTopicMapEdge.dst_node_id",
+    )
+
+
+class AnalyticsTopicMapEdge(Base):
+    """Edge connecting two topic map nodes."""
+
+    __tablename__ = "analytics_topic_map_edges"
+    __table_args__ = (
+        UniqueConstraint(
+            "snapshot_id",
+            "src_node_id",
+            "dst_node_id",
+            "edge_type",
+            name="uq_topic_map_edge_unique",
+        ),
+        {"extend_existing": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("analytics_topic_map_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    src_node_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("analytics_topic_map_nodes.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    dst_node_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("analytics_topic_map_nodes.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    edge_type: Mapped[TopicMapEdgeType] = mapped_column(
+        SQLEnum(TopicMapEdgeType, name="analytics_topic_map_edge_type"),
+        nullable=False,
+    )
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    meta: Mapped[dict | list | None] = mapped_column(_JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    snapshot: Mapped[AnalyticsTopicMapSnapshot] = relationship(
+        "AnalyticsTopicMapSnapshot", back_populates="edges"
+    )
+    src_node: Mapped[AnalyticsTopicMapNode] = relationship(
+        "AnalyticsTopicMapNode",
+        foreign_keys=[src_node_id],
+        back_populates="outgoing_edges",
+    )
+    dst_node: Mapped[AnalyticsTopicMapNode] = relationship(
+        "AnalyticsTopicMapNode",
+        foreign_keys=[dst_node_id],
+        back_populates="incoming_edges",
+    )
+
+
 __all__ = sorted(
     name
     for name, obj in globals().items()
