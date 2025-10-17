@@ -6,16 +6,50 @@ import hashlib
 import logging
 import re
 from collections.abc import Callable
+from typing import Annotated, Any, Literal
 from functools import lru_cache
 from pathlib import Path
 
 from cryptography.fernet import Fernet
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .runtime import allow_insecure_startup
 
 LOGGER = logging.getLogger(__name__)
+
+
+class _BaseEventSink(BaseModel):
+    """Common fields shared by event sink configurations."""
+
+    name: str | None = None
+    enabled: bool = True
+
+
+class KafkaEventSink(_BaseEventSink):
+    """Configuration for Kafka-based event sinks."""
+
+    backend: Literal["kafka"] = "kafka"
+    topic: str
+    bootstrap_servers: str
+    producer_config: dict[str, Any] = Field(default_factory=dict)
+    flush_timeout_seconds: float | None = Field(
+        default=1.0,
+        description="Optional timeout (in seconds) for producer flush operations.",
+    )
+
+
+class RedisStreamEventSink(_BaseEventSink):
+    """Configuration for Redis Streams sinks."""
+
+    backend: Literal["redis_stream"] = "redis_stream"
+    stream: str
+    redis_url: str | None = None
+    maxlen: int | None = None
+    approximate_trim: bool = True
+
+
+EventSink = Annotated[KafkaEventSink | RedisStreamEventSink, Field(discriminator="backend")]
 
 
 class Settings(BaseSettings):
@@ -90,6 +124,10 @@ class Settings(BaseSettings):
     )
     notification_timeout_seconds: float = Field(
         default=10.0, description="HTTP timeout when delivering notifications"
+    )
+    event_sinks: list[EventSink] = Field(
+        default_factory=list,
+        description="Collection of event sink configurations for domain events.",
     )
     ingest_web_timeout_seconds: float = Field(
         default=10.0,
