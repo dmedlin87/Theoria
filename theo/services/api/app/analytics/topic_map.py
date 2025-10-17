@@ -39,7 +39,8 @@ def _average_vectors(vectors: Sequence[Sequence[float]]) -> list[float] | None:
     for vector in vectors:
         if len(vector) != dimension:
             continue
-        totals = [acc + float(component) for acc, component in zip(totals, vector, strict=True)]
+        for i, component in enumerate(vector):
+            totals[i] += float(component)
         count += 1
     if count == 0:
         return None
