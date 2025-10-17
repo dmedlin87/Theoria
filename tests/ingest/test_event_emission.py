@@ -55,7 +55,7 @@ def test_file_pipeline_emits_document_event(tmp_path) -> None:
 
         assert captured, "expected a document ingestion event"
         event = captured[-1]
-        assert event.document_id == document_id
+        assert event.document_id == str(document_id)
         assert event.workflow == "text"
         assert len(event.passage_ids) >= 1
     finally:
