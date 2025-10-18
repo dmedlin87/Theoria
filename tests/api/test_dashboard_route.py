@@ -5,8 +5,8 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
+from theo.adapters.persistence import models
 from theo.application.facades.database import get_session
-from theo.services.api.app.db import models
 from theo.services.api.app.main import app
 
 

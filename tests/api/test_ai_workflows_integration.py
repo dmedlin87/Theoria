@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from theo.services.api.app.ai import SermonPrepResponse, VerseCopilotResponse
 from theo.services.api.app.ai.rag import RAGAnswer
-from theo.services.api.app.core.database import get_session
+from theo.application.facades.database import get_session
 from theo.services.api.app.main import app
 from theo.services.api.app.models.ai import (
     ChatSessionMessage,

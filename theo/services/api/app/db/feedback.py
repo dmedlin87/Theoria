@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from .models import FeedbackEvent, FeedbackEventAction
+from theo.adapters.persistence.models import FeedbackEvent, FeedbackEventAction
 
 
 def record_feedback_event(

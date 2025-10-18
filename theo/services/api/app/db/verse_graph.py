@@ -8,8 +8,12 @@ from typing import Any, Iterable, TypeVar
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from theo.adapters.persistence.models import (
+    CommentaryExcerptSeed,
+    ContradictionSeed,
+    HarmonySeed,
+)
 from ..ingest.osis import expand_osis_reference, osis_intersects
-from .models import CommentaryExcerptSeed, ContradictionSeed, HarmonySeed
 
 _ALLOWED_PERSPECTIVES = {"apologetic", "skeptical", "neutral"}
 

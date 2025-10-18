@@ -13,7 +13,7 @@ import click
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..api.app.db.models import Document
+from theo.adapters.persistence.models import Document
 from ..api.app.export.citations import build_citation_export, render_citation_markdown
 from ..api.app.export.formatters import (
     build_document_export,

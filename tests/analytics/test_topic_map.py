@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from theo.application.facades import settings as settings_module
 from theo.application.facades.database import Base
 from theo.services.api.app.analytics.topic_map import TopicMapBuilder
-from theo.services.api.app.db.models import (
+from theo.adapters.persistence.models import (
     AnalyticsTopicMapSnapshot,
     Document,
     Passage,
