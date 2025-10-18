@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import re
 from collections.abc import Mapping
 from contextlib import contextmanager
 from time import perf_counter
@@ -130,6 +131,81 @@ def _build_histogram(*args: Any, **kwargs: Any) -> HistogramMetric:
     if Histogram is None:  # pragma: no cover - metrics disabled
         return cast(HistogramMetric, _NoopMetric())
     return cast(HistogramMetric, Histogram(*args, **kwargs))
+
+
+def _sanitise_metric_name(name: str) -> str:
+    """Convert dotted metric names into Prometheus-safe identifiers."""
+
+    sanitized = re.sub(r"[^a-zA-Z0-9_]+", "_", name)
+    if not sanitized:
+        return "theo_metric"
+    if sanitized[0].isdigit():
+        sanitized = f"metric_{sanitized}"
+    return sanitized
+
+
+_COUNTER_CACHE: dict[tuple[str, tuple[str, ...]], CounterMetric] = {}
+_HISTOGRAM_CACHE: dict[tuple[str, tuple[str, ...]], HistogramMetric] = {}
+
+
+def _get_counter_metric(name: str, label_names: tuple[str, ...]) -> CounterMetric:
+    key = (name, label_names)
+    metric = _COUNTER_CACHE.get(key)
+    if metric is None:
+        metric = _build_counter(
+            name,
+            f"Auto-generated counter for {name}",
+            labelnames=label_names,
+        )
+        _COUNTER_CACHE[key] = metric
+    return metric
+
+
+def _get_histogram_metric(name: str, label_names: tuple[str, ...]) -> HistogramMetric:
+    key = (name, label_names)
+    metric = _HISTOGRAM_CACHE.get(key)
+    if metric is None:
+        metric = _build_histogram(
+            name,
+            f"Auto-generated histogram for {name}",
+            labelnames=label_names,
+        )
+        _HISTOGRAM_CACHE[key] = metric
+    return metric
+
+
+def record_counter(
+    metric_name: str, amount: float = 1.0, labels: dict[str, Any] | None = None
+) -> None:
+    """Increment a Prometheus counter if metrics are enabled."""
+
+    label_values = labels or {}
+    label_names = tuple(sorted(label_values))
+    metric_id = _sanitise_metric_name(metric_name)
+    counter = _get_counter_metric(metric_id, label_names)
+    try:
+        counter.labels(**label_values).inc(amount)
+    except Exception:  # pragma: no cover - defensive
+        LOGGER.debug(
+            "failed to record counter", extra={"metric": metric_name, "labels": label_values}
+        )
+
+
+def record_histogram(
+    metric_name: str, value: float, labels: dict[str, Any] | None = None
+) -> None:
+    """Observe a value on a Prometheus histogram if metrics are enabled."""
+
+    label_values = labels or {}
+    label_names = tuple(sorted(label_values))
+    metric_id = _sanitise_metric_name(metric_name)
+    histogram = _get_histogram_metric(metric_id, label_names)
+    try:
+        histogram.labels(**label_values).observe(value)
+    except Exception:  # pragma: no cover - defensive
+        LOGGER.debug(
+            "failed to record histogram", extra={"metric": metric_name, "labels": label_values}
+        )
 
 
 WORKFLOW_RUNS: CounterMetric = _build_counter(
@@ -261,6 +337,8 @@ __all__ = [
     "instrument_workflow",
     "log_workflow_event",
     "set_span_attribute",
+    "record_counter",
+    "record_histogram",
     "RAG_CACHE_EVENTS",
     "CITATION_DRIFT_EVENTS",
     "SEARCH_RERANKER_EVENTS",
