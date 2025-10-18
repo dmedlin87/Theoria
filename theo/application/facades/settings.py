@@ -682,8 +682,7 @@ def _resolve_settings_secret_from_backend(settings: Settings) -> str | None:
         return adapter.get_secret(request)
     except SecretRetrievalError as exc:
         LOGGER.error(
-            "Secrets backend '%s' failed to resolve '%s': %s",
-            backend,
+            "Configured secrets backend failed to resolve '%s': %s",
             request.identifier,
             exc,
         )
