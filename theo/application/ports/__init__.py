@@ -12,6 +12,8 @@ __all__ = [
     "SecretRequest",
     "SecretsPort",
     "build_secrets_adapter",
+]
+
 from .events import (
     CompositeEventPublisher,
     DomainEvent,
@@ -21,7 +23,7 @@ from .events import (
     normalise_event_value,
 )
 
-__all__ = [
+__all__ += [
     "CompositeEventPublisher",
     "DomainEvent",
     "EventDispatchError",

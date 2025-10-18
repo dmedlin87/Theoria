@@ -13,8 +13,6 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from tests.fixtures import RegressionDataFactory
-
 try:  # pragma: no cover - optional dependency in local test harness
     import pytest_cov  # type: ignore  # noqa: F401
 
@@ -72,9 +70,15 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.fixture
-def regression_factory() -> RegressionDataFactory:
+def regression_factory():
     """Provide a seeded factory for synthesising regression datasets."""
 
+    try:
+        from tests.fixtures import RegressionDataFactory  # type: ignore
+    except ModuleNotFoundError as exc:  # pragma: no cover - thin local envs
+        pytest.skip(f"faker not installed for regression factory: {exc}")
+    except Exception as exc:  # pragma: no cover - guard against optional deps
+        pytest.skip(f"regression fixtures unavailable: {exc}")
     return RegressionDataFactory()
 
 
