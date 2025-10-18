@@ -9,7 +9,7 @@ from typing import Iterable
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from theo.adapters.persistence.models import (
+from theo.services.api.app.persistence_models import (
     Creator,
     CreatorClaim,
     TranscriptQuote,

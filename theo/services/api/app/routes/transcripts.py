@@ -6,6 +6,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
+from theo.adapters.persistence.transcript_repository import (
+    SQLAlchemyTranscriptRepository,
+)
 from ..models.transcripts import TranscriptSearchResponse, TranscriptSegmentModel
 from ..transcripts.service import (
     build_source_ref,
@@ -25,8 +28,9 @@ def search_transcripts(
     limit: int = Query(default=20, ge=1, le=100),
     session: Session = Depends(get_session),
 ) -> TranscriptSearchResponse:
+    repository = SQLAlchemyTranscriptRepository(session)
     segments = search_transcript_segments(
-        session, osis=osis, video_identifier=video, limit=limit
+        repository, osis=osis, video_identifier=video, limit=limit
     )
     models: list[TranscriptSegmentModel] = []
     for segment in segments:

@@ -8,7 +8,7 @@ from typing import Any, Iterable, TypeVar
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from theo.adapters.persistence.models import (
+from theo.services.api.app.persistence_models import (
     CommentaryExcerptSeed,
     ContradictionSeed,
     HarmonySeed,

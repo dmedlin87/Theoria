@@ -11,7 +11,7 @@ from typing import Iterable, Sequence
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from theo.adapters.persistence.models import (
+from theo.services.api.app.persistence_models import (
     AnalyticsTopicMapEdge,
     AnalyticsTopicMapNode,
     AnalyticsTopicMapSnapshot,

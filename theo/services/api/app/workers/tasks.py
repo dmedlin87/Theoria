@@ -33,7 +33,7 @@ from ..analytics.watchlists import (
     run_watchlist,
 )
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
-from theo.adapters.persistence.models import ChatSession, Document, IngestionJob, Passage
+from theo.services.api.app.persistence_models import ChatSession, Document, IngestionJob, Passage
 from theo.adapters.persistence.types import VectorType
 from ..models.export import DeliverableDownload
 from ..models.search import HybridSearchFilters

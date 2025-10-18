@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import get_settings
-from theo.adapters.persistence.models import Document, Passage
+from theo.services.api.app.persistence_models import Document, Passage
 from .chunking import Chunk, chunk_text
 from .embeddings import get_embedding_service, lexical_representation
 from .sanitizer import sanitize_passage_text

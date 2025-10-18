@@ -9,7 +9,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ingest.osis import expand_osis_reference
-from theo.adapters.persistence.models import (
+from theo.services.api.app.persistence_models import (
     CommentaryExcerptSeed,
     ContradictionSeed,
     HarmonySeed,

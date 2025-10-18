@@ -15,6 +15,7 @@ from .document import (
     DocumentSummaryDTO,
     PassageDTO,
 )
+from .transcript import TranscriptSegmentDTO, TranscriptVideoDTO
 
 __all__ = [
     "CorpusSnapshotDTO",
@@ -23,4 +24,6 @@ __all__ = [
     "DocumentDTO",
     "DocumentSummaryDTO",
     "PassageDTO",
+    "TranscriptSegmentDTO",
+    "TranscriptVideoDTO",
 ]

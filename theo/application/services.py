@@ -2,17 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Protocol
+from typing import Any, Callable, Protocol
 
 from theo.domain import Document, DocumentId
 
 from .research import ResearchService
 
-if TYPE_CHECKING:  # pragma: no cover - typing helper
-    from sqlalchemy.orm import Session
-else:  # pragma: no cover - runtime fallback
-    Session = object
+Session = Any
 
 
 class _CommandCallable(Protocol):

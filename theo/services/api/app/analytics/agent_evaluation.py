@@ -10,7 +10,7 @@ from typing import Iterable
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, joinedload
 
-from theo.adapters.persistence.models import AgentTrail, TrailRetrievalSnapshot
+from theo.services.api.app.persistence_models import AgentTrail, TrailRetrievalSnapshot
 
 
 @dataclass(frozen=True)

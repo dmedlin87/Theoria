@@ -848,6 +848,9 @@ def build_client(provider: str, config: dict[str, str]) -> LanguageModelClient:
     raise GenerationError(f"Unsupported provider: {provider}")
 
 
+set_client_factory(build_client)
+
+
 __all__ = [
     "AIClientSettings",
     "AnthropicClient",

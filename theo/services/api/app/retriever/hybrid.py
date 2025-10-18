@@ -12,7 +12,7 @@ from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from theo.application.facades.settings import get_settings
-from theo.adapters.persistence.models import Document, Passage
+from theo.services.api.app.persistence_models import Document, Passage
 from theo.adapters.persistence.types import VectorType
 from ..db.query_optimizations import query_with_monitoring
 from ..ingest.embeddings import get_embedding_service

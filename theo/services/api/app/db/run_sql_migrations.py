@@ -17,7 +17,7 @@ from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_engine
-from theo.adapters.persistence.models import AppSetting, ContradictionSeed
+from theo.services.api.app.persistence_models import AppSetting, ContradictionSeed
 
 logger = logging.getLogger(__name__)
 

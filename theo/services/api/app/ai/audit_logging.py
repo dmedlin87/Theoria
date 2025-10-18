@@ -13,7 +13,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session as SASession, sessionmaker
 
-from theo.adapters.persistence.models import AuditLog
+from theo.services.api.app.persistence_models import AuditLog
 
 LOGGER = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..case_builder import sync_annotation_case_object
-from theo.adapters.persistence.models import Document, DocumentAnnotation, Passage
+from theo.services.api.app.persistence_models import Document, DocumentAnnotation, Passage
 from ..models.base import Passage as PassageSchema
 from ..models.documents import (
     DocumentAnnotationCreate,
