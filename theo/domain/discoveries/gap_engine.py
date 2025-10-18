@@ -116,12 +116,24 @@ class GapDiscoveryEngine:
 
             missing_keywords = sorted(ref_keywords - best_shared)
             shared_keywords = sorted(best_shared)
-            gap_ratio = 0.0
-            if self.min_similarity != 0.0:
-                gap_ratio = min(1.0, max(self.min_similarity - best_similarity, 0.0) / self.min_similarity)
-            confidence = round(min(0.95, 0.5 + 0.45 * gap_ratio), 4)
+            coverage_ratio = 0.0
+            if ref_keywords:
+                coverage_ratio = len(shared_keywords) / len(ref_keywords)
+            gap_intensity = 1.0 - coverage_ratio
+            if self.min_similarity > 0.0:
+                gap_ratio = min(
+                    1.0,
+                    max(self.min_similarity - best_similarity, 0.0) / self.min_similarity,
+                )
+            else:
+                gap_ratio = gap_intensity
+            confidence_base = 0.55 + 0.35 * gap_intensity + 0.2 * gap_ratio
+            confidence = round(min(0.95, max(0.5, confidence_base)), 4)
             missing_ratio = len(missing_keywords) / max(len(ref_keywords), 1)
-            relevance = round(min(0.9, 0.45 + 0.5 * missing_ratio), 4)
+            relevance_base = 0.45 + 0.4 * missing_ratio
+            if best_topic_id is None:
+                relevance_base += 0.05
+            relevance = round(min(0.9, max(0.45, relevance_base)), 4)
 
             if best_topic_id is None:
                 related_docs: list[str] = []
@@ -150,6 +162,12 @@ class GapDiscoveryEngine:
                     "missingKeywords": missing_keywords,
                     "sharedKeywords": shared_keywords,
                     "scriptureReferences": topic["scriptures"],
+                    "coverageRatio": round(coverage_ratio, 4),
+                    "gapIntensity": round(gap_intensity, 4),
+                    "similarityScore": round(best_similarity, 4),
+                    "thresholdSimilarity": round(self.min_similarity, 4),
+                    "missingCount": len(missing_keywords),
+                    "sharedCount": len(shared_keywords),
                     "bestMatchTopicId": best_topic_id,
                 },
                 "relatedDocuments": related_docs,
