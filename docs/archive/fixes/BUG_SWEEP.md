@@ -26,7 +26,7 @@ A repository-wide test sweep was executed with `pytest`. Collection failed due t
 - **Cause:** `code_quality.py` imports `resolve_application`, which imports `theo.application.facades`. The facades package re-imports `resolve_application` via its `research` facade, causing a bootstrap-time cycle.
 - **Relevant files:**
   - `theo/services/cli/code_quality.py` imports `resolve_application`. 【F:theo/services/cli/code_quality.py†L1-L80】
-  - `theo/services/bootstrap.py` loads application facades during initialization. 【F:theo/services/bootstrap.py†L1-L40】
+  - `theo/platform/application.py` loads application facades during initialization and is re-exported by `theo/services/bootstrap`. 【F:theo/platform/application.py†L1-L40】
   - `theo/application/facades/__init__.py` re-exports the research facade, which calls back into `resolve_application`. 【F:theo/application/facades/__init__.py†L1-L52】
   - `theo/application/facades/research.py` invokes `resolve_application`, completing the loop. 【F:theo/application/facades/research.py†L1-L32】
 - **Captured error:** Circular import trace when importing the CLI test module. 【fe7ee2†L1-L21】

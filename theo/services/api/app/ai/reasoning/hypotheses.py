@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ...models.search import HybridSearchFilters
-from ..clients import GenerationError, build_hypothesis_prompt
+from theo.application.ports.ai_registry import GenerationError
+from ..clients import build_hypothesis_prompt
 from ..rag.retrieval import PassageRetriever
 from ..registry import LLMRegistry
 from ..router import LLMRouterService, get_router

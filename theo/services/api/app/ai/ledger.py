@@ -19,7 +19,7 @@ try:  # pragma: no cover - optional dependency
 except Exception:  # pragma: no cover - metrics disabled
     Counter = None  # type: ignore[assignment]
 
-from .clients import GenerationError
+from theo.application.ports.ai_registry import GenerationError
 
 
 @dataclass
