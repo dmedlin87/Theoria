@@ -15,7 +15,7 @@ import uuid
 import httpx
 from cachetools import LRUCache
 
-from theo.application.ports.ai_registry import GenerationError, set_client_factory
+from theo.application.ports.ai_registry import GenerationError
 
 
 class LanguageModelClient(Protocol):
