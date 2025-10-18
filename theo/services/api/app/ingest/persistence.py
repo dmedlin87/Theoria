@@ -1070,6 +1070,7 @@ def persist_transcript_document(
     )
 
     passages: list[Passage] = []
+    case_object_ids: set[str] = set()
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     collected_verse_refs: list[str] = []
