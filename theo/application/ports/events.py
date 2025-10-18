@@ -82,7 +82,7 @@ def normalise_event_value(value: Any) -> Any:
     if isinstance(value, (datetime, date, time)):
         return value.isoformat()
     if isinstance(value, Path):
-        return str(value)
+        return value.as_posix()
     if isinstance(value, (set, frozenset)):
         return [normalise_event_value(item) for item in sorted(value, key=str)]
     if isinstance(value, Mapping):

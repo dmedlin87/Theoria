@@ -11,7 +11,7 @@ from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...db.models import Document, Passage
+from theo.adapters.persistence.models import Document, Passage
 from ...models.search import HybridSearchFilters, HybridSearchResult
 from ...telemetry import (
     RAG_CACHE_EVENTS,

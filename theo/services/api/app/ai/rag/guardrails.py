@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...db.models import Document, Passage
+from theo.adapters.persistence.models import Document, Passage
 from ...models.search import HybridSearchFilters, HybridSearchResult
 from theo.application.ports.ai_registry import GenerationError
 from .models import RAGAnswer, RAGCitation

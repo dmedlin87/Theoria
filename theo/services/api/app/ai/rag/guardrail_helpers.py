@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 
 from sqlalchemy.orm import Session
 
-from ...db.models import Document, Passage
+from theo.adapters.persistence.models import Document, Passage
 from ...models.search import HybridSearchFilters, HybridSearchResult
 from .guardrails import (
     GuardrailError,

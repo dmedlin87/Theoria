@@ -8,14 +8,21 @@ from typing import Sequence
 import click
 from sqlalchemy.orm import Session
 
-from theo.application.facades.database import (
-    Base,
-    configure_engine,
-    get_engine,
-    get_settings,
-)
+from theo.application.facades.database import Base, configure_engine
+from theo.services.bootstrap import resolve_application
 
 from ..api.app.ingest.pipeline import PipelineDependencies, import_osis_commentary
+
+
+APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
+
+
+def get_settings():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("settings")
+
+
+def get_engine():  # pragma: no cover - transitional wiring helper
+    return _ADAPTER_REGISTRY.resolve("engine")
 
 
 @click.command()
