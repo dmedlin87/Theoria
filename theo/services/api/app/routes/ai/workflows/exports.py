@@ -330,7 +330,7 @@ def export_citations(
     audit_logger.log(
         workflow="export.citations",
         prompt_hash=prompt_hash,
-        model_preset=manifest.model_preset,
+        model_preset=getattr(manifest, "model_preset", None),
         inputs=log_inputs,
         outputs={
             "record_count": len(record_dicts),
