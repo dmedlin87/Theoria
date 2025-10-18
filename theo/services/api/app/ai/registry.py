@@ -37,7 +37,6 @@ def get_llm_registry(session: Session) -> LLMRegistry:
     payload = load_setting(session, SETTINGS_KEY, default=None)
     registry, migrated = application_registry_from_payload(
         payload if isinstance(payload, dict) else None,
-        client_factory=build_client,
         registry_cls=LLMRegistry,
         model_cls=LLMModel,
     )
