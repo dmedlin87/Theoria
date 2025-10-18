@@ -16,7 +16,32 @@ from itertools import count
 from typing import Iterable, Sequence
 
 import pythonbible as pb
-from faker import Faker
+
+try:  # pragma: no cover - exercised indirectly via tests
+    from faker import Faker  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - fallback for minimal test env
+    class Faker:
+        """Lightweight stand-in that mimics the subset of Faker we require."""
+
+        def __init__(self) -> None:
+            self._random = random.Random()
+
+        def seed_instance(self, seed: int) -> None:
+            self._random.seed(seed)
+
+        def words(self, nb: int = 3) -> list[str]:
+            return [f"word-{self._random.randint(1, 9_999_999):07d}" for _ in range(nb)]
+
+        def sentence(self, nb_words: int = 6) -> str:
+            words = self.words(nb_words)
+            words[0] = words[0].capitalize()
+            return " ".join(words) + "."
+
+        def sentences(self, nb: int = 3) -> list[str]:
+            return [self.sentence() for _ in range(nb)]
+
+        def paragraphs(self, nb: int = 3) -> list[str]:
+            return [" ".join(self.sentences(3)) for _ in range(nb)]
 
 from theo.domain.research.osis import format_osis, osis_to_readable
 from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
