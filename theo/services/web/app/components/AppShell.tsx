@@ -70,6 +70,8 @@ export function AppShell({
   const [navigationStatus, setNavigationStatus] = useState<string>("");
   const [isMobileNav, setIsMobileNav] = useState(false);
   const [navPanelOpen, setNavPanelOpen] = useState(true);
+  const [navInitialized, setNavInitialized] = useState(() => typeof window === "undefined");
+  const [shortcutHint, setShortcutHint] = useState("⌘K");
   const navContentRef = useRef<HTMLDivElement | null>(null);
   const navToggleRef = useRef<HTMLButtonElement | null>(null);
   const isNavOpen = !isMobileNav || navPanelOpen;
@@ -85,10 +87,48 @@ export function AppShell({
 
     updateMatches();
 
-    mediaQuery.addEventListener("change", updateMatches);
+    const handleChange = () => {
+      updateMatches();
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+
+    let frameId: number | null = null;
+    if (typeof window !== "undefined") {
+      frameId = window.requestAnimationFrame(() => {
+        setNavInitialized(true);
+      });
+    }
 
     return () => {
-      mediaQuery.removeEventListener("change", updateMatches);
+      mediaQuery.removeEventListener("change", handleChange);
+      if (frameId !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const platform = window.navigator.platform?.toLowerCase() ?? "";
+      const userAgent = window.navigator.userAgent?.toLowerCase() ?? "";
+      const isApplePlatform =
+        platform.includes("mac") ||
+        platform.includes("iphone") ||
+        platform.includes("ipad") ||
+        userAgent.includes("mac os") ||
+        userAgent.includes("iphone") ||
+        userAgent.includes("ipad");
+
+      setShortcutHint(isApplePlatform ? "⌘K" : "Ctrl+K");
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
     };
   }, []);
 
@@ -193,6 +233,7 @@ export function AppShell({
             id="app-shell-v2-nav-content"
             className="app-shell-v2__nav-content"
             data-open={!isMobileNav || isNavOpen}
+            data-ready={navInitialized}
             aria-hidden={isMobileNav && !isNavOpen}
             ref={navContentRef}
           >
@@ -258,7 +299,7 @@ export function AppShell({
           >
             <span className={styles.commandTriggerIcon}>⌘</span>
             <span className={styles.commandTriggerText}>Quick actions...</span>
-            <kbd className={styles.commandTriggerKbd}>⌘K</kbd>
+            <kbd className={styles.commandTriggerKbd}>{shortcutHint}</kbd>
           </button>
           <ConnectionStatusIndicator className={styles.statusIndicator} />
           <div

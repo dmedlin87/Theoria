@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import gc
 import time
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -56,26 +57,30 @@ def dispose_sqlite_engine(
         inspect = None  # type: ignore[assignment]
     if sqlite3 is not None:
         cursor_type = getattr(sqlite3, "Cursor", None)
-        for obj in gc.get_objects():
-            try:
-                if isinstance(obj, sqlite3.Connection):
-                    obj.close()
-                elif cursor_type is not None and isinstance(obj, cursor_type):
-                    obj.close()
-            except ReferenceError:
-                continue
-            except Exception:
-                continue
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            for obj in gc.get_objects():
+                try:
+                    if isinstance(obj, sqlite3.Connection):
+                        obj.close()
+                    elif cursor_type is not None and isinstance(obj, cursor_type):
+                        obj.close()
+                except ReferenceError:
+                    continue
+                except Exception:
+                    continue
         if inspect is not None:
-            for frame_info in inspect.stack():
-                for value in list(frame_info.frame.f_locals.values()):
-                    try:
-                        if isinstance(value, sqlite3.Connection):
-                            value.close()
-                        elif cursor_type is not None and isinstance(value, cursor_type):
-                            value.close()
-                    except Exception:
-                        continue
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", FutureWarning)
+                for frame_info in inspect.stack():
+                    for value in list(frame_info.frame.f_locals.values()):
+                        try:
+                            if isinstance(value, sqlite3.Connection):
+                                value.close()
+                            elif cursor_type is not None and isinstance(value, cursor_type):
+                                value.close()
+                        except Exception:
+                            continue
     gc.collect()
     time.sleep(0.05)
     if database_name and database_name != ":memory:":
@@ -111,9 +116,12 @@ def dispose_sqlite_engine(
             process = psutil.Process()
             target_paths = {str(path.resolve()) for path in candidates if path.exists()}
             for _ in range(100):
-                open_entries = [
-                    entry for entry in process.open_files() if entry.path in target_paths
-                ]
+                try:
+                    open_entries = [
+                        entry for entry in process.open_files() if entry.path in target_paths
+                    ]
+                except RuntimeError:
+                    break
                 if not open_entries:
                     break
                 for entry in open_entries:

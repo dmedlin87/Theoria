@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..db.models import EvidenceCard
+from theo.adapters.persistence.models import EvidenceCard
 
 
 def _normalize_tags(tags: Iterable[str] | None) -> list[str] | None:

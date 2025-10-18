@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from ..db.models import (
+from theo.adapters.persistence.models import (
     Document,
     EntryMention,
     Notebook,

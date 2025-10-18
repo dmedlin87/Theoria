@@ -22,7 +22,7 @@ from theo.platform.events.types import DocumentIngestedEvent
 from theo.application.graph import GraphDocumentProjection
 from ..case_builder import sync_passages_case_objects
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
-from ..db.models import (
+from theo.adapters.persistence.models import (
     CommentaryExcerptSeed,
     Creator,
     CreatorClaim,

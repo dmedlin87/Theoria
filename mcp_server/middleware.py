@@ -6,7 +6,7 @@ import time
 from typing import Callable
 from uuid import uuid4
 
-from fastapi import Request, Response
+from fastapi import Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
@@ -94,11 +94,15 @@ class RequestLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, max_body_size: int = 10 * 1024 * 1024) -> None:
         super().__init__(app)
         self.max_body_size = max_body_size
+        self._payload_limit_status = getattr(
+            status,
+            "HTTP_413_CONTENT_TOO_LARGE",
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        )
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Response]
     ) -> Response:
-        from fastapi import status
         from fastapi.responses import JSONResponse
 
         # Check Content-Length header if present
@@ -108,7 +112,7 @@ class RequestLimitMiddleware(BaseHTTPMiddleware):
                 length = int(content_length)
                 if length > self.max_body_size:
                     return JSONResponse(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        status_code=self._payload_limit_status,
                         content={
                             "error": {
                                 "code": "payload_too_large",

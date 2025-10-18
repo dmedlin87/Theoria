@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from theo.application.facades.settings import get_settings
 from theo.platform.events import event_bus
 from theo.platform.events.types import CaseObjectsUpsertedEvent
-from ..db.models import (
+from theo.adapters.persistence.models import (
     CaseObject,
     CaseSource,
     Document,

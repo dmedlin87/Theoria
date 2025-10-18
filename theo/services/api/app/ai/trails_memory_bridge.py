@@ -8,7 +8,7 @@ from typing import Any, Mapping, Sequence
 
 from sqlalchemy.orm import Session
 
-from ..db.models import AgentTrail, ChatSession
+from theo.adapters.persistence.models import AgentTrail, ChatSession
 from ..models.ai import (
     ChatGoalState,
     ChatMemoryEntry,

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from theo.services.bootstrap import resolve_application
 
-from ..db.models import Document
+from theo.adapters.persistence.models import Document
 from ..discoveries import DiscoveryService
 
 logger = logging.getLogger(__name__)

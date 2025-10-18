@@ -279,26 +279,17 @@ class RetrievalService:
                 },
             )
 
+        rerank_success = False
         if reranker is not None and top_n:
-            try:
-                reranked_head = reranker.rerank(results[:top_n])
-                ordered = list(reranked_head) + results[top_n:]
-                for index, item in enumerate(ordered, start=1):
-                    item.rank = index
-                results = ordered
+            results, rerank_success = self._rerank_results(
+                results,
+                reranker,
+                top_n,
+                log_reference=model_path,
+                log_extra={"strategy": strategy},
+            )
+            if rerank_success:
                 rerank_applied = True
-            except Exception as exc:
-                path_str = str(model_path) if model_path is not None else "<unknown>"
-                LOGGER.exception(
-                    "search.reranker_execution_failed",
-                    extra={
-                        "event": "search.reranker_execution_failed",
-                        "model_path": path_str,
-                        "strategy": strategy,
-                        "error": str(exc),
-                    },
-                )
-                SEARCH_RERANKER_EVENTS.labels(event="execution_failed").inc()
 
         self._record_experiments(
             experiments=experiments,
@@ -339,26 +330,17 @@ class RetrievalService:
             else:
                 header_reference = None
             if reranker is not None:
-                try:
-                    top_n = min(len(results), self.reranker_top_k)
-                    if top_n:
-                        reranked_head = reranker.rerank(results[:top_n])
-                        ordered = list(reranked_head) + results[top_n:]
-                        for index, item in enumerate(ordered, start=1):
-                            item.rank = index
-                        results = ordered
-                        reranker_header = _format_reranker_header(header_reference)
-                except Exception as exc:
-                    path_str = _format_reranker_header(header_reference) or "<unknown>"
-                    LOGGER.exception(
-                        "search.reranker_execution_failed",
-                        extra={
-                            "event": "search.reranker_execution_failed",
-                            "model_path": path_str,
-                            "error": str(exc),
-                        },
-                    )
-                    SEARCH_RERANKER_EVENTS.labels(event="execution_failed").inc()
+                top_n = min(len(results), self.reranker_top_k)
+                formatted_reference = _format_reranker_header(header_reference)
+                results, rerank_success = self._rerank_results(
+                    results,
+                    reranker,
+                    top_n,
+                    log_reference=formatted_reference or header_reference,
+                )
+                if rerank_success:
+                    reranker_header = formatted_reference
+                    rerank_applied = True
 
         if rewrite_metadata and rewrite_metadata.get("rewrite_applied"):
             for item in results:
@@ -398,36 +380,28 @@ class RetrievalService:
             )
             if reranker is None:
                 return None, None
-            header: str | None = None
+            header = None
             if self.settings.reranker_model_path is not None:
-                model_path = Path(self.settings.reranker_model_path)
-                header = model_path.name or str(model_path)
+                header = Path(self.settings.reranker_model_path).name or str(
+                    self.settings.reranker_model_path
+                )
             return reranker, header
-
-        loader = self.experimental_reranker_loaders.get(strategy)
-        if loader is None:
-            LOGGER.debug(
-                "search.reranker_strategy_unknown",
-                extra={
-                    "event": "search.reranker_strategy_unknown",
-                    "strategy": strategy,
-                    "experiments": experiments,
-                },
-            )
-            return self._load_reranker_for_strategy("default", experiments)
-
-        try:
-            return loader(self.settings, experiments)
-        except Exception as exc:  # pragma: no cover - defensive logging
-            LOGGER.exception(
-                "search.reranker_strategy_failed",
-                extra={
-                    "event": "search.reranker_strategy_failed",
-                    "strategy": strategy,
-                    "error": str(exc),
-                },
-            )
-            return None, None
+        else:
+            loader = self.experimental_reranker_loaders.get(strategy)
+            if loader is None:
+                return None, None
+            try:
+                return loader(self.settings, experiments)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                LOGGER.exception(
+                    "search.reranker_strategy_failed",
+                    extra={
+                        "event": "search.reranker_strategy_failed",
+                        "strategy": strategy,
+                        "error": str(exc),
+                    },
+                )
+                return None, None
 
     def _record_experiments(
         self,

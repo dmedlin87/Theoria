@@ -22,7 +22,7 @@ from theo.adapters.persistence.sqlite import dispose_sqlite_engine
 from theo.services.geo import seed_openbible_geo
 from ..ingest.osis import expand_osis_reference
 
-from .models import (
+from theo.adapters.persistence.models import (
     CommentaryExcerptSeed,
     ContradictionSeed,
     GeoPlace,

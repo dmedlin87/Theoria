@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..db.models import Document, Passage
+from theo.adapters.persistence.models import Document, Passage
 
 
 def compose_passage_meta(passage: Passage, document: Document) -> dict[str, Any] | None:

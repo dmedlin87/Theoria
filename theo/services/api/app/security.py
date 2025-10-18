@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
+import threading
+import time
+
 import jwt
 from fastapi import Header, HTTPException, Request, status
 from fastapi.security.utils import get_authorization_scheme_param
@@ -143,9 +146,27 @@ def _resolve_settings_with_credentials() -> tuple[Settings, bool]:
     # still be holding on to a cached ``Settings`` instance without the refreshed
     # credentials. Attempt a single cache refresh before treating the
     # configuration as missing so we honour the latest environment changes.
-    get_settings.cache_clear()
-    settings = get_settings()
-    return settings, _auth_configured(settings)
+    _refresh_settings_cache_if_stale()
+    refreshed_settings = get_settings()
+    return refreshed_settings, _auth_configured(refreshed_settings)
+
+
+_SETTINGS_REFRESH_LOCK = threading.Lock()
+_SETTINGS_REFRESHED_AT: float | None = None
+_SETTINGS_REFRESH_INTERVAL_SECONDS = 5.0
+
+
+def _refresh_settings_cache_if_stale() -> None:
+    now = time.monotonic()
+    with _SETTINGS_REFRESH_LOCK:
+        global _SETTINGS_REFRESHED_AT
+        if (
+            _SETTINGS_REFRESHED_AT is not None
+            and now - _SETTINGS_REFRESHED_AT < _SETTINGS_REFRESH_INTERVAL_SECONDS
+        ):
+            return
+        get_settings.cache_clear()
+        _SETTINGS_REFRESHED_AT = now
 
 
 def require_principal(

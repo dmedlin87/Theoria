@@ -60,6 +60,13 @@ generate_latest: Optional[GenerateLatestFn] = None
 logger = logging.getLogger(__name__)
 
 
+def _should_patch_httpx() -> bool:
+    disabled = os.getenv("THEO_DISABLE_HTTPX_COMPAT_PATCH", "0").lower()
+    if disabled in {"1", "true", "yes"}:
+        return False
+    return True
+
+
 def _patch_httpx_testclient_compat() -> None:
     try:
         import httpx  # type: ignore[import]
@@ -108,7 +115,8 @@ def _patch_httpx_testclient_compat() -> None:
     async_client_cls.__init__ = compat_async_init  # type: ignore[assignment]
 
 
-_patch_httpx_testclient_compat()
+if _should_patch_httpx():
+    _patch_httpx_testclient_compat()
 
 try:  # pragma: no cover - optional dependency
     prometheus_client = importlib.import_module("prometheus_client")
@@ -169,38 +177,39 @@ async def lifespan(_: FastAPI):
         database_module._SessionLocal = None  # type: ignore[attr-defined]
 
 
-def create_app() -> FastAPI:
-    """Create FastAPI application instance."""
-
-    _enforce_authentication_requirements()
-    _enforce_secret_requirements()
-    app = FastAPI(title="Theo Engine API", version="0.2.0", lifespan=lifespan)
-    settings = get_settings()
+def _configure_console_traces(settings) -> None:
     if os.getenv("THEO_ENABLE_CONSOLE_TRACES", "0").lower() in {"1", "true", "yes"}:
         configure_console_tracer()
-    if settings.cors_allowed_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=settings.cors_allowed_origins,
-            allow_credentials=True,
-            allow_methods=["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"],
-            allow_headers=[
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "Origin",
-                "X-Requested-With",
-            ],
-        )
+
+
+def _configure_cors(app: FastAPI, settings) -> None:
+    if not settings.cors_allowed_origins:
+        return
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "Origin",
+            "X-Requested-With",
+        ],
+    )
+
+
+def _install_error_reporting(app: FastAPI) -> None:
     app.add_middleware(
         ErrorReportingMiddleware,
         extra_context={"service": "api"},
     )
 
+
+def _register_health_routes(app: FastAPI) -> None:
     @app.get("/health", tags=["diagnostics"], include_in_schema=False)
     async def healthcheck() -> dict[str, object]:
-        """Return a summary health snapshot for infrastructure monitors."""
-
         from .services.health import get_health_service
 
         report = get_health_service().check()
@@ -208,22 +217,21 @@ def create_app() -> FastAPI:
 
     @app.get("/health/detail", tags=["diagnostics"], include_in_schema=False)
     async def healthcheck_detail() -> dict[str, object]:
-        """Return detailed adapter health data for observability consoles."""
-
         from .services.health import get_health_service
 
         report = get_health_service().check()
         return report.to_detail()
 
-    def _attach_trace_headers(
-        response: Response, trace_headers: dict[str, str] | None = None
-    ) -> Response:
-        headers = trace_headers or get_current_trace_headers()
-        for key, value in headers.items():
-            if key not in response.headers:
-                response.headers[key] = value
-        return response
 
+def _attach_trace_headers(response: Response, trace_headers: dict[str, str] | None = None) -> Response:
+    headers = trace_headers or get_current_trace_headers()
+    for key, value in headers.items():
+        if key not in response.headers:
+            response.headers[key] = value
+    return response
+
+
+def _register_trace_handlers(app: FastAPI) -> None:
     @app.middleware("http")
     async def add_trace_headers(request: Request, call_next: RequestResponseEndpoint):
         response = await call_next(request)
@@ -263,7 +271,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_with_trace(request: Request, exc: Exception) -> Response:  # type: ignore[override]
-        del exc  # Preserve the signature without exposing details.
+        del exc
         trace_headers = get_current_trace_headers()
         body: dict[str, str] = {"detail": "Internal Server Error"}
         trace_id = trace_headers.get(TRACE_ID_HEADER_NAME)
@@ -272,8 +280,8 @@ def create_app() -> FastAPI:
         response = JSONResponse(body, status_code=500)
         return _attach_trace_headers(response, trace_headers)
 
-    security_dependencies = [Depends(require_principal)]
 
+def _include_router_registrations(app: FastAPI, security_dependencies: list[Depends]) -> None:
     for registration in iter_router_registrations():
         include_kwargs: dict[str, object] = {
             "router": registration.router,
@@ -285,24 +293,50 @@ def create_app() -> FastAPI:
             include_kwargs["dependencies"] = security_dependencies
         app.include_router(**include_kwargs)
 
-    if generate_latest is not None:
-        metrics_generator = cast(GenerateLatestFn, generate_latest)
 
-        @app.get("/metrics", tags=["telemetry"])
-        def metrics_endpoint() -> PlainTextResponse:
-            payload = metrics_generator()
-            return PlainTextResponse(payload, media_type=CONTENT_TYPE_LATEST)
+def _register_metrics_endpoint(app: FastAPI) -> None:
+    if generate_latest is None:
+        return
+    metrics_generator = cast(GenerateLatestFn, generate_latest)
 
-    if settings.mcp_tools_enabled:
-        try:
-            from mcp_server.server import app as mcp_app
-        except ImportError as exc:  # pragma: no cover - defensive guard
-            logger.warning(
-                "MCP tools enabled but server package import failed: %s", exc
-            )
-        else:
-            app.mount("/mcp", mcp_app)
-            logger.info("Mounted MCP server at /mcp")
+    @app.get("/metrics", tags=["telemetry"])
+    def metrics_endpoint() -> PlainTextResponse:
+        payload = metrics_generator()
+        return PlainTextResponse(payload, media_type=CONTENT_TYPE_LATEST)
+
+
+def _mount_mcp(app: FastAPI, settings) -> None:
+    if not settings.mcp_tools_enabled:
+        return
+    try:
+        from mcp_server.server import app as mcp_app
+    except ImportError as exc:  # pragma: no cover - defensive guard
+        logger.warning(
+            "MCP tools enabled but server package import failed: %s", exc
+        )
+        return
+    app.mount("/mcp", mcp_app)
+    logger.info("Mounted MCP server at /mcp")
+
+
+def create_app() -> FastAPI:
+    """Create FastAPI application instance."""
+
+    _enforce_authentication_requirements()
+    _enforce_secret_requirements()
+    app = FastAPI(title="Theo Engine API", version="0.2.0", lifespan=lifespan)
+    settings = get_settings()
+    _configure_console_traces(settings)
+    _configure_cors(app, settings)
+    _install_error_reporting(app)
+    _register_health_routes(app)
+    _register_trace_handlers(app)
+
+    security_dependencies = [Depends(require_principal)]
+    _include_router_registrations(app, security_dependencies)
+
+    _register_metrics_endpoint(app)
+    _mount_mcp(app, settings)
 
     return app
 

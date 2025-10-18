@@ -61,6 +61,10 @@ router = APIRouter()
 
 LOGGER = logging.getLogger(__name__)
 
+_PAYLOAD_TOO_LARGE_STATUS = getattr(
+    status, "HTTP_413_CONTENT_TOO_LARGE", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+)
+
 _MAX_STORED_MEMORY = 10
 _MAX_CONTEXT_SNIPPETS = 4
 _MEMORY_TEXT_LIMIT = 600
@@ -562,7 +566,7 @@ def chat_turn(
         raise AIWorkflowError(
             "chat payload exceeds size limit",
             code="AI_CHAT_PAYLOAD_TOO_LARGE",
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=_PAYLOAD_TOO_LARGE_STATUS,
         )
     last_user = next(
         (message for message in reversed(payload.messages) if message.role == "user"),

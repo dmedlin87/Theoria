@@ -13,7 +13,7 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings_store import load_setting
-from ..db.models import (
+from theo.adapters.persistence.models import (
     GeoAncientPlace,
     GeoGeometry,
     GeoModernLocation,

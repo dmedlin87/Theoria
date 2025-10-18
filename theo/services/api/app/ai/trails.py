@@ -11,7 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..db.models import (
+from theo.adapters.persistence.models import (
     AgentStep,
     AgentTrail,
     TrailRetrievalSnapshot,

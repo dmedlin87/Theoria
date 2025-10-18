@@ -35,8 +35,18 @@ def _prepare_database(tmp_path: Path):
     return engine
 
 
-def test_create_annotation_persists_case_object(tmp_path) -> None:
+def test_create_annotation_persists_case_object(tmp_path, monkeypatch) -> None:
     """Annotations are mirrored into CaseObject rows when enabled."""
+
+    # Skip asynchronous worker dispatches that require external services.
+    monkeypatch.setattr(
+        "theo.services.api.app.ingest.events._dispatch_neighborhood_event",
+        lambda payload: None,
+    )
+    monkeypatch.setattr(
+        "theo.platform.events.event_bus.publish",
+        lambda *args, **kwargs: [],
+    )
 
     engine = _prepare_database(tmp_path)
 

@@ -24,6 +24,7 @@ class ResiliencePolicy:
 class CircuitState:
     failures: int = 0
     opened_at: float | None = None
+    last_touched: float = 0.0
 
 
 @dataclass(slots=True)
@@ -54,6 +55,8 @@ class ResilienceError(Exception):
 
 _CIRCUIT_STATES: MutableMapping[str, CircuitState] = {}
 _LOCK = threading.Lock()
+_MAX_CIRCUIT_ENTRIES = 512
+_CIRCUIT_TTL_SECONDS = 3600.0
 
 
 def _categorise_exception(exc: BaseException) -> str:
@@ -69,16 +72,20 @@ def _categorise_exception(exc: BaseException) -> str:
 def _reset_or_unlock(key: str, policy: ResiliencePolicy, now: float) -> None:
     state = _CIRCUIT_STATES.setdefault(key, CircuitState())
     if state.opened_at is None:
+        state.last_touched = now
         return
     if now - state.opened_at >= policy.breaker_reset_seconds:
         state.opened_at = None
         state.failures = 0
+    state.last_touched = now
 
 
 def _check_circuit(key: str, policy: ResiliencePolicy, now: float) -> CircuitState:
     with _LOCK:
+        _prune_circuit_states(now)
         state = _CIRCUIT_STATES.setdefault(key, CircuitState())
         _reset_or_unlock(key, policy, now)
+        state.last_touched = now
         if state.opened_at is not None:
             metadata = ResilienceMetadata(
                 attempts=0,
@@ -97,6 +104,7 @@ def _update_failures(key: str, policy: ResiliencePolicy, now: float) -> CircuitS
     with _LOCK:
         state = _CIRCUIT_STATES.setdefault(key, CircuitState())
         state.failures += 1
+        state.last_touched = now
         if state.failures >= policy.breaker_threshold:
             state.opened_at = now
         return state
@@ -107,6 +115,31 @@ def _reset_success(key: str) -> None:
         state = _CIRCUIT_STATES.setdefault(key, CircuitState())
         state.failures = 0
         state.opened_at = None
+        state.last_touched = time.monotonic()
+
+
+def _prune_circuit_states(now: float) -> None:
+    if len(_CIRCUIT_STATES) <= _MAX_CIRCUIT_ENTRIES:
+        stale_keys = [
+            key
+            for key, state in _CIRCUIT_STATES.items()
+            if state.last_touched and now - state.last_touched >= _CIRCUIT_TTL_SECONDS and state.failures == 0 and state.opened_at is None
+        ]
+        for key in stale_keys:
+            _CIRCUIT_STATES.pop(key, None)
+        return
+    sorted_keys = sorted(
+        _CIRCUIT_STATES.items(),
+        key=lambda item: item[1].last_touched,
+    )
+    excess = len(_CIRCUIT_STATES) - _MAX_CIRCUIT_ENTRIES
+    removed = 0
+    for key, state in sorted_keys:
+        if state.opened_at is None and state.failures == 0:
+            _CIRCUIT_STATES.pop(key, None)
+            removed += 1
+            if removed >= excess:
+                break
 
 
 def resilient_operation(

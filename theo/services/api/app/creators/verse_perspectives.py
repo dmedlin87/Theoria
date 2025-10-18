@@ -11,7 +11,7 @@ from typing import Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from ..db.models import (
+from theo.adapters.persistence.models import (
     Creator,
     CreatorClaim,
     CreatorVerseRollup,

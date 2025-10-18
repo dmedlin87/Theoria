@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..db.models import Passage
+from theo.adapters.persistence.models import Passage
 from ..models.research import (
     NoteEvidenceCreate,
     ResearchNote as ResearchNoteSchema,

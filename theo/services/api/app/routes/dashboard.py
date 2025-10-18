@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 
-from ..db import models
+from theo.adapters.persistence import models
 from ..models.dashboard import (
     DashboardActivity,
     DashboardMetric,

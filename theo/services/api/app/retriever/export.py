@@ -7,7 +7,7 @@ from collections import defaultdict
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from ..db.models import Document, Passage
+from theo.adapters.persistence.models import Document, Passage
 from ..models.base import Passage as PassageSchema
 from ..models.documents import DocumentDetailResponse
 from ..models.export import (

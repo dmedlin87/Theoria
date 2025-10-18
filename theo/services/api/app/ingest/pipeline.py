@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from theo.application.graph import GraphProjector, NullGraphProjector
 from theo.application.facades.graph import get_graph_projector
 from theo.application.facades.settings import Settings, get_settings
-from ..db.models import Document, TranscriptSegment
+from theo.adapters.persistence.models import Document, TranscriptSegment
 from ..telemetry import instrument_workflow, set_span_attribute
 from .embeddings import get_embedding_service
 from .exceptions import UnsupportedSourceError

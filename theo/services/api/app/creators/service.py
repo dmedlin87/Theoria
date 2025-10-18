@@ -9,7 +9,11 @@ from typing import Iterable
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..db.models import Creator, CreatorClaim, TranscriptQuote
+from theo.adapters.persistence.models import (
+    Creator,
+    CreatorClaim,
+    TranscriptQuote,
+)
 
 
 @dataclass(slots=True)

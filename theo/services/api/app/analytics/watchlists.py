@@ -8,7 +8,12 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..db.models import Document, Passage, UserWatchlist, WatchlistEvent
+from theo.adapters.persistence.models import (
+    Document,
+    Passage,
+    UserWatchlist,
+    WatchlistEvent,
+)
 from ..models.watchlists import (
     WatchlistCreateRequest,
     WatchlistFilters,

@@ -22,7 +22,12 @@ from theo.domain.discoveries import (
     TrendDiscoveryEngine,
 )
 
-from ..db.models import CorpusSnapshot, Discovery, Document, Passage
+from theo.adapters.persistence.models import (
+    CorpusSnapshot,
+    Discovery,
+    Document,
+    Passage,
+)
 
 
 def _coerce_topics(raw: object) -> list[str]:

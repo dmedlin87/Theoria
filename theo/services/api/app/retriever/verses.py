@@ -9,7 +9,7 @@ from typing import Literal, cast as typing_cast
 from sqlalchemy import Date, DateTime, Integer, cast, case, exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from ..db.models import Document, Passage, PassageVerse
+from theo.adapters.persistence.models import Document, Passage, PassageVerse
 from ..ingest.osis import canonical_verse_range, expand_osis_reference
 from ..models.base import Passage as PassageSchema
 from ..models.verses import (

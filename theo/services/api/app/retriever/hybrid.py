@@ -12,8 +12,8 @@ from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import get_settings
-from ..db.models import Document, Passage
-from ..db.types import VectorType
+from theo.adapters.persistence.models import Document, Passage
+from theo.adapters.persistence.types import VectorType
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.documents import DocumentAnnotationResponse

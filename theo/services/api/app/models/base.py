@@ -63,7 +63,10 @@ else:  # pragma: no cover - executed only at runtime
 class APIModel(BaseModel):
     """Base schema configuration enabling ORM compatibility."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        from_attributes=True,
+        protected_namespaces=(),
+    )
 
 
 class TimestampedModel(APIModel):

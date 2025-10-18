@@ -8,7 +8,7 @@ from typing import Any, Iterable
 import httpx
 from sqlalchemy.orm import Session
 
-from ..db.models import Document
+from theo.adapters.persistence.models import Document
 from .openalex import OpenAlexClient, _dedupe
 
 

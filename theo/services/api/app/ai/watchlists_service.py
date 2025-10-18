@@ -15,7 +15,7 @@ from ..analytics.watchlists import (
     run_watchlist,
     update_watchlist,
 )
-from ..db.models import UserWatchlist
+from theo.adapters.persistence.models import UserWatchlist
 from ..models.watchlists import (
     WatchlistCreateRequest,
     WatchlistResponse,

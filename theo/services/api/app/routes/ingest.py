@@ -42,9 +42,13 @@ run_pipeline_for_file = _run_pipeline_for_file
 run_pipeline_for_transcript = _run_pipeline_for_transcript
 run_pipeline_for_url = _run_pipeline_for_url
 
+_PAYLOAD_TOO_LARGE_STATUS = getattr(
+    status, "HTTP_413_CONTENT_TOO_LARGE", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+)
+
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
-    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE: {"description": "Upload too large"},
+    _PAYLOAD_TOO_LARGE_STATUS: {"description": "Upload too large"},
 }
 
 
@@ -161,7 +165,7 @@ async def _stream_upload_to_path(
                     raise IngestionError(
                         "Upload exceeds maximum allowed size",
                         code="INGESTION_UPLOAD_TOO_LARGE",
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        status_code=_PAYLOAD_TOO_LARGE_STATUS,
                         severity=Severity.USER,
                         hint="Reduce the file size or configure a larger quota before retrying.",
                     )

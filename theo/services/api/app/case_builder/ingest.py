@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 from datetime import UTC, datetime
 from typing import Any, Sequence
 
@@ -11,7 +10,7 @@ from sqlalchemy.orm import Session
 from theo.application.facades.settings import Settings, get_settings
 from theo.platform.events import event_bus
 from theo.platform.events.types import CaseObjectsUpsertedEvent
-from ..db.models import (
+from theo.adapters.persistence.models import (
     CaseObject,
     CaseObjectType,
     CaseSource,
@@ -147,6 +146,23 @@ def _notify_new_objects(
     )
 
 
+try:
+    from inspect import signature as _inspect_signature
+except ImportError:  # pragma: no cover - standard library availability
+    _inspect_signature = None
+
+
+if _inspect_signature is not None:  # pragma: no branch
+    try:
+        _NOTIFY_SUPPORTS_DOCUMENT_ID = (
+            "document_id" in _inspect_signature(_notify_new_objects).parameters
+        )
+    except (TypeError, ValueError):
+        _NOTIFY_SUPPORTS_DOCUMENT_ID = False
+else:  # pragma: no cover - fallback when inspect.signature missing
+    _NOTIFY_SUPPORTS_DOCUMENT_ID = False
+
+
 def sync_case_objects_for_document(
     session: Session,
     *,
@@ -173,12 +189,18 @@ def sync_case_objects_for_document(
 
     created_objects: list[CaseObject] = []
     updated_objects: list[CaseObject] = []
-    for passage in passages:
-        existing = (
+    passage_ids = [passage.id for passage in passages if passage.id is not None]
+    existing_by_passage_id: dict[str, CaseObject] = {}
+    if passage_ids:
+        existing_objects = (
             session.query(CaseObject)
-            .filter(CaseObject.passage_id == passage.id)
-            .one_or_none()
+            .filter(CaseObject.passage_id.in_(passage_ids))
+            .all()
         )
+        existing_by_passage_id = {obj.passage_id: obj for obj in existing_objects}
+
+    for passage in passages:
+        existing = existing_by_passage_id.get(passage.id)
 
         osis_ranges = _extract_osis_ranges(passage)
         meta = _build_passage_metadata(passage)
@@ -201,6 +223,8 @@ def sync_case_objects_for_document(
                 published_at=document.pub_date,
             )
             session.add(case_object)
+            if passage.id is not None:
+                existing_by_passage_id[passage.id] = case_object
             created_objects.append(case_object)
         else:
             updated = False
@@ -261,11 +285,7 @@ def sync_case_objects_for_document(
         notified_ids.extend(obj.id for obj in updated_objects)
     if notified_ids:
         notify_kwargs: dict[str, object] = {}
-        try:
-            signature = inspect.signature(_notify_new_objects)
-        except (TypeError, ValueError):
-            signature = None
-        if signature and "document_id" in signature.parameters:
+        if _NOTIFY_SUPPORTS_DOCUMENT_ID:
             notify_kwargs["document_id"] = document.id
         _notify_new_objects(
             session,

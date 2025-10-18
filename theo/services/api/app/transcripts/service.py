@@ -6,7 +6,7 @@ import pythonbible as pb
 from sqlalchemy import Integer, cast, exists, func, or_, select
 from sqlalchemy.orm import Session
 
-from ..db.models import TranscriptSegment, Video
+from theo.adapters.persistence.models import TranscriptSegment, Video
 from ..ingest.osis import expand_osis_reference, format_osis
 
 
