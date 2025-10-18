@@ -115,6 +115,10 @@ can map each command to the relevant subsystem.
 
 ### Prerequisites
 
+- **Python**: 3.11 or newer. Create a virtual environment (`python -m venv .venv && source .venv/bin/activate`) to keep
+  dependencies isolated.
+- **Node.js**: 20.x LTS (includes an npm version that works with the web client build).
+
 ```bash
 pip install -r requirements.txt
 ```
