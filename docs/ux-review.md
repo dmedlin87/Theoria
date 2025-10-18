@@ -2,7 +2,7 @@
 
 ## Highlights
 - The dashboard greets users with contextual metadata, provides manual refresh controls, and surfaces load/error states through accessible status messaging. 【F:theo/services/web/app/dashboard/DashboardClient.tsx†L94-L144】
-- The system health card announces adapter status changes via `aria-live`, colour-coded badges, and latency metadata that help operators triage outages quickly. 【F:theo/services/web/app/dashboard/components/SystemHealthCard.tsx†L206-L251】
+- The system health card announces adapter status changes via `aria-live`, color-coded badges, and latency metadata that help operators triage outages quickly. 【F:theo/services/web/app/dashboard/components/SystemHealthCard.tsx†L206-L251】
 - The chat workspace communicates the active reasoning mode with labelled radio groups and offers quick navigation to adjacent research tools, reinforcing the broader workflow. 【F:theo/services/web/app/chat/ChatWorkspace.tsx†L650-L756】
 
 ## Issues & Recommendations
