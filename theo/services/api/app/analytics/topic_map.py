@@ -177,20 +177,19 @@ class TopicMapBuilder:
                 weight = float(round(similarity, 6))
             else:
                 weight = float(len(shared))
+            edge_meta = {
+                "sharedDocuments": shared,
+            }
+            if similarity is not None:
+                edge_meta["similarity"] = round(similarity, 6)
+
             edge = AnalyticsTopicMapEdge(
                 snapshot_id=snapshot.id,
                 src_node_id=node_records[topic_a].id,
                 dst_node_id=node_records[topic_b].id,
                 edge_type=edge_type,
                 weight=weight,
-                src_node_id=node_records[topic_a].id,
-                dst_node_id=node_records[topic_b].id,
-                edge_type=edge_type,
-                weight=edge_weight,
-                meta={
-                    "sharedDocuments": shared,
-                    "similarity": round(similarity, 6),
-                },
+                meta=edge_meta,
             )
             snapshot.edges.append(edge)
 
