@@ -11,12 +11,36 @@ literal strings in multiple places.
 from __future__ import annotations
 
 import random
+import string
 from dataclasses import dataclass
 from itertools import count
 from typing import Iterable, Sequence
 
 import pythonbible as pb
-from faker import Faker
+
+try:  # pragma: no cover - optional dependency for richer fake text
+    from faker import Faker  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - executed when Faker missing
+    class Faker:  # type: ignore[override]
+        """Minimal stub mirroring the parts of :class:`faker.Faker` that we use."""
+
+        def __init__(self) -> None:
+            self._random = random.Random()
+
+        def seed_instance(self, seed: int) -> None:
+            self._random.seed(seed)
+
+        def _word(self) -> str:
+            length = self._random.randint(3, 8)
+            return "".join(self._random.choice(string.ascii_lowercase) for _ in range(length))
+
+        def sentence(self, nb_words: int = 5) -> str:
+            words = [self._word() for _ in range(nb_words)]
+            sentence = " ".join(words).capitalize()
+            return f"{sentence}."
+
+        def sentences(self, nb: int = 3) -> list[str]:
+            return [self.sentence() for _ in range(nb)]
 
 from theo.domain.research.osis import format_osis, osis_to_readable
 from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation

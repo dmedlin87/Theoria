@@ -183,10 +183,6 @@ class TopicMapBuilder:
                 dst_node_id=node_records[topic_b].id,
                 edge_type=edge_type,
                 weight=weight,
-                src_node_id=node_records[topic_a].id,
-                dst_node_id=node_records[topic_b].id,
-                edge_type=edge_type,
-                weight=edge_weight,
                 meta={
                     "sharedDocuments": shared,
                     "similarity": round(similarity, 6),
