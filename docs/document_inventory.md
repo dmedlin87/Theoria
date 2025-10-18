@@ -25,9 +25,9 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
 | `AGENT_HANDOFF_COMPLETE.md` | Summary of delivered handoff materials | Active |
 | `HANDOFF_SESSION_2025_10_15.md` | Session recap and deployment notes | Active |
 | `HANDOFF_MYPY_FIXES_2025_10_17.md` | Strict typing follow-up summary | Active |
-| `HANDOFF_NEXT_PHASE.md` | 4–6 week delivery roadmap (source of truth) | Active |
+| `HANDOFF_NEXT_PHASE.md` | Cognitive Scholar delivery roadmap (source of truth) | Active |
 | `IMPLEMENTATION_CONTEXT.md` | Architecture and implementation patterns | Active |
-| `QUICK_START_FOR_AGENTS.md` | Action plan for incoming agents (Gap Analysis kickoff) | Active |
+| `QUICK_START_FOR_AGENTS.md` | Action plan for incoming agents (Cognitive Scholar kickoff) | Active |
 | `DOCUMENTATION_CLEANUP_SUMMARY.md` | Record of the October cleanup and archive reorg | Informational |
 | `test-ui-enhancements.md` | Manual regression checklist for UI v2 | Reference |
 
@@ -37,10 +37,10 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
   - `docs/INDEX.md` — Comprehensive index organized by persona.
   - `docs/DOCUMENTATION_GUIDE.md` — Structure, naming, and archive policy.
 
-- **Discovery Engine**
-  - `docs/DISCOVERY_FEATURE.md` — End-to-end feature specification (keep aligned with backend progress).
-  - `docs/DISCOVERY_SCHEDULER.md` — Scheduler architecture and lifecycle.
-  - `docs/CONTRADICTION_DETECTION.md` — Implemented DeBERTa-based contradiction engine.
+- **Cognitive Scholar**
+  - `docs/ROADMAP.md` — MVP/Alpha/Beta milestones for hypothesis, gate, TMS, debate, and visualization layers.
+  - `HANDOFF_NEXT_PHASE.md` — Phase-by-phase implementation guide for the Cognitive Scholar stack.
+  - `docs/AGENT_AND_PROMPTING_GUIDE.md` — Prompting guardrails and gate operations documentation.
 
 - **Architecture & Operations**
   - `docs/BLUEPRINT.md` — System design blueprint.

@@ -26,17 +26,18 @@ Your AI agents have everything they need to continue development:
 
 ### 3. **QUICK_START_FOR_AGENTS.md** - Immediate Action Plan
 - Condensed quick-start guide
-- Next task: Gap Analysis (Phase 1.2)
+- Next task: Cognitive Gate v0 + Hypothesis Objects
 - Complete implementation steps with code examples
 - Testing instructions
-- What to do after Gap Analysis
+- Follow-on checklist through TMS and Debate v0
 
 ### 4. **HANDOFF_NEXT_PHASE.md** - Long-term Roadmap
-- 4-6 week development plan
-- Phase 1: Complete Discovery Engine (Week 1-2)
-- Phase 2: Expose Agent Reasoning (Week 3)
-- Phase 3: Personalized Dashboard (Week 4)
-- Phase 4: Citation Manager (Week 5-6)
+- 6-8 week Cognitive Scholar delivery plan
+- Phase 1: Hypothesis Objects & Cognitive Gate v0 (Week 1-2)
+- Phase 2: POU Loop Swap & Research UI Refresh (Week 3)
+- Phase 3: Thought Management System (TMS) v0 (Week 4-5)
+- Phase 4: Debate Loop v0 & Visualization Layer v1 (Week 6)
+- Phase 5: Meta-Prompt Picker & Beta Hardening (Week 7-8)
 - Success metrics for each phase
 
 ---
@@ -218,7 +219,7 @@ Repeat pattern for Connection, Trend, and Anomaly detection.
 - ❌ Phase 3: Personalized dashboard
 - ❌ Phase 4: Citation manager
 
-**Estimated Timeline:** 4-6 weeks to complete all phases
+**Estimated Timeline:** 6-8 weeks to complete Cognitive Scholar phases
 
 ---
 
@@ -322,12 +323,12 @@ All context is in the documentation. If agents need clarification:
 
 ### What Makes This Handoff Complete
 
-1. **Clear starting point** - Gap Analysis is next, with full implementation guide
+1. **Clear starting point** - Cognitive Gate v0 + Hypothesis Objects ready with full implementation guide
 2. **Complete context** - Architecture, patterns, conventions all documented
-3. **Working examples** - Two discovery engines already implemented
+3. **Working examples** - Discovery engines and reasoning flows illustrate patterns
 4. **Test coverage** - Patterns and examples for testing
-5. **Roadmap** - Clear path for next 4-6 weeks
-6. **Success criteria** - Know when each phase is done
+5. **Roadmap** - Clear path for the next 6-8 weeks of Cognitive Scholar delivery
+6. **Success criteria** - Know when each Cognitive Scholar phase is done
 
 ### Your Agents Can Now:
 - ✅ Understand the architecture

@@ -1,187 +1,117 @@
 # Theoria - Next Phase Development Plan
 
-> **Status:** Ready for implementation  
-> **Last Updated:** 2025-01-15  
-> **Estimated Timeline:** 4-6 weeks
+> **Status:** Ready for implementation
+> **Last Updated:** 2025-02-10
+> **Estimated Timeline:** 6–8 weeks
 
 ---
 
 ## Executive Summary
 
-Theoria has a solid foundation. Next phase: **complete discovery engine**, **expose agent reasoning**, **personalized dashboard**, and **citation export**.
+The next delivery window advances the **Cognitive Scholar** initiative: durable hypothesis objects, gate-managed reasoning, and
+structured debate workflows. The plan is organized around successive capability layers—gate, loop control, thought management,
+debate orchestration, and prompt governance. Each phase concludes with demos and telemetry hooks to keep research UX and safety
+in lockstep.
 
 ### Current State ✅
-- ✅ Frontend UI complete
-- ✅ RAG pipeline working
-- ✅ Reasoning framework implemented (not exposed)
-- ✅ Discovery backend (pattern detection only)
-- ✅ Background scheduler (just added)
-- ✅ Comprehensive documentation
+- ✅ Frontend scaffolding for `/research/hypotheses`
+- ✅ Prompt kernel prototypes for the Cognitive Gate
+- ✅ Baseline Prompt-Observe-Update loop in production
+- ✅ Reasoning telemetry primitives (trails, fallacy reports)
+- ✅ Documentation and safety guardrails for agents
 
 ### What's Next 🎯
-1. Complete Discovery Engine (5 missing types)
-2. Expose Agent Reasoning in UI
-3. Personalized Dashboard
-4. Citation Manager
+1. Productionize Cognitive Gate v0 and ship hypothesis objects.
+2. Swap the Prompt-Observe-Update loop to be gate-aware and log all outcomes.
+3. Launch Thought Management System (TMS) v0 with persistence and admin tooling.
+4. Orchestrate Debate Loop v0 and wire structured visualizations.
+5. Deliver Meta-Prompt picker and finalize Beta readiness hardening.
 
 ---
 
-## Phase 1: Complete Discovery Engine (Week 1-2)
+## Phase 1 (Week 1–2): Hypothesis Objects & Cognitive Gate v0
 
-### 1.1 Contradiction Detection ⭐ HIGH PRIORITY
-**Why:** High user value, leverages existing contradiction seeds
+### Goals
+- Persist research hypotheses with lifecycle metadata and evidence hooks.
+- Stand up the Cognitive Gate service for admission control and policy enforcement.
 
-**Files to create:**
-- `theo/domain/discoveries/contradiction_engine.py`
-- `tests/domain/discoveries/test_contradiction_engine.py`
+### Tasks
+- **Hypothesis Schema & Storage**
+  - Create migrations for `hypotheses`, `hypothesis_evidence`, and linking tables.
+  - Implement repository/service layer APIs for CRUD and status transitions.
+  - Backfill tests covering optimistic concurrency and soft-deletes.
+- **Cognitive Gate Service v0**
+  - Convert the prompt kernel into `theo/services/api/app/ai/gate/service.py`.
+  - Implement score computation, policy thresholds, and audit logging.
+  - Expose `/api/ai/gate/evaluate` endpoint with contract tests.
+- **Integration & Telemetry**
+  - Wire gate decisions into research/chat flows in `GuardedAnswerPipeline`.
+  - Emit structured telemetry (scores, policy, overrides) to metrics stream.
+  - Document gate operations, fail-open criteria, and override workflow in `docs/AGENT_AND_PROMPTING_GUIDE.md`.
 
-**Key implementation:**
-- Use pre-trained NLI model (microsoft/deberta-v3-base-mnli)
-- Compare document pairs for contradictions
-- Link to existing contradiction seeds
-- Confidence scores 0.6-0.95
+## Phase 2 (Week 3): POU Loop Swap & Research UI Refresh
 
-### 1.2 Gap Analysis ⭐ HIGH PRIORITY
-**Why:** Helps users discover missing topics
+### Goals
+- Replace legacy evaluator with gate-managed control logic.
+- Expose hypotheses and gate results in the research UI.
 
-**Files to create:**
-- `theo/domain/discoveries/gap_engine.py`
-- `data/seeds/theological_topics.yaml`
-- `tests/domain/discoveries/test_gap_engine.py`
+### Tasks
+- **POU Loop Swap**
+  - Update `GuardedAnswerPipeline` to delegate to the Cognitive Gate.
+  - Add fallback handling for gate errors (retry, degrade, operator alert).
+  - Expand unit and integration tests to cover pass, reject, and override paths.
+- **UI & API Updates**
+  - Enhance `/research/hypotheses` page to display gate verdicts, scores, and timestamps.
+  - Extend research API responses with hypothesis IDs and gate metadata.
+  - Update docs and demos illustrating hypothesis creation and review flows.
 
-**Key implementation:**
-- Use BERTopic for topic modeling
-- Compare against reference topics (Christology, Soteriology, etc.)
-- Suggest searches to fill gaps
+## Phase 3 (Weeks 4–5): Thought Management System (TMS) v0
 
-### 1.3 Connection Detection
-**Why:** Builds on existing cross-reference data
+### Goals
+- Manage concurrent hypotheses, branching, and archival through a dedicated service.
+- Provide operators with tooling to inspect and replay thought sequences.
 
-**Files to create:**
-- `theo/domain/discoveries/connection_engine.py`
+### Tasks
+- **TMS Service Layer**
+  - Implement `theo/services/api/app/ai/tms/service.py` with session lifecycle management.
+  - Persist step history including prompt, agent, gate verdict, and outcome.
+  - Create retention policy jobs for pruning inactive sessions.
+- **Admin & Observability**
+  - Build admin UI for TMS inspection (filter by hypothesis, gate verdict, outcome).
+  - Add replay endpoint to re-run or audit sessions under new policies.
+  - Instrument metrics for session duration, branch counts, and overrides.
 
-**Key implementation:**
-- Build graph from shared verse_ids
-- Find bridge documents
-- Calculate connection strength (Jaccard similarity)
+## Phase 4 (Weeks 6): Debate Loop v0 & Visualization Layer v1
 
-### 1.4 Trend Detection
-**Why:** Shows topic evolution over time
+### Goals
+- Introduce orchestrated pro/con agents moderated by the Cognitive Gate.
+- Visualize debates and hypothesis evolution in the research UI.
 
-**Files to create:**
-- `theo/domain/discoveries/trend_engine.py`
+### Tasks
+- **Debate Orchestration**
+  - Implement debate coordinator managing rounds, agent roles, and gate validations.
+  - Persist debate transcripts linked to hypotheses and TMS sessions.
+  - Establish safety guardrails, scoring rubric, and escalation paths for moderator intervention.
+- **Visualization Layer v1**
+  - Add timeline and graph components showing hypothesis confidence changes.
+  - Surface gate/debate telemetry dashboards (admission rate, overrides, contention points).
+  - Capture UX feedback checklist post-demo for iteration planning.
 
-**Key implementation:**
-- Compare current vs. historical snapshots
-- Calculate topic frequency changes
-- Identify emerging/declining topics
+## Phase 5 (Week 7–8): Meta-Prompt Picker & Beta Hardening
 
-### 1.5 Anomaly Detection
-**Why:** Find outlier documents
+### Goals
+- Allow researchers to select prompt presets aligned with their objectives.
+- Harden the system for limited Beta release with telemetry, safety, and documentation updates.
 
-**Files to create:**
-- `theo/domain/discoveries/anomaly_engine.py`
-
-**Key implementation:**
-- Use sklearn IsolationForest
-- Identify outliers in embeddings
-- Explain why anomalous
-
-### Integration
-Update `DiscoveryService.refresh_user_discoveries()` to run all engines.
-
----
-
-## Phase 2: Expose Agent Reasoning (Week 3)
-
-### 2.1 Reasoning Mode Toggle ⭐ HIGH PRIORITY
-**Files to modify:**
-- `theo/services/web/app/chat/page.tsx`
-- `theo/services/api/app/ai/router.py`
-
-**Add modes:**
-- 🔍 Detective (step-by-step)
-- 🤔 Critic (challenge assumptions)
-- 🛡️ Apologist (harmonize)
-- 📊 Synthesizer (survey all views)
-
-### 2.2 Display Reasoning Trace
-**Files to create:**
-- `theo/services/web/components/ReasoningTrace.tsx`
-
-**Features:**
-- Expandable/collapsible
-- Step-by-step display
-- Confidence bars
-
-### 2.3 Fallacy Warnings
-**Files to create:**
-- `theo/services/web/components/FallacyWarnings.tsx`
-
-**Features:**
-- Highlight high severity
-- Show suggestions
-- Educational tooltips
-
-### 2.4 Hypothesis Dashboard
-**Files to create:**
-- `theo/services/web/app/research/hypotheses/page.tsx`
-
-**Features:**
-- Card view with confidence bars
-- Supporting/contradicting evidence counts
-- "Test Hypothesis" button
-
----
-
-## Phase 3: Personalized Dashboard (Week 4)
-
-### Implementation
-**Files to modify:**
-- `theo/services/web/app/page.tsx` (replace landing)
-
-**Files to create:**
-- `theo/services/api/app/routes/dashboard.py`
-
-**Sections:**
-1. Quick stats (documents, discoveries, queries, insights)
-2. Recent activity timeline
-3. Latest discoveries (top 6)
-4. Quick actions (Upload, Chat, Browse, Search)
-5. Bookmarked research
-
----
-
-## Phase 4: Citation Manager (Week 5-6)
-
-### 4.1 Citation Export ⭐ HIGH PRIORITY
-**Files to create:**
-- `theo/services/api/app/export/citations.py`
-- `theo/services/web/components/CitationExport.tsx`
-
-**Formats:**
-- APA 7th Edition
-- Chicago 17th Edition
-- SBL 2nd Edition
-- BibTeX
-
-### 4.2 Bibliography Builder
-**Files to create:**
-- `theo/services/web/app/bibliography/page.tsx`
-
-**Features:**
-- Document selector
-- Live preview
-- Copy/download/email
-
-### 4.3 Zotero Integration (Optional)
-**Files to create:**
-- `theo/services/api/app/export/zotero.py`
-
-**Features:**
-- API key configuration
-- One-click export
-- Batch support
+### Tasks
+- **Meta-Prompt Picker**
+  - Curate presets (Exploratory, Apologetic, Critical, Synthesis) with guardrail annotations.
+  - Add UI controls to switch presets mid-session with validation warnings.
+  - Track preset usage, satisfaction scores, and gate outcomes per preset.
+- **Beta Hardening**
+  - Run load tests for multi-hypothesis debate sessions; capture baseline metrics.
+  - Expand adversarial test suite covering hallucination, citation drift, and prompt abuse.
+  - Update onboarding documentation, create Beta feedback rubric, and finalize release checklist.
 
 ---
 
@@ -189,74 +119,39 @@ Update `DiscoveryService.refresh_user_discoveries()` to run all engines.
 
 ### Unit Tests
 ```bash
-pytest tests/domain/discoveries/ -v
-pytest tests/api/ai/test_reasoning_modules.py -v
-pytest tests/api/export/test_citations.py -v
+pytest tests/domain/hypotheses/ -v
+pytest tests/api/ai/test_gate.py -v
+pytest tests/api/ai/test_pou_loop.py -v
+pytest tests/api/ai/test_tms.py -v
+pytest tests/api/ai/test_debate.py -v
 ```
 
-### Integration Tests
+### Integration & E2E
 ```bash
-pytest tests/api/test_discovery_integration.py -v
-pytest tests/api/test_reasoning_integration.py -v
-pytest tests/api/test_dashboard.py -v
+pytest tests/api/test_research_workflow.py -v
+pytest tests/ui/test_hypothesis_workflow.py -v
+npm run test:e2e:research --workspace theo/services/web
 ```
 
-### Manual Testing
-- [ ] Upload document → discoveries appear
-- [ ] Chat in detective mode → reasoning shows
-- [ ] Dashboard loads with stats
-- [ ] Export citations works
+### Telemetry & Safety Checks
+```bash
+python scripts/telemetry/validate_gate_events.py
+pytest tests/safety/test_prompt_guardrails.py -v
+```
 
 ---
 
-## Deployment Checklist
+## Dependencies & Risks
 
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run migrations
-3. Restart: `.\start-theoria.ps1`
-4. Verify scheduler: Check logs for "Discovery scheduler started"
-5. Smoke test: Upload, chat, check dashboard
+- **Model Variance** – Gate scoring depends on frontier models; capture calibration curves per provider.
+- **Telemetry Overhead** – New metrics streams may impact ingestion; batch writes and monitor latency.
+- **Operator Training** – Gate overrides and debate moderation require updated runbooks and demos.
 
 ---
 
-## Success Metrics
+## Communication Plan
 
-**Phase 1:** All 6 discovery types working, 10+ discoveries per user  
-**Phase 2:** 30%+ use reasoning modes, 80%+ find helpful  
-**Phase 3:** 80%+ sessions start from dashboard  
-**Phase 4:** 40%+ export citations, 90%+ find useful  
+- Weekly demo cadence showcasing gate decisions, TMS session replays, and debate transcripts.
+- Async updates in `#theoria-research` summarizing gate metrics, hypothesis counts, and debate outcomes.
+- Mid-cycle retrospective after Phase 3 to adjust scope for Beta hardening.
 
----
-
-## Risk Mitigation
-
-**NLI too slow?** Use smaller model, cache results  
-**BERTopic fails?** Require 20+ documents minimum  
-**Too many discoveries?** Smart filtering, top 5 view  
-**Users confused?** Add tooltips, examples, onboarding  
-
----
-
-## Quick Reference
-
-### Key Files Modified
-- `requirements.txt` - Added apscheduler
-- `theo/services/api/app/main.py` - Added scheduler lifecycle
-- `theo/services/api/app/workers/discovery_scheduler.py` - New scheduler
-
-### Key Documentation
-- `docs/AGENT_AND_PROMPTING_GUIDE.md` - Agent architecture
-- `docs/DISCOVERY_SCHEDULER.md` - Scheduler details
-- `docs/DISCOVERY_FEATURE.md` - Discovery spec
-- `docs/IMPLEMENTATION_GUIDE.md` - Reasoning framework
-
-### Next Session Start Here
-1. Review this handoff
-2. Pick Phase 1.1 (Contradiction Detection)
-3. Create `theo/domain/discoveries/contradiction_engine.py`
-4. Implement NLI-based detection
-5. Test and integrate
-
----
-
-**Ready to start Phase 1!** 🚀

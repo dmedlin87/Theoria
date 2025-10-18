@@ -1,57 +1,65 @@
 # Roadmap
 
-> **Source of truth:** `HANDOFF_NEXT_PHASE.md` (last updated 2025-01-15)
+> **Source of truth:** `HANDOFF_NEXT_PHASE.md` (last updated 2025-02-10)
 
-This document summarizes the active roadmap derived from the handoff plan. Use it as a quick reference; consult `HANDOFF_NEXT_PHASE.md` for full implementation details and task breakdowns.
+The Cognitive Scholar initiative reshapes Theoria's planning lens. This roadmap surfaces the delivery checkpoints for the
+Hypothesis & Debate stack. Refer to `HANDOFF_NEXT_PHASE.md` for detailed task breakdowns, owners, and acceptance criteria.
 
 ## Current Status
 
-- **Discovery Engine**
-  - Pattern detection 
-  - Contradiction detection (DeBERTa-based engine completed January 2025)
-  - Gap analysis Pending (BERTopic integration)
-  - Connection, trend, anomaly detection Pending
-  - Background scheduler (APScheduler refresh every 30 minutes)
-- **Agent Reasoning UI** Not yet exposed (framework exists)
-- **Personalized Dashboard** Planned
-- **Citation Manager** Zotero integration shipped; broader manager roadmap tracked in Phase 4
+- **Hypothesis Objects** – Data contract drafted; API scaffolding pending.
+- **Cognitive Gate** – Prompt kernel prototypes exist in notebooks; no production service yet.
+- **POU Loop** – Existing Prompt-Observe-Update loop still uses legacy evaluator and needs to be swapped for the gate-aware
+  controller.
+- **Thought Management System (TMS)** – No persisted thread manager yet; relies on flat trail logs.
+- **Debate Loop** – Debate primitives exist in research prompts but lack orchestration and guardrails.
+- **Visualization Layers** – Lightweight hypothesis table shipped; timeline and graph overlays remain in design.
 
-## Phase 1 – Complete Discovery Engine (Weeks 1–2)
+## MVP (Weeks 1–3): Cognitive Scholar Foundations
 
-- **1.2 Gap Analysis (High Priority)**
-  - Implement `theo/domain/discoveries/gap_engine.py`
-  - Seed reference topics in `data/seeds/theological_topics.yaml`
-  - Integrate BERTopic, add tests under `tests/domain/discoveries/`
-- **1.3 Connection Detection**
-  - Graph-based relationships via shared verses
-  - Introduce `connection_engine.py` and supporting tests
-- **1.4 Trend Detection**
-  - Time-series analysis across corpus snapshots
-  - Surface emerging and declining topics
-- **1.5 Anomaly Detection**
-  - IsolationForest-based outlier surfacing
-  - Explain deviation using metadata and verse usage
+- **Hypothesis Objects v1**
+  - Define persistent hypothesis schema and migrations.
+  - Ship CRUD APIs and SDK helpers for research sessions.
+  - Surface hypotheses in `/research/hypotheses` with status, confidence, and supporting evidence counts.
+- **Cognitive Gate v0**
+  - Promote the gate kernel into a FastAPI service module.
+  - Wire the gate into the Prompt-Observe-Update (POU) loop for chat and research flows.
+  - Implement gate telemetry: entry scores, rejection reasons, timing.
+- **POU Loop Swap**
+  - Replace the legacy evaluator in `GuardedAnswerPipeline` with gate-driven control decisions.
+  - Update regression trails to exercise pass/block branches.
+  - Document fail-open/fail-closed policies for moderators.
 
-## Phase 2 – Expose Agent Reasoning (Week 3)
+## Alpha (Weeks 4–6): Managed Reasoning & Disputation
 
-- Add reasoning mode toggle in `theo/services/web/app/chat/page.tsx`
-- Update API routing in `theo/services/api/app/ai/router.py`
-- Render reasoning traces and fallacy warnings in new components under `theo/services/web/components/`
-- Ship hypothesis dashboard at `/research/hypotheses`
+- **Thought Management System (TMS) v0**
+  - Introduce TMS service responsible for hypothesis selection, branching, and archival.
+  - Add per-step metadata (prompts, decisions, verdicts) with retention policies.
+  - Provide admin tools to inspect and replay TMS sessions.
+- **Debate Loop v0**
+  - Stand up pro/con agent pair orchestrated by the Cognitive Gate.
+  - Persist debate rounds as structured artifacts linked to hypotheses.
+  - Add guardrails and scoring rubric for moderator decisions.
+- **Visualization Layer v1**
+  - Render debate timelines and hypothesis evolution graphs in `/research/hypotheses`.
+  - Add gate telemetry dashboards summarizing admission, rejection, and override rates.
 
-## Phase 3 – Personalized Dashboard (Week 4)
+## Beta (Weeks 7–9): Research UX Polish & Prompt Governance
 
-- Replace landing page with personalized overview
-- Create API route `theo/services/api/app/routes/dashboard.py`
-- Surface quick stats, recent activity, discoveries, and bookmarks
-
-## Phase 4 – Citation Manager (Weeks 5–6)
-
-- Expand citation export formats (APA, Chicago, SBL, BibTeX)
-- Enhance `/bibliography` builder and related API endpoints
-- Continue polishing Zotero integration (`theo/services/api/app/export/zotero.py`)
+- **Meta-Prompt Picker**
+  - Curate prompt presets aligned with research goals (Exploratory, Apologetic, Critical, Synthesis).
+  - Provide UI affordances to swap presets mid-session with guardrail warnings.
+  - Track usage analytics and feedback loops for preset tuning.
+- **Advanced Visualization Layer**
+  - Introduce heatmaps for contention points and stacked confidence trendlines.
+  - Export hypothesis/debate trails as shareable reports (PDF/Markdown).
+- **TMS & Debate Hardening**
+  - Load-test multi-hypothesis sessions, capture performance baselines.
+  - Expand safety suite covering adversarial prompts, hallucination checks, and citation drift.
+  - Prepare Beta feedback rubric and incorporate participant onboarding checklist.
 
 ## Maintenance Notes
 
-- Keep this summary aligned with `HANDOFF_NEXT_PHASE.md` after each milestone.
-- Update `docs/DISCOVERY_FEATURE.md` as new engines ship to reflect backend progress.
+- Keep this summary synchronized with `HANDOFF_NEXT_PHASE.md` after each milestone.
+- Update dependent documentation (`docs/AGENT_AND_PROMPTING_GUIDE.md`, `docs/document_inventory.md`) whenever milestone names or
+  scopes change.
