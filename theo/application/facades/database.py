@@ -9,6 +9,7 @@ from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -76,7 +77,14 @@ class _TheoSession(Session):
             bind = self.get_bind()
         except Exception:
             bind = None
-        super().close()
+        try:
+            super().close()
+        except ProgrammingError as exc:
+            if "closed database" not in str(exc).lower():
+                raise
+            # SQLite disposal helpers may close the underlying connection
+            # before SQLAlchemy attempts its implicit rollback.  Suppress the
+            # resulting noise so session cleanup remains idempotent.
         if bind is not None:
             dispose_sqlite_engine(bind, dispose_engine=False)
 

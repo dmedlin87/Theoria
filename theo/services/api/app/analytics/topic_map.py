@@ -173,16 +173,17 @@ class TopicMapBuilder:
                 if similarity >= self.similarity_threshold
                 else TopicMapEdgeType.CO_OCCURRENCE
             )
-            if edge_type is TopicMapEdgeType.SEMANTIC:
-                weight = float(round(similarity, 6))
-            else:
-                weight = float(len(shared))
+            edge_weight = (
+                float(round(similarity, 6))
+                if edge_type is TopicMapEdgeType.SEMANTIC
+                else float(len(shared))
+            )
             edge = AnalyticsTopicMapEdge(
                 snapshot_id=snapshot.id,
                 src_node_id=node_records[topic_a].id,
                 dst_node_id=node_records[topic_b].id,
                 edge_type=edge_type,
-                weight=weight,
+                weight=edge_weight,
                 meta={
                     "sharedDocuments": shared,
                     "similarity": round(similarity, 6),
