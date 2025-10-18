@@ -13,6 +13,9 @@ dependencies = []
 [tool.setuptools]
 include-package-data = true
 
+[tool.setuptools.package-data]
+"theo.data.research" = ["*.json"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["theo*", "mcp_server*"]
