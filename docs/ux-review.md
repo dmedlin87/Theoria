@@ -12,7 +12,7 @@
    - *Recommendation:* Add a skeleton, spinner, or descriptive message while metrics are loading so the user understands data is on the way.
 
 2. **Quick actions column lacks an empty-state affordance.**
-   - If the API returns zero quick actions the section still renders the heading but no list items, which can look like broken UI. 【F:theo/services/web/app/dashboard/components/QuickActionsPanel.tsx†L9-L30】
+   - If the API returns zero quick actions, the section still renders the heading but no list items, which can look like broken UI. 【F:theo/services/web/app/dashboard/components/QuickActionsPanel.tsx†L9-L30】
    - *Recommendation:* Render guidance (for example, “No shortcuts yet—open a notebook to pin it here”) or hide the card entirely when there are no actions.
 
 3. **Quick stats fallback values can mislead.**
