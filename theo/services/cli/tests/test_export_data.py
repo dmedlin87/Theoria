@@ -50,7 +50,7 @@ def export_module(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> ModuleType
         monkeypatch.setitem(sys.modules, name, module)
 
     install_stub(
-        "theo.services.api.app.db.models",
+        "theo.adapters.persistence.models",
         {"Document": type("Document", (), {})},
     )
     install_stub(

@@ -8,13 +8,13 @@ from typing import Iterable
 import click
 from sqlalchemy.orm import Session
 
-from ..api.app.ai import run_corpus_curation
 from ..api.app.analytics.topics import (
     generate_topic_digest,
     store_topic_digest,
     upsert_digest_document,
 )
-from ..api.app.db.models import Document, Passage
+from theo.adapters.persistence.models import Document
+from theo.adapters.persistence.types import DocumentId
 from theo.services.bootstrap import resolve_application
 
 

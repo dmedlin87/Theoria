@@ -15,7 +15,7 @@ import httpx
 from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
-from ..api.app.db.models import Document
+from theo.adapters.persistence.models import Document
 from ..api.app.enrich import MetadataEnricher
 from ..api.app.ingest.pipeline import (
     PipelineDependencies,

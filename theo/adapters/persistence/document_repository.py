@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Iterable, Sequence
 
 import numpy as np
@@ -82,6 +83,21 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             stmt = stmt.limit(limit)
         documents = self.session.scalars(stmt).all()
         return [document_summary_to_dto(doc) for doc in documents]
+
+    def list_created_since(
+        self, since: datetime, limit: int | None = None
+    ) -> list[DocumentDTO]:
+        """Return documents created on/after *since* ordered by timestamp."""
+
+        stmt = (
+            select(Document)
+            .where(Document.created_at >= since)
+            .order_by(Document.created_at.asc())
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        documents = self.session.scalars(stmt).all()
+        return [document_to_dto(doc) for doc in documents]
 
     @staticmethod
     def _average_vectors(vectors: Sequence[Sequence[float]]) -> list[float]:
