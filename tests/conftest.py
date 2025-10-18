@@ -7,7 +7,10 @@ import os
 import sys
 from collections.abc import Generator
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
+
+if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
+    from tests.fixtures import RegressionDataFactory
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -70,7 +73,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.fixture
-def regression_factory():
+def regression_factory() -> RegressionDataFactory:
     """Provide a seeded factory for synthesising regression datasets."""
 
     module = pytest.importorskip(
