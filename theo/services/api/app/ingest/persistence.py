@@ -931,7 +931,10 @@ def persist_text_document(
                 metadata=metadata or None,
             )
         )
+<<<<<<< HEAD
 
+=======
+>>>>>>> 0e21271d9bd4477461dc091f313dcf00a7a6f035
         emit_document_persisted_event(
             document=document,
             passages=passages,
@@ -1398,7 +1401,10 @@ def persist_transcript_document(
                 metadata=metadata or None,
             )
         )
+<<<<<<< HEAD
 
+=======
+>>>>>>> 0e21271d9bd4477461dc091f313dcf00a7a6f035
         emit_document_persisted_event(
             document=document,
             passages=passages,
