@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import importlib
 import logging
 from typing import Any, Callable, Iterable, Protocol
 
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 ClientFactory = Callable[[str, dict[str, Any]], "LanguageModelClient"]
 _client_factory: ClientFactory | None = None
+_CLIENT_FACTORY_MODULE = "theo.services.api.app.ai.clients"
 
 
 def set_client_factory(factory: ClientFactory) -> None:
@@ -36,6 +38,11 @@ def set_client_factory(factory: ClientFactory) -> None:
 
 
 def _get_client_factory() -> ClientFactory:
+    if _client_factory is None:  # pragma: no branch - configuration guard
+        try:  # pragma: no cover - defensive import path
+            importlib.import_module(_CLIENT_FACTORY_MODULE)
+        except ModuleNotFoundError:
+            pass
     if _client_factory is None:  # pragma: no cover - configuration guard
         raise RuntimeError("Language model client factory has not been configured")
     return _client_factory
