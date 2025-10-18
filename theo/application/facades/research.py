@@ -1,9 +1,8 @@
 """Facade helpers exposing research application services."""
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
-
 from theo.application.research import ResearchService
+from theo.application.interfaces import SessionProtocol
 from theo.domain.research import (
     HypothesisDraft,
     ResearchNoteDraft,
@@ -20,7 +19,7 @@ __all__ = [
 ]
 
 
-def get_research_service(session: Session) -> ResearchService:
+def get_research_service(session: SessionProtocol) -> ResearchService:
     """Return a research service bound to the provided session."""
 
     container, _registry = resolve_application()

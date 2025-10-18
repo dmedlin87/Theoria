@@ -5,8 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy.orm import Session
-
+from theo.application.interfaces import SessionProtocol
 from theo.application.facades.settings import get_settings_cipher
 from theo.application.facades.settings_store import (
     SETTINGS_NAMESPACE,
@@ -27,7 +26,7 @@ _PROVIDER_SETTINGS_KEY = "ai_providers"
 
 
 def migrate_secret_settings(
-    session: Session, *, dry_run: bool = False
+    session: SessionProtocol, *, dry_run: bool = False
 ) -> list[str]:
     """Re-encrypt plaintext secrets stored in ``app_settings``."""
 
@@ -52,7 +51,7 @@ def migrate_secret_settings(
     return migrated
 
 
-def _migrate_llm_registry(session: Session, *, dry_run: bool) -> bool:
+def _migrate_llm_registry(session: SessionProtocol, *, dry_run: bool) -> bool:
     record = session.get(AppSetting, _qualify(LLM_SETTINGS_KEY))
     if record is None:
         return False
@@ -66,7 +65,9 @@ def _migrate_llm_registry(session: Session, *, dry_run: bool) -> bool:
     return True
 
 
-def _migrate_provider_settings(session: Session, *, dry_run: bool) -> bool:
+def _migrate_provider_settings(
+    session: SessionProtocol, *, dry_run: bool
+) -> bool:
     record = session.get(AppSetting, _qualify(_PROVIDER_SETTINGS_KEY))
     if record is None:
         return False

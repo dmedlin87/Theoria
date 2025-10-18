@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
+from typing import Callable, Iterable, Mapping, Protocol, Sequence
 
 import importlib
 
 from theo.adapters.graph import CaseGraphAdapter, GraphEdge, GraphNeighborhood
+from theo.application.interfaces import SessionProtocol
 
 from .events import DocumentPersistedEvent
 
@@ -122,7 +123,7 @@ def _score_labels(
 
 _MODELS = importlib.import_module("theo.adapters.persistence.models")
 CaseObject = getattr(_MODELS, "CaseObject")
-Session = Any
+Session = SessionProtocol
 
 
 class NeighborhoodReasoner:
