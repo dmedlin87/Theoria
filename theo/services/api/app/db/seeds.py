@@ -363,21 +363,12 @@ def _ensure_perspective_column(
         if not _table_has_column(session, table.name, column, schema=table.schema)
     ]
     if "perspective" in missing:
-        if _add_missing_column(
-            session,
-            table,
-            "perspective",
-            dataset_label=dataset_label,
-        ):
-            missing = [
-                column
-                for column in required
-                if not _table_has_column(
-                    session, table.name, column, schema=table.schema
-                )
-            ]
-            if not missing:
-                return True
+        session.rollback()
+        logger.warning(
+            "Skipping %s seeds because 'perspective' column is missing",
+            dataset_label,
+        )
+        return False
 
     if not missing:
         return True
@@ -399,18 +390,12 @@ def _ensure_perspective_column(
             return True
 
     session.rollback()
-    if "perspective" in missing:
-        logger.warning(
-            "Skipping %s seeds because 'perspective' column is missing",
-            dataset_label,
-        )
-    else:
-        formatted = ", ".join(sorted(missing))
-        logger.warning(
-            "Skipping %s seeds because required column(s) are missing: %s",
-            dataset_label,
-            formatted,
-        )
+    formatted = ", ".join(sorted(missing))
+    logger.warning(
+        "Skipping %s seeds because required column(s) are missing: %s",
+        dataset_label,
+        formatted,
+    )
     return False
 
 
@@ -550,6 +535,12 @@ def _handle_missing_perspective_error(
     if table is not None:
         column_name = _extract_missing_column_name(raw_message, table.name)
         if column_name:
+            if column_name.lower() == "perspective":
+                logger.warning(
+                    "Skipping %s seeds because 'perspective' column is missing",
+                    dataset_label,
+                )
+                return True
             try:
                 if _add_missing_column(
                     session, table, column_name, dataset_label=dataset_label
