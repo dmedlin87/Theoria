@@ -10,7 +10,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from theo.adapters.persistence.models import Document, Passage
+from theo.services.api.app.persistence_models import Document, Passage
 from theo.application.facades.version import get_git_sha
 from ...export.formatters import SCHEMA_VERSION, generate_export_id
 from ...models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage

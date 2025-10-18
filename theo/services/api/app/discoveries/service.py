@@ -16,7 +16,7 @@ from theo.domain.discoveries import (
     TrendDiscoveryEngine,
 )
 
-from theo.adapters.persistence.models import (
+from theo.services.api.app.persistence_models import (
     CorpusSnapshot,
     Discovery,
     Document,

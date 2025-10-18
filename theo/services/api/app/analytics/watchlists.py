@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from theo.adapters.persistence.models import (
+from theo.services.api.app.persistence_models import (
     Document,
     Passage,
     UserWatchlist,

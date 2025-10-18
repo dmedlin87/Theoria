@@ -3,14 +3,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import logging
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import Any, Callable, Iterable, Protocol
 
 from cryptography.fernet import InvalidToken
 
 from theo.application.facades.settings import get_settings, get_settings_cipher
-
-if TYPE_CHECKING:  # pragma: no cover - imported for typing only
-    from theo.services.api.app.ai.clients import LanguageModelClient
 
 
 SETTINGS_KEY = "llm"
@@ -25,6 +22,23 @@ SECRET_CONFIG_KEYS = {
 _ENCRYPTED_FIELD = "__encrypted__"
 
 logger = logging.getLogger(__name__)
+
+
+ClientFactory = Callable[[str, dict[str, Any]], "LanguageModelClient"]
+_client_factory: ClientFactory | None = None
+
+
+def set_client_factory(factory: ClientFactory) -> None:
+    """Configure the factory used to instantiate language model clients."""
+
+    global _client_factory
+    _client_factory = factory
+
+
+def _get_client_factory() -> ClientFactory:
+    if _client_factory is None:  # pragma: no cover - configuration guard
+        raise RuntimeError("Language model client factory has not been configured")
+    return _client_factory
 
 
 class GenerationError(RuntimeError):
@@ -92,9 +106,8 @@ class LLMModel:
         return payload
 
     def build_client(self) -> "LanguageModelClient":
-        from theo.services.api.app.ai.clients import build_client
-
-        return build_client(self.provider, self.config)
+        factory = _get_client_factory()
+        return factory(self.provider, self.config)
 
 
 @dataclass
@@ -274,3 +287,17 @@ __all__ = [
     "encrypt_config",
     "registry_from_payload",
 ]
+class LanguageModelClient(Protocol):
+    """Protocol describing language model client behaviour."""
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        temperature: float = 0.2,
+        max_output_tokens: int = 800,
+        cache_key: str | None = None,
+    ) -> str: ...
+
+

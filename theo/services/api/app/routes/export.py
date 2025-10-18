@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
-from theo.adapters.persistence.models import Document
+from theo.services.api.app.persistence_models import Document
 from ..errors import ExportError, Severity
 from ..export.citations import (
     build_citation_export,

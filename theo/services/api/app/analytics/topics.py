@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from theo.application.facades.events import get_event_publisher
 from theo.application.ports.events import DomainEvent, EventDispatchError
 from theo.application.facades.settings_store import load_setting, save_setting
-from theo.adapters.persistence.models import Document
+from theo.services.api.app.persistence_models import Document
 from ..models.base import APIModel
 from .openalex import OpenAlexClient
 

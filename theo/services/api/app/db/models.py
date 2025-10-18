@@ -10,5 +10,5 @@ warn(
     stacklevel=2,
 )
 
-from theo.adapters.persistence.models import *  # noqa: F401,F403
-from theo.adapters.persistence.models import __all__ as __all__  # type: ignore
+from theo.services.api.app.persistence_models import *  # noqa: F401,F403
+from theo.services.api.app.persistence_models import __all__ as __all__  # type: ignore

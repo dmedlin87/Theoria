@@ -15,7 +15,7 @@ import uuid
 import httpx
 from cachetools import LRUCache
 
-from theo.application.ports.ai_registry import GenerationError
+from theo.application.ports.ai_registry import GenerationError, set_client_factory
 
 
 class LanguageModelClient(Protocol):
@@ -846,6 +846,9 @@ def build_client(provider: str, config: dict[str, str]) -> LanguageModelClient:
     if normalized in {"echo", "builtin", "mock"}:
         return EchoClient(config.get("suffix", ""))
     raise GenerationError(f"Unsupported provider: {provider}")
+
+
+set_client_factory(build_client)
 
 
 __all__ = [

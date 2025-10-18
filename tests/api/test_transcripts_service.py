@@ -9,6 +9,8 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session, sessionmaker
 
 from theo.adapters.persistence.models import Document, TranscriptSegment, Video
+from theo.adapters.persistence.transcript_repository import SQLAlchemyTranscriptRepository
+from theo.application.dtos import TranscriptSegmentDTO, TranscriptVideoDTO
 from theo.services.api.app.ingest.osis import expand_osis_reference
 from theo.services.api.app.transcripts.service import (
     build_source_ref,
@@ -67,18 +69,31 @@ def _seed_minimal_video(session: Session, video_id: str) -> tuple[Document, Vide
     return document, video
 
 
-def _make_segment(**overrides: object) -> TranscriptSegment:
-    """Return an in-memory transcript segment for pure function tests."""
+def _make_segment(
+    *,
+    id: str = "segment",
+    document_id: str | None = "doc",
+    text: str | None = "segment",
+    primary_osis: str | None = None,
+    osis_refs: Sequence[str] | None = None,
+    osis_verse_ids: Sequence[int] | None = None,
+    t_start: float | None = 0.0,
+    t_end: float | None = 5.0,
+    video: TranscriptVideoDTO | None = None,
+) -> TranscriptSegmentDTO:
+    """Return a transcript segment DTO for pure function tests."""
 
-    base: dict[str, object] = {
-        "document_id": "doc",
-        "video_id": None,
-        "t_start": 0.0,
-        "t_end": 5.0,
-        "text": "segment",
-    }
-    base.update(overrides)
-    return TranscriptSegment(**base)
+    return TranscriptSegmentDTO(
+        id=id,
+        document_id=document_id,
+        text=text,
+        primary_osis=primary_osis,
+        osis_refs=tuple(osis_refs or ()),
+        osis_verse_ids=tuple(osis_verse_ids or ()),
+        t_start=t_start,
+        t_end=t_end,
+        video=video,
+    )
 
 
 def test_search_transcript_segments_filters_in_sql(sqlite_session: Session) -> None:
@@ -121,14 +136,19 @@ def test_search_transcript_segments_filters_in_sql(sqlite_session: Session) -> N
     )
     sqlite_session.commit()
 
+    repository = SQLAlchemyTranscriptRepository(sqlite_session)
     results = search_transcript_segments(
-        sqlite_session,
+        repository,
         osis="John.3.16",
         video_identifier="vid-sql",
         limit=5,
     )
 
-    assert results == [match, overlap]
+    assert [segment.text for segment in results] == ["matching", "overlap"]
+    assert [segment.primary_osis for segment in results] == [
+        "John.3.16",
+        "John.3.16-17",
+    ]
 
 
 def test_search_transcript_segments_emits_overlap_clause(sqlite_session: Session) -> None:
@@ -162,8 +182,9 @@ def test_search_transcript_segments_emits_overlap_clause(sqlite_session: Session
         _before_cursor_execute,
     )
     try:
+        repository = SQLAlchemyTranscriptRepository(sqlite_session)
         search_transcript_segments(
-            sqlite_session,
+            repository,
             osis="John.3.16",
             video_identifier="vid-overlap",
             limit=5,
@@ -186,7 +207,12 @@ def test_search_transcript_segments_emits_overlap_clause(sqlite_session: Session
 def test_build_source_ref_formats_known_platform_prefix() -> None:
     """YouTube links should use the dedicated prefix with a mm:ss timestamp."""
 
-    video = Video(video_id="yt-123", url="https://www.youtube.com/watch?v=yt-123")
+    video = TranscriptVideoDTO(
+        id=None,
+        video_id="yt-123",
+        title=None,
+        url="https://www.youtube.com/watch?v=yt-123",
+    )
 
     reference = build_source_ref(video, 125.9)
 
@@ -197,10 +223,25 @@ def test_build_source_ref_returns_none_without_minimum_metadata() -> None:
     """Missing identifiers or timestamps should short-circuit to ``None``."""
 
     assert build_source_ref(None, 15.0) is None
-    assert build_source_ref(Video(video_id=None), 15.0) is None
-    assert build_source_ref(Video(video_id="clip"), None) is None
+    assert (
+        build_source_ref(
+            TranscriptVideoDTO(id=None, video_id=None, title=None, url=None), 15.0
+        )
+        is None
+    )
+    assert (
+        build_source_ref(
+            TranscriptVideoDTO(id=None, video_id="clip", title=None, url=None), None
+        )
+        is None
+    )
 
-    video = Video(video_id="clip", url="https://cdn.example.com/clip.mp4")
+    video = TranscriptVideoDTO(
+        id=None,
+        video_id="clip",
+        title=None,
+        url="https://cdn.example.com/clip.mp4",
+    )
 
     assert build_source_ref(video, 59.0) == "video:clip#t=00:59"
 

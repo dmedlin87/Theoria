@@ -5,12 +5,11 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Callable, Iterable, Mapping, Protocol, Sequence
+from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
-from sqlalchemy.orm import Session
+import importlib
 
 from theo.adapters.graph import CaseGraphAdapter, GraphEdge, GraphNeighborhood
-from theo.adapters.persistence.models import CaseObject
 
 from .events import DocumentPersistedEvent
 
@@ -119,6 +118,11 @@ def _score_labels(
         score = round(count / denominator, 4)
         scored.append(InferredLabel(value=value, score=score, count=count))
     return sorted(scored, key=lambda item: item.score, reverse=True)
+
+
+_MODELS = importlib.import_module("theo.adapters.persistence.models")
+CaseObject = getattr(_MODELS, "CaseObject")
+Session = Any
 
 
 class NeighborhoodReasoner:

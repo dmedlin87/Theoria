@@ -1,12 +1,13 @@
 from types import SimpleNamespace
-from typing import Iterator, cast
+from types import SimpleNamespace
+from typing import Iterator
 
 import pytest
 
 from theo.application.facades.database import get_engine
+from theo.application.dtos import TranscriptSegmentDTO
 from theo.services.api.app.ingest.osis import _osis_to_readable, osis_intersects
 from theo.services.api.app.transcripts.service import _matches_osis
-from theo.adapters.persistence.models import TranscriptSegment
 
 
 @pytest.fixture(autouse=True)
@@ -30,9 +31,17 @@ def test_osis_to_readable_normalizes_inputs(reference: str, expected: str) -> No
 
 
 def test_matches_osis_accepts_chapter_only_query() -> None:
-    segment = cast(
-        TranscriptSegment,
-        SimpleNamespace(primary_osis="John.1.1", osis_refs=["John.1.2"], text=""),
+    namespace = SimpleNamespace(primary_osis="John.1.1", osis_refs=["John.1.2"], text="")
+    segment = TranscriptSegmentDTO(
+        id="segment-1",
+        document_id=None,
+        text=namespace.text,
+        primary_osis=namespace.primary_osis,
+        osis_refs=tuple(namespace.osis_refs),
+        osis_verse_ids=(),
+        t_start=None,
+        t_end=None,
+        video=None,
     )
     assert _matches_osis(segment, "John.1")
 
