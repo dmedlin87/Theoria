@@ -286,6 +286,7 @@ __all__ = [
     "decrypt_config",
     "encrypt_config",
     "registry_from_payload",
+    "LanguageModelClient",
 ]
 class LanguageModelClient(Protocol):
     """Protocol describing language model client behaviour."""
