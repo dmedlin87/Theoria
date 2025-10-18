@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol
+from typing import Callable, Protocol
 
 from theo.domain import Document, DocumentId
 
+from .interfaces import SessionProtocol
 from .research import ResearchService
-
-Session = Any
 
 
 class _CommandCallable(Protocol):
@@ -41,7 +40,7 @@ class ApplicationContainer:
     get_document: _GetCallable
     list_documents: _ListCallable
 
-    research_service_factory: Callable[[Session], ResearchService]
+    research_service_factory: Callable[[SessionProtocol], ResearchService]
 
     def bind_command(self) -> Callable[[Document], DocumentId]:
         """Return a command adapter for ingestion workflows."""
@@ -66,7 +65,7 @@ class ApplicationContainer:
 
         return _runner
 
-    def get_research_service(self, session: Session) -> ResearchService:
+    def get_research_service(self, session: SessionProtocol) -> ResearchService:
         """Return a research service bound to the provided session."""
 
         return self.research_service_factory(session)

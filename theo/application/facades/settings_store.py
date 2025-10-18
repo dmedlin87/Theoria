@@ -7,8 +7,8 @@ import logging
 from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
-from sqlalchemy.orm import Session
 
+from theo.application.interfaces import SessionProtocol
 from theo.application.facades.settings import get_settings_cipher
 from theo.adapters.persistence.models import AppSetting
 
@@ -36,7 +36,9 @@ def _qualify(key: str) -> str:
     return f"{SETTINGS_NAMESPACE}:{key}"
 
 
-def load_setting(session: Session, key: str, default: Any | None = None) -> Any | None:
+def load_setting(
+    session: SessionProtocol, key: str, default: Any | None = None
+) -> Any | None:
     """Return the stored value for ``key`` or ``default`` when missing."""
 
     qualified = _qualify(key)
@@ -48,7 +50,7 @@ def load_setting(session: Session, key: str, default: Any | None = None) -> Any 
     return _decrypt_value(record.value, qualified, cipher)
 
 
-def require_setting(session: Session, key: str) -> Any:
+def require_setting(session: SessionProtocol, key: str) -> Any:
     """Return the stored value for ``key`` raising when missing."""
 
     qualified = _qualify(key)
@@ -60,7 +62,7 @@ def require_setting(session: Session, key: str) -> Any:
     return _decrypt_value(record.value, qualified, cipher)
 
 
-def save_setting(session: Session, key: str, value: Any | None) -> None:
+def save_setting(session: SessionProtocol, key: str, value: Any | None) -> None:
     """Persist ``value`` for ``key`` within the shared namespace."""
 
     qualified = _qualify(key)
