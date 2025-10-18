@@ -6,12 +6,6 @@ from .secrets import (
     SecretsPort,
     build_secrets_adapter,
 )
-
-__all__ = [
-    "SecretRetrievalError",
-    "SecretRequest",
-    "SecretsPort",
-    "build_secrets_adapter",
 from .events import (
     CompositeEventPublisher,
     DomainEvent,
@@ -22,6 +16,10 @@ from .events import (
 )
 
 __all__ = [
+    "SecretRetrievalError",
+    "SecretRequest",
+    "SecretsPort",
+    "build_secrets_adapter",
     "CompositeEventPublisher",
     "DomainEvent",
     "EventDispatchError",
