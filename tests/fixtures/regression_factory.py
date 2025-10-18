@@ -20,7 +20,7 @@ import pythonbible as pb
 try:  # pragma: no cover - exercised indirectly via tests
     from faker import Faker  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - fallback for minimal test env
-    class Faker:  # noqa: D401 - simple stand-in for test environments
+    class Faker:
         """Lightweight stand-in that mimics the subset of Faker we require."""
 
         def __init__(self) -> None:
