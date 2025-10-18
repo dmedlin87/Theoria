@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
 from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository
+from theo.application.repositories import DiscoveryRepository, DocumentRepository
 from theo.application.facades.database import get_session
 
 from ..discoveries import DiscoveryService
@@ -31,8 +32,8 @@ def _require_user_subject(principal: Principal) -> str:
 def get_discovery_service(
     session: Session = Depends(get_session),
 ) -> DiscoveryService:
-    discovery_repo = SQLAlchemyDiscoveryRepository(session)
-    document_repo = SQLAlchemyDocumentRepository(session)
+    discovery_repo: DiscoveryRepository = SQLAlchemyDiscoveryRepository(session)
+    document_repo: DocumentRepository = SQLAlchemyDocumentRepository(session)
     return DiscoveryService(discovery_repo, document_repo)
 
 
