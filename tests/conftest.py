@@ -73,13 +73,11 @@ def pytest_configure(config: pytest.Config) -> None:
 def regression_factory():
     """Provide a seeded factory for synthesising regression datasets."""
 
-    try:
-        from tests.fixtures import RegressionDataFactory  # type: ignore
-    except ModuleNotFoundError as exc:  # pragma: no cover - thin local envs
-        pytest.skip(f"faker not installed for regression factory: {exc}")
-    except Exception as exc:  # pragma: no cover - guard against optional deps
-        pytest.skip(f"regression fixtures unavailable: {exc}")
-    return RegressionDataFactory()
+    module = pytest.importorskip(
+        "tests.fixtures",
+        reason="faker not installed for regression factory"
+    )
+    return module.RegressionDataFactory()
 
 
 @pytest.hookimpl(tryfirst=True)
