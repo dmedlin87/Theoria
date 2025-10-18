@@ -767,7 +767,7 @@ class EchoClient:
         return f"{summary_block}\n\nSources: {sources_text}".strip()
 
 
-def build_client(provider: str, config: dict[str, str]) -> LanguageModelClient:
+def build_client(provider: str, config: dict[str, Any]) -> LanguageModelClient:
     """Instantiate a client for ``provider`` using ``config``."""
 
     normalized = provider.lower()
