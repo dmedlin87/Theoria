@@ -669,7 +669,7 @@ def _resolve_settings_secret_from_backend(settings: Settings) -> str | None:
             adapter = build_secrets_adapter(backend)
     except ValueError as exc:
         LOGGER.error(
-            "Unsupported secrets backend '%s' configured: %s", backend, exc
+            "Unsupported secrets backend configured: %s", exc
         )
         return None
     except Exception as exc:  # pragma: no cover - defensive logging path
