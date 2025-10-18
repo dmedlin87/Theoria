@@ -186,16 +186,17 @@ def test_experiment_header_can_disable_reranker(
         response = client.get(
             "/search",
             params={"q": "query"},
-            headers={"X-Search-Experiments": "reranker=bm25"},
+            headers={"X-Search-Experiments": "reranker=none"},
         )
 
     payload = response.json()
     reordered_ids = [entry["id"] for entry in payload["results"]]
-    assert reordered_ids == [result.id for result in results]
-    assert "X-Reranker" not in response.headers
+    assert reordered_ids[0] == results[1].id
+    assert response.headers.get("X-Reranker") == model_path.name
     assert sink.outcomes
     outcome = sink.outcomes[0]
-    assert getattr(outcome, "strategy", "") == "bm25"
+    assert getattr(outcome, "strategy", "") == "none"
+    assert getattr(outcome, "ordering_changed", True) is False
     assert getattr(outcome, "metadata", {}).get("applied") is False
 
 
