@@ -8,7 +8,6 @@ from .events import (
     NullEventPublisher,
     normalise_event_value,
 )
-
 from .secrets import (
     SecretRetrievalError,
     SecretRequest,
@@ -27,4 +26,8 @@ __all__ = [
     "EventPublisher",
     "NullEventPublisher",
     "normalise_event_value",
+    "SecretRetrievalError",
+    "SecretRequest",
+    "SecretsPort",
+    "build_secrets_adapter",
 ]
