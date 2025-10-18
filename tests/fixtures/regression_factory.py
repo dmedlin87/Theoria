@@ -46,8 +46,10 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for minimal envs
             "guidance",
         ]
 
-        def __init__(self) -> None:
+        def __init__(self, seed: int | None = None) -> None:
             self._random = random.Random()
+            if seed is not None:
+                self._random.seed(seed)
 
         def seed_instance(self, seed: int) -> None:
             self._random.seed(seed)
