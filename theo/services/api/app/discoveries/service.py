@@ -28,6 +28,7 @@ from theo.adapters.persistence.models import (
     Document,
     Passage,
 )
+from ..db.query_optimizations import query_with_monitoring
 
 
 def _coerce_topics(raw: object) -> list[str]:
@@ -72,12 +73,15 @@ class DiscoveryService:
         self.connection_engine = connection_engine or ConnectionDiscoveryEngine()
         self.gap_engine = gap_engine or GapDiscoveryEngine()
 
+    @query_with_monitoring("discoveries.list")
     def list(
         self,
         user_id: str,
         *,
         discovery_type: str | None = None,
         viewed: bool | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> list[Discovery]:
         stmt = select(Discovery).where(Discovery.user_id == user_id)
         if discovery_type:
@@ -85,6 +89,10 @@ class DiscoveryService:
         if viewed is not None:
             stmt = stmt.where(Discovery.viewed == viewed)
         stmt = stmt.order_by(Discovery.created_at.desc())
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
         return list(self.session.scalars(stmt))
 
     def mark_viewed(self, user_id: str, discovery_id: int) -> Discovery:

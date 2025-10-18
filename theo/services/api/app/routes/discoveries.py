@@ -51,12 +51,20 @@ def _build_stats(discoveries: list[DiscoveryResponse]) -> DiscoveryStats:
 def list_discoveries(
     discovery_type: str | None = Query(default=None),
     viewed: bool | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
 ) -> DiscoveryListResponse:
     user_id = _require_user_subject(principal)
     service = _service(session)
-    records = service.list(user_id, discovery_type=discovery_type, viewed=viewed)
+    records = service.list(
+        user_id,
+        discovery_type=discovery_type,
+        viewed=viewed,
+        limit=limit,
+        offset=offset,
+    )
     payload = [DiscoveryResponse.model_validate(record) for record in records]
     stats = _build_stats(payload)
     return DiscoveryListResponse(discoveries=payload, stats=stats)
