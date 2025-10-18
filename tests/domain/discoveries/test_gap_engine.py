@@ -108,6 +108,8 @@ def test_gap_engine_detect_identifies_missing_topics(sample_documents, reference
     assert 0.45 <= gap.relevance_score <= 0.9
     assert "gapData" in gap.metadata
     assert gap.metadata["gapData"]["referenceTopic"] == "Trinity and the Godhead"
+    assert gap.metadata["gapData"]["coverageRatio"] == pytest.approx(0.0)
+    assert gap.metadata["gapData"]["gapIntensity"] == pytest.approx(1.0)
 
 
 def test_gap_engine_detect_handles_empty_documents(reference_topics):
@@ -204,3 +206,56 @@ def test_gap_engine_normalise_reference_topic_handles_alternate_fields():
         "keywords": ["trinity", "godhead"],
         "scriptures": ["Matthew 28:19"],
     }
+
+
+def test_gap_engine_confidence_reflects_similarity_gap(sample_documents, reference_topics):
+    engine = GapDiscoveryEngine(
+        min_similarity=0.6,
+        topic_model=FakeTopicModel(),
+        reference_topics=reference_topics,
+    )
+
+    discoveries = engine.detect(sample_documents)
+
+    justification_gap = next(
+        item for item in discoveries if item.reference_topic == "Justification by Faith"
+    )
+
+    assert justification_gap.confidence < 0.9
+    assert justification_gap.metadata["gapData"]["coverageRatio"] == pytest.approx(0.5)
+    assert justification_gap.metadata["gapData"]["similarityScore"] == pytest.approx(0.5)
+
+
+def test_gap_engine_respects_max_results(sample_documents):
+    reference_topics = [
+        {
+            "name": "Topic A",
+            "summary": "",
+            "keywords": ["alpha", "beta"],
+            "scriptures": [],
+        },
+        {
+            "name": "Topic B",
+            "summary": "",
+            "keywords": ["gamma"],
+            "scriptures": [],
+        },
+        {
+            "name": "Topic C",
+            "summary": "",
+            "keywords": ["delta"],
+            "scriptures": [],
+        },
+    ]
+
+    engine = GapDiscoveryEngine(
+        min_similarity=0.4,
+        max_results=2,
+        topic_model=FakeTopicModel(),
+        reference_topics=reference_topics,
+    )
+
+    discoveries = engine.detect(sample_documents)
+
+    assert len(discoveries) == 2
+    assert all(d.metadata["gapData"]["gapIntensity"] == pytest.approx(1.0) for d in discoveries)
