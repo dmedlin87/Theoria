@@ -19,7 +19,7 @@ from ...telemetry import (
     log_workflow_event,
     set_span_attribute,
 )
-from ..clients import GenerationError
+from theo.application.ports.ai_registry import GenerationError
 from ..registry import LLMModel, LLMRegistry, get_llm_registry
 from ..router import get_router
 from ..trails import TrailStepDigest

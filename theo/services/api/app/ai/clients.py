@@ -15,15 +15,7 @@ import uuid
 import httpx
 from cachetools import LRUCache
 
-
-class GenerationError(RuntimeError):
-    """Raised when a provider fails to generate content."""
-
-    def __init__(self, message: str, *, provider: str | None = None, status_code: int | None = None, retryable: bool = False) -> None:
-        super().__init__(message)
-        self.provider = provider
-        self.status_code = status_code
-        self.retryable = retryable
+from theo.application.ports.ai_registry import GenerationError
 
 
 class LanguageModelClient(Protocol):

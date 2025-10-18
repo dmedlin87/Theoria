@@ -25,14 +25,17 @@ and architectural plans are organized under `docs/`.
   - `geo` manages optional geographic enrichment data.
 - **Adapters** – Integration code for embeddings, storage, and third-party
   services is collected in `theo/adapters`, with implementation-specific wiring
-  abstracted behind the application container (`theo/services/bootstrap.py`).
+  abstracted behind the application container (`theo/platform/application.py`,
+  re-exported for services via `theo/services/bootstrap.py`).
 
 ## Backend Services
 
 - **Configuration** – `theo/application/facades/settings.py` defines a
   Pydantic-powered settings object that loads environment variables, covers
   database and Redis connections, embedding models, rerankers, authentication
-  policies, and feature flags for Case Builder and topic digests.
+  policies, and feature flags for Case Builder and topic digests. Shared LLM
+  registry primitives (secret handling, bootstrap defaults) now live in
+  `theo/application/ports/ai_registry.py`.
 - **API Composition** – `theo/services/api/app/main.py` builds the FastAPI app,
   registers routers from feature packages (ingestion, retrieval, analytics,
   creators, transcripts, MCP integrations), enables OpenAPI docs, and wires

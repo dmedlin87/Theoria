@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from ...db.models import Document, Passage
 from ...models.search import HybridSearchFilters, HybridSearchResult
-from ..clients import GenerationError
+from theo.application.ports.ai_registry import GenerationError
 from .models import RAGAnswer, RAGCitation
 from .prompts import sanitise_json_structure
 
