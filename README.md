@@ -395,10 +395,10 @@ Review [`docs/adr/0001-expose-theoengine-via-mcp.md`](docs/adr/0001-expose-theoe
 
 ### UI Enhancements
 
-- **[Animation Enhancements](ANIMATION_ENHANCEMENTS_COMPLETE.md)** – Complete animation system documentation
-- **[UI Overhaul Summary](UI_OVERHAUL_SUMMARY.md)** – Design system refresh details
-- **[UI Loading Improvements](UI_LOADING_IMPROVEMENTS.md)** – Loading state patterns
-- **[Navigation Improvements](NAVIGATION_IMPROVEMENTS.md)** – Navigation UX enhancements
+- **[Animation Enhancements](docs/archive/2025-10/ANIMATION_ENHANCEMENTS_COMPLETE.md)** – Historical animation system documentation
+- **[UI Overhaul Summary](docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md)** – Design system refresh details (archived)
+- **[UI Loading Improvements](docs/archive/2025-10/UI_LOADING_IMPROVEMENTS.md)** – Loading state patterns (archived)
+- **[Navigation Improvements](docs/archive/2025-10/NAVIGATION_IMPROVEMENTS.md)** – Navigation UX enhancements (archived)
 
 ### Quality & Testing
 

@@ -6,6 +6,13 @@ The Discovery Feed is Theoria's **intelligent auto-discovery engine** that autom
 
 **Key Concept**: Transform Theoria from a search tool into a **proactive research companion** that works for you in the background.
 
+**Current Implementation (January 2025)**
+
+- Frontend experience, mock API routes, and navigation are complete.
+- Discovery scheduler (`APScheduler`) runs every 30 minutes to refresh user discoveries.
+- Pattern detection (DBSCAN) and contradiction detection (DeBERTa-based NLI engine) are fully implemented and covered by tests.
+- Gap, connection, trend, and anomaly detectors remain in development (see backend plan below).
+
 ## User Experience
 
 ### Two Modes of Research
@@ -188,6 +195,9 @@ Each discovery type has specialized metadata:
 - [x] Mock API routes
 - [x] Navigation integration
 - [x] Command palette support
+- [x] Background scheduler (`DiscoveryScheduler`) wired into FastAPI lifecycle
+- [x] Pattern detector (`PatternDiscoveryEngine`) generating persisted discoveries
+- [x] Contradiction detector (`ContradictionDiscoveryEngine`) using DeBERTa-v3 NLI
 
 ### Phase 2: Backend Integration (Next Steps)
 
@@ -227,6 +237,8 @@ CREATE INDEX idx_discoveries_viewed ON discoveries(user_id, viewed);
 ```
 
 #### 2.2 FastAPI Endpoints
+
+All routes defined in `theo/services/api/app/routes/discoveries.py` are live for pattern and contradiction discoveries. As additional detectors ship, extend the service layer to emit their results via these endpoints.
 
 ```python
 # theo/services/api/app/routers/discoveries.py
@@ -286,7 +298,7 @@ async def analyze_corpus_for_discoveries(user_id: str):
     patterns = await detect_patterns(user_id)
     
     # 2. Contradiction Detection  
-    contradictions = await detect_contradictions(user_id)
+    contradictions = await detect_contradictions(user_id)  # implemented
     
     # 3. Gap Analysis
     gaps = await analyze_gaps(user_id)
