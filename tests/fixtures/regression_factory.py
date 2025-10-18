@@ -42,6 +42,12 @@ except ModuleNotFoundError:  # pragma: no cover - executed when Faker missing
         def sentences(self, nb: int = 3) -> list[str]:
             return [self.sentence() for _ in range(nb)]
 
+        def words(self, nb: int = 3) -> list[str]:
+            return [self._word() for _ in range(nb)]
+
+        def paragraphs(self, nb: int = 3) -> list[str]:
+            return [" ".join(self.sentences(nb=3)) for _ in range(nb)]
+
 from theo.domain.research.osis import format_osis, osis_to_readable
 from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
 
