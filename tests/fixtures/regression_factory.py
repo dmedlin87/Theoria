@@ -16,10 +16,60 @@ from itertools import count
 from typing import Iterable, Sequence
 
 import pythonbible as pb
-from faker import Faker
+
+try:  # pragma: no cover - exercised only when Faker is unavailable
+    from faker import Faker
+except ModuleNotFoundError:  # pragma: no cover - fallback used in light test envs
+    class _FallbackFaker:
+        """Minimal stub that emulates the Faker APIs used in the test suite."""
+
+        def __init__(self) -> None:
+            self._random = random.Random()
+
+        def seed_instance(self, seed: int) -> None:
+            self._random.seed(seed)
+
+        def sentence(self, nb_words: int = 6) -> str:
+            return self._generate_words(nb_words).capitalize() + "."
+
+        def sentences(self, nb: int = 3) -> list[str]:
+            return [self.sentence() for _ in range(nb)]
+
+        def paragraphs(self, nb: int = 3) -> list[str]:
+            return [" ".join(self.sentences(nb=3)) for _ in range(nb)]
+
+        def words(self, nb: int = 3) -> list[str]:
+            return self._generate_words(nb).split()
+
+        def _generate_words(self, nb: int) -> str:
+            alphabet = "lorem ipsum dolor sit amet consectetur adipiscing elit".split()
+            return " ".join(self._random.choice(alphabet) for _ in range(nb))
+
+    class Faker(_FallbackFaker):  # type: ignore[misc]
+        pass
 
 from theo.domain.research.osis import format_osis, osis_to_readable
-from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
+
+try:  # pragma: no cover - executed only when application models are importable
+    from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
+except Exception:  # pragma: no cover - fallback dataclasses for lightweight testing
+    @dataclass(frozen=True)
+    class RAGCitation:
+        index: int
+        osis: str
+        anchor: str
+        passage_id: str
+        document_id: str
+        document_title: str
+        snippet: str
+        source_url: str
+
+    @dataclass(frozen=True)
+    class RAGAnswer:
+        summary: str
+        citations: Sequence[RAGCitation]
+        model_name: str
+        model_output: str
 
 CANONICAL_BOOKS: tuple[pb.Book, ...] = tuple(
     book for book in pb.Book if book.value <= pb.Book.REVELATION.value
