@@ -83,6 +83,8 @@ def mark_discovery_viewed(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
     except Exception:
         session.rollback()
+        # Intentionally catch any unexpected application error so the
+        # transaction is rolled back before the exception bubbles up.
         raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -105,6 +107,8 @@ def submit_discovery_feedback(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
     except Exception:
         session.rollback()
+        # Intentionally catch any unexpected application error so the
+        # transaction is rolled back before the exception bubbles up.
         raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -125,6 +129,8 @@ def dismiss_discovery(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
     except Exception:
         session.rollback()
+        # Intentionally catch any unexpected application error so the
+        # transaction is rolled back before the exception bubbles up.
         raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
