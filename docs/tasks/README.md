@@ -1,6 +1,7 @@
 # Task Handoff Documents
 
-This directory contains detailed task specifications for future development work. Each task is self-contained and can be picked up independently.
+This directory now tracks the Cognitive Scholar MVP backlog. Each task describes the work needed to evolve Theo into the
+Cognitive Scholar experience—complete with hypotheses, guardrails, and debate orchestration.
 
 ---
 
@@ -8,67 +9,55 @@ This directory contains detailed task specifications for future development work
 
 ### High Priority ⭐⭐⭐
 
-- **[TASK_001](TASK_001_Migrate_DiscoveryService.md)** - Migrate DiscoveryService to New Architecture
-  - Demonstrates migration path
-  - Creates template for future migrations
-  - **Time**: 2-3 hours
+- **[TASK_CS_001](TASK_CS_001_Implement_Hypothesis_Object_and_Dashboard.md)** – Implement Hypothesis Object & Dashboard
+  - Production-grade hypothesis aggregate + persistence layer
+  - API + Next.js dashboard for Cognitive Scholar operators
+  - **Time**: 2-3 days
   - **Status**: Ready to start
 
-- **[TASK_002](TASK_002_Implement_Gap_Analysis_Engine.md)** - Implement Gap Analysis Engine  
-  - Next discovery engine on roadmap
-  - Uses BERTopic for topic modeling
-  - **Time**: 3-4 hours
-  - **Status**: Ready to start
+- **[TASK_CS_002](TASK_CS_002_Wire_Cognitive_Gate_v0.md)** – Wire Cognitive Gate v0
+  - Guardrails for expensive reasoning workflows
+  - Gate verdict events + telemetry
+  - **Time**: 3-4 days
+  - **Status**: Blocked by CS-001
 
 ### Medium Priority ⭐⭐
 
-- **[TASK_003](TASK_003_Add_Query_Optimizations.md)** - Add Query Optimizations
-  - Quick performance wins
-  - Eliminate N+1 queries
-  - **Time**: 1-2 hours
-  - **Status**: Ready to start
-
-### Validation ⭐
-
-- **[TASK_004](TASK_004_Validate_Architecture.md)** - Validate Architecture with Tests
-  - Run test suite
-  - Verify no regressions
-  - **Time**: 30 minutes
-  - **Status**: Can run anytime
+- **[TASK_CS_003](TASK_CS_003_Ship_Debate_v0.md)** – Ship Debate v0
+  - Two-perspective debate orchestration with judge verdict
+  - Debate transcripts + dashboard integration
+  - **Time**: 4-5 days
+  - **Status**: Blocked by CS-002
 
 ---
 
 ## 🎯 Recommended Order
 
-1. **TASK_004** (Validate) - Establish baseline
-2. **TASK_001** (Migrate Service) - Highest value, demonstrates patterns
-3. **TASK_003** (Optimize Queries) - Quick wins while learning
-4. **TASK_002** (Gap Analysis) - Build next feature with clean patterns
+1. **TASK_CS_001** – Establish hypothesis data contracts and dashboard.
+2. **TASK_CS_002** – Layer Cognitive Gate heuristics on top of the new contracts.
+3. **TASK_CS_003** – Use Hypotheses + Gate foundation to ship Debate v0.
 
 ---
 
 ## 📚 Common References
 
-All tasks reference these documents:
-
-- **Quick Start**: `QUICK_START_ARCHITECTURE.md`
-- **Migration Guide**: `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`  
-- **Implementation Guide**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
-- **Reference Code**: `theo/services/api/app/routes/discoveries_v1.py`
+- **Cognitive Scholar Brainstorm**: `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`
+- **Reasoning Architecture**: `docs/AGENT_THINKING_ENHANCEMENT.md`
+- **API Patterns**: `docs/IMPLEMENTATION_GUIDE.md`
+- **UI Standards**: `docs/ui_guidelines.md`
 
 ---
 
 ## ✅ Task Completion Checklist
 
-When completing a task:
+When completing a Cognitive Scholar task:
 
-- [ ] All acceptance criteria met
-- [ ] Tests written and passing
-- [ ] Architecture tests pass
-- [ ] Documentation updated
-- [ ] Performance validated
-- [ ] Lessons learned documented
+- [ ] Acceptance criteria satisfied and demo recorded (if applicable)
+- [ ] Tests written/passing across Python + TypeScript layers
+- [ ] Telemetry/metrics updated with new fields
+- [ ] Documentation updated (roadmap + relevant READMEs)
+- [ ] Follow-up tasks captured for Alpha/Beta scope
 
 ---
 
-**Note**: These tasks use the new architectural patterns (DTOs, repositories, domain errors, API versioning) implemented in October 2025.
+**Note**: Discovery engine tasks have been archived under `docs/archive/planning/discovery-tasks/` for historical reference.
