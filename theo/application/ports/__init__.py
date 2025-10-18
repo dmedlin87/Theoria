@@ -26,4 +26,8 @@ __all__ = [
     "EventPublisher",
     "NullEventPublisher",
     "normalise_event_value",
+    "SecretRetrievalError",
+    "SecretRequest",
+    "SecretsPort",
+    "build_secrets_adapter",
 ]
