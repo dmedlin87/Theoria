@@ -16,7 +16,49 @@ from itertools import count
 from typing import Iterable, Sequence
 
 import pythonbible as pb
-from faker import Faker
+
+try:  # pragma: no cover - exercised indirectly via tests
+    from faker import Faker  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - fallback when optional dep missing
+    class _FallbackFaker:
+        """Lightweight stand-in for :class:`faker.Faker` used in tests."""
+
+        _LEXICON = [
+            "theologia",
+            "sapientia",
+            "veritas",
+            "gratia",
+            "mysterion",
+            "ecclesia",
+            "scriptura",
+            "caritas",
+            "virtus",
+            "justitia",
+        ]
+
+        def __init__(self) -> None:
+            self._random = random.Random()
+
+        def seed_instance(self, seed: int) -> None:
+            self._random.seed(seed)
+
+        def _word(self) -> str:
+            return self._random.choice(self._LEXICON)
+
+        def words(self, nb: int = 1) -> list[str]:
+            return [self._word() for _ in range(nb)]
+
+        def sentence(self, nb_words: int = 6) -> str:
+            words = self.words(nb_words)
+            return (" ".join(words)).capitalize() + "."
+
+        def sentences(self, nb: int = 3) -> list[str]:
+            return [self.sentence() for _ in range(nb)]
+
+        def paragraphs(self, nb: int = 1) -> list[str]:
+            return [" ".join(self.sentences(3)) for _ in range(nb)]
+
+    Faker = _FallbackFaker
 
 from theo.domain.research.osis import format_osis, osis_to_readable
 from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
