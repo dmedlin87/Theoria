@@ -20,3 +20,18 @@ class QueryService(Protocol):
 
     def get_document(self, document_id: DocumentId) -> Document | None: ...
     def list_documents(self, *, limit: int = 20) -> list[Document]: ...
+
+
+@runtime_checkable
+class LanguageModelClientProtocol(Protocol):
+    """Protocol describing the behaviour exposed by language model clients."""
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        temperature: float = 0.2,
+        max_output_tokens: int = 800,
+        cache_key: str | None = None,
+    ) -> str: ...
