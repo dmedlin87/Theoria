@@ -19,10 +19,12 @@ class SQLAlchemyChatSessionRepository(ChatSessionRepository):
         self.session = session
 
     def list_recent(self, limit: int) -> list[ChatSessionDTO]:
+        if limit < 1:
+            raise ValueError("limit must be a positive integer")
         stmt = (
             select(ChatSession)
             .order_by(ChatSession.updated_at.desc())
-            .limit(max(1, limit))
+            .limit(limit)
         )
         results = self.session.scalars(stmt).all()
         return [chat_session_to_dto(model) for model in results]
