@@ -50,6 +50,14 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for minimal envs
             self._random = random.Random()
             if seed is not None:
                 self._random.seed(seed)
+try:  # pragma: no cover - exercised indirectly via tests
+    from faker import Faker  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - fallback for minimal test env
+    class Faker:
+        """Lightweight stand-in that mimics the subset of Faker we require."""
+
+        def __init__(self) -> None:
+            self._random = random.Random()
 
         def seed_instance(self, seed: int) -> None:
             self._random.seed(seed)

@@ -214,7 +214,7 @@ class ZoteroExportRequest(APIModel):
     """Parameters for exporting citations to Zotero."""
 
     document_ids: list[str] = Field(
-        min_length=1,
+        ...,
         description="Document identifiers to export to Zotero.",
     )
     api_key: str = Field(
