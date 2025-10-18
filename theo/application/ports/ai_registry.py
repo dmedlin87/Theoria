@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import logging
+from importlib import import_module
 from typing import Any, Callable, Iterable, Protocol
 
 from cryptography.fernet import InvalidToken
@@ -36,6 +37,12 @@ def set_client_factory(factory: ClientFactory) -> None:
 
 
 def _get_client_factory() -> ClientFactory:
+    global _client_factory
+    if _client_factory is None:  # pragma: no branch - configuration guard
+        try:
+            import_module("theo.services.api.app.ai.clients")
+        except ModuleNotFoundError:  # pragma: no cover - optional dependency guard
+            pass
     if _client_factory is None:  # pragma: no cover - configuration guard
         raise RuntimeError("Language model client factory has not been configured")
     return _client_factory
