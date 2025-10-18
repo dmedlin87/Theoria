@@ -7,9 +7,9 @@ Migration guidance:
 
 Downstream consumers should update their imports to use the new path proactively.
 
-Deprecation timeline:
-    This compatibility shim is scheduled for removal after 2025-01-01.
-    Please migrate to the new import path before this date.
+Deprecation notice:
+    This compatibility shim is scheduled for removal in a future release.
+    Please migrate to the new import path as soon as possible.
 """
 from __future__ import annotations
 
