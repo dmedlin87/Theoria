@@ -930,6 +930,7 @@ def persist_text_document(
                 case_object_ids=sorted(case_object_ids),
                 metadata=metadata or None,
             )
+        )
         emit_document_persisted_event(
             document=document,
             passages=passages,
@@ -1395,6 +1396,7 @@ def persist_transcript_document(
                 case_object_ids=sorted(case_object_ids),
                 metadata=metadata or None,
             )
+        )
         emit_document_persisted_event(
             document=document,
             passages=passages,
