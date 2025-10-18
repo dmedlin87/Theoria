@@ -161,7 +161,7 @@ def seeded_session(session: Session) -> Session:
         meta={"legacy": True},
     )
     session.add(stale_discovery)
-    session.commit()
+    session.flush()
     return session
 
 
