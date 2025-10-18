@@ -5,16 +5,20 @@ import contextlib
 import inspect
 import os
 import sys
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
+    from theo.adapters import AdapterRegistry
+    from theo.application import ApplicationContainer
     from tests.fixtures import RegressionDataFactory
 
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+
+from tests.factories.application import isolated_application_container
 
 try:  # pragma: no cover - optional dependency in local test harness
     import pytest_cov  # type: ignore  # noqa: F401
@@ -83,6 +87,24 @@ def regression_factory():
     except Exception as exc:  # pragma: no cover - guard against optional deps
         pytest.skip(f"regression fixtures unavailable: {exc}")
     return RegressionDataFactory()
+
+
+@pytest.fixture
+def application_container() -> Iterator[tuple["ApplicationContainer", "AdapterRegistry"]]:
+    """Yield an isolated application container and backing registry."""
+
+    with isolated_application_container() as resources:
+        yield resources
+
+
+@pytest.fixture
+def application_container_factory():
+    """Provide a factory returning isolated application containers."""
+
+    def _factory(**overrides):
+        return isolated_application_container(overrides=overrides or None)
+
+    return _factory
 
 
 @pytest.hookimpl(tryfirst=True)

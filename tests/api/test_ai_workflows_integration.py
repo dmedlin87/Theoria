@@ -66,18 +66,19 @@ class _DummyTrailService:
 
 
 @pytest.fixture()
-def api_client() -> Iterator[TestClient]:
+def api_client(application_container_factory) -> Iterator[TestClient]:
     """Provide a FastAPI client with lightweight database overrides."""
 
     def _override_session() -> Iterator[_DummySession]:
         yield _DummySession()
 
-    app.dependency_overrides[get_session] = _override_session  # type: ignore[assignment]
-    try:
-        with TestClient(app) as client:
-            yield client
-    finally:
-        app.dependency_overrides.pop(get_session, None)
+    with application_container_factory():
+        app.dependency_overrides[get_session] = _override_session  # type: ignore[assignment]
+        try:
+            with TestClient(app) as client:
+                yield client
+        finally:
+            app.dependency_overrides.pop(get_session, None)
 
 
 def test_sermon_prep_route_uses_ai_service(api_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
