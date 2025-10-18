@@ -12,12 +12,12 @@ from theo.application.facades.settings_store import (
     SETTINGS_NAMESPACE,
     save_setting,
 )
-from theo.services.api.app.ai.registry import (
+from theo.application.ports.ai_registry import (
     SECRET_CONFIG_KEYS,
     SETTINGS_KEY as LLM_SETTINGS_KEY,
-    _registry_from_payload,
-    save_llm_registry,
+    registry_from_payload,
 )
+from theo.services.api.app.ai.registry import save_llm_registry
 from theo.adapters.persistence.models import AppSetting
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ def _migrate_llm_registry(session: Session, *, dry_run: bool) -> bool:
         return False
     if dry_run:
         return True
-    registry, _ = _registry_from_payload(payload if isinstance(payload, dict) else None)
+    registry, _ = registry_from_payload(payload if isinstance(payload, dict) else None)
     save_llm_registry(session, registry)
     return True
 

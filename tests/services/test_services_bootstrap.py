@@ -6,6 +6,7 @@ from theo.adapters import AdapterRegistry
 from theo.application import ApplicationContainer
 from theo.application.facades.database import Base, configure_engine, get_engine
 from theo.domain import Document, DocumentId, DocumentMetadata
+from theo.platform.application import resolve_application as platform_resolve_application
 from theo.services.bootstrap import resolve_application
 
 
@@ -81,3 +82,7 @@ def test_resolve_application_results_are_cached(sample_document, database):
 
     assert first_container is second_container
     assert first_registry is second_registry
+
+
+def test_service_wrapper_exposes_platform_bootstrap():
+    assert resolve_application is platform_resolve_application

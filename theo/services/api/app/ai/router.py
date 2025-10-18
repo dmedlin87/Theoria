@@ -12,7 +12,7 @@ from typing import Any, Iterator
 from opentelemetry import trace
 from sqlalchemy.orm import Session
 
-from .clients import GenerationError
+from theo.application.ports.ai_registry import GenerationError
 from .ledger import CacheRecord, SharedLedger
 from .registry import LLMModel, LLMRegistry, get_llm_registry
 
