@@ -7,6 +7,7 @@ translating between DTOs and database models.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Sequence
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -67,10 +68,17 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
     
     def create(self, discovery: DiscoveryDTO) -> DiscoveryDTO:
         """Persist a new discovery and return the saved version."""
-        model = dto_to_discovery(discovery)
-        self.session.add(model)
-        self.session.flush()  # Get ID without committing
-        return discovery_to_dto(model)
+        created = self.create_many([discovery])
+        return created[0]
+
+    def create_many(self, discoveries: Sequence[DiscoveryDTO]) -> list[DiscoveryDTO]:
+        """Persist multiple discoveries in a single batch."""
+        if not discoveries:
+            return []
+        models = [dto_to_discovery(dto) for dto in discoveries]
+        self.session.add_all(models)
+        self.session.flush()  # Assign IDs in a single round-trip
+        return [discovery_to_dto(model) for model in models]
     
     def update(self, discovery: DiscoveryDTO) -> DiscoveryDTO:
         """Update an existing discovery."""

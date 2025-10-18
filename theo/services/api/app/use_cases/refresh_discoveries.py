@@ -110,7 +110,7 @@ class RefreshDiscoveriesUseCase:
         )
         
         # Convert domain discoveries to DTOs and persist
-        persisted: list[DiscoveryDTO] = []
+        new_discoveries: list[DiscoveryDTO] = []
         
         # Pattern discoveries
         for candidate in pattern_candidates:
@@ -127,8 +127,7 @@ class RefreshDiscoveriesUseCase:
                 created_at=datetime.now(UTC),
                 metadata=dict(candidate.metadata),
             )
-            created = self.discovery_repo.create(dto)
-            persisted.append(created)
+            new_discoveries.append(dto)
         
         # Contradiction discoveries
         for candidate in contradiction_candidates:
@@ -156,9 +155,14 @@ class RefreshDiscoveriesUseCase:
                 created_at=datetime.now(UTC),
                 metadata=metadata,
             )
-            created = self.discovery_repo.create(dto)
-            persisted.append(created)
+            new_discoveries.append(dto)
         
+        persisted = (
+            self.discovery_repo.create_many(new_discoveries)
+            if new_discoveries
+            else []
+        )
+
         # Similar logic for other discovery types...
         # (Anomaly, Connection, Gap, Trend)
         

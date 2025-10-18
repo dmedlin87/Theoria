@@ -61,9 +61,8 @@ router = APIRouter()
 
 LOGGER = logging.getLogger(__name__)
 
-# Note: HTTP_413_REQUEST_ENTITY_TOO_LARGE is deprecated but HTTP_413_CONTENT_TOO_LARGE
-# doesn't exist in starlette yet. Use the old constant directly to avoid deprecation noise.
-_PAYLOAD_TOO_LARGE_STATUS = 413
+# Prefer Starlette's explicit payload-too-large HTTP status constant.
+_PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_CONTENT_TOO_LARGE
 
 _MAX_STORED_MEMORY = 10
 _MAX_CONTEXT_SNIPPETS = 4

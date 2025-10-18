@@ -6,6 +6,7 @@ demonstrating the improved testability of the new architecture.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from unittest.mock import Mock, call
 
@@ -140,12 +141,34 @@ class TestSQLAlchemyDiscoveryRepository:
         repo = SQLAlchemyDiscoveryRepository(mock_session)
         result = repo.create(sample_discovery_dto)
         
-        # Verify DTO returned
         assert isinstance(result, DiscoveryDTO)
-        
-        # Verify session interaction
-        mock_session.add.assert_called_once()
+        mock_session.add_all.assert_called_once()
         mock_session.flush.assert_called_once()
+        args, _ = mock_session.add_all.call_args
+        assert len(args) == 1
+        batch = args[0]
+        assert isinstance(batch, list)
+        assert len(batch) == 1
+
+    def test_create_many(self, mock_session, sample_discovery_dto):
+        """Create multiple discoveries in a single batch."""
+        repo = SQLAlchemyDiscoveryRepository(mock_session)
+        other_dto = replace(
+            sample_discovery_dto,
+            id=2,
+            title="Second Pattern",
+            metadata={"other": "value"},
+        )
+        results = repo.create_many([sample_discovery_dto, other_dto])
+        
+        assert len(results) == 2
+        mock_session.add_all.assert_called_once()
+        mock_session.flush.assert_called_once()
+        args, _ = mock_session.add_all.call_args
+        assert len(args) == 1
+        batch = args[0]
+        assert isinstance(batch, list)
+        assert len(batch) == 2
     
     def test_update(self, mock_session, sample_discovery_model, sample_discovery_dto):
         """Update an existing discovery."""

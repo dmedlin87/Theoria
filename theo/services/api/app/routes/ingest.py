@@ -42,9 +42,8 @@ run_pipeline_for_file = _run_pipeline_for_file
 run_pipeline_for_transcript = _run_pipeline_for_transcript
 run_pipeline_for_url = _run_pipeline_for_url
 
-# Note: HTTP_413_REQUEST_ENTITY_TOO_LARGE is deprecated but HTTP_413_CONTENT_TOO_LARGE
-# doesn't exist in starlette yet. Use literal 413 to avoid deprecation noise.
-_PAYLOAD_TOO_LARGE_STATUS = 413
+# Starlette's explicit payload-too-large HTTP status constant.
+_PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_CONTENT_TOO_LARGE
 
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},

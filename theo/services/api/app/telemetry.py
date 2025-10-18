@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import re
 from collections.abc import Mapping
 from contextlib import contextmanager
 from time import perf_counter
@@ -130,6 +131,89 @@ def _build_histogram(*args: Any, **kwargs: Any) -> HistogramMetric:
     if Histogram is None:  # pragma: no cover - metrics disabled
         return cast(HistogramMetric, _NoopMetric())
     return cast(HistogramMetric, Histogram(*args, **kwargs))
+
+
+_METRIC_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9_:]")
+
+
+def _normalise_metric_name(raw: str) -> str:
+    """Transform arbitrary metric identifiers into Prometheus-compatible names."""
+
+    name = raw.strip() if raw else ""
+    if not name:
+        raise ValueError("metric name must be a non-empty string")
+    name = _METRIC_NAME_PATTERN.sub("_", name)
+    if not name:
+        name = "theo_metric"
+    if name[0].isdigit():
+        name = f"theo_{name}"
+    return name
+
+
+_COUNTER_CACHE: dict[tuple[str, tuple[str, ...]], CounterMetric] = {}
+_HISTOGRAM_CACHE: dict[tuple[str, tuple[str, ...]], HistogramMetric] = {}
+
+
+def _label_names(labels: Mapping[str, Any] | None) -> tuple[str, ...]:
+    if not labels:
+        return ()
+    return tuple(sorted(labels.keys()))
+
+
+def _get_counter(metric: str, *, labels: Mapping[str, Any] | None = None) -> CounterMetric:
+    normalised = _normalise_metric_name(metric)
+    labelnames = _label_names(labels)
+    key = (normalised, labelnames)
+    cached = _COUNTER_CACHE.get(key)
+    if cached is not None:
+        return cached
+    counter = _build_counter(
+        normalised,
+        f"Theo dynamic counter for {metric}",
+        labelnames=labelnames,
+    )
+    _COUNTER_CACHE[key] = counter
+    return counter
+
+
+def _get_histogram(
+    metric: str,
+    *,
+    labels: Mapping[str, Any] | None = None,
+) -> HistogramMetric:
+    normalised = _normalise_metric_name(metric)
+    labelnames = _label_names(labels)
+    key = (normalised, labelnames)
+    cached = _HISTOGRAM_CACHE.get(key)
+    if cached is not None:
+        return cached
+    histogram = _build_histogram(
+        normalised,
+        f"Theo dynamic histogram for {metric}",
+        labelnames=labelnames,
+    )
+    _HISTOGRAM_CACHE[key] = histogram
+    return histogram
+
+
+def record_counter(metric: str, amount: float = 1.0, **labels: Any) -> None:
+    """Increment a named counter metric with optional labels."""
+
+    counter = _get_counter(metric, labels=labels)
+    if labels:
+        counter.labels(**labels).inc(amount)
+    else:
+        counter.inc(amount)
+
+
+def record_histogram(metric: str, amount: float, **labels: Any) -> None:
+    """Observe a value for a named histogram metric with optional labels."""
+
+    histogram = _get_histogram(metric, labels=labels)
+    if labels:
+        histogram.labels(**labels).observe(amount)
+    else:
+        histogram.observe(amount)
 
 
 WORKFLOW_RUNS: CounterMetric = _build_counter(
@@ -264,6 +348,8 @@ __all__ = [
     "RAG_CACHE_EVENTS",
     "CITATION_DRIFT_EVENTS",
     "SEARCH_RERANKER_EVENTS",
+    "record_counter",
+    "record_histogram",
 ]
 
 

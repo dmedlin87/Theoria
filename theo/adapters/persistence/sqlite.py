@@ -113,24 +113,30 @@ def dispose_sqlite_engine(
         except Exception:
             psutil = None  # type: ignore[assignment]
         if psutil is not None:
-            process = psutil.Process()
-            target_paths = {str(path.resolve()) for path in candidates if path.exists()}
-            for _ in range(100):
-                try:
-                    open_entries = [
-                        entry for entry in process.open_files() if entry.path in target_paths
-                    ]
-                except RuntimeError:
-                    break
-                if not open_entries:
-                    break
-                for entry in open_entries:
+            try:
+                process = psutil.Process()
+            except Exception:  # pragma: no cover - defensive guard
+                process = None
+            if process is not None:
+                target_paths = {str(path.resolve()) for path in candidates if path.exists()}
+                for _ in range(100):
                     try:
-                        import msvcrt  # pragma: no cover - windows-only
-                        import ctypes  # pragma: no cover - windows-only
+                        open_entries = [
+                            entry for entry in process.open_files() if entry.path in target_paths
+                        ]
+                    except RuntimeError:
+                        break
+                    except Exception:  # pragma: no cover - defensive guard
+                        break
+                    if not open_entries:
+                        break
+                    for entry in open_entries:
+                        try:
+                            import msvcrt  # pragma: no cover - windows-only
+                            import ctypes  # pragma: no cover - windows-only
 
-                        handle = msvcrt.get_osfhandle(entry.fd)
-                        ctypes.windll.kernel32.CloseHandle(int(handle))
-                    except Exception:
-                        continue
-                time.sleep(0.05)
+                            handle = msvcrt.get_osfhandle(entry.fd)
+                            ctypes.windll.kernel32.CloseHandle(int(handle))
+                        except Exception:
+                            continue
+                    time.sleep(0.05)

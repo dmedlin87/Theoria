@@ -7,11 +7,12 @@ using DTOs to maintain clean boundaries.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Sequence
 
 from theo.application.dtos import (
+    CorpusSnapshotDTO,
     DiscoveryDTO,
     DiscoveryListFilters,
-    CorpusSnapshotDTO,
 )
 
 
@@ -31,6 +32,11 @@ class DiscoveryRepository(ABC):
     @abstractmethod
     def create(self, discovery: DiscoveryDTO) -> DiscoveryDTO:
         """Persist a new discovery and return the saved version."""
+        ...
+
+    @abstractmethod
+    def create_many(self, discoveries: Sequence[DiscoveryDTO]) -> list[DiscoveryDTO]:
+        """Persist multiple discoveries in a single batch."""
         ...
     
     @abstractmethod

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any, Sequence
 
 from sqlalchemy.orm import Session
@@ -152,15 +153,15 @@ except ImportError:  # pragma: no cover - standard library availability
     _inspect_signature = None
 
 
-if _inspect_signature is not None:  # pragma: no branch
+@lru_cache(maxsize=16)
+def _notify_supports_document_id(callback: object) -> bool:
+    if _inspect_signature is None:
+        return False
     try:
-        _NOTIFY_SUPPORTS_DOCUMENT_ID = (
-            "document_id" in _inspect_signature(_notify_new_objects).parameters
-        )
+        parameters = _inspect_signature(callback).parameters
     except (TypeError, ValueError):
-        _NOTIFY_SUPPORTS_DOCUMENT_ID = False
-else:  # pragma: no cover - fallback when inspect.signature missing
-    _NOTIFY_SUPPORTS_DOCUMENT_ID = False
+        return False
+    return "document_id" in parameters
 
 
 def sync_case_objects_for_document(
@@ -285,9 +286,10 @@ def sync_case_objects_for_document(
         notified_ids.extend(obj.id for obj in updated_objects)
     if notified_ids:
         notify_kwargs: dict[str, object] = {}
-        if _NOTIFY_SUPPORTS_DOCUMENT_ID:
+        notify_callable = _notify_new_objects
+        if _notify_supports_document_id(notify_callable):
             notify_kwargs["document_id"] = document.id
-        _notify_new_objects(
+        notify_callable(
             session,
             notified_ids,
             settings,

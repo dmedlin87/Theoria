@@ -39,5 +39,5 @@ threadpoolctl>=3.1,<4
 defusedxml>=0.7.1,<0.8
 neo4j>=5.20,<6
 transformers>=4.30,<5
-torch>=2.0,<3
+torch==2.4.0
 sentencepiece>=0.2.0,<0.3
