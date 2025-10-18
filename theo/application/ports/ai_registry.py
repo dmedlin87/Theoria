@@ -97,7 +97,12 @@ class LLMModel:
 
     def build_client(self) -> LanguageModelClientProtocol:
         if self.client_factory is None:
-            raise RuntimeError("Language model client factory has not been configured")
+            raise RuntimeError(
+                "Language model client factory has not been configured. "
+                "Provide one via LLMRegistry(client_factory=...), "
+                "registry_from_payload(client_factory=...), or "
+                "LLMRegistry.set_client_factory(...)."
+            )
         return self.client_factory(self.provider, self.config)
 
 
