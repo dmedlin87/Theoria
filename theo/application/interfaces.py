@@ -41,3 +41,16 @@ __all__ = [
     "QueryService",
     "SessionProtocol",
 ]
+@runtime_checkable
+class LanguageModelClientProtocol(Protocol):
+    """Protocol describing the behaviour exposed by language model clients."""
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        temperature: float = 0.2,
+        max_output_tokens: int = 800,
+        cache_key: str | None = None,
+    ) -> str: ...

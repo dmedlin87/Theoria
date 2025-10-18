@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Sequence
 
 from theo.application.dtos import (
+    ChatSessionDTO,
     CorpusSnapshotDTO,
     DiscoveryDTO,
     DocumentDTO,
@@ -18,11 +19,23 @@ from theo.application.dtos import (
 )
 
 from .models import (
+    ChatSession,
     CorpusSnapshot,
     Discovery,
     Document,
     Passage,
 )
+
+
+def chat_session_to_dto(model: ChatSession) -> ChatSessionDTO:
+    """Convert ORM ChatSession to DTO."""
+
+    return ChatSessionDTO(
+        id=model.id,
+        user_id=model.user_id,
+        memory_snippets=list(model.memory_snippets or []),
+        updated_at=model.updated_at,
+    )
 
 
 def discovery_to_dto(model: Discovery) -> DiscoveryDTO:
@@ -135,6 +148,7 @@ def document_to_dto(model: Document, passages: Sequence[Passage] | None = None) 
 
 
 __all__ = [
+    "chat_session_to_dto",
     "discovery_to_dto",
     "dto_to_discovery",
     "corpus_snapshot_to_dto",

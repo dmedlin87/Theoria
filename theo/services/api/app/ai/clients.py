@@ -9,29 +9,17 @@ from email.utils import parsedate_to_datetime
 import logging
 import random
 import time
-from typing import Any, Protocol
+from typing import Any
 import uuid
 
 import httpx
 from cachetools import LRUCache
 
+from theo.application.interfaces import LanguageModelClientProtocol
 from theo.application.ports.ai_registry import GenerationError
 
 
-class LanguageModelClient(Protocol):
-    """Common protocol implemented by provider-specific clients."""
-
-    def generate(
-        self,
-        *,
-        prompt: str,
-        model: str,
-        temperature: float = 0.2,
-        max_output_tokens: int = 800,
-        cache_key: str | None = None,
-    ) -> str:
-        """Return a text completion."""
-        ...
+LanguageModelClient = LanguageModelClientProtocol
 
 
 def build_hypothesis_prompt(
@@ -779,7 +767,7 @@ class EchoClient:
         return f"{summary_block}\n\nSources: {sources_text}".strip()
 
 
-def build_client(provider: str, config: dict[str, str]) -> LanguageModelClient:
+def build_client(provider: str, config: dict[str, Any]) -> LanguageModelClient:
     """Instantiate a client for ``provider`` using ``config``."""
 
     normalized = provider.lower()
@@ -846,9 +834,6 @@ def build_client(provider: str, config: dict[str, str]) -> LanguageModelClient:
     if normalized in {"echo", "builtin", "mock"}:
         return EchoClient(config.get("suffix", ""))
     raise GenerationError(f"Unsupported provider: {provider}")
-
-
-set_client_factory(build_client)
 
 
 __all__ = [
