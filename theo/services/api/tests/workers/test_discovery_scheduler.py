@@ -91,9 +91,32 @@ def test_trigger_user_refresh_commits_on_success(
     session = RecordingSession()
     sentinel = ["discovery"]
 
+    fake_discovery_repo = object()
+    fake_document_repo = object()
+
+    def fake_discovery_repo_factory(received_session):
+        assert received_session is session
+        return fake_discovery_repo
+
+    def fake_document_repo_factory(received_session):
+        assert received_session is session
+        return fake_document_repo
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "SQLAlchemyDiscoveryRepository",
+        fake_discovery_repo_factory,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "SQLAlchemyDocumentRepository",
+        fake_document_repo_factory,
+    )
+
     class StubService:
-        def __init__(self, received_session):
-            assert received_session is session
+        def __init__(self, discovery_repo, document_repo):
+            assert discovery_repo is fake_discovery_repo
+            assert document_repo is fake_document_repo
 
         def refresh_user_discoveries(self, user_id: str):
             assert user_id == "alice"
@@ -114,9 +137,32 @@ def test_trigger_user_refresh_rolls_back_on_error(
 ) -> None:
     session = RecordingSession()
 
+    fake_discovery_repo = object()
+    fake_document_repo = object()
+
+    def fake_discovery_repo_factory(received_session):
+        assert received_session is session
+        return fake_discovery_repo
+
+    def fake_document_repo_factory(received_session):
+        assert received_session is session
+        return fake_document_repo
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "SQLAlchemyDiscoveryRepository",
+        fake_discovery_repo_factory,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "SQLAlchemyDocumentRepository",
+        fake_document_repo_factory,
+    )
+
     class ExplodingService:
-        def __init__(self, received_session):
-            assert received_session is session
+        def __init__(self, discovery_repo, document_repo):
+            assert discovery_repo is fake_discovery_repo
+            assert document_repo is fake_document_repo
 
         def refresh_user_discoveries(self, user_id: str):
             raise RuntimeError("boom")

@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
+from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository
 from theo.application.facades.database import get_session
 
 from ..discoveries import DiscoveryService
@@ -26,8 +28,12 @@ def _require_user_subject(principal: Principal) -> str:
     return subject
 
 
-def _service(session: Session) -> DiscoveryService:
-    return DiscoveryService(session)
+def get_discovery_service(
+    session: Session = Depends(get_session),
+) -> DiscoveryService:
+    discovery_repo = SQLAlchemyDiscoveryRepository(session)
+    document_repo = SQLAlchemyDocumentRepository(session)
+    return DiscoveryService(discovery_repo, document_repo)
 
 
 def _build_stats(discoveries: list[DiscoveryResponse]) -> DiscoveryStats:
@@ -54,7 +60,7 @@ def list_discoveries(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     principal: Principal = Depends(require_principal),
-    session: Session = Depends(get_session),
+    service: DiscoveryService = Depends(get_discovery_service),
 ) -> DiscoveryListResponse:
     user_id = _require_user_subject(principal)
     service = _service(session)
@@ -75,12 +81,18 @@ def mark_discovery_viewed(
     discovery_id: int,
     principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
+    service: DiscoveryService = Depends(get_discovery_service),
 ) -> Response:
     user_id = _require_user_subject(principal)
     try:
-        _service(session).mark_viewed(user_id, discovery_id)
+        service.mark_viewed(user_id, discovery_id)
+        session.commit()
     except LookupError as exc:
+        session.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
+    except Exception:
+        session.rollback()
+        raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -90,13 +102,19 @@ def submit_discovery_feedback(
     payload: DiscoveryFeedbackRequest,
     principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
+    service: DiscoveryService = Depends(get_discovery_service),
 ) -> Response:
     user_id = _require_user_subject(principal)
     reaction = "helpful" if payload.helpful else "not_helpful"
     try:
-        _service(session).set_feedback(user_id, discovery_id, reaction)
+        service.set_feedback(user_id, discovery_id, reaction)
+        session.commit()
     except LookupError as exc:
+        session.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
+    except Exception:
+        session.rollback()
+        raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -105,12 +123,18 @@ def dismiss_discovery(
     discovery_id: int,
     principal: Principal = Depends(require_principal),
     session: Session = Depends(get_session),
+    service: DiscoveryService = Depends(get_discovery_service),
 ) -> Response:
     user_id = _require_user_subject(principal)
     try:
-        _service(session).dismiss(user_id, discovery_id)
+        service.dismiss(user_id, discovery_id)
+        session.commit()
     except LookupError as exc:
+        session.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
+    except Exception:
+        session.rollback()
+        raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

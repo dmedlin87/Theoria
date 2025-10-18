@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from theo.services.bootstrap import resolve_application
 
+from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
+from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository
 from theo.adapters.persistence.models import Document
 from ..discoveries import DiscoveryService
 
@@ -77,7 +79,9 @@ class DiscoveryScheduler:
         """Immediately trigger discovery refresh for a specific user."""
         try:
             logger.info(f"Triggering discovery refresh for user {user_id}")
-            service = DiscoveryService(session)
+            discovery_repo = SQLAlchemyDiscoveryRepository(session)
+            document_repo = SQLAlchemyDocumentRepository(session)
+            service = DiscoveryService(discovery_repo, document_repo)
             discoveries = service.refresh_user_discoveries(user_id)
             session.commit()
             logger.info(f"Generated {len(discoveries)} discoveries for user {user_id}")

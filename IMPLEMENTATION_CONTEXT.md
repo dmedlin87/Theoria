@@ -305,7 +305,9 @@ def test_discovery_refresh_end_to_end(session, user_id):
     documents = create_test_documents(session, user_id)
     
     # 2. Execute: Refresh discoveries
-    service = DiscoveryService(session)
+    discovery_repo = SQLAlchemyDiscoveryRepository(session)
+    document_repo = SQLAlchemyDocumentRepository(session)
+    service = DiscoveryService(discovery_repo, document_repo)
     discoveries = service.refresh_user_discoveries(user_id)
     
     # 3. Assert: Verify results

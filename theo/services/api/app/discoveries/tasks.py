@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session, sessionmaker
 
+from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
+from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository
 from theo.application.facades.database import get_engine
 
 from .service import DiscoveryService
@@ -32,8 +34,15 @@ def run_discovery_refresh(user_id: str) -> None:
 
     factory = _get_session_factory()
     with factory() as session:
-        service = DiscoveryService(session)
-        service.refresh_user_discoveries(user_id)
+        discovery_repo = SQLAlchemyDiscoveryRepository(session)
+        document_repo = SQLAlchemyDocumentRepository(session)
+        service = DiscoveryService(discovery_repo, document_repo)
+        try:
+            service.refresh_user_discoveries(user_id)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
 
 
 def schedule_discovery_refresh(

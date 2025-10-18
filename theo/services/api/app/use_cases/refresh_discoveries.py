@@ -12,13 +12,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from theo.application.dtos import DiscoveryDTO, CorpusSnapshotDTO
-from theo.application.repositories import DiscoveryRepository
+from theo.application.repositories import DiscoveryRepository, DocumentRepository
 from theo.domain.discoveries import (
     AnomalyDiscoveryEngine,
     ConnectionDiscoveryEngine,
     ContradictionDiscoveryEngine,
     DiscoveryType,
-    DocumentEmbedding,
     GapDiscoveryEngine,
     PatternDiscoveryEngine,
     TrendDiscoveryEngine,
@@ -68,17 +67,19 @@ class RefreshDiscoveriesUseCase:
     def execute(
         self,
         user_id: str,
-        documents: list[DocumentEmbedding],
+        document_repo: DocumentRepository,
     ) -> list[DiscoveryDTO]:
         """Execute the discovery refresh for a user.
-        
+
         Args:
             user_id: User ID to refresh discoveries for
-            documents: Document embeddings to analyze
+            document_repo: Repository used to load document embeddings
         
         Returns:
             List of newly created discoveries
         """
+        documents = document_repo.list_with_embeddings(user_id)
+
         # Run all discovery engines
         pattern_candidates, snapshot = self.pattern_engine.detect(documents)
         contradiction_candidates = self.contradiction_engine.detect(documents)

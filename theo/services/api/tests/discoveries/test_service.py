@@ -17,7 +17,13 @@ sys.modules.pop("theo.services.api.app.discoveries", None)
 sys.modules.pop("theo.services.api.app.discoveries.service", None)
 sys.modules.pop("theo.services.api.app.discoveries.tasks", None)
 
-from theo.adapters.persistence.models import (  # noqa: E402 - imported after cleanup
+from theo.adapters.persistence.discovery_repository import (  # noqa: E402 - imported after cleanup
+    SQLAlchemyDiscoveryRepository,
+)
+from theo.adapters.persistence.document_repository import (  # noqa: E402 - imported after cleanup
+    SQLAlchemyDocumentRepository,
+)
+from theo.adapters.persistence.models import (
     Base,
     CorpusSnapshot,
     Discovery,
@@ -252,8 +258,12 @@ def _build_service(session: Session):
     ]
     gap_engine = _RecordingListEngine(gap_candidates)
 
+    discovery_repo = SQLAlchemyDiscoveryRepository(session)
+    document_repo = SQLAlchemyDocumentRepository(session)
+
     service = DiscoveryService(
-        session,
+        discovery_repo,
+        document_repo,
         pattern_engine=pattern_engine,
         contradiction_engine=contradiction_engine,
         trend_engine=trend_engine,
@@ -355,5 +365,5 @@ def test_average_vectors_filters_non_finite():
         [float("inf"), 5.0],
         [2.0, 3.0],
     ]
-    result = DiscoveryService.average_vectors(vectors)
+    result = SQLAlchemyDocumentRepository._average_vectors(vectors)
     assert result == pytest.approx([1.0, 2.0])
