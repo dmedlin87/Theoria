@@ -172,9 +172,12 @@ def step5_with_domain_errors():
 
 def step6_with_use_case():
     """Advanced: Use case for complex operations."""
-    from theo.application.repositories import DiscoveryRepository
+    from theo.application.repositories import (
+        DiscoveryRepository,
+        DocumentRepository,
+    )
     from theo.application.dtos import DiscoveryDTO
-    from theo.domain.discoveries import PatternDiscoveryEngine, DocumentEmbedding
+    from theo.domain.discoveries import PatternDiscoveryEngine
     from datetime import UTC, datetime
     
     class RefreshDiscoveriesUseCase:
@@ -191,8 +194,10 @@ def step6_with_use_case():
             self.discovery_repo = discovery_repo
             self.pattern_engine = PatternDiscoveryEngine()
         
-        def execute(self, user_id: str, documents: list[DocumentEmbedding]):
+        def execute(self, user_id: str, document_repo: DocumentRepository):
             """Execute discovery refresh."""
+            documents = document_repo.list_with_embeddings(user_id)
+
             # Run domain logic
             patterns, snapshot = self.pattern_engine.detect(documents)
             

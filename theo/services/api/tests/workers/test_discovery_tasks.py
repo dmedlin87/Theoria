@@ -63,12 +63,20 @@ def test_run_discovery_refresh_uses_single_service(
     class FakeSession:
         def __init__(self):
             self.closed = False
+            self.commit_calls = 0
+            self.rollback_calls = 0
 
         def __enter__(self):
             return self
 
         def __exit__(self, exc_type, exc, tb):
             self.closed = True
+
+        def commit(self):
+            self.commit_calls += 1
+
+        def rollback(self):
+            self.rollback_calls += 1
 
     session = FakeSession()
     monkeypatch.setitem(
@@ -78,12 +86,35 @@ def test_run_discovery_refresh_uses_single_service(
     created_services: list[FakeDiscoveryService] = []
 
     class FakeDiscoveryService:
-        def __init__(self, received_session):
+        def __init__(self, discovery_repo, document_repo):
             created_services.append(self)
-            assert received_session is session
+            assert discovery_repo is fake_discovery_repo
+            assert document_repo is fake_document_repo
 
         def refresh_user_discoveries(self, user_id: str) -> None:
             assert user_id == "user-123"
+
+    fake_discovery_repo = object()
+    fake_document_repo = object()
+
+    def fake_discovery_repo_factory(received_session):
+        assert received_session is session
+        return fake_discovery_repo
+
+    def fake_document_repo_factory(received_session):
+        assert received_session is session
+        return fake_document_repo
+
+    monkeypatch.setitem(
+        tasks_module.__dict__,
+        "SQLAlchemyDiscoveryRepository",
+        fake_discovery_repo_factory,
+    )
+    monkeypatch.setitem(
+        tasks_module.__dict__,
+        "SQLAlchemyDocumentRepository",
+        fake_document_repo_factory,
+    )
 
     monkeypatch.setitem(
         tasks_module.__dict__, "DiscoveryService", FakeDiscoveryService
@@ -93,6 +124,8 @@ def test_run_discovery_refresh_uses_single_service(
 
     assert len(created_services) == 1
     assert session.closed is True
+    assert session.commit_calls == 1
+    assert session.rollback_calls == 0
 
 
 def test_schedule_discovery_refresh_requires_truthy_user_id(tasks_module) -> None:

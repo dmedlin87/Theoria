@@ -66,9 +66,13 @@ Contradictions are automatically detected:
 ```python
 from theo.services.api.app.discoveries import DiscoveryService
 from theo.application.facades.database import get_session
+from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
+from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository
 
-with get_session() as session:
-    service = DiscoveryService(session)
+    with get_session() as session:
+        discovery_repo = SQLAlchemyDiscoveryRepository(session)
+        document_repo = SQLAlchemyDocumentRepository(session)
+        service = DiscoveryService(discovery_repo, document_repo)
     discoveries = service.refresh_user_discoveries(user_id="abc123")
     
     # Filter for contradictions
