@@ -6,7 +6,7 @@ from typing import Callable, Protocol
 
 from theo.domain import Document, DocumentId
 
-from .interfaces import SessionProtocol
+from theo.application.interfaces import SessionProtocol
 from .research import ResearchService
 
 
