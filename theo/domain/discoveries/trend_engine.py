@@ -44,7 +44,9 @@ class TrendDiscoveryEngine:
         if len(snapshots) < self.min_snapshots:
             return []
 
-        ordered = sorted(snapshots, key=lambda snap: snap.snapshot_date)
+        ordered = sorted(
+            snapshots, key=lambda snap: self._ensure_utc(snap.snapshot_date)
+        )
         if len(ordered) > self.history_window:
             ordered = ordered[-self.history_window :]
         if len(ordered) < self.min_snapshots:
@@ -65,8 +67,8 @@ class TrendDiscoveryEngine:
         if not topics:
             return []
 
-        start_date = ordered[0].snapshot_date
-        end_date = ordered[-1].snapshot_date
+        start_date = self._ensure_utc(ordered[0].snapshot_date)
+        end_date = self._ensure_utc(ordered[-1].snapshot_date)
         timeframe = self._format_timeframe(start_date, end_date)
         trend_candidates: list[tuple[float, TrendDiscovery]] = []
 
@@ -94,7 +96,7 @@ class TrendDiscoveryEngine:
 
             history = [
                 {
-                    "date": snapshot.snapshot_date.astimezone(UTC).isoformat(),
+                    "date": self._ensure_utc(snapshot.snapshot_date).isoformat(),
                     "share": round(value * 100, 2),
                 }
                 for snapshot, value in zip(ordered, series, strict=True)
@@ -199,9 +201,15 @@ class TrendDiscoveryEngine:
         return normalised
 
     @staticmethod
+    def _ensure_utc(moment: datetime) -> datetime:
+        if moment.tzinfo is None or moment.tzinfo.utcoffset(moment) is None:
+            return moment.replace(tzinfo=UTC)
+        return moment.astimezone(UTC)
+
+    @staticmethod
     def _format_timeframe(start: datetime, end: datetime) -> str:
-        start = start.astimezone(UTC)
-        end = end.astimezone(UTC)
+        start = TrendDiscoveryEngine._ensure_utc(start)
+        end = TrendDiscoveryEngine._ensure_utc(end)
         if start.date() == end.date():
             return start.strftime("%d %b %Y")
         if start.year == end.year:
