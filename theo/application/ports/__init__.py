@@ -1,11 +1,5 @@
 """Application service ports used by driven adapters."""
 
-from .secrets import (
-    SecretRetrievalError,
-    SecretRequest,
-    SecretsPort,
-    build_secrets_adapter,
-)
 from .events import (
     CompositeEventPublisher,
     DomainEvent,
@@ -13,6 +7,12 @@ from .events import (
     EventPublisher,
     NullEventPublisher,
     normalise_event_value,
+)
+from .secrets import (
+    SecretRetrievalError,
+    SecretRequest,
+    SecretsPort,
+    build_secrets_adapter,
 )
 
 __all__ = [
@@ -26,4 +26,8 @@ __all__ = [
     "EventPublisher",
     "NullEventPublisher",
     "normalise_event_value",
+    "SecretRetrievalError",
+    "SecretRequest",
+    "SecretsPort",
+    "build_secrets_adapter",
 ]
