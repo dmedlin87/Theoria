@@ -10,6 +10,7 @@ from .discovery import (
     DiscoveryDTO,
     DiscoveryListFilters,
 )
+from .chat import ChatSessionDTO
 from .document import (
     DocumentDTO,
     DocumentSummaryDTO,
@@ -19,6 +20,7 @@ from .transcript import TranscriptSegmentDTO, TranscriptVideoDTO
 
 __all__ = [
     "CorpusSnapshotDTO",
+    "ChatSessionDTO",
     "DiscoveryDTO",
     "DiscoveryListFilters",
     "DocumentDTO",
