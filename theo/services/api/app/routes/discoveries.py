@@ -71,13 +71,19 @@ def list_discoveries(
 def mark_discovery_viewed(
     discovery_id: int,
     principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
     service: DiscoveryService = Depends(get_discovery_service),
 ) -> Response:
     user_id = _require_user_subject(principal)
     try:
         service.mark_viewed(user_id, discovery_id)
+        session.commit()
     except LookupError as exc:
+        session.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
+    except Exception:
+        session.rollback()
+        raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -86,14 +92,20 @@ def submit_discovery_feedback(
     discovery_id: int,
     payload: DiscoveryFeedbackRequest,
     principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
     service: DiscoveryService = Depends(get_discovery_service),
 ) -> Response:
     user_id = _require_user_subject(principal)
     reaction = "helpful" if payload.helpful else "not_helpful"
     try:
         service.set_feedback(user_id, discovery_id, reaction)
+        session.commit()
     except LookupError as exc:
+        session.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
+    except Exception:
+        session.rollback()
+        raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -101,13 +113,19 @@ def submit_discovery_feedback(
 def dismiss_discovery(
     discovery_id: int,
     principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
     service: DiscoveryService = Depends(get_discovery_service),
 ) -> Response:
     user_id = _require_user_subject(principal)
     try:
         service.dismiss(user_id, discovery_id)
+        session.commit()
     except LookupError as exc:
+        session.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discovery not found") from exc
+    except Exception:
+        session.rollback()
+        raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
