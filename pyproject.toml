@@ -101,5 +101,5 @@ markers = [
 filterwarnings = [
     "ignore:jsonschema.exceptions.RefResolutionError is deprecated:DeprecationWarning",
     "ignore:jsonschema.RefResolver is deprecated as of v4.18.0:DeprecationWarning",
-    "ignore:Can't sort tables for DROP; an unresolvable foreign key dependency exists between tables:sqlalchemy.exc.SAWarning",
+    "ignore:Can't sort tables for DROP; an unresolvable foreign key dependency exists between tables:Warning",
 ]

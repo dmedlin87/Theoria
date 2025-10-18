@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from datetime import UTC, datetime
 from typing import Any, Sequence
 
@@ -137,7 +138,7 @@ def _notify_new_objects(
     object_ids: Sequence[str],
     settings: Settings,
     *,
-    document_id: str | None,
+    document_id: str | None = None,
 ) -> None:
     if not object_ids:
         return
@@ -259,10 +260,18 @@ def sync_case_objects_for_document(
     if updated_objects:
         notified_ids.extend(obj.id for obj in updated_objects)
     if notified_ids:
+        notify_kwargs: dict[str, object] = {}
+        try:
+            signature = inspect.signature(_notify_new_objects)
+        except (TypeError, ValueError):
+            signature = None
+        if signature and "document_id" in signature.parameters:
+            notify_kwargs["document_id"] = document.id
         _notify_new_objects(
             session,
             notified_ids,
-            document_id=document.id,
+            settings,
+            **notify_kwargs,
         )
     return created_objects
 

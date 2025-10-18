@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .registry import RouterRegistration, register_router
+from ..graphql.router import graphql_router
 from ..routes import (
     ai,
     analytics,
@@ -25,6 +26,7 @@ from ..routes import (
 
 
 _DEFAULT_REGISTRATIONS = (
+    RouterRegistration(router=graphql_router, prefix="/graphql", tags=("graphql",)),
     RouterRegistration(router=ingest.router, prefix="/ingest", tags=("ingest",)),
     RouterRegistration(router=jobs.router, prefix="/jobs", tags=("jobs",)),
     RouterRegistration(router=search.router, prefix="/search", tags=("search",)),
