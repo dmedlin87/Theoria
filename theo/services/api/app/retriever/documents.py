@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
 
 from ..case_builder import sync_annotation_case_object
 from theo.adapters.persistence.models import Document, DocumentAnnotation, Passage
@@ -17,6 +17,7 @@ from ..models.documents import (
     DocumentSummary,
     DocumentUpdateRequest,
 )
+from ..db.query_optimizations import query_with_monitoring
 from .annotations import annotation_to_schema, prepare_annotation_body
 
 
@@ -33,6 +34,7 @@ def _passage_to_schema(passage: Passage) -> PassageSchema:
         meta=passage.meta,
     )
 
+@query_with_monitoring("documents.list")
 def list_documents(
     session: Session, *, limit: int = 20, offset: int = 0
 ) -> DocumentListResponse:
@@ -62,25 +64,27 @@ def list_documents(
     return DocumentListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
+@query_with_monitoring("documents.detail")
 def get_document(session: Session, document_id: str) -> DocumentDetailResponse:
     """Fetch a document and its passages from the database."""
 
-    document = session.get(Document, document_id)
+    stmt = (
+        select(Document)
+        .options(
+            selectinload(Document.passages)
+            .order_by(Passage.page_no.asc(), Passage.start_char.asc()),
+            selectinload(Document.annotations).order_by(
+                DocumentAnnotation.created_at.asc()
+            ),
+        )
+        .where(Document.id == document_id)
+    )
+    document = session.scalars(stmt).first()
     if document is None:
         raise KeyError(f"Document {document_id} not found")
 
-    passages = (
-        session.query(Passage)
-        .filter(Passage.document_id == document.id)
-        .order_by(Passage.page_no.asc(), Passage.start_char.asc())
-        .all()
-    )
-    annotations = (
-        session.query(DocumentAnnotation)
-        .filter(DocumentAnnotation.document_id == document.id)
-        .order_by(DocumentAnnotation.created_at.asc())
-        .all()
-    )
+    passages = list(document.passages)
+    annotations = list(document.annotations)
 
     passage_schemas = [_passage_to_schema(passage) for passage in passages]
 

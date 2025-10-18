@@ -9,11 +9,12 @@ from typing import Iterable, Sequence
 
 from opentelemetry import trace
 from sqlalchemy import and_, func, literal, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from theo.application.facades.settings import get_settings
 from theo.adapters.persistence.models import Document, Passage
 from theo.adapters.persistence.types import VectorType
+from ..db.query_optimizations import query_with_monitoring
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.documents import DocumentAnnotationResponse
@@ -348,7 +349,11 @@ def _apply_common_filters(stmt, request: HybridSearchRequest):
 
 
 def _build_base_query(request: HybridSearchRequest):
-    stmt = select(Passage, Document).join(Document)
+    stmt = (
+        select(Passage, Document)
+        .join(Document)
+        .options(selectinload(Passage.document))
+    )
     return _apply_common_filters(stmt, request)
 
 
@@ -626,6 +631,7 @@ def _postgres_hybrid_search(
         return results
 
 
+@query_with_monitoring("search.hybrid_search")
 def hybrid_search(
     session: Session, request: HybridSearchRequest
 ) -> list[HybridSearchResult]:

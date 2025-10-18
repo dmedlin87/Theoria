@@ -16,6 +16,35 @@ from theo.domain.discoveries import (
     TrendDiscoveryEngine,
 )
 
+from theo.adapters.persistence.models import (
+    CorpusSnapshot,
+    Discovery,
+    Document,
+    Passage,
+)
+from ..db.query_optimizations import query_with_monitoring
+
+
+def _coerce_topics(raw: object) -> list[str]:
+    topics: list[str] = []
+    if isinstance(raw, str):
+        value = raw.strip()
+        if value:
+            topics.append(value)
+    elif isinstance(raw, Iterable):
+        for item in raw:
+            if isinstance(item, str):
+                value = item.strip()
+                if value:
+                    topics.append(value)
+            elif isinstance(item, Mapping):
+                for key in ("label", "name", "topic", "value"):
+                    candidate = item.get(key)
+                    if isinstance(candidate, str) and candidate.strip():
+                        topics.append(candidate.strip())
+                        break
+    return topics
+
 
 class DiscoveryService:
     """High-level API for working with discovery records."""
@@ -40,22 +69,34 @@ class DiscoveryService:
         self.connection_engine = connection_engine or ConnectionDiscoveryEngine()
         self.gap_engine = gap_engine or GapDiscoveryEngine()
 
+    @query_with_monitoring("discoveries.list")
     def list(
         self,
         user_id: str,
         *,
         discovery_type: str | None = None,
         viewed: bool | None = None,
-    ) -> list[DiscoveryDTO]:
-        filters = DiscoveryListFilters(
-            user_id=user_id,
-            discovery_type=discovery_type,
-            viewed=viewed,
-        )
-        return self.discovery_repo.list(filters)
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[Discovery]:
+        stmt = select(Discovery).where(Discovery.user_id == user_id)
+        if discovery_type:
+            stmt = stmt.where(Discovery.discovery_type == discovery_type)
+        if viewed is not None:
+            stmt = stmt.where(Discovery.viewed == viewed)
+        stmt = stmt.order_by(Discovery.created_at.desc())
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return list(self.session.scalars(stmt))
 
-    def mark_viewed(self, user_id: str, discovery_id: int) -> DiscoveryDTO:
-        return self.discovery_repo.mark_viewed(discovery_id, user_id)
+    def mark_viewed(self, user_id: str, discovery_id: int) -> Discovery:
+        discovery = self._get_user_discovery(user_id, discovery_id)
+        if not discovery.viewed:
+            discovery.viewed = True
+            self.session.commit()
+        return discovery
 
     def set_feedback(
         self, user_id: str, discovery_id: int, reaction: str | None
