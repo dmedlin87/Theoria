@@ -16,7 +16,59 @@ from itertools import count
 from typing import Iterable, Sequence
 
 import pythonbible as pb
-from faker import Faker
+
+try:  # pragma: no cover - exercised indirectly by tests
+    from faker import Faker
+except ModuleNotFoundError:  # pragma: no cover - fallback for minimal envs
+    class _FallbackFaker:
+        """Lightweight replacement used when the optional ``faker`` package is absent."""
+
+        _WORD_BANK = [
+            "grace",
+            "faith",
+            "hope",
+            "charity",
+            "wisdom",
+            "light",
+            "peace",
+            "truth",
+            "covenant",
+            "mercy",
+            "promise",
+            "joy",
+            "steadfast",
+            "justice",
+            "blessing",
+            "deliverance",
+            "comfort",
+            "goodness",
+            "kindness",
+            "guidance",
+        ]
+
+        def __init__(self) -> None:
+            self._random = random.Random()
+
+        def seed_instance(self, seed: int) -> None:
+            self._random.seed(seed)
+
+        def _words(self, nb: int) -> list[str]:
+            return [self._random.choice(self._WORD_BANK) for _ in range(nb)]
+
+        def sentence(self, nb_words: int = 6) -> str:
+            words = self._words(nb_words)
+            return (" ".join(words)).capitalize() + "."
+
+        def sentences(self, nb: int = 3) -> list[str]:
+            return [self.sentence() for _ in range(nb)]
+
+        def paragraphs(self, nb: int = 3) -> list[str]:
+            return [" ".join(self.sentences(nb=3)) for _ in range(nb)]
+
+        def words(self, nb: int = 3) -> list[str]:
+            return self._words(nb)
+
+    Faker = _FallbackFaker
 
 from theo.domain.research.osis import format_osis, osis_to_readable
 from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
