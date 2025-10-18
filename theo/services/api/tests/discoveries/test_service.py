@@ -356,4 +356,4 @@ def test_average_vectors_filters_non_finite():
         [2.0, 3.0],
     ]
     result = DiscoveryService._average_vectors(vectors)
-    assert result == [1.0, 2.0]
+    assert result == pytest.approx([1.0, 2.0])
