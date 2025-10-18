@@ -8,7 +8,7 @@ Migration guidance:
 Downstream consumers should update their imports to use the new path proactively.
 
 Deprecation notice:
-    This compatibility shim is scheduled for removal in a future release.
+    This compatibility shim is scheduled for removal in v2.0.
     Please migrate to the new import path as soon as possible.
 """
 from __future__ import annotations
