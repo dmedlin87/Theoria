@@ -6,15 +6,11 @@ from functools import lru_cache
 from importlib import resources
 from typing import Any
 
-_DATA_PACKAGE = "theo.services.api.app.research.data"
+_DATA_PACKAGE_ROOT = resources.files("theo.data.research")
 
 
 def _load_json(filename: str) -> Any:
-    with (
-        resources.files(_DATA_PACKAGE)
-        .joinpath(filename)
-        .open("r", encoding="utf-8")
-    ) as handle:
+    with _DATA_PACKAGE_ROOT.joinpath(filename).open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
