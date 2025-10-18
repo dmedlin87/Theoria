@@ -63,7 +63,8 @@ def test_chat_turn_blank_user_message_returns_structured_error(client: TestClien
 
 def test_chat_turn_payload_too_large_returns_structured_error(client: TestClient) -> None:
     oversized_message = "x" * MAX_CHAT_MESSAGE_CONTENT_LENGTH
-    messages_needed = (CHAT_SESSION_TOTAL_CHAR_BUDGET // MAX_CHAT_MESSAGE_CONTENT_LENGTH) + 1
+    # Add a safety margin to account for JSON structure overhead
+    messages_needed = (CHAT_SESSION_TOTAL_CHAR_BUDGET // MAX_CHAT_MESSAGE_CONTENT_LENGTH) + 3
     response = client.post(
         "/ai/chat",
         json={
