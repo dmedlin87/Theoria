@@ -43,11 +43,11 @@ Conducted comprehensive architectural review of Theoria's hexagonal architecture
 20. ✅ `.github/PULL_REQUEST_TEMPLATE_ARCHITECTURE.md` - PR template
 
 ### Task Handoffs (5 files)
-21. ✅ `docs/tasks/TASK_001_Migrate_DiscoveryService.md`
-22. ✅ `docs/tasks/TASK_002_Implement_Gap_Analysis_Engine.md`
-23. ✅ `docs/tasks/TASK_003_Add_Query_Optimizations.md`
-24. ✅ `docs/tasks/TASK_004_Validate_Architecture.md`
-25. ✅ `docs/tasks/README.md` - Task index
+21. ✅ `docs/tasks/TASK_CS_001_Implement_Hypothesis_Object_and_Dashboard.md`
+22. ✅ `docs/tasks/TASK_CS_002_Wire_Cognitive_Gate_v0.md`
+23. ✅ `docs/tasks/TASK_CS_003_Ship_Debate_v0.md`
+24. ✅ `docs/tasks/README.md` - Task index
+25. ✅ `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`
 
 ### Session Summaries (2 files)
 26. ✅ `NEXT_STEPS.md` - Clear guidance for next work
@@ -151,25 +151,21 @@ stmt = select(Document).options(selectinload(Document.passages))
 
 ## 📋 Next Steps Created
 
-Created 4 detailed task handoffs for future work:
+Created Cognitive Scholar task handoffs for future work:
 
-1. **TASK_001**: Migrate DiscoveryService (2-3h, HIGH)
-   - Demonstrates migration pattern
-   - Validates architecture in production
+1. **TASK_CS_001**: Implement Hypothesis Object & Dashboard (2-3 days, HIGH)
+   - Ships the persistent hypothesis aggregate and UI foundation
+   - Aligns research agents + human operators on the same contract
 
-2. **TASK_002**: Implement Gap Analysis Engine (3-4h, HIGH)
-   - Next discovery feature on roadmap
-   - Uses clean architecture from day 1
+2. **TASK_CS_002**: Wire Cognitive Gate v0 (3-4 days, HIGH)
+   - Adds guardrails for reasoning workflows before Debate/autonomy work
+   - Captures telemetry for future tuning
 
-3. **TASK_003**: Add Query Optimizations (1-2h, MEDIUM)
-   - Quick performance wins
-   - Eliminate N+1 in search/documents
+3. **TASK_CS_003**: Ship Debate v0 (4-5 days, MEDIUM-HIGH)
+   - Orchestrates two-perspective debates and feeds verdicts into hypotheses
+   - Demonstrates Cognitive Scholar experience end-to-end
 
-4. **TASK_004**: Validate Architecture (30m, VALIDATION)
-   - Run comprehensive test suite
-   - Verify no regressions
-
-**Recommended order**: 4 → 1 → 3 → 2
+**Recommended order**: CS-001 → CS-002 → CS-003
 
 ---
 
@@ -331,4 +327,4 @@ The architecture is now:
 
 ---
 
-**Next recommended action**: Start with TASK_004 (Validate Architecture) to establish baseline, then proceed with TASK_001 (Migrate DiscoveryService) to demonstrate the migration pattern in production code.
+**Next recommended action**: Start with TASK_CS_001 (Hypothesis Object & Dashboard) to anchor Cognitive Scholar data contracts, then proceed with TASK_CS_002 (Cognitive Gate v0) before tackling TASK_CS_003 (Debate v0).

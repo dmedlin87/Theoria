@@ -22,105 +22,84 @@
 
 ## 🎯 Immediate Next Steps (Pick One)
 
-### Option 1: Validate Everything Works ⭐ Recommended First
-**Task**: TASK_004 (30 minutes)
+### Option 1: Stand Up Hypothesis Backbone ⭐⭐⭐ Recommended First
+**Task**: TASK_CS_001 (2-3 days)
 ```bash
-# Run architecture tests
-pytest tests/architecture/ -v
+# Run backend tests focused on research service
+pytest theo/services/api/tests/research/test_hypotheses.py -k "not slow"
 
-# Run full test suite
-pytest tests/ -v
-
-# Check coverage
-pytest --cov=theo --cov-report=html
+# Validate Next.js dashboard builds
+cd theo/services/web && npm run lint && npm run test -- --runTestsByPath tests/app/research/hypotheses-dashboard.test.tsx
 ```
-**Why**: Establish baseline before making changes
+**Why**: Hypothesis persistence + dashboard are prerequisites for every other Cognitive Scholar feature.
 
 ---
 
-### Option 2: Demonstrate Migration Pattern ⭐⭐⭐ High Value
-**Task**: TASK_001 (2-3 hours)
+### Option 2: Activate Cognitive Gate ⭐⭐⭐ High Value
+**Task**: TASK_CS_002 (3-4 days)
 
-**What**: Migrate `DiscoveryService` to use new repository pattern
+**What**: Introduce the gating heuristics that sit in front of high-cost reasoning workflows.
 
 **Benefits**:
-- Validates entire architecture stack works in production
-- Creates migration template for team
-- Improves testability (can mock repositories)
+- Protects LLM spend by rejecting low-rigor generations.
+- Emits telemetry for tuning and alerting.
+- Unlocks Debate v0 and multi-loop autonomy experiments.
 
-**Files**: See `docs/tasks/TASK_001_Migrate_DiscoveryService.md`
+**Files**: See `docs/tasks/TASK_CS_002_Wire_Cognitive_Gate_v0.md`
 
 ---
 
-### Option 3: Build Next Feature with Clean Architecture ⭐⭐⭐
-**Task**: TASK_002 (3-4 hours)
+### Option 3: Pilot Debate v0 ⭐⭐ Aspirational
+**Task**: TASK_CS_003 (4-5 days)
 
-**What**: Implement Gap Analysis Engine with BERTopic
-
-**Benefits**:
-- Advances discovery feature roadmap
-- Demonstrates building new features with clean patterns
-- Pure domain logic from day 1
-
-**Files**: See `docs/tasks/TASK_002_Implement_Gap_Analysis_Engine.md`
-
----
-
-### Option 4: Quick Performance Wins ⭐⭐
-**Task**: TASK_003 (1-2 hours)
-
-**What**: Add eager loading to search/document endpoints
+**What**: Run a two-perspective debate with a judge verdict and push the result into the hypothesis dashboard.
 
 **Benefits**:
-- Immediate user-facing improvements
-- Low risk, high reward
-- Validates query optimization tools
+- Demonstrates the full Cognitive Scholar loop for stakeholders.
+- Exercises Cognitive Gate + Hypothesis pipeline end-to-end.
+- Establishes UI/UX patterns for transcripts and verdicts.
 
-**Files**: See `docs/tasks/TASK_003_Add_Query_Optimizations.md`
+**Files**: See `docs/tasks/TASK_CS_003_Ship_Debate_v0.md`
 
 ---
 
 ## 📚 Task Documentation
 
-All tasks have detailed handoff documents in `docs/tasks/`:
+Cognitive Scholar tasks now live in `docs/tasks/`:
 
-- **TASK_001**: Migrate DiscoveryService (2-3h, HIGH priority)
-- **TASK_002**: Implement Gap Analysis (3-4h, HIGH priority)
-- **TASK_003**: Query Optimizations (1-2h, MEDIUM priority)
-- **TASK_004**: Validate Architecture (30m, validation)
+- **TASK_CS_001** – Implement Hypothesis Object & Dashboard (2-3 days, HIGH)
+- **TASK_CS_002** – Wire Cognitive Gate v0 (3-4 days, HIGH)
+- **TASK_CS_003** – Ship Debate v0 (4-5 days, MEDIUM-HIGH)
 
 Each document includes:
-- Clear objectives
-- Step-by-step implementation guide
-- Code examples
-- Testing strategy
-- Success criteria
-- Common pitfalls
+- Objectives + acceptance criteria
+- Target files/components across Python + TypeScript
+- Testing + telemetry expectations
+- Follow-up ideas for Alpha/Beta scope
 
 ---
 
 ## 🗺️ Strategic Roadmap
 
-### Phase 1: Validation & Migration (This Week)
-1. ✅ Run TASK_004 to validate baseline
-2. ✅ Complete TASK_001 to demonstrate migration
-3. ✅ Document lessons learned
+### Phase 1: Cognitive Scholar MVP Foundations (Week 1-2)
+1. 🚧 Ship **TASK_CS_001** (Hypothesis Object & Dashboard).
+2. 🚧 Enable hypothesis analytics + instrumentation hooks.
+3. 🚧 Document data contracts for downstream agents.
 
-### Phase 2: Feature Development (Next 2 Weeks)
-1. ✅ Implement TASK_002 (Gap Analysis)
-2. ✅ Add remaining discovery engines (Connection, Trend, Anomaly)
-3. ✅ Apply TASK_003 optimizations
+### Phase 2: Guardrails & Autonomy (Week 3-4)
+1. 🚧 Complete **TASK_CS_002** (Cognitive Gate v0).
+2. 🚧 Wire gate verdicts into orchestrator events + logging.
+3. 🚧 Tune gate thresholds using sandbox transcripts.
 
-### Phase 3: Gradual Service Migration (Month 1-2)
-1. ✅ Migrate DocumentService to repositories
-2. ✅ Migrate SearchService with optimizations
-3. ✅ Create v2.0 endpoints with improved contracts
+### Phase 3: Debate & Perspective Surfacing (Week 5-6)
+1. 🚧 Launch **TASK_CS_003** (Debate v0) with skeptical/apologetic defaults.
+2. 🚧 Update dashboard to display debate verdict deltas.
+3. 🚧 Gather user feedback + capture follow-up tasks for Debate v1.
 
-### Phase 4: Advanced Features (Month 3+)
-1. ✅ Add Redis caching layer
-2. ✅ Implement read replicas
-3. ✅ Migrate to Celery for distributed jobs
-4. ✅ Add distributed tracing
+### Phase 4: Alpha Enhancements (Beyond MVP)
+1. 🔭 Truth-Maintenance Graph + belief updates.
+2. 🔭 Multi-hypothesis runner + perspective toggles.
+3. 🔭 Insights panel + contradiction finder upgrades.
 
 ---
 
@@ -181,11 +160,11 @@ mypy theo/
 
 ## 💡 Pro Tips
 
-1. **Start Small**: Pick TASK_004 or TASK_003 to build confidence
-2. **Use References**: Copy patterns from `discoveries_v1.py`
-3. **Test First**: Write repository mocks before implementation
-4. **Ask for Help**: All patterns are documented with examples
-5. **Document Lessons**: Add insights to migration guide
+1. **Start Small**: Prototype a thin slice of TASK_CS_001 (e.g., repository + list API) before expanding scope.
+2. **Use References**: Reuse patterns from `theo/services/api/app/routes/discoveries_v1.py` and existing research tests.
+3. **Test First**: Capture repository + API expectations in `theo/services/api/tests/research/test_hypotheses.py` before wiring UI.
+4. **Ask for Help**: Architectural patterns remain documented—cross-check `docs/IMPLEMENTATION_GUIDE.md`.
+5. **Document Lessons**: Add Cognitive Scholar insights to `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`.
 
 ---
 
@@ -235,6 +214,6 @@ In this session (October 18, 2025):
 4. **Test**: Run architecture tests to verify
 5. **Document**: Add learnings to migration guide
 
-**Recommended first task**: TASK_004 (Validate Architecture) - 30 minutes
+**Recommended first task**: TASK_CS_001 (Implement Hypothesis Object & Dashboard)
 
 Let's build! 🎯
