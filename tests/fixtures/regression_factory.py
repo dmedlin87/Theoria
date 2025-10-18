@@ -52,7 +52,7 @@ from theo.domain.research.osis import format_osis, osis_to_readable
 
 try:  # pragma: no cover - executed only when application models are importable
     from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
-except Exception:  # pragma: no cover - fallback dataclasses for lightweight testing
+except ImportError:  # pragma: no cover - fallback dataclasses for lightweight testing
     @dataclass(frozen=True)
     class RAGCitation:
         index: int
