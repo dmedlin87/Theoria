@@ -930,6 +930,7 @@ def persist_text_document(
                 case_object_ids=sorted(case_object_ids),
                 metadata=metadata or None,
             )
+        )
         emit_document_persisted_event(
             document=document,
             passages=passages,
@@ -1069,6 +1070,7 @@ def persist_transcript_document(
     )
 
     passages: list[Passage] = []
+    case_object_ids: set[str] = set()
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     collected_verse_refs: list[str] = []
@@ -1395,6 +1397,7 @@ def persist_transcript_document(
                 case_object_ids=sorted(case_object_ids),
                 metadata=metadata or None,
             )
+        )
         emit_document_persisted_event(
             document=document,
             passages=passages,
