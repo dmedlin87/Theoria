@@ -1,4 +1,16 @@
-"""Compatibility shim for relocated research datasets."""
+"""
+Compatibility shim for relocated research datasets.
+
+Migration guidance:
+    Old imports: theo.services.api.app.research.data.*
+    New imports: theo.data.research.*
+
+Downstream consumers should update their imports to use the new path proactively.
+
+Deprecation timeline:
+    This compatibility shim is scheduled for removal after 2025-01-01.
+    Please migrate to the new import path before this date.
+"""
 from __future__ import annotations
 
 from theo.data import research as _research
