@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import importlib
 import logging
-from typing import Any, Callable, Iterable, Protocol
+from typing import Any, Callable, Iterable
 
 from cryptography.fernet import InvalidToken
 
 from theo.application.facades.settings import get_settings, get_settings_cipher
+from theo.application.interfaces import LanguageModelClientProtocol
 
 
 SETTINGS_KEY = "llm"
@@ -25,27 +25,7 @@ _ENCRYPTED_FIELD = "__encrypted__"
 logger = logging.getLogger(__name__)
 
 
-ClientFactory = Callable[[str, dict[str, Any]], "LanguageModelClient"]
-_client_factory: ClientFactory | None = None
-_CLIENT_FACTORY_MODULE = "theo.services.api.app.ai.clients"
-
-
-def set_client_factory(factory: ClientFactory) -> None:
-    """Configure the factory used to instantiate language model clients."""
-
-    global _client_factory
-    _client_factory = factory
-
-
-def _get_client_factory() -> ClientFactory:
-    if _client_factory is None:  # pragma: no branch - configuration guard
-        try:  # pragma: no cover - defensive import path
-            importlib.import_module(_CLIENT_FACTORY_MODULE)
-        except ModuleNotFoundError:
-            pass
-    if _client_factory is None:  # pragma: no cover - configuration guard
-        raise RuntimeError("Language model client factory has not been configured")
-    return _client_factory
+ClientFactory = Callable[[str, dict[str, Any]], LanguageModelClientProtocol]
 
 
 class GenerationError(RuntimeError):
@@ -80,6 +60,9 @@ class LLMModel:
     pricing: dict[str, Any] = field(default_factory=dict)
     latency: dict[str, Any] = field(default_factory=dict)
     routing: dict[str, Any] = field(default_factory=dict)
+    client_factory: ClientFactory | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def masked_api_key(self) -> str | None:
         for key_name in SECRET_CONFIG_KEYS:
@@ -112,17 +95,28 @@ class LLMModel:
             payload["masked_api_key"] = self.masked_api_key()
         return payload
 
-    def build_client(self) -> "LanguageModelClient":
-        factory = _get_client_factory()
-        return factory(self.provider, self.config)
+    def build_client(self) -> LanguageModelClientProtocol:
+        if self.client_factory is None:
+            raise RuntimeError("Language model client factory has not been configured")
+        return self.client_factory(self.provider, self.config)
 
 
 @dataclass
 class LLMRegistry:
     models: dict[str, LLMModel] = field(default_factory=dict)
     default_model: str | None = None
+    client_factory: ClientFactory | None = field(
+        default=None, repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        if self.client_factory is not None:
+            for model in self.models.values():
+                model.client_factory = self.client_factory
 
     def add_model(self, model: LLMModel, *, make_default: bool = False) -> None:
+        if self.client_factory is not None:
+            model.client_factory = self.client_factory
         self.models[model.name] = model
         if make_default or not self.default_model:
             self.default_model = model.name
@@ -166,8 +160,15 @@ class LLMRegistry:
             "models": [model.to_payload() for model in self.models.values()],
         }
 
+    def set_client_factory(self, factory: ClientFactory | None) -> None:
+        self.client_factory = factory
+        for model in self.models.values():
+            model.client_factory = factory
 
-def _load_bootstrap_models() -> Iterable[LLMModel]:
+
+def _load_bootstrap_models(
+    client_factory: ClientFactory | None,
+) -> Iterable[LLMModel]:
     settings = get_settings()
     for name, payload in settings.llm_models.items():
         if not isinstance(payload, dict):
@@ -180,11 +181,23 @@ def _load_bootstrap_models() -> Iterable[LLMModel]:
                 config.setdefault("api_key", settings.openai_api_key)
             if settings.openai_base_url:
                 config.setdefault("base_url", settings.openai_base_url)
-        yield LLMModel(name=name, provider=provider, model=model_name, config=config)
+        yield LLMModel(
+            name=name,
+            provider=provider,
+            model=model_name,
+            config=config,
+            client_factory=client_factory,
+        )
 
 
-def registry_from_payload(payload: dict[str, Any] | None) -> tuple[LLMRegistry, bool]:
-    registry = LLMRegistry()
+def registry_from_payload(
+    payload: dict[str, Any] | None,
+    *,
+    client_factory: ClientFactory | None = None,
+    registry_cls: type[LLMRegistry] = LLMRegistry,
+    model_cls: type[LLMModel] = LLMModel,
+) -> tuple[LLMRegistry, bool]:
+    registry = registry_cls(client_factory=client_factory)
     migrated = False
     if payload:
         models = payload.get("models", [])
@@ -203,7 +216,7 @@ def registry_from_payload(payload: dict[str, Any] | None) -> tuple[LLMRegistry, 
             latency = item.get("latency") if isinstance(item, dict) else None
             routing = item.get("routing") if isinstance(item, dict) else None
             registry.add_model(
-                LLMModel(
+                model_cls(
                     name=name,
                     provider=provider,
                     model=model_name,
@@ -211,13 +224,14 @@ def registry_from_payload(payload: dict[str, Any] | None) -> tuple[LLMRegistry, 
                     pricing=_normalize_metadata(pricing),
                     latency=_normalize_metadata(latency),
                     routing=_normalize_metadata(routing),
+                    client_factory=client_factory,
                 )
             )
         default_model = payload.get("default_model")
         if isinstance(default_model, str):
             registry.default_model = default_model
     if not registry.models:
-        for model in _load_bootstrap_models():
+        for model in _load_bootstrap_models(client_factory):
             registry.add_model(model)
         if settings := get_settings():
             if settings.llm_default_model:
@@ -284,7 +298,10 @@ def decrypt_config(config: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     return decrypted, migrated
 
 
+LanguageModelClient = LanguageModelClientProtocol
+
 __all__ = [
+    "ClientFactory",
     "GenerationError",
     "LLMModel",
     "LLMRegistry",
@@ -294,18 +311,7 @@ __all__ = [
     "encrypt_config",
     "registry_from_payload",
     "LanguageModelClient",
+    "LanguageModelClientProtocol",
 ]
-class LanguageModelClient(Protocol):
-    """Protocol describing language model client behaviour."""
-
-    def generate(
-        self,
-        *,
-        prompt: str,
-        model: str,
-        temperature: float = 0.2,
-        max_output_tokens: int = 800,
-        cache_key: str | None = None,
-    ) -> str: ...
 
 
