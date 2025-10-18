@@ -63,7 +63,6 @@ def list_discoveries(
     service: DiscoveryService = Depends(get_discovery_service),
 ) -> DiscoveryListResponse:
     user_id = _require_user_subject(principal)
-    service = _service(session)
     records = service.list(
         user_id,
         discovery_type=discovery_type,
