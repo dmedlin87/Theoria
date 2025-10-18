@@ -11,9 +11,9 @@ literal strings in multiple places.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from itertools import count
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 import pythonbible as pb
 
@@ -69,12 +69,24 @@ except ImportError:  # pragma: no cover - fallback dataclasses for lightweight t
         snippet: str
         source_url: str
 
+        def model_dump(self, *, mode: str | None = None) -> dict[str, Any]:
+            """Provide a pydantic-compatible serialisation hook."""
+
+            _ = mode  # ignored in lightweight fallback
+            return asdict(self)
+
     @dataclass(frozen=True)
     class RAGAnswer:
         summary: str
         citations: Sequence[RAGCitation]
         model_name: str
         model_output: str
+
+        def model_dump(self, *, mode: str | None = None) -> dict[str, Any]:
+            """Mirror the behaviour of the real Pydantic model."""
+
+            _ = mode  # ignored in lightweight fallback
+            return asdict(self)
 
 CANONICAL_BOOKS: tuple[pb.Book, ...] = tuple(
     book for book in pb.Book if book.value <= pb.Book.REVELATION.value
