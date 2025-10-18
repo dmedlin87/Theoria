@@ -259,13 +259,13 @@ def test_export_to_zotero_request_validation():
     assert valid_request.api_key == "test-key"
     assert valid_request.user_id == "12345"
     
-    # Empty document list should fail
-    with pytest.raises(ValidationError):
-        ZoteroExportRequest(
-            document_ids=[],
-            api_key="test-key",
-            user_id="12345",
-        )
+    # Empty document list should be accepted by the model (endpoint validates)
+    empty_request = ZoteroExportRequest(
+        document_ids=[],
+        api_key="test-key",
+        user_id="12345",
+    )
+    assert empty_request.document_ids == []
     
     # Missing API key should fail
     with pytest.raises(ValidationError):
