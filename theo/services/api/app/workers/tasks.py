@@ -33,10 +33,14 @@ from ..analytics.watchlists import (
     run_watchlist,
 )
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
-from theo.services.api.app.persistence_models import ChatSession, Document, IngestionJob, Passage
+from theo.application.dtos import ChatSessionDTO
+from theo.adapters.persistence.chat_repository import SQLAlchemyChatSessionRepository
+from theo.adapters.persistence.ingestion_job_repository import (
+    SQLAlchemyIngestionJobRepository,
+)
+from theo.services.api.app.persistence_models import Document, Passage
 from theo.adapters.persistence.types import VectorType
 from ..models.export import DeliverableDownload
-from ..models.search import HybridSearchFilters
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import (
     PipelineDependencies,
@@ -117,7 +121,7 @@ def _compute_retry_delay(retry_count: int | None) -> int:
     return min(2**retry_count, 60)
 
 
-def _load_chat_entries(record: ChatSession) -> list[ChatMemoryEntry]:
+def _load_chat_entries(record: ChatSessionDTO) -> list[ChatMemoryEntry]:
     entries: list[ChatMemoryEntry] = []
     raw_entries = record.memory_snippets or []
     for raw in raw_entries:
@@ -235,12 +239,8 @@ def validate_citations(
 
     try:
         with Session(engine) as session:
-            stmt = (
-                select(ChatSession)
-                .order_by(ChatSession.updated_at.desc())
-                .limit(session_limit)
-            )
-            chat_sessions = session.execute(stmt).scalars().all()
+            chat_repo = SQLAlchemyChatSessionRepository(session)
+            chat_sessions = chat_repo.list_recent(session_limit)
 
             for record in chat_sessions:
                 entries = _load_chat_entries(record)
@@ -368,9 +368,7 @@ def validate_citations(
 
     if job_id:
         with Session(engine) as session:
-            job = session.get(IngestionJob, job_id)
-            if job is not None:
-                job.payload = metrics
+            _set_job_payload(session, job_id, metrics)
             _update_job_status(session, job_id, status="completed")
             session.commit()
 
@@ -452,15 +450,18 @@ def _update_job_status(
     error: str | None = None,
     document_id: str | None = None,
 ) -> None:
-    job = session.get(IngestionJob, job_id)
-    if job is None:
-        return
-    job.status = status
-    if error is not None:
-        job.error = error
-    if document_id is not None:
-        job.document_id = document_id
-    job.updated_at = datetime.now(UTC)
+    repo = SQLAlchemyIngestionJobRepository(session)
+    repo.update_status(job_id, status=status, error=error, document_id=document_id)
+
+
+def _set_job_payload(session: Session, job_id: str, payload: dict[str, Any]) -> None:
+    repo = SQLAlchemyIngestionJobRepository(session)
+    repo.set_payload(job_id, payload)
+
+
+def _merge_job_payload(session: Session, job_id: str, payload: dict[str, Any]) -> None:
+    repo = SQLAlchemyIngestionJobRepository(session)
+    repo.merge_payload(job_id, payload)
 
 
 @celery.task(name="tasks.process_file")
@@ -1002,15 +1003,15 @@ def refresh_hnsw(
 
     if job_id:
         with Session(engine) as session:
-            job = session.get(IngestionJob, job_id)
-            if job is not None:
-                payload = dict(job.payload or {})
-                payload.update({
+            _merge_job_payload(
+                session,
+                job_id,
+                {
                     "sample_queries": sample_queries,
                     "top_k": top_k,
                     "metrics": metrics,
-                })
-                job.payload = payload
+                },
+            )
             _update_job_status(session, job_id, status="completed")
             session.commit()
 
