@@ -735,23 +735,20 @@ pytest tests/api/ai/test_guardrails.py -v
 
 ## Future Enhancements
 
-### Phase 1: Autonomous Exploration (Planned)
-- Agent can autonomously chase leads
-- Knowledge gap detection triggers follow-up queries
-- Stopping conditions prevent runaway loops
-- Max 10 iterations, 50 passages per session
+### Phase 1: Cognitive Gate v0 (Active)
+- Harden prompt admission control, score calculations, and overrides.
+- Replace legacy evaluator in Prompt-Observe-Update loop with gate-managed flow.
+- Capture telemetry for gate outcomes and decision latencies.
 
-### Phase 2: Discovery Engine (In Progress)
-- Auto-discover patterns, contradictions, gaps
-- Background jobs after document uploads
-- ML-based clustering and NLI for contradictions
-- See `docs/DISCOVERY_FEATURE.md` for details
+### Phase 2: TMS & Debate Foundations (Planned)
+- Launch Thought Management System (TMS) v0 for branching and archival.
+- Persist debate rounds linked to hypotheses with guardrails and scoring rubrics.
+- Provide admin tooling to replay sessions and inspect debate outcomes.
 
-### Phase 3: Collaborative Research (Future)
-- Shared agent trails and insights
-- Team workspaces with comments
-- Research timeline visualization
-- Export to Zotero, BibTeX, RIS
+### Phase 3: Meta-Prompt Governance (Future)
+- Deliver Meta-Prompt picker with presets (Exploratory, Apologetic, Critical, Synthesis).
+- Instrument preset performance metrics and collect researcher feedback.
+- Expand visualization layers for hypothesis evolution and contention heatmaps.
 
 ---
 

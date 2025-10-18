@@ -33,7 +33,7 @@ This session implemented **background auto-discovery** and completed **Phase 1.1
 - Configurable thresholds
 
 ### 3. Comprehensive Documentation
-- `HANDOFF_NEXT_PHASE.md` - 4-6 week roadmap
+- `HANDOFF_NEXT_PHASE.md` - 6-8 week Cognitive Scholar roadmap
 - `docs/AGENT_AND_PROMPTING_GUIDE.md` - Agent architecture
 - `docs/DISCOVERY_SCHEDULER.md` - Scheduler details
 - `docs/CONTRADICTION_DETECTION.md` - Implementation guide
@@ -240,4 +240,4 @@ export THEORIA_MIN_CONTRADICTION_CONFIDENCE=0.6
 
 **Status:** Phase 1.1 complete (2/6 discovery types working)  
 **Next:** Phase 1.2 - Gap Analysis with BERTopic  
-**Timeline:** 4-6 weeks to complete all phases
+**Timeline:** 6-8 weeks to complete Cognitive Scholar phases
