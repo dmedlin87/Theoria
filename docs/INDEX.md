@@ -55,6 +55,7 @@ This index provides a navigational overview of all Theoria documentation, organi
 - [docs/DISCOVERY_FEATURE.md](DISCOVERY_FEATURE.md) - Complete feature specification
 - [docs/DISCOVERY_QUICK_START.md](DISCOVERY_QUICK_START.md) - Quick start guide for discoveries
 - **Status:** Frontend complete, backend planned
+- [docs/TREND_ANOMALY_DETECTOR_RESEARCH.md](TREND_ANOMALY_DETECTOR_RESEARCH.md) - Research blueprint for trend/anomaly maturity
 
 ### Case Builder
 - [docs/CASE_BUILDER.md](CASE_BUILDER.md) - Consolidated specification and roadmap
