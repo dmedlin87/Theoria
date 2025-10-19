@@ -5,6 +5,7 @@ import {
   normaliseChatSessionState,
   toOptionalString,
 } from "./api-normalizers";
+import type { ResearchLoopState } from "./api-normalizers";
 import type {
   GuardrailFailureMetadata,
   GuardrailSuggestion,
@@ -35,7 +36,10 @@ export type ChatWorkflowRequest = {
 
 export type ChatWorkflowStreamEvent =
   | { type: "answer_fragment"; content: string }
-  | { type: "complete"; response: { sessionId: string; answer: RAGAnswer } }
+  | {
+      type: "complete";
+      response: { sessionId: string; answer: RAGAnswer; loopState: ResearchLoopState | null };
+    }
   | {
       type: "guardrail_violation";
       message: string;
@@ -44,7 +48,12 @@ export type ChatWorkflowStreamEvent =
       metadata?: GuardrailFailureMetadata | null;
     };
 
-export type ChatWorkflowSuccess = { kind: "success"; sessionId: string; answer: RAGAnswer };
+export type ChatWorkflowSuccess = {
+  kind: "success";
+  sessionId: string;
+  answer: RAGAnswer;
+  loopState: ResearchLoopState | null;
+};
 
 export type ChatWorkflowGuardrail = {
   kind: "guardrail";
@@ -92,7 +101,11 @@ function interpretStreamChunk(
   if (completion) {
     return {
       type: "complete",
-      response: { sessionId: completion.sessionId, answer: completion.answer },
+      response: {
+        sessionId: completion.sessionId,
+        answer: completion.answer,
+        loopState: completion.loopState,
+      },
     } satisfies ChatWorkflowStreamEvent;
   }
 
@@ -230,6 +243,7 @@ export function createChatClient(http: HttpClient): ChatClient {
                     kind: "success",
                     sessionId: interpreted.response.sessionId,
                     answer: interpreted.response.answer,
+                    loopState: interpreted.response.loopState ?? null,
                   };
                 }
                 options?.onEvent?.(interpreted);
@@ -264,6 +278,7 @@ export function createChatClient(http: HttpClient): ChatClient {
                 kind: "success",
                 sessionId: interpreted.response.sessionId,
                 answer: interpreted.response.answer,
+                loopState: interpreted.response.loopState ?? null,
               };
             }
             options?.onEvent?.(interpreted);
@@ -306,10 +321,15 @@ export function createChatClient(http: HttpClient): ChatClient {
         kind: "success",
         sessionId: completion.sessionId,
         answer: completion.answer,
+        loopState: completion.loopState,
       };
       options?.onEvent?.({
         type: "complete",
-        response: { sessionId: completion.sessionId, answer: completion.answer },
+        response: {
+          sessionId: completion.sessionId,
+          answer: completion.answer,
+          loopState: completion.loopState,
+        },
       });
       return success;
     }

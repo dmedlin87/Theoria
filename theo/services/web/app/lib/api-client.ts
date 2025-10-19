@@ -1,6 +1,7 @@
 import type { components } from "./generated/api";
 import type { HybridSearchFilters } from "./guardrails";
-import { ChatSessionState, normaliseExportResponse } from "./api-normalizers";
+import { normaliseExportResponse, normaliseLoopState } from "./api-normalizers";
+import type { ChatSessionState, ResearchLoopState } from "./api-normalizers";
 import { ChatWorkflowOptions, ChatWorkflowRequest, ChatWorkflowResult, createChatClient } from "./chat-client";
 import { createHttpClient } from "./http";
 
@@ -9,6 +10,7 @@ export type {
   ChatSessionMemoryEntry,
   ChatSessionPreferencesPayload,
   ChatSessionState,
+  ResearchLoopState,
 } from "./api-normalizers";
 export type {
   ChatWorkflowClient,
@@ -57,6 +59,14 @@ export type PerspectiveSynthesisResult = {
   perspective_views: Record<string, PerspectiveView>;
 };
 
+export type LoopControlAction = "pause" | "resume" | "step" | "stop";
+
+export type LoopControlResponse = {
+  sessionId: string;
+  state: ResearchLoopState;
+  partialAnswer: string | null;
+};
+
 type VerseResponse = import("../copilot/components/types").VerseResponse;
 type SermonResponse = import("../copilot/components/types").SermonResponse;
 type ComparativeResponse = import("../copilot/components/types").ComparativeResponse;
@@ -76,6 +86,8 @@ type TheoApiClientShape = {
   fetchFeatures(): Promise<Record<string, boolean>>;
   runChatWorkflow(payload: ChatWorkflowRequest, options?: ChatWorkflowOptions): Promise<ChatWorkflowResult>;
   fetchChatSession(sessionId: string): Promise<ChatSessionState | null>;
+  fetchLoopState(sessionId: string): Promise<ResearchLoopState | null>;
+  controlLoopState(sessionId: string, action: LoopControlAction, stepId?: string | null): Promise<LoopControlResponse>;
   runVerseWorkflow(payload: { model: string; osis?: string | null; passage?: string | null; question?: string | null }): Promise<VerseResponse>;
   runSermonWorkflow(payload: { model: string; topic: string; osis?: string | null }): Promise<SermonResponse>;
   runComparativeWorkflow(payload: { model: string; osis: string; participants: string[] }): Promise<ComparativeResponse>;
@@ -116,6 +128,47 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
 
   return {
     ...chat,
+    fetchLoopState(sessionId: string) {
+      return request(`/ai/chat/${encodeURIComponent(sessionId)}/loop`).then((payload) =>
+        normaliseLoopState(payload),
+      );
+    },
+    controlLoopState(sessionId: string, action: LoopControlAction, stepId?: string | null) {
+      return request(`/ai/chat/${encodeURIComponent(sessionId)}/loop/control`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          step_id: stepId ?? null,
+        }),
+      }).then((payload) => {
+        if (!payload || typeof payload !== "object") {
+          throw new Error("Unexpected loop control response.");
+        }
+        const record = payload as Record<string, unknown>;
+        const state = normaliseLoopState(record.state ?? record.loop_state ?? null);
+        if (!state) {
+          throw new Error("Loop control response missing state.");
+        }
+        const responseSessionId =
+          typeof record.session_id === "string"
+            ? record.session_id
+            : typeof record.sessionId === "string"
+            ? record.sessionId
+            : sessionId;
+        const partialAnswer =
+          typeof record.partial_answer === "string"
+            ? record.partial_answer
+            : typeof record.partialAnswer === "string"
+            ? record.partialAnswer
+            : null;
+        return {
+          sessionId: responseSessionId,
+          state,
+          partialAnswer,
+        } satisfies LoopControlResponse;
+      });
+    },
     fetchFeatures(): Promise<Record<string, boolean>> {
       return request<Record<string, boolean>>("/features/");
     },

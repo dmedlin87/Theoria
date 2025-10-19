@@ -3,7 +3,21 @@
 **Priority**: ⭐⭐⭐ HIGH  
 **Estimated Time**: 2-3 hours  
 **Dependencies**: Architecture improvements complete (✅ Done)  
-**Status**: Ready to start
+**Status**: ✅ **COMPLETED** (2025-10-18)
+
+---
+
+## ✅ Completion Summary
+
+**Completed by**: User changes on 2025-10-18  
+**Files modified**:
+- `theo/application/repositories/document_repository.py` - Added `list_created_since()` method
+- `theo/adapters/persistence/document_repository.py` - Implemented `list_created_since()`
+- `theo/services/api/app/error_handlers.py` - Restored HTTP 422 content status mapping
+
+**Outcome**: Repository pattern successfully implemented with DTOs and abstractions. Architecture foundation is now solid for Cognitive Scholar features.
+
+**Archived**: This task is now superseded by the Cognitive Scholar vision in `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`.
 
 ---
 

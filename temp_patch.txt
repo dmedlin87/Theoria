@@ -1,0 +1,25 @@
+*** Update File: theo/services/web/app/chat/hooks/useChatSessionState.ts
+@@
+   const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
+   const [guardrail, setGuardrail] = useState<GuardrailState>(null);
+   const [errorMessage, setErrorMessage] = useState<InterpretedApiError | null>(null);
+   const [lastQuestion, setLastQuestion] = useState<string | null>(null);
++  const [loopState, setLoopState] = useState<ResearchLoopState | null>(null);
+@@
+       guardrail,
+       errorMessage,
+       lastQuestion,
++      loopState,
+     },
+     setters: {
+       setConversation,
+       setFeedbackSelections,
+       setPendingFeedbackIds,
+@@
+       setActiveAssistantId,
+       setGuardrail,
+       setErrorMessage,
+       setLastQuestion,
++      setLoopState,
+     },
+*** End Patch

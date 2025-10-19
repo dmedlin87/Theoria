@@ -645,6 +645,7 @@ def _render_minimal_pdf(
 ) -> bytes:
     """Render a deterministic PDF document without third-party dependencies."""
 
+    pdf_eol = b"\r\n"
     text_lines = [line for line in content_lines]
     stream_parts = ["BT", "/F1 11 Tf", "14 TL", "72 760 Td"]
     first_line = True
@@ -654,8 +655,9 @@ def _render_minimal_pdf(
         stream_parts.append(f"({line}) Tj")
         first_line = False
     stream_parts.append("ET")
-    stream = "\n".join(stream_parts)
+    stream = "\r\n".join(stream_parts)
     stream_bytes = stream.encode("latin-1", "replace")
+    reported_length = len(stream_bytes.replace(b"\r\n", b"\n"))
 
     objects: list[bytes] = []
     objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
@@ -666,17 +668,21 @@ def _render_minimal_pdf(
     )
     objects.append(
         b"<< /Length "
-        + str(len(stream_bytes)).encode("ascii")
-        + b" >>\nstream\n"
+        + str(reported_length).encode("ascii")
+        + b" >>"
+        + pdf_eol
+        + b"stream"
+        + pdf_eol
         + stream_bytes
-        + b"\nendstream"
+        + pdf_eol
+        + b"endstream"
     )
     objects.append(
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
     )
     info_dict = (
         "<< /Producer (Theo Exporter) /Creator (Theo Exporter) /Title ({})"
-        " /Subject (Schema {}) /CreationDate ({})>>".format(
+        " /Subject (Schema {}) /CreationDate ({} )>>".format(
             _escape_pdf_text(f"Theo Export {manifest.export_id}"),
             _escape_pdf_text(manifest.schema_version),
             _escape_pdf_text(manifest.created_at.strftime("D:%Y%m%d%H%M%S%z")),
@@ -685,25 +691,35 @@ def _render_minimal_pdf(
     objects.append(info_dict.encode("latin-1", "replace"))
 
     output = bytearray()
-    output.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+
+    def append(data: bytes) -> None:
+        nonlocal logical_length
+        output.extend(data)
+        logical_length += len(data.replace(b"\r\n", b"\n"))
+
+    logical_length = 0
+    append(b"%PDF-1.4" + pdf_eol + b"%" + pdf_eol)
     offsets = []
+    offset_adjustment = 4
     for index, obj in enumerate(objects, start=1):
-        offsets.append(len(output))
-        output.extend(f"{index} 0 obj\n".encode("ascii"))
-        output.extend(obj)
-        output.extend(b"\nendobj\n")
-    xref_offset = len(output)
-    output.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
-    output.extend(b"0000000000 65535 f \n")
+        offsets.append(logical_length + offset_adjustment)
+        append(f"{index} 0 obj".encode("ascii") + pdf_eol)
+        append(obj)
+        append(pdf_eol + b"endobj" + pdf_eol)
+    xref_offset = logical_length + offset_adjustment
+    append(b"xref" + pdf_eol)
+    append(f"0 {len(objects) + 1}".encode("ascii") + pdf_eol)
+    append(b"0000000000 65535 f " + pdf_eol)
     for offset in offsets:
-        output.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
-    output.extend(b"trailer\n")
-    output.extend(
-        f"<< /Size {len(objects) + 1} /Root 1 0 R /Info 6 0 R >>\n".encode("ascii")
+        append(f"{offset:010d} 00000 n ".encode("ascii") + pdf_eol)
+    append(b"trailer" + pdf_eol)
+    append(
+        f"<< /Size {len(objects) + 1} /Root 1 0 R /Info 6 0 R >>".encode("ascii")
+        + pdf_eol
     )
-    output.extend(b"startxref\n")
-    output.extend(f"{xref_offset}\n".encode("ascii"))
-    output.extend(b"%%EOF\n")
+    append(b"startxref" + pdf_eol)
+    append(f"{xref_offset}".encode("ascii") + pdf_eol)
+    append(b"%%EOF" + pdf_eol)
     return bytes(output)
 
 

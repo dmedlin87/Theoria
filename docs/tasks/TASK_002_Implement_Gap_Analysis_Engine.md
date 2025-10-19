@@ -1,15 +1,16 @@
-# TASK 002: Implement Gap Analysis Engine
+# TASK 002: Implement Gap Analysis Engine (Cognitive Scholar Component)
 
 **Priority**: ⭐⭐⭐ HIGH  
 **Estimated Time**: 3-4 hours  
 **Dependencies**: BERTopic (already in requirements.txt)  
-**Status**: Ready to start
+**Status**: Ready to start  
+**Cognitive Scholar Alignment**: Knowledge-Gap Generator (§2.3), Gap→Loop Plumbing (Appendix §A.6)
 
 ---
 
 ## 🎯 Objective
 
-Implement Gap Analysis discovery engine using BERTopic to identify under-represented theological topics in user's corpus.
+Implement Gap Analysis discovery engine using BERTopic to identify under-represented theological topics in user's corpus. This component feeds the Cognitive Scholar's Knowledge-Gap Generator, enabling autonomous curiosity-driven research loops.
 
 ---
 
@@ -61,8 +62,24 @@ Implement Gap Analysis discovery engine using BERTopic to identify under-represe
 
 ## 📚 References
 
-- Pattern: `theo/domain/discoveries/engine.py` (PatternDiscoveryEngine)
-- Integration: `theo/services/api/app/use_cases/refresh_discoveries.py`
-- Testing: `tests/domain/discoveries/test_pattern_engine.py`
+- **Existing Gap Engine**: `theo/domain/discoveries/gap_engine.py` ✅
+- **Integration Map**: `docs/tasks/COGNITIVE_SCHOLAR_INTEGRATION_MAP.md` 📊
+- **Cognitive Scholar Spec**: `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`
+- Pattern Reference: `theo/domain/discoveries/engine.py` (PatternDiscoveryEngine)
+- Service Integration: `theo/services/api/app/use_cases/refresh_discoveries.py`
+- Testing Pattern: `tests/domain/discoveries/test_pattern_engine.py`
+
+---
+
+## 🧠 Cognitive Scholar Integration Notes
+
+This gap detection engine will eventually feed into the Cognitive Scholar's autonomous research loops:
+
+1. **Gap Detection** (this task) → identifies missing topics/evidence
+2. **Falsifier Search Operator** (future) → generates targeted queries for gaps
+3. **Retrieval Budgeter** (future) → executes searches within cost/time limits
+4. **Hypothesis Updater** (future) → revises beliefs based on new evidence
+
+The gap engine should return structured metadata suitable for query generation (e.g., missing topic keywords, suggested search terms, priority scores).
 
 **Next Task**: TASK_003 (Query Optimization)

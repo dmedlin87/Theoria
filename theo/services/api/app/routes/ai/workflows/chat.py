@@ -20,7 +20,8 @@ from theo.services.api.app.ai.audit_logging import (
     serialise_citations,
 )
 from theo.services.api.app.ai import memory_index as memory_index_module
-from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer, ensure_completion_safe
+from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer, ReasoningTrace, ReasoningTraceStep, ensure_completion_safe
+from theo.services.api.app.ai.research_loop import ResearchLoopController
 from theo.services.api.app.ai.trails import TrailService
 from theo.services.api.app.ai.memory_metadata import (
     MemoryFocus,
@@ -44,6 +45,11 @@ from theo.services.api.app.models.ai import (
     GoalCloseRequest,
     GoalPriorityUpdateRequest,
     IntentTagPayload,
+    LoopControlAction,
+    LoopControlRequest,
+    LoopControlResponse,
+    ResearchLoopState,
+    ResearchLoopStatus,
 )
 from .guardrails import extract_refusal_text, guardrail_http_exception
 from .utils import has_filters
@@ -522,9 +528,13 @@ def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
     entries = _load_memory_entries(record)
     goals = _load_goal_entries(record)
     preferences: ChatSessionPreferences | None = None
+    loop_state: ResearchLoopState | None = None
     if record.preferences:
         try:
             preferences = ChatSessionPreferences.model_validate(record.preferences)
+            loop_state = preferences.loop_state
+            if loop_state is not None:
+                preferences = preferences.model_copy(update={"loop_state": None})
         except Exception:
             LOGGER.debug(
                 "Unable to parse chat session preferences for %s", record.id, exc_info=True
@@ -542,6 +552,84 @@ def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
         created_at=record.created_at,
         updated_at=record.updated_at,
         last_interaction_at=record.last_interaction_at,
+        loop_state=loop_state,
+    )
+
+
+def _create_mock_reasoning_timeline(
+    session_id: str,
+    question: str,
+    answer: RAGAnswer,
+    loop_state: ResearchLoopState | None = None,
+) -> None:
+    """Create a mock reasoning timeline for CS-001 MVP and attach to answer.
+    
+    This populates the existing reasoning_trace field on RAGAnswer that the frontend
+    already knows how to display.
+    
+    TODO: Replace with real reasoning loop tracking once CS-002/CS-003 are implemented.
+    """
+    # Get citation indices (frontend expects 0-based indices)
+    citation_indices = list(range(min(3, len(answer.citations or []))))
+    
+    step_sequence = [
+        ("understand", "Understanding the question", "Analyzing theological context and key concepts"),
+        ("gather", "Gathering evidence", "Retrieved relevant passages and commentaries"),
+        ("tensions", "Detecting tensions", "Analyzing potential contradictions in sources"),
+        ("draft", "Drafting answer", "Composing initial response with citations"),
+        ("critique", "Critical review", "Evaluating logic, evidence, and clarity"),
+        ("revise", "Revision", "Refining answer based on critique"),
+        ("synthesize", "Final synthesis", "Integrating all perspectives and evidence"),
+    ]
+
+    steps: list[ReasoningTraceStep] = []
+    for step_type, label, detail in step_sequence:
+        step_id = f"{session_id}-{step_type}"
+        payload: dict[str, object] = {
+            "id": step_id,
+            "label": label,
+            "detail": detail,
+            "status": "pending",
+        }
+        if step_type == "gather":
+            payload["citations"] = citation_indices
+        if step_type == "draft":
+            payload["outcome"] = "Initial draft complete with supporting evidence"
+        if step_type == "synthesize":
+            payload["outcome"] = "Comprehensive theological answer with balanced perspective"
+        steps.append(ReasoningTraceStep(**payload))
+
+    if loop_state is None:
+        for step in steps:
+            step.status = "complete"
+    else:
+        total_steps = len(steps)
+        active_index = min(loop_state.current_step_index, max(total_steps - 1, 0))
+        if loop_state.status is ResearchLoopStatus.COMPLETED:
+            active_index = total_steps - 1
+        for index, step in enumerate(steps):
+            if index < active_index:
+                step.status = "complete"
+            elif index == active_index:
+                if loop_state.status in {
+                    ResearchLoopStatus.RUNNING,
+                    ResearchLoopStatus.STEPPING,
+                }:
+                    step.status = "in_progress"
+                elif loop_state.status is ResearchLoopStatus.STOPPED:
+                    step.status = "failed"
+                elif loop_state.status is ResearchLoopStatus.COMPLETED:
+                    step.status = "complete"
+                else:
+                    step.status = "pending"
+            else:
+                step.status = "pending"
+
+    # Create reasoning trace using existing format
+    answer.reasoning_trace = ReasoningTrace(
+        summary="7-step cognitive workflow: Understand → Gather → Tensions → Draft → Critique → Revise → Synthesize",
+        strategy="Detective mode with multi-perspective synthesis",
+        steps=steps,
     )
 
 
@@ -604,6 +692,8 @@ def chat_turn(
             )
 
     session_id = payload.session_id or str(uuid4())
+    loop_controller = ResearchLoopController(session)
+    loop_state = loop_controller.initialise(session_id, question=question, total_steps=7)
     trail_service = TrailService(session)
     audit_logger = AuditLogWriter.from_session(session)
 
@@ -758,6 +848,17 @@ def chat_turn(
             )
             ensure_completion_safe(answer.model_output or answer.summary)
 
+            loop_state = loop_controller.mark_completed(
+                session_id,
+                final_answer=answer.summary,
+            )
+            _create_mock_reasoning_timeline(
+                session_id,
+                question,
+                answer,
+                loop_state=loop_state,
+            )
+
             message_text = extract_refusal_text(answer)
             message = ChatSessionMessage(role="assistant", content=message_text)
             audit_logger.log(
@@ -777,7 +878,7 @@ def chat_turn(
                 citations=serialise_citations(answer.citations),
                 status="generated",
             )
-            _persist_chat_session(
+            record = _persist_chat_session(
                 session,
                 existing=existing_session,
                 session_id=session_id,
@@ -792,6 +893,8 @@ def chat_turn(
                 goals=goals,
                 active_goal=active_goal,
             )
+            if record is not None:
+                loop_controller.persist_to_record(record)
             trail_output = {
                 "session_id": session_id,
                 "answer": answer,
@@ -808,6 +911,10 @@ def chat_turn(
                 status="running" if active_goal is not None else "completed",
             )
     except GuardrailError as exc:
+        try:
+            loop_controller.stop(session_id)
+        except LookupError:
+            pass
         response = guardrail_http_exception(
             exc,
             session=session,
@@ -864,6 +971,7 @@ def chat_turn(
         message=message,
         answer=answer,
         intent_tags=intent_tags,
+        loop_state=loop_state,
     )
 
 
@@ -989,6 +1097,67 @@ def update_goal_priority(
     return ChatGoalProgress(goals=goals)
 
 
+@router.get(
+    "/chat/{session_id}/loop",
+    response_model=ResearchLoopState,
+    responses=_NOT_FOUND_RESPONSE,
+)
+def get_loop_state(
+    session_id: str,
+    session: Session = Depends(get_session),
+) -> ResearchLoopState:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    controller = ResearchLoopController(session)
+    state = controller.get_state(session_id)
+    return state
+
+
+@router.post(
+    "/chat/{session_id}/loop/control",
+    response_model=LoopControlResponse,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
+)
+def control_loop_state(
+    session_id: str,
+    payload: LoopControlRequest,
+    session: Session = Depends(get_session),
+) -> LoopControlResponse:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    controller = ResearchLoopController(session)
+    try:
+        state = controller.apply_action(
+            session_id,
+            payload.action,
+            step_id=payload.step_id,
+        )
+    except LookupError as exc:
+        raise AIWorkflowError(
+            "research loop state not initialised",
+            code="AI_CHAT_LOOP_STATE_NOT_INITIALISED",
+            status_code=status.HTTP_409_CONFLICT,
+        ) from exc
+    controller.persist_to_record(record)
+    session.commit()
+    return LoopControlResponse(
+        session_id=session_id,
+        state=state,
+        partial_answer=state.partial_answer,
+    )
+
+
 __all__ = [
     "router",
     "chat_turn",
@@ -996,6 +1165,8 @@ __all__ = [
     "list_chat_goals",
     "close_chat_goal",
     "update_goal_priority",
+    "get_loop_state",
+    "control_loop_state",
     "_prepare_memory_context",
     "_load_memory_entries",
 ]

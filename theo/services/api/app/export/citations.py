@@ -308,13 +308,32 @@ def _normalise_doi(value: Any) -> str | None:
 
 
 def _normalise_author(name: str) -> dict[str, str]:
+    """
+    Return CSL-style name parts for *name*, falling back to a literal when parsing fails.
+
+    Handles common inputs such as ``"Family, Given"`` and ``"Given Middle Family"``.
+    """
+
     candidate = name.strip()
     if not candidate:
         return {"literal": name}
+
     if "," in candidate:
-        family, given = [segment.strip() for segment in candidate.split(",", 1)]
+        family, given = (segment.strip() for segment in candidate.split(",", 1))
         if family and given:
-            return {"given": given, "family": family, "literal": candidate}
+            return {"given": given, "family": family}
+        if family:
+            return {"family": family}
+        if given:
+            return {"literal": given}
+        return {"literal": candidate}
+
+    parts = [segment for segment in candidate.split() if segment]
+    if len(parts) > 1:
+        family = parts[-1]
+        given = " ".join(parts[:-1]).strip()
+        if family and given:
+            return {"given": given, "family": family}
     return {"literal": candidate}
 
 

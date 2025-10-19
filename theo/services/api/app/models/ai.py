@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from enum import Enum
 from typing import Any, Literal, Sequence
 
 from pydantic import Field, model_validator
@@ -20,6 +21,62 @@ from ..ai.rag import (
 from ..models.export import ExportManifest
 from ..models.search import HybridSearchFilters
 from .base import APIModel
+
+
+class ResearchLoopStatus(str, Enum):
+    """Lifecycle status reported by the research loop orchestrator."""
+
+    IDLE = "idle"
+    RUNNING = "running"
+    PAUSED = "paused"
+    STOPPED = "stopped"
+    STEPPING = "stepping"
+    COMPLETED = "completed"
+
+
+class ResearchLoopState(APIModel):
+    """Serializable snapshot of the research loop."""
+
+    session_id: str
+    status: ResearchLoopStatus = ResearchLoopStatus.IDLE
+    current_step_index: int = 0
+    total_steps: int = 0
+    pending_actions: list[str] = Field(default_factory=list)
+    last_action: str | None = None
+    partial_answer: str | None = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class LoopControlAction(str, Enum):
+    """Supported control surface actions."""
+
+    PAUSE = "pause"
+    RESUME = "resume"
+    STEP = "step"
+    STOP = "stop"
+
+
+class LoopControlRequest(APIModel):
+    """Request payload emitted by the loop controls UI."""
+
+    action: LoopControlAction
+    step_id: str | None = Field(
+        default=None,
+        description="Optional step identifier when stepping through the loop.",
+    )
+    metadata: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional control metadata emitted by the client.",
+    )
+
+
+class LoopControlResponse(APIModel):
+    """Response payload returned after applying a loop control action."""
+
+    session_id: str
+    state: ResearchLoopState
+    partial_answer: str | None = None
 
 
 class RecorderMetadata(APIModel):
@@ -87,6 +144,10 @@ class ChatSessionPreferences(APIModel):
     mode: str | None = None
     default_filters: HybridSearchFilters | None = None
     frequently_opened_panels: list[str] = Field(default_factory=list)
+    loop_state: ResearchLoopState | None = Field(
+        default=None,
+        description="Latest persisted research loop state for the session.",
+    )
 
 
 class ChatMemoryEntry(APIModel):
@@ -186,6 +247,7 @@ class ChatSessionResponse(APIModel):
     message: ChatSessionMessage
     answer: RAGAnswer
     intent_tags: list[IntentTagPayload] | None = None
+    loop_state: ResearchLoopState | None = None
 
 
 class ChatSessionState(APIModel):
@@ -199,6 +261,7 @@ class ChatSessionState(APIModel):
     created_at: datetime
     updated_at: datetime
     last_interaction_at: datetime
+    loop_state: ResearchLoopState | None = None
 
 
 class GuardrailProfile(APIModel):
@@ -555,4 +618,9 @@ __all__ = [
     "GuardrailSuggestion",
     "GuardrailFailureMetadata",
     "GuardrailAdvisory",
+    "ResearchLoopStatus",
+    "ResearchLoopState",
+    "LoopControlAction",
+    "LoopControlRequest",
+    "LoopControlResponse",
 ]

@@ -6,7 +6,7 @@ import type {
   GuardrailState,
   Reaction,
 } from "../useChatWorkspaceState";
-import type { HybridSearchFilters } from "../../lib/api-client";
+import type { HybridSearchFilters, ResearchLoopState } from "../../lib/api-client";
 import type { InterpretedApiError } from "../../lib/errorMessages";
 
 export type ChatSessionState = {
@@ -22,6 +22,7 @@ export type ChatSessionState = {
   guardrail: GuardrailState;
   errorMessage: InterpretedApiError | null;
   lastQuestion: string | null;
+  loopState: ResearchLoopState | null;
 };
 
 export type ChatSessionSetters = {
@@ -37,6 +38,7 @@ export type ChatSessionSetters = {
   setGuardrail: Dispatch<SetStateAction<GuardrailState>>;
   setErrorMessage: Dispatch<SetStateAction<InterpretedApiError | null>>;
   setLastQuestion: Dispatch<SetStateAction<string | null>>;
+  setLoopState: Dispatch<SetStateAction<ResearchLoopState | null>>;
 };
 
 export type ChatSessionSelectors = {
@@ -67,6 +69,7 @@ export function useChatSessionState(): UseChatSessionStateResult {
   const [guardrail, setGuardrail] = useState<GuardrailState>(null);
   const [errorMessage, setErrorMessage] = useState<InterpretedApiError | null>(null);
   const [lastQuestion, setLastQuestion] = useState<string | null>(null);
+  const [loopState, setLoopState] = useState<ResearchLoopState | null>(null);
 
   const hasTranscript = useMemo(() => conversation.length > 0, [conversation]);
   const activeAssistantEntry = useMemo(() => {
@@ -94,6 +97,7 @@ export function useChatSessionState(): UseChatSessionStateResult {
       guardrail,
       errorMessage,
       lastQuestion,
+      loopState,
     },
     setters: {
       setConversation,
@@ -108,6 +112,7 @@ export function useChatSessionState(): UseChatSessionStateResult {
       setGuardrail,
       setErrorMessage,
       setLastQuestion,
+      setLoopState,
     },
     selectors: {
       hasTranscript,

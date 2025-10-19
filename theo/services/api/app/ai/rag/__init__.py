@@ -25,6 +25,8 @@ from .models import (
     MultimediaDigestResponse,
     RAGAnswer,
     RAGCitation,
+    ReasoningTrace,
+    ReasoningTraceStep,
     SermonPrepResponse,
     VerseCopilotResponse,
 )
@@ -57,6 +59,8 @@ __all__ = [
     "MultimediaDigestResponse",
     "RAGAnswer",
     "RAGCitation",
+    "ReasoningTrace",
+    "ReasoningTraceStep",
     "REFUSAL_MESSAGE",
     "REFUSAL_MODEL_NAME",
     "_guarded_answer",

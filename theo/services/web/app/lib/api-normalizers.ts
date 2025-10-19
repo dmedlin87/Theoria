@@ -15,6 +15,26 @@ type RAGCitation = import("../copilot/components/types").RAGCitation;
 type FallacyWarningModel = import("../copilot/components/types").FallacyWarningModel;
 type ReasoningTraceType = ReasoningTrace;
 
+export type ResearchLoopStatus =
+  | "idle"
+  | "running"
+  | "paused"
+  | "stopped"
+  | "stepping"
+  | "completed";
+
+export type ResearchLoopState = {
+  sessionId: string;
+  status: ResearchLoopStatus;
+  currentStepIndex: number;
+  totalSteps: number;
+  pendingActions: string[];
+  lastAction?: string | null;
+  partialAnswer?: string | null;
+  updatedAt: string;
+  metadata: Record<string, unknown>;
+};
+
 export type ChatSessionPreferencesPayload = {
   mode?: string | null;
   defaultFilters?: HybridSearchFilters | null;
@@ -45,11 +65,13 @@ export type ChatSessionState = {
   createdAt: string;
   updatedAt: string;
   lastInteractionAt: string;
+  loopState?: ResearchLoopState | null;
 };
 
 export type NormalisedChatCompletion = {
   sessionId: string;
   answer: RAGAnswer;
+  loopState: ResearchLoopState | null;
 };
 
 export function normaliseExportResponse(
@@ -79,6 +101,56 @@ export function coerceStringList(value: unknown): string[] {
   return value
     .map((entry) => toOptionalString(entry))
     .filter((entry): entry is string => entry !== null);
+}
+
+export function normaliseLoopState(value: unknown): ResearchLoopState | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const sessionId = toOptionalString(record.session_id ?? record.sessionId);
+  const status = toOptionalString(record.status);
+  if (!sessionId || !status) {
+    return null;
+  }
+  const parseInteger = (candidate: unknown, fallback = 0): number => {
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate;
+    }
+    if (typeof candidate === "string") {
+      const parsed = Number.parseInt(candidate, 10);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return fallback;
+  };
+  const pendingSource = record.pending_actions ?? record.pendingActions;
+  const pendingActions = Array.isArray(pendingSource)
+    ? pendingSource
+        .map((entry) => toOptionalString(entry))
+        .filter((entry): entry is string => entry !== null)
+    : [];
+  const metadata =
+    record.metadata && typeof record.metadata === "object"
+      ? (record.metadata as Record<string, unknown>)
+      : {};
+  const updatedAt =
+    toOptionalString(record.updated_at ?? record.updatedAt) ?? new Date().toISOString();
+  return {
+    sessionId,
+    status: status as ResearchLoopStatus,
+    currentStepIndex: parseInteger(
+      record.current_step_index ?? record.currentStepIndex,
+      0,
+    ),
+    totalSteps: parseInteger(record.total_steps ?? record.totalSteps, pendingActions.length + 1),
+    pendingActions,
+    lastAction: toOptionalString(record.last_action ?? record.lastAction),
+    partialAnswer: toOptionalString(record.partial_answer ?? record.partialAnswer),
+    updatedAt,
+    metadata,
+  };
 }
 
 const GUARDRAIL_ACTIONS = new Set(["search", "upload", "retry", "none"]);
@@ -361,7 +433,8 @@ export function normaliseChatCompletion(
   }
   const sessionId =
     toOptionalString(record.session_id ?? record.sessionId ?? record.id) ?? fallbackSessionId ?? "session";
-  return { sessionId, answer };
+  const loopState = normaliseLoopState(record.loop_state ?? record.loopState ?? null);
+  return { sessionId, answer, loopState };
 }
 
 export function normaliseChatSessionState(payload: unknown): ChatSessionState | null {
@@ -380,6 +453,7 @@ export function normaliseChatSessionState(payload: unknown): ChatSessionState | 
   const lastInteractionAt = toOptionalString(record.last_interaction_at ?? record.lastInteractionAt);
 
   const documentIds = coerceStringList(record.document_ids ?? record.documentIds);
+  let loopState = normaliseLoopState(record.loop_state ?? record.loopState ?? null);
 
   const memoryItems = Array.isArray(record.memory) ? record.memory : [];
   const memory: ChatSessionMemoryEntry[] = [];
@@ -430,6 +504,10 @@ export function normaliseChatSessionState(payload: unknown): ChatSessionState | 
       defaultFilters: (defaultFilters ?? null) as HybridSearchFilters | null,
       frequentlyOpenedPanels,
     };
+    const loopStateFromPreferences = normaliseLoopState(pref.loop_state ?? pref.loopState ?? null);
+    if (loopStateFromPreferences) {
+      loopState = loopStateFromPreferences;
+    }
   }
 
   const fallbackTimestamp = new Date().toISOString();
@@ -444,5 +522,6 @@ export function normaliseChatSessionState(payload: unknown): ChatSessionState | 
     createdAt: createdAt ?? fallbackTimestamp,
     updatedAt: updatedAt ?? createdAt ?? fallbackTimestamp,
     lastInteractionAt: lastInteractionAt ?? updatedAt ?? createdAt ?? fallbackTimestamp,
+    loopState,
   };
 }
