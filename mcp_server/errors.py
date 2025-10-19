@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 
+HTTP_422_UNPROCESSABLE = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422)
+
 class ErrorCode(str, Enum):
     """Standard error codes for MCP operations."""
 
@@ -74,7 +76,7 @@ class ValidationError(MCPError):
         details: Dict[str, Any] | None = None,
     ) -> None:
         super().__init__(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=HTTP_422_UNPROCESSABLE,
             error_code=ErrorCode.VALIDATION_ERROR,
             message=message,
             field=field,

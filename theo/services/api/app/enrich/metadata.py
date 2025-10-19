@@ -249,7 +249,10 @@ class MetadataEnricher:
         enrichment_block = bib_copy.get("enrichment")
         if not isinstance(enrichment_block, dict):
             enrichment_block = {}
-        enrichment_block[result.provider] = result.raw
+        raw_payload = result.raw
+        if isinstance(raw_payload, dict):
+            raw_payload = {k: v for k, v in raw_payload.items() if k != "_fixture"}
+        enrichment_block[result.provider] = raw_payload
         bib_copy["enrichment"] = enrichment_block
 
         if result.title and not document.title:

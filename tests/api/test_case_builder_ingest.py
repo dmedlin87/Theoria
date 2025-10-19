@@ -23,17 +23,50 @@ from theo.services.api.app.ingest.persistence import persist_text_document, pers
 from theo.services.api.app.ingest.stages import IngestContext, Instrumentation
 
 
-@pytest.fixture()
-def sqlite_session(tmp_path: Path) -> Iterator[Session]:
-    engine = create_engine(f"sqlite:///{tmp_path}/case_builder.sqlite")
+@pytest.fixture(scope="module")
+def _sqlite_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator:
+    base_dir = tmp_path_factory.mktemp("case_builder_db")
+    engine = create_engine(f"sqlite:///{base_dir}/case_builder.sqlite")
     Base.metadata.create_all(engine)
-    TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture()
+def sqlite_session(_sqlite_engine) -> Iterator[Session]:
+    TestingSession = sessionmaker(bind=_sqlite_engine, autoflush=False, autocommit=False)
     session = TestingSession()
     try:
         yield session
+        session.expunge_all()
     finally:
         session.close()
-        engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _storage_root_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    storage_dir = tmp_path / "storage"
+    storage_dir.mkdir()
+    monkeypatch.setenv("STORAGE_ROOT", str(storage_dir))
+    settings_module.get_settings.cache_clear()
+    try:
+        yield storage_dir
+    finally:
+        monkeypatch.delenv("STORAGE_ROOT", raising=False)
+        settings_module.get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _stub_event_bus_publish(monkeypatch: pytest.MonkeyPatch) -> list[tuple[tuple[object, ...], dict[str, object]]]:
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def _capture(*args: object, **kwargs: object) -> None:
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr("theo.platform.events.event_bus.publish", _capture)
+    return calls
 
 
 def _reset_settings(monkeypatch: pytest.MonkeyPatch, **env: str) -> None:

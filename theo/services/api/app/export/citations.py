@@ -335,6 +335,26 @@ def _apa_author(author: dict[str, str]) -> str:
     return literal or ""
 
 
+def _is_preformatted_author(name: str) -> bool:
+    """
+    Heuristic to detect if an APA author name already contains initials.
+
+    We only re-use the original string when it looks like ``Family, I. I.``
+    to avoid leaving full given names uninitialised (e.g. ``Berkhof, Louis``).
+    """
+
+    candidate = name.strip()
+    if "," not in candidate:
+        return False
+    family, given = (segment.strip() for segment in candidate.split(",", 1))
+    if not family or not given:
+        return False
+    segments = [segment for segment in given.replace("&", " ").split() if segment]
+    if not segments:
+        return False
+    return any("." in segment for segment in segments)
+
+
 def _chicago_author(author: dict[str, str]) -> str:
     if "family" in author and author.get("family"):
         given = author.get("given")
@@ -485,7 +505,7 @@ def _format_apa(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
     trimmed_authors = [name.strip() for name in raw_authors if name and name.strip()]
 
     formatted_authors = ""
-    if trimmed_authors and all("," in name for name in trimmed_authors):
+    if trimmed_authors and all(_is_preformatted_author(name) for name in trimmed_authors):
         if len(trimmed_authors) > 1:
             formatted_authors = (
                 ", ".join(trimmed_authors[:-1]) + f", & {trimmed_authors[-1]}"
@@ -494,10 +514,16 @@ def _format_apa(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
             formatted_authors = trimmed_authors[0]
 
     if not formatted_authors:
-        normalised = [
-            _apa_author(_normalise_author(name)) for name in trimmed_authors
-        ]
-        normalised = [author for author in normalised if author]
+        normalised_candidates = []
+        for name in trimmed_authors:
+            formatted = _apa_author(_normalise_author(name))
+            if name and "," not in name and formatted:
+                normalised_candidates.append(name)
+            elif formatted:
+                normalised_candidates.append(formatted)
+            elif name:
+                normalised_candidates.append(name)
+        normalised = [author for author in normalised_candidates if author]
         if len(normalised) > 1:
             formatted_authors = ", ".join(normalised[:-1]) + f", & {normalised[-1]}"
         elif normalised:
@@ -632,9 +658,8 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
             segments.append(f"{authors_segment}.")
 
     title_text = str(title).strip()
-    if title_text and not title_text.rstrip().endswith((".", "!", "?")):
-        title_text = f"{title_text.rstrip()}."
-    title_segment = f'"{title_text}"'
+    normalised_title = title_text.rstrip(".")
+    title_segment = f'"{normalised_title}"' if normalised_title else '""'
     segments.append(title_segment)
     if details_text:
         if not details_text.endswith(('.', '!', '?')):

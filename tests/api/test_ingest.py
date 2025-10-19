@@ -29,6 +29,7 @@ from theo.services.api.app.ingest import network as network_module  # noqa: E402
 PAYLOAD_TOO_LARGE = getattr(
     status, "HTTP_413_CONTENT_TOO_LARGE", HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value
 )
+UNPROCESSABLE = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422)
 
 @pytest.fixture()
 def api_client(api_engine):
@@ -256,7 +257,7 @@ def test_ingest_url_rejects_disallowed_scheme(
 
     response = api_client.post("/ingest/url", json={"url": disallowed_url})
 
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == UNPROCESSABLE
 
 
 @pytest.mark.parametrize(

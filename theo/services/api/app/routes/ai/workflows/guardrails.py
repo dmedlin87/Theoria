@@ -21,6 +21,8 @@ from theo.services.api.app.models.ai import (
 from theo.services.api.app.models.search import HybridSearchFilters
 from .utils import has_filters
 
+HTTP_422_UNPROCESSABLE = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422)
+
 
 DEFAULT_REFUSAL_MESSAGE = "I’m sorry, but I cannot help with that request."
 _GUARDRAIL_KIND_MAP = {
@@ -228,7 +230,7 @@ def guardrail_http_exception(
     error = AIWorkflowError(
         detail_text,
         code=_normalise_error_code(failure_metadata.code),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=HTTP_422_UNPROCESSABLE,
         severity=Severity.USER,
         hint=failure_metadata.reason,
         data=error_data,

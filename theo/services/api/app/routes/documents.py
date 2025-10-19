@@ -27,6 +27,8 @@ from ..retriever.documents import (
     update_document,
 )
 
+HTTP_422_UNPROCESSABLE = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422)
+
 _DOCUMENT_NOT_FOUND_RESPONSE = {
     status.HTTP_404_NOT_FOUND: {"description": "Document not found"}
 }
@@ -189,7 +191,7 @@ def create_document_annotation(
         raise RetrievalError(
             str(exc),
             code="RETRIEVAL_INVALID_ANNOTATION",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=HTTP_422_UNPROCESSABLE,
             severity=Severity.USER,
             hint="Adjust the annotation payload to satisfy validation rules.",
         ) from exc
