@@ -6,12 +6,12 @@ The Discovery Feed is Theoria's **intelligent auto-discovery engine** that autom
 
 **Key Concept**: Transform Theoria from a search tool into a **proactive research companion** that works for you in the background.
 
-**Current Implementation (January 2025)**
+**Current Implementation (October 2025)**
 
-- Frontend experience, mock API routes, and navigation are complete.
+- Frontend experience, API routes, and navigation are production ready.
 - Discovery scheduler (`APScheduler`) runs every 30 minutes to refresh user discoveries.
-- Pattern detection (DBSCAN) and contradiction detection (DeBERTa-based NLI engine) are fully implemented and covered by tests.
-- Gap, connection, trend, and anomaly detectors remain in development (see backend plan below).
+- Pattern, contradiction, gap, connection, trend, and anomaly detectors are implemented with automated tests and wired into `DiscoveryService.refresh_user_discoveries`.
+- Discovery repository and UI components consume live backend data instead of mocks.
 
 ## User Experience
 

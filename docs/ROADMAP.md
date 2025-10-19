@@ -7,49 +7,40 @@ This document summarizes the active roadmap derived from the handoff plan. Use i
 ## Current Status
 
 - **Discovery Engine**
-  - Pattern detection 
-  - Contradiction detection (DeBERTa-based engine completed January 2025)
-  - Gap analysis Pending (BERTopic integration)
-  - Connection, trend, anomaly detection Pending
-  - Background scheduler (APScheduler refresh every 30 minutes)
-- **Agent Reasoning UI** Not yet exposed (framework exists)
-- **Personalized Dashboard** Planned
-- **Citation Manager** Zotero integration shipped; broader manager roadmap tracked in Phase 4
+  - Pattern detection ✅
+  - Contradiction detection ✅ (DeBERTa-based engine)
+  - Gap analysis ✅ (BERTopic integration with theological topic seed data)
+  - Connection, trend, anomaly detection ✅ (wired into `DiscoveryService.refresh_user_discoveries`)
+  - Background scheduler ✅ (APScheduler refresh every 30 minutes)
+- **Agent Reasoning UI** Reasoning trace, fallacy warnings, and the new timeline panel are live in chat workflows
+- **Personalized Dashboard** Dashboard API (`dashboard.py`) and web components consume real metrics and activity data
+- **Citation Manager** Bibliography builder and Zotero export available; multi-format exports tracked as follow-up work
 
-## Phase 1 – Complete Discovery Engine (Weeks 1–2)
+## Phase 1 - Discovery Engine Enhancements (Completed Q1 2025)
 
-- **1.2 Gap Analysis (High Priority)**
-  - Implement `theo/domain/discoveries/gap_engine.py`
-  - Seed reference topics in `data/seeds/theological_topics.yaml`
-  - Integrate BERTopic, add tests under `tests/domain/discoveries/`
-- **1.3 Connection Detection**
-  - Graph-based relationships via shared verses
-  - Introduce `connection_engine.py` and supporting tests
-- **1.4 Trend Detection**
-  - Time-series analysis across corpus snapshots
-  - Surface emerging and declining topics
-- **1.5 Anomaly Detection**
-  - IsolationForest-based outlier surfacing
-  - Explain deviation using metadata and verse usage
+- Delivered six discovery detectors (pattern, contradiction, gap, connection, trend, anomaly)
+- Persist discoveries through `DiscoveryService.refresh_user_discoveries()` with scheduler coverage
+- Seed data shipped in `data/seeds/theological_topics.yaml`
+- Follow-up: continue tuning confidence thresholds and add analytics dashboards
 
-## Phase 2 – Expose Agent Reasoning (Week 3)
+## Phase 2 - Expose Agent Reasoning (In Progress)
 
-- Add reasoning mode toggle in `theo/services/web/app/chat/page.tsx`
-- Update API routing in `theo/services/api/app/ai/router.py`
-- Render reasoning traces and fallacy warnings in new components under `theo/services/web/components/`
-- Ship hypothesis dashboard at `/research/hypotheses`
+- Reasoning timeline models and components live in chat workflow responses
+- Fallacy warnings and reasoning traces render alongside chat output
+- Active work: CS-002 (loop controls) and CS-003 (plan panel) to increase steerability
+- Upcoming: hypothesis dashboard and research loop orchestration
 
-## Phase 3 – Personalized Dashboard (Week 4)
+## Phase 3 - Personalized Dashboard (Alpha Live)
 
-- Replace landing page with personalized overview
-- Create API route `theo/services/api/app/routes/dashboard.py`
-- Surface quick stats, recent activity, discoveries, and bookmarks
+- `theo/services/api/app/routes/dashboard.py` returns live metrics and activity feeds
+- Quick stats, recent activity, and discoveries widgets backed by real data
+- Next iterations: add personalization controls, bookmarks, and alerts
 
-## Phase 4 – Citation Manager (Weeks 5–6)
+## Phase 4 - Citation Manager (Foundational Features Shipped)
 
-- Expand citation export formats (APA, Chicago, SBL, BibTeX)
-- Enhance `/bibliography` builder and related API endpoints
-- Continue polishing Zotero integration (`theo/services/api/app/export/zotero.py`)
+- Bibliography builder UI and Zotero export operational
+- Supports citation exports through `theo/services/api/app/export/zotero.py`
+- Next up: add APA/Chicago/SBL/BibTeX formatters and batch export improvements
 
 ## Maintenance Notes
 

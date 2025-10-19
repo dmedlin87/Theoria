@@ -1,187 +1,62 @@
 # Theoria - Next Phase Development Plan
 
-> **Status:** Ready for implementation  
-> **Last Updated:** 2025-01-15  
-> **Estimated Timeline:** 4-6 weeks
+> **Status:** Cognitive Scholar MVP execution underway  
+> **Last Updated:** 2025-10-18  
+> **Estimated Timeline:** 4-6 weeks (CS-002 -> CS-016)
 
 ---
 
 ## Executive Summary
 
-Theoria has a solid foundation. Next phase: **complete discovery engine**, **expose agent reasoning**, **personalized dashboard**, and **citation export**.
+Discovery, reasoning, dashboard, and citation foundations are live. The next phase focuses on shipping the Cognitive Scholar MVP: **loop controls**, **live plan editing**, **argument mapping with truth maintenance**, **hypothesis workflows**, and **gap->loop automation**.
 
-### Current State ✅
-- ✅ Frontend UI complete
-- ✅ RAG pipeline working
-- ✅ Reasoning framework implemented (not exposed)
-- ✅ Discovery backend (pattern detection only)
-- ✅ Background scheduler (just added)
-- ✅ Comprehensive documentation
+### Current State
+- ✅ Frontend UI supports reasoning timeline, reasoning trace, and fallacy warnings in chat
+- ✅ RAG workflow stable with guardrails, exports, and monitoring hooks
+- ✅ Discovery backend runs six engines (pattern, contradiction, gap, connection, trend, anomaly) on the APScheduler refresh cadence
+- ✅ Dashboard route (`dashboard.py`) and UI components surface real metrics and activity
+- ✅ Bibliography builder plus Zotero export cover end-to-end citation workflows
+- ✅ Documentation refreshed via CS-001 handoff and task tracker updates
 
-### What's Next 🎯
-1. Complete Discovery Engine (5 missing types)
-2. Expose Agent Reasoning in UI
-3. Personalized Dashboard
-4. Citation Manager
-
----
-
-## Phase 1: Complete Discovery Engine (Week 1-2)
-
-### 1.1 Contradiction Detection ⭐ HIGH PRIORITY
-**Why:** High user value, leverages existing contradiction seeds
-
-**Files to create:**
-- `theo/domain/discoveries/contradiction_engine.py`
-- `tests/domain/discoveries/test_contradiction_engine.py`
-
-**Key implementation:**
-- Use pre-trained NLI model (microsoft/deberta-v3-base-mnli)
-- Compare document pairs for contradictions
-- Link to existing contradiction seeds
-- Confidence scores 0.6-0.95
-
-### 1.2 Gap Analysis ⭐ HIGH PRIORITY
-**Why:** Helps users discover missing topics
-
-**Files to create:**
-- `theo/domain/discoveries/gap_engine.py`
-- `data/seeds/theological_topics.yaml`
-- `tests/domain/discoveries/test_gap_engine.py`
-
-**Key implementation:**
-- Use BERTopic for topic modeling
-- Compare against reference topics (Christology, Soteriology, etc.)
-- Suggest searches to fill gaps
-
-### 1.3 Connection Detection
-**Why:** Builds on existing cross-reference data
-
-**Files to create:**
-- `theo/domain/discoveries/connection_engine.py`
-
-**Key implementation:**
-- Build graph from shared verse_ids
-- Find bridge documents
-- Calculate connection strength (Jaccard similarity)
-
-### 1.4 Trend Detection
-**Why:** Shows topic evolution over time
-
-**Files to create:**
-- `theo/domain/discoveries/trend_engine.py`
-
-**Key implementation:**
-- Compare current vs. historical snapshots
-- Calculate topic frequency changes
-- Identify emerging/declining topics
-
-### 1.5 Anomaly Detection
-**Why:** Find outlier documents
-
-**Files to create:**
-- `theo/domain/discoveries/anomaly_engine.py`
-
-**Key implementation:**
-- Use sklearn IsolationForest
-- Identify outliers in embeddings
-- Explain why anomalous
-
-### Integration
-Update `DiscoveryService.refresh_user_discoveries()` to run all engines.
+### What's Next
+1. **CS-002 to CS-004:** Deliver loop controls, live plan panel, and argument link schema
+2. **CS-005 to CS-008:** Build argument map renderer, Toulmin zoom, and the truth-maintenance system
+3. **CS-009 to CS-013:** Ship hypothesis management, multi-runner, debate loop, belief bars, and meta-prompt picker
+4. **CS-014 to CS-016:** Integrate gap discoveries into reasoning loops with falsifier searches and retrieval budgeting
 
 ---
 
-## Phase 2: Expose Agent Reasoning (Week 3)
+## Phase 1: Control Surface + Timeline (Week 1)
 
-### 2.1 Reasoning Mode Toggle ⭐ HIGH PRIORITY
-**Files to modify:**
-- `theo/services/web/app/chat/page.tsx`
-- `theo/services/api/app/ai/router.py`
+- CS-001 complete: timeline models (`theo/services/api/app/models/reasoning.py`) and UI (`ReasoningTimeline.tsx`) render in chat responses
+- CS-002: expose stop, step, and pause endpoints plus `LoopControls.tsx`
+- CS-003: render and persist plan panel edits with drag-and-drop ordering
+- CS-004: finalize argument link schema in domain + persistence layers
+- **Outcome:** User-steerable reasoning loop with visible state and persistence hooks
 
-**Add modes:**
-- 🔍 Detective (step-by-step)
-- 🤔 Critic (challenge assumptions)
-- 🛡️ Apologist (harmonize)
-- 📊 Synthesizer (survey all views)
+## Phase 2: Argument Maps + TMS (Week 2)
 
-### 2.2 Display Reasoning Trace
-**Files to create:**
-- `theo/services/web/components/ReasoningTrace.tsx`
+- CS-005: argument map renderer (D3) with support/contradict visualization
+- CS-006: Toulmin zoom modal for grounds, warrants, qualifiers, rebuttals
+- CS-007: truth-maintenance engine with justification propagation and unit tests
+- CS-008: TMS explorer UI for dependency inspection and impact preview
+- **Outcome:** Interactive argument visualization backed by consistent truth maintenance
 
-**Features:**
-- Expandable/collapsible
-- Step-by-step display
-- Confidence bars
+## Phase 3: Hypotheses + Debates (Week 3)
 
-### 2.3 Fallacy Warnings
-**Files to create:**
-- `theo/services/web/components/FallacyWarnings.tsx`
+- CS-009: hypothesis domain model, repository, and dashboard cards
+- CS-010: multi-hypothesis runner orchestrating retrieval + scoring
+- CS-011: debate loop (H1 vs H2) with LLM judge and confidence adjustments
+- CS-012: belief bars showing prior→posterior deltas per evidence
+- CS-013: meta-prompt picker sourced from `data/meta_prompts/procedures.yaml`
+- **Outcome:** Structured hypothesis management with transparent debate outcomes
 
-**Features:**
-- Highlight high severity
-- Show suggestions
-- Educational tooltips
+## Phase 4: Gap → Loop Integration (Week 4)
 
-### 2.4 Hypothesis Dashboard
-**Files to create:**
-- `theo/services/web/app/research/hypotheses/page.tsx`
-
-**Features:**
-- Card view with confidence bars
-- Supporting/contradicting evidence counts
-- "Test Hypothesis" button
-
----
-
-## Phase 3: Personalized Dashboard (Week 4)
-
-### Implementation
-**Files to modify:**
-- `theo/services/web/app/page.tsx` (replace landing)
-
-**Files to create:**
-- `theo/services/api/app/routes/dashboard.py`
-
-**Sections:**
-1. Quick stats (documents, discoveries, queries, insights)
-2. Recent activity timeline
-3. Latest discoveries (top 6)
-4. Quick actions (Upload, Chat, Browse, Search)
-5. Bookmarked research
-
----
-
-## Phase 4: Citation Manager (Week 5-6)
-
-### 4.1 Citation Export ⭐ HIGH PRIORITY
-**Files to create:**
-- `theo/services/api/app/export/citations.py`
-- `theo/services/web/components/CitationExport.tsx`
-
-**Formats:**
-- APA 7th Edition
-- Chicago 17th Edition
-- SBL 2nd Edition
-- BibTeX
-
-### 4.2 Bibliography Builder
-**Files to create:**
-- `theo/services/web/app/bibliography/page.tsx`
-
-**Features:**
-- Document selector
-- Live preview
-- Copy/download/email
-
-### 4.3 Zotero Integration (Optional)
-**Files to create:**
-- `theo/services/api/app/export/zotero.py`
-
-**Features:**
-- API key configuration
-- One-click export
-- Batch support
+- CS-014: falsifier search operator converts gaps to targeted queries
+- CS-015: retrieval budgeter enforces token/time constraints
+- CS-016: wire gap discoveries into the reasoning loop and belief updates
+- **Outcome:** Automated feedback cycle linking discovery gaps to reasoning loop iterations
 
 ---
 
@@ -189,74 +64,75 @@ Update `DiscoveryService.refresh_user_discoveries()` to run all engines.
 
 ### Unit Tests
 ```bash
-pytest tests/domain/discoveries/ -v
-pytest tests/api/ai/test_reasoning_modules.py -v
-pytest tests/api/export/test_citations.py -v
+pytest tests/services/reasoning/ -v               # timeline + control DTOs
+pytest tests/domain/arguments/ -v                 # Toulmin + TMS units
+pytest tests/domain/hypotheses/ -v                # hypothesis models and repositories
+pytest tests/services/research/ -v                # falsifier + budgeter logic
 ```
 
 ### Integration Tests
 ```bash
-pytest tests/api/test_discovery_integration.py -v
-pytest tests/api/test_reasoning_integration.py -v
-pytest tests/api/test_dashboard.py -v
+pytest tests/api/test_ai_workflows_integration.py -v   # loop controls + timeline payload
+pytest tests/api/routes/test_discoveries_v1.py -v      # discovery pipeline health
+pytest tests/api/test_dashboard_route.py -v            # dashboard metrics
+pytest tests/api/test_citation_exports.py -v           # bibliography + Zotero
 ```
 
 ### Manual Testing
-- [ ] Upload document → discoveries appear
-- [ ] Chat in detective mode → reasoning shows
-- [ ] Dashboard loads with stats
-- [ ] Export citations works
+- [ ] Interrupt a chat run via stop/step controls and verify timeline updates
+- [ ] Reorder plan panel items and confirm backend execution order changes
+- [ ] Inspect argument map for a multi-claim response; validate Toulmin zoom details
+- [ ] Run multi-hypothesis workflow and observe debate resolution + belief bars
+- [ ] Trigger gap discovery -> falsifier search loop; ensure budgeter applies limits
 
 ---
 
 ## Deployment Checklist
 
 1. Install dependencies: `pip install -r requirements.txt`
-2. Run migrations
-3. Restart: `.\start-theoria.ps1`
-4. Verify scheduler: Check logs for "Discovery scheduler started"
-5. Smoke test: Upload, chat, check dashboard
+2. Apply migrations for new reasoning and hypothesis tables when introduced
+3. Restart services: `.\start-theoria.ps1`
+4. Verify APScheduler logs include discovery cycle completions
+5. Smoke test: chat session with timeline, dashboard metrics, Zotero export
 
 ---
 
 ## Success Metrics
 
-**Phase 1:** All 6 discovery types working, 10+ discoveries per user  
-**Phase 2:** 30%+ use reasoning modes, 80%+ find helpful  
-**Phase 3:** 80%+ sessions start from dashboard  
-**Phase 4:** 40%+ export citations, 90%+ find useful  
+- **Phase 1:** >=90% of chat sessions display timeline + controls without errors
+- **Phase 2:** Users create >=1 argument map per session; TMS resolves contradictions within 2 seconds
+- **Phase 3:** 2-4 hypotheses per question with debate confidence deltas logged
+- **Phase 4:** 60% of identified gaps trigger falsifier searches; retrieval budget overruns <5%
 
 ---
 
 ## Risk Mitigation
 
-**NLI too slow?** Use smaller model, cache results  
-**BERTopic fails?** Require 20+ documents minimum  
-**Too many discoveries?** Smart filtering, top 5 view  
-**Users confused?** Add tooltips, examples, onboarding  
+- **Loop control latency?** Optimize workflow cancellation hooks and add tracing
+- **Argument map complexity?** Start with capped node counts; add clustering for large graphs
+- **TMS performance?** Cache justification evaluations and instrument for cycle detection
+- **Retrieval overrun?** Pre-calculate cost envelopes and short-circuit expensive branches
 
 ---
 
 ## Quick Reference
 
-### Key Files Modified
-- `requirements.txt` - Added apscheduler
-- `theo/services/api/app/main.py` - Added scheduler lifecycle
-- `theo/services/api/app/workers/discovery_scheduler.py` - New scheduler
-
-### Key Documentation
-- `docs/AGENT_AND_PROMPTING_GUIDE.md` - Agent architecture
-- `docs/DISCOVERY_SCHEDULER.md` - Scheduler details
-- `docs/DISCOVERY_FEATURE.md` - Discovery spec
-- `docs/IMPLEMENTATION_GUIDE.md` - Reasoning framework
-
-### Next Session Start Here
-1. Review this handoff
-2. Pick Phase 1.1 (Contradiction Detection)
-3. Create `theo/domain/discoveries/contradiction_engine.py`
-4. Implement NLI-based detection
-5. Test and integrate
+- `theo/services/api/app/models/reasoning.py` – timeline + control DTOs
+- `theo/services/api/app/routes/ai/workflows/chat.py` – workflow payload updates
+- `theo/services/web/app/components/ReasoningTimeline.tsx` – chat reasoning UI
+- `docs/tasks/TASK_005_Cognitive_Scholar_MVP_Tickets.md` – ticket breakdown (CS-001 → CS-016)
+- `COGNITIVE_SCHOLAR_HANDOFF.md` – active handoff context and status ledger
 
 ---
 
-**Ready to start Phase 1!** 🚀
+## Next Session Start Here
+1. Confirm CS-001 completion in the task tracker (done ✅)
+2. Implement loop control endpoints and UI (CS-002)
+3. Add plan panel scaffolding with mock data (CS-003)
+4. Define argument link schema across domain + repository (CS-004)
+5. Draft TMS design update ahead of Phase 2 kickoff
+
+---
+
+**Ready to ship the Cognitive Scholar MVP!**
+4. **CS-014 to CS-016:** Integrate gap discoveries into reasoning loops with falsifier searches and retrieval budgeting
