@@ -238,73 +238,60 @@ def _normalise_doi(value: Any) -> str | None:
     cleaned = value.strip()
     if not cleaned:
         return None
+
     lowered = cleaned.lower()
-    if lowered.startswith("doi:"):
-        cleaned = cleaned[4:].strip()
-        lowered = cleaned.lower()
-    prefixes = (
-        "https://doi.org/",
-        "http://doi.org/",
-        "https://dx.doi.org/",
-        "http://dx.doi.org/",
-        "doi.org/",
-    )
-    for prefix in prefixes:
-        if lowered.startswith(prefix):
-            cleaned = cleaned[len(prefix) :]
-            lowered = cleaned.lower()
-            break
-    cleaned = cleaned.strip()
-    if not cleaned:
-        return None
-    if cleaned.lower().startswith("doi:"):
-        cleaned = cleaned[4:].strip()
-    http_lower = cleaned.lower()
+
+    # Preserve non-DOI HTTP/HTTPS URLs unchanged.
     doi_http_prefixes = (
-        "http://doi.org/",
         "https://doi.org/",
-        "http://dx.doi.org/",
+        "http://doi.org/",
         "https://dx.doi.org/",
+        "http://dx.doi.org/",
     )
-    if http_lower.startswith("http") and not any(
-        http_lower.startswith(prefix) for prefix in doi_http_prefixes
+    if lowered.startswith(("http://", "https://")) and not any(
+        lowered.startswith(prefix) for prefix in doi_http_prefixes
     ):
         return cleaned
 
+    # Remove leading DOI scheme prefixes (possibly repeated).
+    while cleaned.lower().startswith("doi:"):
+        cleaned = cleaned[4:].strip()
+        if not cleaned:
+            return None
+
     lowered = cleaned.lower()
-    if lowered.startswith("http"):
-        # Assume fully qualified URLs are already canonical enough.
-        return cleaned
 
-    if lowered.startswith("doi:"):
-        cleaned = cleaned[len("doi:") :].strip()
-        lowered = cleaned.lower()
-
-    # Accept bare domains such as ``doi.org/10.123`` or ``dx.doi.org/10.123``.
-    for prefix in ("doi.org/", "dx.doi.org/"):
-        if lowered.startswith(prefix):
-            cleaned = cleaned[len(prefix) :].lstrip("/")
-            lowered = cleaned.lower()
-            break
-
-    if not cleaned:
-        return None
-
-    return f"https://doi.org/{cleaned}"
-    lowered = cleaned.lower()
-    prefixes = (
-        "https://doi.org/",
-        "http://doi.org/",
-        "https://dx.doi.org/",
-        "http://dx.doi.org/",
-        "doi:",
-    )
-    for prefix in prefixes:
+    # Strip known DOI host prefixes.
+    for prefix in (*doi_http_prefixes, "doi.org/", "dx.doi.org/"):
         if lowered.startswith(prefix):
             cleaned = cleaned[len(prefix) :].lstrip(" /")
             lowered = cleaned.lower()
             break
-    return cleaned or None
+
+    if not cleaned:
+        return None
+
+    # Accept bare DOI domains that remain after trimming prefixes.
+    for prefix in ("doi.org/", "dx.doi.org/"):
+        if lowered.startswith(prefix):
+            cleaned = cleaned[len(prefix) :].lstrip(" /")
+            lowered = cleaned.lower()
+            break
+
+    if not cleaned:
+        return None
+
+    # If the remaining content is itself a URL (e.g. an unexpected host),
+    # do not force canonicalisation.
+    residual_lower = cleaned.lower()
+    if residual_lower.startswith(("http://", "https://")):
+        return cleaned
+
+    cleaned = cleaned.lstrip("/")
+    if not cleaned:
+        return None
+
+    return f"https://doi.org/{cleaned}"
 
 
 def _normalise_author(name: str) -> dict[str, str]:
@@ -498,7 +485,7 @@ def _format_apa(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
     trimmed_authors = [name.strip() for name in raw_authors if name and name.strip()]
 
     formatted_authors = ""
-    if trimmed_authors and all("," not in name for name in trimmed_authors):
+    if trimmed_authors and all("," in name for name in trimmed_authors):
         if len(trimmed_authors) > 1:
             formatted_authors = (
                 ", ".join(trimmed_authors[:-1]) + f", & {trimmed_authors[-1]}"
@@ -644,9 +631,10 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
         else:
             segments.append(f"{authors_segment}.")
 
-    title_segment = f'"{title}"'
-    if not str(title).rstrip().endswith((".", "!", "?")):
-        title_segment = f"{title_segment}."
+    title_text = str(title).strip()
+    if title_text and not title_text.rstrip().endswith((".", "!", "?")):
+        title_text = f"{title_text.rstrip()}."
+    title_segment = f'"{title_text}"'
     segments.append(title_segment)
     if details_text:
         if not details_text.endswith(('.', '!', '?')):

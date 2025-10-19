@@ -15,6 +15,7 @@ from theo.application.dtos import (
     DiscoveryDTO,
     DocumentDTO,
     DocumentSummaryDTO,
+    IngestionJobDTO,
     PassageDTO,
 )
 
@@ -23,6 +24,7 @@ from .models import (
     CorpusSnapshot,
     Discovery,
     Document,
+    IngestionJob,
     Passage,
 )
 
@@ -147,6 +149,23 @@ def document_to_dto(model: Document, passages: Sequence[Passage] | None = None) 
     )
 
 
+def ingestion_job_to_dto(model: IngestionJob) -> IngestionJobDTO:
+    """Convert ORM IngestionJob row to application DTO."""
+    return IngestionJobDTO(
+        id=model.id,
+        job_type=model.job_type,
+        status=model.status,
+        document_id=model.document_id,
+        task_id=model.task_id,
+        error=model.error,
+        payload=model.payload if isinstance(model.payload, dict) else None,
+        args_hash=model.args_hash,
+        scheduled_at=model.scheduled_at,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
 __all__ = [
     "chat_session_to_dto",
     "discovery_to_dto",
@@ -155,4 +174,5 @@ __all__ = [
     "document_summary_to_dto",
     "document_to_dto",
     "passage_to_dto",
+    "ingestion_job_to_dto",
 ]

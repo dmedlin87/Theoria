@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import tempfile
+from http import HTTPStatus
 from pathlib import Path
-from uuid import uuid4
 from typing import Any, AsyncIterator, Iterator
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -43,7 +44,9 @@ run_pipeline_for_transcript = _run_pipeline_for_transcript
 run_pipeline_for_url = _run_pipeline_for_url
 
 # Starlette's payload-too-large HTTP status constant.
-_PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+_PAYLOAD_TOO_LARGE_STATUS = getattr(
+    status, "HTTP_413_CONTENT_TOO_LARGE", HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value
+)
 
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},

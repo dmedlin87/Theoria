@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from http import HTTPStatus
 from typing import Callable
 from uuid import uuid4
 
@@ -94,8 +95,12 @@ class RequestLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, max_body_size: int = 10 * 1024 * 1024) -> None:
         super().__init__(app)
         self.max_body_size = max_body_size
-        # Use the dedicated Starlette status code for payload limits.
-        self._payload_limit_status = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+        # Use the dedicated Starlette status code for payload limits when available.
+        self._payload_limit_status = getattr(
+            status,
+            "HTTP_413_CONTENT_TOO_LARGE",
+            HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value,
+        )
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Response]

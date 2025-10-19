@@ -354,7 +354,7 @@ Update `docs/tasks/TASK_005_Cognitive_Scholar_MVP_Tickets.md` as you complete ti
 
 Mark checkboxes:
 - [x] CS-001 ✅ **COMPLETE** (2025-10-18)
-- [ ] CS-002 ← **NEXT**
+- [x] CS-002 ✅ COMPLETE (2025-10-18) ← **NEXT**
 - [ ] CS-003
 - ...
 
@@ -381,20 +381,21 @@ Mark checkboxes:
 ## 🎯 Your Action Plan (Next 48 Hours)
 
 **Today**:
-1. Read this handoff ✅
-2. Create `ReasoningTimeline.tsx` component
-3. Get it rendering with mock data
+1. ✅ Confirm CS-001 handoff context
+2. ✅ Ship loop control endpoints + UI (CS-002)
+3. ✅ Capture partial-response tests for stop/pause
 
 **Tomorrow**:
-1. Wire timeline into chat response
-2. Style timeline (collapsible, icons, dark mode)
-3. Test end-to-end
+1. Kick off CS-003 (Plan Panel design & state wiring)
+2. Define research plan DTOs on the backend
+3. Outline integration coverage for plan edits
 
 **Day 3**:
-1. Start CS-002 (Stop/Step/Pause controls)
-2. Add API endpoints for loop control
+1. Implement PlanPanel.tsx with live updates
+2. Connect plan DTOs to chat workflow
+3. Backfill UI tests after layout stabilises
 
-**Goal**: Working timeline by end of weekend/early next week.
+**Goal**: Loop controls live, Plan Panel scaffolding underway.
 
 ---
 

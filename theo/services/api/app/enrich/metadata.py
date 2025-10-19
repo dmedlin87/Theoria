@@ -302,9 +302,13 @@ class MetadataEnricher:
         candidate = fixtures_root / provider / f"{key}.json"
         if candidate.exists():
             try:
-                return json.loads(candidate.read_text(encoding="utf-8"))
+                payload = json.loads(candidate.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 LOGGER.debug("Invalid JSON in fixture %s", candidate)
+            else:
+                if isinstance(payload, dict):
+                    payload["_fixture"] = True
+                return payload
         return None
 
     def _http_get_json(self, url: str) -> Any:

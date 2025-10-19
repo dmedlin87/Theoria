@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import socket
+from http import HTTPStatus
 from pathlib import Path
 import sys
 from ipaddress import ip_address
@@ -25,7 +26,9 @@ from theo.services.api.app.services import ingestion_service as ingestion_servic
 from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E402
 from theo.services.api.app.ingest import network as network_module  # noqa: E402
 
-PAYLOAD_TOO_LARGE = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+PAYLOAD_TOO_LARGE = getattr(
+    status, "HTTP_413_CONTENT_TOO_LARGE", HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value
+)
 
 @pytest.fixture()
 def api_client(api_engine):

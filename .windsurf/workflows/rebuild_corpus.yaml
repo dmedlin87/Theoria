@@ -1,0 +1,33 @@
+name: Rebuild & Refresh Corpus
+description: Re-run ingestion/vector pipelines and restart API when parser/ingest code changes.
+
+on:
+  push:
+    paths:
+      - "theo/services/ingest/**"
+      - "theo/services/parser/**"
+  manual: true
+
+steps:
+  - name: Unit tests (fast)
+    run: poetry run pytest theo/services/ingest theo/services/parser --maxfail=1 --disable-warnings -q
+
+  - name: Rebuild embeddings
+    run: poetry run python theo/cli.py rebuild_embeddings --fast --no-cache
+
+  - name: Restart API server
+    run: |
+      echo "Restarting dev server..."
+      task stop_api || true
+      task start_api
+
+  - name: Summarize run
+    assistant: |
+      1) Summarize key code changes in ingest/parser from the latest commit(s).
+      2) Capture test summary (pass/fail count) and any errors.
+      3) Confirm embeddings step completed and API is reachable on localhost.
+      4) Append a dated entry to docs/dev/rebuild_log.md with:
+         - commit SHA + author + timestamp
+         - changed files (short)
+         - test/embedding/API results (short)
+         - any TODOs or follow-ups

@@ -42,22 +42,25 @@ Break down the Cognitive Scholar MVP into discrete, implementable tickets follow
 
 ---
 
-#### Ticket CS-002: Stop/Step/Pause Controls
+#### Ticket CS-002: Stop/Step/Pause Controls ✅ COMPLETE
 **Estimate**: 4 hours  
 **Dependencies**: CS-001  
 **Description**: Add interactive controls allowing users to pause research loops, step through one tool call at a time, or stop mid-workflow.
 
 **Acceptance Criteria**:
-- [ ] Stop button halts current loop, returns partial synthesis
-- [ ] Step button advances one tool call, shows next queued action
-- [ ] Pause button holds loop, preserves state
-- [ ] UI shows current loop status (running/paused/stopped)
-- [ ] Backend API supports loop control (`POST /api/chat/loop/control`)
+- [x] Stop button halts current loop, returns partial synthesis
+- [x] Step button advances one tool call, shows next queued action
+- [x] Pause button holds loop, preserves state
+- [x] UI shows current loop status (running/paused/stopped)
+- [x] Backend API supports loop control (`POST /api/chat/loop/control`)
 
 **Files**:
-- `theo/services/web/app/components/LoopControls.tsx` (new)
-- `theo/services/api/app/routes/ai/workflows/chat.py` (modify - add control endpoints)
-- `theo/services/api/app/ai/research_loop.py` (new - loop orchestrator)
+- `theo/services/web/app/components/LoopControls.tsx` ✅ CREATED
+- `theo/services/api/app/routes/ai/workflows/chat.py` ✅ MODIFIED
+- `theo/services/api/app/ai/research_loop.py` ✅ CREATED
+
+**Completed**: 2025-10-18  
+**Notes**: Loop controls orchestrate stop, pause/resume, and step actions with persisted state and partial response handling.
 
 ---
 

@@ -7,6 +7,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Sequence, TypeAlias
 from uuid import uuid4
 
@@ -68,7 +69,9 @@ router = APIRouter()
 LOGGER = logging.getLogger(__name__)
 
 # Prefer Starlette's payload-too-large HTTP status constant.
-_PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+_PAYLOAD_TOO_LARGE_STATUS = getattr(
+    status, "HTTP_413_CONTENT_TOO_LARGE", HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value
+)
 
 _MAX_STORED_MEMORY = 10
 _MAX_CONTEXT_SNIPPETS = 4

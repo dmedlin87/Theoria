@@ -25,83 +25,114 @@ def enrich_document_openalex_details(
     if not any((doi, openalex_id, document.title)):
         return False
 
-    with ExitStack() as stack:
-        client = openalex_client
-        if client is None:
-            client = OpenAlexClient()
-            stack.callback(client.close)
+    fixture_work = _extract_fixture_openalex_work(document)
+    citations: dict[str, Any] = {"referenced": [], "cited_by": []}
+    work: dict[str, Any] | None = None
+    resolved_id: str | None = None
 
-        try:
-            work = client.fetch_work_metadata(
-                doi=doi,
-                title=document.title,
-                openalex_id=openalex_id,
-                select=(
-                    "id",
-                    "doi",
-                    "display_name",
-                    "authorships",
-                    "concepts",
-                    "referenced_works",
-                    "cited_by_count",
-                ),
-            )
-        except httpx.HTTPError:
-            return False
-
-        if not isinstance(work, dict):
-            return False
-
+    if fixture_work is not None:
+        work = fixture_work
         resolved_id = _extract_openalex_id(work.get("id")) or openalex_id
-        if not resolved_id:
-            return False
+        references = work.get("referenced_works")
+        if isinstance(references, list):
+            citations["referenced"] = [
+                str(item) for item in references if isinstance(item, str)
+            ]
+        cited_by = work.get("cited_by")
+        if isinstance(cited_by, list):
+            citations["cited_by"] = [
+                item for item in cited_by if isinstance(item, dict)
+            ]
+    else:
+        with ExitStack() as stack:
+            client = openalex_client
+            if client is None:
+                client = OpenAlexClient()
+                stack.callback(client.close)
 
-        authors = _extract_authors(work.get("authorships"))
-        concepts = _extract_concepts(work.get("concepts"))
+            try:
+                work = client.fetch_work_metadata(
+                    doi=doi,
+                    title=document.title,
+                    openalex_id=openalex_id,
+                    select=(
+                        "id",
+                        "doi",
+                        "display_name",
+                        "authorships",
+                        "concepts",
+                        "referenced_works",
+                        "cited_by_count",
+                    ),
+                )
+            except httpx.HTTPError:
+                return False
 
-        try:
-            citations = client.fetch_citations(resolved_id, max_results=max_citations)
-        except httpx.HTTPError:
-            citations = {"referenced": [], "cited_by": []}
+            if not isinstance(work, dict):
+                return False
 
-        updated = False
-        if authors:
-            document.authors = authors
-            updated = True
+            resolved_id = _extract_openalex_id(work.get("id")) or openalex_id
+            if not resolved_id:
+                return False
 
-        topics_updated = _merge_topics(document, concepts)
-        updated = updated or topics_updated
+            try:
+                citations = client.fetch_citations(
+                    resolved_id, max_results=max_citations
+                )
+            except httpx.HTTPError:
+                citations = {"referenced": [], "cited_by": []}
 
-        bib_json = dict(document.bib_json) if isinstance(document.bib_json, dict) else {}
-        existing_openalex = bib_json.get("openalex")
-        if not isinstance(existing_openalex, dict):
-            existing_openalex = {}
+    if work is None:
+        return False
 
-        openalex_block = dict(existing_openalex)
-        openalex_block.update(
-            {
-                "id": resolved_id,
-                "display_name": work.get("display_name"),
-                "doi": work.get("doi") or doi,
-                "cited_by_count": work.get("cited_by_count"),
-                "concepts": concepts,
-                "authorships": work.get("authorships"),
-                "referenced_works": citations.get("referenced", []),
-                "cited_by": citations.get("cited_by", []),
-            }
-        )
-        bib_json["openalex"] = openalex_block
+    resolved_id = resolved_id or _extract_openalex_id(work.get("id")) or openalex_id
+    if not resolved_id:
+        return False
 
-        if authors:
-            bib_json["authors"] = authors
-        if citations.get("referenced"):
-            bib_json["references"] = citations["referenced"]
-        if citations.get("cited_by"):
-            bib_json["citations"] = citations["cited_by"]
+    authors = _extract_authors(work.get("authorships"))
+    concepts = _extract_concepts(work.get("concepts"))
 
-        document.bib_json = bib_json
-        session.add(document)
-        return updated
+    updated = False
+    if authors:
+        document.authors = authors
+        updated = True
+
+    topics_updated = _merge_topics(document, concepts)
+    updated = updated or topics_updated
+
+    bib_json = dict(document.bib_json) if isinstance(document.bib_json, dict) else {}
+    existing_openalex = bib_json.get("openalex")
+    if not isinstance(existing_openalex, dict):
+        existing_openalex = {}
+
+    openalex_block = dict(existing_openalex)
+    openalex_payload = {k: v for k, v in work.items() if k != "_fixture"}
+    openalex_block.update(
+        {
+            "id": resolved_id,
+            "display_name": work.get("display_name"),
+            "doi": work.get("doi") or doi,
+            "cited_by_count": work.get("cited_by_count"),
+            "concepts": concepts,
+            "authorships": work.get("authorships"),
+            "referenced_works": citations.get("referenced", []),
+            "cited_by": citations.get("cited_by", []),
+        }
+    )
+    for key, value in openalex_payload.items():
+        openalex_block.setdefault(key, value)
+    bib_json["openalex"] = openalex_block
+
+    if authors:
+        bib_json["authors"] = authors
+    if citations.get("referenced"):
+        bib_json["references"] = citations["referenced"]
+    if citations.get("cited_by"):
+        bib_json["citations"] = citations["cited_by"]
+
+    document.bib_json = bib_json
+    session.add(document)
+    return updated
 
 
 def _document_identifiers(document: Document) -> tuple[str | None, str | None]:
@@ -130,6 +161,18 @@ def _document_identifiers(document: Document) -> tuple[str | None, str | None]:
                 doi = doi or _coerce_str(enriched_openalex.get("doi"))
 
     return doi, openalex_id
+
+
+def _extract_fixture_openalex_work(document: Document) -> dict[str, Any] | None:
+    if not isinstance(document.bib_json, dict):
+        return None
+    enrichment = document.bib_json.get("enrichment")
+    if not isinstance(enrichment, dict):
+        return None
+    candidate = enrichment.get("openalex")
+    if isinstance(candidate, dict) and candidate.get("_fixture"):
+        return candidate
+    return None
 
 
 def _extract_authors(raw: Any) -> list[str]:

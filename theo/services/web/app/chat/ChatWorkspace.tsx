@@ -19,6 +19,7 @@ import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout
 import { Icon } from "../components/Icon";
 import type { ChatWorkflowClient } from "../lib/chat-client";
 import { createTheoApiClient, TheoApiError } from "../lib/api-client";
+import type { LoopControlAction } from "../lib/api-client";
 import { interpretApiError } from "../lib/errorMessages";
 import type {
   ChatSessionState,
@@ -40,6 +41,7 @@ import {
 } from "./useChatWorkspaceState";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
 import { SessionControls } from "./components/SessionControls";
+import LoopControls from "../components/LoopControls";
 import type { TranscriptEntry as BaseTranscriptEntry } from "./components/transcript/ChatTranscript";
 
 type TranscriptEntry = BaseTranscriptEntry & { timestamp?: Date };
@@ -99,6 +101,7 @@ export default function ChatWorkspace({
       guardrail,
       errorMessage: apiError,
       lastQuestion,
+      loopState,
     },
     setters: {
       setConversation,
@@ -113,6 +116,7 @@ export default function ChatWorkspace({
       setGuardrail,
       setErrorMessage: setApiError,
       setLastQuestion,
+      setLoopState,
     },
     selectors: { hasTranscript },
   } = useChatSessionState();
@@ -194,10 +198,12 @@ export default function ChatWorkspace({
         }
         if (!state) {
           window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+          setLoopState(null);
           setIsRestoring(false);
           return;
         }
         setSessionId(state.sessionId);
+        setLoopState(state.loopState ?? null);
         if (state.preferences?.frequentlyOpenedPanels) {
           setFrequentlyOpenedPanels(state.preferences.frequentlyOpenedPanels);
         } else {
@@ -342,6 +348,7 @@ export default function ChatWorkspace({
       }
       if (event.type === "complete") {
         setSessionId(event.response.sessionId);
+        setLoopState(event.response.loopState ?? null);
         updateAssistantEntry(assistantId, (entry) => ({
           ...entry,
           content: event.response.answer.summary,
@@ -353,7 +360,15 @@ export default function ChatWorkspace({
         return;
       }
     },
-    [removeEntryById, updateAssistantEntry],
+    [
+      removeEntryById,
+      updateAssistantEntry,
+      setSessionId,
+      setLoopState,
+      setActiveAssistantId,
+      setGuardrail,
+      setIsStreaming,
+    ],
   );
 
   const executeChat = useCallback(
@@ -385,6 +400,7 @@ export default function ChatWorkspace({
       setActiveAssistantId(assistantId);
       setGuardrail(null);
       setApiError(null);
+      setLoopState(null);
       setLastQuestion(trimmed);
       setInputValue("");
       setIsStreaming(true);
@@ -420,6 +436,7 @@ export default function ChatWorkspace({
 
         if (result.kind === "success") {
           setSessionId(result.sessionId);
+          setLoopState(result.loopState ?? null);
           updateAssistantEntry(assistantId, (entry) => ({
             ...entry,
             content: result.answer.summary,
@@ -429,6 +446,7 @@ export default function ChatWorkspace({
           }));
         } else if (result.kind === "guardrail") {
           removeEntryById(assistantId);
+          setLoopState(null);
           setGuardrail({
             message: result.message,
             traceId: result.traceId ?? null,
@@ -438,6 +456,7 @@ export default function ChatWorkspace({
         }
       } catch (error: unknown) {
         removeEntryById(assistantId);
+        setLoopState(null);
         if (error instanceof TheoApiError && error.status === 400) {
           const suggestions = buildFallbackSuggestions(trimmed);
           setGuardrail({
@@ -477,6 +496,68 @@ export default function ChatWorkspace({
       updateAssistantEntry,
     ],
   );
+
+  const sendLoopControl = useCallback(
+    async (action: LoopControlAction, stepId?: string | null) => {
+      if (!sessionId) {
+        return;
+      }
+      try {
+        const response = await clientRef.current.controlLoopState(
+          sessionId,
+          action,
+          stepId ?? null,
+        );
+        setLoopState(response.state);
+        if (action === "stop") {
+          setIsStreaming(false);
+          abortControllerRef.current?.abort();
+          abortControllerRef.current = null;
+          const targetAssistantId =
+            activeAssistantId ??
+            [...conversationRef.current]
+              .reverse()
+              .find((entry) => entry.role === "assistant")?.id ??
+            null;
+          if (response.partialAnswer && targetAssistantId) {
+            updateAssistantEntry(targetAssistantId, (entry) => ({
+              ...entry,
+              content: response.partialAnswer ?? entry.content,
+            }));
+          }
+          setActiveAssistantId(null);
+        }
+      } catch (error) {
+        const interpreted = interpretApiError(error, { feature: "chat" });
+        setApiError(interpreted);
+      }
+    },
+    [
+      sessionId,
+      setLoopState,
+      setIsStreaming,
+      activeAssistantId,
+      updateAssistantEntry,
+      setActiveAssistantId,
+      setApiError,
+  ],
+  );
+
+  const handleStopLoop = useCallback(() => {
+    void sendLoopControl("stop");
+  }, [sendLoopControl]);
+
+  const handlePauseToggle = useCallback(() => {
+    if (loopState?.status === "paused") {
+      void sendLoopControl("resume");
+    } else {
+      void sendLoopControl("pause");
+    }
+  }, [loopState?.status, sendLoopControl]);
+
+  const handleStepLoop = useCallback(() => {
+    void sendLoopControl("step");
+  }, [sendLoopControl]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -629,7 +710,8 @@ export default function ChatWorkspace({
       window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
     }
     setSessionId(null);
-  }, []);
+    setLoopState(null);
+  }, [setLoopState]);
 
   const handleUploadCta = useCallback(() => {
     router.push("/upload");
@@ -915,6 +997,15 @@ export default function ChatWorkspace({
           </div>
         )}
       </div>
+
+      <LoopControls
+        state={loopState}
+        disabled={!sessionId || isRestoring || !loopState}
+        isStreaming={isStreaming}
+        onStop={handleStopLoop}
+        onPauseToggle={handlePauseToggle}
+        onStep={handleStepLoop}
+      />
 
       <SessionControls
         disabled={!hasTranscript || isStreaming || isRestoring}
