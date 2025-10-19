@@ -31,18 +31,23 @@ class FileSourceFetcher(SourceFetcher):
 
     def fetch(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
         instrumentation: Instrumentation = context.instrumentation
-        raw_bytes = self.path.read_bytes()
-        sha256 = hashlib.sha256(raw_bytes).hexdigest()
+        raw_bytes = state.get("raw_bytes")
+        if raw_bytes is None:
+            raw_bytes = self.path.read_bytes()
+        sha256 = state.get("sha256")
+        if not sha256:
+            sha256 = hashlib.sha256(raw_bytes).hexdigest()
         merged_frontmatter = merge_metadata({}, load_frontmatter(self.frontmatter))
         source_type = detect_source_type(self.path, merged_frontmatter)
         instrumentation.set("ingest.source_type", source_type)
+        cache_status = state.get("cache_status", "n/a")
         return {
             "path": self.path,
             "raw_bytes": raw_bytes,
             "sha256": sha256,
             "source_type": source_type,
             "frontmatter": merged_frontmatter,
-            "cache_status": "n/a",
+            "cache_status": cache_status,
             "document_metadata": {
                 "sha256": sha256,
                 "source_type": source_type,

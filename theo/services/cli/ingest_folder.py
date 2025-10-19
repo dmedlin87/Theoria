@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Sequence, TYPE_CHECKING, cast
@@ -72,8 +73,16 @@ class IngestItem:
     @property
     def label(self) -> str:
         if self.path is not None:
-            return str(self.path)
+        return str(self.path)
         return str(self.url or "")
+
+
+@dataclass(frozen=True)
+class IngestResult:
+    """Outcome of ingesting a single item."""
+
+    document_id: str
+    cache_status: str = "miss"
 
 
 def _detect_source_type(path: Path) -> str:
@@ -328,12 +337,28 @@ def _ingest_batch_via_api(
     post_batch_steps: set[str] | None = None,
     *,
     dependencies: PipelineDependencies | None = None,
-) -> list[str]:
+    max_workers: int | None = None,
+    skip_unchanged_enrichment: bool = False,
+) -> list[IngestResult]:
     engine = get_engine()
     dependency_bundle = dependencies or PipelineDependencies(settings=get_settings())
-    document_ids: list[str] = []
-    with Session(engine) as session:
-        for item in batch:
+    settings = dependency_bundle.settings or get_settings()
+
+    def _resolve_worker_count(default: int) -> int:
+        if max_workers is not None:
+            return max(1, min(int(max_workers), default))
+        configured = getattr(settings, "ingest_max_workers", None)
+        if configured is not None:
+            return max(1, min(int(configured), default))
+        return default
+
+    max_plausible = max(1, len(batch))
+    worker_count = _resolve_worker_count(min(4, max_plausible))
+
+    results: list[IngestResult] = []
+
+    def _process_item(item: IngestItem) -> IngestResult:
+        with Session(engine) as session:
             frontmatter = dict(overrides)
             if item.is_remote:
                 document = run_pipeline_for_url(
@@ -349,11 +374,37 @@ def _ingest_batch_via_api(
                     cast(Path, item.path),
                     frontmatter,
                     dependencies=dependency_bundle,
+                    skip_enrichment_if_unchanged=skip_unchanged_enrichment,
                 )
-            document_ids.append(document.id)
-        if post_batch_steps:
-            _run_post_batch_operations(session, document_ids, post_batch_steps)
-    return document_ids
+            session.flush()
+            session.commit()
+            cache_status = getattr(document, "_ingest_cache_status", "miss")
+            return IngestResult(document_id=document.id, cache_status=cache_status)
+
+    if worker_count <= 1 or len(batch) == 1:
+        for item in batch:
+            results.append(_process_item(item))
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [
+                (item, executor.submit(_process_item, item))
+                for item in batch
+            ]
+            for item, future in futures:
+                results.append(future.result())
+
+    if post_batch_steps:
+        target_ids = [
+            result.document_id
+            for result in results
+            if not (skip_unchanged_enrichment and result.cache_status == "hit")
+        ]
+        if target_ids:
+            with Session(engine) as session:
+                _run_post_batch_operations(session, target_ids, post_batch_steps)
+                session.commit()
+
+    return results
 
 
 def _queue_batch_via_worker(
@@ -412,6 +463,17 @@ def _queue_batch_via_worker(
         "(options: summaries, tags, biblio)."
     ),
 )
+@click.option(
+    "--workers",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum number of local ingest workers to run in parallel.",
+)
+@click.option(
+    "--skip-unchanged-enrichment",
+    is_flag=True,
+    help="Reuse cached documents when their checksum matches and skip post-batch enrichment for them.",
+)
 def ingest_folder(
     source: str,
     *,
@@ -420,6 +482,8 @@ def ingest_folder(
     dry_run: bool,
     metadata_overrides: tuple[str, ...],
     post_batch_steps: tuple[str, ...],
+    workers: int | None,
+    skip_unchanged_enrichment: bool,
 ) -> None:
     """Queue every supported source (path or URL) for ingestion."""
 
@@ -473,18 +537,35 @@ def ingest_folder(
             continue
 
         if mode.lower() == "api":
-            document_ids = _ingest_batch_via_api(
-                batch, overrides, normalized_post_batch
+            results = _ingest_batch_via_api(
+                batch,
+                overrides,
+                normalized_post_batch,
+                dependencies=PipelineDependencies(settings=get_settings()),
+                max_workers=workers,
+                skip_unchanged_enrichment=skip_unchanged_enrichment,
             )
-            for item, doc_id in zip(batch, document_ids):
-                click.echo(f"   Processed {item.label} → document {doc_id}")
+            for item, outcome in zip(batch, results):
+                if outcome.cache_status == "hit":
+                    click.echo(
+                        f"   Reused {item.label} → document {outcome.document_id} (cache hit)"
+                    )
+                elif outcome.cache_status == "hit-refresh":
+                    click.echo(
+                        f"   Refreshed {item.label} → document {outcome.document_id}"
+                    )
+                else:
+                    click.echo(
+                        f"   Processed {item.label} → document {outcome.document_id}"
+                    )
                 log_workflow_event(
                     "cli.ingest.processed",
                     workflow="cli.ingest_folder",
                     source=source,
                     backend="api",
                     target=item.label,
-                    document_id=doc_id,
+                    document_id=outcome.document_id,
+                    cache_status=outcome.cache_status,
                 )
         else:
             if normalized_post_batch:

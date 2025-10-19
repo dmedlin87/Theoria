@@ -309,18 +309,20 @@ class IngestionService:
                     continue
 
                 if mode == "api":
-                    document_ids = cli_module._ingest_batch_via_api(
+                    outcomes = cli_module._ingest_batch_via_api(
                         batch,
                         overrides,
                         post_batch_steps,
                         dependencies=PipelineDependencies(settings=self.settings),
+                        skip_unchanged_enrichment=payload.skip_unchanged_enrichment,
                     )
-                    for item, doc_id in zip(batch, document_ids):
+                    for item, outcome in zip(batch, outcomes):
                         processed += 1
                         yield {
                             "event": "processed",
                             "target": item.label,
-                            "document_id": doc_id,
+                            "document_id": outcome.document_id,
+                            "cache_status": outcome.cache_status,
                         }
                 else:
                     if post_batch_steps:

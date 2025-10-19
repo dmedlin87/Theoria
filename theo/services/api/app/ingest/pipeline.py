@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.request import build_opener as _urllib_build_opener
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.graph import GraphProjector, NullGraphProjector
@@ -207,12 +209,13 @@ def _orchestrate(
     stages: Iterable[SourceFetcher | Parser | Enricher | Persister],
     workflow: str,
     workflow_kwargs: dict[str, Any],
+    initial_state: dict[str, Any] | None = None,
 ) -> Document:
     pipeline_dependencies = dependencies or PipelineDependencies()
     with instrument_workflow(workflow, **workflow_kwargs) as span:
         context = pipeline_dependencies.build_context(span=span)
         orchestrator = _default_orchestrator(stages)
-        result = orchestrator.run(context=context)
+        result = orchestrator.run(context=context, initial_state=initial_state)
         document = _ensure_success(result)
         return document
 
@@ -274,53 +277,57 @@ def run_pipeline_for_file(
     frontmatter: dict[str, Any] | None = None,
     *,
     dependencies: PipelineDependencies | None = None,
+    skip_enrichment_if_unchanged: bool = False,
 ) -> Document:
     """Execute the file ingestion pipeline synchronously."""
 
+    try:
+        raw_bytes = path.read_bytes()
+    except FileNotFoundError as exc:
+        raise UnsupportedSourceError(f"Source file not found: {path}") from exc
+
+    sha256 = hashlib.sha256(raw_bytes).hexdigest()
     frontmatter_payload = merge_metadata({}, load_frontmatter(frontmatter))
+    existing_document = session.execute(
+        select(Document).where(Document.sha256 == sha256)
+    ).scalar_one_or_none()
+
     stages = [
         FileSourceFetcher(path=path, frontmatter=frontmatter_payload),
         FileParser(),
         DocumentEnricher(default_title_factory=_file_title_default),
         TextDocumentPersister(session=session),
     ]
-    return _orchestrate(
-        session=session,
-        dependencies=dependencies,
-        stages=stages,
-        workflow="ingest.file",
-        workflow_kwargs={"source_path": str(path), "source_name": path.name},
-    )
-    settings, persistence_dependencies = _resolve_context(dependencies)
+    pipeline_dependencies = dependencies or PipelineDependencies()
+    initial_state: dict[str, Any] = {
+        "raw_bytes": raw_bytes,
+        "sha256": sha256,
+        "cache_status": "miss",
+    }
+
     with instrument_workflow(
         "ingest.file", source_path=str(path), source_name=path.name
     ) as span:
-        try:
-            raw_bytes, read_meta = resilient_operation(
-                path.read_bytes,
-                key=f"ingest:file:read:{path.suffix or 'bin'}",
-                classification="file",
-                policy=ResiliencePolicy(max_attempts=2),
-            )
-        except ResilienceError as exc:
-            set_span_attribute(span, "resilience.file_read.category", exc.metadata.category)
-            set_span_attribute(span, "resilience.file_read.attempts", exc.metadata.attempts)
-            raise
-        else:
-            set_span_attribute(span, "resilience.file_read.attempts", read_meta.attempts)
-            set_span_attribute(span, "resilience.file_read.duration", read_meta.duration)
-        merged_frontmatter = merge_metadata(
-            {}, load_frontmatter(frontmatter)
-        )
-        source_type = detect_source_type(path, merged_frontmatter)
-        set_span_attribute(span, "ingest.source_type", source_type)
+        context = pipeline_dependencies.build_context(span=span)
+        instrumentation = context.instrumentation
+        instrumentation.set("ingest.sha256", sha256)
 
-        parser_result, merged_frontmatter, text_content = _prepare_parser_result(
-            source_type,
-            path,
-            frontmatter=merged_frontmatter,
-            settings=settings,
-        )
+        cache_status = "miss"
+        if existing_document is not None:
+            instrumentation.set("ingest.document_id", existing_document.id)
+            if skip_enrichment_if_unchanged:
+                instrumentation.set("ingest.cache_status", "hit")
+                setattr(existing_document, "_ingest_cache_status", "hit")
+                return existing_document
+            cache_status = "hit-refresh"
+        instrumentation.set("ingest.cache_status", cache_status)
+        initial_state["cache_status"] = cache_status
+
+        orchestrator = _default_orchestrator(stages)
+        result = orchestrator.run(context=context, initial_state=initial_state)
+        document = _ensure_success(result)
+        setattr(document, "_ingest_cache_status", cache_status)
+        return document
 
 
 def _url_title_default(state: dict[str, Any]) -> str:

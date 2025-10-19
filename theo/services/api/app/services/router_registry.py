@@ -9,7 +9,7 @@ from ..routes import (
     analytics,
     dashboard,
     creators,
-    discoveries,
+    discoveries_v1,
     documents,
     export,
     features,
@@ -34,9 +34,10 @@ _DEFAULT_REGISTRATIONS = (
     RouterRegistration(router=export.api_router, prefix=None, tags=("export",)),
     RouterRegistration(router=verses.router, prefix="/verses", tags=("verses",)),
     RouterRegistration(
-        router=discoveries.router,
-        prefix="/discoveries",
+        router=discoveries_v1.router,
+        prefix=None,
         tags=("discoveries",),
+        requires_security=False,
     ),
     RouterRegistration(
         router=documents.router,

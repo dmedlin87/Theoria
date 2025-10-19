@@ -39,6 +39,9 @@ class TextDocumentPersister(Persister):
 
         frontmatter = dict(state.get("frontmatter") or {})
         metadata = dict(state.get("document_metadata") or {})
+        parser_sha = state.get("parser_sha256")
+        if parser_sha and "parser_sha256" not in metadata:
+            metadata["parser_sha256"] = parser_sha
         sha256 = state.get("sha256") or metadata.get("sha256")
         if not sha256:
             raise ValueError("sha256 missing from orchestration state")
@@ -87,6 +90,9 @@ class TranscriptDocumentPersister(Persister):
 
         frontmatter = dict(state.get("frontmatter") or {})
         metadata = dict(state.get("document_metadata") or {})
+        parser_sha = state.get("parser_sha256")
+        if parser_sha and "parser_sha256" not in metadata:
+            metadata["parser_sha256"] = parser_sha
         sha256 = state.get("sha256") or metadata.get("sha256")
         if not sha256:
             raise ValueError("sha256 missing from orchestration state")

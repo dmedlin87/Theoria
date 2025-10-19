@@ -1,27 +1,71 @@
 name: Rebuild & Refresh Corpus
 description: Re-run ingestion/vector pipelines and restart API when parser/ingest code changes.
 
+concurrency:
+  group: rebuild-corpus-${{ github.ref }}
+  cancel-in-progress: false
+
 on:
   push:
+    branches:
+      - main
     paths:
       - "theo/services/ingest/**"
       - "theo/services/parser/**"
   manual: true
+  workflow_dispatch: {}
 
 steps:
   - name: Unit tests (fast)
+    id: tests
     run: poetry run pytest theo/services/ingest theo/services/parser --maxfail=1 --disable-warnings -q
 
   - name: Rebuild embeddings
+    id: rebuild
     run: poetry run python theo/cli.py rebuild_embeddings --fast --no-cache
 
   - name: Restart API server
+    if: ${{ success() }}
     run: |
       echo "Restarting dev server..."
       task stop_api || true
       task start_api
 
+  - name: Notify Slack
+    if: always()
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+      JOB_STATUS: ${{ job.status }}
+      TEST_STATUS: ${{ steps.tests.outcome }}
+      REBUILD_STATUS: ${{ steps.rebuild.outcome }}
+    run: |
+      set -euo pipefail
+      payload=$(python - <<'PYCODE'
+import json
+import os
+status = os.environ.get("JOB_STATUS", "unknown")
+tests = os.environ.get("TEST_STATUS", "unknown")
+rebuild = os.environ.get("REBUILD_STATUS", "unknown")
+message = {
+    "text": (
+        f"Rebuild & Refresh Corpus workflow finished with status: {status.upper()}.\n"
+        f"• Unit tests: {tests.upper()}\n"
+        f"• Embedding rebuild: {rebuild.upper()}"
+    )
+}
+print(json.dumps(message))
+PYCODE
+)
+      if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+        curl -X POST -H "Content-Type: application/json" -d "$payload" "$SLACK_WEBHOOK_URL"
+      fi
+      if [ -n "${TEAMS_WEBHOOK_URL:-}" ]; then
+        curl -X POST -H "Content-Type: application/json" -d "$payload" "$TEAMS_WEBHOOK_URL"
+      fi
+
   - name: Summarize run
+    if: always()
     assistant: |
       1) Summarize key code changes in ingest/parser from the latest commit(s).
       2) Capture test summary (pass/fail count) and any errors.

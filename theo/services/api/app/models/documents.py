@@ -51,6 +51,10 @@ class SimpleIngestRequest(APIModel):
     metadata: dict[str, Any] | None = None
     post_batch: list[str] | None = None
     dry_run: bool = False
+    skip_unchanged_enrichment: bool = Field(
+        default=False,
+        description="Reuse cached documents when available instead of re-running enrichment.",
+    )
 
     @field_validator("sources", mode="before")
     @classmethod

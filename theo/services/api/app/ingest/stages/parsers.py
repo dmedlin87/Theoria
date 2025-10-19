@@ -83,10 +83,13 @@ class FileParser(Parser):
                 f"Unable to parse source type {source_type}"
             )
 
+        parser_fingerprint = _hash_parser_result(parser_result)
+
         return {
             "parser_result": parser_result,
             "frontmatter": frontmatter,
             "text_content": text_content,
+            "parser_sha256": parser_fingerprint,
         }
 
 
