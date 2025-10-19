@@ -52,6 +52,12 @@ from theo.services.api.app.models.ai import (
     ResearchLoopState,
     ResearchLoopStatus,
 )
+from theo.services.api.app.models.research_plan import (
+    ResearchPlan,
+    ResearchPlanReorderRequest,
+    ResearchPlanStepSkipRequest,
+    ResearchPlanStepUpdateRequest,
+)
 from .guardrails import extract_refusal_text, guardrail_http_exception
 from .utils import has_filters
 

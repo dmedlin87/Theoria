@@ -248,6 +248,7 @@ class ChatSessionResponse(APIModel):
     answer: RAGAnswer
     intent_tags: list[IntentTagPayload] | None = None
     loop_state: ResearchLoopState | None = None
+    plan: "ResearchPlan | None" = None
 
 
 class ChatSessionState(APIModel):
@@ -262,6 +263,7 @@ class ChatSessionState(APIModel):
     updated_at: datetime
     last_interaction_at: datetime
     loop_state: ResearchLoopState | None = None
+    plan: "ResearchPlan | None" = None
 
 
 class GuardrailProfile(APIModel):
