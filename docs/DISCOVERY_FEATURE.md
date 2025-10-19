@@ -55,20 +55,18 @@ theo/services/web/app/api/discoveries/
     └── feedback/route.ts            # POST /api/discoveries/:id/feedback
 ```
 
-### Backend (FastAPI) - To Be Implemented
+### Backend (FastAPI)
 
 ```python
-theo/services/api/app/routers/discoveries.py
-theo/domain/discoveries/
-├── engine.py           # Discovery analysis engine
-├── detectors/
-│   ├── pattern.py      # Pattern detection
-│   ├── contradiction.py # Contradiction detection
-│   ├── gap.py          # Gap analysis
-│   ├── connection.py   # Connection finding
-│   ├── trend.py        # Trend tracking
-│   └── anomaly.py      # Anomaly detection
-└── models.py           # SQLAlchemy models
+theo/services/api/app/routes/discoveries_v1.py         # HTTP surface for discovery feed
+theo/services/api/app/discoveries/service.py           # Orchestrates six discovery engines
+theo/domain/discoveries/pattern_engine.py
+theo/domain/discoveries/contradiction_engine.py
+theo/domain/discoveries/gap_engine.py
+theo/domain/discoveries/connection_engine.py
+theo/domain/discoveries/trend_engine.py
+theo/domain/discoveries/anomaly_engine.py
+theo/adapters/persistence/discovery_repository.py      # Persists discoveries for the feed
 ```
 
 ---
@@ -623,18 +621,20 @@ Track these metrics:
 
 The Discovery Feed transforms Theoria into a **proactive research assistant** that:
 
-✨ Surfaces insights you wouldn't find manually  
-🔄 Connects disparate parts of your corpus  
-📊 Identifies gaps and growth areas  
-⚡ Works in the background while you research  
-🎯 Learns your preferences over time  
+- Surfaces insights you would not find manually  
+- Connects disparate parts of your corpus  
+- Identifies gaps and growth areas  
+- Works in the background while you research  
+- Learns your preferences over time  
 
-**Next Steps:**
-1. ✅ Frontend complete - test in browser
-2. ⏳ Implement FastAPI backend endpoints
-3. ⏳ Build discovery analysis engine
-4. ⏳ Integrate ML models for pattern detection
-5. ⏳ Add background job scheduling
-6. ⏳ Deploy and monitor
+**Next Enhancements:**
+1. Instrument discovery scoring and confidence calibration
+2. Expand user feedback weighting and suppression logic
+3. Ship notification and digest surfaces for new discoveries
+4. Personalize feed ordering based on research focus areas
+5. Harden scheduler monitoring and alerting
 
-Let's make research discovery effortless! 🚀
+Let's make research discovery effortless!
+
+## Known Limitations & Bugs
+- Track active discovery issues in `docs/status/KnownBugs.md` (filter by discovery-related IDs). Update this section with references as new bugs are logged.

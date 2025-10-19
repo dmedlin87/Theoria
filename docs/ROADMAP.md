@@ -1,17 +1,17 @@
 # Roadmap
 
-> **Source of truth:** `HANDOFF_NEXT_PHASE.md` (last updated 2025-01-15)
+> **Source of truth:** `HANDOFF_NEXT_PHASE.md` (last updated 2025-10-19)
 
 This document summarizes the active roadmap derived from the handoff plan. Use it as a quick reference; consult `HANDOFF_NEXT_PHASE.md` for full implementation details and task breakdowns.
 
 ## Current Status
 
 - **Discovery Engine**
-  - Pattern detection ✅
-  - Contradiction detection ✅ (DeBERTa-based engine)
-  - Gap analysis ✅ (BERTopic integration with theological topic seed data)
-  - Connection, trend, anomaly detection ✅ (wired into `DiscoveryService.refresh_user_discoveries`)
-  - Background scheduler ✅ (APScheduler refresh every 30 minutes)
+  - Pattern detection (complete)
+  - Contradiction detection (complete, DeBERTa-based engine)
+  - Gap analysis (complete with BERTopic integration and theological topic seed data)
+  - Connection, trend, anomaly detection (complete and wired into `DiscoveryService.refresh_user_discoveries`)
+  - Background scheduler (APScheduler refresh every 30 minutes)
 - **Agent Reasoning UI** Reasoning trace, fallacy warnings, and the new timeline panel are live in chat workflows
 - **Personalized Dashboard** Dashboard API (`dashboard.py`) and web components consume real metrics and activity data
 - **Citation Manager** Bibliography builder and Zotero export available; multi-format exports tracked as follow-up work
@@ -46,3 +46,5 @@ This document summarizes the active roadmap derived from the handoff plan. Use i
 
 - Keep this summary aligned with `HANDOFF_NEXT_PHASE.md` after each milestone.
 - Update `docs/DISCOVERY_FEATURE.md` as new engines ship to reflect backend progress.
+- Record review dates in `docs/status/FEATURE_INDEX.md` whenever this roadmap changes.
+- Log any roadmap-impacting bugs in `docs/status/KnownBugs.md` and reference them here if applicable.

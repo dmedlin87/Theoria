@@ -70,6 +70,9 @@ jobs:
       - name: Run mypy
         run: mypy --config-file mypy.ini
 
+      - name: Verify documentation governance
+        run: python scripts/check_docs_governance.py
+
       - name: Run ESLint and TypeScript checks
         working-directory: theo/services/web
         run: npm run lint

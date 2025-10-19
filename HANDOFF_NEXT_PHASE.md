@@ -1,7 +1,7 @@
 # Theoria - Next Phase Development Plan
 
 > **Status:** Cognitive Scholar MVP execution underway  
-> **Last Updated:** 2025-10-18  
+> **Last Updated:** 2025-10-19  
 > **Estimated Timeline:** 4-6 weeks (CS-002 -> CS-016)
 
 ---
@@ -11,12 +11,12 @@
 Discovery, reasoning, dashboard, and citation foundations are live. The next phase focuses on shipping the Cognitive Scholar MVP: **loop controls**, **live plan editing**, **argument mapping with truth maintenance**, **hypothesis workflows**, and **gap->loop automation**.
 
 ### Current State
-- ✅ Frontend UI supports reasoning timeline, reasoning trace, and fallacy warnings in chat
-- ✅ RAG workflow stable with guardrails, exports, and monitoring hooks
-- ✅ Discovery backend runs six engines (pattern, contradiction, gap, connection, trend, anomaly) on the APScheduler refresh cadence
-- ✅ Dashboard route (`dashboard.py`) and UI components surface real metrics and activity
-- ✅ Bibliography builder plus Zotero export cover end-to-end citation workflows
-- ✅ Documentation refreshed via CS-001 handoff and task tracker updates
+- Complete: frontend UI supports reasoning timeline, reasoning trace, and fallacy warnings in chat
+- Complete: RAG workflow stable with guardrails, exports, and monitoring hooks
+- Complete: discovery backend runs six engines (pattern, contradiction, gap, connection, trend, anomaly) on the APScheduler refresh cadence
+- Complete: dashboard route (`dashboard.py`) and UI components surface real metrics and activity
+- Complete: bibliography builder plus Zotero export cover end-to-end citation workflows
+- Complete: documentation refreshed via CS-001 handoff and task tracker updates
 
 ### What's Next
 1. **CS-002 to CS-004:** Deliver loop controls, live plan panel, and argument link schema
@@ -117,11 +117,13 @@ pytest tests/api/test_citation_exports.py -v           # bibliography + Zotero
 
 ## Quick Reference
 
-- `theo/services/api/app/models/reasoning.py` – timeline + control DTOs
-- `theo/services/api/app/routes/ai/workflows/chat.py` – workflow payload updates
-- `theo/services/web/app/components/ReasoningTimeline.tsx` – chat reasoning UI
-- `docs/tasks/TASK_005_Cognitive_Scholar_MVP_Tickets.md` – ticket breakdown (CS-001 → CS-016)
-- `COGNITIVE_SCHOLAR_HANDOFF.md` – active handoff context and status ledger
+- `theo/services/api/app/models/reasoning.py` - timeline + control DTOs
+- `theo/services/api/app/routes/ai/workflows/chat.py` - workflow payload updates
+- `theo/services/web/app/components/ReasoningTimeline.tsx` - chat reasoning UI
+- `docs/tasks/TASK_005_Cognitive_Scholar_MVP_Tickets.md` - ticket breakdown (CS-001 -> CS-016)
+- `COGNITIVE_SCHOLAR_HANDOFF.md` - active handoff context and status ledger
+- `docs/status/FEATURE_INDEX.md` - documentation ownership index
+- `docs/status/KnownBugs.md` - live bug ledger
 
 ---
 
@@ -135,4 +137,7 @@ pytest tests/api/test_citation_exports.py -v           # bibliography + Zotero
 ---
 
 **Ready to ship the Cognitive Scholar MVP!**
+
+## Known Limitations & Bugs
+- Track open issues in `docs/status/KnownBugs.md`; reference IDs here when applicable. Currently no active blockers recorded.
 4. **CS-014 to CS-016:** Integrate gap discoveries into reasoning loops with falsifier searches and retrieval budgeting

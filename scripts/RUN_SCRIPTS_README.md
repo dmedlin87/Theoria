@@ -19,6 +19,21 @@ cd C:\Users\dmedl\Projects\Theoria
 .\scripts\run.ps1 -Mode full
 ```
 
+---
+
+## 📚 Documentation Governance
+
+Run the governance check script locally or in CI to ensure docs stay in sync:
+
+```bash
+python scripts/check_docs_governance.py
+```
+
+This verifies that:
+
+- All canonical docs in `docs/status/FEATURE_INDEX.md` exist and use approved status tags.
+- The bug ledger (`docs/status/KnownBugs.md`) only references existing documentation.
+
 ### Linux/macOS (Bash)
 
 ```bash
