@@ -17,6 +17,7 @@ from theo.services.api.app.ai.reasoning.metacognition import (
     Critique,
     MAX_CITATIONS_IN_PROMPT,
     _detect_bias,
+    _extract_alternative_interpretations,
     _identify_weak_citations,
     _select_revision_citations,
     critique_reasoning,
@@ -392,6 +393,40 @@ class TestMetacognitionHeuristics:
         warnings = _detect_bias(trace, answer)
 
         assert any("apologetic" in warning for warning in warnings)
+
+    def test_extract_alternative_interpretations_detects_common_markers(self):
+        """The extractor should pick up inline alternatives from common phrasing."""
+
+        reasoning = (
+            "- Alternative interpretation: that the covenant refers to oral law.\n"
+            "Some scholars interpret the works of the law as ethnic boundary markers, while others see it as moral effort.\n"
+            "Critics argue it signals hypocrisy, but others contend it's rhetorical."
+        )
+        answer = (
+            "Alternatively, it could highlight covenant membership. "
+            "Another interpretation is that it emphasises humility in practice."
+        )
+
+        interpretations = _extract_alternative_interpretations(reasoning, answer)
+
+        assert "the covenant refers to oral law" in interpretations
+        assert "the works of the law as ethnic boundary markers" in interpretations
+        assert "highlight covenant membership" in interpretations
+        assert "signals hypocrisy" in interpretations
+        assert any("rhetorical" in item for item in interpretations)
+
+    def test_extract_alternative_interpretations_deduplicates_clauses(self):
+        """Repeated alternative phrasings should collapse into one entry."""
+
+        reasoning = (
+            "Some scholars interpret the promise as symbolic fulfillment.\n"
+            "Alternatively, it might point to covenant loyalty.\n"
+            "Some scholars interpret the promise as symbolic fulfillment."
+        )
+        interpretations = _extract_alternative_interpretations(reasoning, "")
+
+        assert interpretations.count("the promise as symbolic fulfillment") == 1
+        assert "point to covenant loyalty" in interpretations
 
     def test_revision_prompt_prioritises_referenced_and_weak_citations(self):
         """Selected citations should include weak and referenced indices within limit."""
