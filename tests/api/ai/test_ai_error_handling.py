@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import pytest
 
 from theo.services.api.app.ai.rag import workflow
 from theo.services.api.app.ai.rag.guardrail_helpers import GuardrailError
 from theo.services.api.app.ai.rag.models import RAGAnswer
-from theo.services.api.app.models.search import HybridSearchResult
+from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchResult
 
 
 def _result(*, identifier: str, osis: str | None) -> HybridSearchResult:
@@ -109,4 +111,30 @@ def test_guarded_answer_or_refusal_reraises_non_safe_error(monkeypatch: pytest.M
         )
 
     assert exc.value is error
+
+
+def test_sermon_prep_guardrail_error_includes_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    @contextmanager
+    def _fake_instrument(*args, **kwargs):
+        yield None
+
+    monkeypatch.setattr(workflow, "instrument_workflow", _fake_instrument)
+    monkeypatch.setattr(workflow, "search_passages", lambda *args, **kwargs: [])
+    monkeypatch.setattr(workflow, "log_workflow_event", lambda *args, **kwargs: None)
+
+    filters = HybridSearchFilters(collection="lectionary")
+
+    with pytest.raises(GuardrailError) as exc:
+        workflow.generate_sermon_prep_outline(
+            object(),
+            topic="Advent hope",
+            filters=filters,
+        )
+
+    error = exc.value
+    assert error.safe_refusal is True
+    assert error.metadata.get("code") == "sermon_prep_insufficient_context"
+    assert error.metadata.get("guardrail") == "retrieval"
+    assert error.metadata.get("suggested_action") == "search"
+    assert error.metadata.get("filters") == filters.model_dump(exclude_none=True)
 
