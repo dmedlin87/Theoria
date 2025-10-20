@@ -125,6 +125,18 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 - Hash or redact sensitive KB content when storing snippets.
 - Maintain audit logs for regulatory compliance (timestamps, actors, decisions).
 
+### 9.1 External Verification Domain Controls
+- **Whitelisted domains & auth requirements:**
+  - `pubmed.ncbi.nlm.nih.gov` (NCBI E-utilities) – supports optional API keys tied to personal NCBI accounts. Keys raise the rate limit from 3 req/s to 10 req/s per IP; we will provision a service account key stored in the central secret manager.
+  - `export.arxiv.org` (arXiv API) – unauthenticated Atom/OAI-PMH feeds. Requires descriptive `User-Agent` headers and adherence to the published 3 requests per second ceiling; no keys are issued.
+  - `aclanthology.org` – static dataset/API without authentication. Requests must follow robots/crawl-delay guidance; responses should be cached to avoid burst load.
+- **Credential storage & rotation:** Retrieve API keys from the managed Vault/Azure Key Vault store noted in `SECURITY.md`, and continue enforcing repository hygiene via the Trufflehog baseline in [`docs/security/secret-scanning.md`](security/secret-scanning.md). Keys rotate every 90 days; rotation updates the vaulted secret, triggers configuration reloads, and refreshes CI secret mirrors.
+- **Monitoring & alerting:**
+  - Emit connector-specific metrics (`requests_total`, `error_rate`, `quota_remaining`) tagged by domain to the observability stack.
+  - Ship structured audit logs recording key ID fingerprints (not raw secrets), response status, and throttling events for correlation with nightly audit reports.
+  - Add heartbeat probes that validate key presence and domain reachability; alert operations if a key is missing or rate-limited.
+- **Key handling in code:** Inject credentials via runtime configuration (`Settings` objects) and never persist to disk. The connectors will fetch the vaulted value at startup and refresh from cache when rotation webhooks fire.
+
 ## 10. Implementation Roadmap
 1. **Phase 0 – Foundations (1-2 weeks)**
    - Implement Claim Extraction service and Claim Card schema.
@@ -140,10 +152,14 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 5. **Phase 4 – Refinement & Automation (ongoing)**
    - Tune thresholds, add domain-specific rules, integrate model monitoring.
 
-## 11. Open Questions
+## 11. Open Questions & Follow-Ups
 - Which storage backend best fits Claim Cards (PostgreSQL vs document store)?
 - What is the acceptable latency overhead for Audit-Web responses?
-- How will we authenticate and monitor external search APIs?
+- **External search API access:** Adopt the strategy in §9.1 – PubMed via vaulted API key, arXiv/ACL Anthology via unsigned requests with throttling + caching – monitored through connector metrics and audit logs.
+  - *Implementation follow-ups (`theo/services/api/app/ai/`):*
+    - Add configuration bindings for `PUBMED_API_KEY`, per-domain rate limiters, and circuit breaker hooks.
+    - Instrument connectors with Prometheus counters/histograms (`requests_total`, `errors_total`, `latency_seconds`) and structured logging of key fingerprints.
+    - Implement rotation callbacks that reload vaulted secrets without service restarts and confirm fresh keys via smoke tests.
 - What human escalation paths are required for regulatory compliance in specific jurisdictions?
 
 ## 12. Success Metrics
