@@ -39,16 +39,18 @@ def dispose_sqlite_engine(
     url = getattr(engine, "url", None)
     database_name = getattr(url, "database", None)
     url_string = str(url) if url is not None else ""
-    if not database_name or database_name == ":memory:" or "mode=memory" in url_string:
-        return
     if dispose_engine:
         try:
             if dispose_callable is not None:
                 dispose_callable()
+            elif not database_name or database_name == ":memory:" or "mode=memory" in url_string:
+                return
             else:
                 engine.dispose()
         except Exception:  # pragma: no cover - defensive release guard
             return
+    if not database_name or database_name == ":memory:" or "mode=memory" in url_string:
+        return
     try:
         import sqlite3  # pragma: no cover - optional inspection for stray connections
         import inspect
