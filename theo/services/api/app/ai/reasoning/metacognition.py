@@ -571,7 +571,7 @@ def _normalise_interpretation_text(text: str) -> str:
     if not cleaned:
         return ""
 
-    cleaned = re.sub(r"^it['’]s\s+", "is ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^it['’']s\s+", "is ", cleaned, flags=re.IGNORECASE)
     # Remove leading commas or conjunctions introduced by regex captures
     cleaned = re.sub(r"^,\s*", "", cleaned)
     cleaned = re.sub(r"^(that|it|this)\s+", "", cleaned, count=1, flags=re.IGNORECASE)
