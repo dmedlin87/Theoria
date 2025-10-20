@@ -1042,9 +1042,16 @@ def generate_sermon_prep_outline(
         # Validate sufficient sources are available
         if not results:
             raise GuardrailError(
-                message="Insufficient biblical sources found for this topic. Try broadening your search or adjusting filters.",
-                category="insufficient_context",
-                severity="error",
+                "Insufficient biblical sources found for this topic. Try broadening your search or adjusting filters.",
+                safe_refusal=True,
+                metadata={
+                    "code": "sermon_prep_insufficient_context",
+                    "guardrail": "retrieval",
+                    "category": "insufficient_context",
+                    "severity": "error",
+                    "suggested_action": "search",
+                    "filters": filters.model_dump(exclude_none=True),
+                },
             )
 
         registry = get_llm_registry(session)
