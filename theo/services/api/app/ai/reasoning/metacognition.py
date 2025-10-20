@@ -490,7 +490,7 @@ def _extract_alternative_interpretations(reasoning_trace: str, answer: str) -> l
         if not cleaned_line:
             continue
 
-        stripped = cleaned_line.lstrip("-•").strip()
+        stripped = _strip_list_prefix(cleaned_line)
         lowered = stripped.lower()
 
         if "alternative interpretation" in lowered:
@@ -532,6 +532,10 @@ def _extract_alternative_interpretations(reasoning_trace: str, answer: str) -> l
             r"\banother possibility is\s+(?P<clause>[^.?!\n]+)",
             re.IGNORECASE,
         ),
+        re.compile(
+            r"\ba different interpretation is\s+(?P<clause>[^.?!\n]+)",
+            re.IGNORECASE,
+        ),
     ]
 
     for pattern in inline_patterns:
@@ -540,6 +544,18 @@ def _extract_alternative_interpretations(reasoning_trace: str, answer: str) -> l
             _add_candidate(clause)
 
     return interpretations
+
+
+def _strip_list_prefix(text: str) -> str:
+    """Remove common bullet/number prefixes from a line."""
+
+    stripped = text.lstrip()
+    stripped = re.sub(r"^[\-\u2022\*\+]+\s*", "", stripped)
+    stripped = re.sub(r"^\(?\d{1,2}\)?[.)-]\s*", "", stripped)
+    stripped = re.sub(r"^\([a-zA-Z0-9]+\)\s*", "", stripped)
+    stripped = re.sub(r"^\d{1,2}\s+", "", stripped)
+    stripped = re.sub(r"^\(?[a-zA-Z]\)?[.)-]\s*", "", stripped)
+    return stripped.strip()
 
 
 def _normalise_interpretation_text(text: str) -> str:
