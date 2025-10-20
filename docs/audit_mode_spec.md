@@ -159,7 +159,7 @@ Following consultation with compliance stakeholders, the audit subsystem feeds u
    - Audit Operations Engineer syncs resolved status back into the audit store, updates Claim Card labels, and ensures reporting dashboards reflect SLA performance.
    - Weekly compliance review notes captured per runbook guidance; severity-1 incidents trigger postmortems within 3 business days.
 
-Escalation metrics (volume, SLA adherence, outstanding actions) appear in the reporting layer dashboards described in §7, enabling compliance leadership to monitor queue health and intervene proactively.
+Escalation metrics (volume, SLA adherence, outstanding actions) appear in the reporting layer dashboards described in §§7–8, enabling compliance leadership to monitor queue health and intervene proactively.
 
 ## 12. Success Metrics
 - ≥90% of audited claims labeled `SUPPORTED` without human intervention.
