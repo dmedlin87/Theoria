@@ -81,6 +81,13 @@ def serialise_citations(citations: Sequence[Any] | None) -> list[Any]:
     return payload if isinstance(payload, list) else []
 
 
+def serialise_claim_cards(claim_cards: Sequence[Any] | None) -> list[Any]:
+    if not claim_cards:
+        return []
+    payload = _serialise_payload(list(claim_cards))
+    return payload if isinstance(payload, list) else []
+
+
 class AuditLogWriter:
     """Persist audit log entries without impacting the caller transaction."""
 
@@ -116,6 +123,8 @@ class AuditLogWriter:
         inputs: Mapping[str, Any] | Sequence[Any] | None,
         outputs: Mapping[str, Any] | Sequence[Any] | None = None,
         citations: Sequence[Any] | None = None,
+        claim_cards: Sequence[Any] | None = None,
+        audit_metadata: Mapping[str, Any] | Sequence[Any] | None = None,
         status: str = "generated",
     ) -> None:
         if self._session_factory is None:
@@ -128,6 +137,10 @@ class AuditLogWriter:
             inputs=_serialise_payload(inputs or {}),
             outputs=_serialise_payload(outputs) if outputs is not None else None,
             citations=serialise_citations(citations),
+            claim_cards=serialise_claim_cards(claim_cards),
+            audit_metadata=_serialise_payload(audit_metadata)
+            if audit_metadata is not None
+            else None,
         )
         session = self._session_factory()
         try:
@@ -192,4 +205,5 @@ __all__ = [
     "fetch_recent_audit_logs",
     "purge_audit_logs",
     "serialise_citations",
+    "serialise_claim_cards",
 ]
