@@ -110,7 +110,7 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 ## 7. Integration Points
 - **Retrieval Service**: Extend API to support claim-focused queries and freshness filters.
 - **Generation Orchestrator**: Add mode toggle (Normal vs Audit-Local vs Audit-Web) and attach verification loop results to responses.
-- **Audit Store**: New persistence layer (document DB or relational tables) for Claim Cards and audit reports.
+- **Audit Store**: Extend the existing PostgreSQL persistence layer with dedicated schemas/tables for Claim Cards and audit reports, leaning on JSONB columns for flexible metrics payloads while preserving relational joins for lineage, access control, and batch analytics.
 - **Reporting Layer**: Dashboard widgets for trust scores, claim statuses, and nightly audit summaries.
 - **External Search Connector**: Service wrapper for controlled web search with domain allow-listing and caching.
 
@@ -141,7 +141,8 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
    - Tune thresholds, add domain-specific rules, integrate model monitoring.
 
 ## 11. Open Questions
-- Which storage backend best fits Claim Cards (PostgreSQL vs document store)?
+- **Storage backend decision (resolved)**: We will persist Claim Cards and audit telemetry in PostgreSQL alongside the existing Theo schemas. The audit workload requires transactional writes across answers, claims, evidence slices, and escalation events, along with referential integrity to user/session data in `theo/services/api/app/db/`. PostgreSQL already underpins that stack via SQLAlchemy, supports JSONB/ARRAY/TSVector columns that match the semi-structured metrics in §6, and powers the nightly rollups/reporting queries described in §7. Standing up a document store would duplicate infrastructure, break migration tooling (`run_sql_migrations.py` and Alembic-compatible SQL files), and complicate BI exports that currently assume SQL access. Instead, we will add migrations for new audit tables, reuse the existing async session factories, and expose read models tuned for reporting dashboards.
+- **Document store evaluation**: A MongoDB/Cosmos-style store would simplify variable JSON payloads but would fragment provenance queries (multi-collection fan-out to reconstruct an answer’s lineage) and weaken compliance controls that depend on relational constraints and row-level retention policies. It would also require retooling batch reports to map-reduce style aggregations, increasing latency for nightly audit summaries.
 - What is the acceptable latency overhead for Audit-Web responses?
 - How will we authenticate and monitor external search APIs?
 - What human escalation paths are required for regulatory compliance in specific jurisdictions?
