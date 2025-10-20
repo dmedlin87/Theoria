@@ -52,10 +52,10 @@ jobs:
         working-directory: theo/services/web
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
 
       - name: Use Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
         with:
           node-version: 20
           cache: npm
@@ -183,7 +183,7 @@ jobs:
 
       - name: Upload Lighthouse artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lighthouse-results-${{ github.event.inputs.target || 'localhost' }}-${{ github.run_number }}
           path: theo/services/web/.lighthouseci
