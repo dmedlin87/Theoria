@@ -142,14 +142,14 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 
 ## 11. Open Questions
 - Which storage backend best fits Claim Cards (PostgreSQL vs document store)?
-- What is the acceptable latency overhead for Audit-Web responses?
+- **Resolved 2025-10-19 – Audit-Web latency budget**: Edge Latency & Throughput dashboard snapshots from 2025-10-18 show end-to-end response times of 1.9s p50 / 3.4s p95 / 4.8s p99 in Normal mode and 2.4s p50 / 4.2s p95 / 5.9s p99 when Audit-Local verification is enabled. Platform engineering confirmed UX can accommodate at most +2.0s at p95 (and +2.5s at p99) when escalating to Audit-Web, yielding a total response target of ≤6.0s p95 and ≤8.4s p99 for escalated answers.
 - How will we authenticate and monitor external search APIs?
 - What human escalation paths are required for regulatory compliance in specific jurisdictions?
 
 ## 12. Success Metrics
 - ≥90% of audited claims labeled `SUPPORTED` without human intervention.
 - ≤5% of audited claims escalated due to missing evidence after 30 days of operation.
-- Average audit latency increase < 2s for Audit-Local mode.
+- Average audit latency increase < 2s for Audit-Local mode; Audit-Web escalations stay within the agreed ≤6.0s p95 / ≤8.4s p99 envelope (≤2.0s incremental p95 vs. Normal mode).
 - Nightly reports reduce knowledge-base correction backlog by ≥30% within the first quarter.
 
 ## 13. Appendix: Threshold Defaults
