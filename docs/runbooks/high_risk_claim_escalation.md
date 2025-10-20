@@ -17,7 +17,7 @@ Escalate a claim when any of the following occur:
 - **Audit Engineering Liaison (AEL)** – Provides tooling support, regenerates reports, and coordinates fixes in the RAG pipeline.
 
 ## Tooling
-- **Audit Dashboard** (reporting layer §7–§8): Escalation queue, claim drill-down, and approval controls.
+- **Audit Dashboard** (reporting layer in `docs/audit_mode_spec.md` §7–§8): Escalation queue, claim drill-down, and approval controls.
 - **Claim Card Detail View**: Displays provenance, verification metrics, and evidence attachments.
 - **Case Management Ticketing** (Jira project `AUD`): Tracks remediation tasks with SLA timers.
 - **Notification Channels**: Slack channel `#audit-escalations` for asynchronous updates; PagerDuty service `Audit Compliance` for urgent breaches.
