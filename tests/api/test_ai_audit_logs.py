@@ -18,6 +18,7 @@ from theo.services.api.app.ai.audit_logging import (
 from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer, RAGCitation
 from theo.services.api.app.main import app
 from theo.services.api.app.routes.ai.workflows import chat as chat_module
+from theo.services.api.app.models import AuditClaimCard, AuditLogMetadata
 
 
 class DummyRecorder:
@@ -218,3 +219,39 @@ def test_audit_log_reporting_and_cleanup(audit_sessionmaker: sessionmaker) -> No
         remaining = fetch_recent_audit_logs(session, limit=5)
         assert len(remaining) == 1
         assert remaining[0].prompt_hash in {"hash-1", "hash-2", "hash-3"}
+
+
+def test_audit_log_claim_cards_and_metadata(audit_sessionmaker: sessionmaker) -> None:
+    SessionLocal = audit_sessionmaker
+    with SessionLocal() as session:
+        session.execute(delete(AuditLog))
+        session.commit()
+
+    claim_card = AuditClaimCard(
+        claim_id="c1",
+        answer_id="a1",
+        text="Example claim",
+        mode="Audit-Local",
+        label="SUPPORTED",
+        confidence=0.92,
+        verification_methods=["CoVe", "RAGAS"],
+    )
+    metadata = AuditLogMetadata(mode="Audit-Local", audit_score=0.88, claim_cards=[claim_card])
+
+    with SessionLocal() as session:
+        writer = AuditLogWriter.from_session(session)
+        writer.log(
+            workflow="chat",
+            prompt_hash="hash-claim",
+            model_preset="delta",
+            inputs={"question": "What is faith?"},
+            claim_cards=[claim_card],
+            audit_metadata=metadata.model_dump(exclude_none=True),
+        )
+
+    with SessionLocal() as session:
+        record = session.execute(select(AuditLog)).scalar_one()
+        assert record.claim_cards is not None
+        assert record.claim_cards[0]["claim_id"] == "c1"
+        assert record.audit_metadata is not None
+        assert record.audit_metadata["mode"] == "Audit-Local"

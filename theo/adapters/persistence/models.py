@@ -1793,6 +1793,12 @@ class AuditLog(Base):
     citations: Mapped[list[dict[str, Any]] | None] = mapped_column(
         _JSONB, nullable=True
     )
+    claim_cards: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        _JSONB, nullable=True
+    )
+    audit_metadata: Mapped[dict[str, Any] | None] = mapped_column(
+        _JSONB, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
