@@ -1,6 +1,6 @@
 fastapi==0.119.0
 strawberry-graphql[fastapi]==0.220.0
-uvicorn[standard]==0.37.0
+uvicorn[standard]==0.38.0
 sqlalchemy==2.0.44
 celery==5.5.3
 apscheduler>=3.10,<4
