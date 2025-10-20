@@ -822,6 +822,8 @@ def test_contract_endpoints(
             )
         if override.body is not None:
             case.body = _resolve_value(override.body, contract_context)
+            if not getattr(case, "media_type", None):
+                case.media_type = "application/json"
     response = case.call(session=contract_client)
     assert response.status_code < 500, (
         f"{method} {path} returned {response.status_code}: {response.text}"
