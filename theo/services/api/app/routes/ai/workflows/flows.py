@@ -133,14 +133,14 @@ def verse_copilot(
         raise AIWorkflowError(
             str(exc),
             code="AI_VERSE_INVALID_REFERENCE",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             data={"passage": passage_value},
         ) from exc
     if not resolved_osis:
         raise AIWorkflowError(
             "Provide an OSIS reference or passage.",
             code="AI_VERSE_REFERENCE_REQUIRED",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
     try:
         with trail_service.start_trail(

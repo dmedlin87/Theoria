@@ -189,7 +189,7 @@ def create_document_annotation(
         raise RetrievalError(
             str(exc),
             code="RETRIEVAL_INVALID_ANNOTATION",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             severity=Severity.USER,
             hint="Adjust the annotation payload to satisfy validation rules.",
         ) from exc

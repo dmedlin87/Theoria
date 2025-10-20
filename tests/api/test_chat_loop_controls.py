@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import sessionmaker
 
 from theo.application.facades.database import get_session
 from theo.services.api.app.ai.research_loop import ResearchLoopController
@@ -12,9 +13,22 @@ from theo.services.api.app.persistence_models import ChatSession
 
 
 @pytest.fixture()
-def client() -> TestClient:
-    with TestClient(app) as test_client:
-        yield test_client
+def _session_factory(api_engine):
+    return sessionmaker(bind=api_engine, future=True)
+
+
+@pytest.fixture()
+def client(_session_factory) -> TestClient:
+    def _override_session():
+        with _session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = _override_session
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.pop(get_session, None)
 
 
 def _create_chat_session(session_id: str) -> None:

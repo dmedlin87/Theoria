@@ -180,8 +180,19 @@ def test_trail_digest_persists_chat_memory(
     ]
 
 
-def test_trail_digest_updates_goal_progress(session: Session) -> None:
+def test_trail_digest_updates_goal_progress(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
     service = TrailService(session)
+    recorded_tasks: list[tuple[str, dict[str, str]]] = []
+    monkeypatch.setattr(
+        "theo.services.api.app.ai.trails_memory_bridge.celery",
+        SimpleNamespace(
+            send_task=lambda name, kwargs=None, args=None: recorded_tasks.append(
+                (name, kwargs or {})
+            )
+        ),
+    )
 
     with service.start_trail(
         workflow="chat",
@@ -254,6 +265,17 @@ def test_trail_digest_updates_goal_progress(session: Session) -> None:
     assert stored_goal.summary == "New census discovery ties into resurrection timeline."
     assert stored_goal.last_interaction_at > previous_interaction
     assert stored_goal.updated_at == stored_goal.last_interaction_at
+
+    assert recorded_tasks == [
+        (
+            "tasks.enqueue_follow_up_retrieval",
+            {
+                "session_id": "chat-session-goal",
+                "trail_id": trail_id,
+                "action": "Compare census records",
+            },
+        )
+    ]
 
 
 def test_trail_digest_deduplicates_entries(

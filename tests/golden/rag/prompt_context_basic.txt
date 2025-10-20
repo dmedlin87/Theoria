@@ -3,9 +3,9 @@ Answer the question strictly from the provided passages.
 Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.
 If the passages do not answer the question, state that explicitly.
 Prior conversation highlights:
-1. Only share kind vote compare role month mother.
-2. Someone human authority security it thus agreement former.
-Question: Style general name outside claim evidence former guess?
+1. Hotel zulu zulu uniform mike oscar lima quebec.
+2. Alpha tango delta romeo golf golf delta hotel.
+Question: Tango bravo delta zulu echo romeo?
 Passages:
 [1] And it came to pass, when Ahab heard those words, that he rent his clothes, and put sackcloth upon his flesh, and fasted, and lay in sackcloth, and went softly. And the word of Jehovah came to Elijah the Tishbite, saying, (OSIS 1Kgs.21.27-28, 1Kgs 21:27-28)
 [2] When ye come to appear before me, who hath required this at your hand, to trample my courts? Bring no more vain oblations; incense is an abomination unto me; new moon and sabbath, the calling of assemblies,— I cannot away with iniquity and the solemn meeting. (OSIS Isa.1.12-13, Isa 1:12-13)

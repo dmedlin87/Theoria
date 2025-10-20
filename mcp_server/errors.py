@@ -74,7 +74,7 @@ class ValidationError(MCPError):
         details: Dict[str, Any] | None = None,
     ) -> None:
         super().__init__(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             error_code=ErrorCode.VALIDATION_ERROR,
             message=message,
             field=field,

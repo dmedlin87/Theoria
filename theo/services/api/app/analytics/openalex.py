@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import re
 import time
 from collections.abc import Iterable, Iterator, Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import httpx
+
+from theo.application.facades.settings import get_settings
 
 
 def _dedupe(values: Iterable[str]) -> list[str]:
@@ -42,6 +47,9 @@ class OpenAlexClient:
         self._client = http_client
         self._max_retries = max_retries or self.MAX_RETRIES
         self._backoff = backoff_seconds or self.DEFAULT_BACKOFF
+        self._fixtures_root = _resolve_fixtures_root()
+        self._fixture_cache: dict[tuple[str, str], Mapping[str, Any]] = {}
+        self._last_result_from_fixture = False
 
     # ------------------------------------------------------------------
     @property
@@ -118,6 +126,7 @@ class OpenAlexClient:
         metadata = self._fetch_by_id(
             work_id, select=("referenced_works", "cited_by_count")
         )
+        used_fixture = self._last_result_from_fixture
         referenced: list[str] = []
         if isinstance(metadata, Mapping):
             referenced_raw = metadata.get("referenced_works")
@@ -125,6 +134,11 @@ class OpenAlexClient:
                 referenced = [str(item) for item in referenced_raw if isinstance(item, str)]
 
         cited_by: list[dict[str, Any]] = []
+        if used_fixture:
+            return {
+                "referenced": referenced,
+                "cited_by": cited_by,
+            }
         for item in self._paginate(
             f"{self.WORKS_PATH}/{self._normalise_work_id(work_id)}/cited-by",
             max_results=max_results,
@@ -145,6 +159,10 @@ class OpenAlexClient:
         if not value:
             return None
 
+        fixture = self._fixture_lookup(query_type, value)
+        if fixture is not None:
+            return fixture
+
         params = self._build_params(select)
 
         if query_type == "doi":
@@ -153,15 +171,21 @@ class OpenAlexClient:
                 identifier = f"https://doi.org/{identifier}"
             url = f"{self._works_url}/{identifier}"
             payload = self._request_json(url, params=params)
-            return payload if isinstance(payload, Mapping) else None
+            self._last_result_from_fixture = False
+            if isinstance(payload, Mapping):
+                self._cache_fixture_data(query_type, value, payload)
+                return payload
+            return None
 
         params = {**params, "search": value, "per-page": 1}
         payload = self._request_json(self._works_url, params=params)
+        self._last_result_from_fixture = False
         if isinstance(payload, Mapping):
             results = payload.get("results")
             if isinstance(results, Sequence) and results:
                 first = results[0]
                 if isinstance(first, Mapping):
+                    self._cache_fixture_data(query_type, value, first)
                     return first
         return None
 
@@ -170,11 +194,18 @@ class OpenAlexClient:
     ) -> Mapping[str, Any] | None:
         if not work_id:
             return None
+        fixture = self._fixture_lookup("id", work_id)
+        if fixture is not None:
+            return fixture
         params = self._build_params(select)
         identifier = self._normalise_work_id(work_id)
         url = f"{self._works_url}/{identifier}"
         payload = self._request_json(url, params=params)
-        return payload if isinstance(payload, Mapping) else None
+        self._last_result_from_fixture = False
+        if isinstance(payload, Mapping):
+            self._cache_fixture_data("id", work_id, payload)
+            return payload
+        return None
 
     def _request_json(
         self, url: str, *, params: Mapping[str, Any] | None = None
@@ -299,5 +330,107 @@ class OpenAlexClient:
             return value[len(prefix) :]
         return value
 
+    def _fixture_lookup(self, query_type: str, value: str) -> Mapping[str, Any] | None:
+        normalized = self._normalise_query_value(query_type, value)
+        cached = self._fixture_cache.get((query_type, normalized))
+        if cached is not None:
+            self._last_result_from_fixture = True
+            return cached
+
+        if self._fixtures_root is None:
+            self._last_result_from_fixture = False
+            return None
+
+        candidates = []
+        if normalized:
+            candidates.append(normalized)
+        if value and value != normalized:
+            candidates.append(value)
+
+        for candidate_value in candidates:
+            slug = _slugify(candidate_value)
+            if not slug:
+                continue
+            fixture_path = self._fixtures_root / "openalex" / f"{query_type}_{slug}.json"
+            if fixture_path.is_file():
+                try:
+                    loaded = json.loads(fixture_path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(loaded, Mapping):
+                    self._cache_fixture_data(query_type, candidate_value, loaded)
+                    self._last_result_from_fixture = True
+                    return loaded
+        self._last_result_from_fixture = False
+        return None
+
+    def _cache_fixture_data(
+        self, query_type: str, value: str, payload: Mapping[str, Any]
+    ) -> None:
+        normalized = self._normalise_query_value(query_type, value)
+        if normalized:
+            self._fixture_cache[(query_type, normalized)] = payload
+        identifier = payload.get("id")
+        if isinstance(identifier, str):
+            normalised_id = self._normalise_work_id(identifier)
+            if normalised_id:
+                self._fixture_cache[("id", normalised_id)] = payload
+        doi = payload.get("doi")
+        if isinstance(doi, str):
+            normalised_doi = _normalise_doi(doi)
+            if normalised_doi:
+                self._fixture_cache[("doi", normalised_doi)] = payload
+        title = payload.get("display_name")
+        if isinstance(title, str):
+            stripped = title.strip()
+            if stripped:
+                self._fixture_cache[("title", stripped)] = payload
+
+    def _normalise_query_value(self, query_type: str, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            return stripped
+        if query_type == "doi":
+            return _normalise_doi(stripped) or stripped
+        if query_type in {"id", "openalex_id"}:
+            return self._normalise_work_id(stripped)
+        return stripped
+
 
 __all__ = ["OpenAlexClient"]
+
+
+def _resolve_fixtures_root() -> Path | None:
+    settings = get_settings()
+    root = getattr(settings, "fixtures_root", None)
+    if isinstance(root, Path):
+        if root.exists():
+            return root
+    elif root:
+        path = Path(root)
+        if path.exists():
+            return path
+    project_root = Path(__file__).resolve().parents[5]
+    candidate = project_root / "fixtures"
+    return candidate if candidate.exists() else None
+
+
+def _slugify(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+
+
+def _normalise_doi(raw: str | Any) -> str | None:
+    if not raw:
+        return None
+    doi = str(raw).strip()
+    if not doi:
+        return None
+    doi_lower = doi.lower()
+    if doi_lower.startswith("https://doi.org/"):
+        doi = doi[16:]
+    elif doi_lower.startswith("http://doi.org/"):
+        doi = doi[15:]
+    elif doi_lower.startswith("doi:"):
+        doi = doi.split(":", 1)[1]
+    doi = doi.strip()
+    return doi or None
