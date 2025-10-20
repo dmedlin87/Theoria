@@ -1,5 +1,7 @@
 # Theoria Audit and Verification System Specification
 
+> **Status:** Deferred concept. The workflow described in this document has not been implemented. The only production audit functionality today is basic request/response logging via `AuditLogWriter`. This specification is retained as future-looking design material and should not be interpreted as describing live capabilities.
+
 ## 1. Purpose and Context
 Theoria currently relies on retrieval-augmented generation (RAG) to synthesize responses for domains that are rich in neuroscience and reasoning-heavy content. Because the product owners may not always have deep subject-matter expertise, they need an automated way to judge whether answers are faithful to trusted sources before presenting them to end users. This specification describes a multi-mode audit subsystem that adds layered verification, structured provenance logging, and human escalation paths without requiring a permanent human-in-the-loop.
 

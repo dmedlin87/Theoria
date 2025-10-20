@@ -1,5 +1,7 @@
 # High-Risk Claim Escalation Runbook
 
+> **Status:** Archived playbook. The automation, dashboards, and roles referenced below are not available in the current product. The live system only writes raw audit logs; this runbook is preserved for future implementation planning.
+
 ## Purpose
 Provide a consistent escalation workflow for unsupported or high-risk claims emitted by the Theoria audit subsystem. This runbook aligns with the reporting layer defined in `docs/audit_mode_spec.md` §7–§8 and ensures regulatory compliance by prescribing human review checkpoints and documentation standards.
 
