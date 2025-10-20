@@ -7,5 +7,5 @@ testcontainers[postgresql]==4.13.2
 cyclonedx-bom==3.11.7
 mypy==1.18.2
 ruff==0.14.0
-Faker>=25.0,<26
+Faker>=25.0,<38
 click>=8.1,<9
