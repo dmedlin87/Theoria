@@ -140,14 +140,46 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 5. **Phase 4 – Refinement & Automation (ongoing)**
    - Tune thresholds, add domain-specific rules, integrate model monitoring.
 
-## 11. Open Questions
-- **Storage backend decision (resolved)**: We will persist Claim Cards and audit telemetry in PostgreSQL alongside the existing Theo schemas. The audit workload requires transactional writes across answers, claims, evidence slices, and escalation events, along with referential integrity to user/session data in `theo/services/api/app/db/`. PostgreSQL already underpins that stack via SQLAlchemy, supports JSONB/ARRAY/TSVector columns that match the semi-structured metrics in §6, and powers the nightly rollups/reporting queries described in §7. Standing up a document store would duplicate infrastructure, break migration tooling (`run_sql_migrations.py` and Alembic-compatible SQL files), and complicate BI exports that currently assume SQL access. Instead, we will add migrations for new audit tables, reuse the existing async session factories, and expose read models tuned for reporting dashboards.
-- **Document store evaluation**: A MongoDB/Cosmos-style store would simplify variable JSON payloads but would fragment provenance queries (multi-collection fan-out to reconstruct an answer’s lineage) and weaken compliance controls that depend on relational constraints and row-level retention policies. It would also require retooling batch reports to map-reduce style aggregations, increasing latency for nightly audit summaries.
-- **Audit-Web latency budget (resolved 2025-10-18)**: Load-test snapshots show baseline end-to-end responses at 95 ms p95 for `/discoveries` and 320 ms p95 for `/search`, so we will cap Audit-Web escalation overhead at ≤3.0 s p95 to keep total turnaround within 3.5 s while leaving buffer beneath the platform UX guardrails (heavy operations stay under 5 s and primary content is visible by 2.5 s in field telemetry).[†1][†2][†3]
-- **Audit-Web external API access (resolved 2025-10-21)**: Audit-Web restricts lookups to PubMed (NCBI E-utilities), arXiv, and the ACL Anthology. PubMed offers optional API keys that expand the request quota from 3 to 10 requests/second/IP; we will provision a service principal–scoped NCBI key (`THEO_AUDIT_PUBMED_API_KEY`) and send it via the `api_key` query parameter on signed requests. arXiv and ACL Anthology expose public RSS/Atom and JSON endpoints without credential requirements; requests to these endpoints are made as anonymous GETs over standard HTTPS. Mutual TLS is enforced only at the platform ingress for transport security, not as a requirement of the external endpoints themselves. Keys live in the existing secret manager, are injected into the Audit-Web worker via environment variables, and rotate every 90 days or immediately on incident. Rotations follow the secret hygiene patterns in `docs/security/secret-scanning.md` (baseline updates, CI guardrails) and are accompanied by access log reviews.
-- **Monitoring & observability for external connectors (resolved 2025-10-21)**: Each outbound request records request/response metadata (domain, path, status, latency, quota headers) through the existing `theo.services.api.app.ai.audit_logging` helpers and emits structured metrics to the observability pipeline. Alerting triggers when PubMed quota headers drop below 20% of the hourly allowance or when 5xx rates exceed 2% over 5 minutes. We also emit synthetic heartbeat probes nightly to confirm we still resolve the allow-listed hosts and capture certificates expiring within 30 days.
-- **Implementation follow-ups for `theo/services/api/app/ai/` connectors**: (1) Extend `clients.py` with dedicated `PubMedClient`, `ArxivClient`, and `AclAnthologyClient` classes that wrap `httpx.AsyncClient`, inject the API key header/query param when configured, and funnel observability metadata into `audit_logging.py`. (2) Teach `rag/retrieval.py` to select these clients when Audit-Web mode is active and surface quota warnings in Claim Cards. (3) Add configuration wiring in `registry.py` so the dependency container can pull secrets from settings and expose rotation-friendly reload hooks. (4) Update automated tests under `theo/services/api/app/ai/tests/` (to be created) with VCR-style fixtures that validate auth headers are omitted for anonymous connectors and masked for PubMed.
-- What human escalation paths are required for regulatory compliance in specific jurisdictions?
+## 11. Escalation Process
+### 11.1 Compliance Stakeholders & Review Gates
+- **Audit Triage Analyst (ATA)** – First-line reviewer who validates data completeness and assigns severity.
+- **Subject Matter Expert (SME)** – Domain-specialized reviewer (e.g., clinician, neuroscience researcher) who judges technical accuracy.
+- **Compliance Officer (CO)** – Regulatory authority responsible for final approval and release decisions.
+- **Audit Engineering Liaison (AEL)** – Engineering representative who implements remediation and ensures telemetry/reporting consistency.
+
+These roles are sourced from the compliance stakeholder workshop (Oct 2025) and map directly to the human review checkpoints required for unsupported or high-risk claims. Each claim escalated from Audit-Web must pass ATA → SME → CO → AEL stages before closure.
+
+### 11.2 Triggering Conditions
+Escalation is mandatory when:
+- A claim remains `REFUTED` or `NEI` after Audit-Web verification with `audit_score < 0.60`.
+- The taxonomy labels a claim as `compliance_risk` (medical, legal, safety-critical guidance).
+- Manual escalation is initiated from the dashboard queue by any compliance stakeholder.
+
+### 11.3 Workflow Alignment with Reporting Layer (§7–§8)
+1. **Queue Intake (ATA)** – Initiated from the reporting layer’s Escalation Queue (see §7–§8). ATA validates provenance in the Claim Card detail view, tags severity, and creates/links Jira ticket `AUD-<id>` for traceability. SLA: within 2 business hours of queue appearance.
+2. **SME Review** – SME accesses the same Claim Card drill-down, reviews attached evidence, and records recommendations directly in the dashboard notes (rendered in the reporting layer widgets). SLA: within 1 business day of ATA completion.
+3. **Compliance Approval** – CO verifies regulatory obligations, uses dashboard approval controls to set final disposition (Publish, Block, Retract), and updates the associated Jira ticket. SLA: within 1 business day of SME decision.
+4. **Engineering Follow-up** – AEL implements remediation, updates Claim Card status via the audit store API, and attaches remediation evidence in Jira. SLA: within 2 business days of compliance approval. Reporting layer widgets reflect closed items and SLA adherence for auditability.
+
+All SLA clocks and state transitions surface in the reporting layer dashboards, enabling compliance leadership to audit performance and export weekly summaries.
+
+### 11.4 Tooling & Documentation
+- Audit Dashboard (reporting layer §7–§8) for queue management, role hand-offs, and note capture.
+- Jira project `AUD` for remediation tracking with SLA automation.
+- Slack `#audit-escalations` for asynchronous coordination; PagerDuty `Audit Compliance` service for SLA breach alerts.
+- Detailed operational steps live in `docs/runbooks/high_risk_claim_escalation.md`, which governs day-to-day execution and on-call coverage.
+
+### 11.5 Post-Escalation Analytics
+- Weekly compliance reports aggregate open/closed escalations, SLA breaches, and remediation themes. Generated from the audit store via the reporting layer export routines described in §7.
+- Recurrent infractions originating from the same knowledge source trigger a retrospective led by the AEL within 5 business days.
+
+### 11.6 Related Implementation Notes
+- **Storage backend decision (resolved)**: Claim Cards and audit telemetry persist in PostgreSQL alongside existing Theo schemas. This ensures transactional writes across answers, claims, evidence slices, and escalation events while reusing SQLAlchemy infrastructure and BI exports (`run_sql_migrations.py`, Alembic migrations).
+- **Document store evaluation**: MongoDB/Cosmos-style stores were rejected because they fragment provenance queries and weaken compliance controls that rely on relational constraints and retention policies.
+- **Audit-Web latency budget (resolved 2025-10-18)**: Audit-Web escalation overhead is capped at ≤3.0 s p95 to keep total response time within 3.5 s while respecting UX guardrails (heavy operations <5 s, primary content visible by 2.5 s).
+- **Audit-Web external API access (resolved 2025-10-21)**: External lookups target PubMed, arXiv, and ACL Anthology. PubMed uses service principal–scoped API keys (`THEO_AUDIT_PUBMED_API_KEY`), rotated every 90 days, injected via environment variables, and governed by `docs/security/secret-scanning.md` procedures.
+- **Monitoring & observability for external connectors (resolved 2025-10-21)**: Outbound requests emit structured metrics via `theo.services.api.app.ai.audit_logging`; alerts trigger on PubMed quota depletion (<20% hourly) or 5xx rates >2% over 5 minutes, supplemented by nightly heartbeat probes.
+- **Implementation follow-ups for `theo/services/api/app/ai/` connectors**: Extend `clients.py` with dedicated PubMed/Arxiv/AclAnthology clients, update `rag/retrieval.py` selection logic, wire configuration in `registry.py`, and add masked-auth tests under `theo/services/api/app/ai/tests/` with VCR fixtures.
 
 ## 12. Success Metrics
 - ≥90% of audited claims labeled `SUPPORTED` without human intervention.
