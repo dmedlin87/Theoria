@@ -26,9 +26,9 @@ jobs:
           python-version: '3.11'
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@825303e8b1cac72c418fc564ba550b32b2741b90 # v4
+        uses: github/codeql-action/init@16140ae1a102900babc80a33c44059580f687047 # v4
         with:
           languages: python,javascript
 
       - name: Analyze
-        uses: github/codeql-action/analyze@825303e8b1cac72c418fc564ba550b32b2741b90 # v4
+        uses: github/codeql-action/analyze@16140ae1a102900babc80a33c44059580f687047 # v4

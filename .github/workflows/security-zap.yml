@@ -49,7 +49,7 @@ jobs:
       - name: Run ZAP baseline scan
         if: steps.verify-secret.outputs.skip != 'true'
         id: zap
-        uses: zaproxy/action-baseline@2b5fc7f98d837319798ab7f128ea50b7d40563b6 # v0.14.0
+        uses: zaproxy/action-baseline@7c4deb10e6261301961c86d65d54a516394f9aed # v0.14.0
         with:
           target: ${{ steps.verify-secret.outputs.url }}
           cmd_options: '-J zap-baseline-report.json -r zap-baseline-report.html -w zap-baseline-warn.md'
@@ -66,7 +66,7 @@ jobs:
 
       - name: Upload SARIF to security dashboard
         if: steps.verify-secret.outputs.skip != 'true'
-        uses: github/codeql-action/upload-sarif@825303e8b1cac72c418fc564ba550b32b2741b90 # v4
+        uses: github/codeql-action/upload-sarif@16140ae1a102900babc80a33c44059580f687047 # v4
         with:
           sarif_file: zap-baseline-report.sarif
           category: zap-baseline
