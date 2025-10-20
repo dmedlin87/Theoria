@@ -5,6 +5,7 @@ Single source of truth for live issues. Update this table whenever a bug is open
 | ID | Title | Severity | Status | Owner | First Noted | Last Updated | Impacted Docs | Resolution Link |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | BUG-2025-10-001 | Reranker hash verification crashes without hashlib import | Critical | Resolved | AI Agent | 2025-10-20 | 2025-10-20 | `theo/services/api/app/ranking/re_ranker.py` | this PR |
+| BUG-2025-10-002 | Loading a reranker from a directory fails to locate the artifact | Major | Resolved | AI Agent | 2025-10-20 | 2025-10-20 | `theo/services/api/app/ranking/re_ranker.py` | this PR |
 
 ## Workflow
 

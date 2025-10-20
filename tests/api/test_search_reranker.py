@@ -13,7 +13,7 @@ from theo.application.facades.settings import get_settings
 from theo.services.api.app.main import app
 from theo.services.api.app.models.search import HybridSearchResult
 from theo.services.api.app.ranking.features import FEATURE_NAMES, extract_features
-from theo.services.api.app.ranking.re_ranker import Reranker
+from theo.services.api.app.ranking.re_ranker import Reranker, load_reranker
 from theo.services.api.app.routes import search as search_route
 from theo.services.api.app.services import retrieval_service as retrieval_service_module
 
@@ -292,3 +292,15 @@ def test_reranker_predict_proba_uses_relevant_class() -> None:
     reranker = Reranker(_ProbabilisticModel())
     scores = reranker.score(_stub_results())
     assert scores == pytest.approx([0.9, 0.2, 0.6])
+
+
+def test_load_reranker_accepts_directory(tmp_path: Path) -> None:
+    artifact_dir = tmp_path / "artifact"
+    artifact_dir.mkdir()
+    model_path = artifact_dir / "model.joblib"
+    joblib.dump(_WeightedModel(feature_index=0), model_path)
+
+    reranker = load_reranker(artifact_dir)
+
+    scores = reranker.score(_stub_results())
+    assert scores[0] == pytest.approx(_stub_results()[0].score)

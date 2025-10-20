@@ -29,15 +29,37 @@ class RerankerValidationError(RuntimeError):
     """Raised when the persisted reranker fails validation prior to loading."""
 
 
+def _resolve_model_artifact(path: Path) -> Path:
+    """Return the concrete artifact file to load for ``path``."""
+
+    if path.is_file():
+        return path
+
+    if path.is_dir():
+        candidates = sorted(path.rglob("*.joblib"))
+        if len(candidates) == 1:
+            return candidates[0]
+        if not candidates:
+            raise RerankerValidationError(
+                f"No joblib artifacts found in reranker directory '{path}'"
+            )
+        raise RerankerValidationError(
+            f"Multiple joblib artifacts found in reranker directory '{path}'"
+        )
+
+    raise RerankerValidationError(f"Reranker model not found at '{path}'")
+
+
 def _load_model(path: Path, *, expected_sha256: str | None = None):
+    artifact_path = _resolve_model_artifact(path)
     if expected_sha256 is not None:
-        actual_sha256 = _compute_sha256(path)
+        actual_sha256 = _compute_sha256(artifact_path)
         if actual_sha256.lower() != expected_sha256.lower():
             raise RerankerValidationError(
                 "Hash mismatch for reranker model: expected %s but loaded %s"
                 % (expected_sha256, actual_sha256)
             )
-    return joblib.load(path)
+    return joblib.load(artifact_path)
 
 
 def _coerce_scores(raw: object) -> list[float]:
