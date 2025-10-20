@@ -146,7 +146,7 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 Following consultation with compliance stakeholders, the audit subsystem feeds unsupported or high-risk claims into a structured, three-tier human review process. Detailed operational guidance lives in `docs/runbooks/high_risk_claim_escalation.md`.
 
 1. **Automated Intake**
-   - Triggered by claims labeled `REFUTED`/`NEI` with `confidence < 0.6`, regulated-domain flags, or manual moderator escalation.
+   - Triggered by claims labeled `REFUTED`/`NEI` with `confidence < 0.6` (matching the threshold in runbook line 7 and `low_confidence_threshold` in §13), regulated-domain flags, or manual moderator escalation.
    - Escalation Orchestrator publishes the Claim Card to the Escalation Queue, annotates risk metadata, and auto-creates a case (`COMP-ESC` ticket) with evidence and context links.
    - Reporting layer dashboards (§§7–8) update in real time and push alerts to `#compliance-alerts` and `compliance-oncall@theoria.ai`.
 2. **Level 1 – On-Call Compliance Analyst (SLA: 30 minutes acknowledge/triage)**
