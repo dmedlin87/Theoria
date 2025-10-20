@@ -150,8 +150,8 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 ## 12. Success Metrics
 - ≥90% of audited claims labeled `SUPPORTED` without human intervention.
 - ≤5% of audited claims escalated due to missing evidence after 30 days of operation.
-- Average audit latency increase < 2s for Audit-Local mode.
-- Average audit latency increase ≤ 3s for Audit-Web mode with p95 total response time ≤ 3.5s.
+- p95 audit latency increase ≤ 2s for Audit-Local mode.
+- p95 audit latency increase ≤ 3s for Audit-Web mode with p95 total response time ≤ 3.5s.
 - Nightly reports reduce knowledge-base correction backlog by ≥30% within the first quarter.
 
 ## 13. Appendix: Threshold Defaults
