@@ -55,7 +55,7 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 - Support filtering and export (e.g., daily CSV/JSON bundles of low-confidence claims).
 
 ### 4.5 Nightly Batch Auditor
-- Reprocess the day’s interactions focusing on claims labeled `REFUTED` or `NEI` with confidence <0.6.
+- Reprocess the day’s interactions focusing on claims labeled `REFUTED` or `NEI` with confidence <`low_confidence_threshold` (0.60).
 - Re-run verification with refreshed retrieval indices and web checks.
 - Produce a summary report (top failing KB entries, stale sources, recommended human review items).
 - Optionally trigger re-indexing tasks or knowledge-base curation tickets.
