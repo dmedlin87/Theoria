@@ -302,6 +302,37 @@ class TestMetacognition:
         assert critique.reasoning_quality >= 65
         assert len(critique.fallacies_found) == 0
 
+    def test_extracts_alternative_interpretations_from_enumerated_lists(self):
+        """Numbered or lettered lists describing alternatives should be captured."""
+
+        reasoning = """
+1. Alternative interpretation: Paul's warning targets complacency rather than disbelief.
+(b) Another possibility: it cautions leaders against neglecting widows.
+        """
+        answer = ""
+
+        critique = critique_reasoning(reasoning, answer, citations=[])
+
+        assert critique.alternative_interpretations == [
+            "Paul's warning targets complacency rather than disbelief",
+            "cautions leaders against neglecting widows",
+        ]
+
+    def test_extracts_inline_alternative_interpretations(self):
+        """Inline sentences beginning with 'Alternatively' should be detected."""
+
+        reasoning = "The passage emphasises covenant renewal."
+        answer = (
+            "The main thrust is communal repentance. Alternatively, it could signal a new covenant sign."
+        )
+
+        critique = critique_reasoning(reasoning, answer, citations=[])
+
+        assert any(
+            "signal a new covenant sign" in item
+            for item in critique.alternative_interpretations
+        )
+
 
 class TestMetacognitionHeuristics:
     """Test targeted metacognition helper behaviours."""
