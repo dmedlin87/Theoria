@@ -532,6 +532,28 @@ def _extract_alternative_interpretations(reasoning_trace: str, answer: str) -> l
             r"\banother possibility is\s+(?P<clause>[^.?!\n]+)",
             re.IGNORECASE,
         ),
+        re.compile(
+            r"\bsome\s+(?:scholars|commentators|interpreters|traditions|theologians|readers)\s+"
+            r"(?:argue|interpret|understand|see|suggest|hold)\s+(?P<clause>[^.?!\n]+)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:while\s+)?others\s+(?:argue|interpret|understand|see|suggest|contend|hold)\s+"
+            r"(?P<clause>[^.?!\n]+)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\bcritics\s+(?:argue|contend|suggest|claim)\s+(?P<clause>[^.?!\n]+)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\bone\s+(?:view|reading)\s+(?:is|holds)\s+that\s+(?P<clause>[^.?!\n]+)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\banother\s+(?:view|reading)\s+(?:is|holds)\s+that\s+(?P<clause>[^.?!\n]+)",
+            re.IGNORECASE,
+        ),
     ]
 
     for pattern in inline_patterns:
@@ -549,6 +571,7 @@ def _normalise_interpretation_text(text: str) -> str:
     if not cleaned:
         return ""
 
+    cleaned = re.sub(r"^it['’]s\s+", "is ", cleaned, flags=re.IGNORECASE)
     # Remove leading commas or conjunctions introduced by regex captures
     cleaned = re.sub(r"^,\s*", "", cleaned)
     cleaned = re.sub(r"^(that|it|this)\s+", "", cleaned, count=1, flags=re.IGNORECASE)
@@ -559,6 +582,23 @@ def _normalise_interpretation_text(text: str) -> str:
         count=1,
         flags=re.IGNORECASE,
     )
+    cleaned = re.sub(
+        r"^(?:may|might|could|would|should|perhaps|possibly)\s+",
+        "",
+        cleaned,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+
+    trailing_patterns = [
+        re.compile(r"(?:,?\s+(?:while|but)\s+others\b.*)$", re.IGNORECASE),
+        re.compile(r"(?:,?\s+(?:while|but)\s+some\b.*)$", re.IGNORECASE),
+        re.compile(r"(?:,?\s+however\b.*)$", re.IGNORECASE),
+    ]
+    for pattern in trailing_patterns:
+        cleaned = pattern.sub("", cleaned)
+
+    cleaned = re.split(r"[.?!](?:\s|$)", cleaned, maxsplit=1)[0]
 
     # Trim trailing punctuation to keep concise bullet-style entries
     cleaned = cleaned.rstrip(" .!?")
