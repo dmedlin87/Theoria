@@ -4,7 +4,7 @@ Single source of truth for live issues. Update this table whenever a bug is open
 
 | ID | Title | Severity | Status | Owner | First Noted | Last Updated | Impacted Docs | Resolution Link |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| _None_ | | | | | | | | |
+| BUG-2025-10-001 | Reranker hash verification crashes without hashlib import | Critical | Resolved | AI Agent | 2025-10-20 | 2025-10-20 | `theo/services/api/app/ranking/re_ranker.py` | this PR |
 
 ## Workflow
 
