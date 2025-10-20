@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from inspect import signature
 import importlib.util
+import json
 import logging
 import re
 from pathlib import Path
@@ -17,7 +18,11 @@ from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_engine
-from theo.services.api.app.persistence_models import AppSetting, ContradictionSeed
+from theo.services.api.app.persistence_models import (
+    AppSetting,
+    ChatSession,
+    ContradictionSeed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +193,7 @@ def _split_sql_statements(sql: str) -> list[str]:
 
 
 _SQLITE_PERSPECTIVE_MIGRATION = "20250129_add_perspective_to_contradiction_seeds.sql"
+_SQLITE_CHAT_GOALS_MIGRATION = "20250223_chat_goals.sql"
 _SQLITE_ADD_COLUMN_RE = re.compile(
     r"^ALTER\s+TABLE\s+(?P<table>[^\s]+)\s+ADD\s+COLUMN\s+(?P<column>[^\s]+)",
     re.IGNORECASE | re.DOTALL,
@@ -267,6 +273,97 @@ def _sqlite_table_exists(connection, table: str) -> bool:
         return result.fetchone() is not None
     finally:
         result.close()
+
+
+def _apply_sqlite_chat_goals_migration(session: Session) -> bool:
+    """Ensure the chat goals schema migration is applied for SQLite."""
+
+    try:
+        connection = session.connection()
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.debug(
+            "Unable to inspect chat_sessions table prior to goals migration",
+            exc_info=exc,
+        )
+        return False
+
+    mutated_schema = False
+    if not _sqlite_table_exists(connection, "chat_sessions"):
+        logger.info("Creating chat_sessions table for SQLite database")
+        ChatSession.__table__.create(bind=connection, checkfirst=True)
+        mutated_schema = True
+
+    if not _sqlite_table_has_column(connection, "chat_sessions", "goals"):
+        logger.info("Adding chat_sessions.goals column for SQLite database")
+        connection.exec_driver_sql(
+            "ALTER TABLE chat_sessions ADD COLUMN goals TEXT NOT NULL DEFAULT '[]'"
+        )
+        mutated_schema = True
+
+    # Normalise memory snippet payloads to include missing keys like the Postgres migration.
+    data_mutated = False
+    try:
+        result = connection.exec_driver_sql(
+            "SELECT id, memory_snippets FROM chat_sessions"
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug(
+            "Unable to inspect chat_sessions memory snippets during goals migration",
+            exc_info=exc,
+        )
+    else:
+        try:
+            rows = list(result)
+        finally:
+            result.close()
+        for row in rows:
+            raw_snippets = row[1]
+            if raw_snippets in (None, "", b""):
+                continue
+            parsed: list[dict[str, object]] | None = None
+            try:
+                if isinstance(raw_snippets, (bytes, bytearray)):
+                    parsed = json.loads(raw_snippets.decode("utf-8"))
+                elif isinstance(raw_snippets, str):
+                    parsed = json.loads(raw_snippets)
+                elif isinstance(raw_snippets, list):
+                    parsed = raw_snippets
+            except Exception:
+                logger.debug(
+                    "Skipping memory snippet normalisation for chat session %s", row[0],
+                    exc_info=True,
+                )
+                parsed = None
+            if not parsed:
+                continue
+            mutated = False
+            normalised_entries: list[dict[str, object]] = []
+            for entry in parsed:
+                if not isinstance(entry, dict):
+                    mutated = True
+                    normalised_entries.append({"value": entry, "goal_id": None, "trail_id": None})
+                    continue
+                if "goal_id" not in entry:
+                    entry = dict(entry)
+                    entry["goal_id"] = None
+                    mutated = True
+                if "trail_id" not in entry:
+                    if not mutated:
+                        entry = dict(entry)
+                    entry["trail_id"] = None
+                    mutated = True
+                normalised_entries.append(entry)
+            if mutated:
+                connection.exec_driver_sql(
+                    "UPDATE chat_sessions SET memory_snippets = ? WHERE id = ?",
+                    (json.dumps(normalised_entries), row[0]),
+                )
+                data_mutated = True
+
+    if mutated_schema or data_mutated:
+        session.commit()
+
+    return True
 
 
 _SQLITE_ADD_COLUMN_RE = re.compile(
@@ -483,6 +580,18 @@ def run_sql_migrations(
                     )
                     should_execute = False
 
+            custom_sqlite_handler_applied = False
+            if (
+                dialect_name == "sqlite"
+                and migration_name == _SQLITE_CHAT_GOALS_MIGRATION
+            ):
+                custom_sqlite_handler_applied = _apply_sqlite_chat_goals_migration(session)
+                if custom_sqlite_handler_applied:
+                    logger.debug(
+                        "Applied SQLite fallback handler for chat goals migration",
+                    )
+                    should_execute = False
+
             if should_execute:
                 logger.info("Applying SQL migration: %s", migration_name)
                 if dialect_name == "postgresql" and _requires_autocommit(sql):
@@ -555,16 +664,17 @@ def run_sql_migrations(
                         "SQLite perspective column still missing after migration execution",
                     )
 
-            session.add(
-                AppSetting(
-                    key=key,
-                    value={
-                        "applied_at": datetime.now(UTC).isoformat(),
-                        "filename": migration_name,
-                    },
+            if should_execute or custom_sqlite_handler_applied:
+                session.add(
+                    AppSetting(
+                        key=key,
+                        value={
+                            "applied_at": datetime.now(UTC).isoformat(),
+                            "filename": migration_name,
+                        },
+                    )
                 )
-            )
-            session.commit()
-            applied.append(migration_name)
+                session.commit()
+                applied.append(migration_name)
 
     return applied

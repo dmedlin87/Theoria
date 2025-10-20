@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Literal, Sequence
 
 from pydantic import Field, model_validator
@@ -510,6 +511,40 @@ class GuardrailAdvisory(APIModel):
     )
 
 
+class LoopControlAction(str, Enum):
+    """Enumerates control surface actions available to the research loop."""
+
+    PAUSE = "pause"
+    RESUME = "resume"
+    STOP = "stop"
+    STEP = "step"
+
+
+class ResearchLoopStatus(str, Enum):
+    """Describes the lifecycle state of the Cognitive Scholar research loop."""
+
+    IDLE = "idle"
+    RUNNING = "running"
+    STEPPING = "stepping"
+    PAUSED = "paused"
+    STOPPED = "stopped"
+    COMPLETED = "completed"
+
+
+class ResearchLoopState(APIModel):
+    """Persisted state snapshot for the research loop controller."""
+
+    session_id: str
+    status: ResearchLoopStatus = ResearchLoopStatus.IDLE
+    current_step_index: int = 0
+    total_steps: int = 0
+    pending_actions: list[str] = Field(default_factory=list)
+    partial_answer: str | None = None
+    last_action: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    updated_at: datetime | None = None
+
+
 AIResponse = (
     VerseCopilotResponse
     | SermonPrepResponse
@@ -555,4 +590,7 @@ __all__ = [
     "GuardrailSuggestion",
     "GuardrailFailureMetadata",
     "GuardrailAdvisory",
+    "LoopControlAction",
+    "ResearchLoopStatus",
+    "ResearchLoopState",
 ]

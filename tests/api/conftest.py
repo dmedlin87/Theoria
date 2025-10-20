@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("THEO_API_KEYS", '["pytest-default-key"]')
 os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
@@ -12,6 +13,7 @@ import sys
 
 import pytest
 from fastapi import Request as FastAPIRequest
+from sqlalchemy import create_engine
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -80,19 +82,53 @@ def _disable_migrations(
     yield
 
 
-@pytest.fixture()
-def api_engine(tmp_path_factory: pytest.TempPathFactory):
-    """Configure and tear down an isolated SQLite engine for API tests."""
+@pytest.fixture(scope="session")
+def _skip_heavy_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disable expensive FastAPI lifespan setup steps for API tests."""
+
+    monkeypatch.setattr(
+        "theo.services.api.app.main.seed_reference_data",
+        lambda session: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.main.start_discovery_scheduler",
+        lambda: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.main.stop_discovery_scheduler",
+        lambda: None,
+        raising=False,
+    )
+
+
+@pytest.fixture(scope="session")
+def _api_engine_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Materialise a migrated SQLite database once per test session."""
     from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 
+    template_dir = tmp_path_factory.mktemp("api-engine-template")
+    template_path = template_dir / "api.sqlite"
+    engine = create_engine(f"sqlite:///{template_path}", future=True)
+    try:
+        Base.metadata.create_all(bind=engine)
+        run_sql_migrations(engine)
+    finally:
+        engine.dispose()
+    return template_path
+
+
+@pytest.fixture()
+def api_engine(
+    tmp_path_factory: pytest.TempPathFactory,
+    _api_engine_template: Path,
+):
+    """Provide an isolated SQLite engine for API tests with pre-applied migrations."""
     database_path = tmp_path_factory.mktemp("db") / "api.sqlite"
+    # Clone the pre-migrated template so each test starts from the same baseline.
+    shutil.copy2(_api_engine_template, database_path)
     configure_engine(f"sqlite:///{database_path}")
-    
-    # Create tables from models first
-    Base.metadata.create_all(bind=get_engine())
-    
-    # Then run migrations to ensure schema is up-to-date
-    run_sql_migrations(get_engine())
 
     engine = get_engine()
 

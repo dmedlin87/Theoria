@@ -95,7 +95,7 @@ class RequestLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.max_body_size = max_body_size
         # Use the dedicated Starlette status code for payload limits.
-        self._payload_limit_status = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+        self._payload_limit_status = status.HTTP_413_CONTENT_TOO_LARGE
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Response]

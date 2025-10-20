@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Sequence, TypeAlias
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.ai import run_guarded_chat
@@ -29,6 +30,8 @@ from theo.services.api.app.ai.memory_metadata import (
 from theo.application.facades.database import get_session
 from theo.application.facades.settings import get_settings
 from theo.services.api.app.persistence_models import ChatSession
+from theo.services.api.app.ai.research_loop import ResearchLoopController
+from theo.services.api.app.models.ai import LoopControlAction, ResearchLoopState
 from theo.services.api.app.intent.tagger import get_intent_tagger
 from theo.services.api.app.models.ai import (
     ChatGoalProgress,
@@ -62,7 +65,7 @@ router = APIRouter()
 LOGGER = logging.getLogger(__name__)
 
 # Prefer Starlette's payload-too-large HTTP status constant.
-_PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+_PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_CONTENT_TOO_LARGE
 
 _MAX_STORED_MEMORY = 10
 _MAX_CONTEXT_SNIPPETS = 4
@@ -70,6 +73,9 @@ _MEMORY_TEXT_LIMIT = 600
 _MEMORY_SUMMARY_LIMIT = 400
 _BAD_REQUEST_RESPONSE = {status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}}
 _NOT_FOUND_RESPONSE = {status.HTTP_404_NOT_FOUND: {"description": "Resource not found"}}
+_LOOP_BAD_REQUEST_RESPONSE = {
+    status.HTTP_400_BAD_REQUEST: {"description": "Invalid loop control request"}
+}
 CHAT_PLAN = "\n".join(
     [
         "- Retrieve supporting passages using hybrid search",
@@ -545,6 +551,15 @@ def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
     )
 
 
+def _get_loop_controller(session: Session) -> ResearchLoopController:
+    return ResearchLoopController(session)
+
+
+def _serialise_loop_state(state: ResearchLoopState) -> dict[str, object]:
+    payload = state.model_dump(mode="json", exclude_none=True)
+    return payload
+
+
 @router.post(
     "/chat",
     response_model=ChatSessionResponse,
@@ -882,6 +897,68 @@ def get_chat_session(session_id: str, session: Session = Depends(get_session)) -
             status_code=status.HTTP_404_NOT_FOUND,
         )
     return _serialise_chat_session(record)
+
+
+@router.get(
+    "/chat/{session_id}/loop",
+    responses=_NOT_FOUND_RESPONSE,
+)
+def get_research_loop_state(
+    session_id: str,
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    controller = _get_loop_controller(session)
+    state = controller.get_state(session_id)
+    return _serialise_loop_state(state)
+
+
+class LoopControlPayload(BaseModel):
+    action: LoopControlAction
+    step_id: str | None = None
+
+
+@router.post(
+    "/chat/{session_id}/loop/control",
+    responses={**_NOT_FOUND_RESPONSE, **_LOOP_BAD_REQUEST_RESPONSE},
+)
+def apply_research_loop_action(
+    session_id: str,
+    payload: LoopControlPayload,
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    controller = _get_loop_controller(session)
+    try:
+        state = controller.apply_action(session_id, payload.action, step_id=payload.step_id)
+    except LookupError as exc:
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_CHAT_LOOP_STATE_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
+    except ValueError as exc:
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_CHAT_LOOP_INVALID_ACTION",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        ) from exc
+    response: dict[str, object] = {"state": _serialise_loop_state(state)}
+    if state.partial_answer:
+        response["partial_answer"] = state.partial_answer
+    return response
 
 
 @router.get(

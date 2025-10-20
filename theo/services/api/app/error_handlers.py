@@ -54,26 +54,26 @@ def _build_error_response(
             "message": exc.message,
         }
     }
-    
+
     if exc.details:
         response["error"]["details"] = exc.details
-    
+
     if isinstance(exc, NotFoundError):
         response["error"]["resource_type"] = exc.resource_type
         response["error"]["resource_id"] = exc.resource_id
-    
+
     if isinstance(exc, ValidationError) and exc.field:
         response["error"]["field"] = exc.field
-    
+
     if isinstance(exc, RateLimitError) and exc.retry_after:
         response["error"]["retry_after"] = exc.retry_after
-    
+
     if isinstance(exc, ExternalServiceError):
         response["error"]["service"] = exc.service
-    
+
     if trace_id:
         response["trace_id"] = trace_id
-    
+
     return response
 
 
@@ -81,16 +81,16 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
     """Handle domain-level errors with consistent response format."""
     # Determine HTTP status code
     status_code = ERROR_STATUS_MAP.get(type(exc), status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     # Get trace ID for observability
     trace_headers = get_current_trace_headers()
     trace_id = trace_headers.get(TRACE_ID_HEADER_NAME) or request.headers.get(
         TRACE_ID_HEADER_NAME
     )
-    
+
     # Build response
     response_body = _build_error_response(exc, status_code, trace_id)
-    
+
     # Log error for monitoring
     if status_code >= 500:
         logger.error(
@@ -109,7 +109,7 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
             exc.message,
             extra={"trace_id": trace_id, "error_code": exc.code},
         )
-    
+
     # Attach trace headers
     response = JSONResponse(
         status_code=status_code,
@@ -117,18 +117,18 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
     )
     for key, value in trace_headers.items():
         response.headers[key] = value
-    
+
     # Add Retry-After header for rate limiting
     if isinstance(exc, RateLimitError) and exc.retry_after:
         response.headers["Retry-After"] = str(exc.retry_after)
-    
+
     return response
 
 
 def install_error_handlers(app: FastAPI) -> None:
     """Install standardized error handlers on the FastAPI application."""
     app.add_exception_handler(DomainError, domain_error_handler)
-    
+
     # Ensure all domain error subclasses are handled
     for error_class in [
         NotFoundError,
@@ -139,7 +139,7 @@ def install_error_handlers(app: FastAPI) -> None:
         ExternalServiceError,
     ]:
         app.add_exception_handler(error_class, domain_error_handler)
-    
+
     logger.info("Installed standardized domain error handlers")
 
 

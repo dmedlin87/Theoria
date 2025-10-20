@@ -684,30 +684,38 @@ def seed_contradiction_claims(session: Session) -> None:
         raise
 
     table_exists = _table_exists(session, table.name, schema=table.schema)
-    if not perspective_ready and not table_exists:
-        try:
-            rebuilt = _recreate_seed_table_if_missing_column(
-                session,
-                table,
-                "perspective",
-                dataset_label="contradiction",
-                force=True,
-            )
-        except OperationalError:
-            session.rollback()
-            logger.warning(
-                "Skipping contradiction seeds because table recreation failed",
-                exc_info=True,
-            )
-            return
-        else:
-            if rebuilt:
-                logger.info(
-                    "Created contradiction_seeds table before seeding bundled data",
+    if not perspective_ready:
+        needs_rebuild = not table_exists or not _table_has_column(
+            session, table.name, "perspective", schema=table.schema
+        )
+        if needs_rebuild:
+            try:
+                rebuilt = _recreate_seed_table_if_missing_column(
+                    session,
+                    table,
+                    "perspective",
+                    dataset_label="contradiction",
+                    force=True,
                 )
-            perspective_ready = _table_has_column(
-                session, table.name, "perspective", schema=table.schema
-            )
+            except OperationalError:
+                session.rollback()
+                logger.warning(
+                    "Skipping contradiction seeds because table recreation failed",
+                    exc_info=True,
+                )
+                return
+            else:
+                if rebuilt and not table_exists:
+                    logger.info(
+                        "Created contradiction_seeds table before seeding bundled data",
+                    )
+                elif rebuilt:
+                    logger.info(
+                        "Rebuilt contradiction_seeds table missing 'perspective' column before seeding",
+                    )
+                perspective_ready = _table_has_column(
+                    session, table.name, "perspective", schema=table.schema
+                )
 
     if not perspective_ready:
         return
