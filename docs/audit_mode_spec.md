@@ -111,13 +111,15 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 - **Retrieval Service**: Extend API to support claim-focused queries and freshness filters.
 - **Generation Orchestrator**: Add mode toggle (Normal vs Audit-Local vs Audit-Web) and attach verification loop results to responses.
 - **Audit Store**: New persistence layer (document DB or relational tables) for Claim Cards and audit reports.
-- **Reporting Layer**: Dashboard widgets for trust scores, claim statuses, and nightly audit summaries.
+- **Escalation Orchestrator**: Publishes flagged claims (unsupported/high-risk) into the compliance queue, enriches Claim Cards with risk metadata, and opens tickets in the Compliance Case Tracker (`COMP-ESC`).
+- **Reporting Layer**: Dashboard widgets for trust scores, claim statuses, nightly audit summaries, and SLA visualizations for human escalation tiers (Levels 1–3). Integrates with notification channels to surface imminent SLA breaches.
 - **External Search Connector**: Service wrapper for controlled web search with domain allow-listing and caching.
 
 ## 8. User Experience Considerations
 - **UI Indicators**: Display per-claim badges (Supported, Refuted, Needs Evidence) with hover tooltips showing key metrics.
 - **Mode Selection**: Provide toggle in admin console; allow per-user or per-conversation defaults.
-- **Escalation Queue**: Dedicated view that lists claims requiring human follow-up, sorted by risk.
+- **Escalation Queue**: Dedicated view that lists claims requiring human follow-up, sorted by risk, showing ownership (Level 1/2/3), SLA countdown timers, and ticket links to `COMP-ESC`.
+- **Compliance Dashboard**: Provide reporting widgets (queue aging charts, SLA attainment, incident summaries) aligned with §7 to support daily compliance stand-ups.
 - **Export Functionality**: Allow exporting Claim Cards for external review (e.g., sending to a trusted agent for validation).
 
 ## 9. Security & Compliance
@@ -140,11 +142,24 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 5. **Phase 4 – Refinement & Automation (ongoing)**
    - Tune thresholds, add domain-specific rules, integrate model monitoring.
 
-## 11. Open Questions
-- Which storage backend best fits Claim Cards (PostgreSQL vs document store)?
-- What is the acceptable latency overhead for Audit-Web responses?
-- How will we authenticate and monitor external search APIs?
-- What human escalation paths are required for regulatory compliance in specific jurisdictions?
+## 11. Human Escalation Workflow
+Following consultation with compliance stakeholders, the audit subsystem feeds unsupported or high-risk claims into a structured, three-tier human review process. Detailed operational guidance lives in `docs/runbooks/high_risk_claim_escalation.md`.
+
+1. **Automated Intake**
+   - Triggered by claims labeled `REFUTED`/`NEI` with `confidence < 0.6`, regulated-domain flags, or manual moderator escalation.
+   - Escalation Orchestrator publishes the Claim Card to the Escalation Queue, annotates risk metadata, and auto-creates a case (`COMP-ESC` ticket) with evidence and context links.
+   - Reporting layer dashboards (§§7–8) update in real time and push alerts to `#compliance-alerts` and `compliance-oncall@theoria.ai`.
+2. **Level 1 – On-Call Compliance Analyst (SLA: 30 minutes acknowledge/triage)**
+   - Reviews Claim Card, validates evidence, and either resolves (documenting rationale in the ticket and closing the queue entry) or escalates to Level 2 with required follow-up notes.
+3. **Level 2 – Domain Expert Reviewer (SLA: 4 business hours)**
+   - Provides subject-matter verification, recommends remediation (content edits, KB updates, user outreach), and records decisions in the ticket.
+4. **Level 3 – Compliance Lead (SLA: 1 business day)**
+   - Arbitrates disputes, engages legal when needed, and authorizes final publication or suppression.
+5. **Closure & Feedback Loop**
+   - Audit Operations Engineer syncs resolved status back into the audit store, updates Claim Card labels, and ensures reporting dashboards reflect SLA performance.
+   - Weekly compliance review notes captured per runbook guidance; severity-1 incidents trigger postmortems within 3 business days.
+
+Escalation metrics (volume, SLA adherence, outstanding actions) appear in the reporting layer dashboards described in §7, enabling compliance leadership to monitor queue health and intervene proactively.
 
 ## 12. Success Metrics
 - ≥90% of audited claims labeled `SUPPORTED` without human intervention.
