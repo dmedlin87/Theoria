@@ -43,7 +43,7 @@ Theoria currently relies on retrieval-augmented generation (RAG) to synthesize r
 
 ### 4.3 Escalation Logic
 - Escalate to Audit-Web when any of the following are true:
-  - Claim has `audit_score < 0.8`.
+  - Claim has `audit_score < audit_score_threshold` (see appendix).
   - No supporting passage retrieved locally.
   - SelfCheck disagreement ratio > 0.4.
   - Source age exceeds freshness policy (e.g., >18 months for neuroscience claims).
