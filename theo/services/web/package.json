@@ -46,7 +46,7 @@
     "@next/bundle-analyzer": "15.5.4",
     "@percy/cli": "^1.31.3",
     "@percy/playwright": "^1.0.9",
-    "@playwright/test": "1.56.0",
+    "@playwright/test": "1.56.1",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.0",
     "@testing-library/user-event": "^14.6.1",
