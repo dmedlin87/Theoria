@@ -621,8 +621,15 @@ def get_settings() -> Settings:
     """Return a cached Settings instance."""
 
     settings = Settings()
-    if settings.fixtures_root is None:
-        candidate = Path(__file__).resolve().parents[5] / "fixtures"
+    project_root = None
+    if settings.fixtures_root is not None:
+        root = settings.fixtures_root
+        if not root.is_absolute():
+            project_root = Path(__file__).resolve().parents[3]
+            settings.fixtures_root = (project_root / root).resolve()
+    else:
+        project_root = Path(__file__).resolve().parents[3]
+        candidate = project_root / "fixtures"
         if candidate.exists():
             settings.fixtures_root = candidate
 

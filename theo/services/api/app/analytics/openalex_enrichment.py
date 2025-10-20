@@ -176,11 +176,20 @@ def _merge_topics(document: Document, concepts: list[dict[str, Any]]) -> bool:
     if not concept_names:
         return False
 
-    # Normalize document.topics to a list of strings for consistent processing.
+    preserve_mapping = isinstance(document.topics, dict)
+    existing_primary: str | None = None
+
     if isinstance(document.topics, list):
         existing_topics = [str(item) for item in document.topics if item]
     elif isinstance(document.topics, dict):
-        existing_topics = [str(value) for value in document.topics.values() if value]
+        mapping = document.topics
+        all_values = mapping.get("all")
+        if isinstance(all_values, list):
+            existing_topics = [str(item) for item in all_values if item]
+        else:
+            existing_topics = [str(value) for value in mapping.values() if value]
+        primary = mapping.get("primary")
+        existing_primary = str(primary) if isinstance(primary, str) and primary else None
     else:
         existing_topics = []
 
@@ -188,7 +197,16 @@ def _merge_topics(document: Document, concepts: list[dict[str, Any]]) -> bool:
     if merged == existing_topics:
         return False
 
-    document.topics = merged
+    if preserve_mapping:
+        primary_topic = existing_primary or (merged[0] if merged else None)
+        document.topics = {
+            "primary": primary_topic,
+            "all": merged,
+        }
+        existing_primary = primary_topic
+    else:
+        document.topics = merged
+
     if isinstance(document.bib_json, dict):
         topics = list(document.bib_json.get("topics") or [])
     else:
@@ -196,8 +214,9 @@ def _merge_topics(document: Document, concepts: list[dict[str, Any]]) -> bool:
     merged_topics = _dedupe(list(topics) + concept_names)
     bib_json = dict(document.bib_json) if isinstance(document.bib_json, dict) else {}
     bib_json["topics"] = merged_topics
-    if concept_names:
-        bib_json.setdefault("primary_topic", concept_names[0])
+    primary_value = existing_primary or (concept_names[0] if concept_names else None)
+    if primary_value:
+        bib_json.setdefault("primary_topic", primary_value)
     document.bib_json = bib_json
     return True
 

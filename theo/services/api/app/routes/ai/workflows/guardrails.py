@@ -228,7 +228,7 @@ def guardrail_http_exception(
     error = AIWorkflowError(
         detail_text,
         code=_normalise_error_code(failure_metadata.code),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         severity=Severity.USER,
         hint=failure_metadata.reason,
         data=error_data,
