@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 import sys
 
 import pytest
@@ -23,9 +24,12 @@ from theo.services.api.app.ingest import pipeline  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 
 
-@pytest.fixture()
-def ingest_client(tmp_path: Path):
-    db_path = tmp_path / "ingest.db"
+@pytest.fixture(scope="module")
+def ingest_test_env(tmp_path_factory: pytest.TempPathFactory):
+    tmp_dir = tmp_path_factory.mktemp("ingest-db")
+    storage_root = tmp_path_factory.mktemp("ingest-storage")
+    db_path = tmp_dir / "ingest.db"
+
     configure_engine(f"sqlite:///{db_path}")
     engine = get_engine()
     Base.metadata.drop_all(engine)
@@ -33,7 +37,6 @@ def ingest_client(tmp_path: Path):
 
     settings = get_settings()
     original_storage = settings.storage_root
-    storage_root = tmp_path / "storage"
     storage_root.mkdir(parents=True, exist_ok=True)
     settings.storage_root = storage_root
 
@@ -45,13 +48,37 @@ def ingest_client(tmp_path: Path):
 
     try:
         with TestClient(app, raise_server_exceptions=False) as client:
-            yield client, storage_root
+            yield {
+                "client": client,
+                "engine": engine,
+                "storage_root": storage_root,
+                "settings": settings,
+                "original_storage": original_storage,
+            }
     finally:
         app.dependency_overrides.pop(get_session, None)
         settings.storage_root = original_storage
         engine.dispose()
         database_module._engine = None  # type: ignore[attr-defined]
         database_module._SessionLocal = None  # type: ignore[attr-defined]
+
+
+@pytest.fixture()
+def ingest_client(ingest_test_env):
+    client = ingest_test_env["client"]
+    engine = ingest_test_env["engine"]
+    storage_root = ingest_test_env["storage_root"]
+
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+
+    for path in storage_root.iterdir():
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+    return client, storage_root
 
 
 def test_duplicate_file_ingest_returns_400(ingest_client):

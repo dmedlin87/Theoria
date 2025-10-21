@@ -65,6 +65,7 @@ from .models import (
     VerseCopilotResponse,
 )
 from .reasoning_trace import build_reasoning_trace_from_completion
+from ..reasoning.chain_of_thought import parse_chain_of_thought
 from ..reasoning.metacognition import (
     Critique,
     RevisionResult,
@@ -421,14 +422,22 @@ class GuardedAnswerPipeline:
         revision_schema: RevisionDetails | None = None
         original_model_output = model_output
 
+        reasoning_text_for_critique = None
+
         if model_output:
+            chain_of_thought = parse_chain_of_thought(model_output)
+            reasoning_text_for_critique = (
+                chain_of_thought.raw_thinking.strip()
+                if chain_of_thought.raw_thinking
+                else model_output
+            )
             citation_payloads = [
                 citation.model_dump(exclude_none=True)
                 for citation in citations
             ]
             try:
                 critique_obj = critique_reasoning(
-                    reasoning_trace=model_output,
+                    reasoning_trace=reasoning_text_for_critique,
                     answer=model_output,
                     citations=citation_payloads,
                 )
@@ -452,7 +461,7 @@ class GuardedAnswerPipeline:
                             critique=critique_obj,
                             client=revision_client,
                             model=selected_model.model,
-                            reasoning_trace=model_output,
+                            reasoning_trace=reasoning_text_for_critique,
                             citations=citation_payloads,
                         )
                     except GenerationError as exc:

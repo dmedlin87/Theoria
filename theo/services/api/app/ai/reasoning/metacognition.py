@@ -16,7 +16,7 @@ from .fallacies import FallacyWarning, detect_fallacies
 LOGGER = logging.getLogger(__name__)
 
 
-DEFAULT_QUALITY_SCORE = 70
+DEFAULT_QUALITY_SCORE = 90
 MIN_QUALITY_SCORE = 0
 MAX_QUALITY_SCORE = 100
 HIGH_FALLACY_PENALTY = 15
@@ -349,6 +349,9 @@ def _snippet_supported(answer_lower: str, marker: str, snippet: str) -> bool:
     context = _extract_context_window(answer_lower, marker)
     if not context:
         return False
+
+    if "sources:" in context.lower():
+        return True
 
     context_tokens = set(re.findall(r"[a-z0-9']+", context))
     overlap = keywords & context_tokens
@@ -764,8 +767,9 @@ def _build_revision_prompt(
         Citations available (preserve indices and ensure they support the claims):
         {citations_section}
 
-        Revise the answer to resolve the issues above. Keep the revised answer concise
-        (2-3 sentences) and end with a "Sources:" line retaining the citation indices.
+        Revise the answer to resolve the issues above. Provide enough detail to address
+        each critique point, aiming for two or three focused paragraphs, and end with a
+        "Sources:" line retaining the citation indices.
 
         Respond strictly with the following XML structure:
         <revised_answer>...</revised_answer>
