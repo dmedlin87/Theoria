@@ -20,6 +20,7 @@ from ..ai.rag import (
 )
 from ..models.export import ExportManifest
 from ..models.search import HybridSearchFilters
+from ..models.research_plan import ResearchPlan
 from .base import APIModel
 
 
@@ -187,6 +188,7 @@ class ChatSessionResponse(APIModel):
     message: ChatSessionMessage
     answer: RAGAnswer
     intent_tags: list[IntentTagPayload] | None = None
+    plan: ResearchPlan | None = None
 
 
 class ChatSessionState(APIModel):
@@ -200,6 +202,7 @@ class ChatSessionState(APIModel):
     created_at: datetime
     updated_at: datetime
     last_interaction_at: datetime
+    plan: ResearchPlan | None = None
 
 
 class GuardrailProfile(APIModel):

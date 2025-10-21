@@ -10,6 +10,7 @@ from theo.application.facades.database import get_session
 from theo.services.api.app.ai.research_loop import ResearchLoopController
 from theo.services.api.app.main import app
 from theo.services.api.app.persistence_models import ChatSession
+from theo.services.api.app.models.research_plan import ResearchPlanStepStatus
 
 
 @pytest.fixture()
@@ -115,3 +116,71 @@ def test_loop_control_step_advances_index(client: TestClient) -> None:
     payload = response.json()
     assert payload["state"]["status"] in {"running", "completed"}
     assert payload["state"]["current_step_index"] >= 1
+
+
+def test_get_research_plan_returns_steps(client: TestClient) -> None:
+    session_id = "plan-get-session"
+    _create_chat_session(session_id)
+    _initialise_loop_state(session_id)
+
+    response = client.get(f"/ai/chat/{session_id}/plan")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["session_id"] == session_id
+    steps = payload["steps"]
+    assert isinstance(steps, list) and steps
+    assert steps[0]["status"] == ResearchPlanStepStatus.IN_PROGRESS.value
+
+
+def test_reorder_research_plan(client: TestClient) -> None:
+    session_id = "plan-reorder-session"
+    _create_chat_session(session_id)
+    _initialise_loop_state(session_id)
+
+    initial = client.get(f"/ai/chat/{session_id}/plan").json()
+    steps = initial["steps"]
+    order = [steps[-1]["id"], *[step["id"] for step in steps[:-1]]]
+    response = client.patch(
+        f"/ai/chat/{session_id}/plan/order",
+        json={"order": order},
+    )
+    assert response.status_code == 200
+    reordered = response.json()["steps"]
+    assert reordered[0]["id"] == steps[-1]["id"]
+    assert reordered[0]["index"] == 0
+
+
+def test_update_research_plan_step(client: TestClient) -> None:
+    session_id = "plan-update-session"
+    _create_chat_session(session_id)
+    _initialise_loop_state(session_id)
+
+    initial = client.get(f"/ai/chat/{session_id}/plan").json()
+    target = initial["steps"][0]
+    response = client.patch(
+        f"/ai/chat/{session_id}/plan/steps/{target['id']}",
+        json={"query": "summaries on justification", "tool": "semantic_search"},
+    )
+    assert response.status_code == 200
+    updated = response.json()
+    step = next(item for item in updated["steps"] if item["id"] == target["id"])
+    assert step["query"] == "summaries on justification"
+    assert step["tool"] == "semantic_search"
+
+
+def test_skip_research_plan_step(client: TestClient) -> None:
+    session_id = "plan-skip-session"
+    _create_chat_session(session_id)
+    _initialise_loop_state(session_id)
+
+    initial = client.get(f"/ai/chat/{session_id}/plan").json()
+    target = initial["steps"][0]
+    response = client.post(
+        f"/ai/chat/{session_id}/plan/steps/{target['id']}/skip",
+        json={"reason": "Handled during intake"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    step = next(item for item in payload["steps"] if item["id"] == target["id"])
+    assert step["status"] == ResearchPlanStepStatus.SKIPPED.value
+    assert payload["active_step_id"] != target["id"]

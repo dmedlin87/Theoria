@@ -31,6 +31,41 @@ export type ChatSessionMemoryEntry = {
   reasoningTrace?: ReasoningTraceType | null;
 };
 
+export type ResearchPlanStepStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "skipped"
+  | "blocked";
+
+export type ResearchPlanStep = {
+  id: string;
+  kind: string;
+  index: number;
+  label: string;
+  query: string | null;
+  tool: string | null;
+  status: ResearchPlanStepStatus;
+  estimatedTokens: number | null;
+  estimatedCostUsd: number | null;
+  estimatedDurationSeconds: number | null;
+  actualTokens: number | null;
+  actualCostUsd: number | null;
+  actualDurationSeconds: number | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ResearchPlan = {
+  sessionId: string;
+  steps: ResearchPlanStep[];
+  activeStepId: string | null;
+  version: number;
+  updatedAt: string;
+  metadata: Record<string, unknown>;
+};
+
 export type ChatSessionState = {
   sessionId: string;
   stance?: string | null;
@@ -45,11 +80,13 @@ export type ChatSessionState = {
   createdAt: string;
   updatedAt: string;
   lastInteractionAt: string;
+  plan: ResearchPlan | null;
 };
 
 export type NormalisedChatCompletion = {
   sessionId: string;
   answer: RAGAnswer;
+  plan: ResearchPlan | null;
 };
 
 export function normaliseExportResponse(
@@ -79,6 +116,104 @@ export function coerceStringList(value: unknown): string[] {
   return value
     .map((entry) => toOptionalString(entry))
     .filter((entry): entry is string => entry !== null);
+}
+
+const PLAN_STATUSES: ReadonlySet<ResearchPlanStepStatus> = new Set([
+  "pending",
+  "in_progress",
+  "completed",
+  "skipped",
+  "blocked",
+]);
+
+function parseNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed) {
+      const parsed = Number(trimmed);
+      if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+function parseMetadata(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>) };
+  }
+  return {};
+}
+
+function normaliseResearchPlanStep(value: unknown): ResearchPlanStep | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = toOptionalString(record.id);
+  const kind = toOptionalString(record.kind);
+  const label = toOptionalString(record.label);
+  const indexValue = parseNumber(record.index);
+  if (!id || !kind || !label || indexValue === null) {
+    return null;
+  }
+  const statusRaw = toOptionalString(record.status) ?? "pending";
+  const status = PLAN_STATUSES.has(statusRaw as ResearchPlanStepStatus)
+    ? (statusRaw as ResearchPlanStepStatus)
+    : "pending";
+  return {
+    id,
+    kind,
+    index: Math.max(0, Math.trunc(indexValue)),
+    label,
+    query: toOptionalString(record.query),
+    tool: toOptionalString(record.tool),
+    status,
+    estimatedTokens: parseNumber(record.estimated_tokens ?? record.estimatedTokens),
+    estimatedCostUsd: parseNumber(record.estimated_cost_usd ?? record.estimatedCostUsd),
+    estimatedDurationSeconds: parseNumber(
+      record.estimated_duration_seconds ?? record.estimatedDurationSeconds,
+    ),
+    actualTokens: parseNumber(record.actual_tokens ?? record.actualTokens),
+    actualCostUsd: parseNumber(record.actual_cost_usd ?? record.actualCostUsd),
+    actualDurationSeconds: parseNumber(
+      record.actual_duration_seconds ?? record.actualDurationSeconds,
+    ),
+    metadata: parseMetadata(record.metadata),
+    createdAt:
+      toOptionalString(record.created_at ?? record.createdAt) ?? new Date().toISOString(),
+    updatedAt:
+      toOptionalString(record.updated_at ?? record.updatedAt) ?? new Date().toISOString(),
+  } satisfies ResearchPlanStep;
+}
+
+export function normaliseResearchPlan(value: unknown): ResearchPlan | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const sessionId = toOptionalString(record.session_id ?? record.sessionId);
+  if (!sessionId) {
+    return null;
+  }
+  const stepsSource = Array.isArray(record.steps) ? record.steps : [];
+  const steps = stepsSource
+    .map((entry) => normaliseResearchPlanStep(entry))
+    .filter((entry): entry is ResearchPlanStep => entry !== null)
+    .sort((a, b) => a.index - b.index);
+  return {
+    sessionId,
+    steps,
+    activeStepId: toOptionalString(record.active_step_id ?? record.activeStepId),
+    version: parseNumber(record.version) ?? 1,
+    updatedAt:
+      toOptionalString(record.updated_at ?? record.updatedAt) ?? new Date().toISOString(),
+    metadata: parseMetadata(record.metadata),
+  } satisfies ResearchPlan;
 }
 
 const GUARDRAIL_ACTIONS = new Set(["search", "upload", "retry", "none"]);
@@ -361,7 +496,8 @@ export function normaliseChatCompletion(
   }
   const sessionId =
     toOptionalString(record.session_id ?? record.sessionId ?? record.id) ?? fallbackSessionId ?? "session";
-  return { sessionId, answer };
+  const plan = normaliseResearchPlan(record.plan ?? null);
+  return { sessionId, answer, plan };
 }
 
 export function normaliseChatSessionState(payload: unknown): ChatSessionState | null {
@@ -418,19 +554,18 @@ export function normaliseChatSessionState(payload: unknown): ChatSessionState | 
   if (record.preferences && typeof record.preferences === "object") {
     const pref = record.preferences as Record<string, unknown>;
     const mode = toOptionalString(pref.mode);
-    const defaultFilters = pref.default_filters ?? pref.defaultFilters ?? null;
-    const panelsSource = pref.frequently_opened_panels ?? pref.frequentlyOpenedPanels;
-    const frequentlyOpenedPanels = Array.isArray(panelsSource)
-      ? panelsSource
-          .map((value: unknown) => toOptionalString(value))
-          .filter((value): value is string => Boolean(value))
-      : [];
+    const defaultFilters = parseHybridFilters(pref.default_filters ?? pref.defaultFilters);
+    const frequentlyOpenedPanels = coerceStringList(
+      pref.frequently_opened_panels ?? pref.frequentlyOpenedPanels,
+    );
     preferences = {
       mode,
-      defaultFilters: (defaultFilters ?? null) as HybridSearchFilters | null,
+      defaultFilters,
       frequentlyOpenedPanels,
     };
   }
+
+  const plan = normaliseResearchPlan(record.plan ?? null);
 
   const fallbackTimestamp = new Date().toISOString();
 
@@ -444,5 +579,6 @@ export function normaliseChatSessionState(payload: unknown): ChatSessionState | 
     createdAt: createdAt ?? fallbackTimestamp,
     updatedAt: updatedAt ?? createdAt ?? fallbackTimestamp,
     lastInteractionAt: lastInteractionAt ?? updatedAt ?? createdAt ?? fallbackTimestamp,
+    plan,
   };
 }

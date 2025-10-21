@@ -1,6 +1,12 @@
 import type { components } from "./generated/api";
 import type { HybridSearchFilters } from "./guardrails";
-import { ChatSessionState, normaliseExportResponse } from "./api-normalizers";
+import {
+  ChatSessionState,
+  ResearchPlan,
+  ResearchPlanStepStatus,
+  normaliseExportResponse,
+  normaliseResearchPlan,
+} from "./api-normalizers";
 import { ChatWorkflowOptions, ChatWorkflowRequest, ChatWorkflowResult, createChatClient } from "./chat-client";
 import { createHttpClient } from "./http";
 
@@ -10,6 +16,7 @@ export type {
   ChatSessionPreferencesPayload,
   ChatSessionState,
 } from "./api-normalizers";
+export type { ResearchPlan, ResearchPlanStepStatus } from "./api-normalizers";
 export type {
   ChatWorkflowClient,
   ChatWorkflowGuardrail,
@@ -76,6 +83,18 @@ type TheoApiClientShape = {
   fetchFeatures(): Promise<Record<string, boolean>>;
   runChatWorkflow(payload: ChatWorkflowRequest, options?: ChatWorkflowOptions): Promise<ChatWorkflowResult>;
   fetchChatSession(sessionId: string): Promise<ChatSessionState | null>;
+  fetchResearchPlan(sessionId: string): Promise<ResearchPlan | null>;
+  reorderResearchPlan(sessionId: string, order: string[]): Promise<ResearchPlan>;
+  updateResearchPlanStep(
+    sessionId: string,
+    stepId: string,
+    payload: ResearchPlanStepUpdatePayload,
+  ): Promise<ResearchPlan>;
+  skipResearchPlanStep(
+    sessionId: string,
+    stepId: string,
+    payload: ResearchPlanStepSkipPayload,
+  ): Promise<ResearchPlan>;
   runVerseWorkflow(payload: { model: string; osis?: string | null; passage?: string | null; question?: string | null }): Promise<VerseResponse>;
   runSermonWorkflow(payload: { model: string; topic: string; osis?: string | null }): Promise<SermonResponse>;
   runComparativeWorkflow(payload: { model: string; osis: string; participants: string[] }): Promise<ComparativeResponse>;
@@ -109,6 +128,20 @@ type TheoApiClientShape = {
   deleteProviderSettings(provider: string): Promise<void>;
 };
 
+export type ResearchPlanStepUpdatePayload = {
+  query?: string | null;
+  tool?: string | null;
+  status?: ResearchPlanStepStatus | null;
+  estimatedTokens?: number | null;
+  estimatedCostUsd?: number | null;
+  estimatedDurationSeconds?: number | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type ResearchPlanStepSkipPayload = {
+  reason?: string | null;
+};
+
 export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
   const http = createHttpClient(baseUrl);
   const chat = createChatClient(http);
@@ -118,6 +151,74 @@ export function createTheoApiClient(baseUrl?: string): TheoApiClientShape {
     ...chat,
     fetchFeatures(): Promise<Record<string, boolean>> {
       return request<Record<string, boolean>>("/features/");
+    },
+    async fetchResearchPlan(sessionId: string): Promise<ResearchPlan | null> {
+      const payload = await request(`/ai/chat/${encodeURIComponent(sessionId)}/plan`);
+      return normaliseResearchPlan(payload);
+    },
+    async reorderResearchPlan(sessionId, order) {
+      const payload = await request(`/ai/chat/${encodeURIComponent(sessionId)}/plan/order`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order }),
+      });
+      const plan = normaliseResearchPlan(payload);
+      if (!plan) {
+        throw new Error("Failed to parse research plan response");
+      }
+      return plan;
+    },
+    async updateResearchPlanStep(sessionId, stepId, payload) {
+      const body: Record<string, unknown> = {};
+      if (payload.query !== undefined) {
+        body.query = payload.query;
+      }
+      if (payload.tool !== undefined) {
+        body.tool = payload.tool;
+      }
+      if (payload.status !== undefined) {
+        body.status = payload.status;
+      }
+      if (payload.estimatedTokens !== undefined) {
+        body.estimated_tokens = payload.estimatedTokens;
+      }
+      if (payload.estimatedCostUsd !== undefined) {
+        body.estimated_cost_usd = payload.estimatedCostUsd;
+      }
+      if (payload.estimatedDurationSeconds !== undefined) {
+        body.estimated_duration_seconds = payload.estimatedDurationSeconds;
+      }
+      if (payload.metadata !== undefined) {
+        body.metadata = payload.metadata;
+      }
+      const responsePayload = await request(
+        `/ai/chat/${encodeURIComponent(sessionId)}/plan/steps/${encodeURIComponent(stepId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const plan = normaliseResearchPlan(responsePayload);
+      if (!plan) {
+        throw new Error("Failed to parse research plan response");
+      }
+      return plan;
+    },
+    async skipResearchPlanStep(sessionId, stepId, payload) {
+      const responsePayload = await request(
+        `/ai/chat/${encodeURIComponent(sessionId)}/plan/steps/${encodeURIComponent(stepId)}/skip`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: payload.reason ?? null }),
+        },
+      );
+      const plan = normaliseResearchPlan(responsePayload);
+      if (!plan) {
+        throw new Error("Failed to parse research plan response");
+      }
+      return plan;
     },
     runVerseWorkflow(payload) {
       return request<VerseResponse>("/ai/verse", {

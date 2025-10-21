@@ -3,7 +3,7 @@
 **Priority**: ⭐⭐⭐ HIGH  
 **Timeline**: 2-4 weeks (MVP phase)  
 **Dependencies**: Architecture foundation (✅), Gap engine (exists), TASK_002-004  
-**Status**: Execution plan  
+**Status**: Phase 1 control-surface features landed (CS-001 → CS-003); streaming plan telemetry pending follow-up
 **Reference**: `theoria_feature_brainstorm_cognitive_scholar_v_1.md` Appendix §A
 
 ---
@@ -64,22 +64,31 @@ Break down the Cognitive Scholar MVP into discrete, implementable tickets follow
 
 ---
 
-#### Ticket CS-003: Live Plan Panel
+#### Ticket CS-003: Live Plan Panel ✅ COMPLETE
 **Estimate**: 6 hours  
 **Dependencies**: CS-002  
 **Description**: Display miniature plan showing queued queries, tools to call, and step priorities. Allow inline editing and reprioritization.
 
 **Acceptance Criteria**:
-- [ ] Panel lists current loop plan: steps, queries, tools
-- [ ] Each item shows: order, status, estimated cost/time
-- [ ] Drag-and-drop to reorder steps
-- [ ] Inline edit query text
-- [ ] Skip action per step
-- [ ] Real-time updates as loop executes
+- [x] Panel lists current loop plan: steps, queries, tools
+- [x] Each item shows: order, status, estimated cost/time
+- [x] Drag-and-drop to reorder steps
+- [x] Inline edit query text
+- [x] Skip action per step
+- [ ] Real-time updates as loop executes *(streaming deltas follow-up; snapshot refresh shipping today)*
 
 **Files**:
-- `theo/services/web/app/components/PlanPanel.tsx` (new)
-- `theo/services/api/app/models/research_plan.py` (new - plan DTOs)
+- `theo/services/api/app/models/research_plan.py` ✅ CREATED
+- `theo/services/api/app/ai/research_loop.py` ✅ MODIFIED
+- `theo/services/api/app/routes/ai/workflows/chat.py` ✅ MODIFIED
+- `theo/services/web/app/components/PlanPanel.tsx` ✅ CREATED
+- `theo/services/web/app/components/PlanPanel.module.css` ✅ CREATED
+- `theo/services/web/app/chat/ChatWorkspace.tsx` ✅ MODIFIED
+- `theo/services/web/app/lib/api-client.ts` ✅ MODIFIED
+- `theo/services/web/app/lib/api-normalizers.ts` ✅ MODIFIED
+- `theo/services/web/app/lib/chat-client.ts` ✅ MODIFIED
+- `theo/services/web/tests/app/chat/chat-workspace.test.tsx` ✅ MODIFIED
+- `tests/api/test_chat_loop_controls.py` ✅ MODIFIED
 
 ---
 
@@ -388,4 +397,4 @@ Break down the Cognitive Scholar MVP into discrete, implementable tickets follow
 
 ---
 
-**Status**: Ready to start CS-001 (Reasoning Timeline UI)
+**Status**: CS-001 through CS-003 complete; next up CS-004 argument schema + plan streaming enhancements

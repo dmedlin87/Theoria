@@ -1,5 +1,6 @@
 import {
   ChatSessionState,
+  ResearchPlan,
   parseGuardrailPayload,
   normaliseChatCompletion,
   normaliseChatSessionState,
@@ -35,7 +36,7 @@ export type ChatWorkflowRequest = {
 
 export type ChatWorkflowStreamEvent =
   | { type: "answer_fragment"; content: string }
-  | { type: "complete"; response: { sessionId: string; answer: RAGAnswer } }
+  | { type: "complete"; response: { sessionId: string; answer: RAGAnswer; plan: ResearchPlan | null } }
   | {
       type: "guardrail_violation";
       message: string;
@@ -44,7 +45,12 @@ export type ChatWorkflowStreamEvent =
       metadata?: GuardrailFailureMetadata | null;
     };
 
-export type ChatWorkflowSuccess = { kind: "success"; sessionId: string; answer: RAGAnswer };
+export type ChatWorkflowSuccess = {
+  kind: "success";
+  sessionId: string;
+  answer: RAGAnswer;
+  plan: ResearchPlan | null;
+};
 
 export type ChatWorkflowGuardrail = {
   kind: "guardrail";
@@ -92,7 +98,11 @@ function interpretStreamChunk(
   if (completion) {
     return {
       type: "complete",
-      response: { sessionId: completion.sessionId, answer: completion.answer },
+      response: {
+        sessionId: completion.sessionId,
+        answer: completion.answer,
+        plan: completion.plan,
+      },
     } satisfies ChatWorkflowStreamEvent;
   }
 
@@ -230,6 +240,7 @@ export function createChatClient(http: HttpClient): ChatClient {
                     kind: "success",
                     sessionId: interpreted.response.sessionId,
                     answer: interpreted.response.answer,
+                    plan: interpreted.response.plan,
                   };
                 }
                 options?.onEvent?.(interpreted);
@@ -264,6 +275,7 @@ export function createChatClient(http: HttpClient): ChatClient {
                 kind: "success",
                 sessionId: interpreted.response.sessionId,
                 answer: interpreted.response.answer,
+                plan: interpreted.response.plan,
               };
             }
             options?.onEvent?.(interpreted);
@@ -306,10 +318,15 @@ export function createChatClient(http: HttpClient): ChatClient {
         kind: "success",
         sessionId: completion.sessionId,
         answer: completion.answer,
+        plan: completion.plan,
       };
       options?.onEvent?.({
         type: "complete",
-        response: { sessionId: completion.sessionId, answer: completion.answer },
+        response: {
+          sessionId: completion.sessionId,
+          answer: completion.answer,
+          plan: completion.plan,
+        },
       });
       return success;
     }
