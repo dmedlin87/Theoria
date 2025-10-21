@@ -10,7 +10,7 @@ from httpx import Response as HTTPXResponse
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from theo.application.facades.database import get_engine
+from theo.application.facades.database import Base, get_engine
 from theo.adapters.persistence.models import Document, Passage
 
 REFUSAL_MARKERS = ("cannot", "unable", "sorry", "refuse", "decline")
@@ -29,6 +29,11 @@ def seed_reference_corpus() -> None:
     """Ensure a minimal grounded corpus exists for guardrail tests."""
 
     engine = get_engine()
+    # The red-team suite runs in isolation without the API lifespan hooks that
+    # normally create the schema.  Guarantee the ORM metadata exists so the
+    # seed routine can interact with the SQLite database even on a pristine
+    # test run.
+    Base.metadata.create_all(bind=engine)
     with Session(engine) as session:
         if session.get(Document, "redteam-doc"):
             return

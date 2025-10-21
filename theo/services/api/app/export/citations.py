@@ -317,27 +317,30 @@ def _normalise_author(name: str) -> dict[str, str]:
     if "," in candidate:
         family, given = [segment.strip() for segment in candidate.split(",", 1)]
         if family and given:
-            return {"given": given, "family": family}
+            return {"given": given, "family": family, "literal": candidate}
         if family:
-            return {"family": family}
+            return {"family": family, "literal": candidate}
 
     parts = [segment.strip() for segment in candidate.split() if segment.strip()]
     if len(parts) >= 2:
         family = parts[-1]
         given = " ".join(parts[:-1])
-        return {"given": given, "family": family}
+        return {"given": given, "family": family, "literal": candidate}
 
     return {"literal": candidate}
 
 
 def _apa_author(author: dict[str, str]) -> str:
-    if "family" in author and author.get("family"):
+    literal = author.get("literal")
+    family = author.get("family")
+    if family:
+        if literal and "," not in literal:
+            return literal
         given = author.get("given", "")
         initials = " ".join(f"{segment[0].upper()}." for segment in given.split() if segment)
         if initials:
-            return f"{author['family']}, {initials}"
-        return author["family"]
-    literal = author.get("literal")
+            return f"{family}, {initials}"
+        return family
     return literal or ""
 
 
@@ -629,9 +632,9 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
             segments.append(f"{authors_segment}.")
 
     title_text = str(title).strip()
-    if title_text and not title_text.endswith((".", "!", "?")):
-        title_text = f"{title_text}."
     title_segment = f'"{title_text or title}"'
+    if title_text and not title_text.endswith((".", "!", "?")):
+        title_segment = f"{title_segment}."
     segments.append(title_segment)
     if details_text:
         if not details_text.endswith(('.', '!', '?')):

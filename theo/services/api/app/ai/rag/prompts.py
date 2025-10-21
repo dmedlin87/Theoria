@@ -52,13 +52,12 @@ def _normalise_mojibake(text: str) -> str:
 
     if not text or not any(trigger in text for trigger in _MOJIBAKE_TRIGGERS):
         return text
-    try:
-        return text.encode("cp1252").decode("utf-8")
-    except UnicodeError:
+    for encoding in ("latin-1", "cp1252"):
         try:
-            return text.encode("latin-1").decode("utf-8")
-        except UnicodeError:
-            return text
+            return text.encode(encoding).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+    return text
 
 
 def scrub_adversarial_language(value: str | None) -> str | None:
