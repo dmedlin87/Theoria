@@ -70,14 +70,11 @@ router = APIRouter()
 
 LOGGER = logging.getLogger(__name__)
 
-# Prefer Starlette's payload-too-large HTTP status constant. Starlette 0.38+
-# renamed ``HTTP_413_CONTENT_TOO_LARGE`` to ``HTTP_413_REQUEST_ENTITY_TOO_LARGE``.
-# Use ``getattr`` so the code works across versions that provide either name.
-_PAYLOAD_TOO_LARGE_STATUS = getattr(
-    status,
-    "HTTP_413_CONTENT_TOO_LARGE",
-    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-)
+# Prefer Starlette's payload-too-large HTTP status constant.
+try:  # pragma: no branch - prefer new constant when available
+    _PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_CONTENT_TOO_LARGE
+except AttributeError:  # pragma: no cover - compatibility for older Starlette
+    _PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
 
 _MAX_STORED_MEMORY = 10
 _MAX_CONTEXT_SNIPPETS = 4
