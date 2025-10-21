@@ -141,6 +141,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 
 ### Progress
 * ✅ Implemented `tests/services/api/app/retriever/test_utils.py` to ensure `compose_passage_meta` merges document context with passage overrides while returning `None` when no metadata is available.
+* ✅ Added `tests/services/api/app/retriever/test_annotations.py` to cover annotation payload serialisation, legacy body handling, batched loading, and passage indexing helpers.
 
 ---
 
