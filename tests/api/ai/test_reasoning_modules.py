@@ -66,6 +66,57 @@ class TestFallacyDetector:
 
         assert any(w.fallacy_type == "verse_isolation" for w in warnings)
 
+    def test_detects_affirming_consequent(self):
+        """Should detect affirming the consequent fallacy."""
+
+        text = (
+            "If Paul's gospel is true then Gentiles are justified; "
+            "therefore Paul's gospel is true."
+        )
+
+        warnings = detect_fallacies(text)
+
+        assert any(w.fallacy_type == "affirming_consequent" for w in warnings)
+
+    def test_detects_straw_man(self):
+        """Should detect straw man arguments."""
+
+        text = "Critics argue the doctrine is false."
+
+        warnings = detect_fallacies(text)
+
+        assert any(w.fallacy_type == "straw_man" for w in warnings)
+
+    def test_detects_false_dichotomy(self):
+        """Should detect false dichotomies when framed as exclusive choices."""
+
+        text = (
+            "Either accept Paul's view exactly or reject the faith entirely, "
+            "leaving no other option for believers."
+        )
+
+        warnings = detect_fallacies(text)
+
+        assert any(w.fallacy_type == "false_dichotomy" for w in warnings)
+
+    def test_detects_eisegesis_language(self):
+        """Should flag eisegesis phrasing that imports meaning into the text."""
+
+        text = "The passage actually refers to modern democracy and nothing else."
+
+        warnings = detect_fallacies(text)
+
+        assert any(w.fallacy_type == "eisegesis" for w in warnings)
+
+    def test_detects_chronological_snobbery(self):
+        """Should detect dismissals based purely on an idea's era."""
+
+        text = "Ancient understanding was primitive; only modern knowledge matters."
+
+        warnings = detect_fallacies(text)
+
+        assert any(w.fallacy_type == "chronological_snobbery" for w in warnings)
+
     def test_no_fallacies_in_clean_text(self):
         """Should not flag clean reasoning."""
         text = "Romans 3:23 states all have sinned. Paul's argument builds on Jewish and Gentile guilt."
@@ -152,6 +203,59 @@ class TestChainOfThought:
         assert "skeptical peer reviewer" in prompt.lower()
         assert "Question Every Claim" in prompt
         assert "Check Logic" in prompt
+
+    def test_builds_detective_prompt_with_contradictions(self):
+        """Detective prompt should surface known tensions when provided."""
+
+        citations = [
+            RAGCitation(
+                index=1,
+                osis="Rom.3.23",
+                anchor="page 42",
+                passage_id="p1",
+                document_id="d1",
+                document_title="Romans Commentary",
+                snippet="All have sinned and fall short",
+            )
+        ]
+        contradictions = [
+            {
+                "summary": "Grace vs works emphasis",
+                "osis_a": "Rom.3.23",
+                "osis_b": "James.2.24",
+                "perspective": "debate",
+            }
+        ]
+
+        prompt = build_cot_prompt(
+            "How do Paul and James align?",
+            citations,
+            mode="detective",
+            contradictions=contradictions,
+        )
+
+        assert "Known Tensions" in prompt
+        assert "Grace vs works emphasis" in prompt
+        assert "Rom.3.23" in prompt and "James.2.24" in prompt
+
+    def test_unknown_mode_defaults_to_detective_prompt(self):
+        """Unknown reasoning modes should fall back to detective scaffolding."""
+
+        citations = [
+            RAGCitation(
+                index=1,
+                osis="John.1.1",
+                anchor="context",
+                passage_id="p1",
+                document_id="d1",
+                document_title="Gospel of John",
+                snippet="In the beginning was the Word",
+            )
+        ]
+
+        prompt = build_cot_prompt("Was Jesus divine?", citations, mode="explorer")
+
+        assert "You are a theological detective" in prompt
 
     def test_parses_thinking_tags(self):
         """Should parse <thinking> tags from completion."""
