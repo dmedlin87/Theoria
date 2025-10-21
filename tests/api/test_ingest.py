@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 from ipaddress import ip_address
 from urllib.error import ContentTooShortError
+from urllib.request import Request
 
 import pytest
 from fastapi import status
@@ -642,6 +643,59 @@ def test_ingest_url_times_out_on_slow_response(
     assert call_counter["count"] == 1
 
 
+def test_loop_detecting_redirect_handler_preserves_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings()
+    settings.ingest_url_block_private_networks = False
+    settings.ingest_url_allowed_hosts = []
+    settings.ingest_url_blocked_hosts = []
+    settings.ingest_url_blocked_ip_networks = []
+    settings.ingest_url_blocked_schemes = []
+    settings.ingest_url_allowed_schemes = ["https", "http"]
+
+    _stub_address_resolution(monkeypatch)
+
+    handler = network_module.LoopDetectingRedirectHandler(2, settings)
+    start_url = "https://example.com/start"
+    handler.visited.add(start_url)
+
+    request = Request(start_url)
+    request.timeout = 2.5  # type: ignore[attr-defined]
+
+    captured: dict[str, object] = {}
+
+    def fake_redirect(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        captured["timeout"] = getattr(req, "timeout", None)
+        captured["newurl"] = newurl
+
+        class _Redirected:
+            pass
+
+        return _Redirected()
+
+    monkeypatch.setattr(
+        network_module.HTTPRedirectHandler,
+        "redirect_request",
+        fake_redirect,
+    )
+
+    redirected = handler.redirect_request(
+        request,
+        fp=None,
+        code=302,
+        msg="Found",
+        headers={"Location": "https://example.com/next"},
+        newurl="https://example.com/next",
+    )
+
+    assert getattr(redirected, "timeout", None) == 2.5
+    assert captured["timeout"] == 2.5
+    assert captured["newurl"] == "https://example.com/next"
+    assert handler.redirect_count == 1
+    assert "https://example.com/next" in handler.visited
+
+
 def test_ingest_url_rejects_oversized_response(
     monkeypatch: pytest.MonkeyPatch, api_client: TestClient
 ) -> None:
@@ -696,6 +750,57 @@ def test_ingest_url_rejects_oversized_response(
         == "Review the URL and ensure it meets ingestion requirements."
     )
     assert call_counter["count"] == 1
+
+
+def test_fetch_web_document_rejects_blocked_redirect_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings()
+    settings.ingest_url_block_private_networks = False
+    settings.ingest_url_allowed_hosts = []
+    settings.ingest_url_blocked_hosts = ["evil.example"]
+    settings.ingest_url_blocked_ip_networks = []
+    settings.ingest_url_blocked_schemes = []
+    settings.ingest_url_allowed_schemes = ["https", "http"]
+    settings.ingest_web_timeout_seconds = 1.0
+    settings.ingest_web_max_bytes = 1024
+    settings.ingest_web_max_redirects = 3
+
+    _stub_address_resolution(monkeypatch)
+
+    class _BlockedRedirectResponse:
+        def __init__(self) -> None:
+            self.headers = _FakeHeaders()
+            self.closed = False
+
+        def geturl(self) -> str:
+            return "https://evil.example/resource"
+
+        def read(self, size: int | None = None) -> bytes:  # noqa: ARG002
+            raise AssertionError("Blocked redirect targets should not be read")
+
+        def close(self) -> None:
+            self.closed = True
+
+    blocked_response = _BlockedRedirectResponse()
+
+    class _BlockedRedirectOpener:
+        def __init__(self, handler):  # noqa: ANN001
+            self.handler = handler
+            self.addheaders = []
+
+        def open(self, request, timeout=None):  # noqa: ANN001, D401
+            return blocked_response
+
+    with pytest.raises(network_module.UnsupportedSourceError) as excinfo:
+        network_module.fetch_web_document(
+            settings,
+            "https://example.com/start",
+            opener_factory=lambda handler: _BlockedRedirectOpener(handler),
+        )
+
+    assert str(excinfo.value) == "URL target is not allowed for ingestion"
+    assert blocked_response.closed is True
 
 
 def test_ingest_url_detects_redirect_loop(
