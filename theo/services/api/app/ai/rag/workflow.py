@@ -660,7 +660,7 @@ _REFUSAL_FALLBACK_SNIPPET = (
     "grounded in that hope."
 )
 REFUSAL_MODEL_NAME = "guardrail.refusal"
-REFUSAL_MESSAGE = "I’m sorry, but I cannot help with that request."
+REFUSAL_MESSAGE = "I'm sorry, but I cannot help with that request."
 
 
 def _load_refusal_reference(session: Session) -> tuple[Passage | None, Document | None]:
