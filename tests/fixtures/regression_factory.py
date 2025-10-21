@@ -12,73 +12,97 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from importlib.util import module_from_spec, spec_from_file_location
 from itertools import count
+from pathlib import Path
 from typing import Iterable, Sequence
 
 import pythonbible as pb
 
-try:  # pragma: no cover - exercised indirectly by tests
-    from faker import Faker
-except ModuleNotFoundError:  # pragma: no cover - fallback for minimal envs
-    class _FallbackFaker:
-        """Lightweight replacement used when the optional ``faker`` package is absent."""
 
-        _WORD_BANK = [
-            "grace",
-            "faith",
-            "hope",
-            "charity",
-            "wisdom",
-            "light",
-            "peace",
-            "truth",
-            "covenant",
-            "mercy",
-            "promise",
-            "joy",
-            "steadfast",
-            "justice",
-            "blessing",
-            "deliverance",
-            "comfort",
-            "goodness",
-            "kindness",
-            "guidance",
-        ]
+class _FallbackFaker:
+    """Lightweight stand-in mirroring the local ``faker`` test stub."""
 
-        def __init__(self, seed: int | None = None) -> None:
-            self._random = random.Random()
-            if seed is not None:
-                self._random.seed(seed)
-try:  # pragma: no cover - exercised indirectly via tests
-    from faker import Faker  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - fallback for minimal test env
-    class Faker:
-        """Lightweight stand-in that mimics the subset of Faker we require."""
+    _WORD_BANK = [
+        "alpha",
+        "bravo",
+        "charlie",
+        "delta",
+        "echo",
+        "foxtrot",
+        "golf",
+        "hotel",
+        "india",
+        "juliet",
+        "kilo",
+        "lima",
+        "mike",
+        "november",
+        "oscar",
+        "papa",
+        "quebec",
+        "romeo",
+        "sierra",
+        "tango",
+        "uniform",
+        "victor",
+        "whiskey",
+        "xray",
+        "yankee",
+        "zulu",
+    ]
 
-        def __init__(self) -> None:
-            self._random = random.Random()
+    def __init__(self) -> None:
+        self._random = random.Random()
 
-        def seed_instance(self, seed: int) -> None:
-            self._random.seed(seed)
+    def seed_instance(self, seed: int) -> None:
+        self._random.seed(seed)
 
-        def _words(self, nb: int) -> list[str]:
-            return [self._random.choice(self._WORD_BANK) for _ in range(nb)]
+    def _words(self, nb: int) -> list[str]:
+        return [self._random.choice(self._WORD_BANK) for _ in range(nb)]
 
-        def sentence(self, nb_words: int = 6) -> str:
-            words = self._words(nb_words)
-            return (" ".join(words)).capitalize() + "."
+    def words(self, nb: int = 3) -> list[str]:
+        return self._words(max(nb, 0))
 
-        def sentences(self, nb: int = 3) -> list[str]:
-            return [self.sentence() for _ in range(nb)]
+    def sentence(self, nb_words: int = 6) -> str:
+        words = self._words(max(nb_words, 1))
+        return (" ".join(words)).capitalize() + "."
 
-        def paragraphs(self, nb: int = 3) -> list[str]:
-            return [" ".join(self.sentences(nb=3)) for _ in range(nb)]
+    def sentences(self, nb: int = 3) -> list[str]:
+        return [self.sentence() for _ in range(max(nb, 0))]
 
-        def words(self, nb: int = 3) -> list[str]:
-            return self._words(nb)
+    def paragraphs(self, nb: int = 3) -> list[str]:
+        return [" ".join(self.sentences(nb=3)) for _ in range(max(nb, 0))]
 
-    Faker = _FallbackFaker
+
+def _resolve_faker() -> type[_FallbackFaker]:
+    """Return the deterministic Faker stub even if the real package is present."""
+
+    try:  # pragma: no cover - exercised indirectly by tests
+        import faker as faker_module  # type: ignore
+    except ModuleNotFoundError:  # pragma: no cover - thin local envs
+        faker_module = None  # type: ignore[assignment]
+
+    if faker_module is not None and hasattr(faker_module, "_WORDS"):
+        return getattr(faker_module, "Faker")  # type: ignore[return-value]
+
+    stub_path = Path(__file__).resolve().parents[2] / "faker" / "__init__.py"
+    if stub_path.exists():
+        spec = spec_from_file_location("_theoria_faker_stub", stub_path)
+        if spec and spec.loader:  # pragma: no branch - loader present in tests
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+            faker_cls = getattr(module, "Faker", None)
+            if faker_cls is not None:
+                return faker_cls  # type: ignore[return-value]
+
+    if faker_module is not None and hasattr(faker_module, "Faker"):
+        return faker_module.Faker  # type: ignore[attr-defined, return-value]
+
+    return _FallbackFaker
+
+
+Faker = _resolve_faker()
 
 from theo.domain.research.osis import format_osis, osis_to_readable
 from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
