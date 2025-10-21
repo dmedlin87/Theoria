@@ -19,7 +19,11 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_QUALITY_SCORE = 90
 MIN_QUALITY_SCORE = 0
 MAX_QUALITY_SCORE = 100
-HIGH_FALLACY_PENALTY = 15
+# A single high-severity fallacy should substantially lower the quality score so
+# that critiques surface the issue prominently. 15 points still left obviously
+# flawed reasoning rated too highly (see tests/api/ai/test_reasoning_modules.py).
+# Increase the penalty so one severe fallacy drops the score below 70.
+HIGH_FALLACY_PENALTY = 25
 MEDIUM_FALLACY_PENALTY = 8
 WEAK_CITATION_PENALTY = 5
 BIAS_WARNING_PENALTY = 10
