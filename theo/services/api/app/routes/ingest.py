@@ -43,7 +43,10 @@ run_pipeline_for_transcript = _run_pipeline_for_transcript
 run_pipeline_for_url = _run_pipeline_for_url
 
 # Starlette's payload-too-large HTTP status constant.
-_PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_CONTENT_TOO_LARGE
+try:  # pragma: no branch - prefer new constant when available
+    _PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_CONTENT_TOO_LARGE
+except AttributeError:  # pragma: no cover - compatibility for older Starlette
+    _PAYLOAD_TOO_LARGE_STATUS = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
 
 _INGEST_ERROR_RESPONSES = {
     status.HTTP_400_BAD_REQUEST: {"description": "Invalid ingest request"},
