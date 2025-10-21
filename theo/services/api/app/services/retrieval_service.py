@@ -350,6 +350,91 @@ class RetrievalService:
 
         return results, reranker_header
 
+    def _rerank_results(
+        self,
+        results: Sequence[HybridSearchResult],
+        reranker: Reranker,
+        top_n: int,
+        *,
+        log_reference: str | Path | None = None,
+        log_extra: Mapping[str, object] | None = None,
+    ) -> tuple[list[HybridSearchResult], bool]:
+        """Apply the supplied ``reranker`` to the top ``top_n`` results."""
+
+        result_list = list(results)
+        if not result_list or top_n <= 0:
+            return [item.model_copy(deep=True) for item in result_list], False
+
+        top_n = min(len(result_list), top_n)
+        leading_results = result_list[:top_n]
+        trailing_results = result_list[top_n:]
+
+        log_payload: dict[str, object] = {
+            "event": "search.reranker_attempt",
+            "top_n": top_n,
+            "result_count": len(result_list),
+        }
+        if log_reference is not None:
+            log_payload["reranker_reference"] = str(log_reference)
+        if log_extra:
+            log_payload.update(dict(log_extra))
+
+        start_time = time.perf_counter()
+        try:
+            reranked_leading = list(reranker.rerank(leading_results))
+        except Exception as exc:  # pragma: no cover - defensive logging
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 3)
+            failure_payload = {
+                **log_payload,
+                "event": "search.reranker_failed",
+                "error": str(exc),
+                "duration_ms": duration_ms,
+            }
+            LOGGER.exception("search.reranker_failed", extra=failure_payload)
+            SEARCH_RERANKER_EVENTS.labels(event="failed").inc()
+            return [item.model_copy(deep=True) for item in result_list], False
+
+        duration_ms = round((time.perf_counter() - start_time) * 1000, 3)
+
+        if len(reranked_leading) != len(leading_results):
+            seen_ids = {
+                str(getattr(item, "id", "")) for item in reranked_leading if getattr(item, "id", None)
+            }
+            for candidate in leading_results:
+                identifier = str(getattr(candidate, "id", ""))
+                if identifier and identifier in seen_ids:
+                    continue
+                clone = candidate.model_copy(deep=True)
+                reranked_leading.append(clone)
+                if identifier:
+                    seen_ids.add(identifier)
+
+        for index, item in enumerate(reranked_leading, start=1):
+            item.rank = index
+
+        reranked_results: list[HybridSearchResult] = list(reranked_leading)
+        for offset, item in enumerate(trailing_results, start=1):
+            clone = item.model_copy(deep=True)
+            clone.rank = len(reranked_leading) + offset
+            reranked_results.append(clone)
+
+        ordering_changed = [
+            str(getattr(item, "id", "")) for item in leading_results if getattr(item, "id", None)
+        ] != [
+            str(getattr(item, "id", "")) for item in reranked_leading if getattr(item, "id", None)
+        ]
+
+        success_payload = {
+            **log_payload,
+            "event": "search.reranker_applied",
+            "duration_ms": duration_ms,
+            "ordering_changed": ordering_changed,
+        }
+        LOGGER.info("search.reranker_applied", extra=success_payload)
+        SEARCH_RERANKER_EVENTS.labels(event="applied").inc()
+
+        return reranked_results, True
+
     def _should_rerank(self) -> bool:
         if not getattr(self.settings, "reranker_enabled", False):
             return False
