@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy.orm import Session
 
 from theo.adapters import AdapterRegistry
 from theo.application import ApplicationContainer
 from theo.application.facades.database import Base, configure_engine, get_engine
+from theo.application.reasoner import NeighborhoodReasoner
+from theo.application.research import ResearchService
+from theo.adapters.research import (
+    SqlAlchemyHypothesisRepository,
+    SqlAlchemyResearchNoteRepository,
+)
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.platform.application import resolve_application as platform_resolve_application
 from theo.services.bootstrap import resolve_application
@@ -48,6 +55,7 @@ def test_resolve_application_returns_container_and_registry(
             "research_notes_repository_factory",
             "hypotheses_repository_factory",
             "research_service_factory",
+            "reasoner_factory",
         }
         assert expected_ports.issubset(registry.factories.keys())
 
@@ -89,4 +97,46 @@ def test_resolve_application_results_are_cached(
 
 def test_service_wrapper_exposes_platform_bootstrap():
     assert resolve_application is platform_resolve_application
+
+
+def test_reasoner_factory_produces_new_instances(
+    database,
+    application_container_factory,
+):
+    with application_container_factory():
+        _, registry = resolve_application()
+
+        reasoner_factory = registry.resolve("reasoner_factory")
+        assert callable(reasoner_factory)
+
+        with Session(database) as session:
+            first_reasoner = reasoner_factory(session)
+            second_reasoner = reasoner_factory(session)
+
+        assert isinstance(first_reasoner, NeighborhoodReasoner)
+        assert isinstance(second_reasoner, NeighborhoodReasoner)
+        assert first_reasoner is not second_reasoner
+
+
+def test_research_service_factory_binds_sqlalchemy_repositories(
+    database,
+    application_container_factory,
+):
+    with application_container_factory():
+        container, registry = resolve_application()
+
+        engine = registry.resolve("engine")
+        with Session(engine) as session:
+            service = container.get_research_service(session)
+
+            assert isinstance(service, ResearchService)
+            assert isinstance(
+                service._notes_repository, SqlAlchemyResearchNoteRepository
+            )
+            assert isinstance(
+                service._hypothesis_repository, SqlAlchemyHypothesisRepository
+            )
+            assert service._hypothesis_repository is not None
+            assert service._notes_repository._session is session
+            assert service._hypothesis_repository._session is session
 
