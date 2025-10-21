@@ -77,3 +77,47 @@ def test_main_runs_task_inline_when_requested(
     assert fake_task.run_calls == [((None,), {"sample_queries": 17, "top_k": 4})]
     assert "HNSW index refreshed synchronously." in result.output
     assert '"sampleQueries": 17' in result.output
+
+
+def test_main_enqueues_task_without_identifier(
+    refresh_cli_module, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _ResultWithoutId:
+        def __init__(self) -> None:
+            self.called_with: tuple[tuple[object, ...], dict[str, object]] | None = None
+
+        def delay(self, *args: object, **kwargs: object) -> "_ResultWithoutId":
+            self.called_with = (args, kwargs)
+            return self
+
+    fake_task = _ResultWithoutId()
+    monkeypatch.setattr(refresh_cli_module, "refresh_hnsw", fake_task)
+
+    result = runner.invoke(
+        refresh_cli_module.main,
+        ["--enqueue", "--sample-queries", "11", "--top-k", "6"],
+    )
+
+    assert result.exit_code == 0
+    assert fake_task.called_with == ((None,), {"sample_queries": 11, "top_k": 6})
+    assert "Queued refresh_hnsw task." in result.output
+
+
+def test_main_rejects_out_of_range_values(
+    refresh_cli_module, runner: CliRunner
+) -> None:
+    result = runner.invoke(
+        refresh_cli_module.main,
+        ["--sample-queries", "0"],
+    )
+
+    assert result.exit_code == 2
+    assert "Invalid value for '--sample-queries'" in result.output
+
+    result = runner.invoke(
+        refresh_cli_module.main,
+        ["--top-k", "201"],
+    )
+
+    assert result.exit_code == 2
+    assert "Invalid value for '--top-k'" in result.output
