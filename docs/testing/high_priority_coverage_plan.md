@@ -91,6 +91,9 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * ✅ Added `tests/services/api/app/ingest/test_metadata.py` to verify `merge_metadata` nested override semantics.
 * ✅ Implemented `tests/services/api/app/ingest/test_pipeline_core.py` to exercise `PipelineDependencies`, `_ensure_success`, default title factories, and `_UrlDocumentPersister` dispatch logic.
 * ✅ Added `tests/services/api/app/ingest/test_orchestrator.py` to cover success, retry/fallback, and terminal failure behaviours of `IngestOrchestrator`.
+* ✅ Added `tests/services/api/app/ingest/test_network.py` to cover host normalisation, redirect loop detection, fetch byte limits, and YouTube helper utilities.
+* ✅ Expanded `tests/services/api/app/ingest/test_metadata.py` with guardrail property tests, metadata serialisation, topic aggregation, and HTML parsing checks.
+* ✅ Added `tests/services/api/app/ingest/test_embeddings.py` to validate embedding cache behaviour, resilience telemetry, and lexical representation fallbacks.
 
 ---
 
