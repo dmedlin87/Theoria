@@ -72,11 +72,12 @@ LOGGER = logging.getLogger(__name__)
 
 # Prefer Starlette's payload-too-large HTTP status constant. Starlette 0.38+
 # renamed ``HTTP_413_CONTENT_TOO_LARGE`` to ``HTTP_413_REQUEST_ENTITY_TOO_LARGE``.
-# Use ``getattr`` so the code works across versions that provide either name.
+# Use ``getattr`` so the code works across versions that provide either name,
+# and fall back to the literal status code if neither attribute exists.
 _PAYLOAD_TOO_LARGE_STATUS = getattr(
     status,
-    "HTTP_413_CONTENT_TOO_LARGE",
-    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+    "HTTP_413_REQUEST_ENTITY_TOO_LARGE",
+    getattr(status, "HTTP_413_CONTENT_TOO_LARGE", 413),
 )
 
 _MAX_STORED_MEMORY = 10
