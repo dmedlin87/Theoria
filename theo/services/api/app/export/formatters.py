@@ -694,13 +694,10 @@ def _render_minimal_pdf(
     # fixtures used in tests.
     ascii_header = b"%PDF-1.4\n%\n"
     output.extend(ascii_header)
-    # The historical implementation used a binary comment ("%\xe2\xe3\xcf\xd3\n") in the
-    # header. The deterministic fixtures in tests were generated with that longer header,
-    # so the cross-reference table needs a fixed compatibility offset to keep byte-for-byte
-    # parity even though the actual header bytes are now ASCII only.
-    header_compat_offset = len(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n") - len(ascii_header)
-    if header_compat_offset < 0:
-        header_compat_offset = 0
+    # The historical implementation wrote a longer binary marker in the header and later
+    # revisions tried to compensate by shifting the cross-reference offsets. The offsets
+    # must continue to reference the real "<num> 0 obj" tokens, so we remove the
+    # compatibility shim and rely on the true positions produced by the shortened header.
     offsets = []
     for index, obj in enumerate(objects, start=1):
         offsets.append(len(output))
@@ -711,15 +708,13 @@ def _render_minimal_pdf(
     output.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
     output.extend(b"0000000000 65535 f \n")
     for offset in offsets:
-        output.extend(
-            f"{offset + header_compat_offset:010d} 00000 n \n".encode("ascii")
-        )
+        output.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
     output.extend(b"trailer\n")
     output.extend(
         f"<< /Size {len(objects) + 1} /Root 1 0 R /Info 6 0 R >>\n".encode("ascii")
     )
     output.extend(b"startxref\n")
-    output.extend(f"{xref_offset + header_compat_offset}\n".encode("ascii"))
+    output.extend(f"{xref_offset}\n".encode("ascii"))
     output.extend(b"%%EOF\n")
     return bytes(output)
 
