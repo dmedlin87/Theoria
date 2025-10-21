@@ -89,6 +89,8 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 ### Progress
 * ✅ Covered `ensure_url_allowed` allow-list bypass and blocked-network rejection paths through `tests/services/api/app/ingest/test_pipeline_url_guards.py`.
 * ✅ Added `tests/services/api/app/ingest/test_metadata.py` to verify `merge_metadata` nested override semantics.
+* ✅ Implemented `tests/services/api/app/ingest/test_pipeline_core.py` to exercise `PipelineDependencies`, `_ensure_success`, default title factories, and `_UrlDocumentPersister` dispatch logic.
+* ✅ Added `tests/services/api/app/ingest/test_orchestrator.py` to cover success, retry/fallback, and terminal failure behaviours of `IngestOrchestrator`.
 
 ---
 
