@@ -44,10 +44,24 @@ _ADVERSARIAL_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
+_MOJIBAKE_TRIGGERS = ("Ã", "â")
+
+
+def _normalise_mojibake(text: str) -> str:
+    """Best-effort fix for mojibake sequences seen in legacy corpora."""
+
+    if not text or not any(trigger in text for trigger in _MOJIBAKE_TRIGGERS):
+        return text
+    try:
+        return text.encode("latin-1").decode("utf-8")
+    except UnicodeDecodeError:
+        return text
+
+
 def scrub_adversarial_language(value: str | None) -> str | None:
     if not value:
         return value
-    text = value
+    text = _normalise_mojibake(value)
     for pattern, replacement in _ADVERSARIAL_REPLACEMENTS:
         text = pattern.sub(replacement, text)
     return text
@@ -68,6 +82,7 @@ def sanitise_markdown_field(value: object) -> str:
     if value is None:
         return ""
     text = str(value).replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    text = _normalise_mojibake(text)
     return escape_markdown_html(text)
 
 
