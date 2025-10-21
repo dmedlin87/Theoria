@@ -399,8 +399,8 @@ def load_youtube_metadata(settings, video_id: str) -> dict[str, Any]:
 
 def extract_youtube_video_id(url: str) -> str:
     parsed = urlparse(url)
-    host = parsed.netloc.lower()
-    if "youtube.com" in host:
+    host = parsed.netloc.lower().rstrip('.')
+    if host == "youtube.com" or host.endswith(".youtube.com"):
         if parsed.path == "/watch":
             qs = parse_qs(parsed.query)
             vid = qs.get("v", [None])[0]
@@ -414,12 +414,12 @@ def extract_youtube_video_id(url: str) -> str:
                 return remainder.split("/")[0]
         elif parsed.path.startswith("/") and len(parsed.path.strip("/")) > 0:
             return parsed.path.strip("/")
-    if "youtu.be" in host:
+    if host == "youtu.be":
         return parsed.path.strip("/")
     raise UnsupportedSourceError(f"Unsupported URL for ingestion: {url}")
 
 
 def is_youtube_url(url: str) -> bool:
-    host = urlparse(url).netloc.lower()
-    return "youtube" in host or "youtu.be" in host
+    host = urlparse(url).netloc.lower().rstrip('.')
+    return (host == "youtube.com" or host.endswith(".youtube.com") or host == "youtu.be")
 
