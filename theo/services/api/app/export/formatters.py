@@ -640,6 +640,9 @@ def _render_pdf_with_reportlab(
     return buffer.getvalue()
 
 
+_PDF_NEWLINE = "\r\n"
+
+
 def _render_minimal_pdf(
     manifest: ExportManifest, content_lines: Sequence[str]
 ) -> bytes:
@@ -654,22 +657,24 @@ def _render_minimal_pdf(
         stream_parts.append(f"({line}) Tj")
         first_line = False
     stream_parts.append("ET")
-    stream = "\n".join(stream_parts)
+    stream = _PDF_NEWLINE.join(stream_parts)
     stream_bytes = stream.encode("latin-1", "replace")
 
     objects: list[bytes] = []
     objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
     objects.append(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
     objects.append(
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
-        b"/Resources << /Font << /F1 5 0 R >> >> >>"
+        (
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+            "/Resources << /Font << /F1 5 0 R >> >> >>"
+        ).encode("ascii")
     )
     objects.append(
         b"<< /Length "
         + str(len(stream_bytes)).encode("ascii")
-        + b" >>\nstream\n"
+        + f" >>{_PDF_NEWLINE}stream{_PDF_NEWLINE}".encode("ascii")
         + stream_bytes
-        + b"\nendstream"
+        + f"{_PDF_NEWLINE}endstream".encode("ascii")
     )
     objects.append(
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
@@ -692,7 +697,7 @@ def _render_minimal_pdf(
     # Some readers can misinterpret non-ASCII bytes in this section, so we keep it simple
     # and deterministic by sticking to an ASCII-only marker that matches the golden
     # fixtures used in tests.
-    ascii_header = b"%PDF-1.4\n%\n"
+    ascii_header = f"%PDF-1.4{_PDF_NEWLINE}%{_PDF_NEWLINE}".encode("ascii")
     output.extend(ascii_header)
     # The historical implementation used a binary comment ("%\xe2\xe3\xcf\xd3\n") in the
     # header. The deterministic fixtures in tests were generated with that longer header,
@@ -704,23 +709,27 @@ def _render_minimal_pdf(
     offsets = []
     for index, obj in enumerate(objects, start=1):
         offsets.append(len(output))
-        output.extend(f"{index} 0 obj\n".encode("ascii"))
+        output.extend(f"{index} 0 obj{_PDF_NEWLINE}".encode("ascii"))
         output.extend(obj)
-        output.extend(b"\nendobj\n")
+        output.extend(f"{_PDF_NEWLINE}endobj{_PDF_NEWLINE}".encode("ascii"))
     xref_offset = len(output)
-    output.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
-    output.extend(b"0000000000 65535 f \n")
+    output.extend(f"xref{_PDF_NEWLINE}0 {len(objects) + 1}{_PDF_NEWLINE}".encode("ascii"))
+    output.extend(f"0000000000 65535 f {_PDF_NEWLINE}".encode("ascii"))
     for offset in offsets:
         output.extend(
-            f"{offset + header_compat_offset:010d} 00000 n \n".encode("ascii")
+            f"{offset + header_compat_offset:010d} 00000 n {_PDF_NEWLINE}".encode(
+                "ascii"
+            )
         )
-    output.extend(b"trailer\n")
+    output.extend(f"trailer{_PDF_NEWLINE}".encode("ascii"))
     output.extend(
-        f"<< /Size {len(objects) + 1} /Root 1 0 R /Info 6 0 R >>\n".encode("ascii")
+        f"<< /Size {len(objects) + 1} /Root 1 0 R /Info 6 0 R >>{_PDF_NEWLINE}".encode(
+            "ascii"
+        )
     )
-    output.extend(b"startxref\n")
-    output.extend(f"{xref_offset + header_compat_offset}\n".encode("ascii"))
-    output.extend(b"%%EOF\n")
+    output.extend(f"startxref{_PDF_NEWLINE}".encode("ascii"))
+    output.extend(f"{xref_offset + header_compat_offset}{_PDF_NEWLINE}".encode("ascii"))
+    output.extend(f"%%EOF{_PDF_NEWLINE}".encode("ascii"))
     return bytes(output)
 
 
