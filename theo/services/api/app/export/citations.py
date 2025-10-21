@@ -307,12 +307,73 @@ def _normalise_doi(value: Any) -> str | None:
     return cleaned or None
 
 
+_CORPORATE_AUTHOR_INDICATORS = {
+    "agency",
+    "association",
+    "bank",
+    "board",
+    "center",
+    "centers",
+    "centre",
+    "centres",
+    "college",
+    "commission",
+    "committee",
+    "company",
+    "council",
+    "department",
+    "foundation",
+    "government",
+    "group",
+    "institute",
+    "laboratories",
+    "laboratory",
+    "library",
+    "llc",
+    "ltd",
+    "ministry",
+    "office",
+    "organization",
+    "organisation",
+    "press",
+    "school",
+    "service",
+    "services",
+    "society",
+    "task force",
+    "team",
+    "trust",
+    "university",
+}
+
+
+def _looks_like_corporate_author(name: str) -> bool:
+    candidate = name.strip()
+    if not candidate:
+        return False
+
+    lowered = candidate.lower()
+    if any(indicator in lowered for indicator in _CORPORATE_AUTHOR_INDICATORS):
+        return True
+
+    if any(char.isdigit() for char in candidate):
+        return True
+
+    if " & " in candidate or candidate.count(" ") >= 4:
+        return True
+
+    return False
+
+
 def _normalise_author(name: str) -> dict[str, str]:
     """Return structured author information from a free-form *name* string."""
 
     candidate = name.strip()
     if not candidate:
         return {"literal": name}
+
+    if _looks_like_corporate_author(candidate):
+        return {"literal": candidate}
 
     if "," in candidate:
         family, given = [segment.strip() for segment in candidate.split(",", 1)]
