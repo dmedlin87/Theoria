@@ -104,13 +104,19 @@ class PromptContext:
     filters: HybridSearchFilters | None = None
     memory_context: Sequence[str] | None = None
 
+    def _normalise_part(self, value: str) -> str:
+        """Normalise prompt segments to smooth out legacy encoding artefacts."""
+
+        return _normalise_mojibake(value) if value else value
+
     def _format_context_lines(self) -> list[str]:
         lines: list[str] = []
         for citation in self.citations:
             prompt_snippet = scrub_adversarial_language(citation.snippet) or ""
-            lines.append(
+            line = (
                 f"[{citation.index}] {prompt_snippet.strip()} (OSIS {citation.osis}, {citation.anchor})"
             )
+            lines.append(self._normalise_part(line))
         return lines
 
     def build_prompt(self, question: str | None) -> str:
@@ -125,14 +131,14 @@ class PromptContext:
             for idx, snippet in enumerate(self.memory_context, start=1):
                 sanitized = scrub_adversarial_language(snippet) or ""
                 if sanitized:
-                    parts.append(f"{idx}. {sanitized}")
+                    parts.append(self._normalise_part(f"{idx}. {sanitized}"))
         sanitized_question = scrub_adversarial_language(question)
         if sanitized_question:
-            parts.append(f"Question: {sanitized_question}")
+            parts.append(self._normalise_part(f"Question: {sanitized_question}"))
         parts.append("Passages:")
         parts.extend(self._format_context_lines())
         parts.append("Respond with 2-3 sentences followed by 'Sources:'")
-        return "\n".join(parts)
+        return "\n".join(self._normalise_part(part) for part in parts)
 
     def build_summary(self, results: Sequence[HybridSearchResult]) -> tuple[str, list[str]]:
         cited_results = [result for result in results if result.osis_ref]
