@@ -33,6 +33,9 @@ The `core` package contains legacy shim modules that re-export functionality fro
 * Use parametrised tests to cover all shim modules in a single file to minimise duplication.
 * Add a docstring assertion test to ensure warning text stays actionable (guards accidental edits).
 
+### Progress
+* ✅ Added `tests/services/api/app/core/test_shims.py` to assert each shim emits a deprecation warning on first import, preserves its `__all__` exports, and forwards facade calls without mutating arguments.
+
 ---
 
 ## 2. `theo/services/api/app/ingest`
@@ -83,6 +86,10 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * Stub `ErrorPolicyDecision` dataclass to reuse across orchestrator tests.
 * Reusable `FakeResponse` class for network tests (supports `.read`, `.headers`, `.geturl`).
 
+### Progress
+* ✅ Covered `ensure_url_allowed` allow-list bypass and blocked-network rejection paths through `tests/services/api/app/ingest/test_pipeline_url_guards.py`.
+* ✅ Added `tests/services/api/app/ingest/test_metadata.py` to verify `merge_metadata` nested override semantics.
+
 ---
 
 ## 3. `theo/services/api/app/retriever`
@@ -129,6 +136,9 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 #### 3.4 Observability Assertions
 * Trace attribute tests verifying `_annotate_retrieval_span` sets fields for query, filters, cache status, and backend.【F:theo/services/api/app/retriever/hybrid.py†L29-L57】
 * Latency metric assertions in `_fallback_search` ensure span attributes record result count and latency.【F:theo/services/api/app/retriever/hybrid.py†L400-L501】
+
+### Progress
+* ✅ Implemented `tests/services/api/app/retriever/test_utils.py` to ensure `compose_passage_meta` merges document context with passage overrides while returning `None` when no metadata is available.
 
 ---
 
