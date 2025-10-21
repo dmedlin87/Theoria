@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from theo.services.api.app.case_builder import sync_case_objects_for_document
@@ -23,33 +24,85 @@ from theo.services.api.app.ingest.persistence import persist_text_document, pers
 from theo.services.api.app.ingest.stages import IngestContext, Instrumentation
 
 
-@pytest.fixture()
-def sqlite_session(tmp_path: Path) -> Iterator[Session]:
-    engine = create_engine(f"sqlite:///{tmp_path}/case_builder.sqlite")
+@pytest.fixture(scope="module")
+def sqlite_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine]:
+    db_dir = tmp_path_factory.mktemp("case_builder_db")
+    engine = create_engine(f"sqlite:///{db_dir}/case_builder.sqlite")
     Base.metadata.create_all(engine)
-    TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture()
+def sqlite_session(sqlite_engine) -> Iterator[Session]:
+    connection = sqlite_engine.connect()
+    transaction = connection.begin()
+    TestingSession = sessionmaker(bind=connection, autoflush=False, autocommit=False)
     session = TestingSession()
+    session.begin_nested()
+
+    def _restart_savepoint(sess: Session, trans) -> None:  # type: ignore[no-untyped-def]
+        if trans.nested and not trans._parent.nested:
+            sess.begin_nested()
+
+    event.listen(session, "after_transaction_end", _restart_savepoint)
+
     try:
         yield session
     finally:
         session.close()
-        engine.dispose()
+        transaction.rollback()
+        connection.close()
+        event.remove(session, "after_transaction_end", _restart_savepoint)
 
 
-def _reset_settings(monkeypatch: pytest.MonkeyPatch, **env: str) -> None:
-    for key, value in env.items():
-        monkeypatch.setenv(key, value)
-    missing_keys = {"CASE_BUILDER_ENABLED"} - set(env)
-    for key in missing_keys:
-        monkeypatch.delenv(key, raising=False)
-    settings_module.get_settings.cache_clear()
+@pytest.fixture(autouse=True)
+def stub_event_bus(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "theo.platform.events.event_bus.publish", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.ingest.persistence.emit_document_persisted_event",
+        lambda *_args, **_kwargs: None,
+    )
+
+
+@pytest.fixture()
+def configured_settings(
+    tmp_path: Path,
+) -> Iterator[Callable[[bool], settings_module.Settings]]:
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir(parents=True, exist_ok=True)
+    settings = settings_module.get_settings()
+    original_enabled = settings.case_builder_enabled
+    original_storage = settings.storage_root
+    settings.storage_root = storage_root
+
+    def _configure(case_builder_enabled: bool) -> settings_module.Settings:
+        settings.case_builder_enabled = case_builder_enabled
+        return settings
+
+    try:
+        yield _configure
+    finally:
+        settings.case_builder_enabled = original_enabled
+        settings.storage_root = original_storage
+
+
+@pytest.fixture(scope="module")
+def embedding_service() -> Iterator["_DummyEmbeddingService"]:
+    settings = settings_module.get_settings()
+    service = _DummyEmbeddingService(settings.embedding_dim)
+    yield service
 
 
 def test_sync_case_objects_creates_records_when_enabled(
-    sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
+    sqlite_session: Session,
+    configured_settings: Callable[[bool], settings_module.Settings],
 ) -> None:
-    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="true")
-    settings = settings_module.get_settings()
+    settings = configured_settings(True)
 
     document = Document(title="Doc", source_type="txt")
     sqlite_session.add(document)
@@ -79,10 +132,11 @@ def test_sync_case_objects_creates_records_when_enabled(
 
 
 def test_sync_case_objects_notifies_updates(
-    sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
+    sqlite_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    configured_settings: Callable[[bool], settings_module.Settings],
 ) -> None:
-    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="true")
-    settings = settings_module.get_settings()
+    settings = configured_settings(True)
 
     document = Document(title="Doc", source_type="txt")
     sqlite_session.add(document)
@@ -134,10 +188,10 @@ def test_sync_case_objects_notifies_updates(
 
 
 def test_sync_case_objects_noop_when_disabled(
-    sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
+    sqlite_session: Session,
+    configured_settings: Callable[[bool], settings_module.Settings],
 ) -> None:
-    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="false")
-    settings = settings_module.get_settings()
+    settings = configured_settings(False)
 
     document = Document(title="Doc", source_type="txt")
     sqlite_session.add(document)
@@ -169,10 +223,12 @@ class _DummyEmbeddingService:
 
 
 def test_persist_text_document_invokes_case_builder_sync(
-    sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
+    sqlite_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    configured_settings: Callable[[bool], settings_module.Settings],
+    embedding_service: "_DummyEmbeddingService",
 ) -> None:
-    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="true")
-    settings = settings_module.get_settings()
+    settings = configured_settings(True)
 
     called = {}
 
@@ -188,7 +244,7 @@ def test_persist_text_document_invokes_case_builder_sync(
 
     context = IngestContext(
         settings=settings,
-        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        embedding_service=embedding_service,
         instrumentation=Instrumentation(span=None),
     )
 
@@ -213,10 +269,12 @@ def test_persist_text_document_invokes_case_builder_sync(
 
 
 def test_persist_text_document_does_not_call_case_builder_when_disabled(
-    sqlite_session: Session, monkeypatch: pytest.MonkeyPatch
+    sqlite_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    configured_settings: Callable[[bool], settings_module.Settings],
+    embedding_service: "_DummyEmbeddingService",
 ) -> None:
-    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="false")
-    settings = settings_module.get_settings()
+    settings = configured_settings(False)
 
     def _fail_sync(*_args, **_kwargs):  # type: ignore[no-untyped-def]
         raise AssertionError("case builder sync should not run")
@@ -228,7 +286,7 @@ def test_persist_text_document_does_not_call_case_builder_when_disabled(
 
     context = IngestContext(
         settings=settings,
-        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        embedding_service=embedding_service,
         instrumentation=Instrumentation(span=None),
     )
     chunk = Chunk(text="Sample text", start_char=0, end_char=11, index=0)
@@ -248,13 +306,16 @@ def test_persist_text_document_does_not_call_case_builder_when_disabled(
     )
 
 
-def test_persist_text_document_creates_passage_verses(sqlite_session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
-    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="false")
-    settings = settings_module.get_settings()
+def test_persist_text_document_creates_passage_verses(
+    sqlite_session: Session,
+    configured_settings: Callable[[bool], settings_module.Settings],
+    embedding_service: "_DummyEmbeddingService",
+) -> None:
+    settings = configured_settings(False)
 
     context = IngestContext(
         settings=settings,
-        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        embedding_service=embedding_service,
         instrumentation=Instrumentation(span=None),
     )
     chunk = Chunk(text="Reference chunk", start_char=0, end_char=17, index=0)
@@ -280,13 +341,16 @@ def test_persist_text_document_creates_passage_verses(sqlite_session: Session, m
     assert passage.osis_verse_ids == expected_ids
 
 
-def test_persist_transcript_document_creates_passage_verses(sqlite_session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
-    _reset_settings(monkeypatch, CASE_BUILDER_ENABLED="false")
-    settings = settings_module.get_settings()
+def test_persist_transcript_document_creates_passage_verses(
+    sqlite_session: Session,
+    configured_settings: Callable[[bool], settings_module.Settings],
+    embedding_service: "_DummyEmbeddingService",
+) -> None:
+    settings = configured_settings(False)
 
     context = IngestContext(
         settings=settings,
-        embedding_service=_DummyEmbeddingService(settings.embedding_dim),
+        embedding_service=embedding_service,
         instrumentation=Instrumentation(span=None),
     )
     chunk = Chunk(
