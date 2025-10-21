@@ -319,7 +319,7 @@ def _normalise_author(name: str) -> dict[str, str]:
         if family and given:
             return {"given": given, "family": family}
         if family:
-            return {"family": family}
+            return {"family": family, "literal": candidate}
 
     parts = [segment.strip() for segment in candidate.split() if segment.strip()]
     if len(parts) >= 2:
