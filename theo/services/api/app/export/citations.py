@@ -308,13 +308,25 @@ def _normalise_doi(value: Any) -> str | None:
 
 
 def _normalise_author(name: str) -> dict[str, str]:
+    """Return structured author information from a free-form *name* string."""
+
     candidate = name.strip()
     if not candidate:
         return {"literal": name}
+
     if "," in candidate:
         family, given = [segment.strip() for segment in candidate.split(",", 1)]
         if family and given:
             return {"given": given, "family": family, "literal": candidate}
+        if family:
+            return {"family": family, "literal": candidate}
+
+    parts = [segment.strip() for segment in candidate.split() if segment.strip()]
+    if len(parts) >= 2:
+        family = parts[-1]
+        given = " ".join(parts[:-1])
+        return {"given": given, "family": family, "literal": candidate}
+
     return {"literal": candidate}
 
 
@@ -473,31 +485,22 @@ def _infer_csl_type(source_type: str | None) -> str:
 
 
 def _format_apa(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) -> str:
-    raw_authors = (
-        [name for name in source.authors or [] if isinstance(name, str)] or []
-    )
-    trimmed_authors = [name.strip() for name in raw_authors if name and name.strip()]
+    raw_authors = [
+        name for name in source.authors or [] if isinstance(name, str) and name.strip()
+    ]
+    normalised_authors = [
+        _apa_author(_normalise_author(name)) for name in raw_authors
+    ]
+    normalised_authors = [author for author in normalised_authors if author]
 
-    formatted_authors = ""
-    if trimmed_authors and all("," not in name for name in trimmed_authors):
-        if len(trimmed_authors) > 1:
-            formatted_authors = (
-                ", ".join(trimmed_authors[:-1]) + f", & {trimmed_authors[-1]}"
-            )
-        else:
-            formatted_authors = trimmed_authors[0]
-
-    if not formatted_authors:
-        normalised = [
-            _apa_author(_normalise_author(name)) for name in trimmed_authors
-        ]
-        normalised = [author for author in normalised if author]
-        if len(normalised) > 1:
-            formatted_authors = ", ".join(normalised[:-1]) + f", & {normalised[-1]}"
-        elif normalised:
-            formatted_authors = normalised[0]
-        elif source.publisher:
-            formatted_authors = source.publisher
+    if len(normalised_authors) > 1:
+        formatted_authors = ", ".join(normalised_authors[:-1]) + f", & {normalised_authors[-1]}"
+    elif normalised_authors:
+        formatted_authors = normalised_authors[0]
+    elif source.publisher:
+        formatted_authors = source.publisher
+    else:
+        formatted_authors = ""
 
     year = str(source.year) if source.year else "n.d."
     title = source.title or "Untitled document"
@@ -625,9 +628,10 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
         else:
             segments.append(f"{authors_segment}.")
 
-    title_segment = f'"{title}"'
-    if not str(title).rstrip().endswith((".", "!", "?")):
-        title_segment = f"{title_segment}."
+    title_text = str(title).strip()
+    if title_text and not title_text.endswith((".", "!", "?")):
+        title_text = f"{title_text}."
+    title_segment = f'"{title_text or title}"'
     segments.append(title_segment)
     if details_text:
         if not details_text.endswith(('.', '!', '?')):
