@@ -145,6 +145,8 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 ### Progress
 * ✅ Implemented `tests/services/api/app/retriever/test_utils.py` to ensure `compose_passage_meta` merges document context with passage overrides while returning `None` when no metadata is available.
 * ✅ Added `tests/services/api/app/retriever/test_annotations.py` to cover annotation payload serialisation, legacy body handling, batched loading, and passage indexing helpers.
+* ✅ Added `tests/services/api/app/retriever/test_hybrid.py` to exercise tokenisation, highlight building, candidate scoring/merging, OSIS guards, TEI helpers, and SQL statement builders.
+* ✅ Added `tests/services/api/app/retriever/test_documents.py` to verify document listing/detail pagination, latest digest selection, update semantics, and annotation CRUD pathways with an in-memory SQLite database.
 
 ---
 
@@ -153,6 +155,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 2. **Backfill unit suites** – Prioritise shim coverage (core), orchestrator/pipeline basics (ingest), and annotation utilities (retriever) for quick wins toward 90%.
 3. **Layer integration tests** – Once helpers are in place, add orchestrator and hybrid search integration tests to validate cross-module behaviour.
 4. **Introduce property-based checks** – After deterministic fixtures exist, layer Hypothesis strategies for metadata and guardrail normalisation to guard against regression drift.
-5. **Track coverage growth** – Run `pytest --cov` after each milestone and update the coverage report, ensuring each package crosses the 90% threshold before moving on.
+5. **Plan next iteration** – Target hybrid fallback/search integration exercises and retriever observability assertions now that unit scaffolding is in place.
+6. **Track coverage growth** – Run `pytest --cov` after each milestone and update the coverage report, ensuring each package crosses the 90% threshold before moving on.
 
 Following this plan will eliminate the three largest blind spots in our backend coverage and establish a reusable testing toolkit for subsequent modules.
