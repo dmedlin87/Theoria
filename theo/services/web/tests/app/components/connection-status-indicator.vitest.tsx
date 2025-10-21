@@ -1,12 +1,13 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import ConnectionStatusIndicator from "../../../app/components/ConnectionStatusIndicator";
 import type { ApiHealthSnapshot, ApiHealthStatus } from "../../../app/lib/useApiHealth";
 
-const { mockUseApiHealth } = vi.hoisted(() => ({
+const { mockUseApiHealth, addToastMock } = vi.hoisted(() => ({
   mockUseApiHealth: vi.fn<[], ApiHealthSnapshot>(),
+  addToastMock: vi.fn(),
 }));
 
 vi.mock("../../../app/lib/useApiHealth", () => ({
@@ -14,7 +15,7 @@ vi.mock("../../../app/lib/useApiHealth", () => ({
 }));
 
 vi.mock("../../../app/components/Toast", () => ({
-  useToast: () => ({ addToast: vi.fn(), removeToast: vi.fn(), toasts: [] }),
+  useToast: () => ({ addToast: addToastMock, removeToast: vi.fn(), toasts: [] }),
 }));
 
 function createSnapshot(overrides: Partial<ApiHealthSnapshot>): ApiHealthSnapshot {
@@ -42,6 +43,7 @@ describe("ConnectionStatusIndicator", () => {
   afterEach(() => {
     cleanup();
     mockUseApiHealth.mockReset();
+    addToastMock.mockReset();
   });
 
   it.each([
@@ -73,5 +75,76 @@ describe("ConnectionStatusIndicator", () => {
     render(<ConnectionStatusIndicator announce={false} />);
 
     expect(screen.getByText("Checking…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Connection status/i })).toBeDisabled();
+  });
+
+  it("renders the inline status message when requested", () => {
+    mockUseApiHealth.mockReturnValue(
+      createSnapshot({ status: "degraded", message: "Latency elevated" }),
+    );
+
+    render(<ConnectionStatusIndicator announce={false} showMessage />);
+
+    expect(screen.getByText("Latency elevated")).toBeInTheDocument();
+  });
+
+  it("invokes the refresh handler when the badge is pressed", async () => {
+    const refresh = vi.fn();
+    mockUseApiHealth.mockReturnValue(
+      createSnapshot({ status: "healthy", refresh }),
+    );
+
+    const user = userEvent.setup();
+    render(<ConnectionStatusIndicator announce={false} />);
+
+    await user.click(screen.getByRole("button", { name: /Connection status/i }));
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces non-healthy transitions and message changes", async () => {
+    mockUseApiHealth.mockReturnValueOnce(
+      createSnapshot({ status: "healthy", message: "All systems nominal" }),
+    );
+
+    const { rerender } = render(<ConnectionStatusIndicator />);
+
+    await waitFor(() => {
+      expect(addToastMock).not.toHaveBeenCalled();
+    });
+
+    mockUseApiHealth.mockReturnValueOnce(
+      createSnapshot({ status: "degraded", message: "Latency elevated" }),
+    );
+
+    rerender(<ConnectionStatusIndicator />);
+
+    await waitFor(() => {
+      expect(addToastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "warning",
+          title: "API health degraded",
+          message: "Latency elevated",
+        }),
+      );
+    });
+
+    addToastMock.mockClear();
+
+    mockUseApiHealth.mockReturnValueOnce(
+      createSnapshot({ status: "degraded", message: "Error rate increasing" }),
+    );
+
+    rerender(<ConnectionStatusIndicator />);
+
+    await waitFor(() => {
+      expect(addToastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "warning",
+          title: "API health degraded",
+          message: "Error rate increasing",
+        }),
+      );
+    });
   });
 });
