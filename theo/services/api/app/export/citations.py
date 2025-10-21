@@ -429,7 +429,12 @@ def _build_csl_entry(source: CitationSource, anchors: Sequence[Mapping[str, Any]
     authors: list[dict[str, str]] = []
     for name in source.authors or []:
         if isinstance(name, str) and name.strip():
-            authors.append(_normalise_author(name))
+            normalised = _normalise_author(name)
+            if normalised.get("family") or normalised.get("given"):
+                author = {key: value for key, value in normalised.items() if key != "literal"}
+            else:
+                author = normalised
+            authors.append(author)
 
     entry: dict[str, Any] = {
         "id": source.document_id,
