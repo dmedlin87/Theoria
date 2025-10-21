@@ -9,6 +9,7 @@ import type {
   ChatWorkflowResult,
   ChatWorkflowStreamEvent,
 } from "../../../app/lib/chat-client";
+import type { ResearchPlan } from "../../../app/lib/api-client";
 import ChatWorkspace from "../../../app/chat/ChatWorkspace";
 import { TheoApiError } from "../../../app/lib/api-client";
 import { emitTelemetry, submitFeedback } from "../../../app/lib/telemetry";
@@ -66,6 +67,38 @@ const sampleAnswer = {
     ],
   },
 } satisfies import("../../../app/copilot/components/types").RAGAnswer;
+
+function createPlan(sessionId: string): ResearchPlan {
+  const timestamp = new Date().toISOString();
+  const stepId = `${sessionId}-understand-1`;
+  return {
+    sessionId,
+    steps: [
+      {
+        id: stepId,
+        kind: "understand",
+        index: 0,
+        label: "Understand question",
+        query: null,
+        tool: null,
+        status: "in_progress",
+        estimatedTokens: null,
+        estimatedCostUsd: null,
+        estimatedDurationSeconds: null,
+        actualTokens: null,
+        actualCostUsd: null,
+        actualDurationSeconds: null,
+        metadata: {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ],
+    activeStepId: stepId,
+    version: 1,
+    updatedAt: timestamp,
+    metadata: {},
+  } satisfies ResearchPlan;
+}
 
 jest.mock("../../../app/mode-context", () => {
   const { RESEARCH_MODES, DEFAULT_MODE_ID } =
@@ -158,10 +191,12 @@ describe("ChatWorkspace", () => {
   });
 
   it("streams a chat response, updates incrementally, and persists the session id", async () => {
+    const plan = createPlan("session-1");
     const successResult: ChatWorkflowResult = {
       kind: "success",
       sessionId: "session-1",
       answer: sampleAnswer,
+      plan,
     };
     const client: ChatWorkflowClient = {
       runChatWorkflow: jest.fn(async (_payload, options) => {
@@ -169,7 +204,7 @@ describe("ChatWorkspace", () => {
         await new Promise((resolve) => setTimeout(resolve, 5));
         options?.onEvent?.({
           type: "complete",
-          response: { sessionId: "session-1", answer: sampleAnswer },
+          response: { sessionId: "session-1", answer: sampleAnswer, plan },
         });
         return successResult;
       }),
@@ -305,14 +340,16 @@ describe("ChatWorkspace", () => {
   });
 
   it("sends feedback when reaction buttons are pressed", async () => {
+    const plan = createPlan("session-1");
     const events: ChatWorkflowStreamEvent[] = [
       { type: "answer_fragment", content: "In the beginning" },
-      { type: "complete", response: { sessionId: "session-1", answer: sampleAnswer } },
+      { type: "complete", response: { sessionId: "session-1", answer: sampleAnswer, plan } },
     ];
     const successResult: ChatWorkflowResult = {
       kind: "success",
       sessionId: "session-1",
       answer: sampleAnswer,
+      plan,
     };
     const client: ChatWorkflowClient = {
       runChatWorkflow: jest.fn(async (_payload, options) => {
@@ -364,14 +401,19 @@ describe("ChatWorkspace", () => {
   });
 
   it("resets feedback controls when submission fails", async () => {
+    const plan = createPlan("session-99");
     const successResult: ChatWorkflowResult = {
       kind: "success",
       sessionId: "session-99",
       answer: sampleAnswer,
+      plan,
     };
     const client: ChatWorkflowClient = {
       runChatWorkflow: jest.fn(async (_payload, options) => {
-        options?.onEvent?.({ type: "complete", response: { sessionId: "session-99", answer: sampleAnswer } });
+        options?.onEvent?.({
+          type: "complete",
+          response: { sessionId: "session-99", answer: sampleAnswer, plan },
+        });
         return successResult;
       }),
       fetchChatSession: jest.fn(async () => null),
@@ -409,16 +451,18 @@ describe("ChatWorkspace", () => {
   });
 
   it("resets the session state and clears persistence", async () => {
+    const plan = createPlan("session-reset");
     const successResult: ChatWorkflowResult = {
       kind: "success",
       sessionId: "session-reset",
       answer: sampleAnswer,
+      plan,
     };
     const client: ChatWorkflowClient = {
       runChatWorkflow: jest.fn(async (_payload, options) => {
         options?.onEvent?.({
           type: "complete",
-          response: { sessionId: "session-reset", answer: sampleAnswer },
+          response: { sessionId: "session-reset", answer: sampleAnswer, plan },
         });
         return successResult;
       }),
@@ -460,16 +504,18 @@ describe("ChatWorkspace", () => {
   });
 
   it("forks the conversation without losing the transcript", async () => {
+    const plan = createPlan("session-fork");
     const successResult: ChatWorkflowResult = {
       kind: "success",
       sessionId: "session-fork",
       answer: sampleAnswer,
+      plan,
     };
     const client: ChatWorkflowClient = {
       runChatWorkflow: jest.fn(async (_payload, options) => {
         options?.onEvent?.({
           type: "complete",
-          response: { sessionId: "session-fork", answer: sampleAnswer },
+          response: { sessionId: "session-fork", answer: sampleAnswer, plan },
         });
         return successResult;
       }),
@@ -510,6 +556,7 @@ describe("ChatWorkspace", () => {
         kind: "success" as const,
         sessionId: "session-1",
         answer: sampleAnswer,
+        plan: createPlan("session-1"),
       })),
       fetchChatSession: jest.fn(async () => null),
     };

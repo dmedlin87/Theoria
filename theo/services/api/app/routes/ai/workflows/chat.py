@@ -48,6 +48,12 @@ from theo.services.api.app.models.ai import (
     GoalPriorityUpdateRequest,
     IntentTagPayload,
 )
+from theo.services.api.app.models.research_plan import (
+    ResearchPlan,
+    ResearchPlanReorderRequest,
+    ResearchPlanStepSkipRequest,
+    ResearchPlanStepUpdateRequest,
+)
 from .guardrails import extract_refusal_text, guardrail_http_exception
 from .utils import has_filters
 
@@ -524,7 +530,9 @@ def _persist_chat_session(
     return record
 
 
-def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
+def _serialise_chat_session(
+    record: ChatSession, session: Session
+) -> ChatSessionState:
     entries = _load_memory_entries(record)
     goals = _load_goal_entries(record)
     preferences: ChatSessionPreferences | None = None
@@ -537,6 +545,13 @@ def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
             )
             preferences = None
     document_ids = list(record.document_ids or [])
+    plan = None
+    try:
+        controller = _get_loop_controller(session)
+        plan = controller.get_plan(record.id)
+    except Exception:  # noqa: BLE001 - plan hydration failures should not break session load
+        LOGGER.debug("Failed to load research plan for %s", record.id, exc_info=True)
+        plan = None
     return ChatSessionState(
         session_id=record.id,
         stance=record.stance,
@@ -548,6 +563,7 @@ def _serialise_chat_session(record: ChatSession) -> ChatSessionState:
         created_at=record.created_at,
         updated_at=record.updated_at,
         last_interaction_at=record.last_interaction_at,
+        plan=plan,
     )
 
 
@@ -624,6 +640,14 @@ def chat_turn(
 
     message: ChatSessionMessage | None = None
     answer: RAGAnswer | None = None
+    controller = _get_loop_controller(session)
+    plan_snapshot: ResearchPlan | None = None
+    try:
+        controller.initialise(session_id, question=question)
+    except Exception:  # noqa: BLE001 - chat should continue even if plan initialisation fails
+        LOGGER.debug(
+            "Failed to initialise research loop state for %s", session_id, exc_info=True
+        )
 
     existing_session = session.get(ChatSession, session_id)
     preferences = _resolve_preferences(payload)
@@ -874,11 +898,18 @@ def chat_turn(
             severity=Severity.CRITICAL,
         )
 
+    try:
+        plan_snapshot = controller.get_plan(session_id)
+    except Exception:  # noqa: BLE001 - plan retrieval is best-effort
+        LOGGER.debug("Failed to fetch research plan for %s", session_id, exc_info=True)
+        plan_snapshot = None
+
     return ChatSessionResponse(
         session_id=session_id,
         message=message,
         answer=answer,
         intent_tags=intent_tags,
+        plan=plan_snapshot,
     )
 
 
@@ -896,7 +927,7 @@ def get_chat_session(session_id: str, session: Session = Depends(get_session)) -
             code="AI_CHAT_SESSION_NOT_FOUND",
             status_code=status.HTTP_404_NOT_FOUND,
         )
-    return _serialise_chat_session(record)
+    return _serialise_chat_session(record, session)
 
 
 @router.get(
@@ -959,6 +990,122 @@ def apply_research_loop_action(
     if state.partial_answer:
         response["partial_answer"] = state.partial_answer
     return response
+
+
+@router.get(
+    "/chat/{session_id}/plan",
+    response_model=ResearchPlan,
+    response_model_exclude_none=True,
+    responses=_NOT_FOUND_RESPONSE,
+)
+def get_research_plan(
+    session_id: str,
+    session: Session = Depends(get_session),
+) -> ResearchPlan:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    controller = _get_loop_controller(session)
+    return controller.get_plan(session_id)
+
+
+@router.patch(
+    "/chat/{session_id}/plan/order",
+    response_model=ResearchPlan,
+    response_model_exclude_none=True,
+    responses={**_NOT_FOUND_RESPONSE, **_LOOP_BAD_REQUEST_RESPONSE},
+)
+def reorder_research_plan(
+    session_id: str,
+    payload: ResearchPlanReorderRequest,
+    session: Session = Depends(get_session),
+) -> ResearchPlan:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    controller = _get_loop_controller(session)
+    try:
+        return controller.reorder_plan(session_id, payload)
+    except LookupError as exc:
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_CHAT_LOOP_STATE_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
+    except ValueError as exc:
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_CHAT_LOOP_INVALID_ACTION",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        ) from exc
+
+
+@router.patch(
+    "/chat/{session_id}/plan/steps/{step_id}",
+    response_model=ResearchPlan,
+    response_model_exclude_none=True,
+    responses={**_NOT_FOUND_RESPONSE, **_LOOP_BAD_REQUEST_RESPONSE},
+)
+def update_research_plan_step(
+    session_id: str,
+    step_id: str,
+    payload: ResearchPlanStepUpdateRequest,
+    session: Session = Depends(get_session),
+) -> ResearchPlan:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    controller = _get_loop_controller(session)
+    try:
+        return controller.update_plan_step(session_id, step_id, payload)
+    except LookupError as exc:
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_CHAT_PLAN_STEP_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
+
+
+@router.post(
+    "/chat/{session_id}/plan/steps/{step_id}/skip",
+    response_model=ResearchPlan,
+    response_model_exclude_none=True,
+    responses={**_NOT_FOUND_RESPONSE, **_LOOP_BAD_REQUEST_RESPONSE},
+)
+def skip_research_plan_step(
+    session_id: str,
+    step_id: str,
+    payload: ResearchPlanStepSkipRequest,
+    session: Session = Depends(get_session),
+) -> ResearchPlan:
+    record = session.get(ChatSession, session_id)
+    if record is None:
+        raise AIWorkflowError(
+            "chat session not found",
+            code="AI_CHAT_SESSION_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    controller = _get_loop_controller(session)
+    try:
+        return controller.skip_plan_step(session_id, step_id, payload)
+    except LookupError as exc:
+        raise AIWorkflowError(
+            str(exc),
+            code="AI_CHAT_PLAN_STEP_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
 
 
 @router.get(

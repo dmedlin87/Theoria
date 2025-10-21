@@ -1,0 +1,326 @@
+.panel {
+  border: 1.5px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-md);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.caption {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.metadata {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.metadata div {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.metadata dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.08em;
+}
+
+.metadata dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.error {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+  color: var(--color-danger-strong);
+}
+
+.progress {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.stepList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.step {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background: var(--color-surface-muted);
+  display: grid;
+  gap: var(--space-3);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.step:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.dragging {
+  opacity: 0.7;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-lg);
+}
+
+.active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.stepHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.stepIndex {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--color-surface-stronger);
+  display: grid;
+  place-items: center;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.stepTitleGroup {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stepLabel {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.status {
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.statuspending {
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  color: var(--color-warning-strong);
+}
+
+.statusin_progress {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info-strong);
+}
+
+.statuscompleted {
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success-strong);
+}
+
+.statusskipped {
+  background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+  color: var(--color-text-muted);
+}
+
+.statusblocked {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger-strong);
+}
+
+.activeBadge {
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.stepActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.stepActions button {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background var(--transition-base), border-color var(--transition-base);
+}
+
+.stepActions button:hover:not(:disabled) {
+  border-color: var(--color-border-default);
+  background: var(--color-surface-stronger);
+}
+
+.stepActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.metrics {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.metrics div {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.metrics dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.metrics dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.summary {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+}
+
+.summaryLabel {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.placeholder {
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.editForm {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.formField {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.formField span {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.formField input,
+.formField textarea,
+.formField select {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+}
+
+.formButtons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.formButtons button {
+  border: 1px solid var(--color-border-subtle);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.formButtons button[type="submit"] {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
+.formButtons button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.emptyState {
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .metadata {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .stepHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .stepActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

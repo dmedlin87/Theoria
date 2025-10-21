@@ -18,7 +18,13 @@ import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useS
 import ErrorCallout, { type ErrorCalloutProps } from "../components/ErrorCallout";
 import { Icon } from "../components/Icon";
 import type { ChatWorkflowClient } from "../lib/chat-client";
-import { createTheoApiClient, TheoApiError } from "../lib/api-client";
+import {
+  createTheoApiClient,
+  TheoApiError,
+  type ResearchPlan,
+  type ResearchPlanStepSkipPayload,
+  type ResearchPlanStepUpdatePayload,
+} from "../lib/api-client";
 import { interpretApiError } from "../lib/errorMessages";
 import type {
   ChatSessionState,
@@ -40,6 +46,7 @@ import {
 } from "./useChatWorkspaceState";
 import type { ChatSessionMemoryEntry } from "../lib/api-client";
 import { SessionControls } from "./components/SessionControls";
+import PlanPanel from "../components/PlanPanel";
 import type { TranscriptEntry as BaseTranscriptEntry } from "./components/transcript/ChatTranscript";
 
 type TranscriptEntry = BaseTranscriptEntry & { timestamp?: Date };
@@ -99,6 +106,7 @@ export default function ChatWorkspace({
       guardrail,
       errorMessage: apiError,
       lastQuestion,
+      plan,
     },
     setters: {
       setConversation,
@@ -113,6 +121,7 @@ export default function ChatWorkspace({
       setGuardrail,
       setErrorMessage: setApiError,
       setLastQuestion,
+      setPlan,
     },
     selectors: { hasTranscript },
   } = useChatSessionState();
@@ -120,6 +129,16 @@ export default function ChatWorkspace({
   useEffect(() => {
     conversationRef.current = conversation;
   }, [conversation]);
+
+  const planRef = useRef<ResearchPlan | null>(plan);
+  useEffect(() => {
+    planRef.current = plan;
+  }, [plan]);
+
+  const lastPlanSessionRef = useRef<string | null>(null);
+
+  const [planIsUpdating, setPlanIsUpdating] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   const [inputValue, setInputValue] = useState(initialPrompt ?? "");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -208,6 +227,7 @@ export default function ChatWorkspace({
         } else {
           setDefaultFilters(null);
         }
+        setPlan(state.plan ?? null);
         const restoredConversation: ConversationEntry[] = [];
         state.memory.forEach((entry: ChatSessionMemoryEntry) => {
           restoredConversation.push({
@@ -260,6 +280,40 @@ export default function ChatWorkspace({
       window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
     }
   }, [sessionId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (!sessionId) {
+      lastPlanSessionRef.current = null;
+      return;
+    }
+    if (plan) {
+      lastPlanSessionRef.current = sessionId;
+      return;
+    }
+    if (lastPlanSessionRef.current === sessionId) {
+      return;
+    }
+    let cancelled = false;
+    lastPlanSessionRef.current = sessionId;
+    void (async () => {
+      try {
+        const snapshot = await fallbackClient.fetchResearchPlan(sessionId);
+        if (!cancelled && snapshot) {
+          setPlan(snapshot);
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("Failed to fetch research plan", error);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackClient, plan, sessionId, setPlan]);
 
   const updateAssistantEntry = useCallback(
     (id: string, transform: (entry: AssistantConversationEntry) => AssistantConversationEntry) => {
@@ -317,6 +371,72 @@ export default function ChatWorkspace({
     [defaultFilters],
   );
 
+  const handlePlanReorder = useCallback(
+    async (order: string[]) => {
+      if (!sessionId || order.length === 0) {
+        return;
+      }
+      setPlanIsUpdating(true);
+      setPlanError(null);
+      try {
+        const snapshot = await fallbackClient.reorderResearchPlan(sessionId, order);
+        setPlan(snapshot);
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("Failed to reorder research plan", error);
+        }
+        setPlanError("Unable to reorder plan. Please try again.");
+      } finally {
+        setPlanIsUpdating(false);
+      }
+    },
+    [fallbackClient, sessionId, setPlan, setPlanError],
+  );
+
+  const handlePlanStepUpdate = useCallback(
+    async (stepId: string, changes: ResearchPlanStepUpdatePayload) => {
+      if (!sessionId || !stepId) {
+        return;
+      }
+      setPlanIsUpdating(true);
+      setPlanError(null);
+      try {
+        const snapshot = await fallbackClient.updateResearchPlanStep(sessionId, stepId, changes);
+        setPlan(snapshot);
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("Failed to update research plan step", error);
+        }
+        setPlanError("Unable to update plan step. Please try again.");
+      } finally {
+        setPlanIsUpdating(false);
+      }
+    },
+    [fallbackClient, sessionId, setPlan, setPlanError],
+  );
+
+  const handlePlanStepSkip = useCallback(
+    async (stepId: string, payload: ResearchPlanStepSkipPayload) => {
+      if (!sessionId || !stepId) {
+        return;
+      }
+      setPlanIsUpdating(true);
+      setPlanError(null);
+      try {
+        const snapshot = await fallbackClient.skipResearchPlanStep(sessionId, stepId, payload);
+        setPlan(snapshot);
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("Failed to skip research plan step", error);
+        }
+        setPlanError("Unable to skip plan step. Please try again.");
+      } finally {
+        setPlanIsUpdating(false);
+      }
+    },
+    [fallbackClient, sessionId, setPlan, setPlanError],
+  );
+
   const applyStreamEvent = useCallback(
     (assistantId: string, event: ChatWorkflowStreamEvent) => {
       if (event.type === "answer_fragment") {
@@ -349,11 +469,13 @@ export default function ChatWorkspace({
           fallacyWarnings: event.response.answer.fallacy_warnings ?? [],
           reasoningTrace: event.response.answer.reasoning_trace ?? null,
         }));
+        setPlan(event.response.plan ?? null);
+        setPlanError(null);
         setActiveAssistantId(null);
         return;
       }
     },
-    [removeEntryById, updateAssistantEntry],
+    [removeEntryById, setPlan, setPlanError, updateAssistantEntry],
   );
 
   const executeChat = useCallback(
@@ -427,6 +549,8 @@ export default function ChatWorkspace({
             fallacyWarnings: result.answer.fallacy_warnings ?? [],
             reasoningTrace: result.answer.reasoning_trace ?? null,
           }));
+          setPlan(result.plan ?? null);
+          setPlanError(null);
         } else if (result.kind === "guardrail") {
           removeEntryById(assistantId);
           setGuardrail({
@@ -619,17 +743,19 @@ export default function ChatWorkspace({
     setIsStreaming(false);
     setDefaultFilters(null);
     setFrequentlyOpenedPanels([]);
+    setPlan(null);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
     }
-  }, []);
+  }, [setPlan]);
 
   const handleForkSession = useCallback(() => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
     }
     setSessionId(null);
-  }, []);
+    setPlan(null);
+  }, [setPlan]);
 
   const handleUploadCta = useCallback(() => {
     router.push("/upload");
@@ -785,6 +911,16 @@ export default function ChatWorkspace({
           </li>
         </ul>
       </section>
+
+      <PlanPanel
+        plan={plan}
+        isUpdating={planIsUpdating}
+        errorMessage={planError}
+        disabled={isStreaming || isRestoring}
+        onReorder={handlePlanReorder}
+        onUpdateStep={handlePlanStepUpdate}
+        onSkipStep={handlePlanStepSkip}
+      />
 
       <div className={styles.transcript} role="log" aria-label="Chat transcript">
         {hasTranscript ? (

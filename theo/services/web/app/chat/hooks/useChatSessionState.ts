@@ -1,5 +1,7 @@
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
+import type { ResearchPlan } from "../../lib/api-client";
+
 import type {
   AssistantConversationEntry,
   ConversationEntry,
@@ -22,6 +24,7 @@ export type ChatSessionState = {
   guardrail: GuardrailState;
   errorMessage: InterpretedApiError | null;
   lastQuestion: string | null;
+  plan: ResearchPlan | null;
 };
 
 export type ChatSessionSetters = {
@@ -37,6 +40,7 @@ export type ChatSessionSetters = {
   setGuardrail: Dispatch<SetStateAction<GuardrailState>>;
   setErrorMessage: Dispatch<SetStateAction<InterpretedApiError | null>>;
   setLastQuestion: Dispatch<SetStateAction<string | null>>;
+  setPlan: Dispatch<SetStateAction<ResearchPlan | null>>;
 };
 
 export type ChatSessionSelectors = {
@@ -67,6 +71,7 @@ export function useChatSessionState(): UseChatSessionStateResult {
   const [guardrail, setGuardrail] = useState<GuardrailState>(null);
   const [errorMessage, setErrorMessage] = useState<InterpretedApiError | null>(null);
   const [lastQuestion, setLastQuestion] = useState<string | null>(null);
+  const [plan, setPlan] = useState<ResearchPlan | null>(null);
 
   const hasTranscript = useMemo(() => conversation.length > 0, [conversation]);
   const activeAssistantEntry = useMemo(() => {
@@ -94,6 +99,7 @@ export function useChatSessionState(): UseChatSessionStateResult {
       guardrail,
       errorMessage,
       lastQuestion,
+      plan,
     },
     setters: {
       setConversation,
@@ -108,6 +114,7 @@ export function useChatSessionState(): UseChatSessionStateResult {
       setGuardrail,
       setErrorMessage,
       setLastQuestion,
+      setPlan,
     },
     selectors: {
       hasTranscript,

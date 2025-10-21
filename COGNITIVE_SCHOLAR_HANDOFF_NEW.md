@@ -1,8 +1,8 @@
 # Cognitive Scholar CS-003 Handoff (Fresh Chat)
 
 ## Summary
-- **Current focus**: CS-003 Live Plan Panel scaffolding.
-- **Status**: Research loop persists live plan state and chat responses include `plan` snapshots. Plan API routes, streaming, frontend wiring, and tests still outstanding.
+- **Current focus**: Finishing CS-003 by layering in streaming plan telemetry.
+- **Status**: Plan CRUD endpoints, chat response snapshots, and the Plan Panel UI are shipped. Streaming deltas are the remaining gap for real-time sync.
 
 ## Completed Work
 - **Plan DTO integration**: `ResearchLoopController` builds and persists `ResearchPlan` instances with helpers for enqueue/reorder/update/skip mutations (`theo/services/api/app/ai/research_loop.py`).
@@ -10,33 +10,32 @@
 - **Schema updates**: Optional `plan` fields have been added to API response models (`theo/services/api/app/models/ai.py`).
 
 ## Outstanding Tasks
-- **Plan routes**: Add REST handlers (`GET /chat/{session_id}/plan`, mutate/reorder/skip endpoints) that wrap controller helpers and persist updates.
-- **Streaming updates**: Refactor `/chat` to emit plan deltas (NDJSON or SSE) so the UI stays in sync while the loop runs.
-- **Frontend integration**: Create `PlanPanel` component + client store, extend normalisers to ingest `plan` snapshots/events, and wire to chat workspace.
-- **Testing & docs**: Cover controller mutations, plan routes, and streaming behaviour; update CS-003 ticket status in `docs/tasks/TASK_005_Cognitive_Scholar_MVP_Tickets.md`.
+- **Streaming updates**: Refactor `/ai/chat` streaming responses to emit incremental plan frames so the panel updates mid-loop.
+- **Loop event hooks**: Decide whether intermediate loop actions (pause/step/skip) should push plan deltas or rely on polling.
+- **Observability**: Add metrics/logging for plan mutations to monitor reorder/update/skip usage.
 
 ## Suggested Next Steps
-1. Implement plan CRUD routes in `chat.py`, returning updated `ResearchPlan` payloads on each mutation.
-2. Adjust chat workflow streaming to emit `{"type":"plan_update"}` frames alongside answer tokens.
-3. Build the Plan Panel UI + state store, ensuring chat clients hydrate from snapshots and streaming deltas.
-4. Backfill unit/integration tests and document CS-003 progress in the task tracker.
+1. Extend the streaming pipeline to emit lightweight `plan_update` frames (diffs or snapshots) during long-running loops.
+2. Update the Plan Panel store to consume streaming deltas and fall back to periodic refresh when streams are unavailable.
+3. Instrument plan mutations with structured logs/metrics to validate usage patterns and detect race conditions.
 
 ## Verification Notes
 - Run targeted FastAPI route tests once plan endpoints exist.
 - Execute chat turn happy path to confirm `plan` snapshots return correctly.
 - Add streaming smoke test after NDJSON/SSE integration.
 
-## Key Files Reference
-- **Controller** `theo/services/api/app/ai/research_loop.py`: Exposes `ResearchPlan` lifecycle helpers (`enqueue`, `update_step`, `reorder`, `skip`).
-- **Chat Routes** `theo/services/api/app/routes/ai/workflows/chat.py`: Hosts `/chat` POST; needs `/chat/{session_id}/plan` family.
-- **API Models** `theo/services/api/app/models/ai.py`: Provides `ChatSessionResponse.plan` and mutation payload schemas.
-- **Frontend scaffolding**: `theo/services/web/app/chat/` (workspace/hooks) — add store + `PlanPanel` component alongside timeline UI.
+- **Controller** `theo/services/api/app/ai/research_loop.py`: Plan lifecycle helpers and default sequence logic.
+- **Chat Routes** `theo/services/api/app/routes/ai/workflows/chat.py`: `/chat/{session_id}/plan` CRUD endpoints + plan snapshots in chat responses.
+- **API Models** `theo/services/api/app/models/ai.py`: `ResearchPlan` models and chat response fields.
+- **Frontend** `theo/services/web/app/chat/ChatWorkspace.tsx`: Hydrates plan state, wires `PlanPanel`, and drives plan mutations.
+- **UI Component** `theo/services/web/app/components/PlanPanel.tsx`: Live plan panel with reorder/edit/skip controls.
+- **Client libraries** `theo/services/web/app/lib/{api-client,api-normalizers,chat-client}.ts`: Plan fetch/mutation helpers and streaming payloads.
 
 ## Implementation Outline
-1. **Surface CRUD endpoints**: Add GET/PATCH/POST/DELETE handlers under `/chat/{session_id}/plan` delegating to `ResearchLoopController`.
-2. **Emit streaming deltas**: Extend `/chat` workflow to push `{"type":"plan_update"}` frames for enqueue/reorder/skip actions.
-3. **Frontend wiring**: Normalise `plan` payloads client-side, hydrate a dedicated plan store, and subscribe the Plan Panel to streaming events.
-4. **Testing & docs**: Add controller + route tests, streaming contract tests, and update `docs/tasks/TASK_005_Cognitive_Scholar_MVP_Tickets.md`.
+1. **Plan streaming**: Define `plan_update` payload contract and emit from `/ai/chat` streaming loop.
+2. **Client handling**: Consume streaming updates in `ChatWorkspace`/`PlanPanel`, reconciling with optimistic local state.
+3. **Resilience**: Fall back to periodic plan fetch (existing REST endpoints) when streaming is unavailable.
+4. **QA**: Add streaming-focused tests once deltas ship (unit + integration).
 
 ## Risks & Mitigations
 - **Race conditions**: Concurrent plan mutations via chat and explicit CRUD can drift. Enforce controller-level locks or optimistic version checks.
@@ -45,10 +44,10 @@
 
 ## Progress Tracking
 - [x] Persist plan state via controller + DTOs.
-- [ ] Expose dedicated plan CRUD endpoints.
+- [x] Expose dedicated plan CRUD endpoints.
 - [ ] Stream live plan updates alongside chat tokens.
-- [ ] Integrate Plan Panel with normalised plan store + events.
-- [ ] Backfill unit/integration coverage + docs.
+- [x] Integrate Plan Panel with normalised plan store + events.
+- [x] Backfill unit/integration coverage + docs.
 
 ## Known Limitations & Bugs
 - No open bugs logged. Add new issues to `docs/status/KnownBugs.md` and reference their IDs here.

@@ -217,7 +217,9 @@ class ResearchLoopController:
         return self._load_plan_from_state(updated_state)
 
     def get_plan(self, session_id: str) -> ResearchPlan:
-        state = self.require_state(session_id)
+        state = self._load_state(session_id)
+        if state is None:
+            return self._build_default_plan(session_id, list(DEFAULT_LOOP_STEP_SEQUENCE))
         plan = self._load_plan_from_state(state)
         self._sync_plan_progress(state)
         self._store_state(session_id, state)
