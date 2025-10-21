@@ -543,6 +543,7 @@ def run_sql_migrations(
                 continue
 
             should_execute = True
+            should_record = False
             if (
                 is_sqlite_perspective_migration
                 and not sqlite_missing_perspective
@@ -552,6 +553,7 @@ def run_sql_migrations(
                     "Skipping SQLite perspective migration; column already exists"
                 )
                 should_execute = False
+                should_record = True
 
             # Skip Postgres-only operations when using SQLite. These include
             # pgvector/tsvector types and index methods not supported by SQLite.
@@ -664,7 +666,7 @@ def run_sql_migrations(
                         "SQLite perspective column still missing after migration execution",
                     )
 
-            if should_execute or custom_sqlite_handler_applied:
+            if should_execute or custom_sqlite_handler_applied or should_record:
                 session.add(
                     AppSetting(
                         key=key,
