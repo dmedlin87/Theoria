@@ -103,14 +103,23 @@ class AuditLogWriter:
             return cls(None)
         if bind is None:
             return cls(None)
-        session_cls = session.__class__ if isinstance(session, SASession) else SASession
+        # Use SQLAlchemy's base ``Session`` class for audit logging rather than
+        # reusing the application's custom subclass.  The application session
+        # adds aggressive SQLite handle cleanup in ``close`` which interferes
+        # with other concurrently active sessions (for example, the request
+        # session responsible for the guardrail workflow).  When audit logging
+        # fails to commit—common under SQLite when another transaction is
+        # writing—the cleanup routine could close the primary connection and
+        # leave the request transaction in a broken state.  Sticking with the
+        # stock ``Session`` avoids that cross-session interference while still
+        # providing the isolation audit logging needs.
         factory = sessionmaker(
             bind=bind,
             autoflush=False,
             autocommit=False,
             expire_on_commit=False,
             future=True,
-            class_=session_cls,
+            class_=SASession,
         )
         return cls(factory)
 

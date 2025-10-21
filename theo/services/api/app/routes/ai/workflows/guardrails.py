@@ -22,7 +22,7 @@ from theo.services.api.app.models.search import HybridSearchFilters
 from .utils import has_filters
 
 
-DEFAULT_REFUSAL_MESSAGE = "I’m sorry, but I cannot help with that request."
+DEFAULT_REFUSAL_MESSAGE = "I'm sorry, but I cannot help with that request."
 _GUARDRAIL_KIND_MAP = {
     "retrieval": "retrieval",
     "generation": "generation",
