@@ -13,6 +13,7 @@ import sys
 
 import pytest
 from fastapi import Request as FastAPIRequest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -82,8 +83,9 @@ def _disable_migrations(
     yield
 
 
-@pytest.fixture(scope="session")
-def _skip_heavy_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.fixture(scope="session", autouse=True)
+def _skip_heavy_startup() -> None:
+    monkeypatch = pytest.MonkeyPatch()
     """Disable expensive FastAPI lifespan setup steps for API tests."""
 
     monkeypatch.setattr(
@@ -101,6 +103,11 @@ def _skip_heavy_startup(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda: None,
         raising=False,
     )
+
+    try:
+        yield
+    finally:
+        monkeypatch.undo()
 
 
 @pytest.fixture(scope="session")
@@ -139,4 +146,12 @@ def api_engine(
             engine.dispose()
         database_module._engine = None  # type: ignore[attr-defined]
         database_module._SessionLocal = None  # type: ignore[attr-defined]
+
+
+@pytest.fixture()
+def api_test_client(api_engine) -> TestClient:
+    """Yield a ``TestClient`` bound to an isolated, migrated database."""
+
+    with TestClient(app) as client:
+        yield client
 
