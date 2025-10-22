@@ -132,13 +132,12 @@ def _get_value(obj: Any, mapping: Mapping[str, Any] | None, *keys: str) -> Any:
             return getattr(obj, key)
 
     if mapping:
-        meta_candidate: Mapping[str, Any] | None = None
+        meta_candidates: list[Mapping[str, Any]] = []
         for meta_key in ("meta", "metadata"):
             found_meta, meta_value = _lookup_mapping(mapping, (meta_key,))
             if found_meta and isinstance(meta_value, Mapping):
-                meta_candidate = meta_value
-                break
-        if meta_candidate:
+                meta_candidates.append(meta_value)
+        for meta_candidate in meta_candidates:
             found_meta_value, meta_value = _lookup_mapping(meta_candidate, keys)
             if found_meta_value:
                 return meta_value
