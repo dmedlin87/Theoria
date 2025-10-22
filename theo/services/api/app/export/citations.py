@@ -890,6 +890,34 @@ _CORPORATE_LEADING_TOKENS = {
 }
 
 
+# Additional trailing tokens that frequently indicate an organisation when the
+# input consists of only two uppercase words. These capture common corporate
+# suffixes that are not already covered by :data:`_CORPORATE_AUTHOR_KEYWORDS`
+# but that rarely appear as surnames.
+_CORPORATE_TRAILING_TOKENS = {
+    "alliance",
+    "america",
+    "americas",
+    "campaign",
+    "council",
+    "cross",
+    "fellowship",
+    "fund",
+    "funds",
+    "initiative",
+    "institute",
+    "mission",
+    "missions",
+    "network",
+    "project",
+    "projects",
+    "society",
+    "team",
+    "teams",
+    "trust",
+}
+
+
 def _looks_like_uppercase_personal_name(parts: list[str]) -> bool:
     """Return ``True`` when *parts* resemble an uppercase personal name."""
 
@@ -926,6 +954,9 @@ def _looks_like_uppercase_personal_name(parts: list[str]) -> bool:
             return len(last) > 1 and last.isalpha()
 
         if lower_first in _CORPORATE_LEADING_TOKENS or lower_last in _CORPORATE_LEADING_TOKENS:
+            return False
+
+        if lower_last in _CORPORATE_TRAILING_TOKENS:
             return False
 
         return len(first) > 1 and len(last) > 1 and first.isalpha() and last.isalpha()
