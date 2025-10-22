@@ -388,6 +388,7 @@ _COMMON_UPPERCASE_GIVEN_NAMES = {
     "adrian",
     "alex",
     "alexander",
+    "albert",
     "alice",
     "allison",
     "amanda",
@@ -882,7 +883,25 @@ def _looks_like_uppercase_personal_name(parts: list[str]) -> bool:
         return False
 
     if len(stripped_parts) == 2:
-        return len(first) > 1 and len(last) > 1
+        lower_first = first.lower()
+        lower_last = last.lower()
+
+        if lower_first in _PERSON_NAME_PARTICLES:
+            return lower_last in _COMMON_UPPERCASE_SURNAMES
+
+        if len(first) == 1 and first.isalpha():
+            return lower_last in _COMMON_UPPERCASE_SURNAMES
+
+        if lower_first not in _COMMON_UPPERCASE_GIVEN_NAMES:
+            return False
+
+        if lower_last in _CORPORATE_AUTHOR_KEYWORDS:
+            return False
+
+        if lower_last in _COMMON_UPPERCASE_SURNAMES:
+            return True
+
+        return len(last) > 1 and last.isalpha()
 
     def _is_middle_component(token: str) -> bool:
         cleaned = token.strip(".")
