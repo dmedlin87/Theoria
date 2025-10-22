@@ -135,6 +135,8 @@ def test_extract_passages_handles_object_source() -> None:
         ("Single", {"literal": "Single"}),
         ("", {"literal": ""}),
         ("UNITED WAY", {"literal": "UNITED WAY"}),
+        ("OXFAM AMERICA", {"literal": "OXFAM AMERICA"}),
+        ("RED CROSS", {"literal": "RED CROSS"}),
     ],
 )
 def test_normalise_author_handles_varied_inputs(raw: str, expected: dict[str, str]) -> None:
