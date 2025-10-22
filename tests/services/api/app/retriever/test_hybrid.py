@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
+from hypothesis import given, strategies as st
 
 from theo.services.api.app.models.documents import DocumentAnnotationResponse
 from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchRequest
@@ -244,4 +245,62 @@ def test_build_statements_apply_filters_and_limits(monkeypatch):
     assert compiled_vector.params["source_type_1"] == "sermon"
     assert any(value == 5 for value in compiled_lexical.params.values())
     assert any(str(value) == "%grace%" for value in compiled_tei.params.values())
+
+
+_TOPIC_TEXT = st.text(
+    alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_categories=("Cs",)),
+    min_size=1,
+    max_size=32,
+).filter(lambda value: value.strip() != "")
+
+
+def _whitespace() -> st.SearchStrategy[str]:
+    return st.text(alphabet=st.sampled_from([" ", "\t", "\n"]), min_size=0, max_size=3)
+
+
+@given(
+    base=_TOPIC_TEXT,
+    extra_domains=st.lists(st.text(alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_categories=("Cs",)), max_size=16), max_size=4),
+    doc_prefix=_whitespace(),
+    doc_suffix=_whitespace(),
+    filter_prefix=_whitespace(),
+    filter_suffix=_whitespace(),
+)
+def test_matches_topic_domain_handles_whitespace_and_casefold(
+    base: str,
+    extra_domains: list[str],
+    doc_prefix: str,
+    doc_suffix: str,
+    filter_prefix: str,
+    filter_suffix: str,
+) -> None:
+    document = _make_document(
+        topic_domains=[*extra_domains, f"{doc_prefix}{base.swapcase()}{doc_suffix}"],
+    )
+    filter_value = f"{filter_prefix}{base}{filter_suffix}".upper()
+
+    assert hybrid._matches_topic_domain(document, filter_value) is True
+
+
+@st.composite
+def _base_and_nonmatching_domains(draw):
+    base = draw(_TOPIC_TEXT)
+    normalized = base.strip().casefold()
+    candidate = st.text(
+        alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_categories=("Cs",)),
+        max_size=16,
+    )
+    others = draw(
+        st.lists(candidate.filter(lambda value: not value.strip() or value.strip().casefold() != normalized), max_size=5)
+    )
+    return base, others
+
+
+@given(_base_and_nonmatching_domains())
+def test_matches_topic_domain_requires_normalised_match(data) -> None:
+    base, other_domains = data
+    document = _make_document(topic_domains=other_domains)
+    filter_value = f" {base} "
+
+    assert hybrid._matches_topic_domain(document, filter_value) is False
 

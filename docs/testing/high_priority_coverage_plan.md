@@ -79,7 +79,7 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 #### 2.3 Property / Fuzz Tests
 * Property-based test around `merge_metadata` ensuring associative merging regardless of dict order (Hypothesis).【F:theo/services/api/app/ingest/metadata.py†L122-L134】
 * Generate random guardrail inputs (lists/strings) to guarantee `_normalise_guardrail_collection` deduplicates and strips whitespace. 【F:theo/services/api/app/ingest/metadata.py†L167-L197】
-* Hypothesis strategies for URLs to stress `normalise_host` and blocked network parsing without hitting the network stack.【F:theo/services/api/app/ingest/network.py†L29-L107】
+* Hypothesis suites to fuzz `_parse_blocked_networks` and cached CIDR handling so invalid ranges are ignored without impacting allow-lists.【F:theo/services/api/app/ingest/network.py†L34-L55】
 
 #### 2.4 Fixtures & Utilities
 * Shared fake settings object exposing ingest allow/block lists and user agent.
@@ -92,6 +92,7 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * ✅ Implemented `tests/services/api/app/ingest/test_pipeline_core.py` to exercise `PipelineDependencies`, `_ensure_success`, default title factories, and `_UrlDocumentPersister` dispatch logic.
 * ✅ Added `tests/services/api/app/ingest/test_orchestrator.py` to cover success, retry/fallback, and terminal failure behaviours of `IngestOrchestrator`.
 * ✅ Added `tests/services/api/app/ingest/test_network.py` to cover host normalisation, redirect loop detection, fetch byte limits, and YouTube helper utilities.
+* ✅ Augmented `tests/services/api/app/ingest/test_network.py` with Hypothesis-driven fuzzing of `normalise_host` to stress trimming, casefolding, and idempotence across random ASCII input.
 * ✅ Expanded `tests/services/api/app/ingest/test_metadata.py` with guardrail property tests, metadata serialisation, topic aggregation, and HTML parsing checks.
 * ✅ Added `tests/services/api/app/ingest/test_embeddings.py` to validate embedding cache behaviour, resilience telemetry, and lexical representation fallbacks.
 
@@ -135,8 +136,8 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 | Document CRUD | Create document + annotations, then exercise `create_annotation`, `list_annotations`, and `delete_annotation` end-to-end to ensure case builder sync called and database state updates. | Transactional fixture resets DB between tests.
 
 #### 3.3 Property Tests
-* Hypothesis-driven fuzzing for `prepare_annotation_body` to ensure passage ID deduplication and metadata passthrough regardless of ordering.【F:theo/services/api/app/retriever/annotations.py†L30-L56】
-* Generate random guardrail metadata for `_matches_topic_domain` to confirm normalised comparisons remain symmetric.【F:theo/services/api/app/retriever/hybrid.py†L294-L312】
+* Extend `_passes_guardrail_filters` coverage with Hypothesis-generated filter combinations to exercise tradition/topic interplay and missing metadata cases.【F:theo/services/api/app/retriever/hybrid.py†L269-L312】
+* Fuzz `_tei_terms` / `_tei_match_score` with nested metadata dicts and blobs to harden TEI keyword extraction against malformed inputs.【F:theo/services/api/app/retriever/hybrid.py†L315-L341】
 
 #### 3.4 Observability Assertions
 * Trace attribute tests verifying `_annotate_retrieval_span` sets fields for query, filters, cache status, and backend.【F:theo/services/api/app/retriever/hybrid.py†L29-L57】
@@ -146,6 +147,8 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 * ✅ Implemented `tests/services/api/app/retriever/test_utils.py` to ensure `compose_passage_meta` merges document context with passage overrides while returning `None` when no metadata is available.
 * ✅ Added `tests/services/api/app/retriever/test_annotations.py` to cover annotation payload serialisation, legacy body handling, batched loading, and passage indexing helpers.
 * ✅ Added `tests/services/api/app/retriever/test_hybrid.py` to exercise tokenisation, highlight building, candidate scoring/merging, OSIS guards, TEI helpers, and SQL statement builders.
+* ✅ Extended `tests/services/api/app/retriever/test_annotations.py` with Hypothesis fuzzing for `prepare_annotation_body` to assert passage deduplication, optional field stripping, and metadata passthrough invariants.
+* ✅ Expanded `tests/services/api/app/retriever/test_hybrid.py` with property-based guardrail coverage to confirm `_matches_topic_domain` respects whitespace and casefolded comparisons.
 * ✅ Added `tests/services/api/app/retriever/test_documents.py` to verify document listing/detail pagination, latest digest selection, update semantics, and annotation CRUD pathways with an in-memory SQLite database.
 * ✅ Added `tests/services/api/app/retriever/test_hybrid_search.py` to validate `_annotate_retrieval_span` observability hooks, `_fallback_search` guardrail/OSIS handling, and `_postgres_hybrid_search` backend selection and candidate aggregation.
 
@@ -156,6 +159,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 2. **Backfill unit suites** – Prioritise shim coverage (core), orchestrator/pipeline basics (ingest), and annotation utilities (retriever) for quick wins toward 90%.
 3. **Layer integration tests** – Once helpers are in place, add orchestrator and hybrid search integration tests to validate cross-module behaviour.
 4. **Introduce property-based checks** – After deterministic fixtures exist, layer Hypothesis strategies for metadata and guardrail normalisation to guard against regression drift.
+5. **Plan next iteration** – Prioritise `_parse_blocked_networks` fuzzing, guardrail filter Hypothesis suites, and the remaining observability assertions before expanding into hybrid fallback/search integrations.
 5. **Plan next iteration** – Expand into hybrid end-to-end scenarios that stitch together retriever and ingest fixtures, then pursue property tests for guardrail fuzzing and annotation bodies.
 6. **Track coverage growth** – Run `pytest --cov` after each milestone and update the coverage report, ensuring each package crosses the 90% threshold before moving on.
 

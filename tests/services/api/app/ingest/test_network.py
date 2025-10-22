@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any, Callable
 
 import pytest
+from hypothesis import given, strategies as st
 
 from theo.services.api.app.ingest import network
 from theo.services.api.app.ingest.network import (
@@ -40,6 +41,13 @@ def _build_settings(**overrides: Any) -> _FakeSettings:
 
 def test_normalise_host_strips_and_lowercases() -> None:
     assert normalise_host("  Example.COM.  ") == "example.com"
+
+
+@given(st.text(alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_categories=("Cs",)), max_size=64))
+def test_normalise_host_property(host: str) -> None:
+    result = normalise_host(host)
+    assert result == host.strip().lower().rstrip(".")
+    assert normalise_host(result) == result
 
 
 def test_resolve_host_addresses_uses_dns_and_deduplicates(monkeypatch: pytest.MonkeyPatch) -> None:

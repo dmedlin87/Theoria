@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import pytest
+
+from hypothesis import given, strategies as st
 
 from theo.services.api.app.retriever.annotations import (
     annotation_to_schema,
@@ -187,3 +189,102 @@ def test_index_annotations_by_passage_maps_ids() -> None:
     assert set(index.keys()) == {"p1", "p2", "p3"}
     assert [annotation.id for annotation in index["p2"]] == ["a1", "a2"]
     assert [annotation.id for annotation in index["p1"]] == ["a1"]
+
+
+_ASCII_CHARS = st.characters(min_codepoint=32, max_codepoint=126, blacklist_categories=("Cs",))
+_NON_EMPTY_ASCII = st.text(_ASCII_CHARS, min_size=1, max_size=32).filter(lambda value: value.strip() != "")
+
+
+def _whitespace() -> st.SearchStrategy[str]:
+    return st.text(alphabet=st.sampled_from([" ", "\t", "\n"]), min_size=0, max_size=3)
+
+
+@st.composite
+def _annotation_payloads(draw) -> DocumentAnnotationCreate:
+    base_text = draw(_NON_EMPTY_ASCII)
+    text = f"{draw(_whitespace())}{base_text}{draw(_whitespace())}"
+
+    stance_value = draw(st.one_of(st.none(), _NON_EMPTY_ASCII))
+    if stance_value is not None:
+        stance = f"{draw(_whitespace())}{stance_value}{draw(_whitespace())}"
+    else:
+        stance = None
+
+    group_value = draw(st.one_of(st.none(), _NON_EMPTY_ASCII))
+    if group_value is not None:
+        group_id = f"{draw(_whitespace())}{group_value}{draw(_whitespace())}"
+    else:
+        group_id = None
+
+    passage_element = st.one_of(
+        st.text(_ASCII_CHARS, min_size=0, max_size=8),
+        st.integers(-5, 5).map(str),
+    )
+    passage_ids = draw(st.lists(passage_element, max_size=6))
+
+    metadata = draw(
+        st.one_of(
+            st.none(),
+            st.dictionaries(
+                st.text(_ASCII_CHARS, min_size=1, max_size=10),
+                st.one_of(
+                    st.integers(-10, 10),
+                    st.floats(allow_nan=False, allow_infinity=False),
+                    st.text(_ASCII_CHARS, max_size=12),
+                    st.booleans(),
+                ),
+                max_size=4,
+            ),
+        )
+    )
+
+    annotation_type = draw(
+        st.one_of(st.none(), st.sampled_from(["note", "claim", "evidence", "question"]))
+    )
+
+    payload = DocumentAnnotationCreate(
+        type=annotation_type,
+        text=text,
+        stance=stance,
+        group_id=group_id,
+        passage_ids=passage_ids,
+        metadata=metadata,
+    )
+    return payload
+
+
+@given(_annotation_payloads())
+def test_prepare_annotation_body_preserves_semantics(payload: DocumentAnnotationCreate) -> None:
+    document = prepare_annotation_body(payload)
+    parsed = json.loads(document)
+
+    assert set(parsed) <= {"type", "text", "stance", "passage_ids", "group_id", "metadata"}
+    assert parsed["type"] == payload.type
+    assert parsed["text"] == payload.text
+
+    expected_stance = (payload.stance or "").strip() or None
+    if expected_stance is None:
+        assert "stance" not in parsed
+    else:
+        assert parsed["stance"] == expected_stance
+
+    expected_group = (payload.group_id or "").strip() or None
+    if expected_group is None:
+        assert "group_id" not in parsed
+    else:
+        assert parsed["group_id"] == expected_group
+
+    expected_passages: list[str] = []
+    for passage_id in payload.passage_ids:
+        if passage_id not in expected_passages:
+            expected_passages.append(passage_id)
+    if expected_passages:
+        assert parsed["passage_ids"] == expected_passages
+    else:
+        assert "passage_ids" not in parsed
+
+    expected_metadata = payload.metadata or None
+    if expected_metadata is None:
+        assert "metadata" not in parsed
+    else:
+        assert parsed["metadata"] == expected_metadata
