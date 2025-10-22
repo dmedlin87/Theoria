@@ -126,6 +126,7 @@ def test_extract_passages_handles_object_source() -> None:
             "United States Census Bureau",
             {"literal": "United States Census Bureau"},
         ),
+        ("JOHN DOE", {"given": "JOHN", "family": "DOE"}),
         ("Single", {"literal": "Single"}),
         ("", {"literal": ""}),
     ],
