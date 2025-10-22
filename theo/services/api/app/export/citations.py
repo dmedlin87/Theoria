@@ -307,6 +307,65 @@ def _normalise_doi(value: Any) -> str | None:
     return cleaned or None
 
 
+_CORPORATE_AUTHOR_KEYWORDS = {
+    "academy",
+    "agency",
+    "association",
+    "board",
+    "bureau",
+    "center",
+    "centre",
+    "church",
+    "commission",
+    "committee",
+    "company",
+    "conference",
+    "council",
+    "department",
+    "division",
+    "editors",
+    "foundation",
+    "government",
+    "group",
+    "institute",
+    "institution",
+    "laboratories",
+    "laboratory",
+    "ministry",
+    "office",
+    "press",
+    "school",
+    "services",
+    "society",
+    "synod",
+    "team",
+    "university",
+}
+
+
+def _looks_like_corporate_author(candidate: str, parts: list[str]) -> bool:
+    """Return ``True`` when *candidate* resembles an organisation name."""
+
+    lowered_parts = [part.lower().strip(".,") for part in parts]
+
+    if any(char.isdigit() for char in candidate):
+        return True
+
+    if any(symbol in candidate for symbol in {"&", "/", "@"}):
+        return True
+
+    if any(part in _CORPORATE_AUTHOR_KEYWORDS for part in lowered_parts):
+        return True
+
+    if any(part.isupper() and len(part) > 1 for part in parts):
+        return True
+
+    if len(parts) >= 3 and any(part in {"of", "for", "the", "and"} for part in lowered_parts):
+        return True
+
+    return False
+
+
 def _normalise_author(name: str) -> dict[str, str]:
     """Return structured author information from a free-form *name* string."""
 
@@ -323,6 +382,8 @@ def _normalise_author(name: str) -> dict[str, str]:
 
     parts = [segment.strip() for segment in candidate.split() if segment.strip()]
     if len(parts) >= 2:
+        if _looks_like_corporate_author(candidate, parts):
+            return {"literal": candidate}
         family = parts[-1]
         given = " ".join(parts[:-1])
         return {"given": given, "family": family}
