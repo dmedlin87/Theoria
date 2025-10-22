@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
-    Iterable,
     Mapping,
     Sequence,
     TYPE_CHECKING,
@@ -92,45 +91,80 @@ class CitationSource:
         )
 
 
-def _get_value(obj: Any, mapping: Mapping[str, Any] | None, *keys: str) -> Any:
+def _lookup_mapping(
+    mapping: Mapping[str, Any] | None, keys: Sequence[str]
+) -> tuple[bool, Any]:
+    """Return a ``(found, value)`` tuple for *keys* within *mapping*.
+
+    The lookup is case-insensitive for string keys while still preserving
+    the original value. ``found`` indicates whether any key matched even if
+    the corresponding value is ``None``.
+    """
+
+    if mapping is None:
+        return False, None
+
     for key in keys:
-        if mapping and key in mapping:
-            return mapping[key]
+        if key in mapping:
+            return True, mapping[key]
+
+    lower_lookup: dict[str, str] = {}
+    for existing_key in mapping.keys():
+        if isinstance(existing_key, str):
+            lower_lookup.setdefault(existing_key.lower(), existing_key)
+
+    for key in keys:
+        if isinstance(key, str):
+            match = lower_lookup.get(key.lower())
+            if match is not None:
+                return True, mapping[match]
+
+    return False, None
+
+
+def _get_value(obj: Any, mapping: Mapping[str, Any] | None, *keys: str) -> Any:
+    found, value = _lookup_mapping(mapping, keys)
+    if found:
+        return value
+
+    for key in keys:
         if hasattr(obj, key):
             return getattr(obj, key)
+
     if mapping:
-        meta = mapping.get("meta") or mapping.get("metadata")
-        if isinstance(meta, Mapping):
-            for key in keys:
-                if key in meta:
-                    return meta[key]
+        meta_candidate: Mapping[str, Any] | None = None
+        for meta_key in ("meta", "metadata"):
+            found_meta, meta_value = _lookup_mapping(mapping, (meta_key,))
+            if found_meta and isinstance(meta_value, Mapping):
+                meta_candidate = meta_value
+                break
+        if meta_candidate:
+            found_meta_value, meta_value = _lookup_mapping(meta_candidate, keys)
+            if found_meta_value:
+                return meta_value
+
     if hasattr(obj, "meta"):
         meta_attr = cast(Any, obj).meta
         if isinstance(meta_attr, Mapping):
-            for key in keys:
-                if key in meta_attr:
-                    return meta_attr[key]
+            found_meta_value, meta_value = _lookup_mapping(meta_attr, keys)
+            if found_meta_value:
+                return meta_value
+
     return None
 
 
 def _extract_metadata(obj: Any, mapping: Mapping[str, Any] | None) -> dict[str, Any]:
-    candidates: Iterable[Any] = []
     if mapping:
-        candidates = (
-            mapping.get("metadata"),
-            mapping.get("meta"),
-            mapping.get("bib_json"),
-        )
+        for key in ("metadata", "meta", "bib_json"):
+            found, value = _lookup_mapping(mapping, (key,))
+            if found and isinstance(value, Mapping):
+                return dict(value)
     else:
-        candidates = (
-            getattr(obj, "metadata", None),
-            getattr(obj, "meta", None),
-            getattr(obj, "bib_json", None),
-        )
-
-    for value in candidates:
-        if isinstance(value, Mapping):
-            return dict(value)
+        for attr in ("metadata", "meta", "bib_json"):
+            if hasattr(obj, attr):
+                candidate = getattr(obj, attr)
+                if isinstance(candidate, Mapping):
+                    return dict(candidate)
     return {}
 
 
@@ -145,10 +179,11 @@ def _resolve_topics(
         return topics
     if metadata:
         for key in ("topics", "tags", "keywords", "subjects"):
-            value = metadata.get(key)
-            topics = _coerce_str_list(value)
-            if topics:
-                return topics
+            found, value = _lookup_mapping(metadata, (key,))
+            if found:
+                topics = _coerce_str_list(value)
+                if topics:
+                    return topics
     return None
 
 
@@ -156,12 +191,14 @@ def _metadata_first(metadata: Mapping[str, Any] | None, *keys: str) -> str | Non
     if not metadata:
         return None
     for key in keys:
-        value = metadata.get(key)
+        found, value = _lookup_mapping(metadata, (key,))
+        if not found:
+            continue
         if isinstance(value, str):
             cleaned = value.strip()
             if cleaned:
                 return cleaned
-        if isinstance(value, Sequence):
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
             for entry in value:
                 if isinstance(entry, str) and entry.strip():
                     return entry.strip()
