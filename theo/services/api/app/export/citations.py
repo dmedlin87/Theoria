@@ -334,8 +334,6 @@ def _apa_author(author: dict[str, str]) -> str:
     literal = author.get("literal")
     family = author.get("family")
     if family:
-        if literal and "," not in literal:
-            return literal
         given = author.get("given", "")
         initials = " ".join(f"{segment[0].upper()}." for segment in given.split() if segment)
         if initials:
@@ -634,7 +632,7 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
     title_text = str(title).strip()
     title_segment = f'"{title_text or title}"'
     if title_text and not title_text.endswith((".", "!", "?")):
-        title_segment = f"{title_segment}."
+        title_segment = f'"{title_text}."'
     segments.append(title_segment)
     if details_text:
         if not details_text.endswith(('.', '!', '?')):
