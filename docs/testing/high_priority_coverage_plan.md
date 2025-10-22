@@ -95,6 +95,7 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * ✅ Augmented `tests/services/api/app/ingest/test_network.py` with Hypothesis-driven fuzzing of `normalise_host` to stress trimming, casefolding, and idempotence across random ASCII input.
 * ✅ Expanded `tests/services/api/app/ingest/test_metadata.py` with guardrail property tests, metadata serialisation, topic aggregation, and HTML parsing checks.
 * ✅ Added `tests/services/api/app/ingest/test_embeddings.py` to validate embedding cache behaviour, resilience telemetry, and lexical representation fallbacks.
+* ✅ Extended `tests/services/api/app/ingest/test_pipeline_core.py` to cover `_orchestrate`, file/transcript pipeline entrypoints, and `import_osis_commentary` success/error paths, ensuring workflow instrumentation and dependency wiring remain intact.
 
 ---
 
@@ -158,6 +159,11 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 1. **Bootstrap fixtures & fakes** – Create reusable fake settings, sessions, and response helpers shared across ingest/retriever tests.
 2. **Backfill unit suites** – Prioritise shim coverage (core), orchestrator/pipeline basics (ingest), and annotation utilities (retriever) for quick wins toward 90%.
 3. **Layer integration tests** – Once helpers are in place, add orchestrator and hybrid search integration tests to validate cross-module behaviour.
+
+### Next Iteration Focus
+* Exercise the file and URL pipelines against the real `resilient_operation` helpers to assert span attributes and retry metadata in failure scenarios.
+* Add integration coverage for `run_pipeline_for_file` and `run_pipeline_for_transcript` that runs through the real stage implementations with in-memory fixtures to surface persistence edge cases.
+* Expand retriever guardrail property tests to cover `_tei_match_score` fuzzing and additional `_fallback_search` filter combinations.
 4. **Introduce property-based checks** – After deterministic fixtures exist, layer Hypothesis strategies for metadata and guardrail normalisation to guard against regression drift.
 5. **Plan next iteration** – Prioritise `_parse_blocked_networks` fuzzing, guardrail filter Hypothesis suites, and the remaining observability assertions before expanding into hybrid fallback/search integrations.
 5. **Plan next iteration** – Expand into hybrid end-to-end scenarios that stitch together retriever and ingest fixtures, then pursue property tests for guardrail fuzzing and annotation bodies.
