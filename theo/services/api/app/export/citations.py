@@ -866,6 +866,30 @@ _PERSON_NAME_SUFFIXES = {
 }
 
 
+# Common lead-in words for corporate names that frequently appear without
+# additional corporate keywords. These help distinguish two-word uppercase
+# organisation names (for example, "UNITED WAY") from legitimate personal
+# names whose given names are not in :data:`_COMMON_UPPERCASE_GIVEN_NAMES`.
+_CORPORATE_LEADING_TOKENS = {
+    "american",
+    "central",
+    "eastern",
+    "federal",
+    "first",
+    "general",
+    "global",
+    "international",
+    "national",
+    "northern",
+    "royal",
+    "southern",
+    "standard",
+    "united",
+    "western",
+    "world",
+}
+
+
 def _looks_like_uppercase_personal_name(parts: list[str]) -> bool:
     """Return ``True`` when *parts* resemble an uppercase personal name."""
 
@@ -892,16 +916,19 @@ def _looks_like_uppercase_personal_name(parts: list[str]) -> bool:
         if len(first) == 1 and first.isalpha():
             return lower_last in _COMMON_UPPERCASE_SURNAMES
 
-        if lower_first not in _COMMON_UPPERCASE_GIVEN_NAMES:
-            return False
-
-        if lower_last in _CORPORATE_AUTHOR_KEYWORDS:
+        if lower_first in _CORPORATE_AUTHOR_KEYWORDS or lower_last in _CORPORATE_AUTHOR_KEYWORDS:
             return False
 
         if lower_last in _COMMON_UPPERCASE_SURNAMES:
             return True
 
-        return len(last) > 1 and last.isalpha()
+        if lower_first in _COMMON_UPPERCASE_GIVEN_NAMES:
+            return len(last) > 1 and last.isalpha()
+
+        if lower_first in _CORPORATE_LEADING_TOKENS or lower_last in _CORPORATE_LEADING_TOKENS:
+            return False
+
+        return len(first) > 1 and len(last) > 1 and first.isalpha() and last.isalpha()
 
     def _is_middle_component(token: str) -> bool:
         cleaned = token.strip(".")
