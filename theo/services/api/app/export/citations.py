@@ -315,12 +315,16 @@ _CORPORATE_AUTHOR_KEYWORDS = {
     "bureau",
     "center",
     "centre",
+    "co",
+    "co.",
     "church",
     "commission",
     "committee",
     "company",
     "conference",
     "council",
+    "corp",
+    "corp.",
     "department",
     "division",
     "editors",
@@ -331,8 +335,14 @@ _CORPORATE_AUTHOR_KEYWORDS = {
     "institution",
     "laboratories",
     "laboratory",
+    "llc",
+    "l.l.c.",
+    "llp",
+    "ltd",
+    "ltd.",
     "ministry",
     "office",
+    "plc",
     "press",
     "school",
     "services",
@@ -355,9 +365,6 @@ def _looks_like_corporate_author(candidate: str, parts: list[str]) -> bool:
         return True
 
     if any(part in _CORPORATE_AUTHOR_KEYWORDS for part in lowered_parts):
-        return True
-
-    if any(part.isupper() and len(part) > 1 for part in parts):
         return True
 
     if len(parts) >= 3 and any(part in {"of", "for", "the", "and"} for part in lowered_parts):
