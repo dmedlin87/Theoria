@@ -326,11 +326,21 @@ def _recreate_seed_table_if_missing_column(
         return False
 
     try:
-        context = (
-            connection.begin()
-            if hasattr(connection, "begin") and not used_session_connection
-            else nullcontext()
-        )
+        has_active_transaction = False
+        if hasattr(connection, "in_transaction"):
+            try:
+                has_active_transaction = bool(connection.in_transaction())
+            except TypeError:  # pragma: no cover - SQLAlchemy 1.4 attr
+                has_active_transaction = bool(connection.in_transaction)
+        elif hasattr(connection, "get_transaction"):
+            has_active_transaction = connection.get_transaction() is not None
+
+        context = nullcontext()
+        if hasattr(connection, "begin"):
+            if has_active_transaction and hasattr(connection, "begin_nested"):
+                context = connection.begin_nested()
+            elif not has_active_transaction:
+                context = connection.begin()
         with context:
             table.drop(bind=connection, checkfirst=True)
             table.create(bind=connection, checkfirst=False)
