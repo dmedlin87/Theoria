@@ -23,9 +23,12 @@ class _FakeResult:
 
 
 class _FakeSession:
-    def __init__(self, executions, *, dialect_name: str = "postgresql"):
+    def __init__(self, executions, *, dialect_name: str | None = "postgresql"):
         self._executions = list(executions)
-        self.bind = SimpleNamespace(dialect=SimpleNamespace(name=dialect_name))
+        if dialect_name is None:
+            self.bind = None
+        else:
+            self.bind = SimpleNamespace(dialect=SimpleNamespace(name=dialect_name))
 
     def execute(self, stmt):  # pragma: no cover - exercised in tests
         if not self._executions:
@@ -148,6 +151,43 @@ def _patch_osis_helpers(monkeypatch, mapping: dict[str, set[int]]):
 
     monkeypatch.setattr(hybrid, "expand_osis_reference", _expand)
     monkeypatch.setattr(hybrid, "osis_intersects", _intersects)
+
+
+def test_annotate_retrieval_span_records_request_fields():
+    span = _SpanRecorder()
+    request = HybridSearchRequest(
+        query="Grace",
+        osis="Gen.1.1",
+        filters=HybridSearchFilters(
+            collection="research",
+            author="Allowed",
+            source_type="sermon",
+            theological_tradition="Catholic",
+            topic_domain="Ethics",
+        ),
+        k=5,
+        cursor="cursor-42",
+        limit=25,
+        mode="mentions",
+    )
+
+    hybrid._annotate_retrieval_span(span, request, cache_status="hit", backend="cached")
+
+    assert span.attributes == {
+        "retrieval.backend": "cached",
+        "retrieval.cache_status": "hit",
+        "retrieval.k": 5,
+        "retrieval.limit": 25,
+        "retrieval.cursor": "cursor-42",
+        "retrieval.mode": "mentions",
+        "retrieval.query": "Grace",
+        "retrieval.osis": "Gen.1.1",
+        "retrieval.filter.collection": "research",
+        "retrieval.filter.author": "Allowed",
+        "retrieval.filter.source_type": "sermon",
+        "retrieval.filter.theological_tradition": "Catholic",
+        "retrieval.filter.topic_domain": "Ethics",
+    }
 
 
 def test_fallback_search_filters_and_scores(monkeypatch, tracer_stub):
@@ -338,6 +378,78 @@ def test_postgres_hybrid_search_osis_only_branch(monkeypatch, tracer_stub):
     span_name, span = tracer_stub.spans[-1]
     assert span_name == "retriever.postgres"
     assert span.attributes["retrieval.hit_count"] == len(results)
+
+
+def test_hybrid_search_uses_fallback_backend(monkeypatch, tracer_stub):
+    times = iter([100.0, 100.5])
+    monkeypatch.setattr(hybrid, "perf_counter", lambda: next(times))
+
+    stub_results = [SimpleNamespace(id="fallback", document_id="doc", score=1.0)]
+    captured: dict[str, object] = {}
+
+    def _fake_fallback(session, request):
+        captured["session"] = session
+        captured["request"] = request
+        return stub_results
+
+    def _unexpected_postgres(*_args, **_kwargs):
+        raise AssertionError("Postgres backend should not be used for fallback tests")
+
+    monkeypatch.setattr(hybrid, "_fallback_search", _fake_fallback)
+    monkeypatch.setattr(hybrid, "_postgres_hybrid_search", _unexpected_postgres)
+
+    session = _FakeSession([], dialect_name=None)
+    request = HybridSearchRequest(query="Grace", k=1)
+
+    results = hybrid.hybrid_search(session, request)
+
+    assert results is stub_results
+    assert captured["session"] is session
+    assert captured["request"] is request
+
+    span_name, span = tracer_stub.spans[-1]
+    assert span_name == "retriever.hybrid"
+    assert span.attributes["retrieval.backend"] == "hybrid"
+    assert span.attributes["retrieval.cache_status"] == "miss"
+    assert span.attributes["retrieval.selected_backend"] == "fallback"
+    assert span.attributes["retrieval.hit_count"] == len(stub_results)
+    assert span.attributes["retrieval.latency_ms"] == 500.0
+
+
+def test_hybrid_search_uses_postgres_backend(monkeypatch, tracer_stub):
+    times = iter([200.0, 200.123])
+    monkeypatch.setattr(hybrid, "perf_counter", lambda: next(times))
+
+    stub_results = [SimpleNamespace(id="postgres", document_id="doc", score=2.0)]
+    captured: dict[str, object] = {}
+
+    def _fake_postgres(session, request):
+        captured["session"] = session
+        captured["request"] = request
+        return stub_results
+
+    def _unexpected_fallback(*_args, **_kwargs):
+        raise AssertionError("Fallback backend should not be used for postgres tests")
+
+    monkeypatch.setattr(hybrid, "_postgres_hybrid_search", _fake_postgres)
+    monkeypatch.setattr(hybrid, "_fallback_search", _unexpected_fallback)
+
+    session = _FakeSession([], dialect_name="postgresql")
+    request = HybridSearchRequest(query="Grace", k=2)
+
+    results = hybrid.hybrid_search(session, request)
+
+    assert results is stub_results
+    assert captured["session"] is session
+    assert captured["request"] is request
+
+    span_name, span = tracer_stub.spans[-1]
+    assert span_name == "retriever.hybrid"
+    assert span.attributes["retrieval.backend"] == "hybrid"
+    assert span.attributes["retrieval.cache_status"] == "miss"
+    assert span.attributes["retrieval.selected_backend"] == "postgresql"
+    assert span.attributes["retrieval.hit_count"] == len(stub_results)
+    assert span.attributes["retrieval.latency_ms"] == 123.0
 
 
 def test_postgres_hybrid_search_falls_back_for_non_postgres(monkeypatch):
