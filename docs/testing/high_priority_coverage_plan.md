@@ -147,6 +147,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 * ✅ Added `tests/services/api/app/retriever/test_annotations.py` to cover annotation payload serialisation, legacy body handling, batched loading, and passage indexing helpers.
 * ✅ Added `tests/services/api/app/retriever/test_hybrid.py` to exercise tokenisation, highlight building, candidate scoring/merging, OSIS guards, TEI helpers, and SQL statement builders.
 * ✅ Added `tests/services/api/app/retriever/test_documents.py` to verify document listing/detail pagination, latest digest selection, update semantics, and annotation CRUD pathways with an in-memory SQLite database.
+* ✅ Added `tests/services/api/app/retriever/test_hybrid_search.py` to validate `_annotate_retrieval_span` observability hooks, `_fallback_search` guardrail/OSIS handling, and `_postgres_hybrid_search` backend selection and candidate aggregation.
 
 ---
 
@@ -155,7 +156,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 2. **Backfill unit suites** – Prioritise shim coverage (core), orchestrator/pipeline basics (ingest), and annotation utilities (retriever) for quick wins toward 90%.
 3. **Layer integration tests** – Once helpers are in place, add orchestrator and hybrid search integration tests to validate cross-module behaviour.
 4. **Introduce property-based checks** – After deterministic fixtures exist, layer Hypothesis strategies for metadata and guardrail normalisation to guard against regression drift.
-5. **Plan next iteration** – Target hybrid fallback/search integration exercises and retriever observability assertions now that unit scaffolding is in place.
+5. **Plan next iteration** – Expand into hybrid end-to-end scenarios that stitch together retriever and ingest fixtures, then pursue property tests for guardrail fuzzing and annotation bodies.
 6. **Track coverage growth** – Run `pytest --cov` after each milestone and update the coverage report, ensuring each package crosses the 90% threshold before moving on.
 
 Following this plan will eliminate the three largest blind spots in our backend coverage and establish a reusable testing toolkit for subsequent modules.
