@@ -317,15 +317,15 @@ def _normalise_author(name: str) -> dict[str, str]:
     if "," in candidate:
         family, given = [segment.strip() for segment in candidate.split(",", 1)]
         if family and given:
-            return {"given": given, "family": family, "literal": candidate}
+            return {"given": given, "family": family}
         if family:
-            return {"family": family, "literal": candidate}
+            return {"family": family}
 
     parts = [segment.strip() for segment in candidate.split() if segment.strip()]
     if len(parts) >= 2:
         family = parts[-1]
         given = " ".join(parts[:-1])
-        return {"given": given, "family": family, "literal": candidate}
+        return {"given": given, "family": family}
 
     return {"literal": candidate}
 
