@@ -8,6 +8,7 @@ import re
 import time
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
+from contextlib import nullcontext
 from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
@@ -297,26 +298,64 @@ def _recreate_seed_table_if_missing_column(
     ):
         return False
 
-    bind = session.get_bind()
-    if bind is None:
-        return False
-
-    engine = bind.engine if isinstance(bind, Connection) else bind
-    if engine is None:
-        return False
-
     session.rollback()
+    connection, should_close = _get_session_connection(session)
+    used_session_connection = connection is not None
+    engine = None
+    if connection is not None:
+        engine = getattr(connection, "engine", None)
+
+    bind = session.get_bind()
+    if engine is None and isinstance(bind, Connection):
+        engine = bind.engine
+    elif engine is None:
+        engine = bind if isinstance(bind, Engine) else None
+
+    if connection is None:
+        if isinstance(bind, Engine):
+            connection = bind.connect()
+            should_close = True
+            if engine is None:
+                engine = bind
+        elif isinstance(bind, Connection):
+            connection = bind
+        else:
+            return False
+
+    if connection is None:
+        return False
+
     try:
-        with engine.begin() as connection:
+        has_active_transaction = False
+        if hasattr(connection, "in_transaction"):
+            try:
+                has_active_transaction = bool(connection.in_transaction())
+            except TypeError:  # pragma: no cover - SQLAlchemy 1.4 attr
+                has_active_transaction = bool(connection.in_transaction)
+        elif hasattr(connection, "get_transaction"):
+            has_active_transaction = connection.get_transaction() is not None
+
+        context = nullcontext()
+        if hasattr(connection, "begin"):
+            if has_active_transaction and hasattr(connection, "begin_nested"):
+                context = connection.begin_nested()
+            elif not has_active_transaction:
+                context = connection.begin()
+        with context:
             table.drop(bind=connection, checkfirst=True)
             table.create(bind=connection, checkfirst=False)
     except Exception:
         session.rollback()
         raise
+    finally:
+        if should_close and connection is not None:
+            connection.close()
 
     # Ensure subsequent ORM work reflects the rebuilt schema across connections.
-    inspect(engine).clear_cache()
-    engine.dispose()
+    if engine is not None:
+        inspect(engine).clear_cache()
+        if not used_session_connection:
+            _dispose_sqlite_engine(engine)
     session.expire_all()
     return True
 
@@ -1215,33 +1254,46 @@ def _repair_missing_perspective_columns(session: Session) -> None:
             "commentary excerpts",
         ),
     )
-    bind = session.get_bind()
-    engine = bind.engine if isinstance(bind, Connection) else bind
-    dialect_name = getattr(getattr(engine, "dialect", None), "name", None)
     for table, dataset_label, log_label in repairs:
+        session.rollback()
+        bind = session.get_bind()
+        engine = bind.engine if isinstance(bind, Connection) else bind
+        connection, should_close = _get_session_connection(session)
+        if connection is not None and engine is None:
+            engine = getattr(connection, "engine", None)
+        dialect_name = getattr(getattr(engine, "dialect", None), "name", None)
         if _table_has_column(session, table.name, "perspective", schema=table.schema):
             continue
 
         repaired = False
-        if dialect_name == "sqlite" and engine is not None:
+        used_session_connection = False
+        if dialect_name == "sqlite" and (engine is not None or connection is not None):
             statement = f'ALTER TABLE "{table.name}" ADD COLUMN perspective TEXT'
-            session.rollback()
-            try:
-                with engine.begin() as connection:
-                    connection.exec_driver_sql(statement)
-            except OperationalError as exc:
-                message = str(getattr(exc, "orig", exc)).lower()
-                duplicate_indicators = ("duplicate column name", "already exists")
-                if not any(indicator in message for indicator in duplicate_indicators):
-                    logger.warning(
-                        "Failed to add perspective column to %s via ALTER TABLE: %s",
-                        table.name,
-                        exc,
-                    )
+            target_connection = connection
+            close_target = False
+            if target_connection is None and engine is not None:
+                target_connection = engine.connect()
+                close_target = True
+            if target_connection is not None:
+                try:
+                    target_connection.exec_driver_sql(statement)
+                except OperationalError as exc:
+                    message = str(getattr(exc, "orig", exc)).lower()
+                    duplicate_indicators = ("duplicate column name", "already exists")
+                    if not any(indicator in message for indicator in duplicate_indicators):
+                        logger.warning(
+                            "Failed to add perspective column to %s via ALTER TABLE: %s",
+                            table.name,
+                            exc,
+                        )
+                    else:
+                        repaired = True
                 else:
                     repaired = True
-            else:
-                repaired = True
+                    used_session_connection = target_connection is connection
+                finally:
+                    if close_target and target_connection is not None:
+                        target_connection.close()
         if not repaired and _recreate_seed_table_if_missing_column(
             session, table, "perspective", dataset_label=dataset_label
         ):
@@ -1255,7 +1307,9 @@ def _repair_missing_perspective_columns(session: Session) -> None:
             )
             session.expire_all()
             if engine is not None:
-                engine.dispose()
+                inspect(engine).clear_cache()
+                if not used_session_connection:
+                    _dispose_sqlite_engine(engine)
 
 
 def seed_reference_data(session: Session) -> None:

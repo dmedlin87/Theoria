@@ -10,7 +10,7 @@ import textwrap
 from pathlib import Path
 
 import anyio
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -237,6 +237,130 @@ def test_seed_reference_data_repairs_missing_perspective_column(
         assert contradiction_perspectives == ["skeptical"]
         assert harmony_perspectives == ["apologetic"]
         assert commentary_perspectives == ["neutral"]
+
+
+def test_seed_reference_data_repairs_missing_perspective_in_memory(
+    tmp_path, monkeypatch, caplog
+) -> None:
+    """Reference seeding repairs legacy in-memory SQLite databases."""
+
+    seed_dir = tmp_path / "seeds"
+    seed_dir.mkdir()
+
+    _write_seed(
+        seed_dir / "contradictions.json",
+        [
+            {
+                "osis_a": "Gen.1.1",
+                "osis_b": "Gen.1.2",
+                "source": "test",
+                "summary": "first",
+                "perspective": "skeptical",
+            }
+        ],
+    )
+    _write_seed(
+        seed_dir / "harmonies.json",
+        [
+            {
+                "osis_a": "Gen.1.1",
+                "osis_b": "Gen.1.2",
+                "summary": "aligned",
+                "source": "test",
+                "perspective": "apologetic",
+            }
+        ],
+    )
+    _write_seed(
+        seed_dir / "commentaries.json",
+        [
+            {
+                "osis": "Gen.1.1",
+                "excerpt": "In the beginning...",
+                "source": "test",
+                "perspective": "neutral",
+            }
+        ],
+    )
+
+    monkeypatch.setattr(seeds, "SEED_ROOT", seed_dir)
+    monkeypatch.setattr(seeds, "seed_openbible_geo", lambda session: None)
+    monkeypatch.setattr(seeds, "seed_geo_places", lambda session: None)
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+
+    with Session(engine) as session:
+        session.execute(
+            text(
+                """
+                CREATE TABLE contradiction_seeds (
+                    id TEXT PRIMARY KEY,
+                    osis_a TEXT NOT NULL,
+                    osis_b TEXT NOT NULL,
+                    summary TEXT,
+                    source TEXT,
+                    tags JSON,
+                    weight FLOAT NOT NULL DEFAULT 1.0,
+                    created_at TIMESTAMP NOT NULL
+                )
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                CREATE TABLE harmony_seeds (
+                    id TEXT PRIMARY KEY,
+                    osis_a TEXT NOT NULL,
+                    osis_b TEXT NOT NULL,
+                    summary TEXT,
+                    source TEXT,
+                    tags JSON,
+                    weight FLOAT NOT NULL DEFAULT 1.0
+                )
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                CREATE TABLE commentary_excerpt_seeds (
+                    id TEXT PRIMARY KEY,
+                    osis TEXT NOT NULL,
+                    title TEXT,
+                    excerpt TEXT NOT NULL,
+                    source TEXT,
+                    tags JSON
+                )
+                """
+            )
+        )
+        session.commit()
+
+        with caplog.at_level(logging.INFO):
+            seeds.seed_reference_data(session)
+
+        log_messages = [record.getMessage() for record in caplog.records]
+        assert any(
+            "Rebuilt contradiction_seeds table missing 'perspective' column" in message
+            for message in log_messages
+        )
+
+        for table_name in (
+            "contradiction_seeds",
+            "harmony_seeds",
+            "commentary_excerpt_seeds",
+        ):
+            result = session.execute(text(f"PRAGMA table_info('{table_name}')")).all()
+            assert any(column[1] == "perspective" for column in result)
+
+        contradiction = session.scalars(select(ContradictionSeed)).all()
+        harmony = session.scalars(select(HarmonySeed)).all()
+        commentary = session.scalars(select(CommentaryExcerptSeed)).all()
+
+        assert [record.perspective for record in contradiction] == ["skeptical"]
+        assert [record.perspective for record in harmony] == ["apologetic"]
+        assert [record.perspective for record in commentary] == ["neutral"]
 
 
 def test_api_boots_contradiction_seeding_without_migrations(
