@@ -122,6 +122,10 @@ def test_extract_passages_handles_object_source() -> None:
     [
         ("Doe, Jane M.", {"given": "Jane M.", "family": "Doe"}),
         ("Jane Mary Doe", {"given": "Jane Mary", "family": "Doe"}),
+        (
+            "United States Census Bureau",
+            {"literal": "United States Census Bureau"},
+        ),
         ("Single", {"literal": "Single"}),
         ("", {"literal": ""}),
     ],
