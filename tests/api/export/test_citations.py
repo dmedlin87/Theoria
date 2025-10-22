@@ -50,11 +50,40 @@ def test_citation_source_from_minimal_object():
     """Test CitationSource with minimal data."""
     minimal_doc = {"id": "minimal-1", "title": "Untitled"}
     source = CitationSource.from_object(minimal_doc)
-    
+
     assert source.document_id == "minimal-1"
     assert source.title == "Untitled"
     assert source.authors is None
     assert source.year is None
+
+
+def test_citation_source_handles_case_insensitive_fields():
+    """Ensure CitationSource picks up fields regardless of key capitalisation."""
+    document = {
+        "ID": "case-1",
+        "TITLE": "Case Sensitivity in Citations",
+        "AUTHORS": ["Doe, Jane"],
+        "YEAR": "1999",
+        "VENUE": "Journal of Testing",
+        "DOI": "DOI:10.5555/case",
+        "Metadata": {
+            "Publisher": "Test Press",
+            "LOCATION": "New York",
+            "KEYWORDS": ["Testing", "Citations"],
+        },
+    }
+
+    source = CitationSource.from_object(document)
+
+    assert source.document_id == "case-1"
+    assert source.title == "Case Sensitivity in Citations"
+    assert source.authors == ["Doe, Jane"]
+    assert source.year == 1999
+    assert source.venue == "Journal of Testing"
+    assert source.doi == "https://doi.org/10.5555/case"
+    assert source.publisher == "Test Press"
+    assert source.location == "New York"
+    assert source.topics == ["Testing", "Citations"]
 
 
 def test_citation_source_normalizes_doi():
