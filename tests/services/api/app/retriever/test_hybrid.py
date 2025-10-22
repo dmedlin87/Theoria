@@ -8,7 +8,11 @@ from sqlalchemy import create_engine
 from hypothesis import given, strategies as st
 
 from theo.services.api.app.models.documents import DocumentAnnotationResponse
-from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchRequest
+from theo.services.api.app.models.search import (
+    HybridSearchFilters,
+    HybridSearchRequest,
+    HybridSearchResult,
+)
 from theo.services.api.app.retriever import hybrid
 
 
@@ -68,6 +72,128 @@ def _make_annotation_response(*, body: str, passage_ids: list[str] | None = None
         created_at=timestamp,
         updated_at=timestamp,
     )
+
+
+def test_tokenise_and_lexical_score_casefold_inputs():
+    tokens = hybrid._tokenise(" Grace   ABOUNDS   \t   ")
+    assert tokens == ["grace", "abounds"]
+
+    score = hybrid._lexical_score("Grace abounds. Grace teaches.", ["grace", "teaches"])
+    assert score == 3.0
+
+
+def test_snippet_truncates_with_ellipsis():
+    text = "x" * 300
+    snippet = hybrid._snippet(text, max_length=50)
+
+    assert snippet.endswith("...")
+    assert len(snippet) == 50
+
+
+def test_build_result_merges_meta_and_annotations(monkeypatch):
+    passage = SimpleNamespace(
+        id="p-meta",
+        document_id="doc-meta",
+        text="A" * 300,
+        raw_text="A" * 300,
+        osis_ref="Gen.1.1",
+        start_char=0,
+        end_char=300,
+        page_no=2,
+        t_start=1.5,
+        t_end=5.5,
+        meta={"existing": "value"},
+    )
+    document = SimpleNamespace(title="Doc Title")
+    monkeypatch.setattr(hybrid, "compose_passage_meta", lambda *_args, **_kwargs: {"base": "meta"})
+
+    timestamp = datetime(2024, 2, 1, tzinfo=UTC)
+    annotation = DocumentAnnotationResponse(
+        id="ann-meta",
+        document_id="doc-meta",
+        type="note",
+        body="Important note",
+        passage_ids=["p-meta"],
+        created_at=timestamp,
+        updated_at=timestamp,
+    )
+
+    result = hybrid._build_result(
+        passage,
+        document,
+        [annotation],
+        score=1.5,
+        lexical_score=0.4,
+        vector_score=0.8,
+        osis_distance=0.0,
+    )
+
+    assert result.score == 1.5
+    assert result.lexical_score == 0.4
+    assert result.vector_score == 0.8
+    assert result.snippet.endswith("...")
+    assert result.meta is not None
+    assert result.meta["base"] == "meta"
+    assert result.meta["annotations"][0]["body"] == "Important note"
+
+
+def test_apply_document_ranks_assigns_scores_and_highlights():
+    results = [
+        HybridSearchResult(
+            id="p-1",
+            document_id="doc-1",
+            text="Grace teaches love and mercy.",
+            raw_text="Grace teaches love and mercy.",
+            osis_ref=None,
+            start_char=0,
+            end_char=30,
+            page_no=None,
+            t_start=None,
+            t_end=None,
+            score=0.9,
+            meta=None,
+            document_title="Doc One",
+            snippet="Grace teaches love and mercy.",
+            rank=0,
+            highlights=None,
+            lexical_score=0.6,
+            vector_score=0.3,
+            osis_distance=None,
+        ),
+        HybridSearchResult(
+            id="p-2",
+            document_id="doc-2",
+            text="Hope anchors the soul.",
+            raw_text="Hope anchors the soul.",
+            osis_ref=None,
+            start_char=0,
+            end_char=24,
+            page_no=None,
+            t_start=None,
+            t_end=None,
+            score=0.4,
+            meta=None,
+            document_title="Doc Two",
+            snippet="Hope anchors the soul.",
+            rank=0,
+            highlights=None,
+            lexical_score=0.2,
+            vector_score=0.1,
+            osis_distance=None,
+        ),
+    ]
+
+    updated = hybrid._apply_document_ranks(
+        results,
+        {"doc-1": 0.9, "doc-2": 0.4},
+        ["grace"],
+    )
+
+    assert updated is results
+    assert [res.document_rank for res in updated] == [1, 2]
+    assert [res.document_score for res in updated] == [0.9, 0.4]
+    assert updated[0].highlights and "Grace" in updated[0].highlights[0]
+    assert updated[1].highlights == []
 
 
 def test_build_highlights_limits_unique_clips():
