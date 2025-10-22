@@ -310,29 +310,44 @@ def _normalise_doi(value: Any) -> str | None:
 _CORPORATE_AUTHOR_KEYWORDS = {
     "academy",
     "agency",
+    "airlines",
     "association",
+    "associates",
+    "bank",
     "board",
     "bureau",
     "center",
     "centre",
+    "church",
+    "city",
     "co",
     "co.",
-    "church",
     "commission",
     "committee",
     "company",
     "conference",
+    "corporation",
     "council",
+    "county",
     "corp",
     "corp.",
     "department",
     "division",
     "editors",
+    "enterprise",
+    "enterprises",
     "foundation",
+    "general",
     "government",
     "group",
+    "holdings",
+    "inc",
+    "inc.",
+    "industries",
+    "industry",
     "institute",
     "institution",
+    "international",
     "laboratories",
     "laboratory",
     "llc",
@@ -341,14 +356,26 @@ _CORPORATE_AUTHOR_KEYWORDS = {
     "ltd",
     "ltd.",
     "ministry",
+    "ministries",
+    "motor",
+    "motors",
+    "nation",
+    "national",
+    "nations",
     "office",
+    "partners",
     "plc",
     "press",
     "school",
     "services",
+    "solutions",
     "society",
+    "state",
+    "states",
     "synod",
     "team",
+    "technology",
+    "technologies",
     "university",
 }
 
@@ -812,6 +839,73 @@ _COMMON_UPPERCASE_SURNAMES = {
 }
 
 
+_PERSON_NAME_PARTICLES = {
+    "da",
+    "de",
+    "del",
+    "der",
+    "di",
+    "du",
+    "la",
+    "le",
+    "van",
+    "von",
+}
+
+
+_PERSON_NAME_SUFFIXES = {
+    "jr",
+    "jr.",
+    "sr",
+    "sr.",
+    "ii",
+    "iii",
+    "iv",
+    "v",
+}
+
+
+def _looks_like_uppercase_personal_name(parts: list[str]) -> bool:
+    """Return ``True`` when *parts* resemble an uppercase personal name."""
+
+    stripped_parts = [part.strip(".,") for part in parts if part.strip(".,")]
+    if len(stripped_parts) < 2:
+        return False
+
+    first, *middle_parts, last = stripped_parts
+
+    if last.lower() in _PERSON_NAME_SUFFIXES and len(stripped_parts) >= 3:
+        last = stripped_parts[-2]
+        middle_parts = middle_parts[:-1]
+
+    if not first.isalpha() or not last.isalpha():
+        return False
+
+    if len(stripped_parts) == 2:
+        return len(first) > 1 and len(last) > 1
+
+    def _is_middle_component(token: str) -> bool:
+        cleaned = token.strip(".")
+        if not cleaned:
+            return False
+        if len(cleaned) == 1 and cleaned.isalpha():
+            return True
+        lower = cleaned.lower()
+        return (
+            lower in _COMMON_UPPERCASE_GIVEN_NAMES
+            or lower in _COMMON_UPPERCASE_SURNAMES
+            or lower in _PERSON_NAME_PARTICLES
+        )
+
+    if any(
+        component and not component.replace(".", "").isalpha()
+        for component in middle_parts
+    ):
+        return False
+
+    return all(_is_middle_component(component) for component in middle_parts)
+
+
 def _looks_like_corporate_author(candidate: str, parts: list[str]) -> bool:
     """Return ``True`` when *candidate* resembles an organisation name."""
 
@@ -830,12 +924,8 @@ def _looks_like_corporate_author(candidate: str, parts: list[str]) -> bool:
         return True
 
     if len(parts) >= 2 and all(part.isupper() for part in parts):
-        if len(parts) == 2:
-            first, last = lowered_parts[0], lowered_parts[1]
-            if first in _COMMON_UPPERCASE_GIVEN_NAMES and (
-                last in _COMMON_UPPERCASE_SURNAMES or len(last) <= 4
-            ):
-                return False
+        if _looks_like_uppercase_personal_name(parts):
+            return False
         return True
 
     return False

@@ -128,6 +128,8 @@ def test_extract_passages_handles_object_source() -> None:
         ),
         ("UNITED NATIONS", {"literal": "UNITED NATIONS"}),
         ("JOHN DOE", {"given": "JOHN", "family": "DOE"}),
+        ("JOHN A DOE", {"given": "JOHN A", "family": "DOE"}),
+        ("ALBERT EINSTEIN", {"given": "ALBERT", "family": "EINSTEIN"}),
         ("Single", {"literal": "Single"}),
         ("", {"literal": ""}),
     ],
