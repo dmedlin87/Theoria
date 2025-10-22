@@ -150,6 +150,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 * ✅ Extended `tests/services/api/app/retriever/test_annotations.py` with Hypothesis fuzzing for `prepare_annotation_body` to assert passage deduplication, optional field stripping, and metadata passthrough invariants.
 * ✅ Expanded `tests/services/api/app/retriever/test_hybrid.py` with property-based guardrail coverage to confirm `_matches_topic_domain` respects whitespace and casefolded comparisons.
 * ✅ Added `tests/services/api/app/retriever/test_documents.py` to verify document listing/detail pagination, latest digest selection, update semantics, and annotation CRUD pathways with an in-memory SQLite database.
+* ✅ Added `tests/services/api/app/retriever/test_hybrid_search.py` to validate `_annotate_retrieval_span` observability hooks, `_fallback_search` guardrail/OSIS handling, and `_postgres_hybrid_search` backend selection and candidate aggregation.
 
 ---
 
@@ -159,6 +160,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 3. **Layer integration tests** – Once helpers are in place, add orchestrator and hybrid search integration tests to validate cross-module behaviour.
 4. **Introduce property-based checks** – After deterministic fixtures exist, layer Hypothesis strategies for metadata and guardrail normalisation to guard against regression drift.
 5. **Plan next iteration** – Prioritise `_parse_blocked_networks` fuzzing, guardrail filter Hypothesis suites, and the remaining observability assertions before expanding into hybrid fallback/search integrations.
+5. **Plan next iteration** – Expand into hybrid end-to-end scenarios that stitch together retriever and ingest fixtures, then pursue property tests for guardrail fuzzing and annotation bodies.
 6. **Track coverage growth** – Run `pytest --cov` after each milestone and update the coverage report, ensuring each package crosses the 90% threshold before moving on.
 
 Following this plan will eliminate the three largest blind spots in our backend coverage and establish a reusable testing toolkit for subsequent modules.
