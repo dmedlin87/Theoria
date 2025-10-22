@@ -96,6 +96,7 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * ✅ Expanded `tests/services/api/app/ingest/test_metadata.py` with guardrail property tests, metadata serialisation, topic aggregation, and HTML parsing checks.
 * ✅ Added `tests/services/api/app/ingest/test_embeddings.py` to validate embedding cache behaviour, resilience telemetry, and lexical representation fallbacks.
 * ✅ Extended `tests/services/api/app/ingest/test_pipeline_core.py` to cover `_orchestrate`, file/transcript pipeline entrypoints, and `import_osis_commentary` success/error paths, ensuring workflow instrumentation and dependency wiring remain intact.
+* ✅ Added `tests/services/api/app/ingest/test_chunking.py` to exercise `chunk_text` paragraph splitting heuristics and `chunk_transcript` time-window flush logic, including speaker aggregation semantics.
 
 ---
 
@@ -152,6 +153,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 * ✅ Expanded `tests/services/api/app/retriever/test_hybrid.py` with property-based guardrail coverage to confirm `_matches_topic_domain` respects whitespace and casefolded comparisons.
 * ✅ Added `tests/services/api/app/retriever/test_documents.py` to verify document listing/detail pagination, latest digest selection, update semantics, and annotation CRUD pathways with an in-memory SQLite database.
 * ✅ Added `tests/services/api/app/retriever/test_hybrid_search.py` to validate `_annotate_retrieval_span` observability hooks, `_fallback_search` guardrail/OSIS handling, and `_postgres_hybrid_search` backend selection and candidate aggregation.
+* ✅ Extended `tests/services/api/app/retriever/test_hybrid.py` with unit coverage for `_tokenise`, `_lexical_score`, `_snippet`, `_build_result`, and `_apply_document_ranks`, ensuring metadata composition and highlight assignment remain stable.
 
 ---
 
