@@ -23,7 +23,8 @@ def test_prompt_context_build_prompt_matches_golden(
 
     golden_path = golden_dir / "prompt_context_basic.txt"
     assert golden_path.exists(), "Golden prompt file is missing"
-    assert prompt == golden_path.read_text().rstrip("\n")
+    golden_text = golden_path.read_text(encoding="utf-8").rstrip("\n")
+    assert prompt == golden_text
 
 
 def test_prompt_context_build_summary_matches_golden(
