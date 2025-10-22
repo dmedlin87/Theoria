@@ -13,6 +13,7 @@ from typing import (
     Sequence,
     TYPE_CHECKING,
     Literal,
+    Tuple,
     cast,
 )
 
@@ -307,43 +308,42 @@ def _normalise_doi(value: Any) -> str | None:
     return cleaned or None
 
 
-def _normalise_author(name: str) -> dict[str, str]:
-    """Return structured author information from a free-form *name* string."""
+def _parse_author_name(name: str) -> Tuple[dict[str, str], bool]:
+    """Return an author mapping and whether the order was explicit."""
 
     candidate = name.strip()
     if not candidate:
-        return {"literal": name}
+        return {"literal": name}, False
 
     if "," in candidate:
         family, given = [segment.strip() for segment in candidate.split(",", 1)]
-        result: dict[str, str] = {"structure": "comma"}
+        result: dict[str, str] = {}
         if family:
             result["family"] = family
         if given:
             result["given"] = given
-        if not family and not given:
-            return {"literal": candidate}
-        return result
+        if not result:
+            return {"literal": candidate}, True
+        return result, True
 
     parts = [segment.strip() for segment in candidate.split() if segment.strip()]
     if len(parts) >= 2:
         family = parts[-1]
         given = " ".join(parts[:-1])
-        return {
-            "given": given,
-            "family": family,
-            "literal": candidate,
-            "structure": "space",
-        }
+        return {"given": given, "family": family}, False
 
-    return {"literal": candidate}
+    return {"literal": candidate}, False
+
+
+def _normalise_author(name: str) -> dict[str, str]:
+    """Return structured author information from a free-form *name* string."""
+
+    author, _ = _parse_author_name(name)
+    return author
 
 
 def _apa_author(author: dict[str, str]) -> str:
     literal = author.get("literal")
-    structure = author.get("structure")
-    if literal and structure == "space":
-        return literal
     family = author.get("family")
     if family:
         given = author.get("given", "")
@@ -501,10 +501,19 @@ def _format_apa(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
     raw_authors = [
         name for name in source.authors or [] if isinstance(name, str) and name.strip()
     ]
-    normalised_authors = [
-        _apa_author(_normalise_author(name)) for name in raw_authors
-    ]
-    normalised_authors = [author for author in normalised_authors if author]
+    normalised_authors: list[str] = []
+    for name in raw_authors:
+        author, ordered = _parse_author_name(name)
+        if not ordered and "literal" not in author:
+            literal = name.strip()
+            if literal:
+                formatted = _apa_author({"literal": literal})
+            else:
+                formatted = ""
+        else:
+            formatted = _apa_author(author)
+        if formatted:
+            normalised_authors.append(formatted)
 
     if len(normalised_authors) > 1:
         formatted_authors = ", ".join(normalised_authors[:-1]) + f", & {normalised_authors[-1]}"
