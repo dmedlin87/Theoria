@@ -46,14 +46,18 @@ def _build_zotero_item(
     if "author" in csl_entry:
         for author in csl_entry["author"]:
             creator: dict[str, str] = {"creatorType": "author"}
-            if "family" in author and "given" in author:
-                creator["lastName"] = author["family"]
-                creator["firstName"] = author["given"]
-            elif "literal" in author:
-                creator["name"] = author["literal"]
-            else:
-                continue
-            creators.append(creator)
+            family = author.get("family")
+            given = author.get("given")
+            literal = author.get("literal")
+
+            if family:
+                creator["lastName"] = family
+                if given:
+                    creator["firstName"] = given
+                creators.append(creator)
+            elif literal:
+                creator["name"] = literal
+                creators.append(creator)
 
     # Build base item
     item: dict[str, Any] = {

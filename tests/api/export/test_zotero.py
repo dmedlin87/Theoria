@@ -176,6 +176,30 @@ def test_build_zotero_item_literal_author():
     }
 
 
+def test_build_zotero_item_family_only_author():
+    """Test handling authors with only a family name."""
+    source = CitationSource(
+        document_id="family-only",
+        title="Anonymous Work",
+        authors=["Doe"],
+    )
+
+    csl_entry = {
+        "id": "family-only",
+        "type": "article-journal",
+        "title": "Anonymous Work",
+        "author": [{"family": "Doe"}],
+    }
+
+    item = _build_zotero_item(source, csl_entry)
+
+    assert len(item["creators"]) == 1
+    assert item["creators"][0] == {
+        "creatorType": "author",
+        "lastName": "Doe",
+    }
+
+
 @pytest.mark.asyncio
 async def test_export_to_zotero_success(sample_source, sample_csl_entry):
     """Test successful export to Zotero."""
