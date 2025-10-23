@@ -1,4 +1,5 @@
 import pytest
+from types import SimpleNamespace
 
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.platform import application as application_module
@@ -100,3 +101,60 @@ def test_resolve_application_wires_container(monkeypatch):
     # Registry should expose registered factories
     assert "settings" in registry.factories
     assert "engine" in registry.factories
+
+
+def test_extract_language_prefers_explicit_language_key():
+    record = SimpleNamespace(bib_json={"language": "grc", "lang": "en"})
+
+    assert application_module._extract_language(record) == "grc"
+
+
+def test_extract_language_returns_none_when_missing_or_blank():
+    record = SimpleNamespace(bib_json={"language": "   ", "lang": None})
+
+    assert application_module._extract_language(record) is None
+
+
+def test_extract_tags_combines_topics_and_payload_tags():
+    record = SimpleNamespace(
+        topics=["apologetics", "history", "apologetics", "", None],
+        bib_json={"tags": ("history", "exegesis", "apologetics", "")},
+    )
+
+    assert application_module._extract_tags(record) == [
+        "apologetics",
+        "history",
+        "exegesis",
+    ]
+
+
+def test_extract_tags_handles_dictionary_topics_and_ignores_invalid_entries():
+    record = SimpleNamespace(
+        topics={"primary": "patristics", "secondary": 42},
+        bib_json="not-a-dict",
+    )
+
+    assert application_module._extract_tags(record) == ["patristics"]
+
+
+class _RecordingSession:
+    def __init__(self, rows: list[tuple[str, ...]]):
+        self._rows = rows
+        self.executed = []
+
+    def execute(self, statement):
+        self.executed.append(statement)
+        return self._rows
+
+
+def test_extract_scripture_refs_merges_payload_and_database_results():
+    session = _RecordingSession(rows=[("John.1.1",), ("Gen.1.1",), ("Rev.22.13",)])
+    record = SimpleNamespace(
+        bib_json={"scripture_refs": ["Gen.1.1", "Exod.3.14", "", None, "Gen.1.1"]},
+        id="doc-1",
+    )
+
+    result = application_module._extract_scripture_refs(session, record)
+
+    assert result == ("Gen.1.1", "Exod.3.14", "John.1.1", "Rev.22.13")
+    assert len(session.executed) == 1
