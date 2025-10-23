@@ -102,6 +102,8 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * ✅ Expanded `tests/services/api/app/ingest/test_persistence.py` to assert `_dedupe_preserve_order`, `_project_document_if_possible`, and `refresh_creator_verse_rollups` handle deduplication, graph projection wiring, and synchronous refresh fallbacks without invoking asynchronous worker infrastructure.
 * ✅ Added `tests/services/api/app/ingest/test_osis.py` to lock in OSIS document parsing, canonicalisation, verse range aggregation, and reference classification utilities.
 * ✅ Further extended `tests/services/api/app/ingest/test_network.py` to verify fixture resolution precedence, YouTube transcript ingestion fallbacks, and metadata JSON parsing so ingestion remains deterministic in offline test environments.
+* ✅ Added `tests/services/api/app/ingest/test_events.py` to cover persistence event emission, topic normalisation, and neighborhood analytics dispatch behaviour including task delay fallbacks.
+* ✅ Added `tests/services/api/app/ingest/test_sanitizer.py` to guard prompt-injection stripping, whitespace normalisation, and `[filtered]` fallbacks for control-phrase-only content.
 
 ---
 
@@ -165,6 +167,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 ## Next Iteration Targets
 * **Ingest network error handling** – Add regression tests for `theo/services/api/app/ingest/network.fetch_web_document` to simulate `URLError` timeout reasons and `ContentTooShortError` partial reads so the bespoke exception translation remains stable.
 * **Network cache semantics** – Cover `theo/services/api/app/ingest/network.cached_blocked_networks` to assert CIDR parsing results are memoised and filter out invalid entries without leaking state between calls.
+* **Parser normalisation** – Build fixture-driven tests for `theo/services/api/app/ingest/parsers` to validate Markdown frontmatter, transcript hand-offs, and sanitizer integration now that event emission is locked down.
 * **Retriever TEI fuzzing** – Implement Hypothesis-based tests around `theo/services/api/app/retriever/hybrid._tei_terms` and `_tei_match_score` to stress nested metadata dictionaries, mixed list/dict payloads, and ensure keyword extraction stays order-insensitive.
 * Restore coverage for the asynchronous `refresh_creator_verse_rollups` worker dispatch once Celery task imports can be safely stubbed without relying on Redis; a dedicated fixture that patches the worker module will unblock the remaining branch.
 * Exercise ingestion persistence error paths such as `ensure_unique_document_sha` and commentary import collision updates to hit remaining uncovered lines in `persistence.py`.
