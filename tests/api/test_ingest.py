@@ -18,7 +18,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.application.facades.database import get_session  # noqa: E402
+from theo.application.facades import database as database_module  # noqa: E402
+from theo.application.facades.database import configure_engine, get_session  # noqa: E402
 from theo.application.facades.settings import Settings  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
@@ -27,6 +28,19 @@ from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E4
 from theo.services.api.app.ingest import network as network_module  # noqa: E402
 
 PAYLOAD_TOO_LARGE = status.HTTP_413_CONTENT_TOO_LARGE
+
+@pytest.fixture(scope="module")
+def api_engine(tmp_path_factory: pytest.TempPathFactory):
+    db_path = tmp_path_factory.mktemp("api-ingest") / "ingest.db"
+    engine = configure_engine(f"sqlite:///{db_path}")
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
+        database_module._engine_url_override = None  # type: ignore[attr-defined]
+
 
 @pytest.fixture()
 def api_client(api_engine):
