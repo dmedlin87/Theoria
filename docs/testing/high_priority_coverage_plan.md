@@ -11,6 +11,9 @@ The latest coverage review highlights that our backend coverage is only **28.3%*
 
 This document inventories the tests we need to build to bring each module close to 90% line coverage while protecting their most failure-prone behaviours.
 
+## Update Log
+* **2025-10-19** – Documented the first tranche of implemented tests that now exercise the core shims, ingest orchestration (pipelines, networking, observability), and retriever scoring/filters so the plan reflects tangible coverage gains.【F:tests/api/core/test_database.py†L1-L19】【F:tests/ingest/test_pipeline.py†L77-L158】【F:tests/api/retriever/test_edge_cases.py†L9-L45】
+
 ---
 
 ## 1. `theo/services/api/app/core`
@@ -85,6 +88,13 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * Generate random guardrail inputs (lists/strings) to guarantee `_normalise_guardrail_collection` deduplicates and strips whitespace. 【F:theo/services/api/app/ingest/metadata.py†L167-L197】
 * Hypothesis suites to fuzz `_parse_blocked_networks` and cached CIDR handling so invalid ranges are ignored without impacting allow-lists.【F:theo/services/api/app/ingest/network.py†L34-L55】
 
+### Coverage Implemented (2025-10-19)
+* End-to-end ingest pipeline tests now cover file, URL, and transcript flows, asserting persisted passages, storage artifacts, span instrumentation, and case-builder fan-out when enabled.【F:tests/ingest/test_pipeline.py†L77-L212】【F:tests/ingest/test_pipeline.py†L217-L307】【F:tests/ingest/test_pipeline.py†L310-L406】【F:tests/ingest/test_pipeline.py†L431-L507】
+* Added API-level regression coverage to guard ingest upload handling: chunked streaming, debug logging on failures, and max-size enforcement across the `/ingest/file` route.【F:tests/api/test_ingest.py†L51-L199】
+* Hardened network guards through tests that simulate allowlists, blocklists, redirect chains, and fallback logic so `ensure_url_allowed` and the pipeline wrapper respect private network toggles without bypasses.【F:tests/api/test_ingest.py†L81-L123】【F:tests/ingest/test_pipeline.py†L625-L705】
+* Property-based Hypothesis suite exercises OSIS detection and chunking heuristics, validating that metadata merging and text segmentation remain stable across randomly generated references and paragraph layouts.【F:tests/ingest/test_osis_property.py†L1-L148】
+* Parser regressions are covered via tests for HTML fallbacks, XXE-resistant DOCX parsing, and unstructured failures, increasing confidence in unsafe content handling.【F:tests/ingest/test_parsers.py†L11-L114】
+
 #### 2.4 Fixtures & Utilities
 * Shared fake settings object exposing ingest allow/block lists and user agent.
 * Stub `ErrorPolicyDecision` dataclass to reuse across orchestrator tests.
@@ -158,6 +168,11 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 #### 3.3 Property Tests
 * Extend `_passes_guardrail_filters` coverage with Hypothesis-generated filter combinations to exercise tradition/topic interplay and missing metadata cases.【F:theo/services/api/app/retriever/hybrid.py†L269-L312】
 * Fuzz `_tei_terms` / `_tei_match_score` with nested metadata dicts and blobs to harden TEI keyword extraction against malformed inputs.【F:theo/services/api/app/retriever/hybrid.py†L315-L341】
+
+### Coverage Implemented (2025-10-19)
+* Added guardrail and filter unit tests for the hybrid retriever to confirm author/tradition/topic filters, OSIS tagging, TEI scoring, and tokenisation logic all behave across edge cases and whitespace variants.【F:tests/api/retriever/test_edge_cases.py†L9-L67】【F:tests/api/retriever/test_query_processing.py†L6-L34】
+* Verified ranking math by asserting `_apply_document_ranks`, `_score_candidates`, and backend selection functions preserve deterministic ordering, annotation enrichment, and backend routing for Postgres vs. fallback sessions.【F:tests/api/retriever/test_ranking.py†L1-L43】【F:tests/api/retriever/test_vector_search.py†L12-L57】【F:tests/api/retriever/test_hybrid_search.py†L23-L62】
+* Introduced verse-level integration coverage to ensure OSIS expansion, metadata composition, and timeline queries operate correctly against a temporary SQLite database populated with verse ids and annotations.【F:tests/api/app/retriever/test_verses.py†L49-L200】
 
 #### 3.4 Observability Assertions
 * Trace attribute tests verifying `_annotate_retrieval_span` sets fields for query, filters, cache status, and backend.【F:theo/services/api/app/retriever/hybrid.py†L29-L57】
