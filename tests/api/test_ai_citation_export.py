@@ -1,25 +1,28 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
 import sys
+from typing import Any
 from uuid import uuid5
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.application.facades import database as database_module
-from theo.application.facades.database import configure_engine, get_engine, get_session
+from theo.application.facades.database import configure_engine, get_engine
 from theo.adapters.persistence.models import (
     ContradictionSeed,
     Document,
@@ -32,17 +35,67 @@ from theo.services.api.app.main import app
 from theo.services.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _build_csl_entry
 
 
-@pytest.fixture()
-def client(api_engine) -> Generator[TestClient, None, None]:
-    engine = api_engine
-    session_factory = sessionmaker(
-        bind=engine,
-        autoflush=False,
-        autocommit=False,
-        expire_on_commit=False,
+CONTRADICTIONS_PATH = PROJECT_ROOT / "data" / "seeds" / "contradictions.json"
+CONTRADICTION_SEEDS: list[dict[str, Any]] = json.loads(
+    CONTRADICTIONS_PATH.read_text(encoding="utf-8")
+)
+assert CONTRADICTION_SEEDS, "Expected bundled contradiction seeds to be present"
+
+MIGRATION_FILENAME = "20250129_add_perspective_to_contradiction_seeds.sql"
+MIGRATION_LEDGER_KEY = f"db:migration:{MIGRATION_FILENAME}"
+
+
+def _legacy_identifier(entry: dict[str, Any]) -> str:
+    osis_a = entry["osis_a"].lower()
+    osis_b = entry["osis_b"].lower()
+    source = (entry.get("source") or "community").lower()
+    perspective = (entry.get("perspective") or "skeptical").strip().lower()
+    return str(
+        uuid5(
+            CONTRADICTION_NAMESPACE,
+            "|".join([osis_a, osis_b, source, perspective]),
+        )
     )
 
+
+def _ledger_value() -> str:
+    return json.dumps(
+        {
+            "applied_at": "2024-01-01T00:00:00+00:00",
+            "filename": MIGRATION_FILENAME,
+        }
+    )
+
+
+@pytest.fixture(scope="module")
+def module_api_engine(
+    tmp_path_factory: pytest.TempPathFactory, _api_engine_template: Path
+) -> Generator[Engine, None, None]:
+    database_path = tmp_path_factory.mktemp("ai-citation-export") / "api.sqlite"
+    shutil.copy2(_api_engine_template, database_path)
+    configure_engine(f"sqlite:///{database_path}")
+    engine = get_engine()
+
+    try:
+        yield engine
+    finally:
+        if engine is not None:
+            engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
+
+
+@pytest.fixture(scope="module")
+def module_api_test_client(module_api_engine) -> Generator[TestClient, None, None]:
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def _seed_sample_passage(engine: Engine) -> None:
     with Session(engine) as session:
+        if session.get(Document, "doc-1") is not None:
+            return
+
         document = Document(
             id="doc-1",
             title="Sample Document",
@@ -74,19 +127,13 @@ def client(api_engine) -> Generator[TestClient, None, None]:
         )
         session.commit()
 
-    def _override_session() -> Generator[Session, None, None]:
-        db_session = session_factory()
-        try:
-            yield db_session
-        finally:
-            db_session.close()
 
-    app.dependency_overrides[get_session] = _override_session
-    try:
-        with TestClient(app) as test_client:
-            yield test_client
-    finally:
-        app.dependency_overrides.pop(get_session, None)
+@pytest.fixture(scope="module")
+def client(
+    module_api_engine, module_api_test_client
+) -> Generator[TestClient, None, None]:
+    _seed_sample_passage(module_api_engine)
+    yield module_api_test_client
 
 
 @pytest.mark.enable_migrations
@@ -97,27 +144,14 @@ def test_api_startup_recovers_missing_perspective_column(
     database_url = f"sqlite:///{database_path}"
     monkeypatch.setenv("DATABASE_URL", database_url)
 
-    contradictions_path = PROJECT_ROOT / "data" / "seeds" / "contradictions.json"
-    legacy_payload = json.loads(contradictions_path.read_text(encoding="utf-8"))
-    assert legacy_payload, "Expected bundled contradiction seeds to be present"
-    first_entry = legacy_payload[0]
+    first_entry = CONTRADICTION_SEEDS[0]
     osis_a = first_entry["osis_a"]
     osis_b = first_entry["osis_b"]
     source = first_entry.get("source") or "community"
     perspective = (first_entry.get("perspective") or "skeptical").strip().lower()
-    legacy_identifier = str(
-        uuid5(
-            CONTRADICTION_NAMESPACE,
-            "|".join([osis_a.lower(), osis_b.lower(), source.lower(), perspective]),
-        )
-    )
+    legacy_identifier = _legacy_identifier(first_entry)
 
-    ledger_value = json.dumps(
-        {
-            "applied_at": "2024-01-01T00:00:00+00:00",
-            "filename": "20250129_add_perspective_to_contradiction_seeds.sql",
-        }
-    )
+    ledger_value = _ledger_value()
 
     _bootstrap_legacy_contradiction_database(
         database_url, ledger_value, first_entry, legacy_identifier
@@ -212,27 +246,14 @@ def test_api_startup_handles_operational_error_from_missing_columns(
     database_url = f"sqlite:///{database_path}"
     monkeypatch.setenv("DATABASE_URL", database_url)
 
-    contradictions_path = PROJECT_ROOT / "data" / "seeds" / "contradictions.json"
-    legacy_payload = json.loads(contradictions_path.read_text(encoding="utf-8"))
-    assert legacy_payload, "Expected bundled contradiction seeds to be present"
-    first_entry = legacy_payload[0]
+    first_entry = CONTRADICTION_SEEDS[0]
     osis_a = first_entry["osis_a"]
     osis_b = first_entry["osis_b"]
     source = first_entry.get("source") or "community"
     perspective = (first_entry.get("perspective") or "skeptical").strip().lower()
-    legacy_identifier = str(
-        uuid5(
-            CONTRADICTION_NAMESPACE,
-            "|".join([osis_a.lower(), osis_b.lower(), source.lower(), perspective]),
-        )
-    )
+    legacy_identifier = _legacy_identifier(first_entry)
 
-    ledger_value = json.dumps(
-        {
-            "applied_at": "2024-01-01T00:00:00+00:00",
-            "filename": "20250129_add_perspective_to_contradiction_seeds.sql",
-        }
-    )
+    ledger_value = _ledger_value()
 
     _bootstrap_legacy_contradiction_database(
         database_url, ledger_value, first_entry, legacy_identifier
@@ -535,7 +556,7 @@ def _bootstrap_legacy_contradiction_database(
                     updated_at = excluded.updated_at
                 """,
                 {
-                    "key": "db:migration:20250129_add_perspective_to_contradiction_seeds.sql",
+                    "key": MIGRATION_LEDGER_KEY,
                     "value": ledger_value,
                     "created": "2024-01-01T00:00:00+00:00",
                     "updated": "2024-01-01T00:00:00+00:00",
