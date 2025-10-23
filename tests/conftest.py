@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import importlib
 import inspect
 import os
 import sys
@@ -26,6 +27,21 @@ try:  # pragma: no cover - optional dependency in local test harness
     _HAS_PYTEST_COV = True
 except ModuleNotFoundError:  # pragma: no cover - executed when plugin is missing
     _HAS_PYTEST_COV = False
+
+
+def _register_randomly_plugin(pluginmanager: pytest.PluginManager) -> bool:
+    """Ensure pytest-randomly is registered when available."""
+
+    if pluginmanager.hasplugin("randomly"):
+        return True
+
+    try:
+        plugin_module = importlib.import_module("pytest_randomly.plugin")
+    except ModuleNotFoundError:
+        return False
+
+    pluginmanager.register(plugin_module, "pytest_randomly")
+    return True
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -70,10 +86,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers used throughout the test suite."""
 
+    if _register_randomly_plugin(config.pluginmanager):
+        config.option.randomly_seed = 1337
+
     config.addinivalue_line(
         "markers",
         "asyncio: mark a test function as running with an asyncio event loop.",
     )
+
+
+def pytest_load_initial_conftests(
+    early_config: pytest.Config, parser: pytest.Parser, args: list[str]
+) -> None:
+    """Ensure required plugins are available before parsing ini options."""
+
+    _register_randomly_plugin(early_config.pluginmanager)
 
 
 @pytest.fixture
@@ -214,7 +241,7 @@ def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[s
     from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
     from theo.application.facades.database import Base
     
-    database_dir = tmp_path_factory.mktemp("sqlite")
+    database_dir = tmp_path_factory.mktemp("sqlite", numbered=True)
     path = database_dir / "test.db"
     url = f"sqlite:///{path}"
     
@@ -264,16 +291,21 @@ def integration_engine(
         engine.dispose()
 
 
-@pytest.fixture(autouse=True)
-def _ensure_database_url_env(
-    monkeypatch: pytest.MonkeyPatch,
-    integration_database_url: str,
-) -> None:
+@pytest.fixture(scope="session", autouse=True)
+def _set_database_url_env(integration_database_url: str) -> Generator[None, None, None]:
     """Expose the integration database URL via ``DATABASE_URL``.
 
     Several subsystems rely on the ``DATABASE_URL`` environment variable during
-    initialisation. Setting it for all tests keeps configuration consistent,
-    regardless of whether SQLite or pgvector has been requested.
+    initialisation. Setting it once per test session avoids repeated fixture
+    setup work while still restoring any pre-existing value afterwards.
     """
 
-    monkeypatch.setenv("DATABASE_URL", integration_database_url)
+    previous = os.environ.get("DATABASE_URL")
+    os.environ["DATABASE_URL"] = integration_database_url
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous

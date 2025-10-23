@@ -93,13 +93,31 @@ follow_imports = "skip"
 # Coverage disabled by default for faster test discovery
 # To run with coverage: pytest --cov=theo --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 addopts = [
+    "-ra",
+    "--strict-markers",
+    "--timeout=60",
 ]
 testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    ".tox",
+    "dist",
+    "build",
+    "node_modules",
+    ".*",
+    "__pycache__",
+]
 markers = [
     "redteam: OWASP LLM red-team regression suite",
     "no_auth_override: disable authentication override fixture for security assertions",
-    "slow: slower end-to-end smoke tests",
+    "slow: long-running tests that require opt-in",
     "enable_migrations: allow database migrations to execute in tests",
+    "e2e: end-to-end/system tests",
+    "db: database-hitting tests",
+    "network: tests that would reach network if not mocked",
+    "perf: benchmark-style performance checks",
+    "flaky: known-intermittent tests",
 ]
 filterwarnings = [
     "ignore:jsonschema.exceptions.RefResolutionError is deprecated:DeprecationWarning",

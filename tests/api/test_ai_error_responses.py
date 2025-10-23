@@ -1,7 +1,5 @@
 import pytest
 from fastapi.testclient import TestClient
-
-from theo.services.api.app.main import app
 from theo.services.api.app.models.ai import (
     CHAT_SESSION_TOTAL_CHAR_BUDGET,
     MAX_CHAT_MESSAGE_CONTENT_LENGTH,
@@ -9,8 +7,8 @@ from theo.services.api.app.models.ai import (
 
 
 @pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
+def client(api_test_client: TestClient) -> TestClient:
+    return api_test_client
 
 
 def test_chat_turn_empty_messages_returns_structured_error(client: TestClient) -> None:

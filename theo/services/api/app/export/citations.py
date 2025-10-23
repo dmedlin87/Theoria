@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
-    Iterable,
     Mapping,
     Sequence,
     TYPE_CHECKING,
@@ -92,45 +91,79 @@ class CitationSource:
         )
 
 
-def _get_value(obj: Any, mapping: Mapping[str, Any] | None, *keys: str) -> Any:
+def _lookup_mapping(
+    mapping: Mapping[str, Any] | None, keys: Sequence[str]
+) -> tuple[bool, Any]:
+    """Return a ``(found, value)`` tuple for *keys* within *mapping*.
+
+    The lookup is case-insensitive for string keys while still preserving
+    the original value. ``found`` indicates whether any key matched even if
+    the corresponding value is ``None``.
+    """
+
+    if mapping is None:
+        return False, None
+
     for key in keys:
-        if mapping and key in mapping:
-            return mapping[key]
+        if key in mapping:
+            return True, mapping[key]
+
+    lower_lookup: dict[str, str] = {}
+    for existing_key in mapping.keys():
+        if isinstance(existing_key, str):
+            lower_lookup.setdefault(existing_key.lower(), existing_key)
+
+    for key in keys:
+        if isinstance(key, str):
+            match = lower_lookup.get(key.lower())
+            if match is not None:
+                return True, mapping[match]
+
+    return False, None
+
+
+def _get_value(obj: Any, mapping: Mapping[str, Any] | None, *keys: str) -> Any:
+    found, value = _lookup_mapping(mapping, keys)
+    if found:
+        return value
+
+    for key in keys:
         if hasattr(obj, key):
             return getattr(obj, key)
+
     if mapping:
-        meta = mapping.get("meta") or mapping.get("metadata")
-        if isinstance(meta, Mapping):
-            for key in keys:
-                if key in meta:
-                    return meta[key]
+        meta_candidates: list[Mapping[str, Any]] = []
+        for meta_key in ("meta", "metadata"):
+            found_meta, meta_value = _lookup_mapping(mapping, (meta_key,))
+            if found_meta and isinstance(meta_value, Mapping):
+                meta_candidates.append(meta_value)
+        for meta_candidate in meta_candidates:
+            found_meta_value, meta_value = _lookup_mapping(meta_candidate, keys)
+            if found_meta_value:
+                return meta_value
+
     if hasattr(obj, "meta"):
         meta_attr = cast(Any, obj).meta
         if isinstance(meta_attr, Mapping):
-            for key in keys:
-                if key in meta_attr:
-                    return meta_attr[key]
+            found_meta_value, meta_value = _lookup_mapping(meta_attr, keys)
+            if found_meta_value:
+                return meta_value
+
     return None
 
 
 def _extract_metadata(obj: Any, mapping: Mapping[str, Any] | None) -> dict[str, Any]:
-    candidates: Iterable[Any] = []
     if mapping:
-        candidates = (
-            mapping.get("metadata"),
-            mapping.get("meta"),
-            mapping.get("bib_json"),
-        )
+        for key in ("metadata", "meta", "bib_json"):
+            found, value = _lookup_mapping(mapping, (key,))
+            if found and isinstance(value, Mapping):
+                return dict(value)
     else:
-        candidates = (
-            getattr(obj, "metadata", None),
-            getattr(obj, "meta", None),
-            getattr(obj, "bib_json", None),
-        )
-
-    for value in candidates:
-        if isinstance(value, Mapping):
-            return dict(value)
+        for attr in ("metadata", "meta", "bib_json"):
+            if hasattr(obj, attr):
+                candidate = getattr(obj, attr)
+                if isinstance(candidate, Mapping):
+                    return dict(candidate)
     return {}
 
 
@@ -145,10 +178,11 @@ def _resolve_topics(
         return topics
     if metadata:
         for key in ("topics", "tags", "keywords", "subjects"):
-            value = metadata.get(key)
-            topics = _coerce_str_list(value)
-            if topics:
-                return topics
+            found, value = _lookup_mapping(metadata, (key,))
+            if found:
+                topics = _coerce_str_list(value)
+                if topics:
+                    return topics
     return None
 
 
@@ -156,12 +190,14 @@ def _metadata_first(metadata: Mapping[str, Any] | None, *keys: str) -> str | Non
     if not metadata:
         return None
     for key in keys:
-        value = metadata.get(key)
+        found, value = _lookup_mapping(metadata, (key,))
+        if not found:
+            continue
         if isinstance(value, str):
             cleaned = value.strip()
             if cleaned:
                 return cleaned
-        if isinstance(value, Sequence):
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
             for entry in value:
                 if isinstance(entry, str) and entry.strip():
                     return entry.strip()
@@ -291,20 +327,69 @@ def _normalise_doi(value: Any) -> str | None:
         return None
 
     return f"https://doi.org/{cleaned}"
-    lowered = cleaned.lower()
-    prefixes = (
-        "https://doi.org/",
-        "http://doi.org/",
-        "https://dx.doi.org/",
-        "http://dx.doi.org/",
-        "doi:",
-    )
-    for prefix in prefixes:
-        if lowered.startswith(prefix):
-            cleaned = cleaned[len(prefix) :].lstrip(" /")
-            lowered = cleaned.lower()
-            break
-    return cleaned or None
+
+
+_ORGANISATIONAL_KEYWORDS = {
+    "academy",
+    "alliance",
+    "board",
+    "bureau",
+    "center",
+    "centre",
+    "church",
+    "churches",
+    "college",
+    "commission",
+    "committee",
+    "community",
+    "conference",
+    "council",
+    "department",
+    "diocese",
+    "fellowship",
+    "foundation",
+    "government",
+    "group",
+    "institute",
+    "institution",
+    "library",
+    "ministries",
+    "ministry",
+    "mission",
+    "network",
+    "office",
+    "organization",
+    "organisation",
+    "press",
+    "project",
+    "school",
+    "seminary",
+    "society",
+    "synod",
+    "team",
+    "university",
+}
+
+
+def _looks_like_literal_author(candidate: str, parts: Sequence[str]) -> bool:
+    """Heuristically determine whether *candidate* should remain literal."""
+
+    lowered_candidate = candidate.lower()
+    if " et al" in lowered_candidate:
+        return True
+    if any(char.isdigit() for char in candidate):
+        return True
+    if any(char in "&/@" for char in candidate):
+        return True
+
+    lowered_parts = [segment.lower() for segment in parts]
+    if any(keyword in lowered_parts for keyword in _ORGANISATIONAL_KEYWORDS):
+        return True
+
+    if any(segment.isupper() and len(segment) > 1 for segment in parts):
+        return True
+
+    return False
 
 
 def _normalise_author(name: str) -> dict[str, str]:
@@ -316,32 +401,38 @@ def _normalise_author(name: str) -> dict[str, str]:
 
     if "," in candidate:
         family, given = [segment.strip() for segment in candidate.split(",", 1)]
-        if family and given:
-            return {"given": given, "family": family, "literal": candidate}
+        if not family and not given:
+            return {"literal": candidate}
+        result: dict[str, str] = {}
         if family:
-            return {"family": family, "literal": candidate}
+            result["family"] = family
+        if given:
+            result["given"] = given
+        return result
 
     parts = [segment.strip() for segment in candidate.split() if segment.strip()]
     if len(parts) >= 2:
+        if _looks_like_literal_author(candidate, parts):
+            return {"literal": candidate}
         family = parts[-1]
         given = " ".join(parts[:-1])
-        return {"given": given, "family": family, "literal": candidate}
+        result: dict[str, str] = {"family": family}
+        if given:
+            result["given"] = given
+        return result
 
     return {"literal": candidate}
 
 
 def _apa_author(author: dict[str, str]) -> str:
-    literal = author.get("literal")
     family = author.get("family")
     if family:
-        if literal and "," not in literal:
-            return literal
         given = author.get("given", "")
         initials = " ".join(f"{segment[0].upper()}." for segment in given.split() if segment)
         if initials:
             return f"{family}, {initials}"
         return family
-    return literal or ""
+    return author.get("literal", "")
 
 
 def _chicago_author(author: dict[str, str]) -> str:
@@ -632,10 +723,12 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
             segments.append(f"{authors_segment}.")
 
     title_text = str(title).strip()
-    title_segment = f'"{title_text or title}"'
-    if title_text and not title_text.endswith((".", "!", "?")):
-        title_segment = f"{title_segment}."
-    segments.append(title_segment)
+    if title_text:
+        if title_text.endswith("."):
+            title_text = title_text.rstrip(".").rstrip()
+        segments.append(f'"{title_text}"')
+    else:
+        segments.append('"Untitled"')
     if details_text:
         if not details_text.endswith(('.', '!', '?')):
             details_text = details_text.rstrip('.') + "."
@@ -650,7 +743,12 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
     if anchor_entries:
         segments.append(f"Anchors: {anchor_entries}.")
 
-    return " ".join(segment.strip() for segment in segments if segment and segment.strip())
+    citation = " ".join(
+        segment.strip() for segment in segments if segment and segment.strip()
+    )
+    if citation and not citation.endswith((".", "!", "?")):
+        citation = citation.rstrip(".") + "."
+    return citation
 
 
 def _map_bibtex_type(csl_type: str) -> str:
