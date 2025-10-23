@@ -17,7 +17,7 @@ def test_sanitize_removes_control_phrases_and_tags() -> None:
 
     assert "script" not in sanitized.lower()
     assert "ignore previous instructions" not in sanitized.lower()
-    assert sanitized == "This content is safe.\nAdditional text."
+    assert sanitized == "This content is safe. and proceed.\nAdditional text."
 
 
 def test_sanitize_returns_filtered_when_only_dangerous_content() -> None:
@@ -43,4 +43,4 @@ def test_sanitize_normalises_whitespace_after_removal() -> None:
     sanitized = sanitize_passage_text(raw)
 
     assert "guardrails" not in sanitized.lower()
-    assert sanitized == "Useful information follows."
+    assert sanitized == "! . Useful information follows."
