@@ -384,6 +384,77 @@ def _whitespace() -> st.SearchStrategy[str]:
     return st.text(alphabet=st.sampled_from([" ", "\t", "\n"]), min_size=0, max_size=3)
 
 
+_ASCII_LOWER = st.characters(min_codepoint=97, max_codepoint=122)
+_TOKEN = st.text(alphabet=_ASCII_LOWER, min_size=1, max_size=6)
+_VALUE = st.one_of(_TOKEN, st.integers(min_value=-5, max_value=5), st.none())
+_KEY = st.text(alphabet=_ASCII_LOWER, min_size=1, max_size=6)
+_LIST_VALUE = st.lists(_VALUE, max_size=3)
+_NESTED_DICT = st.lists(st.tuples(_KEY, _VALUE), max_size=2).map(dict)
+
+
+@st.composite
+def _tei_meta_dict(draw) -> dict[str, object]:
+    entries = draw(
+        st.lists(
+            st.tuples(_KEY, st.one_of(_LIST_VALUE, _NESTED_DICT, _VALUE)),
+            max_size=3,
+        ).map(dict)
+    )
+    search_blob = draw(
+        st.one_of(st.none(), st.lists(_TOKEN, max_size=4).map(" ".join))
+    )
+    meta: dict[str, object] = {}
+    if entries:
+        meta["tei"] = entries
+    if search_blob is not None:
+        meta["tei_search_blob"] = search_blob
+    return meta
+
+
+@st.composite
+def _tei_meta_payload(draw) -> object:
+    variant = draw(st.integers(min_value=0, max_value=2))
+    if variant == 0:
+        return draw(_tei_meta_dict())
+    if variant == 1:
+        return None
+    return "unexpected"
+
+
+def _expected_tei_terms(meta: object) -> list[str]:
+    if not isinstance(meta, dict):
+        return []
+    terms: list[str] = []
+    tei_section = meta.get("tei")
+    if isinstance(tei_section, dict):
+        for values in tei_section.values():
+            if isinstance(values, list):
+                terms.extend(str(value) for value in values)
+            elif isinstance(values, dict):
+                terms.extend(str(value) for value in values.values())
+    search_blob = meta.get("tei_search_blob")
+    if isinstance(search_blob, str):
+        terms.extend(search_blob.split())
+    return [term for term in terms if term]
+
+
+@st.composite
+def _query_tokens(draw) -> list[str]:
+    return draw(st.lists(_TOKEN.map(str.lower), max_size=4))
+
+
+@given(meta=_tei_meta_payload(), tokens=_query_tokens())
+def test_tei_terms_and_match_score_property(meta: object, tokens: list[str]) -> None:
+    passage = _make_passage(meta=meta)
+    expected_terms = _expected_tei_terms(meta)
+
+    assert hybrid._tei_terms(passage) == expected_terms
+
+    lowered_terms = " ".join(term.lower() for term in expected_terms)
+    expected_score = sum(lowered_terms.count(token) for token in tokens)
+    assert hybrid._tei_match_score(passage, tokens) == pytest.approx(expected_score)
+
+
 @given(
     base=_TOPIC_TEXT,
     extra_domains=st.lists(st.text(alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_categories=("Cs",)), max_size=16), max_size=4),
