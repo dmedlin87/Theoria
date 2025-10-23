@@ -87,3 +87,43 @@ def configure_redteam_environment(
 
         settings_module.get_settings.cache_clear()
 
+
+@pytest.fixture(scope="session", autouse=True)
+def _speed_up_redteam_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _noop_run_sql_migrations(
+        engine=None,
+        migrations_path=None,
+        *,
+        force: bool = False,
+    ) -> list[str]:
+        return []
+
+    def _noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "theo.services.api.app.main.run_sql_migrations",
+        _noop_run_sql_migrations,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.db.run_sql_migrations.run_sql_migrations",
+        _noop_run_sql_migrations,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.main.seed_reference_data",
+        _noop,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.db.seeds.seed_reference_data",
+        _noop,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.workers.discovery_scheduler.start_discovery_scheduler",
+        _noop,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.services.api.app.workers.discovery_scheduler.stop_discovery_scheduler",
+        _noop,
+        raising=False,
+    )
