@@ -61,11 +61,15 @@ def test_serialise_frontmatter_renders_supported_types(tmp_path: Path) -> None:
         "datetime": now,
     }
 
+    windows_path = "C:" + "\\" + "Users" + "\\" + "example"
+    payload["windows_path"] = windows_path
+
     rendered = serialise_frontmatter(payload)
 
     assert "2024-01-01" in rendered
     assert "2024-01-02T03:04:05+00:00" in rendered
     assert str(tmp_path) in rendered
+    assert windows_path in rendered
 
 
 @given(st.lists(st.one_of(st.text(min_size=0, max_size=5), st.none(), st.integers()), max_size=8))
