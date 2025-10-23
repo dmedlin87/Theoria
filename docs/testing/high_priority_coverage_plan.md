@@ -100,6 +100,7 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * ✅ Extended `tests/services/api/app/ingest/test_pipeline_core.py` to cover `_orchestrate`, file/transcript pipeline entrypoints, and `import_osis_commentary` success/error paths, ensuring workflow instrumentation and dependency wiring remain intact.
 * ✅ Added `tests/services/api/app/ingest/test_chunking.py` to exercise `chunk_text` paragraph splitting heuristics and `chunk_transcript` time-window flush logic, including speaker aggregation semantics.
 * ✅ Expanded `tests/services/api/app/ingest/test_persistence.py` to assert `_dedupe_preserve_order`, `_project_document_if_possible`, and `refresh_creator_verse_rollups` handle deduplication, graph projection wiring, and synchronous refresh fallbacks without invoking asynchronous worker infrastructure.
+* ✅ Added `tests/services/api/app/ingest/test_osis.py` to lock in OSIS document parsing, canonicalisation, verse range aggregation, and reference classification utilities.
 
 ---
 
