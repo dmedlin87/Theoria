@@ -101,6 +101,7 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * ✅ Added `tests/services/api/app/ingest/test_chunking.py` to exercise `chunk_text` paragraph splitting heuristics and `chunk_transcript` time-window flush logic, including speaker aggregation semantics.
 * ✅ Expanded `tests/services/api/app/ingest/test_persistence.py` to assert `_dedupe_preserve_order`, `_project_document_if_possible`, and `refresh_creator_verse_rollups` handle deduplication, graph projection wiring, and synchronous refresh fallbacks without invoking asynchronous worker infrastructure.
 * ✅ Added `tests/services/api/app/ingest/test_osis.py` to lock in OSIS document parsing, canonicalisation, verse range aggregation, and reference classification utilities.
+* ✅ Further extended `tests/services/api/app/ingest/test_network.py` to verify fixture resolution precedence, YouTube transcript ingestion fallbacks, and metadata JSON parsing so ingestion remains deterministic in offline test environments.
 
 ---
 
@@ -158,12 +159,13 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 * ✅ Added `tests/services/api/app/retriever/test_documents.py` to verify document listing/detail pagination, latest digest selection, update semantics, and annotation CRUD pathways with an in-memory SQLite database.
 * ✅ Added `tests/services/api/app/retriever/test_hybrid_search.py` to validate `_annotate_retrieval_span` observability hooks, `_fallback_search` guardrail/OSIS handling, and `_postgres_hybrid_search` backend selection and candidate aggregation.
 * ✅ Extended `tests/services/api/app/retriever/test_hybrid.py` with unit coverage for `_tokenise`, `_lexical_score`, `_snippet`, `_build_result`, and `_apply_document_ranks`, ensuring metadata composition and highlight assignment remain stable.
-* ✅ Added property-based regression coverage in `tests/services/api/app/retriever/test_hybrid.py` for `_tei_terms` and `_tei_match_score`, fuzzing nested TEI metadata and query token combinations to keep term extraction and scoring consistent.
 
 ---
 
 ## Next Iteration Targets
-
+* **Ingest network error handling** – Add regression tests for `theo/services/api/app/ingest/network.fetch_web_document` to simulate `URLError` timeout reasons and `ContentTooShortError` partial reads so the bespoke exception translation remains stable.
+* **Network cache semantics** – Cover `theo/services/api/app/ingest/network.cached_blocked_networks` to assert CIDR parsing results are memoised and filter out invalid entries without leaking state between calls.
+* **Retriever TEI fuzzing** – Implement Hypothesis-based tests around `theo/services/api/app/retriever/hybrid._tei_terms` and `_tei_match_score` to stress nested metadata dictionaries, mixed list/dict payloads, and ensure keyword extraction stays order-insensitive.
 * Restore coverage for the asynchronous `refresh_creator_verse_rollups` worker dispatch once Celery task imports can be safely stubbed without relying on Redis; a dedicated fixture that patches the worker module will unblock the remaining branch.
 * Exercise ingestion persistence error paths such as `ensure_unique_document_sha` and commentary import collision updates to hit remaining uncovered lines in `persistence.py`.
 * Extend retriever hybrid coverage to integration-test `_postgres_hybrid_search` against a stubbed vector backend and verify guardrail filtering across mixed TEI and OSIS inputs.
