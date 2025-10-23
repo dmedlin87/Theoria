@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import importlib
 import inspect
 import os
 import sys
@@ -26,6 +27,21 @@ try:  # pragma: no cover - optional dependency in local test harness
     _HAS_PYTEST_COV = True
 except ModuleNotFoundError:  # pragma: no cover - executed when plugin is missing
     _HAS_PYTEST_COV = False
+
+
+def _register_randomly_plugin(pluginmanager: pytest.PluginManager) -> bool:
+    """Ensure pytest-randomly is registered when available."""
+
+    if pluginmanager.hasplugin("randomly"):
+        return True
+
+    try:
+        plugin_module = importlib.import_module("pytest_randomly.plugin")
+    except ModuleNotFoundError:
+        return False
+
+    pluginmanager.register(plugin_module, "pytest_randomly")
+    return True
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -70,10 +86,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers used throughout the test suite."""
 
-    if not config.pluginmanager.hasplugin("randomly"):
-        plugin = __import__("pytest_randomly.plugin", fromlist=["plugin"])
-        config.pluginmanager.register(plugin, "pytest_randomly")
-    config.option.randomly_seed = 1337
+    if _register_randomly_plugin(config.pluginmanager):
+        config.option.randomly_seed = 1337
 
     config.addinivalue_line(
         "markers",
@@ -86,9 +100,7 @@ def pytest_load_initial_conftests(
 ) -> None:
     """Ensure required plugins are available before parsing ini options."""
 
-    if not early_config.pluginmanager.hasplugin("randomly"):
-        plugin = __import__("pytest_randomly.plugin", fromlist=["plugin"])
-        early_config.pluginmanager.register(plugin, "pytest_randomly")
+    _register_randomly_plugin(early_config.pluginmanager)
 
 
 @pytest.fixture
