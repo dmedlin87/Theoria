@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
+import shutil
 import sys
 from unittest.mock import AsyncMock, patch
 
@@ -16,15 +17,35 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.application.facades.database import get_session
+from theo.application.facades import database as database_module
+from theo.application.facades.database import configure_engine, get_engine, get_session
 from theo.adapters.persistence.models import Document
 from theo.services.api.app.main import app
 
 
-@pytest.fixture()
-def client(api_engine) -> Generator[TestClient, None, None]:
+@pytest.fixture(scope="module")
+def module_api_engine(tmp_path_factory, _api_engine_template):
+    """Module-scoped API engine cloned from the session template."""
+
+    database_path = tmp_path_factory.mktemp("zotero-db") / "api.sqlite"
+    shutil.copy2(_api_engine_template, database_path)
+    configure_engine(f"sqlite:///{database_path}")
+
+    engine = get_engine()
+
+    try:
+        yield engine
+    finally:
+        if engine is not None:
+            engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
+
+
+@pytest.fixture(scope="module")
+def client(module_api_engine) -> Generator[TestClient, None, None]:
     """Test client with sample documents."""
-    engine = api_engine
+    engine = module_api_engine
     session_factory = sessionmaker(
         bind=engine,
         autoflush=False,
@@ -73,6 +94,23 @@ def client(api_engine) -> Generator[TestClient, None, None]:
             yield test_client
     finally:
         app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.fixture()
+def document_cleanup(module_api_engine):
+    """Helper to remove documents inserted during a test."""
+
+    tracked_ids: set[str] = set()
+
+    def register(*document_ids: str) -> None:
+        tracked_ids.update(document_ids)
+
+    yield register
+
+    if tracked_ids:
+        with Session(module_api_engine) as session:
+            session.query(Document).filter(Document.id.in_(tracked_ids)).delete(synchronize_session=False)
+            session.commit()
 
 
 def test_export_to_zotero_success(client: TestClient):
