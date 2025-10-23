@@ -7,16 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from sqlalchemy.orm import Session
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.application.facades.database import (  # noqa: E402  (import after path tweak)
-    Base,
-    configure_engine,
-    get_engine,
     get_settings,
 )
 from theo.adapters.persistence.models import (  # noqa: E402
@@ -32,16 +27,6 @@ from theo.services.api.app.ingest.parsers import TranscriptSegment  # noqa: E402
 from theo.services.api.app.ingest.stages import ErrorDecision  # noqa: E402
 from theo.services.api.app.ingest.stages.fetchers import UrlSourceFetcher  # noqa: E402
 from theo.services.api.app.ingest.stages.parsers import TranscriptParser  # noqa: E402
-
-
-def _prepare_database(tmp_path: Path) -> None:
-    db_path = tmp_path / "pipeline.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
-
-
 def _capture_span_attributes(monkeypatch):
     recorded = []
 
@@ -74,11 +59,10 @@ def _assert_ingest_metrics(
     assert ingest_attributes["ingest.document_id"] == document_id
 
 
-def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
+def test_run_pipeline_for_file_persists_chunks(
+    tmp_path, pipeline_session_factory
+) -> None:
     """File ingestion stores a document, passages, and artifacts."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -91,17 +75,23 @@ def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
         doc_path = tmp_path / "sample.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_file(
                 session,
                 doc_path,
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
-            passages = session.query(Passage).filter_by(document_id=document_id).all()
+            passages = (
+                session.query(Passage).filter_by(document_id=document_id).all()
+            )
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.title == "Sample Doc"
@@ -122,11 +112,10 @@ def test_run_pipeline_for_file_persists_chunks(tmp_path) -> None:
         settings.storage_root = original_storage
 
 
-def test_run_pipeline_for_file_records_span_metrics(tmp_path, monkeypatch) -> None:
+def test_run_pipeline_for_file_records_span_metrics(
+    tmp_path, monkeypatch, pipeline_session_factory
+) -> None:
     """File ingestion records span metrics alongside persistence."""
-    _prepare_database(tmp_path)
-    engine = get_engine()
-
     settings = get_settings()
     original_storage = settings.storage_root
     settings.storage_root = tmp_path / "storage"
@@ -139,16 +128,20 @@ def test_run_pipeline_for_file_records_span_metrics(tmp_path, monkeypatch) -> No
         doc_path = tmp_path / "telemetry.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_file(
                 session,
                 doc_path,
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.title == "Telemetry Doc"
@@ -158,11 +151,10 @@ def test_run_pipeline_for_file_records_span_metrics(tmp_path, monkeypatch) -> No
         settings.storage_root = original_storage
 
 
-def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
+def test_run_pipeline_creates_case_builder_objects(
+    tmp_path, pipeline_session_factory
+) -> None:
     """Case Builder objects mirror ingested passages when enabled."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -179,15 +171,17 @@ def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
         doc_path = tmp_path / "case_doc.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_file(
                 session,
                 doc_path,
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             source = (
                 session.query(CaseSource)
                 .filter(CaseSource.document_id == document_id)
@@ -203,6 +197,8 @@ def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
                 passage.id
                 for passage in session.query(Passage).filter_by(document_id=document_id)
             }
+        finally:
+            session.close()
 
         assert source is not None
         assert objects, "Expected case objects to be persisted"
@@ -214,11 +210,10 @@ def test_run_pipeline_creates_case_builder_objects(tmp_path) -> None:
         settings.case_builder_enabled = original_flag
 
 
-def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
+def test_run_pipeline_for_url_ingests_html(
+    tmp_path, monkeypatch, pipeline_session_factory
+) -> None:
     """URL ingestion persists HTML content via the generic pipeline."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -234,17 +229,23 @@ def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
 
     try:
         dependencies = pipeline.PipelineDependencies(settings=settings)
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_url(
                 session,
                 "https://example.com/foo",
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
-            passages = session.query(Passage).filter_by(document_id=document_id).all()
+            passages = (
+                session.query(Passage).filter_by(document_id=document_id).all()
+            )
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.title == "Example"
@@ -266,11 +267,10 @@ def test_run_pipeline_for_url_ingests_html(tmp_path, monkeypatch) -> None:
         settings.storage_root = original_storage
 
 
-def test_run_pipeline_for_url_records_span_metrics(tmp_path, monkeypatch) -> None:
+def test_run_pipeline_for_url_records_span_metrics(
+    tmp_path, monkeypatch, pipeline_session_factory
+) -> None:
     """URL ingestion records span metrics alongside persistence."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -287,16 +287,20 @@ def test_run_pipeline_for_url_records_span_metrics(tmp_path, monkeypatch) -> Non
 
     try:
         dependencies = pipeline.PipelineDependencies(settings=settings)
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_url(
                 session,
                 "https://example.com/foo",
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.title == "Example"
@@ -307,11 +311,10 @@ def test_run_pipeline_for_url_records_span_metrics(tmp_path, monkeypatch) -> Non
         settings.storage_root = original_storage
 
 
-def test_run_pipeline_for_file_inlines_snapshot_when_small(tmp_path) -> None:
+def test_run_pipeline_for_file_inlines_snapshot_when_small(
+    tmp_path, pipeline_session_factory
+) -> None:
     """Smaller ingests include inline text and chunk snapshots."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -326,16 +329,20 @@ def test_run_pipeline_for_file_inlines_snapshot_when_small(tmp_path) -> None:
         doc_path = tmp_path / "inline.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_file(
                 session,
                 doc_path,
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.storage_path is not None
@@ -355,11 +362,10 @@ def test_run_pipeline_for_file_inlines_snapshot_when_small(tmp_path) -> None:
         settings.ingest_normalized_snapshot_max_bytes = original_threshold
 
 
-def test_run_pipeline_for_large_file_uses_snapshot_manifest(tmp_path) -> None:
+def test_run_pipeline_for_large_file_uses_snapshot_manifest(
+    tmp_path, pipeline_session_factory
+) -> None:
     """Large snapshots omit inline text in favour of artifact manifests."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -375,16 +381,20 @@ def test_run_pipeline_for_large_file_uses_snapshot_manifest(tmp_path) -> None:
         doc_path = tmp_path / "large.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_file(
                 session,
                 doc_path,
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.storage_path is not None
@@ -428,11 +438,10 @@ def test_run_pipeline_for_url_rejects_disallowed_scheme(monkeypatch) -> None:
         settings.ingest_url_allowed_schemes = original_schemes
 
 
-def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
+def test_run_pipeline_for_file_rejects_javascript_source_url(
+    tmp_path, pipeline_session_factory
+) -> None:
     """Unsafe source URLs are stripped during file ingestion."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -451,16 +460,20 @@ def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
         doc_path = tmp_path / "unsafe.md"
         doc_path.write_text(markdown, encoding="utf-8")
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_file(
                 session,
                 doc_path,
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.source_url is None
@@ -468,11 +481,10 @@ def test_run_pipeline_for_file_rejects_javascript_source_url(tmp_path) -> None:
         settings.storage_root = original_storage
 
 
-def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> None:
+def test_run_pipeline_for_transcript_rejects_javascript_source_url(
+    tmp_path, pipeline_session_factory
+) -> None:
     """Unsafe source URLs are stripped during transcript ingestion."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -490,7 +502,8 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
             "source_url": "javascript:alert(1)",
         }
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_transcript(
                 session,
                 transcript_path,
@@ -498,9 +511,12 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.source_url is None
@@ -509,12 +525,9 @@ def test_run_pipeline_for_transcript_rejects_javascript_source_url(tmp_path) -> 
 
 
 def test_run_pipeline_for_transcript_records_span_metrics(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, pipeline_session_factory
 ) -> None:
     """Transcript ingestion records span metrics alongside persistence."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -533,7 +546,8 @@ def test_run_pipeline_for_transcript_records_span_metrics(
             "source_url": "https://example.com/video",
         }
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_transcript(
                 session,
                 transcript_path,
@@ -541,9 +555,12 @@ def test_run_pipeline_for_transcript_records_span_metrics(
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             stored = session.get(Document, document_id)
+        finally:
+            session.close()
 
         assert stored is not None
         assert stored.title == "Transcript Doc"
@@ -554,11 +571,10 @@ def test_run_pipeline_for_transcript_records_span_metrics(
         settings.storage_root = original_storage
 
 
-def test_transcript_pipeline_retries_parser_failure(tmp_path, monkeypatch) -> None:
+def test_transcript_pipeline_retries_parser_failure(
+    tmp_path, monkeypatch, pipeline_session_factory
+) -> None:
     """Transcript ingestion respects retry decisions from error policies."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -598,13 +614,16 @@ def test_transcript_pipeline_retries_parser_failure(tmp_path, monkeypatch) -> No
         dependencies = pipeline.PipelineDependencies(
             settings=settings, error_policy=policy
         )
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_transcript(
                 session,
                 transcript_path,
                 dependencies=dependencies,
             )
             assert document is not None
+        finally:
+            session.close()
     finally:
         settings.storage_root = original_storage
 
@@ -612,11 +631,10 @@ def test_transcript_pipeline_retries_parser_failure(tmp_path, monkeypatch) -> No
     assert any(stage == "transcript_parser" for stage, _, _ in policy.calls)
 
 
-def test_youtube_fetch_retries_with_error_policy(tmp_path, monkeypatch) -> None:
+def test_youtube_fetch_retries_with_error_policy(
+    tmp_path, monkeypatch, pipeline_session_factory
+) -> None:
     """URL ingestion retries fetch failures via injected error policies."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -672,13 +690,16 @@ def test_youtube_fetch_retries_with_error_policy(tmp_path, monkeypatch) -> None:
         dependencies = pipeline.PipelineDependencies(
             settings=settings, error_policy=policy
         )
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_url(
                 session,
                 "https://youtu.be/example",
                 dependencies=dependencies,
             )
             assert document.source_type == "youtube"
+        finally:
+            session.close()
     finally:
         settings.storage_root = original_storage
 
@@ -686,11 +707,10 @@ def test_youtube_fetch_retries_with_error_policy(tmp_path, monkeypatch) -> None:
     assert any(stage == "url_source_fetcher" for stage, _, _ in policy.calls)
 
 
-def test_duplicate_file_ingest_triggers_error_policy(tmp_path) -> None:
+def test_duplicate_file_ingest_triggers_error_policy(
+    tmp_path, pipeline_session_factory
+) -> None:
     """Duplicate detection surfaces stage failures to injected policies."""
-
-    _prepare_database(tmp_path)
-    engine = get_engine()
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -701,12 +721,15 @@ def test_duplicate_file_ingest_triggers_error_policy(tmp_path) -> None:
 
     try:
         base_dependencies = pipeline.PipelineDependencies(settings=settings)
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             pipeline.run_pipeline_for_file(
                 session,
                 doc_path,
                 dependencies=base_dependencies,
             )
+        finally:
+            session.close()
 
         class RecordingPolicy:
             def __init__(self) -> None:
@@ -718,7 +741,8 @@ def test_duplicate_file_ingest_triggers_error_policy(tmp_path) -> None:
 
         policy = RecordingPolicy()
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             with pytest.raises(UnsupportedSourceError):
                 pipeline.run_pipeline_for_file(
                     session,
@@ -727,6 +751,8 @@ def test_duplicate_file_ingest_triggers_error_policy(tmp_path) -> None:
                         settings=settings, error_policy=policy
                     ),
                 )
+        finally:
+            session.close()
     finally:
         settings.storage_root = original_storage
 
@@ -756,9 +782,9 @@ def test_run_pipeline_for_url_blocks_private_targets(monkeypatch, blocked_url) -
         )
 
 
-def test_pipeline_sanitises_adversarial_markdown(tmp_path) -> None:
-    _prepare_database(tmp_path)
-    engine = get_engine()
+def test_pipeline_sanitises_adversarial_markdown(
+    tmp_path, pipeline_session_factory
+) -> None:
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -775,16 +801,20 @@ def test_pipeline_sanitises_adversarial_markdown(tmp_path) -> None:
         doc_path = tmp_path / "adversarial.md"
         doc_path.write_text(malicious, encoding="utf-8")
 
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_file(
                 session,
                 doc_path,
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             passages = session.query(Passage).filter_by(document_id=document_id).all()
+        finally:
+            session.close()
 
         assert passages, "Expected at least one passage to be stored"
 
@@ -800,9 +830,9 @@ def test_pipeline_sanitises_adversarial_markdown(tmp_path) -> None:
         settings.storage_root = original_storage
 
 
-def test_pipeline_sanitises_adversarial_html(tmp_path, monkeypatch) -> None:
-    _prepare_database(tmp_path)
-    engine = get_engine()
+def test_pipeline_sanitises_adversarial_html(
+    tmp_path, monkeypatch, pipeline_session_factory
+) -> None:
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -826,16 +856,20 @@ def test_pipeline_sanitises_adversarial_html(tmp_path, monkeypatch) -> None:
 
     try:
         dependencies = pipeline.PipelineDependencies(settings=settings)
-        with Session(engine) as session:
+        session = pipeline_session_factory()
+        try:
             document = pipeline.run_pipeline_for_url(
                 session,
                 "https://example.com/injected",
                 dependencies=dependencies,
             )
             document_id = document.id
+            session.flush()
+            session.expire_all()
 
-        with Session(engine) as session:
             passages = session.query(Passage).filter_by(document_id=document_id).all()
+        finally:
+            session.close()
 
         assert passages, "Expected HTML ingestion to create passages"
 
