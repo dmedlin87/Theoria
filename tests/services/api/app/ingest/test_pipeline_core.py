@@ -12,6 +12,7 @@ from theo.services.api.app.ingest.pipeline import (
     _ensure_success,
     _file_title_default,
     _transcript_title_default,
+    _url_title_default,
     run_pipeline_for_url,
 )
 
@@ -172,6 +173,16 @@ def test_transcript_title_default_prefers_path_objects() -> None:
     assert _transcript_title_default({"transcript_path": Path("/tmp/video.vtt")}) == "video"
     assert _transcript_title_default({"transcript_path": "video.vtt"}) == "Transcript"
     assert _transcript_title_default({}) == "Transcript"
+
+
+def test_url_title_default_prefers_youtube_video_id() -> None:
+    state = {"source_type": "youtube", "video_id": "abc123"}
+    assert _url_title_default(state) == "YouTube Video abc123"
+
+
+def test_url_title_default_falls_back_to_source_url() -> None:
+    assert _url_title_default({"url": "https://example.com"}) == "https://example.com"
+    assert _url_title_default({}) == "Document"
 
 
 class _FakeTextDocumentPersister:
