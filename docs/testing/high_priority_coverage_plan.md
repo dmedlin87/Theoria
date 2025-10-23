@@ -87,6 +87,8 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * Reusable `FakeResponse` class for network tests (supports `.read`, `.headers`, `.geturl`).
 
 ### Progress
+* ✅ Extended `tests/services/api/app/ingest/test_pipeline_core.py` with coverage for `_url_title_default`, ensuring YouTube ingest assigns friendly titles while non-YouTube sources fall back to their URLs or a generic label.
+* ✅ Added `tests/services/api/app/ingest/test_pipeline_url_guards.py` regression coverage to confirm non allow-listed hosts propagate the original `UnsupportedSourceError` and always restore the resolver monkeypatch.
 * ✅ Covered `ensure_url_allowed` allow-list bypass and blocked-network rejection paths through `tests/services/api/app/ingest/test_pipeline_url_guards.py`.
 * ✅ Added `tests/services/api/app/ingest/test_metadata.py` to verify `merge_metadata` nested override semantics.
 * ✅ Implemented `tests/services/api/app/ingest/test_pipeline_core.py` to exercise `PipelineDependencies`, `_ensure_success`, default title factories, and `_UrlDocumentPersister` dispatch logic.
@@ -166,6 +168,7 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 * Exercise the file and URL pipelines against the real `resilient_operation` helpers to assert span attributes and retry metadata in failure scenarios.
 * Add integration coverage for `run_pipeline_for_file` and `run_pipeline_for_transcript` that runs through the real stage implementations with in-memory fixtures to surface persistence edge cases.
 * Expand retriever guardrail property tests to cover `_tei_match_score` fuzzing and additional `_fallback_search` filter combinations.
+* Build ingest resilience regressions verifying `_UrlDocumentPersister` error paths propagate `UnsupportedSourceError` when downstream persisters fail mid-persist.
 4. **Introduce property-based checks** – After deterministic fixtures exist, layer Hypothesis strategies for metadata and guardrail normalisation to guard against regression drift.
 5. **Plan next iteration** – Prioritise `_parse_blocked_networks` fuzzing, guardrail filter Hypothesis suites, and the remaining observability assertions before expanding into hybrid fallback/search integrations.
 5. **Plan next iteration** – Expand into hybrid end-to-end scenarios that stitch together retriever and ingest fixtures, then pursue property tests for guardrail fuzzing and annotation bodies.

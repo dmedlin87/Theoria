@@ -73,3 +73,25 @@ def test_allowlisted_host_blocked_by_network_ranges(monkeypatch: pytest.MonkeyPa
         ensure_url_allowed(settings, url)
 
     assert ingest_network.resolve_host_addresses is original_resolver
+
+
+def test_ensure_url_allowed_reraises_for_non_allowlisted_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = FakeSettings(ingest_url_allowed_hosts=["allowed.test"])
+    url = "https://blocked.test/path"
+
+    original_resolver = ingest_network.resolve_host_addresses
+
+    def failing_ensure(settings_arg, url_arg):
+        assert settings_arg is settings
+        assert url_arg == url
+        raise UnsupportedSourceError("blocked")
+
+    monkeypatch.setattr(ingest_network, "ensure_url_allowed", failing_ensure)
+
+    with pytest.raises(UnsupportedSourceError) as excinfo:
+        ensure_url_allowed(settings, url)
+
+    assert "blocked" in str(excinfo.value)
+    assert ingest_network.resolve_host_addresses is original_resolver
