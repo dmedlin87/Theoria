@@ -290,17 +290,21 @@ def _recreate_seed_table_if_missing_column(
     *,
     dataset_label: str,
     force: bool = False,
-) -> bool:
-    """Drop and recreate ``table`` when ``column_name`` is absent."""
+) -> tuple[bool, bool]:
+    """Drop and recreate ``table`` when ``column_name`` is absent.
+
+    Returns ``(success, used_session_connection)`` so callers know whether the
+    rebuild reused the session's active connection.
+    """
 
     if not force and _table_has_column(
         session, table.name, column_name, schema=table.schema
     ):
-        return False
+        return (False, False)
 
     session.rollback()
     connection, should_close = _get_session_connection(session)
-    used_session_connection = connection is not None
+    used_session_connection = connection is not None and not should_close
     engine = None
     if connection is not None:
         engine = getattr(connection, "engine", None)
@@ -319,11 +323,13 @@ def _recreate_seed_table_if_missing_column(
                 engine = bind
         elif isinstance(bind, Connection):
             connection = bind
+            should_close = False
+            used_session_connection = True
         else:
-            return False
+            return (False, False)
 
     if connection is None:
-        return False
+        return (False, False)
 
     try:
         has_active_transaction = False
@@ -357,7 +363,7 @@ def _recreate_seed_table_if_missing_column(
         if not used_session_connection:
             _dispose_sqlite_engine(engine)
     session.expire_all()
-    return True
+    return (True, used_session_connection)
 
 
 def _rebuild_perspective_column(
@@ -370,13 +376,14 @@ def _rebuild_perspective_column(
 ) -> None:
     """Drop and recreate *table* when ``perspective`` is absent, logging the repair."""
 
-    if _recreate_seed_table_if_missing_column(
+    rebuilt, _ = _recreate_seed_table_if_missing_column(
         session,
         table,
         "perspective",
         dataset_label=dataset_label,
         force=force,
-    ):
+    )
+    if rebuilt:
         logger.info(
             "Rebuilt %s table missing 'perspective' column; %s",
             table.name,
@@ -585,13 +592,14 @@ def _handle_missing_perspective_error(
                     session, table, column_name, dataset_label=dataset_label
                 ):
                     return True
-                if _recreate_seed_table_if_missing_column(
+                rebuilt, _ = _recreate_seed_table_if_missing_column(
                     session,
                     table,
                     column_name,
                     dataset_label=dataset_label,
                     force=True,
-                ):
+                )
+                if rebuilt:
                     logger.info(
                         "Rebuilt %s table missing '%s' column after %s seed failure",
                         table.name,
@@ -729,7 +737,7 @@ def seed_contradiction_claims(session: Session) -> None:
         )
         if needs_rebuild:
             try:
-                rebuilt = _recreate_seed_table_if_missing_column(
+                rebuilt, _ = _recreate_seed_table_if_missing_column(
                     session,
                     table,
                     "perspective",
@@ -904,6 +912,9 @@ def seed_contradiction_claims(session: Session) -> None:
             )
 
     _run_with_sqlite_lock_retry(session, "contradiction", _load)
+
+    if payload:
+        logger.info("Ensured %d contradiction seeds are present", len(payload))
 
 
 def seed_harmony_claims(session: Session) -> None:
@@ -1294,10 +1305,13 @@ def _repair_missing_perspective_columns(session: Session) -> None:
                 finally:
                     if close_target and target_connection is not None:
                         target_connection.close()
-        if not repaired and _recreate_seed_table_if_missing_column(
-            session, table, "perspective", dataset_label=dataset_label
-        ):
-            repaired = True
+        if not repaired:
+            rebuilt, rebuilt_with_session = _recreate_seed_table_if_missing_column(
+                session, table, "perspective", dataset_label=dataset_label
+            )
+            if rebuilt:
+                repaired = True
+                used_session_connection = used_session_connection or rebuilt_with_session
 
         if repaired:
             logger.info(
@@ -1315,6 +1329,7 @@ def _repair_missing_perspective_columns(session: Session) -> None:
 def seed_reference_data(session: Session) -> None:
     """Entry point for loading all bundled reference datasets."""
 
+    logger.info("Seeding reference datasets during application startup")
     _repair_missing_perspective_columns(session)
     _run_seed_with_perspective_guard(session, seed_contradiction_claims, "contradiction")
     _run_seed_with_perspective_guard(session, seed_harmony_claims, "harmony")
