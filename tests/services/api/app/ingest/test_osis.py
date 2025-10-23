@@ -56,7 +56,12 @@ def test_parse_osis_document_extracts_metadata() -> None:
     ]
     assert document.verses[0].text == "In the beginning"
     # Commentary anchors are deduplicated and only valid OSIS identifiers survive.
-    assert document.commentaries == []
+    assert len(document.commentaries) == 1
+    commentary = document.commentaries[0]
+    assert commentary.title == "Commentary Title"
+    assert commentary.excerpt == "Commentary text."
+    assert commentary.anchors == ["Gen.1.1", "Gen.1.2"]
+    assert commentary.note_id == "note-1"
 
 
 @pytest.mark.parametrize(
