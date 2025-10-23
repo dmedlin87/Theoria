@@ -329,6 +329,69 @@ def _normalise_doi(value: Any) -> str | None:
     return f"https://doi.org/{cleaned}"
 
 
+_ORGANISATIONAL_KEYWORDS = {
+    "academy",
+    "alliance",
+    "board",
+    "bureau",
+    "center",
+    "centre",
+    "church",
+    "churches",
+    "college",
+    "commission",
+    "committee",
+    "community",
+    "conference",
+    "council",
+    "department",
+    "diocese",
+    "fellowship",
+    "foundation",
+    "government",
+    "group",
+    "institute",
+    "institution",
+    "library",
+    "ministries",
+    "ministry",
+    "mission",
+    "network",
+    "office",
+    "organization",
+    "organisation",
+    "press",
+    "project",
+    "school",
+    "seminary",
+    "society",
+    "synod",
+    "team",
+    "university",
+}
+
+
+def _looks_like_literal_author(candidate: str, parts: Sequence[str]) -> bool:
+    """Heuristically determine whether *candidate* should remain literal."""
+
+    lowered_candidate = candidate.lower()
+    if " et al" in lowered_candidate:
+        return True
+    if any(char.isdigit() for char in candidate):
+        return True
+    if any(char in "&/@" for char in candidate):
+        return True
+
+    lowered_parts = [segment.lower() for segment in parts]
+    if any(keyword in lowered_parts for keyword in _ORGANISATIONAL_KEYWORDS):
+        return True
+
+    if any(segment.isupper() and len(segment) > 1 for segment in parts):
+        return True
+
+    return False
+
+
 def _normalise_author(name: str) -> dict[str, str]:
     """Return structured author information from a free-form *name* string."""
 
@@ -343,6 +406,17 @@ def _normalise_author(name: str) -> dict[str, str]:
         result: dict[str, str] = {}
         if family:
             result["family"] = family
+        if given:
+            result["given"] = given
+        return result
+
+    parts = [segment.strip() for segment in candidate.split() if segment.strip()]
+    if len(parts) >= 2:
+        if _looks_like_literal_author(candidate, parts):
+            return {"literal": candidate}
+        family = parts[-1]
+        given = " ".join(parts[:-1])
+        result: dict[str, str] = {"family": family}
         if given:
             result["given"] = given
         return result
