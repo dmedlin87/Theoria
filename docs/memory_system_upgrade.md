@@ -64,6 +64,8 @@ Migration tasks:
 - If an existing entry in the same space has a Hamming distance ≤ 3, treat it as a near-duplicate:
   - Increment `repeat_count` on the canonical entry.
   - Recompute `importance = clamp(base_importance + f(repeat_count), 0, 1)`.
+  - OR the incoming `manually_saved` flag onto the canonical row and run pinning logic before returning so user intent persists.
+  - Merge any new metadata (e.g., `tags`, `source_ids`) or manual-save state from the incoming event into the canonical row.
   - Do not create a new row.
 
 ### Importance Heuristics
@@ -87,11 +89,16 @@ Migration tasks:
 ```python
 def persist_memory(user_id, space, text, manually_saved=False):
     norm = normalize(text)
+    metadata = extract_metadata(norm)
     h = simhash64(norm)
     dupe = find_near_dupe(user_id, space, h, hamming_thresh=3)
     if dupe:
         dupe.repeat_count += 1
         dupe.importance = clamp(dupe.importance + repeat_boost(dupe.repeat_count), 0, 1)
+        dupe.manually_saved = dupe.manually_saved or manually_saved
+        dupe.tags = merge_tags(dupe.tags, metadata.tags)
+        dupe.source_ids = merge_source_ids(dupe.source_ids, metadata.source_ids)
+        apply_pinning_policy(dupe, manually_saved=manually_saved)
         save(dupe)
         return dupe.id
 
@@ -104,7 +111,10 @@ def persist_memory(user_id, space, text, manually_saved=False):
         repeat_count=0,
         importance=score_importance(text, manually_saved),
         manually_saved=manually_saved,
+        tags=metadata.tags,
+        source_ids=metadata.source_ids,
     )
+    apply_pinning_policy(entry, manually_saved=manually_saved)
     save(entry)
     enqueue_embed(entry.id)
 
