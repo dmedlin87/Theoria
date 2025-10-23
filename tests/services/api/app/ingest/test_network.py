@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from ipaddress import ip_address
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any, Callable
 
 import pytest
@@ -15,7 +17,10 @@ from theo.services.api.app.ingest.network import (
     extract_youtube_video_id,
     fetch_web_document,
     is_youtube_url,
+    load_youtube_metadata,
+    load_youtube_transcript,
     normalise_host,
+    resolve_fixtures_dir,
     resolve_host_addresses,
 )
 
@@ -31,6 +36,7 @@ class _FakeSettings(SimpleNamespace):
     ingest_web_max_bytes: int | None = 512
     ingest_web_max_redirects: int = 3
     user_agent: str = "pytest-agent"
+    fixtures_root: str | None = None
 
 
 def _build_settings(**overrides: Any) -> _FakeSettings:
@@ -288,6 +294,75 @@ def test_fetch_web_document_returns_html_and_metadata(monkeypatch: pytest.Monkey
     assert metadata["final_url"] == "https://example.com/final"
     assert metadata["canonical_url"] == "https://example.com/final"
     assert metadata["source_url"] == "https://example.com/final"
+
+
+def test_resolve_fixtures_dir_prefers_absolute_root(tmp_path: Path) -> None:
+    custom_root = tmp_path / "custom-fixtures"
+    custom_root.mkdir()
+
+    settings = _build_settings(fixtures_root=str(custom_root))
+
+    resolved = resolve_fixtures_dir(settings)
+
+    assert resolved == custom_root
+
+
+def test_resolve_fixtures_dir_falls_back_to_repo() -> None:
+    settings = _build_settings()
+
+    resolved = resolve_fixtures_dir(settings)
+
+    expected = Path(network.__file__).resolve().parents[5] / "fixtures"
+    assert resolved == expected
+
+
+def test_load_youtube_transcript_uses_fixture() -> None:
+    settings = _build_settings()
+
+    segments, transcript_path = load_youtube_transcript(settings, "sample_video")
+
+    assert transcript_path is not None
+    assert transcript_path.name == "sample_video.vtt"
+    assert segments
+    assert segments[0].speaker == "Speaker 1"
+    assert "Theo Engine" in segments[0].text
+
+
+def test_load_youtube_transcript_without_fixture_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _build_settings()
+
+    monkeypatch.setattr(network, "resolve_fixtures_dir", lambda _settings: None)
+
+    module = ModuleType("youtube_transcript_api")
+
+    class _StubApi:
+        @staticmethod
+        def get_transcript(video_id: str) -> list[dict[str, object]]:
+            return [{"text": "   ", "start": 0.0, "duration": 0.0}]
+
+    module.YouTubeTranscriptApi = _StubApi
+    monkeypatch.setitem(sys.modules, "youtube_transcript_api", module)
+
+    with pytest.raises(UnsupportedSourceError):
+        load_youtube_transcript(settings, "missing")
+
+
+def test_load_youtube_metadata_reads_fixture() -> None:
+    settings = _build_settings()
+
+    metadata = load_youtube_metadata(settings, "sample_video")
+
+    assert metadata["title"] == "Sample Theo Engine Video"
+    assert metadata["channel"] == "Theo Channel"
+
+
+def test_load_youtube_metadata_missing_returns_empty(tmp_path: Path) -> None:
+    fixtures_root = tmp_path / "fixtures"
+    (fixtures_root / "youtube").mkdir(parents=True)
+
+    settings = _build_settings(fixtures_root=str(fixtures_root))
+
+    assert load_youtube_metadata(settings, "unknown") == {}
 
 
 @pytest.mark.parametrize(
