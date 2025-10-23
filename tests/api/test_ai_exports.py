@@ -52,16 +52,17 @@ def _build_package(
     return DeliverablePackage(manifest=manifest, assets=assets)
 
 
-@pytest.fixture
-def api_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+@pytest.fixture(scope="module")
+def api_client() -> Iterator[TestClient]:
     def override_session():
         yield object()
 
     app.dependency_overrides[get_session] = override_session
+    client = TestClient(app)
     try:
-        with TestClient(app) as client:
-            yield client
+        yield client
     finally:
+        client.close()
         app.dependency_overrides.pop(get_session, None)
 
 
