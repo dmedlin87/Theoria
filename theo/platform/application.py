@@ -173,7 +173,8 @@ def _ingest_document(registry: AdapterRegistry, document: Document) -> DocumentI
         if document.checksum:
             record.sha256 = document.checksum
 
-        payload = record.bib_json if isinstance(record.bib_json, dict) else {}
+        existing_payload = record.bib_json if isinstance(record.bib_json, dict) else {}
+        payload = dict(existing_payload)
         if document.metadata.language:
             payload.setdefault("language", document.metadata.language)
         if document.scripture_refs:

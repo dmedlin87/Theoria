@@ -218,10 +218,10 @@ def test_ingest_document_persists_metadata_and_merges_tags(
         assert record is not None
         assert record.bib_json["language"] == "en"
         assert record.bib_json["scripture_refs"] == [
-            "John.3.16",
             "Rom.8.1",
+            "Gal.2.20",
         ]
-        assert record.bib_json["tags"] == ["grace", "hope"]
+        assert record.bib_json["tags"] == ["grace", "hope", "faith"]
         assert record.topics == ["grace", "hope", "faith"]
 
 
