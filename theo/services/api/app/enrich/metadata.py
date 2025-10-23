@@ -13,8 +13,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
-from theo.services.api.app.persistence_models import Document, Passage
 from theo.application.facades.settings import Settings, get_settings
+from theo.services.api.app.persistence_models import Document, Passage
 
 LOGGER = logging.getLogger(__name__)
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"

@@ -7,6 +7,8 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
+
+from ..errors import RetrievalError, Severity
 from ..models.documents import (
     DocumentAnnotationCreate,
     DocumentAnnotationResponse,
@@ -15,7 +17,6 @@ from ..models.documents import (
     DocumentPassagesResponse,
     DocumentUpdateRequest,
 )
-from ..errors import RetrievalError, Severity
 from ..retriever.documents import (
     create_annotation,
     delete_annotation,

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from . import digest, watchlists, workflows
 from ...ai.registry import get_llm_registry
 from ...analytics.topics import (
     TopicDigest,
@@ -12,7 +11,7 @@ from ...analytics.topics import (
     store_topic_digest,
     upsert_digest_document,
 )
-
+from . import digest, watchlists, workflows
 
 router = APIRouter()
 router.include_router(workflows.router)

@@ -7,7 +7,6 @@ from typing import Any
 from .cache import RAGCache
 from .models import RAGAnswer
 
-
 DEFAULT_CACHE = RAGCache()
 
 

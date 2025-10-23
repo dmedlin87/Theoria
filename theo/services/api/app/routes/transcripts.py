@@ -5,10 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from theo.application.facades.database import get_session
 from theo.adapters.persistence.transcript_repository import (
     SQLAlchemyTranscriptRepository,
 )
+from theo.application.facades.database import get_session
+
 from ..models.transcripts import TranscriptSearchResponse, TranscriptSegmentModel
 from ..transcripts.service import (
     build_source_ref,

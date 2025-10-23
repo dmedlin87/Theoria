@@ -18,6 +18,7 @@ from theo.services.api.app.persistence_models import (
     NotebookCollaboratorRole,
     NotebookEntry,
 )
+
 from ..ingest.osis import expand_osis_reference
 from ..models.notebooks import (
     EntryMentionPayload,
@@ -30,8 +31,8 @@ from ..models.notebooks import (
     NotebookResponse,
     NotebookUpdatePayload,
 )
-from ..security import Principal
 from ..routes.realtime import publish_notebook_update
+from ..security import Principal
 
 
 def _principal_subject(principal: Principal | None) -> str | None:

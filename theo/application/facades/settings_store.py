@@ -8,9 +8,9 @@ from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from theo.application.interfaces import SessionProtocol
-from theo.application.facades.settings import get_settings_cipher
 from theo.adapters.persistence.models import AppSetting
+from theo.application.facades.settings import get_settings_cipher
+from theo.application.interfaces import SessionProtocol
 
 SETTINGS_NAMESPACE = "app"
 _ENCRYPTED_FIELD = "__encrypted__"

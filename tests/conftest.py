@@ -240,11 +240,11 @@ def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[s
     """Create a SQLite database URL with migrations applied."""
     from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
     from theo.application.facades.database import Base
-    
+
     database_dir = tmp_path_factory.mktemp("sqlite", numbered=True)
     path = database_dir / "test.db"
     url = f"sqlite:///{path}"
-    
+
     # Create engine and apply migrations
     engine = create_engine(url, future=True)
     try:

@@ -7,8 +7,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from ...ai.watchlists_service import WatchlistNotFoundError, WatchlistsService
 from theo.application.facades.database import get_session
+
+from ...ai.watchlists_service import WatchlistNotFoundError, WatchlistsService
+from ...errors import AIWorkflowError
 from ...models.watchlists import (
     WatchlistCreateRequest,
     WatchlistResponse,
@@ -16,8 +18,6 @@ from ...models.watchlists import (
     WatchlistUpdateRequest,
 )
 from ...security import Principal, require_principal
-from ...errors import AIWorkflowError
-
 
 _WATCHLIST_NOT_FOUND_RESPONSE = {
     status.HTTP_404_NOT_FOUND: {"description": "Watchlist not found"}

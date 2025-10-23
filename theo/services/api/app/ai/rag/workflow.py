@@ -11,7 +11,9 @@ from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from theo.application.ports.ai_registry import GenerationError
 from theo.services.api.app.persistence_models import Document, Passage
+
 from ...models.search import HybridSearchFilters, HybridSearchResult
 from ...telemetry import (
     RAG_CACHE_EVENTS,
@@ -19,7 +21,14 @@ from ...telemetry import (
     log_workflow_event,
     set_span_attribute,
 )
-from theo.application.ports.ai_registry import GenerationError
+from ..reasoning.chain_of_thought import parse_chain_of_thought
+from ..reasoning.metacognition import (
+    REVISION_QUALITY_THRESHOLD,
+    Critique,
+    RevisionResult,
+    critique_reasoning,
+    revise_with_critique,
+)
 from ..registry import LLMModel, LLMRegistry, get_llm_registry
 from ..router import get_router
 from ..trails import TrailStepDigest
@@ -65,14 +74,6 @@ from .models import (
     VerseCopilotResponse,
 )
 from .reasoning_trace import build_reasoning_trace_from_completion
-from ..reasoning.chain_of_thought import parse_chain_of_thought
-from ..reasoning.metacognition import (
-    Critique,
-    RevisionResult,
-    REVISION_QUALITY_THRESHOLD,
-    critique_reasoning,
-    revise_with_critique,
-)
 from .retrieval import record_used_citation_feedback, search_passages
 
 if TYPE_CHECKING:  # pragma: no cover - hints only

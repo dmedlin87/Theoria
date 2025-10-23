@@ -6,16 +6,16 @@ import hashlib
 import logging
 import re
 from collections.abc import Callable
-from typing import Annotated, Any, Literal
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated, Any, Literal
 
 from cryptography.fernet import Fernet
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .runtime import allow_insecure_startup
 from ..ports.secrets import SecretRequest, SecretRetrievalError, build_secrets_adapter
+from .runtime import allow_insecure_startup
 
 LOGGER = logging.getLogger(__name__)
 

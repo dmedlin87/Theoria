@@ -57,7 +57,7 @@ def discovery_to_dto(model: Discovery) -> DiscoveryDTO:
 
 def dto_to_discovery(dto: DiscoveryDTO) -> Discovery:
     """Convert application DTO to ORM Discovery.
-    
+
     Note: Does not set id, as it's typically auto-generated.
     """
     return Discovery(
@@ -92,7 +92,7 @@ def document_summary_to_dto(model: Document) -> DocumentSummaryDTO:
     topics: list[str] = []
     if isinstance(model.topics, list):
         topics = [str(t) for t in model.topics if isinstance(t, str)]
-    
+
     return DocumentSummaryDTO(
         id=model.id,
         title=model.title,
@@ -124,13 +124,13 @@ def document_to_dto(model: Document, passages: Sequence[Passage] | None = None) 
     topics: list[str] = []
     if isinstance(model.topics, list):
         topics = [str(t) for t in model.topics if isinstance(t, str)]
-    
+
     passage_dtos = []
     if passages is not None:
         passage_dtos = [passage_to_dto(p) for p in passages]
     elif hasattr(model, 'passages') and model.passages:
         passage_dtos = [passage_to_dto(p) for p in model.passages]
-    
+
     return DocumentDTO(
         id=model.id,
         title=model.title,

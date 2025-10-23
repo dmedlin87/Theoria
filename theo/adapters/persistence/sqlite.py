@@ -76,8 +76,8 @@ def dispose_sqlite_engine(
     if not database_name or database_name == ":memory:" or "mode=memory" in url_string:
         return
     try:
-        import sqlite3  # pragma: no cover - optional inspection for stray connections
         import inspect
+        import sqlite3  # pragma: no cover - optional inspection for stray connections
     except Exception:
         sqlite3 = None
         inspect = None  # type: ignore[assignment]
@@ -153,8 +153,8 @@ def dispose_sqlite_engine(
                         break
                     for entry in open_entries:
                         try:
-                            import msvcrt  # pragma: no cover - windows-only
                             import ctypes  # pragma: no cover - windows-only
+                            import msvcrt  # pragma: no cover - windows-only
 
                             handle = msvcrt.get_osfhandle(entry.fd)
                             ctypes.windll.kernel32.CloseHandle(int(handle))

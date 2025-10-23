@@ -70,7 +70,7 @@ def test_map_csl_to_zotero_type():
 def test_build_zotero_item_journal_article(sample_source, sample_csl_entry):
     """Test building Zotero item from journal article."""
     item = _build_zotero_item(sample_source, sample_csl_entry)
-    
+
     assert item["itemType"] == "journalArticle"
     assert item["title"] == "Systematic Theology"
     assert item["date"] == "2020"
@@ -81,7 +81,7 @@ def test_build_zotero_item_journal_article(sample_source, sample_csl_entry):
     assert item["DOI"] == "10.1234/theology.2020"
     assert item["url"] == "https://example.com/doc"
     assert item["abstractNote"] == "A comprehensive study of Reformed theology."
-    
+
     # Check creators
     assert len(item["creators"]) == 2
     assert item["creators"][0] == {
@@ -94,7 +94,7 @@ def test_build_zotero_item_journal_article(sample_source, sample_csl_entry):
         "firstName": "Jane",
         "lastName": "Doe",
     }
-    
+
     # Check tags
     assert len(item["tags"]) == 2
     assert {"tag": "Soteriology"} in item["tags"]
@@ -112,7 +112,7 @@ def test_build_zotero_item_book():
         location="Wittenberg",
         source_type="book",
     )
-    
+
     csl_entry = {
         "id": "book-1",
         "type": "book",
@@ -122,9 +122,9 @@ def test_build_zotero_item_book():
         "publisher": "Wittenberg Press",
         "publisher-place": "Wittenberg",
     }
-    
+
     item = _build_zotero_item(source, csl_entry)
-    
+
     assert item["itemType"] == "book"
     assert item["title"] == "Commentary on Romans"
     assert item["date"] == "1516"
@@ -138,15 +138,15 @@ def test_build_zotero_item_minimal_data():
         document_id="minimal-doc",
         title="Untitled Work",
     )
-    
+
     csl_entry = {
         "id": "minimal-doc",
         "type": "article-journal",
         "title": "Untitled Work",
     }
-    
+
     item = _build_zotero_item(source, csl_entry)
-    
+
     assert item["itemType"] == "journalArticle"
     assert item["title"] == "Untitled Work"
     assert item["creators"] == []
@@ -159,16 +159,16 @@ def test_build_zotero_item_literal_author():
         title="Church Statement",
         authors=["World Council of Churches"],
     )
-    
+
     csl_entry = {
         "id": "org-doc",
         "type": "article-journal",
         "title": "Church Statement",
         "author": [{"literal": "World Council of Churches"}],
     }
-    
+
     item = _build_zotero_item(source, csl_entry)
-    
+
     assert len(item["creators"]) == 1
     assert item["creators"][0] == {
         "creatorType": "author",
@@ -185,19 +185,19 @@ async def test_export_to_zotero_success(sample_source, sample_csl_entry):
         "successful": {"0": "ABC123"},
         "failed": {},
     }
-    
+
     with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=mock_response
         )
-        
+
         result = await export_to_zotero(
             sources=[sample_source],
             csl_entries=[sample_csl_entry],
             api_key="test-api-key",
             user_id="12345",
         )
-    
+
     assert result["success"] is True
     assert result["exported_count"] == 1
     assert result["failed_count"] == 0
@@ -213,19 +213,19 @@ async def test_export_to_zotero_partial_failure(sample_source, sample_csl_entry)
         "successful": {"0": "ABC123"},
         "failed": {"1": "Invalid item format"},
     }
-    
+
     with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=mock_response
         )
-        
+
         result = await export_to_zotero(
             sources=[sample_source, sample_source],
             csl_entries=[sample_csl_entry, sample_csl_entry],
             api_key="test-api-key",
             user_id="12345",
         )
-    
+
     assert result["success"] is True
     assert result["exported_count"] == 1
     assert result["failed_count"] == 1
@@ -273,12 +273,12 @@ async def test_export_to_zotero_forbidden(sample_source, sample_csl_entry):
     mock_response = AsyncMock()
     mock_response.status_code = 403
     mock_response.text = "Forbidden"
-    
+
     with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=mock_response
         )
-        
+
         with pytest.raises(ZoteroExportError, match="Access denied"):
             await export_to_zotero(
                 sources=[sample_source],
@@ -294,12 +294,12 @@ async def test_export_to_zotero_not_found(sample_source, sample_csl_entry):
     mock_response = AsyncMock()
     mock_response.status_code = 404
     mock_response.text = "Not Found"
-    
+
     with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=mock_response
         )
-        
+
         with pytest.raises(ZoteroExportError, match="Library not found"):
             await export_to_zotero(
                 sources=[sample_source],
@@ -313,12 +313,12 @@ async def test_export_to_zotero_not_found(sample_source, sample_csl_entry):
 async def test_export_to_zotero_timeout(sample_source, sample_csl_entry):
     """Test Zotero export with timeout."""
     import httpx
-    
+
     with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             side_effect=httpx.TimeoutException("Timeout")
         )
-        
+
         with pytest.raises(ZoteroExportError, match="timed out"):
             await export_to_zotero(
                 sources=[sample_source],
@@ -337,18 +337,18 @@ async def test_export_to_zotero_group_library(sample_source, sample_csl_entry):
         "successful": {"0": "ABC123"},
         "failed": {},
     }
-    
+
     with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_post = AsyncMock(return_value=mock_response)
         mock_client.return_value.__aenter__.return_value.post = mock_post
-        
+
         result = await export_to_zotero(
             sources=[sample_source],
             csl_entries=[sample_csl_entry],
             api_key="test-api-key",
             group_id="67890",
         )
-    
+
     # Verify it called the group endpoint
     call_args = mock_post.call_args
     assert "groups/67890/items" in call_args[0][0]
@@ -360,17 +360,17 @@ async def test_verify_zotero_credentials_valid():
     """Test successful Zotero credential verification."""
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    
+
     with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.get = AsyncMock(
             return_value=mock_response
         )
-        
+
         result = await verify_zotero_credentials(
             api_key="valid-key",
             user_id="12345",
         )
-    
+
     assert result is True
 
 
@@ -379,17 +379,17 @@ async def test_verify_zotero_credentials_invalid():
     """Test failed Zotero credential verification."""
     mock_response = AsyncMock()
     mock_response.status_code = 403
-    
+
     with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.get = AsyncMock(
             return_value=mock_response
         )
-        
+
         result = await verify_zotero_credentials(
             api_key="invalid-key",
             user_id="12345",
         )
-    
+
     assert result is False
 
 
@@ -398,6 +398,6 @@ async def test_verify_zotero_credentials_missing_params():
     """Test credential verification without required params."""
     result = await verify_zotero_credentials(api_key="", user_id="12345")
     assert result is False
-    
+
     result = await verify_zotero_credentials(api_key="key", user_id=None, group_id=None)
     assert result is False

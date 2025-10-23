@@ -6,17 +6,17 @@ import json
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
-
 from typing import Any, Callable, NotRequired, TypedDict, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
 from celery.result import AsyncResult
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 from theo.services.api.app.persistence_models import Document, IngestionJob
+
 from ..models.jobs import (
     CitationValidationJobRequest,
     HNSWRefreshJobRequest,

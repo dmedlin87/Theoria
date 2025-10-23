@@ -14,26 +14,32 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.ai import run_guarded_chat
+from theo.application.facades.database import get_session
+from theo.application.facades.settings import get_settings
+from theo.services.api.app.ai import (
+    memory_index as memory_index_module,
+    run_guarded_chat,
+)
 from theo.services.api.app.ai.audit_logging import (
     AuditLogWriter,
     compute_prompt_hash,
     serialise_citations,
 )
-from theo.services.api.app.ai import memory_index as memory_index_module
-from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer, ensure_completion_safe
-from theo.services.api.app.ai.trails import TrailService
 from theo.services.api.app.ai.memory_metadata import (
     MemoryFocus,
     extract_memory_metadata,
 )
-from theo.application.facades.database import get_session
-from theo.application.facades.settings import get_settings
-from theo.services.api.app.persistence_models import ChatSession
+from theo.services.api.app.ai.rag import (
+    GuardrailError,
+    RAGAnswer,
+    ensure_completion_safe,
+)
 from theo.services.api.app.ai.research_loop import ResearchLoopController
-from theo.services.api.app.models.ai import LoopControlAction, ResearchLoopState
+from theo.services.api.app.ai.trails import TrailService
 from theo.services.api.app.intent.tagger import get_intent_tagger
 from theo.services.api.app.models.ai import (
+    CHAT_SESSION_MEMORY_CHAR_BUDGET,
+    CHAT_SESSION_TOTAL_CHAR_BUDGET,
     ChatGoalProgress,
     ChatGoalState,
     ChatMemoryEntry,
@@ -42,11 +48,11 @@ from theo.services.api.app.models.ai import (
     ChatSessionRequest,
     ChatSessionResponse,
     ChatSessionState,
-    CHAT_SESSION_MEMORY_CHAR_BUDGET,
-    CHAT_SESSION_TOTAL_CHAR_BUDGET,
     GoalCloseRequest,
     GoalPriorityUpdateRequest,
     IntentTagPayload,
+    LoopControlAction,
+    ResearchLoopState,
 )
 from theo.services.api.app.models.research_plan import (
     ResearchPlan,
@@ -54,10 +60,11 @@ from theo.services.api.app.models.research_plan import (
     ResearchPlanStepSkipRequest,
     ResearchPlanStepUpdateRequest,
 )
-from .guardrails import extract_refusal_text, guardrail_http_exception
-from .utils import has_filters
+from theo.services.api.app.persistence_models import ChatSession
 
 from ....errors import AIWorkflowError, Severity
+from .guardrails import extract_refusal_text, guardrail_http_exception
+from .utils import has_filters
 
 if TYPE_CHECKING:  # pragma: no cover - runtime import for FastAPI annotations
     from fastapi.responses import JSONResponse

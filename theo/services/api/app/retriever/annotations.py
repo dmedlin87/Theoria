@@ -9,6 +9,7 @@ from typing import Iterable, Mapping
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.persistence_models import DocumentAnnotation
+
 from ..models.documents import (
     AnnotationType,
     DocumentAnnotationCreate,

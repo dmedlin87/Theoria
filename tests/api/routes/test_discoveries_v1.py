@@ -46,29 +46,29 @@ def sample_discovery_dto():
 
 class TestDiscoveriesV1Routes:
     """Test v1 discovery routes with repository pattern."""
-    
+
     def test_list_discoveries_success(self, mock_discovery_repo, sample_discovery_dto):
         """List discoveries returns DTOs from repository."""
         # Setup mock
         mock_discovery_repo.list.return_value = [sample_discovery_dto]
-        
+
         # Override dependency
         from theo.services.api.app.routes import discoveries_v1
         app.dependency_overrides[discoveries_v1.get_discovery_repository] = (
             lambda: mock_discovery_repo
         )
-        
+
         try:
             client = TestClient(app)
             response = client.get("/discoveries?user_id=test_user")
-            
+
             # Verify response
             assert response.status_code == 200
             data = response.json()
             assert len(data) == 1
             assert data[0]["title"] == "Test Pattern Discovery"
             assert data[0]["confidence"] == 0.85
-            
+
             # Verify repository was called correctly
             mock_discovery_repo.list.assert_called_once()
             call_args = mock_discovery_repo.list.call_args[0][0]
@@ -76,25 +76,25 @@ class TestDiscoveriesV1Routes:
             assert call_args.user_id == "test_user"
         finally:
             app.dependency_overrides.clear()
-    
+
     def test_list_discoveries_with_filters(self, mock_discovery_repo):
         """List discoveries applies all filters."""
         mock_discovery_repo.list.return_value = []
-        
+
         from theo.services.api.app.routes import discoveries_v1
         app.dependency_overrides[discoveries_v1.get_discovery_repository] = (
             lambda: mock_discovery_repo
         )
-        
+
         try:
             client = TestClient(app)
             response = client.get(
                 "/discoveries?user_id=test_user&discovery_type=pattern&"
                 "viewed=false&min_confidence=0.7&limit=10&offset=5"
             )
-            
+
             assert response.status_code == 200
-            
+
             # Verify filters were passed correctly
             call_args = mock_discovery_repo.list.call_args[0][0]
             assert call_args.discovery_type == "pattern"
@@ -104,42 +104,42 @@ class TestDiscoveriesV1Routes:
             assert call_args.offset == 5
         finally:
             app.dependency_overrides.clear()
-    
+
     def test_get_discovery_success(self, mock_discovery_repo, sample_discovery_dto):
         """Get single discovery by ID."""
         mock_discovery_repo.get_by_id.return_value = sample_discovery_dto
-        
+
         from theo.services.api.app.routes import discoveries_v1
         app.dependency_overrides[discoveries_v1.get_discovery_repository] = (
             lambda: mock_discovery_repo
         )
-        
+
         try:
             client = TestClient(app)
             response = client.get("/discoveries/1?user_id=test_user")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["id"] == 1
             assert data["title"] == "Test Pattern Discovery"
-            
+
             mock_discovery_repo.get_by_id.assert_called_once_with(1, "test_user")
         finally:
             app.dependency_overrides.clear()
-    
+
     def test_get_discovery_not_found(self, mock_discovery_repo):
         """Get discovery returns 404 for missing discovery."""
         mock_discovery_repo.get_by_id.return_value = None
-        
+
         from theo.services.api.app.routes import discoveries_v1
         app.dependency_overrides[discoveries_v1.get_discovery_repository] = (
             lambda: mock_discovery_repo
         )
-        
+
         try:
             client = TestClient(app)
             response = client.get("/discoveries/999?user_id=test_user")
-            
+
             # Verify standardized error response
             assert response.status_code == 404
             data = response.json()
@@ -149,7 +149,7 @@ class TestDiscoveriesV1Routes:
             assert data["error"]["resource_id"] == "999"
         finally:
             app.dependency_overrides.clear()
-    
+
     def test_mark_viewed_success(self, mock_discovery_repo, sample_discovery_dto):
         """Mark discovery as viewed."""
         viewed_dto = DiscoveryDTO(
@@ -166,43 +166,43 @@ class TestDiscoveriesV1Routes:
             metadata=sample_discovery_dto.metadata,
         )
         mock_discovery_repo.mark_viewed.return_value = viewed_dto
-        
+
         from theo.services.api.app.routes import discoveries_v1
         app.dependency_overrides[discoveries_v1.get_discovery_repository] = (
             lambda: mock_discovery_repo
         )
-        
+
         try:
             client = TestClient(app)
             response = client.post("/discoveries/1/view?user_id=test_user")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["viewed"] is True
-            
+
             mock_discovery_repo.mark_viewed.assert_called_once_with(1, "test_user")
         finally:
             app.dependency_overrides.clear()
-    
+
     def test_mark_viewed_not_found(self, mock_discovery_repo):
         """Mark viewed returns 404 when discovery doesn't exist."""
         mock_discovery_repo.mark_viewed.side_effect = LookupError("Not found")
-        
+
         from theo.services.api.app.routes import discoveries_v1
         app.dependency_overrides[discoveries_v1.get_discovery_repository] = (
             lambda: mock_discovery_repo
         )
-        
+
         try:
             client = TestClient(app)
             response = client.post("/discoveries/999/view?user_id=test_user")
-            
+
             assert response.status_code == 404
             data = response.json()
             assert data["error"]["type"] == "NotFoundError"
         finally:
             app.dependency_overrides.clear()
-    
+
     def test_set_feedback_success(self, mock_discovery_repo, sample_discovery_dto):
         """Set user feedback on discovery."""
         feedback_dto = DiscoveryDTO(
@@ -219,22 +219,22 @@ class TestDiscoveriesV1Routes:
             metadata=sample_discovery_dto.metadata,
         )
         mock_discovery_repo.set_reaction.return_value = feedback_dto
-        
+
         from theo.services.api.app.routes import discoveries_v1
         app.dependency_overrides[discoveries_v1.get_discovery_repository] = (
             lambda: mock_discovery_repo
         )
-        
+
         try:
             client = TestClient(app)
             response = client.post(
                 "/discoveries/1/feedback?user_id=test_user&reaction=helpful"
             )
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["user_reaction"] == "helpful"
-            
+
             mock_discovery_repo.set_reaction.assert_called_once_with(
                 1, "test_user", "helpful"
             )
@@ -244,7 +244,7 @@ class TestDiscoveriesV1Routes:
 
 class TestRepositoryIntegration:
     """Test actual repository integration (requires database)."""
-    
+
     @pytest.mark.slow
     def test_full_stack_list_discoveries(self, api_engine):
         """Full integration test with real repository and database."""
@@ -253,7 +253,7 @@ class TestRepositoryIntegration:
             SQLAlchemyDiscoveryRepository,
         )
         from theo.adapters.persistence.models import Discovery
-        
+
         # Setup test data
         session = Session(api_engine)
         discovery = Discovery(
@@ -270,21 +270,21 @@ class TestRepositoryIntegration:
         session.add(discovery)
         session.commit()
         discovery_id = discovery.id
-        
+
         try:
             # Test via repository
             repo = SQLAlchemyDiscoveryRepository(session)
             filters = DiscoveryListFilters(user_id="integration_test")
             results = repo.list(filters)
-            
+
             assert len(results) == 1
             assert results[0].title == "Integration Test Discovery"
             assert isinstance(results[0], DiscoveryDTO)
-            
+
             # Test mark viewed
             viewed_dto = repo.mark_viewed(discovery_id, "integration_test")
             assert viewed_dto.viewed is True
-            
+
         finally:
             # Cleanup
             session.delete(discovery)

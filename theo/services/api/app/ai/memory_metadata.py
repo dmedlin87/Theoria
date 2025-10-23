@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterable, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, Sequence
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:  # pragma: no cover - used only for type checking

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
+
 from ....ai.reasoning import synthesize_perspectives
 from ....ai.reasoning.perspectives import PerspectiveCitation, PerspectiveView
 from ....models.ai import (

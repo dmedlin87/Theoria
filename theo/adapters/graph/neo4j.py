@@ -4,8 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
-from neo4j import GraphDatabase
-from neo4j import Driver as _Driver
+from neo4j import Driver as _Driver, GraphDatabase
 
 from theo.application.graph import GraphDocumentProjection, GraphProjector
 

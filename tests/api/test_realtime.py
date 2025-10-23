@@ -143,7 +143,7 @@ def test_realtime_websocket_requires_authentication(
     with pytest.raises(WebSocketDenialResponse) as exc:
         with realtime_client.websocket_connect("/realtime/notebooks/example"):
             pytest.fail("Should not accept unauthenticated connection")
-    
+
     assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -178,7 +178,7 @@ def test_realtime_websocket_denies_forbidden_access(
             headers={"X-API-Key": "pytest-default-key"},
         ):
             pytest.fail("Should not accept forbidden connection")
-    
+
     assert exc.value.status_code == status.HTTP_403_FORBIDDEN
     assert connect_called is False
 

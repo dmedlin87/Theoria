@@ -1,9 +1,11 @@
 import os
+
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("THEO_API_KEYS", '["pytest-default-key"]')
 os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
 os.environ.setdefault("THEORIA_ENVIRONMENT", "development")
 
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -11,12 +13,10 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-from theo.application.facades.database import get_session, configure_engine, get_engine
+from theo.application.facades.database import configure_engine, get_engine, get_session
 from theo.services.api.app.db.models import Base, Document
 from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 from theo.services.api.app.main import app
-
-import tempfile
 
 tmp_dir = tempfile.mkdtemp()
 db_path = Path(tmp_dir) / 'api.sqlite'

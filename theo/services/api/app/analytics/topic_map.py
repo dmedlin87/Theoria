@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from datetime import UTC, datetime
 from itertools import combinations
-import math
 from typing import Iterable, Sequence
 
 from sqlalchemy import delete, select
@@ -20,6 +20,7 @@ from theo.services.api.app.persistence_models import (
     TopicMapEdgeType,
     TopicMapNodeType,
 )
+
 from .topics import _extract_topics
 
 

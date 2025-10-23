@@ -27,16 +27,16 @@ def with_eager_loading(
     strategy: str = "selectin",
 ) -> type[T]:
     """Configure eager loading for relationships.
-    
+
     Args:
         session: SQLAlchemy session
         model_class: The model to query
         relationships: Relationships to eager load
         strategy: Either 'selectin' (default) or 'joined'
-    
+
     Returns:
         Configured query with eager loading
-        
+
     Example:
         stmt = select(Document).options(
             *with_eager_loading_options(Document.passages, strategy="selectin")
@@ -48,7 +48,7 @@ def with_eager_loading(
 
 def query_with_monitoring(metric_name: str):
     """Decorator to monitor query execution time and result counts.
-    
+
     Usage:
         @query_with_monitoring("discovery.list_query")
         def list_discoveries(session, user_id):
@@ -61,14 +61,14 @@ def query_with_monitoring(metric_name: str):
             try:
                 result = func(*args, **kwargs)
                 duration = time.perf_counter() - start_time
-                
+
                 # Record metrics
                 record_histogram(f"{metric_name}.duration_seconds", duration)
-                
+
                 # Count results if it's a sequence
                 if isinstance(result, Sequence):
                     record_counter(f"{metric_name}.result_count", len(result))
-                
+
                 return result
             except Exception:
                 duration = time.perf_counter() - start_time
@@ -85,24 +85,24 @@ def batch_load(
     batch_size: int = 100,
 ) -> list[T]:
     """Load models in batches to avoid excessive query parameters.
-    
+
     Args:
         session: SQLAlchemy session
         model_class: The model to load
         ids: List of IDs to load
         batch_size: Number of IDs per batch
-    
+
     Returns:
         List of loaded models
     """
     results: list[T] = []
-    
+
     for i in range(0, len(ids), batch_size):
         batch = ids[i:i + batch_size]
         stmt = select(model_class).where(model_class.id.in_(batch))  # type: ignore
         batch_results = list(session.scalars(stmt))
         results.extend(batch_results)
-    
+
     return results
 
 

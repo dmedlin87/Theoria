@@ -5,12 +5,13 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 
 class ReasoningStepType(str, Enum):
     """Types of reasoning steps in the research workflow."""
-    
+
     UNDERSTAND = "understand"
     GATHER = "gather"
     TENSIONS = "tensions"
@@ -22,7 +23,7 @@ class ReasoningStepType(str, Enum):
 
 class ReasoningStepStatus(str, Enum):
     """Execution status of a reasoning step."""
-    
+
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -32,7 +33,7 @@ class ReasoningStepStatus(str, Enum):
 
 class ReasoningStep(BaseModel):
     """A single step in the reasoning timeline."""
-    
+
     id: str
     step_type: ReasoningStepType
     status: ReasoningStepStatus = ReasoningStepStatus.PENDING
@@ -49,7 +50,7 @@ class ReasoningStep(BaseModel):
 
 class ReasoningTimeline(BaseModel):
     """Complete reasoning timeline for a research session."""
-    
+
     session_id: str
     question: str
     steps: list[ReasoningStep]

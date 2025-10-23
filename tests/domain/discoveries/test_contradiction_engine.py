@@ -178,7 +178,7 @@ def test_detect_requires_minimum_documents():
 )
 def test_detect_contradictions(sample_documents):
     """Test full contradiction detection pipeline.
-    
+
     Note: This test requires transformers and torch to be installed.
     It will download the NLI model on first run (~400MB).
     """

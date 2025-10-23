@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from theo.application.ports.secrets import SecretRequest, SecretRetrievalError, SecretsPort
+from theo.application.ports.secrets import (
+    SecretRequest,
+    SecretRetrievalError,
+    SecretsPort,
+)
 
 try:  # pragma: no cover - optional dependency
     import hvac

@@ -5,20 +5,21 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from theo.application.facades.database import get_session
 from theo.services.api.app.ai.registry import (
     LLMModel,
     LLMRegistry,
     get_llm_registry,
     save_llm_registry,
 )
-from theo.application.facades.database import get_session
-from ....errors import AIWorkflowError
 from theo.services.api.app.models.ai import (
     LLMDefaultRequest,
     LLMModelRequest,
     LLMModelUpdateRequest,
     LLMSettingsResponse,
 )
+
+from ....errors import AIWorkflowError
 
 router = APIRouter()
 

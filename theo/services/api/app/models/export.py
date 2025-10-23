@@ -12,7 +12,6 @@ from .base import APIModel, Passage
 from .documents import DocumentDetailResponse
 from .search import HybridSearchFilters
 
-
 CitationStyleLiteral = Literal["csl-json", "apa", "chicago", "sbl", "bibtex"]
 
 

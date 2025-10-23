@@ -14,13 +14,15 @@ from fastapi import Depends, status
 from sqlalchemy.orm import Session
 
 from theo.application.facades.events import get_event_publisher
+from theo.application.facades.settings import Settings, get_settings
 from theo.application.ports.events import (
     DomainEvent,
     EventDispatchError,
     EventPublisher,
     NullEventPublisher,
 )
-from theo.application.facades.settings import Settings, get_settings
+
+from ..errors import IngestionError, Severity
 from ..ingest.pipeline import (
     PipelineDependencies,
     run_pipeline_for_file,
@@ -29,9 +31,7 @@ from ..ingest.pipeline import (
 )
 from ..models.documents import SimpleIngestRequest
 from ..telemetry import log_workflow_event
-from ..errors import IngestionError, Severity
 from ..utils.imports import LazyImportModule
-
 
 cli_ingest = LazyImportModule("theo.services.cli.ingest_folder")
 

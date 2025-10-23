@@ -15,6 +15,18 @@ from opentelemetry import trace
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from theo.adapters.persistence.models import Document, TranscriptQuote
+from theo.application.facades.database import get_session
+from theo.domain.research import fetch_passage
+from theo.services.api.app.models.search import (
+    HybridSearchFilters,
+    HybridSearchRequest,
+    HybridSearchResult,
+)
+from theo.services.api.app.models.verses import VerseMentionsFilters
+from theo.services.api.app.retriever.hybrid import hybrid_search
+from theo.services.api.app.retriever.verses import get_verse_timeline
+
 from .. import schemas
 from ..security import WriteSecurityError, get_read_security_policy
 from ..validators import (
@@ -23,17 +35,6 @@ from ..validators import (
     validate_osis_reference,
     validate_query,
 )
-from theo.application.facades.database import get_session
-from theo.adapters.persistence.models import Document, TranscriptQuote
-from theo.services.api.app.models.search import (
-    HybridSearchFilters,
-    HybridSearchRequest,
-    HybridSearchResult,
-)
-from theo.services.api.app.models.verses import VerseMentionsFilters
-from theo.domain.research import fetch_passage
-from theo.services.api.app.retriever.hybrid import hybrid_search
-from theo.services.api.app.retriever.verses import get_verse_timeline
 
 LOGGER = logging.getLogger(__name__)
 _TRACER = trace.get_tracer("theo.mcp.read")
@@ -60,6 +61,7 @@ def _tool_instrumentation(
 ) -> Iterator[tuple[str, Any]]:
     """Context manager adding span attributes, logging, and metrics."""
     import time
+
     from ..metrics import get_metrics_collector
 
     run_id = str(uuid4())

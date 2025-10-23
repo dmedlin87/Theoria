@@ -7,6 +7,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.persistence_models import FeedbackEventAction
+
 from ..db.feedback import record_feedback_event as persist_feedback_event
 from ..models.analytics import FeedbackEventPayload, TelemetryBatch
 

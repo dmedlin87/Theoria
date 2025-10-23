@@ -10,12 +10,16 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.persistence_models import Document, Passage
 from theo.application.facades.version import get_git_sha
+from theo.services.api.app.persistence_models import Document, Passage
+
 from ...export.formatters import SCHEMA_VERSION, generate_export_id
 from ...models.export import DeliverableAsset, DeliverableManifest, DeliverablePackage
-from .guardrail_helpers import GuardrailError, sanitize_json_structure, sanitize_markdown_field
-
+from .guardrail_helpers import (
+    GuardrailError,
+    sanitize_json_structure,
+    sanitize_markdown_field,
+)
 
 _SUPPORTED_DELIVERABLE_FORMATS = {"markdown", "ndjson", "csv", "pdf"}
 

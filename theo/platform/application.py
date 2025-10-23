@@ -10,8 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.adapters import AdapterRegistry
-from theo.adapters.persistence.models import Document as DocumentRecord
-from theo.adapters.persistence.models import Passage
+from theo.adapters.persistence.models import Document as DocumentRecord, Passage
 from theo.adapters.research import (
     SqlAlchemyHypothesisRepositoryFactory,
     SqlAlchemyResearchNoteRepositoryFactory,
@@ -19,8 +18,8 @@ from theo.adapters.research import (
 from theo.application import ApplicationContainer
 from theo.application.facades.database import get_engine
 from theo.application.facades.settings import get_settings
-from theo.application.research import ResearchService
 from theo.application.reasoner import NeighborhoodReasoner
+from theo.application.research import ResearchService
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.platform.bootstrap import bootstrap_application
 

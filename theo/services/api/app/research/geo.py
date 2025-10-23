@@ -13,13 +13,14 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings_store import load_setting
+from theo.domain.research.osis import format_osis, osis_to_readable
 from theo.services.api.app.persistence_models import (
     GeoAncientPlace,
     GeoGeometry,
     GeoModernLocation,
     GeoPlaceVerse,
 )
-from theo.domain.research.osis import format_osis, osis_to_readable
+
 from ..models.research import (
     GeoAttribution,
     GeoLocationItem,

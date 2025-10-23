@@ -5,8 +5,14 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from theo.services.api.app.persistence_models import (
+    Document,
+    DocumentAnnotation,
+    Passage,
+)
+
 from ..case_builder import sync_annotation_case_object
-from theo.services.api.app.persistence_models import Document, DocumentAnnotation, Passage
+from ..db.query_optimizations import query_with_monitoring
 from ..models.base import Passage as PassageSchema
 from ..models.documents import (
     DocumentAnnotationCreate,
@@ -17,7 +23,6 @@ from ..models.documents import (
     DocumentSummary,
     DocumentUpdateRequest,
 )
-from ..db.query_optimizations import query_with_monitoring
 from .annotations import annotation_to_schema, prepare_annotation_body
 
 

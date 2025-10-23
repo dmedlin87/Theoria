@@ -8,6 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.persistence_models import Document, Passage
+
 from ..models.base import Passage as PassageSchema
 from ..models.documents import DocumentDetailResponse
 from ..models.export import (

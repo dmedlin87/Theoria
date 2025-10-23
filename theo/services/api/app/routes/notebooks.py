@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
+
 from ..models.notebooks import (
     NotebookCreatePayload,
     NotebookEntryCreate,
@@ -17,7 +18,6 @@ from ..models.notebooks import (
 )
 from ..notebooks.service import NotebookService
 from ..security import Principal, require_principal
-
 
 router = APIRouter()
 

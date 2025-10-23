@@ -7,14 +7,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..exceptions import UnsupportedSourceError
 from ..metadata import (
+    ensure_list,
+    html_to_text,
     merge_metadata,
+    parse_text_file,
     prepare_pdf_chunks,
     prepare_text_chunks,
     prepare_transcript_chunks,
 )
-from ..exceptions import UnsupportedSourceError
-from ..metadata import ensure_list, html_to_text, parse_text_file
+from ..osis import OsisDocument, ResolvedCommentaryAnchor
 from ..parsers import (
     ParserResult,
     load_transcript,
@@ -22,7 +25,6 @@ from ..parsers import (
     parse_docx_document,
     parse_html_document,
 )
-from ..osis import OsisDocument, ResolvedCommentaryAnchor
 from . import Parser
 
 

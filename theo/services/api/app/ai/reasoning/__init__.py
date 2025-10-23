@@ -1,7 +1,7 @@
 """Reasoning and meta-cognitive capabilities for theological AI agents."""
 
-from .fallacies import FallacyDetector, FallacyWarning, detect_fallacies
 from .chain_of_thought import ChainOfThought, ReasoningStep, build_cot_prompt
+from .fallacies import FallacyDetector, FallacyWarning, detect_fallacies
 from .hypotheses import (
     Hypothesis,
     HypothesisGenerator,
@@ -10,7 +10,12 @@ from .hypotheses import (
     update_hypothesis_confidence,
 )
 from .insights import Insight, InsightDetector, detect_insights
-from .metacognition import Critique, RevisionResult, critique_reasoning, revise_with_critique
+from .metacognition import (
+    Critique,
+    RevisionResult,
+    critique_reasoning,
+    revise_with_critique,
+)
 from .perspectives import PerspectiveSynthesis, synthesize_perspectives
 
 __all__ = [

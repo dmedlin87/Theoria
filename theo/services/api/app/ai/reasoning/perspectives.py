@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
 import re
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Sequence
 
 from theo.application.facades.settings import get_settings
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
-    from ...models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
+
+    from ...models.search import (
+        HybridSearchFilters,
+        HybridSearchRequest,
+        HybridSearchResult,
+    )
     from ...services.retrieval_service import RetrievalService
 
 from ...models.search import HybridSearchFilters, HybridSearchRequest
-from ...services.retrieval_service import RetrievalService
 from ...retriever.hybrid import hybrid_search
+from ...services.retrieval_service import RetrievalService
 
 
 @dataclass(slots=True)

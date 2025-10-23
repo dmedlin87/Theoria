@@ -6,12 +6,12 @@ import json
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
+    Literal,
     Mapping,
     Sequence,
-    TYPE_CHECKING,
-    Literal,
     cast,
 )
 

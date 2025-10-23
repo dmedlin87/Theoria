@@ -6,11 +6,11 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.settings_store import load_setting, save_setting
 from theo.application.ports.ai_registry import (
+    SECRET_CONFIG_KEYS,
+    SETTINGS_KEY,
     GenerationError,
     LLMModel as ApplicationLLMModel,
     LLMRegistry as ApplicationLLMRegistry,
-    SECRET_CONFIG_KEYS,
-    SETTINGS_KEY,
     registry_from_payload as application_registry_from_payload,
 )
 

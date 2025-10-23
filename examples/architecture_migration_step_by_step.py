@@ -12,15 +12,16 @@ def old_approach_list_discoveries():
     """Old approach: Direct ORM usage in route handler."""
     from sqlalchemy import select
     from sqlalchemy.orm import Session
+
     from theo.adapters.persistence.models import Discovery
     from theo.application.facades.database import get_session
-    
+
     # Route handler directly queries database
     session = next(get_session())
     try:
         stmt = select(Discovery).where(Discovery.user_id == "test")
         results = session.scalars(stmt).all()
-        
+
         # Manual serialization (BAD - ORM models exposed)
         return [
             {
@@ -43,16 +44,17 @@ def step2_with_dtos():
     """Improved: Use DTOs to decouple from ORM."""
     from sqlalchemy import select
     from sqlalchemy.orm import Session
-    from theo.adapters.persistence.models import Discovery
+
     from theo.adapters.persistence.mappers import discovery_to_dto
+    from theo.adapters.persistence.models import Discovery
     from theo.application.dtos import DiscoveryDTO
     from theo.application.facades.database import get_session
-    
+
     session = next(get_session())
     try:
         stmt = select(Discovery).where(Discovery.user_id == "test")
         orm_results = session.scalars(stmt).all()
-        
+
         # Convert to DTOs (BETTER - no ORM leakage)
         dto_results = [discovery_to_dto(d) for d in orm_results]
         return dto_results
@@ -67,18 +69,19 @@ def step2_with_dtos():
 def step3_with_repository():
     """Better: Use repository pattern for abstraction."""
     from sqlalchemy.orm import Session
+
     from theo.adapters.persistence.discovery_repository import (
         SQLAlchemyDiscoveryRepository,
     )
     from theo.application.dtos import DiscoveryListFilters
     from theo.application.facades.database import get_session
-    
+
     session = next(get_session())
     try:
         # Repository handles database details (BEST - clean abstraction)
         repo = SQLAlchemyDiscoveryRepository(session)
         filters = DiscoveryListFilters(user_id="test", viewed=False)
-        
+
         # Returns DTOs, no ORM knowledge needed
         return repo.list(filters)
     finally:
@@ -93,26 +96,27 @@ def step4_dependency_injection():
     """Best: Use FastAPI dependency injection."""
     from fastapi import APIRouter, Depends
     from sqlalchemy.orm import Session
-    from theo.application.repositories import DiscoveryRepository
+
     from theo.adapters.persistence.discovery_repository import (
         SQLAlchemyDiscoveryRepository,
     )
     from theo.application.dtos import DiscoveryDTO, DiscoveryListFilters
     from theo.application.facades.database import get_session
-    
+    from theo.application.repositories import DiscoveryRepository
+
     router = APIRouter()
-    
+
     def get_discovery_repo(session: Session = Depends(get_session)) -> DiscoveryRepository:
         """Factory for repository - easy to mock in tests."""
         return SQLAlchemyDiscoveryRepository(session)
-    
+
     @router.get("/discoveries")
     def list_discoveries(
         user_id: str,
         repo: DiscoveryRepository = Depends(get_discovery_repo),
     ) -> list[DiscoveryDTO]:
         """Route handler with injected repository.
-        
+
         Benefits:
         - No database code in handler
         - Easy to test (mock repository)
@@ -131,19 +135,20 @@ def step5_with_domain_errors():
     """Complete: Add domain errors for consistency."""
     from fastapi import APIRouter, Depends
     from sqlalchemy.orm import Session
-    from theo.application.repositories import DiscoveryRepository
+
     from theo.adapters.persistence.discovery_repository import (
         SQLAlchemyDiscoveryRepository,
     )
     from theo.application.dtos import DiscoveryDTO
-    from theo.domain.errors import NotFoundError
     from theo.application.facades.database import get_session
-    
+    from theo.application.repositories import DiscoveryRepository
+    from theo.domain.errors import NotFoundError
+
     router = APIRouter()
-    
+
     def get_discovery_repo(session: Session = Depends(get_session)) -> DiscoveryRepository:
         return SQLAlchemyDiscoveryRepository(session)
-    
+
     @router.get("/discoveries/{discovery_id}")
     def get_discovery(
         discovery_id: int,
@@ -151,18 +156,18 @@ def step5_with_domain_errors():
         repo: DiscoveryRepository = Depends(get_discovery_repo),
     ) -> DiscoveryDTO:
         """Route with consistent error handling.
-        
+
         Domain errors are automatically converted to HTTP responses:
         - NotFoundError → 404 with structured JSON
         - ValidationError → 422 with field details
         - etc.
         """
         discovery = repo.get_by_id(discovery_id, user_id)
-        
+
         if discovery is None:
             # Raises NotFoundError which middleware converts to HTTP 404
             raise NotFoundError("Discovery", discovery_id)
-        
+
         return discovery
 
 
@@ -172,38 +177,39 @@ def step5_with_domain_errors():
 
 def step6_with_use_case():
     """Advanced: Use case for complex operations."""
+    from datetime import UTC, datetime
+
+    from theo.application.dtos import DiscoveryDTO
     from theo.application.repositories import (
         DiscoveryRepository,
         DocumentRepository,
     )
-    from theo.application.dtos import DiscoveryDTO
     from theo.domain.discoveries import PatternDiscoveryEngine
-    from datetime import UTC, datetime
-    
+
     class RefreshDiscoveriesUseCase:
         """Orchestrates discovery refresh process.
-        
+
         Benefits:
         - Testable business logic
         - Coordinates multiple repositories
         - Maintains transaction boundaries
         - Reusable across different entry points
         """
-        
+
         def __init__(self, discovery_repo: DiscoveryRepository):
             self.discovery_repo = discovery_repo
             self.pattern_engine = PatternDiscoveryEngine()
-        
+
         def execute(self, user_id: str, document_repo: DocumentRepository):
             """Execute discovery refresh."""
             documents = document_repo.list_with_embeddings(user_id)
 
             # Run domain logic
             patterns, snapshot = self.pattern_engine.detect(documents)
-            
+
             # Clear old discoveries
             self.discovery_repo.delete_by_types(user_id, ["pattern"])
-            
+
             # Persist new discoveries
             discoveries = []
             for pattern in patterns:
@@ -222,7 +228,7 @@ def step6_with_use_case():
                 )
                 created = self.discovery_repo.create(dto)
                 discoveries.append(created)
-            
+
             return discoveries
 
 
@@ -240,8 +246,9 @@ def test_old_approach():
 def test_new_approach():
     """New approach: Mock repository."""
     from unittest.mock import Mock
+
     from theo.application.dtos import DiscoveryDTO, DiscoveryListFilters
-    
+
     # Create mock repository
     mock_repo = Mock()
     mock_repo.list.return_value = [
@@ -259,11 +266,11 @@ def test_new_approach():
             metadata={},
         )
     ]
-    
+
     # Test with mock (FAST - no database)
     filters = DiscoveryListFilters(user_id="test")
     results = mock_repo.list(filters)
-    
+
     assert len(results) == 1
     assert results[0].title == "Test"
     # Verify mock was called correctly

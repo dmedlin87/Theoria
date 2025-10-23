@@ -12,28 +12,29 @@ from fastapi.params import Header as HeaderInfo
 from opentelemetry import trace
 from sqlalchemy.orm import Session
 
-from .. import schemas
-from ..security import WriteSecurityError, get_write_security_policy
-from ..validators import (
-    validate_body_text,
-    validate_end_user_id,
-    validate_osis_reference,
-    validate_tenant_id,
-    validate_idempotency_key,
-    validate_array_length,
-)
-from .read import _session_scope
-from theo.services.api.app.models.jobs import HNSWRefreshJobRequest
 from theo.application.facades.research import (
     ResearchNoteDraft,
     ResearchNoteEvidenceDraft,
     get_research_service,
 )
+from theo.services.api.app.models.jobs import HNSWRefreshJobRequest
 from theo.services.api.app.research.evidence_cards import (
     create_evidence_card,
     preview_evidence_card,
 )
 from theo.services.api.app.routes.jobs import enqueue_refresh_hnsw_job
+
+from .. import schemas
+from ..security import WriteSecurityError, get_write_security_policy
+from ..validators import (
+    validate_array_length,
+    validate_body_text,
+    validate_end_user_id,
+    validate_idempotency_key,
+    validate_osis_reference,
+    validate_tenant_id,
+)
+from .read import _session_scope
 
 LOGGER = logging.getLogger(__name__)
 _TRACER = trace.get_tracer("theo.mcp.write")
@@ -59,6 +60,7 @@ def _write_instrumentation(
 ) -> Iterator[tuple[str, Any]]:
     """Context manager for write tool instrumentation with metrics."""
     import time
+
     from ..metrics import get_metrics_collector
 
     run_id = str(uuid4())
@@ -401,7 +403,7 @@ async def evidence_card_create(
     # Validate request inputs
     validate_osis_reference(request.osis)
     if request.claim_summary:
-        from ..validators import validate_string_length, MAX_QUERY_LENGTH
+        from ..validators import MAX_QUERY_LENGTH, validate_string_length
         validate_string_length(request.claim_summary, "claim_summary", MAX_QUERY_LENGTH)
     validate_array_length(request.tags, "tags", max_length=20)
 

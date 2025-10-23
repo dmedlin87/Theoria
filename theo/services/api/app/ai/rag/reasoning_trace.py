@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+
 from ..reasoning.chain_of_thought import parse_chain_of_thought
 from .models import ReasoningTrace, ReasoningTraceStep
 

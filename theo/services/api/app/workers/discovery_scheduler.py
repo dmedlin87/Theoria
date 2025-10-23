@@ -10,11 +10,11 @@ from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from theo.services.bootstrap import resolve_application
-
 from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
 from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository
 from theo.services.api.app.persistence_models import Document
+from theo.services.bootstrap import resolve_application
+
 from ..discoveries import DiscoveryService
 
 logger = logging.getLogger(__name__)

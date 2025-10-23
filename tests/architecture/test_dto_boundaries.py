@@ -26,7 +26,7 @@ def _gather_imports(path: Path) -> set[str]:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except (SyntaxError, UnicodeDecodeError):
         return set()
-    
+
     imports: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -44,15 +44,15 @@ def test_repositories_use_dtos_not_orm():
     for path in _iter_python_files("theo/adapters/persistence"):
         if not path.name.endswith("_repository.py"):
             continue
-        
+
         # Check that repository files import DTOs
         imports = _gather_imports(path)
-        
+
         # Should import from application layer
         has_dto_import = any(
             "theo.application.dtos" in imp for imp in imports
         )
-        
+
         if "repository" in path.stem:
             assert has_dto_import, (
                 f"Repository {path} should import DTOs from application.dtos"
@@ -64,18 +64,18 @@ def test_services_no_direct_orm_imports():
     forbidden_imports = [
         "theo.adapters.persistence.models",
     ]
-    
+
     for path in _iter_python_files("theo/services/api/app"):
         # Skip database and adapter-specific modules
         if "db/" in str(path) or "compat/" in str(path):
             continue
-        
+
         imports = _gather_imports(path)
-        
+
         for forbidden in forbidden_imports:
             # Check if any import starts with forbidden prefix
             violations = [imp for imp in imports if imp.startswith(forbidden)]
-            
+
             assert not violations, (
                 f"Service module {path} imports ORM models directly: {violations}. "
                 f"Use DTOs from theo.application.dtos instead."
@@ -85,13 +85,13 @@ def test_services_no_direct_orm_imports():
 def test_dtos_are_immutable_dataclasses():
     """DTOs should be frozen dataclasses for immutability."""
     dto_file = REPO_ROOT / "theo" / "application" / "dtos" / "discovery.py"
-    
+
     if not dto_file.exists():
         return  # Skip if DTOs not yet created
-    
+
     content = dto_file.read_text(encoding="utf-8")
     tree = ast.parse(content)
-    
+
     # Find all classes
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
@@ -105,7 +105,7 @@ def test_dtos_are_immutable_dataclasses():
                             for keyword in decorator.keywords:
                                 if keyword.arg == "frozen" and isinstance(keyword.value, ast.Constant):
                                     has_frozen = keyword.value.value
-                
+
                 assert has_frozen, (
                     f"DTO {node.name} in {dto_file} should be a frozen dataclass: "
                     f"@dataclass(frozen=True)"
@@ -115,12 +115,12 @@ def test_dtos_are_immutable_dataclasses():
 def test_mappers_bidirectional():
     """Mapper module should provide bidirectional conversion functions."""
     mappers_file = REPO_ROOT / "theo" / "adapters" / "persistence" / "mappers.py"
-    
+
     if not mappers_file.exists():
         return  # Skip if mappers not yet created
-    
+
     content = mappers_file.read_text(encoding="utf-8")
-    
+
     # Should have both directions of mapping
     assert "to_dto" in content, "Mappers should include model_to_dto functions"
     assert "dto_to_" in content or "to_model" in content, (
@@ -131,21 +131,21 @@ def test_mappers_bidirectional():
 def test_repository_interfaces_in_application_layer():
     """Repository interfaces should be defined in application layer, not adapters."""
     app_repo_path = REPO_ROOT / "theo" / "application" / "repositories"
-    
+
     if not app_repo_path.exists():
         return  # Skip if not yet created
-    
+
     # Check that repository interfaces exist in application layer
     interface_files = list(app_repo_path.glob("*_repository.py"))
-    
+
     assert len(interface_files) > 0, (
         "Repository interfaces should be defined in theo/application/repositories/"
     )
-    
+
     # Verify they contain abstract methods
     for repo_file in interface_files:
         content = repo_file.read_text(encoding="utf-8")
-        
+
         assert "ABC" in content or "abstractmethod" in content, (
             f"Repository interface {repo_file.name} should use ABC and @abstractmethod"
         )
@@ -156,17 +156,17 @@ def test_no_sqlalchemy_in_application_layer():
     forbidden_imports = [
         "sqlalchemy",
     ]
-    
+
     for path in _iter_python_files("theo/application"):
         # Skip facades which are allowed to interface with adapters
         if "facades" in str(path):
             continue
-        
+
         imports = _gather_imports(path)
-        
+
         for forbidden in forbidden_imports:
             violations = [imp for imp in imports if imp.startswith(forbidden)]
-            
+
             assert not violations, (
                 f"Application module {path} imports SQLAlchemy: {violations}. "
                 f"Application layer should be ORM-agnostic."

@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 import pythonbible as pb
 
-from .osis import expand_osis_reference, verse_ids_to_osis
-
 from .datasets import scripture_dataset
+from .osis import expand_osis_reference, verse_ids_to_osis
 
 
 @dataclass(frozen=True, slots=True)

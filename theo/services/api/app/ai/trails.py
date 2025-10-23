@@ -17,8 +17,8 @@ from theo.services.api.app.persistence_models import (
     TrailRetrievalSnapshot,
     TrailSource,
 )
-from ..models.search import HybridSearchFilters
 
+from ..models.search import HybridSearchFilters
 
 LOGGER = logging.getLogger(__name__)
 
