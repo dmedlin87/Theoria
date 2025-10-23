@@ -122,6 +122,8 @@ def test_extract_passages_handles_object_source() -> None:
     [
         ("Doe, Jane M.", {"given": "Jane M.", "family": "Doe"}),
         ("Jane Mary Doe", {"given": "Jane Mary", "family": "Doe"}),
+        ("World Council of Churches", {"literal": "World Council of Churches"}),
+        ("Editorial Board", {"literal": "Editorial Board"}),
         ("Single", {"literal": "Single"}),
         ("", {"literal": ""}),
     ],
