@@ -327,20 +327,6 @@ def _normalise_doi(value: Any) -> str | None:
         return None
 
     return f"https://doi.org/{cleaned}"
-    lowered = cleaned.lower()
-    prefixes = (
-        "https://doi.org/",
-        "http://doi.org/",
-        "https://dx.doi.org/",
-        "http://dx.doi.org/",
-        "doi:",
-    )
-    for prefix in prefixes:
-        if lowered.startswith(prefix):
-            cleaned = cleaned[len(prefix) :].lstrip(" /")
-            lowered = cleaned.lower()
-            break
-    return cleaned or None
 
 
 def _normalise_author(name: str) -> dict[str, str]:
@@ -352,34 +338,28 @@ def _normalise_author(name: str) -> dict[str, str]:
 
     if "," in candidate:
         family, given = [segment.strip() for segment in candidate.split(",", 1)]
-        result: dict[str, str] = {"structure": "comma"}
+        if not family and not given:
+            return {"literal": candidate}
+        result: dict[str, str] = {}
         if family:
             result["family"] = family
         if given:
             result["given"] = given
-        if not family and not given:
-            return {"literal": candidate}
         return result
 
     parts = [segment.strip() for segment in candidate.split() if segment.strip()]
     if len(parts) >= 2:
         family = parts[-1]
         given = " ".join(parts[:-1])
-        return {
-            "given": given,
-            "family": family,
-            "literal": candidate,
-            "structure": "space",
-        }
+        result: dict[str, str] = {"family": family}
+        if given:
+            result["given"] = given
+        return result
 
     return {"literal": candidate}
 
 
 def _apa_author(author: dict[str, str]) -> str:
-    literal = author.get("literal")
-    structure = author.get("structure")
-    if literal and structure == "space":
-        return literal
     family = author.get("family")
     if family:
         given = author.get("given", "")
@@ -387,7 +367,7 @@ def _apa_author(author: dict[str, str]) -> str:
         if initials:
             return f"{family}, {initials}"
         return family
-    return literal or ""
+    return author.get("literal", "")
 
 
 def _chicago_author(author: dict[str, str]) -> str:
@@ -678,11 +658,13 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
             segments.append(f"{authors_segment}.")
 
     title_text = str(title).strip()
-    title_segment = f'"{title_text or title}"'
-    if title_text and not title_text.endswith((".", "!", "?")):
-        segments.append(f"{title_segment}.")
+    if title_text:
+        if title_text.endswith((".", "!", "?")):
+            segments.append(f'"{title_text}"')
+        else:
+            segments.append(f'"{title_text}."')
     else:
-        segments.append(title_segment)
+        segments.append('"Untitled."')
     if details_text:
         if not details_text.endswith(('.', '!', '?')):
             details_text = details_text.rstrip('.') + "."

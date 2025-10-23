@@ -88,9 +88,52 @@ def _skip_heavy_startup() -> None:
     monkeypatch = pytest.MonkeyPatch()
     """Disable expensive FastAPI lifespan setup steps for API tests."""
 
+    from sqlalchemy import text as _sql_text
+    from theo.services.api.app.db import seeds as _seeds_module
+
+    original_seed_reference_data = _seeds_module.seed_reference_data
+
+    def _maybe_seed_reference_data(session) -> None:
+        """Invoke the real seeders when the database still needs backfilling."""
+
+        needs_seeding = True
+        try:
+            bind = session.get_bind()
+            if bind is not None:
+                try:
+                    perspective_present = bool(
+                        session.execute(
+                            _sql_text(
+                                "SELECT 1 FROM pragma_table_info('contradiction_seeds') "
+                                "WHERE name = 'perspective'"
+                            )
+                        ).first()
+                    )
+                except Exception:
+                    perspective_present = False
+                if perspective_present:
+                    try:
+                        has_rows = bool(
+                            session.execute(
+                                _sql_text(
+                                    "SELECT 1 FROM contradiction_seeds LIMIT 1"
+                                )
+                            ).first()
+                        )
+                    except Exception:
+                        has_rows = False
+                    needs_seeding = not has_rows
+                else:
+                    needs_seeding = True
+        except Exception:
+            needs_seeding = True
+
+        if needs_seeding:
+            original_seed_reference_data(session)
+
     monkeypatch.setattr(
         "theo.services.api.app.main.seed_reference_data",
-        lambda session: None,
+        _maybe_seed_reference_data,
         raising=False,
     )
     monkeypatch.setattr(
