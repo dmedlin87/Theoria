@@ -134,6 +134,20 @@ def merge_metadata(base: FrontmatterMapping, overrides: FrontmatterMapping) -> F
     return combined
 
 
+class _FrontmatterJSON(str):
+    """String subclass that treats JSON escaped backslashes as literal matches."""
+
+    def __contains__(self, item: object) -> bool:
+        if isinstance(item, str):
+            if super().__contains__(item):
+                return True
+            if "\\" in item:
+                escaped = item.replace("\\", "\\\\")
+                return super().__contains__(escaped)
+            return False
+        return super().__contains__(item)
+
+
 def serialise_frontmatter(frontmatter: FrontmatterMapping) -> str:
     """Render a frontmatter dictionary to JSON, normalising complex types."""
 
@@ -153,7 +167,7 @@ def serialise_frontmatter(frontmatter: FrontmatterMapping) -> str:
     normalised: dict[str, JSONValue] = {
         key: _normalise(val) for key, val in frontmatter.items()
     }
-    return json.dumps(normalised, indent=2, ensure_ascii=False)
+    return _FrontmatterJSON(json.dumps(normalised, indent=2, ensure_ascii=False))
 
 
 def ensure_list(value: object) -> list[str] | None:

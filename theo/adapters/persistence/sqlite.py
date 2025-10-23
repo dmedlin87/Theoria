@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import gc
+import threading
 import time
 import warnings
 from collections.abc import Callable
@@ -17,6 +18,29 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
         def dispose(self) -> None: ...
 else:  # pragma: no cover - runtime import guard
     _Disposable = object  # type: ignore[assignment]
+
+def _collect_open_files(process, target_paths: set[str], timeout: float = 1.0):
+    """Best-effort collection of open file handles with a timeout safeguard."""
+
+    entries: list = []
+    errors: list[BaseException] = []
+
+    def _invoke() -> None:
+        try:
+            entries.append(process.open_files())  # type: ignore[attr-defined]
+        except Exception as exc:  # pragma: no cover - defensive guard
+            errors.append(exc)
+
+    worker = threading.Thread(target=_invoke, daemon=True)
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        return None
+    if errors:
+        return []
+    if not entries:
+        return []
+    return [entry for entry in entries[0] if getattr(entry, "path", None) in target_paths]
 
 
 def dispose_sqlite_engine(
@@ -122,13 +146,8 @@ def dispose_sqlite_engine(
             if process is not None:
                 target_paths = {str(path.resolve()) for path in candidates if path.exists()}
                 for _ in range(100):
-                    try:
-                        open_entries = [
-                            entry for entry in process.open_files() if entry.path in target_paths
-                        ]
-                    except RuntimeError:
-                        break
-                    except Exception:  # pragma: no cover - defensive guard
+                    open_entries = _collect_open_files(process, target_paths)
+                    if open_entries is None:
                         break
                     if not open_entries:
                         break
