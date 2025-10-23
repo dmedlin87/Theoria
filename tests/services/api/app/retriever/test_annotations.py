@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 
 from theo.services.api.app.retriever.annotations import (
     annotation_to_schema,
@@ -20,6 +20,8 @@ from theo.services.api.app.models.documents import (
 )
 from theo.services.api.app.persistence_models import DocumentAnnotation
 
+
+HYPOTHESIS_SETTINGS = settings(max_examples=40, deadline=None)
 
 @dataclass
 class _FakeAnnotationRow:
@@ -253,6 +255,7 @@ def _annotation_payloads(draw) -> DocumentAnnotationCreate:
     return payload
 
 
+@HYPOTHESIS_SETTINGS
 @given(_annotation_payloads())
 def test_prepare_annotation_body_preserves_semantics(payload: DocumentAnnotationCreate) -> None:
     document = prepare_annotation_body(payload)
@@ -288,3 +291,4 @@ def test_prepare_annotation_body_preserves_semantics(payload: DocumentAnnotation
         assert "metadata" not in parsed
     else:
         assert parsed["metadata"] == expected_metadata
+

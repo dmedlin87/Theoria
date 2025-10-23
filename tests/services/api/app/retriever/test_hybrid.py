@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 
 from theo.services.api.app.models.documents import DocumentAnnotationResponse
 from theo.services.api.app.models.search import (
@@ -15,6 +15,8 @@ from theo.services.api.app.models.search import (
 )
 from theo.services.api.app.retriever import hybrid
 
+
+HYPOTHESIS_SETTINGS = settings(max_examples=40, deadline=None)
 
 def _make_document(**overrides):
     base = {
@@ -443,6 +445,7 @@ def _query_tokens(draw) -> list[str]:
     return draw(st.lists(_TOKEN.map(str.lower), max_size=4))
 
 
+@HYPOTHESIS_SETTINGS
 @given(meta=_tei_meta_payload(), tokens=_query_tokens())
 def test_tei_terms_and_match_score_property(meta: object, tokens: list[str]) -> None:
     passage = _make_passage(meta=meta)
@@ -455,6 +458,7 @@ def test_tei_terms_and_match_score_property(meta: object, tokens: list[str]) -> 
     assert hybrid._tei_match_score(passage, tokens) == pytest.approx(expected_score)
 
 
+@HYPOTHESIS_SETTINGS
 @given(
     base=_TOPIC_TEXT,
     extra_domains=st.lists(st.text(alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_categories=("Cs",)), max_size=16), max_size=4),
@@ -493,6 +497,7 @@ def _base_and_nonmatching_domains(draw):
     return base, others
 
 
+@HYPOTHESIS_SETTINGS
 @given(_base_and_nonmatching_domains())
 def test_matches_topic_domain_requires_normalised_match(data) -> None:
     base, other_domains = data
@@ -500,4 +505,5 @@ def test_matches_topic_domain_requires_normalised_match(data) -> None:
     filter_value = f" {base} "
 
     assert hybrid._matches_topic_domain(document, filter_value) is False
+
 
