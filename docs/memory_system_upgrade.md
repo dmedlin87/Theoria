@@ -177,7 +177,7 @@ def enforce_capacity(user_id, space):
 - **Recency:** exponential decay `recency = exp(-Δt / τ)` with `τ ≈ 7 days`.
 - **Importance:** stored importance value.
 - Compute `total = α * relevance + β * recency + γ * importance` with default weights `α = β = γ = 1`.
-- Apply maximal marginal relevance (MMR) to ensure topical diversity.
+- Apply maximal marginal relevance (MMR) using cosine distance over entry embeddings as the primary dissimilarity metric; when cosine scores tie (e.g., missing embeddings), break ties by preferring entries with non-overlapping tags.
 - Select the top 8–16 entries within the token budget.
 
 ### Context Assembly
@@ -194,18 +194,42 @@ def retrieve_memories(user_id, space, query_text, now, top_n=12):
     dense = vector_search(user_id, space, query_text)
     fused = rrf_fuse([sparse, dense], k=60)
 
-    scored = []
+    candidates = []
     query_emb = embed_query(query_text)
     for mid in fused:
         m = load_memory(mid)
         rel = cosine(query_emb, m.embedding) if m.embedding else normalize_sparse_score(mid, sparse)
         rec = math.exp(-age_seconds(m.created_at, now) / tau_seconds)
         tot = alpha * rel + beta * rec + gamma * m.importance
-        scored.append((tot, m))
+        candidates.append({
+            "total": tot,
+            "relevance": rel,
+            "memory": m,
+        })
 
-    diverse = maximal_marginal_relevance(scored, key=lambda memory: memory.tags, k=top_n)
-    return [memory for _, memory in diverse]
+    def pairwise_similarity(a, b):
+        ma, mb = a["memory"], b["memory"]
+        if ma.embedding and mb.embedding:
+            return cosine(ma.embedding, mb.embedding)
+        return tag_overlap_similarity(ma.tags, mb.tags)
+
+    diverse = maximal_marginal_relevance(
+        candidates,
+        query_scores=lambda item: item["relevance"],  # relevance against the query
+        similarity=pairwise_similarity,
+        value=lambda item: item["total"],
+        tie_break=lambda a, b: len(set(a["memory"].tags) & set(b["memory"].tags)),
+        k=top_n,
+    )
+    return [item["memory"] for item in diverse]
+
 ```
+
+To ensure MMR balances query relevance and diversity:
+
+- **Query relevance input:** pass the same cosine-based relevance scores used in the tri-score computation (or their normalized sparse fallbacks) to the MMR routine so that it can prioritize items that actually answer the query.
+- **Pairwise similarity input:** compute cosine similarities between candidate embeddings when available, and fall back to lightweight tag-overlap heuristics when embeddings are missing. Feed these values to the MMR function (or precompute an upper-triangular similarity matrix) so it can penalize items that are too close to already-selected memories.
+- **Weighting:** expose the standard `λ` (or equivalent) parameter on the MMR helper so operators can tune the trade-off between high-relevance items (`λ → 1`) and diverse coverage (`λ → 0`).
 
 ### Fallback Behavior
 
