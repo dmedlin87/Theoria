@@ -44,7 +44,7 @@ Add or update the following fields on `memory_entries` (or the equivalent table)
 | `importance` | Float 0–1 | Long-term value score. |
 | `pinned` | Bool | Explicitly pinned by the user. |
 | `manually_saved` | Bool | Created via explicit user action. |
-| `last_scores` | JSON (optional) | Cached breakdown of relevance, recency, importance, and total scores. |
+| `last_scores` | JSON (optional) | Cached breakdown of relevance, recency, importance, and total scores plus a `computed_at` timestamp. |
 
 Migration tasks:
 
@@ -79,10 +79,19 @@ Migration tasks:
 
 - Store the entry with `needs_embedding = true` and enqueue a job for `memory_embed_backfill`.
 
+### Score Persistence
+
+- Persist `last_scores` for entries that pass through retrieval ranking or capacity enforcement.
+- The JSON payload must include floats for `relevance`, `recency`, `importance`, and `total`, plus an ISO8601 `computed_at` timestamp.
+- Retrieval writes the latest tri-score tuple (`relevance`, `recency`, `importance`, `total`) and a `computed_at` timestamp for each fetched entry before returning results.
+- Capacity enforcement recomputes scores for entries lacking `last_scores` or whose `computed_at` timestamp is stale (e.g., older than 24 hours).
+- Recompute deterministically with the same recency decay function and stored importance, defaulting `relevance = 0` when no query context is available.
+
 ### Capacity Trimming
 
-- When the soft cap is exceeded, drop the lowest total-scoring entries that are neither pinned nor manually saved.
-- Total score equals `relevance + recency + importance`; relevance defaults to `0` on write.
+- When the soft cap is exceeded, trim using the cached totals in `last_scores`, recomputing first if data is missing or stale.
+- Exclude entries that are pinned or manually saved from trimming.
+- Total score equals `relevance + recency + importance`; relevance defaults to `0` on write when no retrieval context exists.
 
 ### Persist Flow Pseudocode
 
@@ -120,6 +129,38 @@ def persist_memory(user_id, space, text, manually_saved=False):
 
     enforce_capacity(user_id, space)
     return entry.id
+
+
+def enforce_capacity(user_id, space):
+    entries = load_memories(user_id, space)
+    overage = max(0, len(entries) - soft_cap)
+    if overage == 0:
+        return
+
+    now = utcnow()
+    candidates = []
+    for entry in entries:
+        if entry.pinned or entry.manually_saved:
+            continue
+
+        scores = entry.last_scores
+        if (not scores) or is_stale(scores["computed_at"], now):
+            rec = math.exp(-age_seconds(entry.created_at, now) / tau_seconds)
+            scores = {
+                "relevance": 0.0,
+                "recency": rec,
+                "importance": entry.importance,
+                "total": rec + entry.importance,
+                "computed_at": now,
+            }
+            entry.last_scores = scores
+            save(entry)
+
+        candidates.append(entry)
+
+    victims = n_smallest(overage, candidates, key=lambda e: e.last_scores["total"])
+    for entry in victims:
+        delete(entry)
 ```
 
 ## Retrieval Policy
