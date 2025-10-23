@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Callable, Iterable, Mapping, Protocol, Sequence
-
-import importlib
 
 from theo.adapters.graph import CaseGraphAdapter, GraphEdge, GraphNeighborhood
 from theo.application.interfaces import SessionProtocol
@@ -122,7 +121,7 @@ def _score_labels(
 
 
 _MODELS = importlib.import_module("theo.adapters.persistence.models")
-CaseObject = getattr(_MODELS, "CaseObject")
+CaseObject = _MODELS.CaseObject
 Session = SessionProtocol
 
 

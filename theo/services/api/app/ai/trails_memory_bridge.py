@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.persistence_models import AgentTrail, ChatSession
+
 from ..models.ai import (
     ChatGoalState,
     ChatMemoryEntry,
@@ -47,8 +48,8 @@ class TrailsMemoryBridge:
         message_text = self._compose_message_text(digest)
 
         try:
-            from ..routes.ai.workflows import chat as chat_workflow
             from ..ai.rag import RAGAnswer
+            from ..routes.ai.workflows import chat as chat_workflow
         except Exception:  # pragma: no cover - defensive import guard
             LOGGER.debug("Unable to load chat workflow helpers", exc_info=True)
             return

@@ -112,10 +112,10 @@ def _invoke_rag_eval(
 
     env = os.environ.copy()
     env.setdefault("PYTHONUNBUFFERED", "1")
-    
+
     # Print command for debugging
     print(f"Running command: {' '.join(command)}")
-    
+
     try:
         # Capture output so we can emit it on failure
         result = subprocess.run(
@@ -207,18 +207,18 @@ def _write_comparison(module: str, output_path: Path, output_dir: Path) -> None:
 def main() -> None:
     args = _parse_args()
     modules = _ensure_modules(args.modules)
-    
+
     # Validate required input files exist
     for file_path in [args.dev_path, args.trace_path, args.baseline]:
         if not file_path.exists():
             print(f"Required file not found: {file_path}", file=sys.stderr)
             sys.exit(2)
-    
+
     # Check if modules were detected
     if not modules:
         print("No RAG modules detected (modules list empty). Skipping rag_eval.", file=sys.stderr)
         sys.exit(0)
-    
+
     print(f"Running rag_eval for modules: {', '.join(modules)}")
 
     for module in modules:

@@ -5,18 +5,20 @@ from __future__ import annotations
 import sys
 import types
 
-from . import guardrails as _guardrails_module
-from . import guardrail_helpers as _guardrail_helpers_module
-from . import retrieval as _retrieval_module
-from . import workflow as _workflow_module
+from ...telemetry import instrument_workflow
+from ..registry import get_llm_registry
+from . import (
+    guardrail_helpers as _guardrail_helpers_module,
+    guardrails as _guardrails_module,
+    retrieval as _retrieval_module,
+    workflow as _workflow_module,
+)
 from .guardrail_helpers import (
     GuardrailError,
     build_citations,
     ensure_completion_safe,
     validate_model_completion,
 )
-from ...telemetry import instrument_workflow
-from ..registry import get_llm_registry
 from .models import (
     CollaborationResponse,
     ComparativeAnalysisResponse,

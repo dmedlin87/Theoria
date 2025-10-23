@@ -9,6 +9,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.persistence_models import Document
+
 from .openalex import OpenAlexClient, _dedupe
 
 

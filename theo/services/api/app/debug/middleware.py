@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp, Message
 
+from ..errors import TheoError
 from .reporting import (
     SAFE_ENV_PREFIXES,
     BodyCapture,
@@ -18,7 +19,6 @@ from .reporting import (
     build_debug_report,
     emit_debug_report,
 )
-from ..errors import TheoError
 
 
 class ErrorReportingMiddleware(BaseHTTPMiddleware):

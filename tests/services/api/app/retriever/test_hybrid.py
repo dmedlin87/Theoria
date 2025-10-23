@@ -335,7 +335,7 @@ def test_tei_terms_and_match_score():
 
     score = hybrid._tei_match_score(passage, ["grace", "justice"])
     assert score == pytest.approx(3.0)
- 
+
 
 def test_build_statements_apply_filters_and_limits(monkeypatch):
     request = HybridSearchRequest(

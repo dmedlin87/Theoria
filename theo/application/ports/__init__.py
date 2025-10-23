@@ -9,8 +9,8 @@ from .events import (
     normalise_event_value,
 )
 from .secrets import (
-    SecretRetrievalError,
     SecretRequest,
+    SecretRetrievalError,
     SecretsPort,
     build_secrets_adapter,
 )

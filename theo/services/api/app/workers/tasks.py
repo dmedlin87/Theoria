@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Sequence, cast
 
@@ -15,17 +15,30 @@ from celery.utils.log import get_task_logger
 from sqlalchemy import func, literal, select, text
 from sqlalchemy.orm import Session
 
-from ..analytics.topic_map import TopicMapBuilder
+from theo.adapters.persistence.chat_repository import SQLAlchemyChatSessionRepository
+from theo.adapters.persistence.ingestion_job_repository import (
+    SQLAlchemyIngestionJobRepository,
+)
+from theo.adapters.persistence.types import VectorType
+from theo.application.dtos import ChatSessionDTO
+from theo.application.reasoner.events import DocumentPersistedEvent
+from theo.services.api.app.persistence_models import Document, Passage
+from theo.services.bootstrap import resolve_application
+
+from ..ai import rag
+from ..ai.rag import (
+    GuardrailError,
+    RAGCitation,
+    build_sermon_deliverable,
+    build_transcript_deliverable,
+    generate_sermon_prep_outline,
+)
 from ..analytics.openalex_enrichment import enrich_document_openalex_details
+from ..analytics.topic_map import TopicMapBuilder
 from ..analytics.topics import (
     generate_topic_digest,
     store_topic_digest,
     upsert_digest_document,
-)
-from ..ai.rag import (
-    build_sermon_deliverable,
-    build_transcript_deliverable,
-    generate_sermon_prep_outline,
 )
 from ..analytics.watchlists import (
     get_watchlist,
@@ -33,14 +46,6 @@ from ..analytics.watchlists import (
     run_watchlist,
 )
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
-from theo.application.dtos import ChatSessionDTO
-from theo.adapters.persistence.chat_repository import SQLAlchemyChatSessionRepository
-from theo.adapters.persistence.ingestion_job_repository import (
-    SQLAlchemyIngestionJobRepository,
-)
-from theo.services.api.app.persistence_models import Document, Passage
-from theo.adapters.persistence.types import VectorType
-from ..models.export import DeliverableDownload
 from ..enrich import MetadataEnricher
 from ..ingest.pipeline import (
     PipelineDependencies,
@@ -48,14 +53,10 @@ from ..ingest.pipeline import (
     run_pipeline_for_url,
 )
 from ..models.ai import ChatMemoryEntry
+from ..models.export import DeliverableDownload
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.hybrid import hybrid_search
 from ..telemetry import CITATION_DRIFT_EVENTS, log_workflow_event
-from ..ai import rag
-from ..ai.rag import GuardrailError, RAGCitation
-from theo.services.bootstrap import resolve_application
-from theo.application.reasoner.events import DocumentPersistedEvent
-
 
 APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
 settings = _ADAPTER_REGISTRY.resolve("settings")

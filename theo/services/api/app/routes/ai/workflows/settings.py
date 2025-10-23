@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 from theo.application.facades.settings_store import load_setting, save_setting
-from theo.services.api.app.models.ai import ProviderSettingsRequest, ProviderSettingsResponse
+from theo.services.api.app.models.ai import (
+    ProviderSettingsRequest,
+    ProviderSettingsResponse,
+)
+
 from ....errors import AIWorkflowError
 
 router = APIRouter(prefix="/settings/ai", tags=["ai-settings"])

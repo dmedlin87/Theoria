@@ -9,13 +9,17 @@ from typing import TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from ...analytics.telemetry import record_feedback_event
-from ...models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
+from ...models.search import (
+    HybridSearchFilters,
+    HybridSearchRequest,
+    HybridSearchResult,
+)
 from ...retriever.hybrid import hybrid_search
 from .guardrail_helpers import load_passages_for_osis
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
-    from .models import RAGCitation
     from ..trails import TrailRecorder
+    from .models import RAGCitation
 
 
 LOGGER = logging.getLogger(__name__)

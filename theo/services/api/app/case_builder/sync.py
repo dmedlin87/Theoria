@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import logging
+from datetime import UTC, datetime
 from typing import Iterable, Sequence
 
 from sqlalchemy import select
@@ -19,6 +19,7 @@ from theo.services.api.app.persistence_models import (
     DocumentAnnotation,
     Passage,
 )
+
 from ..ingest.embeddings import get_embedding_service
 
 LOGGER = logging.getLogger(__name__)

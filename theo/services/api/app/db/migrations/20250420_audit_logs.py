@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from sqlalchemy import (
+    JSON,
     Column,
     DateTime,
     Index,
     Integer,
-    JSON,
     MetaData,
     String,
     Table,

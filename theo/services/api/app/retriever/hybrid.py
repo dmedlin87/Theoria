@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import heapq
-from time import perf_counter
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Iterable, Sequence
 
 from opentelemetry import trace
 from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from theo.adapters.persistence.types import VectorType
 from theo.application.facades.settings import get_settings
 from theo.services.api.app.persistence_models import Document, Passage
-from theo.adapters.persistence.types import VectorType
+
 from ..db.query_optimizations import query_with_monitoring
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import expand_osis_reference, osis_intersects
@@ -21,7 +22,6 @@ from ..models.documents import DocumentAnnotationResponse
 from ..models.search import HybridSearchFilters, HybridSearchRequest, HybridSearchResult
 from .annotations import index_annotations_by_passage, load_annotations_for_documents
 from .utils import compose_passage_meta
-
 
 _TRACER = trace.get_tracer("theo.retriever")
 

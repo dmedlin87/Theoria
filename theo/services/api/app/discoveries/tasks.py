@@ -11,7 +11,6 @@ from theo.application.facades.database import get_engine
 
 from .service import DiscoveryService
 
-
 _SESSION_FACTORY: sessionmaker[Session] | None = None
 
 

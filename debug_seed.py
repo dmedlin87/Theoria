@@ -1,10 +1,12 @@
 import sqlite3
 from pathlib import Path
-from sqlalchemy.orm import Session
+
 from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from theo.application.facades.database import configure_engine, get_engine
 from theo.services.api.app.db import seeds as seeds_module
 from theo.services.api.app.db.seeds import seed_contradiction_claims
-from theo.application.facades.database import configure_engine, get_engine
 
 path = Path('temp_seed.db')
 if path.exists():

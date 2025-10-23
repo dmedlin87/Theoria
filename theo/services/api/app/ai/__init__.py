@@ -1,7 +1,6 @@
 """AI and generative utilities for Theo Engine."""
 
 from .rag import (
-    build_guardrail_refusal,
     ComparativeAnalysisResponse,
     DevotionalResponse,
     MultimediaDigestResponse,
@@ -9,6 +8,7 @@ from .rag import (
     RAGCitation,
     SermonPrepResponse,
     VerseCopilotResponse,
+    build_guardrail_refusal,
     build_sermon_deliverable,
     build_sermon_prep_package,
     build_transcript_deliverable,
@@ -18,8 +18,8 @@ from .rag import (
     generate_multimedia_digest,
     generate_sermon_prep_outline,
     generate_verse_brief,
-    run_guarded_chat,
     run_corpus_curation,
+    run_guarded_chat,
     run_research_reconciliation,
 )
 from .registry import LLMRegistry, get_llm_registry

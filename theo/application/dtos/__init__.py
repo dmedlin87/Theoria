@@ -5,12 +5,12 @@ allowing the service layer to work with domain-aligned objects rather than
 ORM models directly.
 """
 
+from .chat import ChatSessionDTO
 from .discovery import (
     CorpusSnapshotDTO,
     DiscoveryDTO,
     DiscoveryListFilters,
 )
-from .chat import ChatSessionDTO
 from .document import (
     DocumentDTO,
     DocumentSummaryDTO,

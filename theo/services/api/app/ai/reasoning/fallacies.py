@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-import logging
 from typing import Callable, Iterable, Pattern
-
 
 LOGGER = logging.getLogger(__name__)
 

@@ -7,11 +7,11 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from ...ai.digest_service import DigestService
-from ...analytics.topics import TopicDigest
 from theo.application.facades.database import get_session
 from theo.application.facades.settings import get_settings
 
+from ...ai.digest_service import DigestService
+from ...analytics.topics import TopicDigest
 
 router = APIRouter()
 

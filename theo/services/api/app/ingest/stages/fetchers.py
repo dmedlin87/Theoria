@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from .. import network as ingest_network
 from ..exceptions import UnsupportedSourceError
 from ..metadata import detect_source_type, load_frontmatter, merge_metadata
-from ..osis import parse_osis_document
 from ..network import (
     extract_youtube_video_id,
     fetch_web_document,
@@ -17,7 +17,7 @@ from ..network import (
     load_youtube_metadata,
     load_youtube_transcript,
 )
-from .. import network as ingest_network
+from ..osis import parse_osis_document
 from . import Instrumentation, SourceFetcher
 
 

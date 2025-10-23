@@ -9,16 +9,17 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.persistence_models import Passage
-from ..models.research import (
-    NoteEvidenceCreate,
-    ResearchNote as ResearchNoteSchema,
-    ResearchNoteCreate,
-)
 from theo.application.facades.research import (
     ResearchNoteDraft,
     ResearchNoteEvidenceDraft,
     get_research_service,
+)
+from theo.services.api.app.persistence_models import Passage
+
+from ..models.research import (
+    NoteEvidenceCreate,
+    ResearchNote as ResearchNoteSchema,
+    ResearchNoteCreate,
 )
 
 

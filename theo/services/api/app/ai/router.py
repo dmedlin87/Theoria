@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import logging
 import os
 import time
+from dataclasses import dataclass
 from typing import Any, Iterator
 
 from opentelemetry import trace
 from sqlalchemy.orm import Session
 
 from theo.application.ports.ai_registry import GenerationError
+
 from .ledger import CacheRecord, SharedLedger
 from .registry import LLMModel, LLMRegistry, get_llm_registry
 

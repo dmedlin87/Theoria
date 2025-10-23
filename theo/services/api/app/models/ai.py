@@ -19,8 +19,8 @@ from ..ai.rag import (
     VerseCopilotResponse,
 )
 from ..models.export import ExportManifest
-from ..models.search import HybridSearchFilters
 from ..models.research_plan import ResearchPlan
+from ..models.search import HybridSearchFilters
 from .base import APIModel
 
 

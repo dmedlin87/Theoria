@@ -6,10 +6,11 @@ from collections.abc import Iterable
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal, cast as typing_cast
 
-from sqlalchemy import Date, DateTime, Integer, cast, case, exists, func, or_, select
+from sqlalchemy import Date, DateTime, Integer, case, cast, exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from theo.services.api.app.persistence_models import Document, Passage, PassageVerse
+
 from ..ingest.osis import canonical_verse_range, expand_osis_reference
 from ..models.base import Passage as PassageSchema
 from ..models.verses import (

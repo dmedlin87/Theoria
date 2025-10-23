@@ -7,9 +7,13 @@ from typing import TYPE_CHECKING, Any, Sequence
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.persistence_models import Document, Passage
+
 from ...models.search import HybridSearchFilters, HybridSearchResult
 from .guardrails import (
     GuardrailError,
+    _derive_snippet as _guardrails_derive_snippet,
+    _format_anchor as _guardrails_format_anchor,
+    _normalise_snippet as _guardrails_normalise_snippet,
     apply_guardrail_profile as _guardrails_apply_guardrail_profile,
     build_citations as _guardrails_build_citations,
     build_guardrail_result as _guardrails_build_guardrail_result,
@@ -19,12 +23,11 @@ from .guardrails import (
     load_passages_for_osis as _guardrails_load_passages_for_osis,
     validate_model_completion as _guardrails_validate_model_completion,
 )
-from .guardrails import _derive_snippet as _guardrails_derive_snippet
-from .guardrails import _format_anchor as _guardrails_format_anchor
-from .guardrails import _normalise_snippet as _guardrails_normalise_snippet
-from .prompts import sanitise_json_structure as _prompts_sanitize_json_structure
-from .prompts import sanitise_markdown_field as _prompts_sanitize_markdown_field
-from .prompts import scrub_adversarial_language as _prompts_scrub_adversarial_language
+from .prompts import (
+    sanitise_json_structure as _prompts_sanitize_json_structure,
+    sanitise_markdown_field as _prompts_sanitize_markdown_field,
+    scrub_adversarial_language as _prompts_scrub_adversarial_language,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from .models import RAGCitation

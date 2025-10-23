@@ -6,6 +6,8 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from theo.services.api.app.persistence_models import UserWatchlist
+
 from ..analytics.watchlists import (
     create_watchlist,
     delete_watchlist,
@@ -15,7 +17,6 @@ from ..analytics.watchlists import (
     run_watchlist,
     update_watchlist,
 )
-from theo.services.api.app.persistence_models import UserWatchlist
 from ..models.watchlists import (
     WatchlistCreateRequest,
     WatchlistResponse,

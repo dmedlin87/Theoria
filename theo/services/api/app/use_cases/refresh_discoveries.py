@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from theo.application.dtos import DiscoveryDTO, CorpusSnapshotDTO
+from theo.application.dtos import CorpusSnapshotDTO, DiscoveryDTO
 from theo.application.repositories import DiscoveryRepository, DocumentRepository
 from theo.domain.discoveries import (
     AnomalyDiscoveryEngine,
@@ -26,7 +26,7 @@ from theo.domain.discoveries import (
 
 class RefreshDiscoveriesUseCase:
     """Orchestrates the discovery refresh process.
-    
+
     This use case coordinates:
     1. Loading document embeddings
     2. Running all discovery engines
@@ -34,7 +34,7 @@ class RefreshDiscoveriesUseCase:
     4. Persisting new discoveries
     5. Creating corpus snapshot
     """
-    
+
     def __init__(
         self,
         discovery_repo: DiscoveryRepository,
@@ -46,7 +46,7 @@ class RefreshDiscoveriesUseCase:
         gap_engine: GapDiscoveryEngine | None = None,
     ):
         """Initialize use case with repository and engines.
-        
+
         Args:
             discovery_repo: Repository for discovery persistence
             pattern_engine: Optional pattern detection engine
@@ -63,7 +63,7 @@ class RefreshDiscoveriesUseCase:
         self.anomaly_engine = anomaly_engine or AnomalyDiscoveryEngine()
         self.connection_engine = connection_engine or ConnectionDiscoveryEngine()
         self.gap_engine = gap_engine or GapDiscoveryEngine()
-    
+
     def execute(
         self,
         user_id: str,
@@ -74,7 +74,7 @@ class RefreshDiscoveriesUseCase:
         Args:
             user_id: User ID to refresh discoveries for
             document_repo: Repository used to load document embeddings
-        
+
         Returns:
             List of newly created discoveries
         """
@@ -86,7 +86,7 @@ class RefreshDiscoveriesUseCase:
         anomaly_candidates = self.anomaly_engine.detect(documents)
         connection_candidates = self.connection_engine.detect(documents)
         gap_candidates = self.gap_engine.detect(documents)
-        
+
         # Load historical snapshots for trend detection
         historical_snapshots = self.discovery_repo.get_recent_snapshots(
             user_id, limit=self.trend_engine.history_window - 1
@@ -95,7 +95,7 @@ class RefreshDiscoveriesUseCase:
             *[self._snapshot_dto_to_domain(s) for s in historical_snapshots],
             snapshot,
         ])
-        
+
         # Clear old discoveries atomically
         discovery_types_to_clear = [
             DiscoveryType.PATTERN.value,
@@ -108,10 +108,10 @@ class RefreshDiscoveriesUseCase:
         deleted_count = self.discovery_repo.delete_by_types(
             user_id, discovery_types_to_clear
         )
-        
+
         # Convert domain discoveries to DTOs and persist
         new_discoveries: list[DiscoveryDTO] = []
-        
+
         # Pattern discoveries
         for candidate in pattern_candidates:
             dto = DiscoveryDTO(
@@ -128,7 +128,7 @@ class RefreshDiscoveriesUseCase:
                 metadata=dict(candidate.metadata),
             )
             new_discoveries.append(dto)
-        
+
         # Contradiction discoveries
         for candidate in contradiction_candidates:
             metadata = {
@@ -141,7 +141,7 @@ class RefreshDiscoveriesUseCase:
                 "contradiction_type": candidate.contradiction_type,
             }
             metadata.update(dict(candidate.metadata))
-            
+
             dto = DiscoveryDTO(
                 id=0,
                 user_id=user_id,
@@ -156,7 +156,7 @@ class RefreshDiscoveriesUseCase:
                 metadata=metadata,
             )
             new_discoveries.append(dto)
-        
+
         persisted = (
             self.discovery_repo.create_many(new_discoveries)
             if new_discoveries
@@ -165,7 +165,7 @@ class RefreshDiscoveriesUseCase:
 
         # Similar logic for other discovery types...
         # (Anomaly, Connection, Gap, Trend)
-        
+
         # Create corpus snapshot
         snapshot_dto = CorpusSnapshotDTO(
             id=0,
@@ -177,14 +177,14 @@ class RefreshDiscoveriesUseCase:
             metadata=dict(snapshot.metadata),
         )
         self.discovery_repo.create_snapshot(snapshot_dto)
-        
+
         return persisted
-    
+
     @staticmethod
     def _snapshot_dto_to_domain(dto: CorpusSnapshotDTO):
         """Convert snapshot DTO back to domain object for trend engine."""
         from theo.domain.discoveries.models import CorpusSnapshotSummary
-        
+
         return CorpusSnapshotSummary(
             snapshot_date=dto.snapshot_date,
             document_count=dto.document_count,

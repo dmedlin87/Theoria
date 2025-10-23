@@ -2,22 +2,21 @@
 
 from __future__ import annotations
 
+import logging
+import random
+import time
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-import logging
-import random
-import time
 from typing import Any
-import uuid
 
 import httpx
 from cachetools import LRUCache
 
 from theo.application.interfaces import LanguageModelClientProtocol
 from theo.application.ports.ai_registry import GenerationError
-
 
 LanguageModelClient = LanguageModelClientProtocol
 

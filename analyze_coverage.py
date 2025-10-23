@@ -3,6 +3,7 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+
 def analyze_coverage(coverage_file='coverage.xml'):
     tree = ET.parse(coverage_file)
     root = tree.getroot()

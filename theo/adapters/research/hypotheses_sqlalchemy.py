@@ -6,9 +6,9 @@ from typing import Sequence
 from sqlalchemy import Text, cast, func
 from sqlalchemy.orm import Session
 
-from theo.domain.research import Hypothesis, HypothesisDraft, HypothesisNotFoundError
-from theo.domain.repositories import HypothesisRepository
 from theo.adapters.persistence.models import Hypothesis as HypothesisModel
+from theo.domain.repositories import HypothesisRepository
+from theo.domain.research import Hypothesis, HypothesisDraft, HypothesisNotFoundError
 
 
 def _normalize_list(values: Sequence[str] | None) -> list[str] | None:

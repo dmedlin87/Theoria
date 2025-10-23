@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from inspect import isclass
 from datetime import UTC, datetime
 from enum import Enum
+from inspect import isclass
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -13,6 +13,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Enum as SQLEnum,
     Float,
     ForeignKey,
     Index,
@@ -22,12 +23,12 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects import postgresql
-from theo.application.facades.settings import get_settings
-from .types import IntArrayType, TSVectorType, VectorType
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from theo.application.facades.settings import get_settings
+
+from .types import IntArrayType, TSVectorType, VectorType
 
 _JSONB = postgresql.JSONB(astext_type=Text()).with_variant(JSON, "sqlite")
 

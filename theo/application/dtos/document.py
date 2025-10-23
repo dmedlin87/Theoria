@@ -9,7 +9,7 @@ from datetime import datetime
 @dataclass(frozen=True)
 class DocumentSummaryDTO:
     """Lightweight document summary without passages."""
-    
+
     id: str
     title: str | None
     authors: list[str] | None
@@ -22,7 +22,7 @@ class DocumentSummaryDTO:
 @dataclass(frozen=True)
 class PassageDTO:
     """Application-layer representation of a document passage."""
-    
+
     id: int
     document_id: str
     text: str | None
@@ -37,7 +37,7 @@ class PassageDTO:
 @dataclass(frozen=True)
 class DocumentDTO:
     """Complete document with passages."""
-    
+
     id: str
     title: str | None
     authors: list[str] | None

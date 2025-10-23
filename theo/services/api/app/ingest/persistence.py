@@ -6,22 +6,19 @@ import json
 import logging
 import shutil
 import tempfile
-from pathlib import Path
-from typing import Any, Iterable, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Any, Sequence
+from pathlib import Path
+from typing import Any, Iterable, Sequence
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from theo.application.graph import GraphDocumentProjection
 from theo.platform.events import event_bus
 from theo.platform.events.types import DocumentIngestedEvent
-from theo.application.graph import GraphDocumentProjection
-from ..case_builder import sync_passages_case_objects
-from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from theo.services.api.app.persistence_models import (
     CommentaryExcerptSeed,
     Creator,
@@ -35,9 +32,12 @@ from theo.services.api.app.persistence_models import (
     TranscriptSegmentVerse,
     Video,
 )
+
+from ..case_builder import sync_passages_case_objects
+from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from .embeddings import lexical_representation
-from .exceptions import UnsupportedSourceError
 from .events import emit_document_persisted_event
+from .exceptions import UnsupportedSourceError
 from .metadata import (
     build_source_ref,
     coerce_date,
@@ -61,7 +61,6 @@ from .osis import (
     expand_osis_reference,
 )
 from .sanitizer import sanitize_passage_text
-
 
 logger = logging.getLogger(__name__)
 

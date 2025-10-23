@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import pytest
 
-from ...config import DEFAULT_LOCALE  # noqa: F401 - kept for compatibility
 from ... import Faker
+from ...config import DEFAULT_LOCALE  # noqa: F401 - kept for compatibility
 
 DEFAULT_SEED = 0
 

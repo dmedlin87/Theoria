@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from .registry import RouterRegistration, register_router
 from ..graphql.router import graphql_router
 from ..routes import (
     ai,
     analytics,
-    dashboard,
     creators,
+    dashboard,
     discoveries,
     discoveries_v1,
     documents,
@@ -24,7 +23,7 @@ from ..routes import (
     transcripts,
     verses,
 )
-
+from .registry import RouterRegistration, register_router
 
 _DEFAULT_REGISTRATIONS = (
     RouterRegistration(router=graphql_router, prefix="/graphql", tags=("graphql",)),

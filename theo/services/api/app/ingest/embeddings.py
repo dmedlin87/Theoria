@@ -28,8 +28,8 @@ class _EmbeddingBackend(Protocol):
         ...
 
 from theo.application.facades.settings import get_settings
-from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
+from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 
 _LOGGER = logging.getLogger(__name__)
 _TRACER = trace.get_tracer("theo.embedding")

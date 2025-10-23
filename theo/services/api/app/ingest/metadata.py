@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from datetime import date, datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
-from collections.abc import Mapping
 from typing import Protocol, TypeAlias
 
 import yaml
 
+from .chunking import Chunk, chunk_text, chunk_transcript
 from .exceptions import UnsupportedSourceError
 from .osis import DetectedOsis, classify_osis_matches
 from .parsers import (
@@ -26,9 +27,7 @@ from .parsers import (
     parse_pdf_document,
     read_text_file,
 )
-from .chunking import Chunk, chunk_text, chunk_transcript
 from .sanitizer import sanitize_passage_text
-
 
 JSONPrimitive: TypeAlias = str | int | float | bool | None
 JSONValue: TypeAlias = JSONPrimitive | list["JSONValue"] | dict[str, "JSONValue"]

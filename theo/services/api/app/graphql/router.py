@@ -7,7 +7,6 @@ from strawberry.fastapi import GraphQLRouter
 from .context import get_graphql_context
 from .schema import schema
 
-
 graphql_router = GraphQLRouter(
     schema,
     context_getter=get_graphql_context,

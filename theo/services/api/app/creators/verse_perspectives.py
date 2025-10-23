@@ -21,6 +21,7 @@ from theo.services.api.app.persistence_models import (
     TranscriptSegmentVerse,
     Video,
 )
+
 from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.creators import (
     CreatorVersePerspectiveCreator,
