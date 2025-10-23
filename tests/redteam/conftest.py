@@ -89,7 +89,9 @@ def configure_redteam_environment(
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _speed_up_redteam_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+def _speed_up_redteam_startup() -> Generator[None, None, None]:
+    monkeypatch = pytest.MonkeyPatch()
+
     def _noop_run_sql_migrations(
         engine=None,
         migrations_path=None,
@@ -127,3 +129,8 @@ def _speed_up_redteam_startup(monkeypatch: pytest.MonkeyPatch) -> None:
         _noop,
         raising=False,
     )
+
+    try:
+        yield
+    finally:
+        monkeypatch.undo()
