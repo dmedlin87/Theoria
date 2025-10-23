@@ -347,15 +347,6 @@ def _normalise_author(name: str) -> dict[str, str]:
             result["given"] = given
         return result
 
-    parts = [segment.strip() for segment in candidate.split() if segment.strip()]
-    if len(parts) >= 2:
-        family = parts[-1]
-        given = " ".join(parts[:-1])
-        result: dict[str, str] = {"family": family}
-        if given:
-            result["given"] = given
-        return result
-
     return {"literal": candidate}
 
 
@@ -659,12 +650,11 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
 
     title_text = str(title).strip()
     if title_text:
-        if title_text.endswith((".", "!", "?")):
-            segments.append(f'"{title_text}"')
-        else:
-            segments.append(f'"{title_text}."')
+        if title_text.endswith("."):
+            title_text = title_text.rstrip(".").rstrip()
+        segments.append(f'"{title_text}"')
     else:
-        segments.append('"Untitled."')
+        segments.append('"Untitled"')
     if details_text:
         if not details_text.endswith(('.', '!', '?')):
             details_text = details_text.rstrip('.') + "."
@@ -679,7 +669,12 @@ def _format_sbl(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
     if anchor_entries:
         segments.append(f"Anchors: {anchor_entries}.")
 
-    return " ".join(segment.strip() for segment in segments if segment and segment.strip())
+    citation = " ".join(
+        segment.strip() for segment in segments if segment and segment.strip()
+    )
+    if citation and not citation.endswith((".", "!", "?")):
+        citation = citation.rstrip(".") + "."
+    return citation
 
 
 def _map_bibtex_type(csl_type: str) -> str:
