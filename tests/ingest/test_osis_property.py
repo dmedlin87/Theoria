@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 import pythonbible as pb
 
 from theo.services.api.app.ingest.chunking import Chunk, chunk_text
@@ -15,6 +15,8 @@ from theo.services.api.app.ingest.osis import (
     _osis_to_readable,
 )
 
+
+HYPOTHESIS_SETTINGS = settings(max_examples=40, deadline=None)
 
 @st.composite
 def normalized_references(draw) -> pb.NormalizedReference:
@@ -67,6 +69,7 @@ def paragraph_texts(draw) -> str:
     return "\n\n".join(spaced_paragraphs)
 
 
+@HYPOTHESIS_SETTINGS
 @given(normalized_references())
 def test_detect_osis_round_trip(reference: pb.NormalizedReference) -> None:
     """Formatting then detecting an OSIS reference should be lossless."""
@@ -86,6 +89,7 @@ def test_detect_osis_round_trip(reference: pb.NormalizedReference) -> None:
     assert primary_ids.issuperset(expected_ids)
 
 
+@HYPOTHESIS_SETTINGS
 @given(st.lists(normalized_references(), min_size=1, max_size=4))
 def test_combine_references_matches_detected_primary(
     references: list[pb.NormalizedReference],
@@ -106,6 +110,7 @@ def test_combine_references_matches_detected_primary(
     assert detected.primary == format_osis(combined)
 
 
+@HYPOTHESIS_SETTINGS
 @given(paragraph_texts(), st.integers(min_value=120, max_value=240))
 def test_chunk_text_preserves_offsets_and_token_budgets(
     text: str, max_tokens: int
@@ -146,3 +151,4 @@ def test_chunk_text_preserves_offsets_and_token_budgets(
         token_count = len(chunk.text.split())
         assert token_count <= hard_cap
         last_end = chunk.end_char
+

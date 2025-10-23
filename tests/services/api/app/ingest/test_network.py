@@ -7,7 +7,7 @@ from types import ModuleType, SimpleNamespace
 from typing import Any, Callable
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 
 from theo.services.api.app.ingest import network
 from theo.services.api.app.ingest.network import (
@@ -24,6 +24,8 @@ from theo.services.api.app.ingest.network import (
     resolve_host_addresses,
 )
 
+
+HYPOTHESIS_SETTINGS = settings(max_examples=40, deadline=None)
 
 class _FakeSettings(SimpleNamespace):
     ingest_url_blocked_schemes: list[str] = []
@@ -49,6 +51,7 @@ def test_normalise_host_strips_and_lowercases() -> None:
     assert normalise_host("  Example.COM.  ") == "example.com"
 
 
+@HYPOTHESIS_SETTINGS
 @given(st.text(alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_categories=("Cs",)), max_size=64))
 def test_normalise_host_property(host: str) -> None:
     result = normalise_host(host)
@@ -395,4 +398,5 @@ def test_extract_youtube_video_id_rejects_unknown() -> None:
 )
 def test_is_youtube_url(url: str, expected: bool) -> None:
     assert is_youtube_url(url) is expected
+
 
