@@ -43,17 +43,22 @@ def module_api_engine(tmp_path_factory, _api_engine_template):
 
 
 @pytest.fixture(scope="module")
-def client(module_api_engine) -> Generator[TestClient, None, None]:
-    """Test client with sample documents."""
-    engine = module_api_engine
-    session_factory = sessionmaker(
-        bind=engine,
+def module_session_factory(module_api_engine):
+    """Session factory bound to the module API engine."""
+
+    return sessionmaker(
+        bind=module_api_engine,
         autoflush=False,
         autocommit=False,
         expire_on_commit=False,
     )
 
-    with Session(engine) as session:
+
+@pytest.fixture(scope="module", autouse=True)
+def seed_module_documents(module_api_engine):
+    """Seed the shared module database with base documents once."""
+
+    with Session(module_api_engine) as session:
         doc1 = Document(
             id="doc-1",
             title="Systematic Theology Vol 1",
@@ -81,8 +86,17 @@ def client(module_api_engine) -> Generator[TestClient, None, None]:
         session.add(doc2)
         session.commit()
 
+    yield
+
+
+@pytest.fixture()
+def client(
+    module_session_factory, seed_module_documents
+) -> Generator[TestClient, None, None]:
+    """Test client with sample documents."""
+
     def _override_session() -> Generator[Session, None, None]:
-        db_session = session_factory()
+        db_session = module_session_factory()
         try:
             yield db_session
         finally:
