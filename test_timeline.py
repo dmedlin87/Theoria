@@ -1,6 +1,7 @@
 """Quick test script for CS-001 Reasoning Timeline."""
 
 from datetime import UTC, datetime
+
 from theo.services.api.app.models.reasoning import (
     ReasoningStep,
     ReasoningStepStatus,
@@ -8,10 +9,11 @@ from theo.services.api.app.models.reasoning import (
     ReasoningTimeline,
 )
 
+
 def test_reasoning_timeline():
     """Test that we can create and serialize a reasoning timeline."""
     now = datetime.now(UTC)
-    
+
     # Create a sample timeline
     timeline = ReasoningTimeline(
         session_id="test-123",
@@ -57,10 +59,10 @@ def test_reasoning_timeline():
         created_at=now.isoformat(),
         updated_at=now.isoformat(),
     )
-    
+
     # Test serialization
     timeline_dict = timeline.model_dump()
-    
+
     print("✅ Timeline Model Created Successfully")
     print(f"   Session: {timeline.session_id}")
     print(f"   Question: {timeline.question}")
@@ -68,7 +70,7 @@ def test_reasoning_timeline():
     print(f"   Status: {timeline.status}")
     print(f"   Total Duration: {timeline.total_duration_ms}ms")
     print()
-    
+
     # Print each step
     print("📋 Timeline Steps:")
     for i, step in enumerate(timeline.steps, 1):
@@ -80,24 +82,24 @@ def test_reasoning_timeline():
         if step.tools_called:
             print(f"      Tools: {', '.join(step.tools_called)}")
         print()
-    
+
     # Test JSON serialization
     import json
     timeline_json = json.dumps(timeline_dict, indent=2, default=str)
     print("✅ JSON Serialization Works")
     print(f"   Size: {len(timeline_json)} bytes")
     print()
-    
+
     # Verify structure
     assert timeline_dict["session_id"] == "test-123"
     assert len(timeline_dict["steps"]) == 3
     assert timeline_dict["steps"][0]["step_type"] == "understand"
     assert timeline_dict["steps"][1]["citations"] == ["Romans 3:28", "Galatians 2:16", "Ephesians 2:8-9"]
-    
+
     print("✅ All Assertions Passed!")
     print()
     print("🎯 Timeline model is working correctly!")
-    
+
     return timeline
 
 if __name__ == "__main__":

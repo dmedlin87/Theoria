@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
+
 from ..ingest.embeddings import clear_embedding_cache
 from ..models.search import (
     HybridSearchFilters,

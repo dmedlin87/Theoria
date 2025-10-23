@@ -9,7 +9,6 @@ from pydantic import ConfigDict, Field
 
 from .base import APIModel, BaseModel
 
-
 NotebookRole = Literal["owner", "editor", "viewer"]
 
 

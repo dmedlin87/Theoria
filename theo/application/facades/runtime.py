@@ -6,7 +6,6 @@ import logging
 import os
 from functools import lru_cache
 
-
 LOGGER = logging.getLogger(__name__)
 
 _TRUTHY_VALUES = {"1", "true", "yes", "on"}

@@ -5,6 +5,7 @@ import logging
 from functools import lru_cache
 
 from theo.application.graph import GraphProjector, NullGraphProjector
+
 from .settings import get_settings
 
 try:  # pragma: no cover - optional dependency resolution

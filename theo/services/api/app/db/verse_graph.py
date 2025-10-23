@@ -13,6 +13,7 @@ from theo.services.api.app.persistence_models import (
     ContradictionSeed,
     HarmonySeed,
 )
+
 from ..ingest.osis import expand_osis_reference, osis_intersects
 
 _ALLOWED_PERSPECTIVES = {"apologetic", "skeptical", "neutral"}

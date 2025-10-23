@@ -7,9 +7,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from ...models.search import HybridSearchFilters, HybridSearchResult
-
 from .models import RAGCitation
-
 
 _MARKDOWN_ESCAPE_PATTERN = re.compile(r"([\\`*_{}\[\]()#+.!|\-])")
 _ADVERSARIAL_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -72,7 +70,7 @@ def _normalise_mojibake(text: str) -> str:
     if not text or not any(trigger in text for trigger in _MOJIBAKE_TRIGGERS):
         return text
     normalised: str | None = None
-    for encoding in ("latin-1", "cp1252"): 
+    for encoding in ("latin-1", "cp1252"):
         try:
             normalised = text.encode(encoding).decode("utf-8")
             break

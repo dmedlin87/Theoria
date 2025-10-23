@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 import importlib
 import inspect
 import logging
 import os
+from contextlib import asynccontextmanager
 from functools import wraps
 from typing import Callable, Optional, cast
 
 from fastapi import Depends, FastAPI, Request, status
-from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -24,11 +27,14 @@ from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, get_engine
 from theo.application.facades.runtime import allow_insecure_startup
 from theo.application.facades.settings import get_settings, get_settings_secret
+
+from . import events as _app_events  # noqa: F401  (ensure handlers register)
 from .db.run_sql_migrations import run_sql_migrations
 from .db.seeds import seed_reference_data
 from .debug import ErrorReportingMiddleware
-from .ingest.exceptions import UnsupportedSourceError
+from .error_handlers import install_error_handlers
 from .errors import TheoError
+from .ingest.exceptions import UnsupportedSourceError
 from .routes import (
     ai,
     analytics,
@@ -47,13 +53,12 @@ from .routes import (
     verses,
 )
 from .security import require_principal
-from .telemetry import configure_console_tracer
-from . import events as _app_events  # noqa: F401  (ensure handlers register)
-from .tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
 from .services import router_registry as _router_registry  # noqa: F401
 from .services.registry import RouterRegistration, iter_router_registrations
-from .error_handlers import install_error_handlers
+from .telemetry import configure_console_tracer
+from .tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
 from .versioning import get_version_manager
+
 GenerateLatestFn = Callable[[], bytes]
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
 generate_latest: Optional[GenerateLatestFn] = None
@@ -333,13 +338,13 @@ def create_app() -> FastAPI:
     _install_error_reporting(app)
     _register_health_routes(app)
     _register_trace_handlers(app)
-    
+
     # Install standardized domain error handlers
     install_error_handlers(app)
 
     security_dependencies = [Depends(require_principal)]
     _include_router_registrations(app, security_dependencies)
-    
+
     # Initialize API versioning (v1.0 as default for backward compatibility)
     version_manager = get_version_manager()
     v1 = version_manager.register_version("1.0", is_default=True)

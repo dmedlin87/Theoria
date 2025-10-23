@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
 from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository
-from theo.application.repositories import DiscoveryRepository, DocumentRepository
 from theo.application.facades.database import get_session
+from theo.application.repositories import DiscoveryRepository, DocumentRepository
 
 from ..discoveries import DiscoveryService
 from ..models.discoveries import (

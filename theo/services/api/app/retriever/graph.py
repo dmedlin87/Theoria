@@ -6,7 +6,11 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from ..db.verse_graph import CommentarySeedRecord, PairSeedRecord, load_seed_relationships
+from ..db.verse_graph import (
+    CommentarySeedRecord,
+    PairSeedRecord,
+    load_seed_relationships,
+)
 from ..ingest.osis import osis_intersects
 from ..models.base import Passage as PassageSchema
 from ..models.verses import (

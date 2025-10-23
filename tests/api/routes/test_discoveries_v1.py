@@ -212,7 +212,7 @@ class TestDiscoveriesV1Routes:
 
 class TestRepositoryIntegration:
     """Test actual repository integration (requires database)."""
-    
+
     @pytest.mark.slow
     def test_full_stack_list_discoveries(self, api_engine):
         """Full integration test with real repository and database."""
@@ -221,7 +221,7 @@ class TestRepositoryIntegration:
             SQLAlchemyDiscoveryRepository,
         )
         from theo.adapters.persistence.models import Discovery
-        
+
         # Setup test data
         session = Session(api_engine)
         discovery = Discovery(
@@ -238,21 +238,21 @@ class TestRepositoryIntegration:
         session.add(discovery)
         session.commit()
         discovery_id = discovery.id
-        
+
         try:
             # Test via repository
             repo = SQLAlchemyDiscoveryRepository(session)
             filters = DiscoveryListFilters(user_id="integration_test")
             results = repo.list(filters)
-            
+
             assert len(results) == 1
             assert results[0].title == "Integration Test Discovery"
             assert isinstance(results[0], DiscoveryDTO)
-            
+
             # Test mark viewed
             viewed_dto = repo.mark_viewed(discovery_id, "integration_test")
             assert viewed_dto.viewed is True
-            
+
         finally:
             # Cleanup
             session.delete(discovery)

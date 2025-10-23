@@ -51,7 +51,7 @@ def _disable_migrations(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Prevent migrations from running during API startup.
-    
+
     Migrations are already applied by the integration_database_url fixture,
     so we don't need to run them again during FastAPI app lifespan startup.
     """

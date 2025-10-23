@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
+from theo.adapters.persistence import models
 from theo.application.facades.database import get_session
 
-from theo.adapters.persistence import models
 from ..models.dashboard import (
     DashboardActivity,
     DashboardMetric,

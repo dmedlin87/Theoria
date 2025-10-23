@@ -13,8 +13,9 @@ from theo.application.facades.research import (
     ResearchService,
     get_research_service,
 )
-from theo.domain.research import HypothesisNotFoundError, ResearchNoteNotFoundError
 from theo.application.facades.settings import get_settings
+from theo.domain.research import HypothesisNotFoundError, ResearchNoteNotFoundError
+
 from ..models.research import (
     CommentarySearchResponse,
     ContradictionSearchResponse,
@@ -22,21 +23,21 @@ from ..models.research import (
     CrossReferenceResponse,
     DssLink,
     DssLinksResponse,
+    FallacyDetection,
     FallacyDetectRequest,
     FallacyDetectResponse,
-    FallacyDetection,
-    Hypothesis,
-    HypothesisCreate,
-    HypothesisStatus,
-    HypothesisListResponse,
-    HypothesisResponse,
-    HypothesisUpdate,
     GeoPlaceSearchResponse,
     GeoVerseResponse,
     HistoricityEntry,
     HistoricitySearchResponse,
-    MorphToken,
+    Hypothesis,
+    HypothesisCreate,
+    HypothesisListResponse,
+    HypothesisResponse,
+    HypothesisStatus,
+    HypothesisUpdate,
     MorphologyResponse,
+    MorphToken,
     OverviewBullet,
     ReliabilityOverviewResponse,
     ReportBuildRequest,

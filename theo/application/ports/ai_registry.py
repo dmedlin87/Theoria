@@ -1,15 +1,14 @@
 """Application-level primitives for the LLM registry."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
 from cryptography.fernet import InvalidToken
 
 from theo.application.facades.settings import get_settings, get_settings_cipher
 from theo.application.interfaces import LanguageModelClientProtocol
-
 
 SETTINGS_KEY = "llm"
 SECRET_CONFIG_KEYS = {

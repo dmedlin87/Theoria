@@ -8,6 +8,7 @@ from typing import Iterable
 from sqlalchemy.orm import Session
 
 from theo.services.api.app.persistence_models import ContradictionSeed, HarmonySeed
+
 from ..db.verse_graph import compute_verse_id_ranges, query_pair_seed_rows
 from ..models.research import ContradictionItem
 

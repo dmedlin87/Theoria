@@ -12,9 +12,10 @@ from urllib.parse import urlencode
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.persistence_models import Document, Passage
-from ...models.search import HybridSearchFilters, HybridSearchResult
 from theo.application.ports.ai_registry import GenerationError
+from theo.services.api.app.persistence_models import Document, Passage
+
+from ...models.search import HybridSearchFilters, HybridSearchResult
 from .models import RAGAnswer, RAGCitation
 from .prompts import sanitise_json_structure
 

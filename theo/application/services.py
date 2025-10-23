@@ -4,9 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
+from theo.application.interfaces import SessionProtocol
 from theo.domain import Document, DocumentId
 
-from theo.application.interfaces import SessionProtocol
 from .research import ResearchService
 
 

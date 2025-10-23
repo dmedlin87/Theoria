@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import Settings, get_settings
 from theo.application.search import QueryRewriter
+
 from ..analytics.experiments import (
     ExperimentAnalyticsSink,
     RerankerExperimentOutcome,

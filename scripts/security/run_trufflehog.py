@@ -40,16 +40,16 @@ def fingerprint(entry: dict) -> Tuple[str, str, str]:
 
 def run_trufflehog() -> subprocess.CompletedProcess[str]:
     """Execute the legacy CLI bundled with `pip install trufflehog`."""
-    
+
     # Try to find trufflehog in PATH first
     trufflehog_path = shutil.which("trufflehog")
-    
+
     # On Windows, also check user scripts directory
     if trufflehog_path is None and sys.platform == "win32":
         user_scripts = Path.home() / "AppData" / "Roaming" / "Python" / f"Python{sys.version_info.major}{sys.version_info.minor}" / "Scripts" / "trufflehog.exe"
         if user_scripts.exists():
             trufflehog_path = str(user_scripts)
-    
+
     if trufflehog_path is None:
         raise RuntimeError("trufflehog executable not found. Install with: pip install trufflehog")
 

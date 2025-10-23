@@ -1,8 +1,8 @@
 """Facade helpers exposing research application services."""
 from __future__ import annotations
 
-from theo.application.research import ResearchService
 from theo.application.interfaces import SessionProtocol
+from theo.application.research import ResearchService
 from theo.domain.research import (
     HypothesisDraft,
     ResearchNoteDraft,

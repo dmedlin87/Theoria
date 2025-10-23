@@ -6,6 +6,11 @@ from typing import Mapping, Sequence
 from sqlalchemy import Text, cast, func
 from sqlalchemy.orm import Session
 
+from theo.adapters.persistence.models import (
+    NoteEvidence,
+    ResearchNote as ResearchNoteModel,
+)
+from theo.domain.repositories import ResearchNoteRepository
 from theo.domain.research import (
     ResearchNote,
     ResearchNoteDraft,
@@ -13,8 +18,6 @@ from theo.domain.research import (
     ResearchNoteEvidenceDraft,
     ResearchNoteNotFoundError,
 )
-from theo.domain.repositories import ResearchNoteRepository
-from theo.adapters.persistence.models import NoteEvidence, ResearchNote as ResearchNoteModel
 
 
 def _normalize_tags(tags: tuple[str, ...] | None) -> list[str] | None:

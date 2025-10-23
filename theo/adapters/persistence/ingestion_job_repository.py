@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import Session
 
 from theo.application.repositories import IngestionJobRepository
 
 from .models import IngestionJob
-
 
 if TYPE_CHECKING:
     from theo.application.dtos import IngestionJobDTO

@@ -6,9 +6,9 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 from strawberry.fastapi.context import BaseContext
 
-from theo.application.services import ApplicationContainer
-from theo.application.research import ResearchService
 from theo.application.facades.database import get_session
+from theo.application.research import ResearchService
+from theo.application.services import ApplicationContainer
 from theo.services.api.app.security import Principal
 from theo.services.bootstrap import resolve_application
 

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, TypeAlias
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from theo.application.facades.database import get_session
 from theo.services.api.app.ai import (
     generate_comparative_analysis,
     generate_devotional_flow,
@@ -17,7 +18,10 @@ from theo.services.api.app.ai import (
     run_corpus_curation,
     run_research_reconciliation,
 )
-from theo.services.api.app.ai.passage import PassageResolutionError, resolve_passage_reference
+from theo.services.api.app.ai.passage import (
+    PassageResolutionError,
+    resolve_passage_reference,
+)
 from theo.services.api.app.ai.rag import (
     CollaborationResponse,
     ComparativeAnalysisResponse,
@@ -29,7 +33,6 @@ from theo.services.api.app.ai.rag import (
     VerseCopilotResponse,
 )
 from theo.services.api.app.ai.trails import TrailService
-from theo.application.facades.database import get_session
 from theo.services.api.app.models.ai import (
     CollaborationRequest,
     ComparativeAnalysisRequest,
@@ -39,9 +42,9 @@ from theo.services.api.app.models.ai import (
     SermonPrepRequest,
     VerseCopilotRequest,
 )
-from .guardrails import guardrail_http_exception
-from ....errors import AIWorkflowError
 
+from ....errors import AIWorkflowError
+from .guardrails import guardrail_http_exception
 
 if TYPE_CHECKING:
     from fastapi.responses import JSONResponse

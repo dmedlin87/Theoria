@@ -14,6 +14,7 @@ from theo.services.api.app.persistence_models import (
     UserWatchlist,
     WatchlistEvent,
 )
+
 from ..models.watchlists import (
     WatchlistCreateRequest,
     WatchlistFilters,

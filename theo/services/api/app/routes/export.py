@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import gzip
-from datetime import UTC, datetime
-
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -15,10 +14,11 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 from theo.services.api.app.persistence_models import Document
+
 from ..errors import ExportError, Severity
 from ..export.citations import (
-    build_citation_export,
     CitationSource,
+    build_citation_export,
     render_citation_markdown,
 )
 from ..export.formatters import (
@@ -28,7 +28,11 @@ from ..export.formatters import (
     generate_export_id,
     render_bundle,
 )
-from ..export.zotero import export_to_zotero, verify_zotero_credentials, ZoteroExportError
+from ..export.zotero import (
+    ZoteroExportError,
+    export_to_zotero,
+    verify_zotero_credentials,
+)
 from ..models.export import (
     CitationExportRequest,
     DeliverableRequest,
@@ -38,9 +42,9 @@ from ..models.export import (
     ZoteroExportResponse,
 )
 from ..models.search import HybridSearchFilters, HybridSearchRequest
+from ..models.verses import VerseMentionsFilters
 from ..retriever.export import export_documents, export_search_results
 from ..retriever.verses import get_mentions_for_osis
-from ..models.verses import VerseMentionsFilters
 from ..workers import tasks as worker_tasks
 
 __all__ = ["router", "api_router", "ExportError"]

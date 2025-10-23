@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from uuid import uuid4
 from typing import Any, AsyncIterator, Iterator
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 from theo.application.facades.settings import get_settings
+
 from ..discoveries.tasks import schedule_discovery_refresh
 from ..errors import IngestionError, Severity
 from ..ingest.exceptions import UnsupportedSourceError
@@ -28,9 +29,9 @@ from ..models.documents import (
     UrlIngestRequest,
 )
 from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
-from ..utils.imports import LazyImportModule
 from ..security import Principal, require_principal
 from ..services.ingestion_service import IngestionService, get_ingestion_service
+from ..utils.imports import LazyImportModule
 
 cli_ingest = LazyImportModule("theo.services.cli.ingest_folder")
 

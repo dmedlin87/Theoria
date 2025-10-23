@@ -21,6 +21,7 @@ from theo.domain.errors import (
     RateLimitError,
     ValidationError,
 )
+
 from .tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
 
 if TYPE_CHECKING:

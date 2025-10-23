@@ -5,19 +5,19 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from theo.application.interfaces import SessionProtocol
+from theo.adapters.persistence.models import AppSetting
 from theo.application.facades.settings import get_settings_cipher
 from theo.application.facades.settings_store import (
     SETTINGS_NAMESPACE,
     save_setting,
 )
+from theo.application.interfaces import SessionProtocol
 from theo.application.ports.ai_registry import (
     SECRET_CONFIG_KEYS,
     SETTINGS_KEY as LLM_SETTINGS_KEY,
     registry_from_payload,
 )
 from theo.services.api.app.ai.registry import save_llm_registry
-from theo.adapters.persistence.models import AppSetting
 
 logger = logging.getLogger(__name__)
 

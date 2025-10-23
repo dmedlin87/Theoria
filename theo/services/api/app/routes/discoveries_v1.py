@@ -9,10 +9,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from theo.application.dtos import DiscoveryDTO, DiscoveryListFilters
-from theo.application.repositories import DiscoveryRepository
 from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
+from theo.application.dtos import DiscoveryDTO, DiscoveryListFilters
 from theo.application.facades.database import get_session
+from theo.application.repositories import DiscoveryRepository
 from theo.domain.errors import NotFoundError
 
 router = APIRouter()
@@ -22,7 +22,7 @@ def get_discovery_repository(
     session: Session = Depends(get_session),
 ) -> DiscoveryRepository:
     """Dependency injection for discovery repository.
-    
+
     This factory creates a repository instance for each request,
     allowing the service layer to work with abstractions rather
     than concrete implementations.
@@ -43,12 +43,12 @@ def list_discoveries(
     repo: DiscoveryRepository = Depends(get_discovery_repository),
 ) -> list[DiscoveryDTO]:
     """List discoveries for a user with optional filters.
-    
+
     This endpoint demonstrates the new architecture:
     - Works with DTOs (not ORM models)
     - Uses repository abstraction
     - Returns type-safe responses
-    
+
     Example:
         GET /api/v1/discoveries?user_id=test&viewed=false&min_confidence=0.7
     """
@@ -60,7 +60,7 @@ def list_discoveries(
         limit=limit,
         offset=offset,
     )
-    
+
     return repo.list(filters)
 
 
@@ -71,15 +71,15 @@ def get_discovery(
     repo: DiscoveryRepository = Depends(get_discovery_repository),
 ) -> DiscoveryDTO:
     """Get a single discovery by ID.
-    
+
     Raises:
         NotFoundError: If discovery doesn't exist or user doesn't have access
     """
     discovery = repo.get_by_id(discovery_id, user_id)
-    
+
     if discovery is None:
         raise NotFoundError("Discovery", discovery_id)
-    
+
     return discovery
 
 
@@ -90,7 +90,7 @@ def mark_discovery_viewed(
     repo: DiscoveryRepository = Depends(get_discovery_repository),
 ) -> DiscoveryDTO:
     """Mark a discovery as viewed.
-    
+
     This updates the viewed flag and returns the updated discovery.
     Domain errors are automatically converted to appropriate HTTP responses.
     """
@@ -108,7 +108,7 @@ def set_discovery_feedback(
     repo: DiscoveryRepository = Depends(get_discovery_repository),
 ) -> DiscoveryDTO:
     """Set user feedback/reaction on a discovery.
-    
+
     Valid reactions:
     - helpful: Discovery was useful
     - not_helpful: Discovery wasn't relevant

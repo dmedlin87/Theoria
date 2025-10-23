@@ -148,8 +148,8 @@ async def mcp_error_handler(request: Request, exc: MCPError) -> JSONResponse:
 
 async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle unexpected exceptions with structured error format."""
-    from datetime import datetime, timezone
     import logging
+    from datetime import datetime, timezone
 
     logger = logging.getLogger(__name__)
     logger.exception("Unhandled exception in MCP server", exc_info=exc)

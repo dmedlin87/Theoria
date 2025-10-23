@@ -9,10 +9,10 @@ from datetime import datetime
 @dataclass(frozen=True)
 class DiscoveryDTO:
     """Application-layer representation of a discovery.
-    
+
     Decouples service layer from ORM model implementation.
     """
-    
+
     id: int
     user_id: str
     discovery_type: str
@@ -29,7 +29,7 @@ class DiscoveryDTO:
 @dataclass(frozen=True)
 class DiscoveryListFilters:
     """Filters for querying discoveries."""
-    
+
     user_id: str
     discovery_type: str | None = None
     viewed: bool | None = None
@@ -41,7 +41,7 @@ class DiscoveryListFilters:
 @dataclass(frozen=True)
 class CorpusSnapshotDTO:
     """Application-layer representation of a corpus snapshot."""
-    
+
     id: int
     user_id: str
     snapshot_date: datetime

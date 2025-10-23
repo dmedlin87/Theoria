@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Sequence
 
 from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
 from sqlalchemy.sql import sqltypes

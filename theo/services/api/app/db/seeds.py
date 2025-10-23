@@ -7,8 +7,8 @@ import logging
 import re
 import time
 from collections.abc import Callable, Iterable
-from datetime import UTC, datetime
 from contextlib import nullcontext
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
@@ -20,15 +20,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateColumn
 
 from theo.adapters.persistence.sqlite import dispose_sqlite_engine
-from theo.services.geo import seed_openbible_geo
-from ..ingest.osis import expand_osis_reference
-
 from theo.services.api.app.persistence_models import (
     CommentaryExcerptSeed,
     ContradictionSeed,
     GeoPlace,
     HarmonySeed,
 )
+from theo.services.geo import seed_openbible_geo
+
+from ..ingest.osis import expand_osis_reference
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
 SEED_ROOT = PROJECT_ROOT / "data" / "seeds"

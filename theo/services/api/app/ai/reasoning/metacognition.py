@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections import Counter
-from dataclasses import dataclass, field
 import logging
 import re
 import textwrap
+from collections import Counter
+from dataclasses import dataclass, field
 from typing import Iterable
 
 from ..clients import LanguageModelClient

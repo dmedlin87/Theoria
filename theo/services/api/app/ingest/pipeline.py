@@ -10,15 +10,17 @@ from urllib.request import build_opener as _urllib_build_opener
 
 from sqlalchemy.orm import Session
 
-from theo.application.graph import GraphProjector, NullGraphProjector
 from theo.application.facades.graph import get_graph_projector
 from theo.application.facades.settings import Settings, get_settings
+from theo.application.graph import GraphProjector, NullGraphProjector
 from theo.services.api.app.persistence_models import Document, TranscriptSegment
+
+from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
 from ..telemetry import instrument_workflow, set_span_attribute
+from . import network as ingest_network
 from .embeddings import get_embedding_service
 from .exceptions import UnsupportedSourceError
 from .metadata import Frontmatter, load_frontmatter, merge_metadata, parse_text_file
-from . import network as ingest_network
 from .network import fetch_web_document
 from .orchestrator import IngestOrchestrator, OrchestratorResult
 from .persistence import refresh_creator_verse_rollups
@@ -51,8 +53,6 @@ from .stages.persisters import (
     TextDocumentPersister,
     TranscriptDocumentPersister,
 )
-from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
-
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,6 @@
 """Research domain exports."""
+from .crossrefs import CrossReferenceEntry, fetch_cross_references
+from .dss_links import DssLinkEntry, fetch_dss_links
 from .entities import (
     Hypothesis,
     HypothesisDraft,
@@ -9,8 +11,6 @@ from .entities import (
     ResearchNoteEvidenceDraft,
     ResearchNoteNotFoundError,
 )
-from .crossrefs import CrossReferenceEntry, fetch_cross_references
-from .dss_links import DssLinkEntry, fetch_dss_links
 from .fallacies import FallacyHit, fallacy_detect
 from .historicity import HistoricityEntry, historicity_search
 from .morphology import MorphToken, fetch_morphology

@@ -13,8 +13,8 @@ from .context import GraphQLContext
 from .types import (
     DocumentInput,
     DocumentType,
-    InsightType,
     IngestDocumentPayload,
+    InsightType,
     VerseType,
 )
 

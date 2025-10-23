@@ -6,7 +6,18 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Annotated, Any, Awaitable, Callable, Dict, Generic, Iterable, Mapping, TypeVar, cast
+from typing import (
+    Annotated,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Mapping,
+    TypeVar,
+    cast,
+)
 from uuid import uuid4
 
 from fastapi import FastAPI, Header, Request
@@ -14,7 +25,7 @@ from fastapi.responses import JSONResponse
 
 from . import schemas
 from .config import ServerConfig
-from .errors import MCPError, mcp_error_handler, generic_error_handler
+from .errors import MCPError, generic_error_handler, mcp_error_handler
 from .metrics import get_metrics_collector
 from .middleware import (
     CORSHeaderMiddleware,
