@@ -33,6 +33,11 @@ The `core` package contains legacy shim modules that re-export functionality fro
 * Use parametrised tests to cover all shim modules in a single file to minimise duplication.
 * Add a docstring assertion test to ensure warning text stays actionable (guards accidental edits).
 
+### Coverage Progress
+* ✅ Legacy shim modules now emit the expected `DeprecationWarning` and expose facade symbols verbatim via a shared `import_legacy_module` helper that clears module caches before each import. The `database`, `runtime`, `secret_migration`, `settings`, `settings_store`, and `version` shims all assert their `__all__` exports and forwarded callables, ensuring passthrough semantics remain intact.【F:tests/api/core/__init__.py†L1-L21】【F:tests/api/core/test_database.py†L1-L22】【F:tests/api/core/test_runtime.py†L1-L19】【F:tests/api/core/test_secret_migration.py†L1-L19】【F:tests/api/core/test_settings.py†L1-L21】【F:tests/api/core/test_settings_store.py†L1-L29】【F:tests/api/core/test_version.py†L1-L19】
+* ✅ Facade parity tests also verify that accessing forwarded helpers (e.g., `require_setting`, `allow_insecure_startup`) returns the underlying facade objects directly, preventing silent wrapper mutations and protecting exception behaviour during future refactors.【F:tests/api/core/test_runtime.py†L13-L19】【F:tests/api/core/test_settings_store.py†L19-L29】
+* ⏭️ Still to do: add text assertions around warning copy so changes remain intentional (tracked under "Additional Coverage Boosters").
+
 ---
 
 ## 2. `theo/services/api/app/ingest`
@@ -83,6 +88,14 @@ This package orchestrates ingestion flows (file, transcript, URL, OSIS), metadat
 * Stub `ErrorPolicyDecision` dataclass to reuse across orchestrator tests.
 * Reusable `FakeResponse` class for network tests (supports `.read`, `.headers`, `.geturl`).
 
+### Coverage Progress
+* ✅ File, URL, and transcript pipelines now have integration-style tests that persist documents, capture span metrics, and validate Case Builder mirroring, snapshot manifests, and sanitisation of adversarial content, covering both inline and manifest snapshot paths.【F:tests/ingest/test_pipeline.py†L77-L398】【F:tests/ingest/test_pipeline.py†L431-L799】
+* ✅ Retry and error-policy wiring is exercised through flaky transcript parsers, YouTube fetch retries, duplicate ingestion handling, and policy recordings so `_ensure_success` and orchestrator surfaces respect injected decisions.【F:tests/ingest/test_pipeline.py†L557-L734】
+* ✅ Network guardrails enforce allow/block lists, private network checks, streaming chunk limits, oversized response handling, and truncated debug reports for failures; tests also confirm uploads stay chunked without buffering and allow-lists bypass DNS failures when configured.【F:tests/api/test_ingest.py†L81-L195】【F:tests/api/test_ingest.py†L125-L195】【F:tests/ingest/test_pipeline.py†L408-L969】
+* ✅ Ingestion emits domain events and records tracing attributes via instrumentation hooks that assert cache status, chunk counts, and event payload integrity.【F:tests/ingest/test_event_emission.py†L18-L63】【F:tests/ingest/test_pipeline.py†L45-L157】
+* ✅ Embedding cache behaviour is covered with deterministic stubs to ensure batch deduplication, cache hits, and LRU eviction semantics within `EmbeddingService` remain predictable for downstream pipelines.【F:tests/api/test_embeddings_cache.py†L7-L64】
+* ⏭️ Next up: extend coverage to property-style metadata merge tests and explicit `_ensure_success` unhappy-path assertions once reusable fixtures are finalised.
+
 ---
 
 ## 3. `theo/services/api/app/retriever`
@@ -129,6 +142,17 @@ The retriever package powers hybrid semantic + lexical search, annotation hydrat
 #### 3.4 Observability Assertions
 * Trace attribute tests verifying `_annotate_retrieval_span` sets fields for query, filters, cache status, and backend.【F:theo/services/api/app/retriever/hybrid.py†L29-L57】
 * Latency metric assertions in `_fallback_search` ensure span attributes record result count and latency.【F:theo/services/api/app/retriever/hybrid.py†L400-L501】
+
+### Coverage Progress
+* ✅ Query parsing, tokenisation, snippet building, and highlight generation are validated with whitespace/duplication edge cases to keep lexical scoring deterministic for hybrid search inputs.【F:tests/api/retriever/test_query_processing.py†L6-L34】
+* ✅ Guardrail filters, OSIS distance helpers, and TEI term aggregation run through targeted unit tests covering casing, whitespace, and nested metadata so candidate eligibility logic stays robust.【F:tests/api/retriever/test_edge_cases.py†L9-L68】
+* ✅ Candidate scoring, annotation enrichment, and result merging are exercised end-to-end, ensuring hybrid scores combine lexical/vector/annotation signals, OSIS boosts apply, and rank ordering honours requested limits.【F:tests/api/retriever/test_vector_search.py†L12-L57】【F:tests/api/retriever/test_search_integration.py†L9-L60】【F:tests/api/retriever/test_ranking.py†L27-L43】
+* ✅ Backend selection defers to the fallback search when no Postgres bind is present and switches to the pgvector pipeline when available, guarding hybrid orchestration entry points.【F:tests/api/retriever/test_hybrid_search.py†L19-L47】
+* ✅ Document annotation APIs are validated alongside ingestion to confirm annotations persist, mirror into Case Builder objects, and keep embeddings populated for downstream retrieval consumers.【F:tests/api/test_case_builder_annotations.py†L38-L92】
+* ⏭️ Remaining work: add direct coverage for SQL compilation helpers and pagination helpers in `documents.py` to close out the roadmap.
+
+## Update Log
+- **2025-10-19:** Recorded coverage progress from newly landed core shim, ingest pipeline, and retriever hybrid tests, noting remaining follow-ups for warning text assertions, metadata property tests, and retriever SQL builders.【F:tests/api/core/test_database.py†L1-L22】【F:tests/ingest/test_pipeline.py†L77-L969】【F:tests/api/retriever/test_search_integration.py†L9-L60】
 
 ---
 
