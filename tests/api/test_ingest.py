@@ -127,11 +127,16 @@ def test_ingest_file_streams_large_upload_without_buffering(
 ) -> None:
     _override_ingest_limit(monkeypatch, 12 * 1024 * 1024)
 
+    chunk_size = 32 * 1024
+    monkeypatch.setattr(ingest_module, "_UPLOAD_CHUNK_SIZE", chunk_size)
+
     captured_sizes: list[int] = []
 
     original_iter = ingest_module._iter_upload_chunks
 
-    async def tracking_iter(upload, chunk_size=ingest_module._UPLOAD_CHUNK_SIZE):
+    async def tracking_iter(upload, chunk_size=None):
+        if chunk_size is None or chunk_size > ingest_module._UPLOAD_CHUNK_SIZE:
+            chunk_size = ingest_module._UPLOAD_CHUNK_SIZE
         async for chunk in original_iter(upload, chunk_size=chunk_size):
             captured_sizes.append(len(chunk))
             yield chunk
@@ -150,7 +155,7 @@ def test_ingest_file_streams_large_upload_without_buffering(
 
     monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_file", fake_pipeline)
 
-    payload = b"x" * (11 * 1024 * 1024)
+    payload = b"x" * (chunk_size * 5)
 
     response = api_client.post(
         "/ingest/file",
@@ -169,6 +174,9 @@ def test_ingest_file_logs_large_body_as_truncated(
 ) -> None:
     _override_ingest_limit(monkeypatch, 12 * 1024 * 1024)
 
+    chunk_size = 32 * 1024
+    monkeypatch.setattr(ingest_module, "_UPLOAD_CHUNK_SIZE", chunk_size)
+
     def failing_pipeline(
         _session, path: Path, frontmatter, *, dependencies=None
     ) -> object:
@@ -176,7 +184,7 @@ def test_ingest_file_logs_large_body_as_truncated(
 
     monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_file", failing_pipeline)
 
-    payload = b"y" * (11 * 1024 * 1024)
+    payload = b"y" * (chunk_size * 5)
 
     with caplog.at_level(logging.ERROR, logger="theo.api.errors"):
         response = api_client.post(
@@ -198,7 +206,10 @@ def test_ingest_file_logs_large_body_as_truncated(
 def test_ingest_file_rejects_upload_exceeding_limit(
     monkeypatch: pytest.MonkeyPatch, api_client: TestClient
 ) -> None:
-    _override_ingest_limit(monkeypatch, 1 * 1024 * 1024)
+    chunk_size = 32 * 1024
+    monkeypatch.setattr(ingest_module, "_UPLOAD_CHUNK_SIZE", chunk_size)
+
+    _override_ingest_limit(monkeypatch, chunk_size * 2)
 
     called = False
 
@@ -211,7 +222,7 @@ def test_ingest_file_rejects_upload_exceeding_limit(
 
     monkeypatch.setattr(ingestion_service_module, "run_pipeline_for_file", fake_pipeline)
 
-    payload = b"z" * (2 * 1024 * 1024)
+    payload = b"z" * (chunk_size * 3)
 
     response = api_client.post(
         "/ingest/file",
