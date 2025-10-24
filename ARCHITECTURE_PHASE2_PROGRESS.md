@@ -131,3 +131,21 @@
 - When moving more workflow helpers, keep updating the regression tests and package proxy (`ai/rag/__init__.py`) so the shims remain patchable from the old import paths.
 - Prefer funnelling any new guardrail response logic through the `refusals` module to keep `workflow.py` focused on orchestration rather than response shaping.
 - Continue appending to this log after each PR with precise deliverables and outstanding scope to maintain continuity through the migration.
+
+## Entry – 2025-10-30
+
+### Delivered in this PR
+- Added regression coverage for `ai/rag/refusals.build_guardrail_refusal`, exercising the database-backed citation path and the static fallback to guard against future regressions while the guardrail catalogue evolves.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Extend guardrail refusal behaviours:**
+   - Backfill tests for refusal telemetry/logging once the guardrail service exposes structured events.
+   - Cover negative-path validation (e.g., malformed guardrail profiles) as new inputs are formalised.
+2. **Continue modularising the RAG workflows:**
+   - Move remaining response-shaping helpers (key point selection, devotional builders) out of `workflow.py` into dedicated modules now that regression tests protect the refusal layer.
+3. **Broaden prompt utility adoption:**
+   - Shift the sermon prep and multimedia prompt builders into `ai/rag/prompts.py`, updating the new tests as needed to reflect the sanitisation pipeline.
+
+### Guidance for the Next Agent
+- Keep the new refusal tests updated as guardrail catalogue storage changes; they provide fast feedback that the compatibility shim still yields stable refusals when the database is unavailable.
+- Use the upcoming modular splits to tighten `ai/__init__.py` exports only after routes/tests adopt the new module boundaries to preserve compatibility during the migration.
