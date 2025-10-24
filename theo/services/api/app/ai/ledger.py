@@ -956,6 +956,16 @@ class SharedLedger:
                     )
                     success_missing_output_since = None
                     return preserved_record
+                message = (row.error or "").strip().lower()
+                if "completed without a result" in message:
+                    _record_event(
+                        "transient_error",
+                        cache_key,
+                        status=row.status,
+                        error=row.error,
+                    )
+                    time.sleep(poll_interval)
+                    continue
                 _record_event(
                     "error_raised",
                     cache_key,
