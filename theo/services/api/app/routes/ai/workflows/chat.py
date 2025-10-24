@@ -16,10 +16,7 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
 from theo.application.facades.settings import get_settings
-from theo.services.api.app.ai import (
-    memory_index as memory_index_module,
-    run_guarded_chat,
-)
+from theo.services.api.app.ai import memory_index as memory_index_module
 from theo.services.api.app.ai.audit_logging import (
     AuditLogWriter,
     compute_prompt_hash,
@@ -33,6 +30,7 @@ from theo.services.api.app.ai.rag import (
     GuardrailError,
     RAGAnswer,
     ensure_completion_safe,
+    run_guarded_chat,
 )
 from theo.services.api.app.ai.research_loop import ResearchLoopController
 from theo.services.api.app.ai.trails import TrailService
