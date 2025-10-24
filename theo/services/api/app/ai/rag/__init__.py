@@ -8,11 +8,14 @@ import types
 from ...telemetry import instrument_workflow
 from ..registry import get_llm_registry
 from . import (
+    collaboration as _collaboration_module,
+    corpus as _corpus_module,
     deliverables as _deliverables_module,
     guardrail_helpers as _guardrail_helpers_module,
     guardrails as _guardrails_module,
     refusals as _refusals_module,
     retrieval as _retrieval_module,
+    verse as _verse_module,
     workflow as _workflow_module,
 )
 from .deliverables import (
@@ -39,6 +42,9 @@ from .models import (
     VerseCopilotResponse,
 )
 from .retrieval import record_used_citation_feedback, search_passages
+from .verse import generate_verse_brief
+from .corpus import run_corpus_curation
+from .collaboration import run_research_reconciliation
 from .workflow import (
     REFUSAL_MESSAGE,
     REFUSAL_MODEL_NAME,
@@ -48,10 +54,7 @@ from .workflow import (
     build_sermon_prep_package,
     build_transcript_deliverable,
     build_transcript_package,
-    generate_verse_brief,
-    run_corpus_curation,
     run_guarded_chat,
-    run_research_reconciliation,
 )
 
 __all__ = [
@@ -107,6 +110,12 @@ class _RAGModule(types.ModuleType):
             setattr(_refusals_module, name, value)
         if hasattr(_retrieval_module, name):
             setattr(_retrieval_module, name, value)
+        if hasattr(_collaboration_module, name):
+            setattr(_collaboration_module, name, value)
+        if hasattr(_corpus_module, name):
+            setattr(_corpus_module, name, value)
+        if hasattr(_verse_module, name):
+            setattr(_verse_module, name, value)
         super().__setattr__(name, value)
 
 
