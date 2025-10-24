@@ -156,6 +156,44 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
 os.environ.setdefault("THEO_ALLOW_INSECURE_STARTUP", "1")
 os.environ.setdefault("THEORIA_ENVIRONMENT", "development")
 
+
+@pytest.fixture(scope="session", autouse=True)
+def _configure_celery_for_tests() -> Generator[None, None, None]:
+    """Execute Celery tasks inline to avoid external broker dependencies."""
+
+    os.environ.setdefault("THEORIA_TESTING", "1")
+
+    try:
+        from theo.services.api.app.workers import tasks as worker_tasks
+    except Exception:  # pragma: no cover - Celery optional in some test subsets
+        yield
+        return
+
+    app = worker_tasks.celery
+    previous_config = {
+        "task_always_eager": app.conf.task_always_eager,
+        "task_eager_propagates": app.conf.task_eager_propagates,
+        "task_ignore_result": getattr(app.conf, "task_ignore_result", False),
+        "task_store_eager_result": getattr(app.conf, "task_store_eager_result", False),
+        "broker_url": app.conf.broker_url,
+        "result_backend": app.conf.result_backend,
+    }
+
+    app.conf.update(
+        task_always_eager=True,
+        task_eager_propagates=True,
+        task_ignore_result=True,
+        task_store_eager_result=False,
+        broker_url="memory://",
+        result_backend=None,
+    )
+
+    try:
+        yield
+    finally:
+        app.conf.update(**previous_config)
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
