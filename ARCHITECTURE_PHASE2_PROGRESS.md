@@ -2,7 +2,7 @@
 
 > **Update cadence:** Update this log at the end of every Phase 2 PR. Each entry should capture (1) changes delivered, (2) remaining scope, and (3) guidance for the next implementer. Keep this document as the canonical hand-off reference until Phase 2 is complete.
 
-## Current Entry – 2025-10-24
+## Entry – 2025-10-24
 
 ### Delivered in this PR
 - Established the new modular AI package scaffold under `theo/services/api/app/ai/`, including provider-agnostic interfaces, client factory plumbing, and supporting cache/usage utilities.
@@ -26,3 +26,25 @@
 - Coordinate module migrations carefully: move logic in manageable chunks and keep interfaces backward compatible until all call sites are switched.
 - Update this log at the end of your PR with a precise summary of what changed and what remains.
 
+
+## Current Entry – 2025-10-25
+
+### Delivered in this PR
+- Carved the guardrail catalogue and advisory Pydantic schemas out of `models/ai.py` into the new `theo/services/api/app/ai/guardrails/` package so the Phase 2 guardrail module has a concrete home.
+- Updated the `/ai/features` and guardrail workflow routes to consume the new abstractions without changing their response payloads.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Finish the guardrail package build-out:**
+   - Migrate the HTTP response helpers in `routes/ai/workflows/guardrails.py` into the new `ai/guardrails/` namespace once the package gains more structure (e.g., advice builders, refusal templates).
+   - Wire future guardrail configuration sources (DB/feature flags) through the new package instead of hard-coding catalogues.
+2. **Continue slimming `models/ai.py`:**
+   - Move the LLM registry request/response schemas and related helpers into purpose-built modules under `ai/registry`.
+   - Audit remaining chat/memory schemas for relocation into `ai/` subpackages as their owning services come online.
+3. **Unblock test harness imports:**
+   - `tests/api` cannot import the FastAPI app because `theo.services.api.app.ai.registry` still points at `theo.services.api.app.ai.clients` (package) which does not expose `build_client` from the legacy module.
+   - Either finish migrating the factory logic into `ai/clients/` or introduce a compatibility shim so the new registry helpers can resolve their client factory.
+
+### Guidance for the Next Agent
+- Consolidate future guardrail schema changes inside `theo/services/api/app/ai/guardrails/` and delete the legacy definitions from `models/ai.py` as additional call sites move over.
+- When tackling the client factory import conflict, ensure `registry.py` continues to surface a provider-agnostic `build_client` for the rest of the service layer before deleting the legacy module.
+- Keep updating this log after every PR so we maintain a continuous hand-off narrative across the remaining Phase 2 scope.

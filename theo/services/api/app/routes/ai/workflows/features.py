@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from theo.services.api.app.models.ai import (
-    DEFAULT_GUARDRAIL_SETTINGS,
+from theo.services.api.app.ai.guardrails import (
     AIFeaturesResponse,
+    DEFAULT_GUARDRAIL_SETTINGS,
 )
 
 router = APIRouter()
