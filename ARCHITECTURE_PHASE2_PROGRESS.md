@@ -88,3 +88,24 @@
 ### Guidance for the Next Agent
 - Prefer adding new workflow helpers directly into the modular `ai/rag/` structure and simply re-export them from `ai/__init__.py` as needed for backwards compatibility.
 - Keep the compatibility shim lean by deleting exports once upstream call sites finish migrating to the new modules, ensuring the package surface reflects the final architecture when Phase 2 closes.
+
+## Entry – 2025-10-28
+
+### Delivered in this PR
+- Added regression tests under `tests/api/ai/test_ai_package_exports.py` to ensure the modular AI package continues to re-export guardrailed workflow helpers and legacy submodules relied on by existing routes/tests.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Continue decomposing the RAG workflow monolith:**
+   - Split remaining guardrail responses and prompt builders out of `ai/rag/workflow.py` into focused modules, updating the package exports once the new structure is in place.
+   - Track FastAPI routes still importing from `models.ai` so they can be migrated to the new modules in tandem.
+2. **Strengthen async client parity:**
+   - Port retry/backoff logic and cache usage from `legacy_clients.py` into the async adapters so callers can begin switching over without behavioural regressions.
+   - Backfill tests that exercise both the compatibility shim and the async clients as feature parity improves.
+3. **Harden compatibility shims and guardrails:**
+   - Maintain the new regression tests as additional exports move; extend coverage to new compatibility surfaces as they appear.
+   - Remove shimmed exports once call sites finish migrating to the modular structure to keep the package surface aligned with the target architecture.
+
+### Guidance for the Next Agent
+- Keep expanding the modular `ai/rag/` structure by moving workflow responsibilities into smaller, purpose-driven modules and updating the compatibility re-exports to match.
+- When migrating workflow helpers or clients, update the regression tests (and add new ones) so the compatibility guarantees are enforced automatically.
+- Continue appending to this log after each PR with concrete deliverables and next steps for Phase 2.
