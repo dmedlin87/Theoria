@@ -22,13 +22,7 @@ from ...telemetry import (
     set_span_attribute,
 )
 from ..reasoning.chain_of_thought import parse_chain_of_thought
-from ..reasoning.metacognition import (
-    REVISION_QUALITY_THRESHOLD,
-    Critique,
-    RevisionResult,
-    critique_reasoning,
-    revise_with_critique,
-)
+from ..reasoning.metacognition import critique_reasoning, revise_with_critique
 from ..registry import LLMModel, LLMRegistry, get_llm_registry
 from ..router import get_router
 from ..trails import TrailStepDigest
@@ -60,7 +54,6 @@ from .models import (
     ComparativeAnalysisResponse,
     CorpusCurationReport,
     DevotionalResponse,
-    FallacyWarningModel,
     MultimediaDigestResponse,
     RAGAnswer,
     RAGCitation,
@@ -72,6 +65,7 @@ from .models import (
 )
 from .prompts import PromptContext
 from .refusals import REFUSAL_MESSAGE, REFUSAL_MODEL_NAME, build_guardrail_refusal
+from .revisions import critique_to_schema, revision_to_schema, should_attempt_revision
 from .reasoning_trace import build_reasoning_trace_from_completion
 from .retrieval import record_used_citation_feedback, search_passages
 
@@ -420,8 +414,8 @@ class GuardedAnswerPipeline:
                         error_message=str(exc),
                     )
             else:
-                critique_schema = _critique_to_schema(critique_obj)
-                if _should_attempt_revision(critique_obj) and selected_model is not None:
+                critique_schema = critique_to_schema(critique_obj)
+                if should_attempt_revision(critique_obj) and selected_model is not None:
                     try:
                         revision_client = selected_model.build_client()
                         revision_result = revise_with_critique(
@@ -446,7 +440,7 @@ class GuardedAnswerPipeline:
                                 error_message=str(exc),
                             )
                     else:
-                        revision_schema = _revision_to_schema(revision_result)
+                        revision_schema = revision_to_schema(revision_result)
                         if revision_result.revised_answer.strip():
                             model_output = revision_result.revised_answer
                         log_workflow_event(
@@ -1393,67 +1387,6 @@ def run_research_reconciliation(
         return CollaborationResponse(
             thread=thread, synthesized_view=synthesized_view, answer=answer
         )
-
-
-def build_sermon_prep_package(
-    response: SermonPrepResponse, *, format: str
-) -> tuple[str | bytes, str]:
-    normalised = format.lower()
-    package = build_sermon_deliverable(response, formats=[normalised])
-    asset = package.get_asset(normalised)
-    return asset.content, asset.media_type
-
-
-def _should_attempt_revision(critique: Critique) -> bool:
-    """Determine whether a revision pass is warranted for a critique."""
-
-    if critique.fallacies_found or critique.weak_citations or critique.bias_warnings:
-        return True
-    if critique.reasoning_quality < REVISION_QUALITY_THRESHOLD:
-        return True
-    actionable_recommendations = [
-        recommendation
-        for recommendation in critique.recommendations
-        if "acceptable" not in recommendation.lower()
-    ]
-    return bool(actionable_recommendations)
-
-
-def _critique_to_schema(critique: Critique) -> ReasoningCritique:
-    """Convert a dataclass critique into the API schema."""
-
-    fallacies = [
-        FallacyWarningModel(
-            fallacy_type=fallacy.fallacy_type,
-            severity=fallacy.severity,
-            description=fallacy.description,
-            matched_text=fallacy.matched_text,
-            suggestion=fallacy.suggestion,
-        )
-        for fallacy in critique.fallacies_found
-    ]
-
-    return ReasoningCritique(
-        reasoning_quality=critique.reasoning_quality,
-        fallacies_found=fallacies,
-        weak_citations=list(critique.weak_citations),
-        alternative_interpretations=list(critique.alternative_interpretations),
-        bias_warnings=list(critique.bias_warnings),
-        recommendations=list(critique.recommendations),
-    )
-
-
-def _revision_to_schema(result: RevisionResult) -> RevisionDetails:
-    """Convert a revision result into the API schema."""
-
-    return RevisionDetails(
-        original_answer=result.original_answer,
-        revised_answer=result.revised_answer,
-        critique_addressed=list(result.critique_addressed),
-        improvements=result.improvements,
-        quality_delta=result.quality_delta,
-        revised_critique=_critique_to_schema(result.revised_critique),
-    )
 
 
 __all__ = [
