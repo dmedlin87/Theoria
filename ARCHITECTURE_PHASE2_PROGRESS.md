@@ -70,3 +70,21 @@
 - Keep the compatibility exports in `ai/clients/__init__.py` up to date as you migrate symbols out of `legacy_clients.py`; this prevents regressions for modules still importing `theo.services.api.app.ai.clients`.
 - When porting workflow helpers, coordinate with the FastAPI route owners so the import paths change only after the new modules are wired end-to-end.
 - Continue appending entries to this log with concrete deliverables and blockers after each PR to maintain the Phase 2 hand-off narrative.
+
+## Entry – 2025-10-27
+
+### Delivered in this PR
+- Restored the legacy `theo.services.api.app.ai` surface by re-exporting the guardrailed RAG workflow helpers (`run_guarded_chat`, `generate_sermon_prep_outline`, etc.) and the commonly imported submodules so existing routes and tests resolve the new package layout without import errors.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Continue migrating the workflow implementations into modular subpackages:**
+   - Move remaining guardrail responses and prompt builders from `ai/rag/workflow.py` into purpose-specific modules (e.g., `ai/rag/deliverables.py`, `ai/rag/prompts.py`) to shrink the monolith.
+   - Audit the FastAPI routes for any direct `models.ai` dependencies that still need shims while the migration completes.
+2. **Strengthen async client parity:**
+   - Port retry/backoff logic and cache usage from `legacy_clients.py` into the async adapters so callers can begin switching over without behavioural regressions.
+3. **Expand targeted tests for the compatibility layer:**
+   - Add regression tests around the package re-exports (e.g., importing `run_guarded_chat` from `theo.services.api.app.ai`) to prevent future refactors from accidentally dropping the shim again.
+
+### Guidance for the Next Agent
+- Prefer adding new workflow helpers directly into the modular `ai/rag/` structure and simply re-export them from `ai/__init__.py` as needed for backwards compatibility.
+- Keep the compatibility shim lean by deleting exports once upstream call sites finish migrating to the new modules, ensuring the package surface reflects the final architecture when Phase 2 closes.
