@@ -9,15 +9,15 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
-from theo.services.api.app.ai import (
+from theo.services.api.app.ai.rag.collaboration import run_research_reconciliation
+from theo.services.api.app.ai.rag.corpus import run_corpus_curation
+from theo.services.api.app.ai.rag.deliverables import (
     generate_comparative_analysis,
     generate_devotional_flow,
     generate_multimedia_digest,
     generate_sermon_prep_outline,
-    generate_verse_brief,
-    run_corpus_curation,
-    run_research_reconciliation,
 )
+from theo.services.api.app.ai.rag.verse import generate_verse_brief
 from theo.services.api.app.ai.passage import (
     PassageResolutionError,
     resolve_passage_reference,
