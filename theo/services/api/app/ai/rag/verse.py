@@ -11,7 +11,7 @@ from ...telemetry import instrument_workflow, log_workflow_event, set_span_attri
 from ..registry import get_llm_registry
 from .models import VerseCopilotResponse
 from .retrieval import record_used_citation_feedback, search_passages
-from .workflow import _guarded_answer_or_refusal
+from .chat import _guarded_answer_or_refusal
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from ..trails import TrailRecorder

@@ -217,3 +217,26 @@
 - Prefer landing new workflow refactors directly inside the purpose-built modules and keep the compatibility wrappers lightweight until legacy imports are updated.
 - When introducing additional modules, update both the package proxy and regression tests in the same PR to keep the compatibility guarantees verifiable.
 - Continue appending entries to this log after every Phase 2 PR so the migration narrative stays unbroken.
+
+## Entry – 2025-11-03
+
+### Delivered in this PR
+- Extracted the guardrailed chat pipeline (`GuardedAnswerPipeline`, `_guarded_answer`, `_guarded_answer_or_refusal`, and `run_guarded_chat`) into the new `theo/services/api/app/ai/rag/chat.py` module so the remaining legacy logic in `workflow.py` is isolated behind a shim.
+- Rebuilt `theo/services/api/app/ai/rag/workflow.py` as a compatibility proxy that forwards attribute mutations to the chat module while continuing to re-export the legacy surface for existing imports and tests.
+- Updated the RAG package proxy and downstream modules (`deliverables.py`, `collaboration.py`, `verse.py`) to depend on the new chat module and added lazy workflow imports for retrieval helpers to keep monkeypatch-based tests working. Extended the targeted API workflow tests to confirm the new layout passes.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Continue teasing apart the chat pipeline internals:**
+   - Move cache instrumentation, telemetry logging, and reasoning helpers from `chat.py` into narrower modules (`cache.py`, `telemetry.py`, `reasoning.py`) as the new architecture solidifies.
+   - Replace direct imports of deliverable builders with dependency-injected hooks so the chat pipeline no longer depends on deliverable modules at import time.
+2. **Trim the compatibility layer once call sites migrate:**
+   - Audit FastAPI routes and tests to import from `rag.chat` (or other new modules) directly so `workflow.py` can eventually stop re-exporting its legacy surface.
+   - Add regression coverage that patches `rag.chat` directly to guard against missing proxy updates when the compatibility shim is removed.
+3. **Harmonise retrieval shims and fixtures:**
+   - Consolidate the lazy `workflow.search_passages` imports added to deliverables into a shared helper or fixture utility so future modules can stub retrieval without new boilerplate.
+   - Evaluate whether the RAG package proxy should propagate attribute patches to the retrieval module to simplify monkeypatching semantics.
+
+### Guidance for the Next Agent
+- Keep updating both the compatibility shim and the package proxy whenever new modules are introduced so monkeypatch-heavy tests continue to work during the migration.
+- When relocating helpers out of `chat.py`, add focused tests around the new modules and adjust the lazy imports in deliverables/verse/collaboration at the same time to avoid circular imports.
+- Continue appending entries to this log with the same structure after each Phase 2 PR to preserve the migration narrative and highlight remaining blockers.
