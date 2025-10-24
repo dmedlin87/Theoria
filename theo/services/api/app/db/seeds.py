@@ -29,6 +29,7 @@ from theo.services.api.app.persistence_models import (
 from theo.services.geo import seed_openbible_geo
 
 from ..ingest.osis import expand_osis_reference
+from ..errors import DatabaseMigrationRequiredError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
 SEED_ROOT = PROJECT_ROOT / "data" / "seeds"
@@ -830,7 +831,20 @@ def seed_contradiction_claims(session: Session) -> None:
                     )
                 )
                 seen_ids.add(identifier)
-                record = target_session.get(ContradictionSeed, identifier)
+                try:
+                    record = target_session.get(ContradictionSeed, identifier)
+                except OperationalError as exc:
+                    message = str(getattr(exc, "orig", exc)).lower()
+                    if "no such column" in message:
+                        logger.error(
+                            "Schema migration required before seeding contradiction claims: %s",
+                            exc,
+                        )
+                        raise DatabaseMigrationRequiredError(
+                            "Missing column 'perspective' in contradiction_seeds."
+                            " Run: alembic upgrade head"
+                        ) from exc
+                    raise
                 tags = _coerce_list(entry.get("tags"))
                 weight = float(entry.get("weight", 1.0))
                 summary = entry.get("summary")
