@@ -11,7 +11,7 @@ from .schema import schema
 
 _graphql_app = GraphQLRouter(
     schema,
-    path="/",
+    path="/graphql",
     context_getter=get_graphql_context,
 )
 
