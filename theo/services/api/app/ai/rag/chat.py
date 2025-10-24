@@ -4,24 +4,16 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Literal, Sequence
-
-from opentelemetry import trace
+from typing import TYPE_CHECKING, Any, Sequence
 from sqlalchemy.orm import Session
 
 from theo.application.ports.ai_registry import GenerationError
 from ...models.search import HybridSearchFilters, HybridSearchResult
-from ...telemetry import (
-    RAG_CACHE_EVENTS,
-    instrument_workflow,
-    log_workflow_event,
-    set_span_attribute,
-)
-from ..reasoning.chain_of_thought import parse_chain_of_thought
-from ..reasoning.metacognition import critique_reasoning, revise_with_critique
+from ...telemetry import instrument_workflow, set_span_attribute
 from ..registry import LLMModel, LLMRegistry, get_llm_registry
 from ..router import get_router
 from ..trails import TrailStepDigest
+from .cache import extract_cache_key_suffix, record_cache_status
 from .cache_ops import (
     DEFAULT_CACHE,
     RAGCache,
@@ -59,25 +51,27 @@ from .models import (
     MultimediaDigestResponse,
     RAGAnswer,
     RAGCitation,
-    ReasoningCritique,
-    ReasoningTrace,
-    RevisionDetails,
     SermonPrepResponse,
     VerseCopilotResponse,
 )
 from .prompts import PromptContext
+from .reasoning import run_reasoning_review
 from .refusals import REFUSAL_MESSAGE, REFUSAL_MODEL_NAME, build_guardrail_refusal
-from .revisions import critique_to_schema, revision_to_schema, should_attempt_revision
-from .reasoning_trace import build_reasoning_trace_from_completion
 from .retrieval import record_used_citation_feedback, search_passages
+from .telemetry import (
+    generation_span,
+    record_answer_event,
+    record_generation_result,
+    record_passages_retrieved,
+    record_validation_event,
+    set_final_cache_status,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from ..trails import TrailRecorder
 
 
 LOGGER = logging.getLogger(__name__)
-
-_RAG_TRACER = trace.get_tracer("theo.rag")
 
 
 
@@ -168,7 +162,7 @@ class GuardedAnswerPipeline:
                 retrieval_digest=retrieval_digest,
                 cache=self.cache,
             )
-            cache_key_suffix = cache_key[-12:]
+            cache_key_suffix = extract_cache_key_suffix(cache_key)
             cache_status = "miss"
             cache_hit_payload: RAGAnswer | None = None
             validation_result = None
@@ -194,12 +188,8 @@ class GuardedAnswerPipeline:
                     except GuardrailError as exc:
                         cache_status = "stale"
                         self.cache.delete(cache_key)
-                        RAG_CACHE_EVENTS.labels(status="stale").inc()
-                        log_workflow_event(
-                            "workflow.guardrails_cache",
-                            workflow="rag",
-                            status="stale",
-                            cache_key_suffix=cache_key_suffix,
+                        record_cache_status(
+                            "stale", cache_key_suffix=cache_key_suffix
                         )
                         cache_event_logged = True
                         if self.recorder:
@@ -219,32 +209,11 @@ class GuardedAnswerPipeline:
                     cache_status = "stale"
 
             if cache_status == "hit" and model_output:
-                RAG_CACHE_EVENTS.labels(status="hit").inc()
-                log_workflow_event(
-                    "workflow.guardrails_cache",
-                    workflow="rag",
-                    status="hit",
-                    cache_key_suffix=cache_key_suffix,
-                )
+                record_cache_status("hit", cache_key_suffix=cache_key_suffix)
             elif not cache_event_logged:
                 if cache_status == "hit":
                     cache_status = "stale"
-                if cache_status == "stale":
-                    RAG_CACHE_EVENTS.labels(status="stale").inc()
-                    log_workflow_event(
-                        "workflow.guardrails_cache",
-                        workflow="rag",
-                        status="stale",
-                        cache_key_suffix=cache_key_suffix,
-                    )
-                else:
-                    RAG_CACHE_EVENTS.labels(status="miss").inc()
-                    log_workflow_event(
-                        "workflow.guardrails_cache",
-                        workflow="rag",
-                        status="miss",
-                        cache_key_suffix=cache_key_suffix,
-                    )
+                record_cache_status(cache_status, cache_key_suffix=cache_key_suffix)
 
             if self.recorder and cache_key:
                 self.recorder.log_step(
@@ -266,13 +235,13 @@ class GuardedAnswerPipeline:
             if mode:
                 llm_payload["reasoning_mode"] = mode
             try:
-                with _RAG_TRACER.start_as_current_span("rag.execute_generation") as span:
-                    span.set_attribute("rag.candidate", candidate.name)
-                    span.set_attribute("rag.model_label", candidate.model)
-                    span.set_attribute("rag.cache_status", cache_status)
-                    if cache_key_suffix:
-                        span.set_attribute("rag.cache_key_suffix", cache_key_suffix)
-                    span.set_attribute("rag.prompt_tokens", max(len(prompt) // 4, 0))
+                with generation_span(
+                    candidate.name,
+                    candidate.model,
+                    cache_status=cache_status,
+                    cache_key_suffix=cache_key_suffix,
+                    prompt=prompt,
+                ) as span:
                     try:
                         routed_generation = router.execute_generation(
                             workflow="rag",
@@ -281,15 +250,14 @@ class GuardedAnswerPipeline:
                             reasoning_mode=mode,
                         )
                     except GenerationError as inner_exc:
-                        span.record_exception(inner_exc)
-                        span.set_attribute("rag.guardrails_cache_final", cache_status)
+                        if span is not None and hasattr(span, "record_exception"):
+                            span.record_exception(inner_exc)
+                        set_final_cache_status(span, cache_status)
                         raise
-                    span.set_attribute("rag.latency_ms", routed_generation.latency_ms)
-                    span.set_attribute(
-                        "rag.completion_tokens",
-                        max(len(routed_generation.output) // 4, 0)
-                        if routed_generation.output
-                        else 0,
+                    record_generation_result(
+                        span,
+                        latency_ms=routed_generation.latency_ms,
+                        completion=routed_generation.output,
                     )
 
                     completion = routed_generation.output
@@ -315,13 +283,14 @@ class GuardedAnswerPipeline:
                         validation_result = validate_model_completion(completion, citations)
                         ensure_completion_safe(completion)
                     except GuardrailError as exc:
-                        span.record_exception(exc)
-                        log_workflow_event(
-                            "workflow.guardrails_validation",
-                            workflow="rag",
-                            status="failed",
+                        if span is not None and hasattr(span, "record_exception"):
+                            span.record_exception(exc)
+                        record_validation_event(
+                            "failed",
                             cache_status=cache_status,
                             cache_key_suffix=cache_key_suffix,
+                            citation_count=None,
+                            cited_indices=None,
                         )
                         if self.recorder:
                             self.recorder.log_step(
@@ -335,13 +304,13 @@ class GuardedAnswerPipeline:
                                 output_payload={"completion": completion},
                                 error_message=str(exc),
                             )
-                        span.set_attribute("rag.guardrails_cache_final", cache_status)
+                        set_final_cache_status(span, cache_status)
                         raise
                     model_output = completion
                     model_name = candidate.name
                     if cache_status == "stale":
                         cache_status = "refresh"
-                    span.set_attribute("rag.guardrails_cache_final", cache_status)
+                    set_final_cache_status(span, cache_status)
                     break
             except GenerationError as exc:
                 last_error = exc
@@ -361,10 +330,8 @@ class GuardedAnswerPipeline:
                 raise last_error
             raise GenerationError("Language model routing failed to produce a completion")
         if validation_result:
-            log_workflow_event(
-                "workflow.guardrails_validation",
-                workflow="rag",
-                status=validation_result.get("status", "passed"),
+            record_validation_event(
+                validation_result.get("status", "passed"),
                 cache_status=cache_status,
                 cache_key_suffix=cache_key_suffix,
                 citation_count=validation_result.get("citation_count"),
@@ -382,100 +349,24 @@ class GuardedAnswerPipeline:
                     output_digest=f"status={validation_result.get('status', 'passed')}",
                 )
 
-        critique_schema: ReasoningCritique | None = None
-        revision_schema: RevisionDetails | None = None
+        critique_schema = None
+        revision_schema = None
         original_model_output = model_output
-
-        reasoning_text_for_critique = None
+        reasoning_trace = None
 
         if model_output:
-            chain_of_thought = parse_chain_of_thought(model_output)
-            reasoning_text_for_critique = (
-                chain_of_thought.raw_thinking.strip()
-                if chain_of_thought.raw_thinking
-                else model_output
-            )
-            citation_payloads = [
-                citation.model_dump(exclude_none=True)
-                for citation in citations
-            ]
-            try:
-                critique_obj = critique_reasoning(
-                    reasoning_trace=reasoning_text_for_critique,
-                    answer=model_output,
-                    citations=citation_payloads,
-                )
-            except Exception as exc:  # pragma: no cover - defensive guard
-                LOGGER.warning("Failed to critique model output", exc_info=exc)
-                if self.recorder:
-                    self.recorder.log_step(
-                        tool="rag.critique",
-                        action="critique_reasoning",
-                        status="failed",
-                        input_payload={"model_output": model_output[:2000]},
-                        error_message=str(exc),
-                    )
-            else:
-                critique_schema = critique_to_schema(critique_obj)
-                if should_attempt_revision(critique_obj) and selected_model is not None:
-                    try:
-                        revision_client = selected_model.build_client()
-                        revision_result = revise_with_critique(
-                            original_answer=model_output,
-                            critique=critique_obj,
-                            client=revision_client,
-                            model=selected_model.model,
-                            reasoning_trace=reasoning_text_for_critique,
-                            citations=citation_payloads,
-                        )
-                    except GenerationError as exc:
-                        LOGGER.warning("Revision attempt failed: %s", exc)
-                        if self.recorder:
-                            self.recorder.log_step(
-                                tool="rag.revise",
-                                action="revise_with_critique",
-                                status="failed",
-                                input_payload={
-                                    "original_quality": critique_obj.reasoning_quality,
-                                },
-                                output_digest=str(exc),
-                                error_message=str(exc),
-                            )
-                    else:
-                        revision_schema = revision_to_schema(revision_result)
-                        if revision_result.revised_answer.strip():
-                            model_output = revision_result.revised_answer
-                        log_workflow_event(
-                            "workflow.reasoning_revision",
-                            workflow="rag",
-                            status="applied",
-                            quality_delta=revision_result.quality_delta,
-                            addressed=len(revision_result.critique_addressed),
-                        )
-                        if self.recorder:
-                            self.recorder.log_step(
-                                tool="rag.revise",
-                                action="revise_with_critique",
-                                input_payload={
-                                    "original_quality": critique_obj.reasoning_quality,
-                                },
-                                output_payload={
-                                    "quality_delta": revision_result.quality_delta,
-                                    "addressed": revision_result.critique_addressed,
-                                    "revised_quality": revision_result.revised_critique.reasoning_quality,
-                                },
-                                output_digest=(
-                                    f"delta={revision_result.quality_delta}, "
-                                    f"addressed={len(revision_result.critique_addressed)}"
-                                ),
-                            )
-
-        reasoning_trace: ReasoningTrace | None = None
-        if model_output:
-            reasoning_trace = build_reasoning_trace_from_completion(
-                model_output,
+            reasoning_outcome = run_reasoning_review(
+                answer=model_output,
+                citations=citations,
+                selected_model=selected_model,
+                recorder=self.recorder,
                 mode=mode,
             )
+            model_output = reasoning_outcome.answer
+            critique_schema = reasoning_outcome.critique
+            revision_schema = reasoning_outcome.revision
+            reasoning_trace = reasoning_outcome.reasoning_trace
+            original_model_output = reasoning_outcome.original_answer
 
         answer = RAGAnswer(
             summary=summary_text,
@@ -502,13 +393,7 @@ class GuardedAnswerPipeline:
                 cache=self.cache,
             )
             if cache_status == "refresh":
-                RAG_CACHE_EVENTS.labels(status="refresh").inc()
-                log_workflow_event(
-                    "workflow.guardrails_cache",
-                    workflow="rag",
-                    status="refresh",
-                    cache_key_suffix=cache_key_suffix,
-                )
+                record_cache_status("refresh", cache_key_suffix=cache_key_suffix)
 
         if self.recorder:
             key_entities: list[str] = []
@@ -692,11 +577,7 @@ def run_guarded_chat(
             set_span_attribute(span, "workflow.reasoning_mode", mode)
         results = search_passages(session, query=question, osis=osis, filters=filters)
         set_span_attribute(span, "workflow.result_count", len(results))
-        log_workflow_event(
-            "workflow.passages_retrieved",
-            workflow="chat",
-            result_count=len(results),
-        )
+        record_passages_retrieved(result_count=len(results))
         registry = get_llm_registry(session)
         if recorder:
             recorder.log_step(
@@ -741,11 +622,7 @@ def run_guarded_chat(
         )
         set_span_attribute(span, "workflow.citation_count", len(answer.citations))
         set_span_attribute(span, "workflow.summary_length", len(answer.summary))
-        log_workflow_event(
-            "workflow.answer_composed",
-            workflow="chat",
-            citations=len(answer.citations),
-        )
+        record_answer_event(citation_count=len(answer.citations))
         if recorder:
             recorder.record_citations(answer.citations)
         return answer

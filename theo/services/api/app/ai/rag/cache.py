@@ -13,6 +13,7 @@ from typing import Any, Callable
 from theo.application.facades.runtime import allow_insecure_startup
 from theo.application.facades.settings import get_settings
 from theo.application.facades.version import get_git_sha
+from ...telemetry import RAG_CACHE_EVENTS, log_workflow_event
 
 try:  # pragma: no cover - optional dependency guard
     import redis
@@ -165,4 +166,29 @@ class RAGCache:
         return CacheLookupResult(status=status, payload=payload, cache_key=key)
 
 
-__all__ = ["CacheLookupResult", "RAGCache"]
+def extract_cache_key_suffix(cache_key: str | None) -> str | None:
+    """Return the identifying suffix for a cache key."""
+
+    if not cache_key:
+        return None
+    return cache_key[-12:]
+
+
+def record_cache_status(status: str, *, cache_key_suffix: str | None = None) -> None:
+    """Emit telemetry for a cache lookup outcome."""
+
+    RAG_CACHE_EVENTS.labels(status=status).inc()
+    log_workflow_event(
+        "workflow.guardrails_cache",
+        workflow="rag",
+        status=status,
+        cache_key_suffix=cache_key_suffix,
+    )
+
+
+__all__ = [
+    "CacheLookupResult",
+    "RAGCache",
+    "extract_cache_key_suffix",
+    "record_cache_status",
+]

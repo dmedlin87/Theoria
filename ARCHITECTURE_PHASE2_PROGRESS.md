@@ -240,3 +240,26 @@
 - Keep updating both the compatibility shim and the package proxy whenever new modules are introduced so monkeypatch-heavy tests continue to work during the migration.
 - When relocating helpers out of `chat.py`, add focused tests around the new modules and adjust the lazy imports in deliverables/verse/collaboration at the same time to avoid circular imports.
 - Continue appending entries to this log with the same structure after each Phase 2 PR to preserve the migration narrative and highlight remaining blockers.
+
+## Entry – 2025-11-04
+
+### Delivered in this PR
+- Split the guardrailed chat pipeline internals by moving cache telemetry helpers into `ai/rag/cache.py` and creating new `ai/rag/telemetry.py` and `ai/rag/reasoning.py` modules that encapsulate span handling, workflow logging, and the critique/revision flow.
+- Refactored `ai/rag/chat.py` to depend on the new helpers, trimming inline instrumentation, reusing shared cache status emitters, and routing critique/revision through the dedicated reasoning module while keeping recorder hooks intact.
+- Replaced direct workflow logging with telemetry helpers across the chat entrypoints and ran the export regression suite (`tests/api/ai/test_ai_package_exports.py`) to confirm the compatibility surface still passes.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Finish decoupling deliverable dependencies from `chat.py`:**
+   - Introduce dependency-injected hooks (or service interfaces) for deliverable builders so the chat pipeline no longer imports `deliverables.py` at module import time.
+   - Add targeted tests covering the injection path once the abstraction lands to ensure recorder logging remains stable.
+2. **Harden the new telemetry/reasoning helpers:**
+   - Backfill unit coverage for `rag.telemetry` and `rag.reasoning` to lock down expected event payloads, especially cache status propagation and revision logging.
+   - Evaluate whether additional guardrail failure metadata should be surfaced through the telemetry helpers for downstream analytics.
+3. **Continue slimming the compatibility layer:**
+   - Audit remaining modules that still import the legacy workflow surface and update them to reference the new helpers directly so future PRs can shrink `rag/workflow.py` further.
+   - Capture regression checks that patch `rag.telemetry`/`rag.reasoning` directly to ensure the proxy module mirrors new exports as they land.
+
+### Guidance for the Next Agent
+- Keep new guardrailed workflow helpers inside the purpose-built `ai/rag/` modules and re-export only what legacy call sites need from `ai/__init__.py` until migrations complete.
+- When wiring dependency injection for deliverable builders, update both the FastAPI routes and the recorder expectations in the same PR to avoid transient import loops.
+- Continue appending entries to this log after each PR so Phase 2 progress and outstanding blockers remain easy to track.
