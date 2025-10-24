@@ -109,3 +109,25 @@
 - Keep expanding the modular `ai/rag/` structure by moving workflow responsibilities into smaller, purpose-driven modules and updating the compatibility re-exports to match.
 - When migrating workflow helpers or clients, update the regression tests (and add new ones) so the compatibility guarantees are enforced automatically.
 - Continue appending to this log after each PR with concrete deliverables and next steps for Phase 2.
+
+## Entry – 2025-10-29
+
+### Delivered in this PR
+- Extracted the guardrail refusal builders into `theo/services/api/app/ai/rag/refusals.py` and wired the package proxy to keep the new module patchable for compatibility shims.
+- Refactored the guarded answer pipeline to reuse `PromptContext` for prompt/summary construction, eliminating duplicated guardrail sanitisation logic in `workflow.py`.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Broaden the prompt utilities:**
+   - Migrate the remaining workflow-specific prompt builders (e.g., sermon prep, multimedia) into `ai/rag/prompts.py` so the module owns all sanitisation flows.
+   - Consider exposing PromptContext helpers for non-RAG workflows to simplify future refactors.
+2. **Harden guardrail refusal behaviours:**
+   - Add targeted unit coverage for `refusals.build_guardrail_refusal` to validate catalogue fallback behaviour against empty/errored database lookups.
+   - Audit downstream call sites to delete any lingering direct imports from `workflow.py` once they consume the new module directly.
+3. **Continue decomposing the RAG workflow monolith:**
+   - Identify additional guardrail response helpers still embedded in `workflow.py` and migrate them into purpose-built modules (e.g., deliverables, guardrail states).
+   - Ensure regression tests cover each new module as exports move to keep compatibility stable.
+
+### Guidance for the Next Agent
+- When moving more workflow helpers, keep updating the regression tests and package proxy (`ai/rag/__init__.py`) so the shims remain patchable from the old import paths.
+- Prefer funnelling any new guardrail response logic through the `refusals` module to keep `workflow.py` focused on orchestration rather than response shaping.
+- Continue appending to this log after each PR with precise deliverables and outstanding scope to maintain continuity through the migration.
