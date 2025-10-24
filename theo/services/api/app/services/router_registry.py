@@ -26,7 +26,12 @@ from ..routes import (
 from .registry import RouterRegistration, register_router
 
 _DEFAULT_REGISTRATIONS = (
-    RouterRegistration(router=graphql_router, prefix="/graphql", tags=("graphql",)),
+    RouterRegistration(
+        router=graphql_router,
+        prefix=None,
+        tags=("graphql",),
+        requires_security=False,
+    ),
     RouterRegistration(router=ingest.router, prefix="/ingest", tags=("ingest",)),
     RouterRegistration(router=jobs.router, prefix="/jobs", tags=("jobs",)),
     RouterRegistration(router=search.router, prefix="/search", tags=("search",)),
