@@ -10,10 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
-from theo.services.api.app.ai import (
+from theo.services.api.app.ai.rag.deliverables import generate_sermon_prep_outline
+from theo.services.api.app.ai.rag.exports import (
     build_sermon_deliverable,
     build_transcript_deliverable,
-    generate_sermon_prep_outline,
 )
 from theo.services.api.app.ai.audit_logging import (
     AuditLogWriter,

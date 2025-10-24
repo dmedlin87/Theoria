@@ -308,3 +308,23 @@
 - Keep the new telemetry and reasoning tests updated as modules move; extend them alongside structural changes to preserve coverage of regression-prone paths.
 - When continuing deliverable migrations, update both the compatibility shims and their tests in the same PR to avoid breaking the existing routes.
 - Append your progress here after landing changes so Phase 2 history stays cohesive and actionable.
+
+## Entry – 2025-11-07
+
+### Delivered in this PR
+- Updated the workflow routes in `theo/services/api/app/routes/ai/workflows/flows.py` and `exports.py` to import deliverable helpers directly from the modular `ai.rag` packages, keeping FastAPI entrypoints aligned with the new architecture while reducing reliance on the `chat.py` compatibility shim.
+- Verified the package export surface remains intact by running `pytest tests/api/ai/test_ai_package_exports.py`.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Finish migrating remaining call sites off the compatibility shim:**
+   - Audit background workers and any lingering routes that still import deliverable helpers via `theo.services.api.app.ai` and transition them to the modular `ai.rag` modules.
+   - Remove the temporary deliverable hook fallbacks in `rag.chat` once all downstream modules resolve the new imports.
+2. **Align documentation and type hints with the new import paths:**
+   - Update developer docs and inline comments that reference the legacy import patterns so future refactors do not regress to the shimmed surface.
+3. **Expand regression coverage around direct imports:**
+   - Add smoke tests (or extend existing route tests) that exercise the FastAPI endpoints after the direct-import migration to guard against missing dependency injections when the compatibility layer is trimmed.
+
+### Guidance for the Next Agent
+- Continue migrating one subsystem at a time so the compatibility exports can be removed without destabilising the routes; keep `rag.workflow` re-exports in sync until then.
+- When updating workers or additional routes, run the targeted export suite (`tests/api/ai/test_ai_package_exports.py`) to confirm the package surface remains backwards compatible for legacy callers.
+- Append the next entry here with the same structure to maintain visibility into the Phase 2 migration status.
