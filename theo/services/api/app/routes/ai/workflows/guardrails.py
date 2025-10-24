@@ -10,8 +10,11 @@ from fastapi import status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.ai import build_guardrail_refusal
-from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer
+from theo.services.api.app.ai.rag import (
+    GuardrailError,
+    RAGAnswer,
+    build_guardrail_refusal,
+)
 from theo.services.api.app.errors import AIWorkflowError, Severity
 from theo.services.api.app.ai.guardrails import (
     GuardrailAdvisory,

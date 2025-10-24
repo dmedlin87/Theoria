@@ -328,3 +328,26 @@
 - Continue migrating one subsystem at a time so the compatibility exports can be removed without destabilising the routes; keep `rag.workflow` re-exports in sync until then.
 - When updating workers or additional routes, run the targeted export suite (`tests/api/ai/test_ai_package_exports.py`) to confirm the package surface remains backwards compatible for legacy callers.
 - Append the next entry here with the same structure to maintain visibility into the Phase 2 migration status.
+
+## Entry – 2025-11-08
+
+### Delivered in this PR
+- Updated the chat workflow route to import `run_guarded_chat` directly from `theo.services.api.app.ai.rag`, reducing reliance on the package root shim while keeping memory index wiring untouched.
+- Switched the shared guardrail response helpers to source `build_guardrail_refusal` from the modular RAG package so downstream guardrail metadata no longer depends on the legacy compatibility export.
+- Ran the package export regression suite (`pytest tests/api/ai/test_ai_package_exports.py`) to confirm the shimmed surface still behaves for remaining legacy callers.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Finish auditing background and orchestration call sites:**
+   - Review worker modules and any scheduled tasks that still import via `theo.services.api.app.ai` (e.g., module-level `rag` imports) and migrate them to the modular namespaces so the compatibility layer can be narrowed further.
+   - Once all imports are localised, delete or deprecate the root-level re-export helpers to prevent future regressions.
+2. **Trim residual compatibility re-exports:**
+   - After verifying no runtime consumers rely on the package root, remove the now-redundant guardrail exports from `theo/services/api/app/ai/__init__.py` and tighten its `__all__` surface.
+   - Update the export regression tests to cover the new, slimmer namespace so accidental reintroductions are caught quickly.
+3. **Document the new import guidance:**
+   - Refresh developer docs and inline comments that still reference the legacy `theo.services.api.app.ai` import path, steering contributors toward the modular modules for guardrails and chat workflows.
+   - Capture a short migration note in the Phase 2 architecture updates to explain the remaining steps toward removing the shim.
+
+### Guidance for the Next Agent
+- Prioritise migrating any worker/task imports off the package root before deleting compatibility exports to avoid Celery startup regressions.
+- Keep running `tests/api/ai/test_ai_package_exports.py` after each migration to ensure the narrowing namespace remains intentional and documented.
+- Continue appending detailed entries here so future agents can track the shrinking compatibility surface and outstanding documentation updates.
