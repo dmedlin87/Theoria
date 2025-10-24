@@ -286,3 +286,25 @@
 - Prefer importing deliverable builders from the new module namespaces in upcoming PRs so we can eventually delete the compatibility exports from `chat.py` once all call sites migrate.
 - When expanding telemetry/reasoning coverage, update the regression tests and proxy exports concurrently to keep the monkeypatch-based suites stable during refactors.
 - Continue appending entries to this log with concrete deliverables and blockers after each Phase 2 PR to maintain the shared hand-off narrative.
+
+## Entry – 2025-11-06
+
+### Delivered in this PR
+- Added focused unit tests for `rag.telemetry` to validate tracer spans, cache annotations, and workflow event payloads so the new instrumentation helpers are covered by regression checks.
+- Exercised `rag.reasoning.run_reasoning_review` with success and failure scenarios to ensure revision telemetry, recorder hooks, and error handling keep working during future refactors.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Complete deliverable dependency decoupling downstream:**
+   - Continue migrating routes and workers to import deliverable helpers directly from `ai.rag.deliverables` so the compatibility placeholders in `chat.py` can be removed.
+   - Remove the temporary deliverable hook shims once all call sites resolve the new wiring without regressions.
+2. **Broaden telemetry coverage:**
+   - Add integration-level checks that capture emitted logs/spans during end-to-end chat runs to confirm the helpers stay wired through the compatibility proxy.
+   - Evaluate whether retrieval telemetry should mirror the cache helpers for parity before the compatibility layer is trimmed further.
+3. **Extend reasoning module verification:**
+   - Backfill targeted tests for edge cases (e.g., critiques without revision eligibility, reasoning traces without raw thinking) so the migration can safely adjust parsing behaviour.
+   - Audit remaining guardrail integrations that still depend on the legacy workflow exports and migrate them toward the modular reasoning helpers.
+
+### Guidance for the Next Agent
+- Keep the new telemetry and reasoning tests updated as modules move; extend them alongside structural changes to preserve coverage of regression-prone paths.
+- When continuing deliverable migrations, update both the compatibility shims and their tests in the same PR to avoid breaking the existing routes.
+- Append your progress here after landing changes so Phase 2 history stays cohesive and actionable.
