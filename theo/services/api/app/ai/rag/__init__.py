@@ -8,11 +8,18 @@ import types
 from ...telemetry import instrument_workflow
 from ..registry import get_llm_registry
 from . import (
+    deliverables as _deliverables_module,
     guardrail_helpers as _guardrail_helpers_module,
     guardrails as _guardrails_module,
     refusals as _refusals_module,
     retrieval as _retrieval_module,
     workflow as _workflow_module,
+)
+from .deliverables import (
+    generate_comparative_analysis,
+    generate_devotional_flow,
+    generate_multimedia_digest,
+    generate_sermon_prep_outline,
 )
 from .guardrail_helpers import (
     GuardrailError,
@@ -41,10 +48,6 @@ from .workflow import (
     build_sermon_prep_package,
     build_transcript_deliverable,
     build_transcript_package,
-    generate_comparative_analysis,
-    generate_devotional_flow,
-    generate_multimedia_digest,
-    generate_sermon_prep_outline,
     generate_verse_brief,
     run_corpus_curation,
     run_guarded_chat,
@@ -94,6 +97,8 @@ class _RAGModule(types.ModuleType):
     def __setattr__(self, name: str, value: object) -> None:
         if hasattr(_workflow_module, name):
             setattr(_workflow_module, name, value)
+        if hasattr(_deliverables_module, name):
+            setattr(_deliverables_module, name, value)
         if hasattr(_guardrails_module, name):
             setattr(_guardrails_module, name, value)
         if hasattr(_guardrail_helpers_module, name):
