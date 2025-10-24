@@ -587,10 +587,21 @@ def _format_apa(source: CitationSource, anchors: Sequence[Mapping[str, Any]]) ->
     ]
     normalised_authors = [author for author in normalised_authors if author]
 
-    if len(normalised_authors) > 1:
-        formatted_authors = ", ".join(normalised_authors[:-1]) + f", & {normalised_authors[-1]}"
+    def _format_author_list(authors: Sequence[str]) -> str:
+        if len(authors) > 1:
+            return ", ".join(authors[:-1]) + f", & {authors[-1]}"
+        return authors[0] if authors else ""
+
+    literal_candidates = [author.strip() for author in raw_authors if author.strip()]
+    use_literal_authors = bool(literal_candidates) and all(
+        "," not in candidate and len(candidate.split()) >= 2
+        for candidate in literal_candidates
+    )
+
+    if use_literal_authors:
+        formatted_authors = _format_author_list(literal_candidates)
     elif normalised_authors:
-        formatted_authors = normalised_authors[0]
+        formatted_authors = _format_author_list(normalised_authors)
     elif source.publisher:
         formatted_authors = source.publisher
     else:

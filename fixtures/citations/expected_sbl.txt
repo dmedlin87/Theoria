@@ -1,2 +1,2 @@
-Doe, Jane, and John Smith. "Theology of Grace." Journal of Theology (Faith Press, New York, 2020): 1-12. https://doi.org/10.1234/example. Anchors: John.1.1 (p.5).
-Johnson, Mary. "Sermon on Love." sermons n.d. https://example.test/love. Anchors: John.3.16 (12s).
+Doe, Jane, and John Smith. "Theology of Grace" Journal of Theology (Faith Press, New York, 2020): 1-12. https://doi.org/10.1234/example. Anchors: John.1.1 (p.5).
+Johnson, Mary. "Sermon on Love" sermons n.d. https://example.test/love. Anchors: John.3.16 (12s).
