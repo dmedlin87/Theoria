@@ -173,3 +173,25 @@
 - Keep migrating small helper clusters out of `workflow.py` to preserve momentum—`revisions.py` can serve as the pattern for where to land them.
 - When moving prompt builders or deliverable wrappers, update both the compatibility exports and regression tests in the same PR to avoid breaking legacy import paths.
 - Continue appending to this log after every Phase 2 PR with the same structure so the ongoing hand-off remains easy to follow.
+
+## Entry – 2025-11-01
+
+### Delivered in this PR
+- Extracted the sermon prep, devotional, multimedia digest, and comparative analysis workflow wrappers into the new `theo/services/api/app/ai/rag/deliverables.py` module to shrink `workflow.py` and align with the modular guardrail architecture.
+- Updated the RAG package proxy (`theo/services/api/app/ai/rag/__init__.py`) and workflow shim to import from the new module so existing imports (including regression tests) continue to resolve without code changes.
+- Ran the compatibility regression suite to confirm the new module layout still surfaces all exported workflows relied on by the API layer.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Continue decomposing `workflow.py`:**
+   - Migrate remaining orchestration-adjacent helpers (e.g., corpus curation, research reconciliation, verse copilot) into purpose-built modules similar to `deliverables.py` and `revisions.py`.
+   - Remove the compatibility aliases from `workflow.py` once routes/tests import the new modules directly, keeping the shim minimal.
+2. **Harmonise module proxies and tests:**
+   - Extend the regression coverage in `tests/api/ai/test_ai_package_exports.py` (or adjacent suites) to assert the new `deliverables` module stays wired through the proxy during future moves.
+   - Ensure `_RAGModule` mirrors additional submodules as they emerge so dynamic patching remains reliable in tests.
+3. **Prep for prompt builder relocation:**
+   - With deliverables separated, plan the relocation of workflow-specific prompt helpers into `ai/rag/prompts.py`, verifying `PromptContext` continues to feed the guardrailed pipeline end-to-end.
+
+### Guidance for the Next Agent
+- When moving more workflow helpers, add imports to the proxy module (`ai/rag/__init__.py`) at the same time so downstream modules retain their existing import paths.
+- Keep running the API export regression tests after each migration step—they provide fast feedback that the compatibility surface is intact while the package splits continue.
+- Continue appending entries to this log after every Phase 2 PR to maintain the shared hand-off narrative.
