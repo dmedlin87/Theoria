@@ -17,7 +17,7 @@ from .models import (
     RAGCitation,
     SermonPrepResponse,
 )
-from .retrieval import record_used_citation_feedback, search_passages
+from .retrieval import record_used_citation_feedback
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from ..trails import TrailRecorder
@@ -65,7 +65,7 @@ def generate_sermon_prep_outline(
     outline_template: list[str] | None = None,
     key_points_limit: int = 4,
 ):
-    from .workflow import _guarded_answer_or_refusal  # Imported lazily to avoid cycles.
+    from .chat import _guarded_answer_or_refusal  # Imported lazily to avoid cycles.
 
     filters = filters or HybridSearchFilters()
     query = topic if not osis else f"{topic} {osis}"
@@ -80,6 +80,8 @@ def generate_sermon_prep_outline(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
+        from .workflow import search_passages
+
         results = search_passages(session, query=query, osis=osis, filters=filters, k=10)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
@@ -187,7 +189,7 @@ def generate_comparative_analysis(
     participants: Sequence[str],
     model_name: str | None = None,
 ):
-    from .workflow import _guarded_answer_or_refusal
+    from .chat import _guarded_answer_or_refusal
 
     filters = HybridSearchFilters()
     with instrument_workflow(
@@ -201,6 +203,8 @@ def generate_comparative_analysis(
             "workflow.participants",
             list(participants),
         )
+        from .workflow import search_passages
+
         results = search_passages(
             session, query="; ".join(participants), osis=osis, filters=filters, k=12
         )
@@ -254,7 +258,7 @@ def generate_multimedia_digest(
     model_name: str | None = None,
     recorder: "TrailRecorder | None" = None,
 ):
-    from .workflow import _guarded_answer_or_refusal
+    from .chat import _guarded_answer_or_refusal
 
     filters = HybridSearchFilters(
         collection=collection, source_type="audio" if collection else None
@@ -269,6 +273,8 @@ def generate_multimedia_digest(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
+        from .workflow import search_passages
+
         results = search_passages(session, query="highlights", osis=None, filters=filters, k=8)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(
@@ -336,7 +342,7 @@ def generate_devotional_flow(
     model_name: str | None = None,
     recorder: "TrailRecorder | None" = None,
 ):
-    from .workflow import _guarded_answer_or_refusal
+    from .chat import _guarded_answer_or_refusal
 
     filters = HybridSearchFilters()
     with instrument_workflow(
@@ -350,6 +356,8 @@ def generate_devotional_flow(
             "workflow.filters",
             filters.model_dump(exclude_none=True),
         )
+        from .workflow import search_passages
+
         results = search_passages(session, query=focus, osis=osis, filters=filters, k=6)
         set_span_attribute(span, "workflow.result_count", len(results))
         log_workflow_event(

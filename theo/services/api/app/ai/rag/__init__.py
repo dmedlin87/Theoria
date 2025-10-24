@@ -8,6 +8,7 @@ import types
 from ...telemetry import instrument_workflow
 from ..registry import get_llm_registry
 from . import (
+    chat as _chat_module,
     collaboration as _collaboration_module,
     corpus as _corpus_module,
     deliverables as _deliverables_module,
@@ -45,7 +46,7 @@ from .retrieval import record_used_citation_feedback, search_passages
 from .verse import generate_verse_brief
 from .corpus import run_corpus_curation
 from .collaboration import run_research_reconciliation
-from .workflow import (
+from .chat import (
     REFUSAL_MESSAGE,
     REFUSAL_MODEL_NAME,
     _guarded_answer,
@@ -98,6 +99,8 @@ class _RAGModule(types.ModuleType):
     """Module proxy that keeps workflow exports patchable for tests."""
 
     def __setattr__(self, name: str, value: object) -> None:
+        if hasattr(_chat_module, name):
+            setattr(_chat_module, name, value)
         if hasattr(_workflow_module, name):
             setattr(_workflow_module, name, value)
         if hasattr(_deliverables_module, name):
