@@ -107,13 +107,38 @@ def _expand_osis(
         default_chapter=start_chapter,
     )
 
-    start_key = _sort_key(book=start_book, chapter=start_chapter, verse=start_verse, high=False)
+    start_data = {
+        "book": start_book,
+        "chapter": start_chapter,
+        "verse": start_verse,
+    }
+    end_data = {
+        "book": end_book,
+        "chapter": end_chapter,
+        "verse": end_verse,
+    }
+
+    start_key = _sort_key(
+        book=start_book, chapter=start_chapter, verse=start_verse, high=False
+    )
     end_key = _sort_key(book=end_book, chapter=end_chapter, verse=end_verse, high=True)
 
     if start_key > end_key:
-        start_key, end_key = end_key, start_key
+        start_data, end_data = end_data, start_data
+        start_key = _sort_key(
+            book=start_data["book"],
+            chapter=start_data["chapter"],
+            verse=start_data["verse"],
+            high=False,
+        )
+        end_key = _sort_key(
+            book=end_data["book"],
+            chapter=end_data["chapter"],
+            verse=end_data["verse"],
+            high=True,
+        )
 
-    matched: list[tuple[tuple[str, int, int], str]] = []
+    matched: dict[str, tuple[str, int, int]] = {}
     for key in dataset.keys():
         try:
             book, chapter, verse = _parse_reference(key)
@@ -121,10 +146,27 @@ def _expand_osis(
             continue
         sort_key = _sort_key(book=book, chapter=chapter, verse=verse, high=False)
         if start_key <= sort_key <= end_key:
-            matched.append((sort_key, key))
+            matched.setdefault(key, sort_key)
 
-    matched.sort(key=lambda item: item[0])
-    return [key for _, key in matched]
+    if (
+        start_data["book"] == end_data["book"]
+        and start_data["chapter"] is not None
+        and start_data["chapter"] == end_data["chapter"]
+        and start_data["verse"] is not None
+        and end_data["verse"] is not None
+    ):
+        for verse in range(start_data["verse"], end_data["verse"] + 1):
+            key = f"{start_data['book']}.{start_data['chapter']}.{verse}"
+            sort_key = _sort_key(
+                book=start_data["book"],
+                chapter=start_data["chapter"],
+                verse=verse,
+                high=False,
+            )
+            if start_key <= sort_key <= end_key:
+                matched.setdefault(key, sort_key)
+
+    return [key for key, _ in sorted(matched.items(), key=lambda item: item[1])]
 
 
 def variants_apparatus(
