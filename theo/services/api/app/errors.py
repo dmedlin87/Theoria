@@ -87,12 +87,26 @@ class AIWorkflowError(TheoError):
     severity: Severity = field(default=Severity.USER)
 
 
+class DatabaseMigrationRequiredError(TheoError):
+    """Error raised when a required database migration is missing."""
+
+    def __init__(self, message: str, *, hint: str | None = None):
+        super().__init__(
+            message=message,
+            code="DATABASE_MIGRATION_REQUIRED",
+            status_code=500,
+            severity=Severity.CRITICAL,
+            hint=hint,
+        )
+
+
 __all__ = [
     "TheoError",
     "IngestionError",
     "RetrievalError",
     "ExportError",
     "AIWorkflowError",
+    "DatabaseMigrationRequiredError",
     "Severity",
 ]
 
