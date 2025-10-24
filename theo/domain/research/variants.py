@@ -87,8 +87,15 @@ def _sort_key(
     return book, chapter_value, verse_value
 
 
-def _expand_osis(osis: str, dataset: Mapping[str, Iterable[dict[str, object]]]) -> list[str]:
+def _expand_osis(
+    osis: str,
+    dataset: Mapping[str, Iterable[dict[str, object]]] | None = None,
+) -> list[str]:
     """Expand a verse or range into individual OSIS keys, honoring chapter spans."""
+
+    if dataset is None:
+        dataset = variants_dataset()
+    assert dataset is not None
 
     if "-" not in osis:
         return [osis]
