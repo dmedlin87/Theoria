@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -12,6 +13,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+os.environ.setdefault("THEO_FORCE_EMBEDDING_FALLBACK", "1")
+
 from theo.application.facades import database as database_module  # noqa: E402
 from theo.application.facades.database import (  # noqa: E402
     Base,
@@ -21,6 +24,7 @@ from theo.application.facades.database import (  # noqa: E402
 )
 from theo.application.facades.settings import get_settings  # noqa: E402
 from theo.services.api.app.ingest import pipeline  # noqa: E402
+from theo.services.api.app.ingest import events as ingest_events  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 
 
@@ -81,9 +85,15 @@ def ingest_client(ingest_test_env):
     return client, storage_root
 
 
-def test_duplicate_file_ingest_returns_400(ingest_client):
+def test_duplicate_file_ingest_returns_400(ingest_client, monkeypatch):
     client, storage_root = ingest_client
     payload = b"Sample duplicate document"
+
+    monkeypatch.setattr(
+        ingest_events,
+        "_dispatch_neighborhood_event",
+        lambda payload: None,
+    )
 
     before = list(storage_root.iterdir())
     assert before == []
@@ -114,6 +124,12 @@ def test_duplicate_url_ingest_returns_400(ingest_client, monkeypatch):
 
     html = "<html><body><p>Hello world</p></body></html>"
     metadata = {"title": "Example", "canonical_url": "https://example.com/article"}
+
+    monkeypatch.setattr(
+        ingest_events,
+        "_dispatch_neighborhood_event",
+        lambda payload: None,
+    )
 
     def _fake_fetch(settings, url: str):
         return html, metadata
