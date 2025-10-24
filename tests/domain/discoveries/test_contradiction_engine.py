@@ -16,7 +16,7 @@ def _has_transformers() -> bool:
         import transformers  # noqa: F401
         import torch  # noqa: F401
         return True
-    except ImportError:
+    except Exception:
         return False
 
 
