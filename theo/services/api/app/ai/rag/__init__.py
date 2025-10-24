@@ -10,6 +10,7 @@ from ..registry import get_llm_registry
 from . import (
     guardrail_helpers as _guardrail_helpers_module,
     guardrails as _guardrails_module,
+    refusals as _refusals_module,
     retrieval as _retrieval_module,
     workflow as _workflow_module,
 )
@@ -97,6 +98,8 @@ class _RAGModule(types.ModuleType):
             setattr(_guardrails_module, name, value)
         if hasattr(_guardrail_helpers_module, name):
             setattr(_guardrail_helpers_module, name, value)
+        if hasattr(_refusals_module, name):
+            setattr(_refusals_module, name, value)
         if hasattr(_retrieval_module, name):
             setattr(_retrieval_module, name, value)
         super().__setattr__(name, value)

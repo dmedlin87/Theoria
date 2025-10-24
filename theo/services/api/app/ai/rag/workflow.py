@@ -50,12 +50,9 @@ from .guardrail_helpers import (
     apply_guardrail_profile,
     build_citations,
     build_retrieval_digest,
-    derive_snippet,
     ensure_completion_safe,
-    format_anchor,
     load_guardrail_reference,
     load_passages_for_osis,
-    scrub_adversarial_language,
     validate_model_completion,
 )
 from .models import (
@@ -73,6 +70,8 @@ from .models import (
     SermonPrepResponse,
     VerseCopilotResponse,
 )
+from .prompts import PromptContext
+from .refusals import REFUSAL_MESSAGE, REFUSAL_MODEL_NAME, build_guardrail_refusal
 from .reasoning_trace import build_reasoning_trace_from_completion
 from .retrieval import record_used_citation_feedback, search_passages
 
@@ -130,20 +129,12 @@ class GuardedAnswerPipeline:
                 },
             )
 
-        cited_results = [result for result in ordered_results if result.osis_ref]
-        summary_lines = []
-        for idx, citation in enumerate(citations):
-            result = cited_results[idx] if idx < len(cited_results) else None
-            document_title = (
-                citation.document_title
-                or (result.document_title if result else None)
-                or citation.document_id
-            )
-            summary_lines.append(
-                f"[{citation.index}] {citation.snippet} — {document_title}"
-                f" ({citation.osis}, {citation.anchor})"
-            )
-        summary_text = "\n".join(summary_lines)
+        prompt_context = PromptContext(
+            citations=citations,
+            filters=filters,
+            memory_context=memory_context,
+        )
+        summary_text, summary_lines = prompt_context.build_summary(ordered_results)
 
         model_output = None
         model_name = None
@@ -161,31 +152,7 @@ class GuardedAnswerPipeline:
         if not candidates:
             raise GenerationError("No language models are available for workflow 'rag'")
 
-        context_lines = []
-        for citation in citations:
-            prompt_snippet = scrub_adversarial_language(citation.snippet) or ""
-            context_lines.append(
-                f"[{citation.index}] {prompt_snippet.strip()} (OSIS {citation.osis}, {citation.anchor})"
-            )
-        prompt_parts = [
-            "You are Theo Engine's grounded assistant.",
-            "Answer the question strictly from the provided passages.",
-            "Cite evidence using the bracketed indices and retain OSIS + anchor in a Sources line.",
-            "If the passages do not answer the question, state that explicitly.",
-        ]
-        if memory_context:
-            prompt_parts.append("Prior conversation highlights:")
-            for idx, snippet in enumerate(memory_context, start=1):
-                sanitized = scrub_adversarial_language(snippet) or ""
-                if sanitized:
-                    prompt_parts.append(f"{idx}. {sanitized}")
-        sanitized_question = scrub_adversarial_language(question)
-        if sanitized_question:
-            prompt_parts.append(f"Question: {sanitized_question}")
-        prompt_parts.append("Passages:")
-        prompt_parts.extend(context_lines)
-        prompt_parts.append("Respond with 2-3 sentences followed by 'Sources:'")
-        prompt = "\n".join(prompt_parts)
+        prompt = prompt_context.build_prompt(question)
 
         retrieval_digest = build_retrieval_digest(ordered_results)
         last_error: GenerationError | None = None
@@ -652,100 +619,6 @@ def _guarded_answer(
         allow_fallback=allow_fallback,
         mode=mode,
     )
-
-_REFUSAL_OSIS = "John.1.1"
-_REFUSAL_FALLBACK_ANCHOR = "John 1:1"
-_REFUSAL_FALLBACK_TITLE = "Guardrail Reference"
-_REFUSAL_FALLBACK_SNIPPET = (
-    "John 1:1 affirms the Word as divine and life-giving; our responses must remain "
-    "grounded in that hope."
-)
-REFUSAL_MODEL_NAME = "guardrail.refusal"
-REFUSAL_MESSAGE = "I'm sorry, but I cannot help with that request."
-
-
-def _load_refusal_reference(session: Session) -> tuple[Passage | None, Document | None]:
-    try:
-        record = (
-            session.execute(
-                select(Passage, Document)
-                .join(Document)
-                .where(Passage.osis_ref == _REFUSAL_OSIS)
-                .limit(1)
-            )
-            .first()
-        )
-    except Exception:  # pragma: no cover - defensive fallback
-        LOGGER.debug("failed to load guardrail refusal reference", exc_info=True)
-        return None, None
-    if not record:
-        return None, None
-    passage, document = record
-    return passage, document
-
-
-def _build_refusal_citation(session: Session) -> RAGCitation:
-    passage, document = _load_refusal_reference(session)
-    document_title = _REFUSAL_FALLBACK_TITLE
-    anchor = _REFUSAL_FALLBACK_ANCHOR
-    snippet = _REFUSAL_FALLBACK_SNIPPET
-    passage_id = "guardrail-passage"
-    document_id = "guardrail-document"
-
-    if passage is not None:
-        document_title = getattr(document, "title", None) or _REFUSAL_FALLBACK_TITLE
-        passage_id = passage.id
-        document_id = passage.document_id
-        result = HybridSearchResult(
-            id=passage.id,
-            document_id=passage.document_id,
-            text=passage.text or _REFUSAL_FALLBACK_SNIPPET,
-            raw_text=getattr(passage, "raw_text", None),
-            osis_ref=passage.osis_ref or _REFUSAL_OSIS,
-            start_char=passage.start_char,
-            end_char=passage.end_char,
-            page_no=passage.page_no,
-            t_start=passage.t_start,
-            t_end=passage.t_end,
-            score=1.0,
-            meta=getattr(passage, "meta", None),
-            document_title=document_title,
-            snippet=passage.text or _REFUSAL_FALLBACK_SNIPPET,
-            rank=1,
-            highlights=None,
-        )
-        snippet = derive_snippet(result, fallback=_REFUSAL_FALLBACK_SNIPPET)
-        anchor = format_anchor(result)
-
-    return RAGCitation(
-        index=1,
-        osis=_REFUSAL_OSIS,
-        anchor=anchor,
-        passage_id=passage_id,
-        document_id=document_id,
-        document_title=document_title,
-        snippet=snippet,
-        source_url=None,
-    )
-
-
-def build_guardrail_refusal(
-    session: Session, *, reason: str | None = None
-) -> RAGAnswer:
-    citation = _build_refusal_citation(session)
-    sources_line = f"[{citation.index}] {citation.osis} ({citation.anchor})"
-    model_output = f"{REFUSAL_MESSAGE}\n\nSources: {sources_line}"
-    guardrail_profile = {"status": "refused"}
-    if reason:
-        guardrail_profile["reason"] = reason
-    return RAGAnswer(
-        summary=REFUSAL_MESSAGE,
-        citations=[citation],
-        model_name=REFUSAL_MODEL_NAME,
-        model_output=model_output,
-        guardrail_profile=guardrail_profile,
-    )
-
 
 def _guarded_answer_or_refusal(
     session: Session,
