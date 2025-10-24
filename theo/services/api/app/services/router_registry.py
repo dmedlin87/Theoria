@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..graphql.router import graphql_router
+from ..graphql.router import router as graphql_router
 from ..routes import (
     ai,
     analytics,
