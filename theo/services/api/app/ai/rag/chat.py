@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Sequence
 from sqlalchemy.orm import Session
 
@@ -20,18 +21,6 @@ from .cache_ops import (
     build_cache_key,
     load_cached_answer,
     store_cached_answer,
-)
-from .deliverables import (
-    generate_comparative_analysis,
-    generate_devotional_flow,
-    generate_multimedia_digest,
-    generate_sermon_prep_outline,
-)
-from .exports import (
-    build_sermon_deliverable,
-    build_sermon_prep_package,
-    build_transcript_deliverable,
-    build_transcript_package,
 )
 from .guardrail_helpers import (
     GuardrailError,
@@ -69,9 +58,95 @@ from .telemetry import (
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from ..trails import TrailRecorder
+    from collections.abc import Callable
+
+    from .deliverables import (
+        generate_comparative_analysis as _GenerateComparativeAnalysis,
+        generate_devotional_flow as _GenerateDevotionalFlow,
+        generate_multimedia_digest as _GenerateMultimediaDigest,
+        generate_sermon_prep_outline as _GenerateSermonPrepOutline,
+    )
+    from .exports import (
+        build_sermon_deliverable as _BuildSermonDeliverable,
+        build_sermon_prep_package as _BuildSermonPrepPackage,
+        build_transcript_deliverable as _BuildTranscriptDeliverable,
+        build_transcript_package as _BuildTranscriptPackage,
+    )
+else:  # pragma: no cover - runtime fallback
+    from collections.abc import Callable
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _missing_deliverable_hook(name: str) -> Callable[..., Any]:
+    def _missing(*_args: Any, **_kwargs: Any) -> Any:
+        raise RuntimeError(
+            "Deliverable hook '%s' has not been configured. "
+            "Import 'theo.services.api.app.ai.rag.workflow' to initialise the"
+            " compatibility layer." % name
+        )
+
+    return _missing
+
+
+@dataclass(frozen=True)
+class DeliverableHooks:
+    generate_sermon_prep_outline: "Callable[..., SermonPrepResponse]"
+    generate_comparative_analysis: "Callable[..., ComparativeAnalysisResponse]"
+    generate_devotional_flow: "Callable[..., DevotionalResponse]"
+    generate_multimedia_digest: "Callable[..., MultimediaDigestResponse]"
+    build_sermon_deliverable: "Callable[..., Any]"
+    build_sermon_prep_package: "Callable[..., Any]"
+    build_transcript_deliverable: "Callable[..., Any]"
+    build_transcript_package: "Callable[..., Any]"
+
+
+_deliverable_hooks: DeliverableHooks | None = None
+
+
+generate_sermon_prep_outline = _missing_deliverable_hook(
+    "generate_sermon_prep_outline"
+)
+generate_comparative_analysis = _missing_deliverable_hook(
+    "generate_comparative_analysis"
+)
+generate_devotional_flow = _missing_deliverable_hook("generate_devotional_flow")
+generate_multimedia_digest = _missing_deliverable_hook(
+    "generate_multimedia_digest"
+)
+build_sermon_deliverable = _missing_deliverable_hook("build_sermon_deliverable")
+build_sermon_prep_package = _missing_deliverable_hook("build_sermon_prep_package")
+build_transcript_deliverable = _missing_deliverable_hook(
+    "build_transcript_deliverable"
+)
+build_transcript_package = _missing_deliverable_hook("build_transcript_package")
+
+
+def configure_deliverable_hooks(hooks: DeliverableHooks) -> DeliverableHooks:
+    """Install deliverable helpers while preserving compatibility exports."""
+
+    global _deliverable_hooks
+    _deliverable_hooks = hooks
+
+    globals().update(
+        generate_sermon_prep_outline=hooks.generate_sermon_prep_outline,
+        generate_comparative_analysis=hooks.generate_comparative_analysis,
+        generate_devotional_flow=hooks.generate_devotional_flow,
+        generate_multimedia_digest=hooks.generate_multimedia_digest,
+        build_sermon_deliverable=hooks.build_sermon_deliverable,
+        build_sermon_prep_package=hooks.build_sermon_prep_package,
+        build_transcript_deliverable=hooks.build_transcript_deliverable,
+        build_transcript_package=hooks.build_transcript_package,
+    )
+
+    return hooks
+
+
+def get_deliverable_hooks() -> DeliverableHooks | None:
+    """Return the currently configured deliverable hooks, if any."""
+
+    return _deliverable_hooks
 
 
 

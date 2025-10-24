@@ -263,3 +263,26 @@
 - Keep new guardrailed workflow helpers inside the purpose-built `ai/rag/` modules and re-export only what legacy call sites need from `ai/__init__.py` until migrations complete.
 - When wiring dependency injection for deliverable builders, update both the FastAPI routes and the recorder expectations in the same PR to avoid transient import loops.
 - Continue appending entries to this log after each PR so Phase 2 progress and outstanding blockers remain easy to track.
+
+## Entry – 2025-11-05
+
+### Delivered in this PR
+- Introduced a `DeliverableHooks` configuration API in `ai/rag/chat.py` so the chat pipeline no longer imports the deliverable builders at module import time while keeping backwards-compatible exports available for legacy call sites.
+- Updated the `ai/rag/workflow.py` proxy to install the deliverable hooks during initialisation, ensuring the compatibility shim mirrors the relocated helpers without reintroducing tight coupling.
+- Added a dedicated unit test (`tests/api/ai/test_chat_deliverable_hooks.py`) that exercises the hook registration path to guard against future regressions in the compatibility surface.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Complete deliverable dependency decoupling downstream:**
+   - Audit modules that still import deliverable helpers via the chat proxy (routes, workers) and migrate them to import from `ai.rag.deliverables` directly once the compatibility layer stabilises.
+   - Remove the temporary placeholder functions from `chat.py` after all call sites resolve the new hook wiring.
+2. **Harden the new telemetry/reasoning helpers:**
+   - Backfill unit coverage for `rag.telemetry` and `rag.reasoning` to lock down expected event payloads, especially cache status propagation and revision logging.
+   - Evaluate whether additional guardrail failure metadata should be surfaced through the telemetry helpers for downstream analytics.
+3. **Continue slimming the compatibility layer:**
+   - Audit remaining modules that still import the legacy workflow surface and update them to reference the new helpers directly so future PRs can shrink `rag/workflow.py` further.
+   - Capture regression checks that patch `rag.telemetry`/`rag.reasoning` directly to ensure the proxy module mirrors new exports as they land.
+
+### Guidance for the Next Agent
+- Prefer importing deliverable builders from the new module namespaces in upcoming PRs so we can eventually delete the compatibility exports from `chat.py` once all call sites migrate.
+- When expanding telemetry/reasoning coverage, update the regression tests and proxy exports concurrently to keep the monkeypatch-based suites stable during refactors.
+- Continue appending entries to this log with concrete deliverables and blockers after each Phase 2 PR to maintain the shared hand-off narrative.
