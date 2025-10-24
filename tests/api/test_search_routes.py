@@ -194,3 +194,67 @@ def test_reranker_cache_retries_when_artifact_changes(
     assert reranker == "version-two"
     assert cache.failed is False
     assert len(loads) == 2
+
+
+def test_search_rejects_experiment_header_overflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        retrieval_service_module,
+        "hybrid_search",
+        lambda *_args, **_kwargs: [],
+    )
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/search",
+            headers={"X-Search-Experiments": "a" * 513},
+            params={"q": "grace"},
+        )
+
+    assert response.status_code == 400
+    assert "header exceeds" in response.json()["detail"].lower()
+
+
+def test_search_rejects_experiment_token_overflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        retrieval_service_module,
+        "hybrid_search",
+        lambda *_args, **_kwargs: [],
+    )
+
+    tokens = ",".join(f"flag{i}" for i in range(25))
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/search",
+            headers={"X-Search-Experiments": tokens},
+            params={"q": "faith"},
+        )
+
+    assert response.status_code == 400
+    assert "too many experiment flags" in response.json()["detail"].lower()
+
+
+def test_search_rejects_experiment_token_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        retrieval_service_module,
+        "hybrid_search",
+        lambda *_args, **_kwargs: [],
+    )
+
+    long_token = "x" * 80
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/search",
+            headers={"X-Search-Experiments": long_token},
+            params={"q": "hope"},
+        )
+
+    assert response.status_code == 400
+    assert "must be shorter" in response.json()["detail"].lower()

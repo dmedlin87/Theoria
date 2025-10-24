@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import get_session
@@ -18,6 +18,10 @@ from ..services.retrieval_service import (
     get_retrieval_service,
     reset_reranker_cache as _reset_reranker_cache,
 )
+
+_MAX_EXPERIMENT_HEADER_LENGTH = 512
+_MAX_EXPERIMENT_TOKEN_COUNT = 20
+_MAX_EXPERIMENT_TOKEN_LENGTH = 64
 
 router = APIRouter()
 
@@ -45,6 +49,30 @@ def _parse_experiment_tokens(tokens: list[str]) -> dict[str, str]:
             key, value = token, "1"
         experiments[key.strip().casefold()] = value.strip()
     return experiments
+
+
+def _validate_experiment_tokens(tokens: list[str]) -> list[str]:
+    """Validate experiment tokens and return the cleaned list."""
+
+    cleaned = [token for token in tokens if token]
+    if len(cleaned) > _MAX_EXPERIMENT_TOKEN_COUNT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Too many experiment flags supplied; "
+                f"limit is {_MAX_EXPERIMENT_TOKEN_COUNT}."
+            ),
+        )
+    for token in cleaned:
+        if len(token) > _MAX_EXPERIMENT_TOKEN_LENGTH:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Experiment flag entries must be shorter than "
+                    f"{_MAX_EXPERIMENT_TOKEN_LENGTH} characters."
+                ),
+            )
+    return cleaned
 
 
 @router.get("/", response_model=HybridSearchResponse)
@@ -103,9 +131,17 @@ def search(
     experiment_tokens: list[str] = []
     header_tokens = request.headers.get("X-Search-Experiments")
     if header_tokens:
+        if len(header_tokens) > _MAX_EXPERIMENT_HEADER_LENGTH:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "X-Search-Experiments header exceeds the maximum allowed length."
+                ),
+            )
         experiment_tokens.extend([token.strip() for token in header_tokens.split(",")])
     if experiment:
         experiment_tokens.extend(experiment)
+    experiment_tokens = _validate_experiment_tokens(experiment_tokens)
     experiments = _parse_experiment_tokens(experiment_tokens)
 
     results, reranker_header = retrieval_service.search(
