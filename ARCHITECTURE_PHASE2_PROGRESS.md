@@ -48,3 +48,25 @@
 - Consolidate future guardrail schema changes inside `theo/services/api/app/ai/guardrails/` and delete the legacy definitions from `models/ai.py` as additional call sites move over.
 - When tackling the client factory import conflict, ensure `registry.py` continues to surface a provider-agnostic `build_client` for the rest of the service layer before deleting the legacy module.
 - Keep updating this log after every PR so we maintain a continuous hand-off narrative across the remaining Phase 2 scope.
+
+## Entry – 2025-10-26
+
+### Delivered in this PR
+- Renamed the legacy `theo.services.api.app.ai.clients` module to `legacy_clients.py` and updated the new `ai/clients/` package to re-export the existing client factory API so `registry.py` and the API tests can import `build_client` again without touching legacy call sites.
+- Added explicit compatibility exports for the legacy client helpers alongside the nascent async adapters (`AsyncOpenAIClient`, `AsyncAnthropicClient`) so Phase 2 work can continue migrating functionality piecemeal.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Finish decomposing the legacy client monolith:**
+   - Gradually migrate provider adapters, caching utilities, and prompt helpers from `ai/legacy_clients.py` into purpose-built modules under `ai/clients/` while keeping `__init__.py` shimmed for backwards compatibility.
+   - Once call sites no longer rely on the legacy implementations, delete `legacy_clients.py` and collapse the compatibility layer.
+2. **Resolve missing AI surface exports blocking tests:**
+   - `tests/api` still fail because `theo.services.api.app.ai` no longer exposes `run_guarded_chat`; either re-home the workflow utilities into the new package or update the routes/tests to consume the new abstractions.
+   - Audit other guardrail/chat helpers referenced by the FastAPI routes to ensure imports remain stable during the migration.
+3. **Align the async client adapters with the legacy interfaces:**
+   - Flesh out the async `clients/` implementations so they can satisfy the `LanguageModelClientProtocol` expectations and replace the synchronous legacy clients without regression.
+   - Expand unit coverage to exercise both the compatibility shim and the new async adapters once they reach feature parity.
+
+### Guidance for the Next Agent
+- Keep the compatibility exports in `ai/clients/__init__.py` up to date as you migrate symbols out of `legacy_clients.py`; this prevents regressions for modules still importing `theo.services.api.app.ai.clients`.
+- When porting workflow helpers, coordinate with the FastAPI route owners so the import paths change only after the new modules are wired end-to-end.
+- Continue appending entries to this log with concrete deliverables and blockers after each PR to maintain the Phase 2 hand-off narrative.
