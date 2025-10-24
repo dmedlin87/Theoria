@@ -149,3 +149,27 @@
 ### Guidance for the Next Agent
 - Keep the new refusal tests updated as guardrail catalogue storage changes; they provide fast feedback that the compatibility shim still yields stable refusals when the database is unavailable.
 - Use the upcoming modular splits to tighten `ai/__init__.py` exports only after routes/tests adopt the new module boundaries to preserve compatibility during the migration.
+- Continue appending to this log after each PR with precise deliverables and outstanding scope to maintain continuity through the migration.
+
+## Entry – 2025-10-31
+
+### Delivered in this PR
+- Moved the revision gating and schema translation helpers into the new `theo/services/api/app/ai/rag/revisions.py` module so the guarded workflow no longer owns that logic directly.
+- Updated the guarded answer pipeline to consume the extracted helpers and trimmed unused imports that lingered from the legacy implementation.
+- Added focused tests under `tests/api/ai/test_rag_revisions.py` covering revision triggering and schema conversion to keep the new boundary protected as the module evolves.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Continue shrinking the RAG workflow module:**
+   - Identify the remaining orchestration-adjacent helpers (e.g., deliverable wrappers, devotional builders) that can join purpose-built modules similar to `revisions.py`.
+   - Keep the regression imports in `ai/__init__.py` aligned as functions move so compatibility shims stay intact.
+2. **Broaden prompt utility adoption:**
+   - Finish relocating the sermon prep and multimedia prompt builders into `ai/rag/prompts.py`, ensuring routes and tests adopt the shared sanitisation helpers.
+   - Revisit the RAG regression tests once the prompt refactor lands to confirm the revised contexts are exercised.
+3. **Exercise the revision path end-to-end:**
+   - Add integration coverage that drives a critique through to a revision when the async adapters gain parity, proving the new module wiring holds under real completions.
+   - Capture telemetry assertions for revision events to guarantee analytics remain accurate during the migration.
+
+### Guidance for the Next Agent
+- Keep migrating small helper clusters out of `workflow.py` to preserve momentum—`revisions.py` can serve as the pattern for where to land them.
+- When moving prompt builders or deliverable wrappers, update both the compatibility exports and regression tests in the same PR to avoid breaking legacy import paths.
+- Continue appending to this log after every Phase 2 PR with the same structure so the ongoing hand-off remains easy to follow.
