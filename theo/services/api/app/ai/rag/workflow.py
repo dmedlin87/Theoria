@@ -42,6 +42,19 @@ from .refusals import REFUSAL_MESSAGE, REFUSAL_MODEL_NAME, build_guardrail_refus
 from .retrieval import record_used_citation_feedback, search_passages
 from .verse import generate_verse_brief
 
+_chat_module.configure_deliverable_hooks(
+    _chat_module.DeliverableHooks(
+        generate_sermon_prep_outline=generate_sermon_prep_outline,
+        generate_comparative_analysis=generate_comparative_analysis,
+        generate_devotional_flow=generate_devotional_flow,
+        generate_multimedia_digest=generate_multimedia_digest,
+        build_sermon_deliverable=build_sermon_deliverable,
+        build_sermon_prep_package=build_sermon_prep_package,
+        build_transcript_deliverable=build_transcript_deliverable,
+        build_transcript_package=build_transcript_package,
+    )
+)
+
 # Delegate primary workflow helpers to the chat module ---------------------
 GuardedAnswerPipeline = _chat_module.GuardedAnswerPipeline
 _guarded_answer = _chat_module._guarded_answer
