@@ -22,6 +22,9 @@ def reload_ai_module():
         "generate_sermon_prep_outline",
         "generate_multimedia_digest",
         "build_transcript_deliverable",
+        "generate_verse_brief",
+        "run_corpus_curation",
+        "run_research_reconciliation",
     ],
 )
 def test_ai_package_reexports_rag_workflow_helpers(attribute_name: str) -> None:

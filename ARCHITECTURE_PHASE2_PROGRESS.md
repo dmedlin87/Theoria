@@ -195,3 +195,25 @@
 - When moving more workflow helpers, add imports to the proxy module (`ai/rag/__init__.py`) at the same time so downstream modules retain their existing import paths.
 - Keep running the API export regression tests after each migration step—they provide fast feedback that the compatibility surface is intact while the package splits continue.
 - Continue appending entries to this log after every Phase 2 PR to maintain the shared hand-off narrative.
+
+## Entry – 2025-11-02
+
+### Delivered in this PR
+- Moved the verse copilot, corpus curation, and research reconciliation orchestrators into dedicated modules under `theo/services/api/app/ai/rag/` (`verse.py`, `corpus.py`, `collaboration.py`) to continue slimming `workflow.py`.
+- Added compatibility shims that delegate from `workflow.py` to the new modules and expanded the RAG package proxy so patches still reach the relocated implementations.
+- Extended the AI package export regression test to cover the newly modularised workflows, ensuring the compatibility layer remains exercised as functions move.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Continue decomposing `workflow.py`:**
+   - Identify the remaining orchestration helpers (e.g., chat streaming, verse follow-up generation, research digest formatting) that can relocate into focused modules once supporting abstractions are ready.
+   - Remove the temporary delegation wrappers in `workflow.py` after downstream call sites import from the new modules directly.
+2. **Align package proxies with future modules:**
+   - Update `_RAGModule` and related shims whenever additional modules are introduced so monkeypatched attributes still propagate during tests.
+   - Consider surfacing explicit module exports (e.g., `rag.verse`) once the compatibility surface stabilises to ease targeted imports.
+3. **Backfill targeted tests for relocated workflows:**
+   - Add unit or integration coverage around `verse.generate_verse_brief`, `corpus.run_corpus_curation`, and `collaboration.run_research_reconciliation` as soon as lightweight fixtures exist to validate their behaviour outside of package export checks.
+
+### Guidance for the Next Agent
+- Prefer landing new workflow refactors directly inside the purpose-built modules and keep the compatibility wrappers lightweight until legacy imports are updated.
+- When introducing additional modules, update both the package proxy and regression tests in the same PR to keep the compatibility guarantees verifiable.
+- Continue appending entries to this log after every Phase 2 PR so the migration narrative stays unbroken.

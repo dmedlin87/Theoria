@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, Sequence
 
 from opentelemetry import trace
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.ports.ai_registry import GenerationError
-from theo.services.api.app.persistence_models import Document, Passage
+from theo.services.api.app.persistence_models import Passage
 
 from ...models.search import HybridSearchFilters, HybridSearchResult
 from ...telemetry import (
@@ -764,89 +763,18 @@ def generate_verse_brief(
     model_name: str | None = None,
     recorder: "TrailRecorder | None" = None,
 ) -> VerseCopilotResponse:
-    filters = filters or HybridSearchFilters()
-    with instrument_workflow(
-        "verse_copilot",
+    """Compatibility shim that delegates to the verse module implementation."""
+
+    from .verse import generate_verse_brief as _generate_verse_brief
+
+    return _generate_verse_brief(
+        session,
         osis=osis,
-        question_present=bool(question),
-        model_hint=model_name,
-    ) as span:
-        set_span_attribute(
-            span,
-            "workflow.filters",
-            filters.model_dump(exclude_none=True),
-        )
-        results = search_passages(session, query=question or osis, osis=osis, filters=filters)
-        set_span_attribute(span, "workflow.result_count", len(results))
-        log_workflow_event(
-            "workflow.passages_retrieved",
-            workflow="verse_copilot",
-            osis=osis,
-            result_count=len(results),
-        )
-        registry = get_llm_registry(session)
-        if recorder:
-            recorder.log_step(
-                tool="hybrid_search",
-                action="retrieve_passages",
-                input_payload={
-                    "query": question or osis,
-                    "osis": osis,
-                    "filters": filters,
-                },
-                output_payload=[
-                    {
-                        "id": result.id,
-                        "osis": result.osis_ref,
-                        "document_id": result.document_id,
-                        "score": getattr(result, "score", None),
-                        "snippet": result.snippet,
-                    }
-                    for result in results
-                ],
-                output_digest=f"{len(results)} passages",
-            )
-        answer = _guarded_answer_or_refusal(
-            session,
-            context="verse_copilot",
-            question=question,
-            results=results,
-            registry=registry,
-            model_hint=model_name,
-            recorder=recorder,
-            filters=filters,
-            osis=osis,
-        )
-        record_used_citation_feedback(
-            session,
-            citations=answer.citations,
-            results=results,
-            query=question or osis,
-            recorder=recorder,
-        )
-        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
-        set_span_attribute(span, "workflow.summary_length", len(answer.summary))
-        log_workflow_event(
-            "workflow.answer_composed",
-            workflow="verse_copilot",
-            citations=len(answer.citations),
-        )
-        if recorder:
-            recorder.record_citations(answer.citations)
-        follow_ups = [
-            "Compare historical and contemporary commentary",
-            "Trace how this verse links to adjacent passages",
-            "Surface sermons that emphasise this verse",
-        ]
-        set_span_attribute(span, "workflow.follow_up_count", len(follow_ups))
-        log_workflow_event(
-            "workflow.follow_ups_suggested",
-            workflow="verse_copilot",
-            follow_up_count=len(follow_ups),
-        )
-        return VerseCopilotResponse(
-            osis=osis, question=question, answer=answer, follow_ups=follow_ups
-        )
+        question=question,
+        filters=filters,
+        model_name=model_name,
+        recorder=recorder,
+    )
 
 
 def run_corpus_curation(
@@ -855,51 +783,11 @@ def run_corpus_curation(
     since: datetime | None = None,
     recorder: "TrailRecorder | None" = None,
 ) -> CorpusCurationReport:
-    with instrument_workflow(
-        "corpus_curation",
-        since=since.isoformat() if since else "auto-7d",
-    ) as span:
-        if since is None:
-            since = datetime.now(UTC) - timedelta(days=7)
-        set_span_attribute(span, "workflow.effective_since", since.isoformat())
-        rows = (
-            session.execute(
-                select(Document)
-                .where(Document.created_at >= since)
-                .order_by(Document.created_at.asc())
-            )
-            .scalars()
-            .all()
-        )
-        set_span_attribute(span, "workflow.documents_processed", len(rows))
-        log_workflow_event(
-            "workflow.documents_loaded",
-            workflow="corpus_curation",
-            count=len(rows),
-        )
-        summaries: list[str] = []
-        for document in rows:
-            primary_topic = None
-            if document.bib_json and isinstance(document.bib_json, dict):
-                primary_topic = document.bib_json.get("primary_topic")
-            if isinstance(document.topics, list) and not primary_topic:
-                primary_topic = document.topics[0] if document.topics else None
-            topic_label = primary_topic or "Uncategorised"
-            summaries.append(
-                f"{document.title or document.id} — {topic_label} ({document.collection or 'general'})"
-            )
-        set_span_attribute(span, "workflow.summary_count", len(summaries))
-        if recorder:
-            recorder.log_step(
-                tool="corpus_curation",
-                action="summarise_documents",
-                input_payload={"since": since.isoformat()},
-                output_payload=summaries,
-                output_digest=f"{len(summaries)} summaries",
-            )
-        return CorpusCurationReport(
-            since=since, documents_processed=len(rows), summaries=summaries
-        )
+    """Compatibility shim delegating to the corpus module implementation."""
+
+    from .corpus import run_corpus_curation as _run_corpus_curation
+
+    return _run_corpus_curation(session, since=since, recorder=recorder)
 
 
 def run_research_reconciliation(
@@ -911,85 +799,18 @@ def run_research_reconciliation(
     model_name: str | None = None,
     recorder: "TrailRecorder | None" = None,
 ) -> CollaborationResponse:
-    filters = HybridSearchFilters()
-    with instrument_workflow(
-        "research_reconciliation",
+    """Compatibility shim delegating to the collaboration module implementation."""
+
+    from .collaboration import run_research_reconciliation as _run_research_reconciliation
+
+    return _run_research_reconciliation(
+        session,
         thread=thread,
         osis=osis,
-        viewpoint_count=len(viewpoints),
-        model_hint=model_name,
-    ) as span:
-        set_span_attribute(
-            span,
-            "workflow.viewpoints",
-            list(viewpoints),
-        )
-        results = search_passages(
-            session, query="; ".join(viewpoints), osis=osis, filters=filters, k=10
-        )
-        set_span_attribute(span, "workflow.result_count", len(results))
-        log_workflow_event(
-            "workflow.passages_retrieved",
-            workflow="research_reconciliation",
-            thread=thread,
-            result_count=len(results),
-        )
-        if recorder:
-            recorder.log_step(
-                tool="hybrid_search",
-                action="retrieve_passages",
-                input_payload={
-                    "query": "; ".join(viewpoints),
-                    "osis": osis,
-                    "filters": filters,
-                },
-                output_payload=[
-                    {
-                        "id": result.id,
-                        "osis": result.osis_ref,
-                        "document_id": result.document_id,
-                        "score": getattr(result, "score", None),
-                        "snippet": result.snippet,
-                    }
-                    for result in results
-                ],
-                output_digest=f"{len(results)} passages",
-            )
-        registry = get_llm_registry(session)
-        question_text = f"Reconcile viewpoints for {osis} in {thread}"
-        answer = _guarded_answer_or_refusal(
-            session,
-            context="research_reconciliation",
-            question=question_text,
-            results=results,
-            registry=registry,
-            model_hint=model_name,
-            recorder=recorder,
-            filters=filters,
-            osis=osis,
-        )
-        record_used_citation_feedback(
-            session,
-            citations=answer.citations,
-            results=results,
-            query=question_text,
-            recorder=recorder,
-        )
-        set_span_attribute(span, "workflow.citation_count", len(answer.citations))
-        log_workflow_event(
-            "workflow.answer_composed",
-            workflow="research_reconciliation",
-            citations=len(answer.citations),
-        )
-        if recorder:
-            recorder.record_citations(answer.citations)
-        synthesis_lines = [
-            f"{citation.osis}: {citation.snippet}" for citation in answer.citations
-        ]
-        synthesized_view = "\n".join(synthesis_lines)
-        return CollaborationResponse(
-            thread=thread, synthesized_view=synthesized_view, answer=answer
-        )
+        viewpoints=viewpoints,
+        model_name=model_name,
+        recorder=recorder,
+    )
 
 
 __all__ = [
