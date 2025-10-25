@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, Iterator, Mapping
@@ -39,6 +39,22 @@ class RepositoryCallTrace:
         self.set_attribute("result_count", count)
 
 
+class _NullRepositoryCallTrace:
+    """Fallback trace that disables telemetry operations."""
+
+    __slots__ = ("repository", "operation")
+
+    def __init__(self, *, repository: str, operation: str) -> None:
+        self.repository = repository
+        self.operation = operation
+
+    def set_attribute(self, key: str, value: Any) -> None:  # noqa: D401 - mimic RepositoryCallTrace
+        """No-op attribute setter when telemetry is disabled."""
+
+    def record_result_count(self, count: int) -> None:  # noqa: D401 - mimic RepositoryCallTrace
+        """No-op result recorder when telemetry is disabled."""
+
+
 @contextmanager
 def trace_repository_call(
     repository: str,
@@ -52,32 +68,51 @@ def trace_repository_call(
     if attributes:
         enriched_attributes.update(attributes)
 
-    start_time = perf_counter()
     workflow_name = f"repository.{repository}.{operation}"
 
-    with instrument_workflow(workflow_name, **enriched_attributes) as span:
-        trace = RepositoryCallTrace(repository=repository, operation=operation, span=span)
+    try:
+        workflow_cm = instrument_workflow(workflow_name, **enriched_attributes)
+    except RuntimeError:
+        workflow_cm = nullcontext(None)
+        telemetry_enabled = False
+    else:
+        telemetry_enabled = True
 
-        trace.set_attribute("name", repository)
-        trace.set_attribute("operation", operation)
-        for key, value in (attributes or {}).items():
-            trace.set_attribute(key, value)
+    start_time = perf_counter() if telemetry_enabled else None
+
+    with workflow_cm as span:
+        if telemetry_enabled:
+            trace: RepositoryCallTrace | _NullRepositoryCallTrace = RepositoryCallTrace(
+                repository=repository,
+                operation=operation,
+                span=span,
+            )
+
+            trace.set_attribute("name", repository)
+            trace.set_attribute("operation", operation)
+            for key, value in (attributes or {}).items():
+                trace.set_attribute(key, value)
+        else:
+            trace = _NullRepositoryCallTrace(repository=repository, operation=operation)
 
         try:
             yield trace
         except Exception:
-            trace.set_attribute("status", "failed")
+            if telemetry_enabled:
+                trace.set_attribute("status", "failed")
             raise
         else:
-            trace.set_attribute("status", "success")
+            if telemetry_enabled:
+                trace.set_attribute("status", "success")
         finally:
-            duration = perf_counter() - start_time
-            trace.set_attribute("duration_ms", round(duration * 1000, 2))
-            record_histogram(
-                REPOSITORY_LATENCY_METRIC,
-                value=duration,
-                labels={"repository": repository, "operation": operation},
-            )
+            if telemetry_enabled and start_time is not None:
+                duration = perf_counter() - start_time
+                trace.set_attribute("duration_ms", round(duration * 1000, 2))
+                record_histogram(
+                    REPOSITORY_LATENCY_METRIC,
+                    value=duration,
+                    labels={"repository": repository, "operation": operation},
+                )
 
 
 __all__ = [
