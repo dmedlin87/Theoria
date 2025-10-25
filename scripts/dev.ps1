@@ -120,8 +120,8 @@ $RepoRoot = Split-Path -Parent $ScriptDir
 $ApiModule = 'theo.services.api.app.bootstrap.app_factory:create_app'
 $WebDir = Join-Path $RepoRoot 'theo/services/web'
 
-if (-not (Test-Path (Join-Path $RepoRoot 'requirements.txt'))) {
-  Write-Host 'Could not find requirements.txt at repo root. Aborting.' -ForegroundColor Red
+if (-not (Test-Path (Join-Path $RepoRoot 'pyproject.toml'))) {
+  Write-Host 'Could not find pyproject.toml at repo root. Aborting.' -ForegroundColor Red
   exit 1
 }
 

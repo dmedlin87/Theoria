@@ -26,3 +26,11 @@ tasks:
     cmds:
       - task: architecture:test
       - task: architecture:imports
+
+  deps:lock:
+    desc: Regenerate pip-compile lockfiles for all extras
+    cmds:
+      - pip-compile --resolver=backtracking --extra base --output-file constraints/base.txt pyproject.toml
+      - pip-compile --resolver=backtracking --extra api --output-file constraints/api.txt pyproject.toml
+      - pip-compile --resolver=backtracking --extra ml --output-file constraints/ml.txt pyproject.toml
+      - pip-compile --resolver=backtracking --extra dev --output-file constraints/dev.txt pyproject.toml
