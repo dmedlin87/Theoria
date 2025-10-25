@@ -10,3 +10,19 @@ tasks:
     cmds:
       - pkill -f "uvicorn .*theo.services.api.app.bootstrap.app_factory" || true
     silent: true
+
+  architecture:test:
+    desc: Run architecture enforcement tests
+    cmds:
+      - pytest tests/architecture -q
+
+  architecture:imports:
+    desc: Validate import boundaries with import-linter
+    cmds:
+      - lint-imports --config importlinter.ini
+
+  architecture:check:
+    desc: Run all architecture boundary checks
+    cmds:
+      - task: architecture:test
+      - task: architecture:imports

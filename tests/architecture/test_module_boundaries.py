@@ -5,6 +5,8 @@ import ast
 from pathlib import Path
 from typing import Iterable
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -68,6 +70,30 @@ def test_application_does_not_import_service_database() -> None:
             assert not module.startswith(forbidden_prefix), (
                 f"Application module {path} imports forbidden database dependency '{module}'"
             )
+
+
+def test_application_does_not_import_service_runtimes_or_fastapi() -> None:
+    forbidden_service_prefix = "theo.services.api.app"
+    forbidden_adapters = (
+        "theo.services.api.app.adapters.telemetry",
+        "theo.services.api.app.adapters.resilience",
+        "theo.services.api.app.adapters.security",
+    )
+    for path in _iter_python_files("theo.application"):
+        for module in _gather_imports(path):
+            for adapter in forbidden_adapters:
+                if module == adapter or module.startswith(f"{adapter}."):
+                    pytest.fail(
+                        f"Application module {path} imports forbidden adapter '{module}'"
+                    )
+            if module.startswith(forbidden_service_prefix):
+                pytest.fail(
+                    f"Application module {path} must not import service-layer runtime module '{module}'"
+                )
+            if module == "fastapi" or module.startswith("fastapi."):
+                pytest.fail(
+                    f"Application module {path} imports FastAPI dependency '{module}'"
+                )
 
 
 def test_adapters_do_not_cross_import() -> None:
