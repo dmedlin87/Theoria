@@ -38,6 +38,8 @@ COMMENTARY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/commentaries")
 
 logger = logging.getLogger(__name__)
 
+MISSING_COLUMN_MAX_ATTEMPTS = 10
+
 _DATASET_TABLES: dict[str, Table] = {
     "contradiction": ContradictionSeed.__table__,
     "harmony": HarmonySeed.__table__,
@@ -696,26 +698,32 @@ def _run_seed_with_perspective_guard(
     session: Session,
     seed_fn: Callable[[Session], None],
     dataset_label: str,
+    *,
+    max_attempts: int = MISSING_COLUMN_MAX_ATTEMPTS,
 ) -> None:
     """Execute *seed_fn* while gracefully handling missing perspective columns."""
 
     attempts = 0
-    while True:
+    while attempts < max_attempts:
         try:
             seed_fn(session)
             return
         except OperationalError as exc:
             if getattr(exc, "_theoria_missing_column_handled", False):
                 attempts += 1
-                if attempts >= 2:
-                    return
                 continue
             handled = _handle_missing_perspective_error(session, dataset_label, exc)
             if not handled:
                 raise
             attempts += 1
-            if attempts >= 2:
-                return
+            continue
+
+    if attempts:
+        logger.warning(
+            "Skipping %s seeds after exhausting %d missing-column retries",
+            dataset_label,
+            attempts,
+        )
 
 
 def seed_contradiction_claims(session: Session) -> None:
