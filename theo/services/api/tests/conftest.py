@@ -49,7 +49,7 @@ from theo.services.api.app.adapters.security import require_principal
 
 def _use_pgvector_backend(request: pytest.FixtureRequest) -> bool:
     try:
-        option = request.config.getoption("use_pgvector")
+        option = request.config.getoption("pgvector")
     except (AttributeError, ValueError):
         option = False
     return bool(option or os.environ.get("PYTEST_USE_PGVECTOR"))

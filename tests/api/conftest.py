@@ -177,6 +177,8 @@ _register_sklearn_stubs()
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.schema
 from fastapi import Request as FastAPIRequest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -221,7 +223,7 @@ def _disable_migrations(
     so we don't need to run them again during FastAPI app lifespan startup.
     """
 
-    if request.node.get_closest_marker("enable_migrations"):
+    if request.node.get_closest_marker("schema"):
         yield
         return
 

@@ -118,8 +118,8 @@ Both scripts boot the API and Next.js app, wiring ports and environment variable
 - Run `task deps:lock` after editing dependency definitions to regenerate the pinned constraints via `pip-compile`.
 
 ### Testing & quality gates
-- **Python tests**: `pytest -q`
-- **pgvector flows**: `PYTEST_USE_PGVECTOR=1 pytest -q`
+- **Python tests (fast)**: `task test:fast` or `pytest -m "not (slow or gpu or contract)"`
+- **Full Python suite**: `task test:full` or `pytest --schema --pgvector --contract`
 - **Web tests**: from `theo/services/web`, run `npm test` or `npm run test:vitest`
 - **Playwright smoke**: `npm run test:e2e:smoke`
 - **Performance baselines**: Lighthouse CI policy lives in [`docs/performance.md`](docs/performance.md)

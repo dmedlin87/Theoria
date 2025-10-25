@@ -75,11 +75,39 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         )
 
     parser.addoption(
+        "--pgvector",
+        action="store_true",
+        default=False,
+        dest="pgvector",
+        help="Enable tests marked with @pytest.mark.pgvector (starts a Postgres+pgvector Testcontainer).",
+    )
+    parser.addoption(
         "--use-pgvector",
         action="store_true",
         default=False,
-        dest="use_pgvector",
-        help="Back API tests with a Postgres+pgvector Testcontainer instead of SQLite.",
+        dest="pgvector",
+        help="Deprecated alias for --pgvector.",
+    )
+    parser.addoption(
+        "--schema",
+        action="store_true",
+        default=False,
+        dest="schema",
+        help="Allow database schema migrations required by @pytest.mark.schema tests.",
+    )
+    parser.addoption(
+        "--contract",
+        action="store_true",
+        default=False,
+        dest="contract",
+        help="Run contract suites marked with @pytest.mark.contract.",
+    )
+    parser.addoption(
+        "--gpu",
+        action="store_true",
+        default=False,
+        dest="gpu",
+        help="Allow GPU-dependent tests marked with @pytest.mark.gpu.",
     )
 
 
@@ -93,6 +121,9 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "asyncio: mark a test function as running with an asyncio event loop.",
     )
+
+    if config.getoption("pgvector") and not config.getoption("schema"):
+        config.option.schema = True
 
 
 def pytest_load_initial_conftests(
@@ -198,12 +229,86 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+
+_FIXTURE_MARKER_REQUIREMENTS: dict[str, set[str]] = {
+    "pgvector": {
+        "pgvector_container",
+        "pgvector_database_url",
+        "pgvector_engine",
+        "pgvector_migrated_database_url",
+    },
+    "schema": {
+        "integration_database_url",
+        "integration_engine",
+    },
+}
+
+
+_MARKER_OPTIONS: dict[str, str] = {
+    "pgvector": "pgvector",
+    "schema": "schema",
+    "contract": "contract",
+    "gpu": "gpu",
+}
+
+
+def _ensure_cli_opt_in(
+    request: pytest.FixtureRequest, *, option: str, marker: str
+) -> None:
+    """Skip costly fixtures unless explicitly enabled via CLI flag."""
+
+    if request.config.getoption(option):
+        return
+
+    cli_flag = option.replace("_", "-")
+    pytest.skip(
+        f"@pytest.mark.{marker} fixtures require the --{cli_flag} flag; "
+        f"rerun with --{cli_flag} to enable this opt-in suite."
+    )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Enforce marker usage and CLI opt-ins for costly test suites."""
+
+    for item in items:
+        fixture_names = set(item.fixturenames)
+
+        for marker_name, fixtures in _FIXTURE_MARKER_REQUIREMENTS.items():
+            if fixtures & fixture_names and item.get_closest_marker(marker_name) is None:
+                fixtures_list = ", ".join(sorted(fixtures & fixture_names))
+                cli_flag = _MARKER_OPTIONS[marker_name].replace("_", "-")
+                raise pytest.UsageError(
+                    " ".join(
+                        [
+                            f"{item.nodeid} uses fixture(s) {fixtures_list}",
+                            f"but is missing @pytest.mark.{marker_name}.",
+                            f"Mark the test and re-run with --{cli_flag}",
+                            "to opt in to the heavy suite.",
+                        ]
+                    )
+                )
+
+        for marker_name, option_name in _MARKER_OPTIONS.items():
+            if item.get_closest_marker(marker_name) and not config.getoption(option_name):
+                cli_flag = option_name.replace("_", "-")
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason=f"requires --{cli_flag} opt-in to run @{marker_name} tests"
+                    )
+                )
+
 POSTGRES_IMAGE = os.environ.get("PYTEST_PGVECTOR_IMAGE", "ankane/pgvector:0.5.2")
 
 
 @pytest.fixture(scope="session")
-def pgvector_container() -> Generator["PostgresContainer", None, None]:
+def pgvector_container(
+    request: pytest.FixtureRequest,
+) -> Generator["PostgresContainer", None, None]:
     """Launch a pgvector-enabled Postgres container for integration tests."""
+
+    _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
 
     try:
         from testcontainers.postgres import PostgresContainer
@@ -234,8 +339,12 @@ def _normalise_database_url(url: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def pgvector_database_url(pgvector_container) -> Generator[str, None, None]:
+def pgvector_database_url(
+    request: pytest.FixtureRequest, pgvector_container
+) -> Generator[str, None, None]:
     """Yield a SQLAlchemy-friendly database URL for the running container."""
+
+    _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
 
     raw_url = pgvector_container.get_connection_url()
     url = _normalise_database_url(raw_url)
@@ -250,8 +359,12 @@ def pgvector_database_url(pgvector_container) -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope="session")
-def pgvector_engine(pgvector_database_url: str) -> Generator[Engine, None, None]:
+def pgvector_engine(
+    request: pytest.FixtureRequest, pgvector_database_url: str
+) -> Generator[Engine, None, None]:
     """Provide a SQLAlchemy engine connected to the pgvector container."""
+
+    _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
 
     engine = create_engine(pgvector_database_url, future=True)
     try:
@@ -261,8 +374,12 @@ def pgvector_engine(pgvector_database_url: str) -> Generator[Engine, None, None]
 
 
 @pytest.fixture(scope="session")
-def pgvector_migrated_database_url(pgvector_database_url: str) -> Generator[str, None, None]:
+def pgvector_migrated_database_url(
+    request: pytest.FixtureRequest, pgvector_database_url: str
+) -> Generator[str, None, None]:
     """Apply SQL migrations to the pgvector database and return the connection URL."""
+
+    _ensure_cli_opt_in(request, option="schema", marker="schema")
 
     from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 
@@ -308,7 +425,12 @@ def integration_database_url(
     suites can ``create_engine`` with minimal boilerplate.
     """
 
-    if request.config.getoption("use_pgvector"):
+    if not request.config.getoption("schema"):
+        pytest.skip(
+            "@pytest.mark.schema fixtures require --schema (or --pgvector) opt-in"
+        )
+
+    if request.config.getoption("pgvector"):
         pgvector_url = request.getfixturevalue("pgvector_migrated_database_url")
         yield pgvector_url
         return
@@ -330,7 +452,9 @@ def integration_engine(
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _set_database_url_env(integration_database_url: str) -> Generator[None, None, None]:
+def _set_database_url_env(
+    request: pytest.FixtureRequest, pytestconfig: pytest.Config
+) -> Generator[None, None, None]:
     """Expose the integration database URL via ``DATABASE_URL``.
 
     Several subsystems rely on the ``DATABASE_URL`` environment variable during
@@ -338,6 +462,11 @@ def _set_database_url_env(integration_database_url: str) -> Generator[None, None
     setup work while still restoring any pre-existing value afterwards.
     """
 
+    if not pytestconfig.getoption("schema"):
+        yield
+        return
+
+    integration_database_url = request.getfixturevalue("integration_database_url")
     previous = os.environ.get("DATABASE_URL")
     os.environ["DATABASE_URL"] = integration_database_url
     try:
