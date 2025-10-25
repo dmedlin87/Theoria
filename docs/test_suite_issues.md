@@ -28,3 +28,7 @@
 - Importing `theo.services.api.app.main` during test discovery pulls in the full ingestion stack, which imports `FlagEmbedding`, `transformers`, and ultimately `torch`. Even a targeted test run spends significant time loading GPU inference modules before the first assertion executes.【F:tests/api/conftest.py†L18-L25】【a2291f†L1-L116】
 - **Impact:** Local feedback loops slow to a crawl, and environments without torch fail before tests can start.
 - **Suggested actions:** Gate heavyweight imports behind runtime flags (similar to `_skip_heavy_startup`) or lazy-load optional ML dependencies only when specific tests require them.
+
+## Reading the test durations report
+- Pytest now emits a summary of the 50 slowest tests after each run. Look for the "slowest durations" table near the end of the output to spot newly sluggish cases quickly.
+- Re-run the suite with `pytest -q` to view the report again; combine it with markers such as `-m "not slow"` when you want to narrow in on targeted failures without losing the timing context.
