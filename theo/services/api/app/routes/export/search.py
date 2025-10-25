@@ -9,7 +9,7 @@ from ...errors import ExportError, Severity
 from ...export.formatters import build_search_export, render_bundle
 from ...models.search import HybridSearchFilters, HybridSearchRequest
 from ...retriever.export import export_search_results
-from ...facades.database import get_session
+from theo.application.facades.database import get_session
 from .utils import _BAD_REQUEST_RESPONSE, finalize_response, parse_fields
 
 router = APIRouter()

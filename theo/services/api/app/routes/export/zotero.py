@@ -12,7 +12,7 @@ from ...export.zotero import (
     export_to_zotero,
 )
 from ...models.export import ZoteroExportRequest, ZoteroExportResponse
-from ...facades.database import get_session
+from theo.application.facades.database import get_session
 from .utils import _BAD_REQUEST_RESPONSE, fetch_documents_by_ids
 
 router = APIRouter()
