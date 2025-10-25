@@ -7,8 +7,8 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
 
 ## Snapshot
 
-- **Canonical entry points**: `README.md`, `CONTRIBUTING.md`, `START_HERE.md`, `SECURITY.md`, `DEPLOYMENT.md`, `THREATMODEL.md`.
-- **Agent handoff package**: `AGENT_HANDOFF_COMPLETE.md`, `HANDOFF_SESSION_2025_10_15.md`, `HANDOFF_MYPY_FIXES_2025_10_17.md`, `HANDOFF_NEXT_PHASE.md`, `IMPLEMENTATION_CONTEXT.md`, `QUICK_START_FOR_AGENTS.md`.
+- **Canonical entry points**: `README.md`, `CONTRIBUTING.md`, `START_HERE.md`, `SECURITY.md`, `DEPLOYMENT.md`, `THREATMODEL.md`, `QUICK_START_AGENTS.md`, `AGENT_CONTEXT.md`, `CHANGELOG.md`.
+- **Agent handoff archive**: Completed packages (e.g., Cognitive Scholar CS-001) now live under `docs/archive/handoffs/` alongside `IMPLEMENTATION_CONTEXT.md` references when historical context is required.
 - **Navigation aids**: `docs/INDEX.md` (master index) and `docs/DOCUMENTATION_GUIDE.md` (maintenance guide) are the definitive sources for researchers and contributors.
 - **Historical materials**: All October 2025 implementation notes, audits, and improvement logs live under `docs/archive/`.
 
@@ -22,12 +22,10 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
 | `SECURITY.md` | Security policy and disclosure process | Authoritative |
 | `DEPLOYMENT.md` | Deployment and signing guidance | Authoritative |
 | `THREATMODEL.md` | Current threat model for Theoria | Authoritative |
-| `AGENT_HANDOFF_COMPLETE.md` | Summary of delivered handoff materials | Active |
-| `HANDOFF_SESSION_2025_10_15.md` | Session recap and deployment notes | Active |
-| `HANDOFF_MYPY_FIXES_2025_10_17.md` | Strict typing follow-up summary | Active |
-| `HANDOFF_NEXT_PHASE.md` | Cognitive Scholar delivery roadmap (source of truth) | Active |
-| `IMPLEMENTATION_CONTEXT.md` | Architecture and implementation patterns | Active |
-| `QUICK_START_FOR_AGENTS.md` | Action plan for incoming agents (Cognitive Scholar kickoff) | Active |
+| `QUICK_START_AGENTS.md` | Orientation and environment setup for incoming agents | Authoritative |
+| `AGENT_CONTEXT.md` | Living architecture and workflow context for agents | Authoritative |
+| `CHANGELOG.md` | Recent repository history and documentation log | Authoritative |
+| `IMPLEMENTATION_CONTEXT.md` | Deep-dive architecture references sourced from prior handoffs | Reference |
 | `DOCUMENTATION_CLEANUP_SUMMARY.md` | Record of the October cleanup and archive reorg | Informational |
 | `test-ui-enhancements.md` | Manual regression checklist for UI v2 | Reference |
 
