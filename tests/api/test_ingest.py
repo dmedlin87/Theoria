@@ -23,7 +23,7 @@ from theo.application.facades.database import configure_engine, get_session  # n
 from theo.application.facades.settings import Settings  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
 from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
-from theo.services.api.app.services import ingestion_service as ingestion_service_module  # noqa: E402
+from theo.services.api.app.infra import ingestion_service as ingestion_service_module  # noqa: E402
 from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E402
 from theo.services.api.app.ingest import network as network_module  # noqa: E402
 

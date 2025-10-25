@@ -9,7 +9,7 @@ import pytest
 
 from theo.services.api.app.errors import IngestionError
 from theo.services.api.app.models.documents import SimpleIngestRequest
-from theo.services.api.app.services.ingestion_service import IngestionService
+from theo.services.api.app.infra.ingestion_service import IngestionService
 from theo.services.api.app.ingest.pipeline import PipelineDependencies
 from theo.application.ports.events import DomainEvent
 

@@ -26,7 +26,7 @@ from ..routes import (  # noqa: F401  (ensure handlers register)
     transcripts,
     verses,
 )
-from ..services.registry import RouterRegistration, iter_router_registrations
+from ..infra.registry import RouterRegistration, iter_router_registrations
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +57,14 @@ def register_health_routes(app: FastAPI) -> None:
 
     @app.get("/health", tags=["diagnostics"], include_in_schema=False)
     async def healthcheck() -> dict[str, object]:
-        from ..services.health import get_health_service
+        from ..infra.health import get_health_service
 
         report = get_health_service().check()
         return report.to_summary()
 
     @app.get("/health/detail", tags=["diagnostics"], include_in_schema=False)
     async def healthcheck_detail() -> dict[str, object]:
-        from ..services.health import get_health_service
+        from ..infra.health import get_health_service
 
         report = get_health_service().check()
         return report.to_detail()

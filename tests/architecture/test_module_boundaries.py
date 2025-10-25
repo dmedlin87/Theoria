@@ -126,3 +126,15 @@ def test_async_workers_do_not_depend_on_domain_layer() -> None:
             assert not module.startswith("theo.domain"), (
                 f"Async worker module {path} must not import domain layer module '{module}'"
             )
+
+
+def test_api_adapters_live_under_infra_namespace() -> None:
+    legacy_services_path = REPO_ROOT / "theo/services/api/app/services"
+    assert not legacy_services_path.exists(), (
+        "Legacy API services package reintroduced; adapters must live in 'infra'."
+    )
+
+    infra_path = REPO_ROOT / "theo/services/api/app/infra"
+    assert infra_path.exists(), "API infrastructure adapters must live under 'infra'."
+    adapter_modules = list(infra_path.rglob("*.py"))
+    assert adapter_modules, "Infrastructure namespace should contain adapter modules."

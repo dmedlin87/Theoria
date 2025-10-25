@@ -196,7 +196,7 @@ Found 1678 errors in 69 files (checked 39 source files)
 
 7. **`no-untyped-def`** (~1 instance) ⬇️ _2 fixed_
    - Functions missing type annotations
-   - Remaining: Check `theo/services/api/app/services/ingestion_service.py:288`
+   - Remaining: Check `theo/services/api/app/infra/ingestion_service.py:288`
 
 8. **`import-untyped`** ✅ _RESOLVED_
    - ~~Missing stub for `cachetools` library~~
@@ -252,7 +252,7 @@ Found 1678 errors in 69 files (checked 39 source files)
    - `theo/services/api/app/ai/clients.py` - may have remaining instances
 
 3. **Add Missing Function Annotation** (~1 error)
-   - `theo/services/api/app/services/ingestion_service.py:288`
+   - `theo/services/api/app/infra/ingestion_service.py:288`
 
 ### Medium Priority (More Complex)
 

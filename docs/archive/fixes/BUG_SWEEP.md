@@ -8,7 +8,7 @@ A repository-wide test sweep was executed with `pytest`. Collection failed due t
 - **Reproduction:** `pytest` or `python -c "import theo.services.api.app.ai.rag"` while the API app loads workers.
 - **Cause:** `IngestionService` depends on the CLI ingest module, which in turn imports Celery workers. The worker module re-imports the RAG package, creating a cycle before `build_sermon_deliverable` is defined.
 - **Relevant files:**
-  - `theo/services/api/app/services/ingestion_service.py` imports the CLI ingest entry point. 【F:theo/services/api/app/services/ingestion_service.py†L1-L60】
+  - `theo/services/api/app/infra/ingestion_service.py` imports the CLI ingest entry point. 【F:theo/services/api/app/infra/ingestion_service.py†L1-L60】
   - `theo/services/cli/ingest_folder.py` pulls in worker tasks, tying the API import path back to Celery. 【F:theo/services/cli/ingest_folder.py†L1-L40】
   - `theo/services/api/app/workers/tasks.py` imports `build_sermon_deliverable` from the RAG package, closing the circular chain. 【F:theo/services/api/app/workers/tasks.py†L1-L28】
 - **Captured error:** `ImportError` during `pytest` collection. 【4271a6†L4-L35】
