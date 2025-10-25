@@ -1,0 +1,4118 @@
+{
+  "generated_at": "2025-10-25T18:43:31.435576+00:00",
+  "packages": [
+    "theo"
+  ],
+  "module_count": 346,
+  "edge_count": 940,
+  "modules": [
+    "theo",
+    "theo.adapters",
+    "theo.adapters.events",
+    "theo.adapters.events.kafka",
+    "theo.adapters.events.redis",
+    "theo.adapters.graph",
+    "theo.adapters.graph.neo4j",
+    "theo.adapters.persistence",
+    "theo.adapters.persistence.chat_repository",
+    "theo.adapters.persistence.discovery_repository",
+    "theo.adapters.persistence.document_repository",
+    "theo.adapters.persistence.ingestion_job_repository",
+    "theo.adapters.persistence.mappers",
+    "theo.adapters.persistence.models",
+    "theo.adapters.persistence.sqlite",
+    "theo.adapters.persistence.transcript_repository",
+    "theo.adapters.persistence.types",
+    "theo.adapters.registry",
+    "theo.adapters.research",
+    "theo.adapters.research.hypotheses_sqlalchemy",
+    "theo.adapters.research.sqlalchemy",
+    "theo.adapters.secrets",
+    "theo.adapters.secrets.aws",
+    "theo.adapters.secrets.vault",
+    "theo.application",
+    "theo.application.dtos",
+    "theo.application.dtos.chat",
+    "theo.application.dtos.discovery",
+    "theo.application.dtos.document",
+    "theo.application.dtos.ingestion_job",
+    "theo.application.dtos.transcript",
+    "theo.application.facades",
+    "theo.application.facades.database",
+    "theo.application.facades.events",
+    "theo.application.facades.graph",
+    "theo.application.facades.research",
+    "theo.application.facades.resilience",
+    "theo.application.facades.runtime",
+    "theo.application.facades.secret_migration",
+    "theo.application.facades.security",
+    "theo.application.facades.settings",
+    "theo.application.facades.settings_store",
+    "theo.application.facades.telemetry",
+    "theo.application.facades.version",
+    "theo.application.graph",
+    "theo.application.interfaces",
+    "theo.application.ports",
+    "theo.application.ports.ai_registry",
+    "theo.application.ports.events",
+    "theo.application.ports.secrets",
+    "theo.application.reasoner",
+    "theo.application.reasoner.events",
+    "theo.application.repositories",
+    "theo.application.repositories.chat_repository",
+    "theo.application.repositories.discovery_repository",
+    "theo.application.repositories.document_repository",
+    "theo.application.repositories.ingestion_job_repository",
+    "theo.application.repositories.transcript_repository",
+    "theo.application.research",
+    "theo.application.research.service",
+    "theo.application.resilience",
+    "theo.application.search",
+    "theo.application.search.query_rewriter",
+    "theo.application.security",
+    "theo.application.services",
+    "theo.application.telemetry",
+    "theo.cli",
+    "theo.domain",
+    "theo.domain.discoveries",
+    "theo.domain.discoveries.anomaly_engine",
+    "theo.domain.discoveries.connection_engine",
+    "theo.domain.discoveries.contradiction_engine",
+    "theo.domain.discoveries.engine",
+    "theo.domain.discoveries.gap_engine",
+    "theo.domain.discoveries.models",
+    "theo.domain.discoveries.trend_engine",
+    "theo.domain.documents",
+    "theo.domain.errors",
+    "theo.domain.references",
+    "theo.domain.repositories",
+    "theo.domain.repositories.hypotheses",
+    "theo.domain.repositories.research_notes",
+    "theo.domain.research",
+    "theo.domain.research.crossrefs",
+    "theo.domain.research.datasets",
+    "theo.domain.research.dss_links",
+    "theo.domain.research.entities",
+    "theo.domain.research.fallacies",
+    "theo.domain.research.historicity",
+    "theo.domain.research.morphology",
+    "theo.domain.research.osis",
+    "theo.domain.research.overview",
+    "theo.domain.research.scripture",
+    "theo.domain.research.variants",
+    "theo.platform",
+    "theo.platform.application",
+    "theo.platform.bootstrap",
+    "theo.platform.events",
+    "theo.platform.events.types",
+    "theo.services",
+    "theo.services.api",
+    "theo.services.api.app",
+    "theo.services.api.app.adapters",
+    "theo.services.api.app.adapters.resilience",
+    "theo.services.api.app.adapters.security",
+    "theo.services.api.app.adapters.telemetry",
+    "theo.services.api.app.ai",
+    "theo.services.api.app.ai.audit_logging",
+    "theo.services.api.app.ai.cache",
+    "theo.services.api.app.ai.cache.cache_manager",
+    "theo.services.api.app.ai.clients",
+    "theo.services.api.app.ai.clients.anthropic_client",
+    "theo.services.api.app.ai.clients.factory",
+    "theo.services.api.app.ai.clients.openai_client",
+    "theo.services.api.app.ai.digest_service",
+    "theo.services.api.app.ai.guardrails",
+    "theo.services.api.app.ai.guardrails.schemas",
+    "theo.services.api.app.ai.ledger",
+    "theo.services.api.app.ai.ledger.usage_tracker",
+    "theo.services.api.app.ai.legacy_clients",
+    "theo.services.api.app.ai.memory_index",
+    "theo.services.api.app.ai.memory_metadata",
+    "theo.services.api.app.ai.passage",
+    "theo.services.api.app.ai.rag",
+    "theo.services.api.app.ai.rag.cache",
+    "theo.services.api.app.ai.rag.cache_ops",
+    "theo.services.api.app.ai.rag.chat",
+    "theo.services.api.app.ai.rag.collaboration",
+    "theo.services.api.app.ai.rag.corpus",
+    "theo.services.api.app.ai.rag.deliverables",
+    "theo.services.api.app.ai.rag.exports",
+    "theo.services.api.app.ai.rag.guardrail_helpers",
+    "theo.services.api.app.ai.rag.guardrails",
+    "theo.services.api.app.ai.rag.models",
+    "theo.services.api.app.ai.rag.prompts",
+    "theo.services.api.app.ai.rag.reasoning",
+    "theo.services.api.app.ai.rag.reasoning_trace",
+    "theo.services.api.app.ai.rag.refusals",
+    "theo.services.api.app.ai.rag.retrieval",
+    "theo.services.api.app.ai.rag.revisions",
+    "theo.services.api.app.ai.rag.telemetry",
+    "theo.services.api.app.ai.rag.verse",
+    "theo.services.api.app.ai.rag.workflow",
+    "theo.services.api.app.ai.reasoning",
+    "theo.services.api.app.ai.reasoning.chain_of_thought",
+    "theo.services.api.app.ai.reasoning.fallacies",
+    "theo.services.api.app.ai.reasoning.hypotheses",
+    "theo.services.api.app.ai.reasoning.insights",
+    "theo.services.api.app.ai.reasoning.metacognition",
+    "theo.services.api.app.ai.reasoning.perspectives",
+    "theo.services.api.app.ai.registry",
+    "theo.services.api.app.ai.research_loop",
+    "theo.services.api.app.ai.router",
+    "theo.services.api.app.ai.routing",
+    "theo.services.api.app.ai.routing.router",
+    "theo.services.api.app.ai.trails",
+    "theo.services.api.app.ai.trails_memory_bridge",
+    "theo.services.api.app.ai.watchlists_service",
+    "theo.services.api.app.bootstrap",
+    "theo.services.api.app.bootstrap.app_factory",
+    "theo.services.api.app.bootstrap.lifecycle",
+    "theo.services.api.app.bootstrap.middleware",
+    "theo.services.api.app.bootstrap.routes",
+    "theo.services.api.app.case_builder",
+    "theo.services.api.app.case_builder.ingest",
+    "theo.services.api.app.case_builder.sync",
+    "theo.services.api.app.compat",
+    "theo.services.api.app.core",
+    "theo.services.api.app.core.database",
+    "theo.services.api.app.core.runtime",
+    "theo.services.api.app.core.secret_migration",
+    "theo.services.api.app.core.settings",
+    "theo.services.api.app.core.settings_store",
+    "theo.services.api.app.core.version",
+    "theo.services.api.app.creators",
+    "theo.services.api.app.creators.service",
+    "theo.services.api.app.creators.verse_perspectives",
+    "theo.services.api.app.debug",
+    "theo.services.api.app.debug.middleware",
+    "theo.services.api.app.debug.reporting",
+    "theo.services.api.app.discoveries",
+    "theo.services.api.app.discoveries.service",
+    "theo.services.api.app.discoveries.tasks",
+    "theo.services.api.app.enrich",
+    "theo.services.api.app.enrich.metadata",
+    "theo.services.api.app.error_handlers",
+    "theo.services.api.app.errors",
+    "theo.services.api.app.events",
+    "theo.services.api.app.export",
+    "theo.services.api.app.export.citations",
+    "theo.services.api.app.export.formatters",
+    "theo.services.api.app.export.zotero",
+    "theo.services.api.app.graphql",
+    "theo.services.api.app.graphql.context",
+    "theo.services.api.app.graphql.router",
+    "theo.services.api.app.graphql.schema",
+    "theo.services.api.app.graphql.types",
+    "theo.services.api.app.infra",
+    "theo.services.api.app.infra.health",
+    "theo.services.api.app.infra.ingestion_service",
+    "theo.services.api.app.infra.registry",
+    "theo.services.api.app.infra.retrieval_service",
+    "theo.services.api.app.infra.router_registry",
+    "theo.services.api.app.ingest",
+    "theo.services.api.app.ingest.chunking",
+    "theo.services.api.app.ingest.embeddings",
+    "theo.services.api.app.ingest.events",
+    "theo.services.api.app.ingest.exceptions",
+    "theo.services.api.app.ingest.metadata",
+    "theo.services.api.app.ingest.network",
+    "theo.services.api.app.ingest.orchestrator",
+    "theo.services.api.app.ingest.osis",
+    "theo.services.api.app.ingest.parsers",
+    "theo.services.api.app.ingest.persistence",
+    "theo.services.api.app.ingest.pipeline",
+    "theo.services.api.app.ingest.sanitizer",
+    "theo.services.api.app.ingest.stages",
+    "theo.services.api.app.ingest.stages.base",
+    "theo.services.api.app.ingest.stages.enrichers",
+    "theo.services.api.app.ingest.stages.fetchers",
+    "theo.services.api.app.ingest.stages.parsers",
+    "theo.services.api.app.ingest.stages.persisters",
+    "theo.services.api.app.ingest.tei_pipeline",
+    "theo.services.api.app.intent",
+    "theo.services.api.app.intent.tagger",
+    "theo.services.api.app.main",
+    "theo.services.api.app.mcp",
+    "theo.services.api.app.mcp.tools",
+    "theo.services.api.app.models",
+    "theo.services.api.app.models.ai",
+    "theo.services.api.app.models.analytics",
+    "theo.services.api.app.models.audit",
+    "theo.services.api.app.models.base",
+    "theo.services.api.app.models.creators",
+    "theo.services.api.app.models.dashboard",
+    "theo.services.api.app.models.discoveries",
+    "theo.services.api.app.models.documents",
+    "theo.services.api.app.models.export",
+    "theo.services.api.app.models.jobs",
+    "theo.services.api.app.models.notebooks",
+    "theo.services.api.app.models.reasoning",
+    "theo.services.api.app.models.research",
+    "theo.services.api.app.models.research_plan",
+    "theo.services.api.app.models.search",
+    "theo.services.api.app.models.trails",
+    "theo.services.api.app.models.transcripts",
+    "theo.services.api.app.models.verses",
+    "theo.services.api.app.models.watchlists",
+    "theo.services.api.app.persistence_models",
+    "theo.services.api.app.ranking",
+    "theo.services.api.app.ranking.features",
+    "theo.services.api.app.ranking.metrics",
+    "theo.services.api.app.ranking.mlflow_integration",
+    "theo.services.api.app.ranking.re_ranker",
+    "theo.services.api.app.research",
+    "theo.services.api.app.research.commentaries",
+    "theo.services.api.app.research.contradictions",
+    "theo.services.api.app.research.data",
+    "theo.services.api.app.research.evidence_cards",
+    "theo.services.api.app.research.geo",
+    "theo.services.api.app.retriever",
+    "theo.services.api.app.retriever.annotations",
+    "theo.services.api.app.retriever.documents",
+    "theo.services.api.app.retriever.export",
+    "theo.services.api.app.retriever.graph",
+    "theo.services.api.app.retriever.hybrid",
+    "theo.services.api.app.retriever.tests",
+    "theo.services.api.app.retriever.tests.test_export_mentions",
+    "theo.services.api.app.retriever.tests.test_filters",
+    "theo.services.api.app.retriever.utils",
+    "theo.services.api.app.retriever.verses",
+    "theo.services.api.app.routes",
+    "theo.services.api.app.routes.ai",
+    "theo.services.api.app.routes.ai.digest",
+    "theo.services.api.app.routes.ai.watchlists",
+    "theo.services.api.app.routes.ai.workflows",
+    "theo.services.api.app.routes.ai.workflows.chat",
+    "theo.services.api.app.routes.ai.workflows.exports",
+    "theo.services.api.app.routes.ai.workflows.features",
+    "theo.services.api.app.routes.ai.workflows.flows",
+    "theo.services.api.app.routes.ai.workflows.guardrails",
+    "theo.services.api.app.routes.ai.workflows.llm",
+    "theo.services.api.app.routes.ai.workflows.perspectives",
+    "theo.services.api.app.routes.ai.workflows.settings",
+    "theo.services.api.app.routes.ai.workflows.utils",
+    "theo.services.api.app.routes.analytics",
+    "theo.services.api.app.routes.creators",
+    "theo.services.api.app.routes.dashboard",
+    "theo.services.api.app.routes.discoveries",
+    "theo.services.api.app.routes.discoveries_v1",
+    "theo.services.api.app.routes.documents",
+    "theo.services.api.app.routes.export",
+    "theo.services.api.app.routes.features",
+    "theo.services.api.app.routes.ingest",
+    "theo.services.api.app.routes.jobs",
+    "theo.services.api.app.routes.notebooks",
+    "theo.services.api.app.routes.realtime",
+    "theo.services.api.app.routes.research",
+    "theo.services.api.app.routes.search",
+    "theo.services.api.app.routes.trails",
+    "theo.services.api.app.routes.transcripts",
+    "theo.services.api.app.routes.verses",
+    "theo.services.api.app.tracing",
+    "theo.services.api.app.transcripts",
+    "theo.services.api.app.transcripts.service",
+    "theo.services.api.app.use_cases",
+    "theo.services.api.app.use_cases.refresh_discoveries",
+    "theo.services.api.app.utils",
+    "theo.services.api.app.utils.imports",
+    "theo.services.api.app.versioning",
+    "theo.services.api.app.workers",
+    "theo.services.api.app.workers.discovery_scheduler",
+    "theo.services.api.app.workers.tasks",
+    "theo.services.api.tests",
+    "theo.services.api.tests.conftest",
+    "theo.services.api.tests.test_agent_evaluation",
+    "theo.services.api.tests.test_ai_routes",
+    "theo.services.api.tests.test_creator_profiles",
+    "theo.services.api.tests.test_enrich_metadata",
+    "theo.services.api.tests.test_error_handling",
+    "theo.services.api.tests.test_export_formatters",
+    "theo.services.api.tests.test_features",
+    "theo.services.api.tests.test_hybrid_retriever",
+    "theo.services.api.tests.test_ingest_and_search",
+    "theo.services.api.tests.test_jobs",
+    "theo.services.api.tests.test_lazy_import_module",
+    "theo.services.api.tests.test_notifications",
+    "theo.services.api.tests.test_osis",
+    "theo.services.api.tests.test_osis_utils",
+    "theo.services.api.tests.test_passage_parser",
+    "theo.services.api.tests.test_reasoning_trace",
+    "theo.services.api.tests.test_research_routes",
+    "theo.services.api.tests.test_security",
+    "theo.services.api.tests.test_settings",
+    "theo.services.api.tests.test_topics",
+    "theo.services.api.tests.test_trails",
+    "theo.services.api.tests.test_transcript_ingest",
+    "theo.services.api.tests.test_transcript_search",
+    "theo.services.api.tests.test_watchlists",
+    "theo.services.api.tests.workers",
+    "theo.services.api.tests.workers.test_discovery_scheduler",
+    "theo.services.api.tests.workers.test_discovery_tasks",
+    "theo.services.api.tests.workers.test_tasks_properties",
+    "theo.services.bootstrap",
+    "theo.services.geo",
+    "theo.services.geo.seed_openbible_geo"
+  ],
+  "edges": [
+    {
+      "importer": "theo.adapters",
+      "imported": "theo.adapters.registry"
+    },
+    {
+      "importer": "theo.adapters.events",
+      "imported": "theo.adapters.events.kafka"
+    },
+    {
+      "importer": "theo.adapters.events",
+      "imported": "theo.adapters.events.redis"
+    },
+    {
+      "importer": "theo.adapters.events",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.adapters.events",
+      "imported": "theo.application.ports.events"
+    },
+    {
+      "importer": "theo.adapters.events.kafka",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.adapters.events.kafka",
+      "imported": "theo.application.ports.events"
+    },
+    {
+      "importer": "theo.adapters.events.redis",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.adapters.events.redis",
+      "imported": "theo.application.ports.events"
+    },
+    {
+      "importer": "theo.adapters.graph",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.graph.neo4j",
+      "imported": "theo.application.graph"
+    },
+    {
+      "importer": "theo.adapters.persistence",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.persistence",
+      "imported": "theo.adapters.persistence.sqlite"
+    },
+    {
+      "importer": "theo.adapters.persistence.chat_repository",
+      "imported": "theo.adapters.persistence.mappers"
+    },
+    {
+      "importer": "theo.adapters.persistence.chat_repository",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.persistence.chat_repository",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.adapters.persistence.chat_repository",
+      "imported": "theo.application.repositories"
+    },
+    {
+      "importer": "theo.adapters.persistence.discovery_repository",
+      "imported": "theo.adapters.persistence.mappers"
+    },
+    {
+      "importer": "theo.adapters.persistence.discovery_repository",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.persistence.discovery_repository",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.adapters.persistence.discovery_repository",
+      "imported": "theo.application.repositories.discovery_repository"
+    },
+    {
+      "importer": "theo.adapters.persistence.document_repository",
+      "imported": "theo.adapters.persistence.mappers"
+    },
+    {
+      "importer": "theo.adapters.persistence.document_repository",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.persistence.document_repository",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.adapters.persistence.document_repository",
+      "imported": "theo.application.repositories.document_repository"
+    },
+    {
+      "importer": "theo.adapters.persistence.document_repository",
+      "imported": "theo.domain.discoveries"
+    },
+    {
+      "importer": "theo.adapters.persistence.ingestion_job_repository",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.persistence.ingestion_job_repository",
+      "imported": "theo.application.repositories"
+    },
+    {
+      "importer": "theo.adapters.persistence.mappers",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.persistence.mappers",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.adapters.persistence.models",
+      "imported": "theo.adapters.persistence.types"
+    },
+    {
+      "importer": "theo.adapters.persistence.models",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.adapters.persistence.transcript_repository",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.persistence.transcript_repository",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.adapters.persistence.transcript_repository",
+      "imported": "theo.application.repositories.transcript_repository"
+    },
+    {
+      "importer": "theo.adapters.persistence.transcript_repository",
+      "imported": "theo.domain.research.osis"
+    },
+    {
+      "importer": "theo.adapters.research",
+      "imported": "theo.adapters.research.hypotheses_sqlalchemy"
+    },
+    {
+      "importer": "theo.adapters.research",
+      "imported": "theo.adapters.research.sqlalchemy"
+    },
+    {
+      "importer": "theo.adapters.research.hypotheses_sqlalchemy",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.research.hypotheses_sqlalchemy",
+      "imported": "theo.domain.repositories"
+    },
+    {
+      "importer": "theo.adapters.research.hypotheses_sqlalchemy",
+      "imported": "theo.domain.research"
+    },
+    {
+      "importer": "theo.adapters.research.sqlalchemy",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.adapters.research.sqlalchemy",
+      "imported": "theo.domain.repositories"
+    },
+    {
+      "importer": "theo.adapters.research.sqlalchemy",
+      "imported": "theo.domain.research"
+    },
+    {
+      "importer": "theo.adapters.secrets",
+      "imported": "theo.adapters.secrets.aws"
+    },
+    {
+      "importer": "theo.adapters.secrets",
+      "imported": "theo.adapters.secrets.vault"
+    },
+    {
+      "importer": "theo.adapters.secrets.aws",
+      "imported": "theo.application.ports.secrets"
+    },
+    {
+      "importer": "theo.adapters.secrets.vault",
+      "imported": "theo.application.ports.secrets"
+    },
+    {
+      "importer": "theo.application",
+      "imported": "theo.application.interfaces"
+    },
+    {
+      "importer": "theo.application",
+      "imported": "theo.application.research"
+    },
+    {
+      "importer": "theo.application",
+      "imported": "theo.application.services"
+    },
+    {
+      "importer": "theo.application.dtos",
+      "imported": "theo.application.dtos.chat"
+    },
+    {
+      "importer": "theo.application.dtos",
+      "imported": "theo.application.dtos.discovery"
+    },
+    {
+      "importer": "theo.application.dtos",
+      "imported": "theo.application.dtos.document"
+    },
+    {
+      "importer": "theo.application.dtos",
+      "imported": "theo.application.dtos.transcript"
+    },
+    {
+      "importer": "theo.application.facades.database",
+      "imported": "theo.adapters.persistence"
+    },
+    {
+      "importer": "theo.application.facades.database",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.application.facades.events",
+      "imported": "theo.adapters.events"
+    },
+    {
+      "importer": "theo.application.facades.events",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.application.facades.events",
+      "imported": "theo.application.ports.events"
+    },
+    {
+      "importer": "theo.application.facades.graph",
+      "imported": "theo.adapters.graph.neo4j"
+    },
+    {
+      "importer": "theo.application.facades.graph",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.application.facades.graph",
+      "imported": "theo.application.graph"
+    },
+    {
+      "importer": "theo.application.facades.research",
+      "imported": "theo.application.interfaces"
+    },
+    {
+      "importer": "theo.application.facades.research",
+      "imported": "theo.application.research"
+    },
+    {
+      "importer": "theo.application.facades.research",
+      "imported": "theo.application.services"
+    },
+    {
+      "importer": "theo.application.facades.research",
+      "imported": "theo.domain.research"
+    },
+    {
+      "importer": "theo.application.facades.resilience",
+      "imported": "theo.application.resilience"
+    },
+    {
+      "importer": "theo.application.facades.secret_migration",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.application.facades.secret_migration",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.application.facades.secret_migration",
+      "imported": "theo.application.facades.settings_store"
+    },
+    {
+      "importer": "theo.application.facades.secret_migration",
+      "imported": "theo.application.interfaces"
+    },
+    {
+      "importer": "theo.application.facades.secret_migration",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.application.facades.security",
+      "imported": "theo.application.security"
+    },
+    {
+      "importer": "theo.application.facades.settings",
+      "imported": "theo.application.facades.runtime"
+    },
+    {
+      "importer": "theo.application.facades.settings",
+      "imported": "theo.application.ports.secrets"
+    },
+    {
+      "importer": "theo.application.facades.settings_store",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.application.facades.settings_store",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.application.facades.settings_store",
+      "imported": "theo.application.interfaces"
+    },
+    {
+      "importer": "theo.application.facades.telemetry",
+      "imported": "theo.application.telemetry"
+    },
+    {
+      "importer": "theo.application.interfaces",
+      "imported": "theo.domain"
+    },
+    {
+      "importer": "theo.application.ports",
+      "imported": "theo.application.ports.events"
+    },
+    {
+      "importer": "theo.application.ports",
+      "imported": "theo.application.ports.secrets"
+    },
+    {
+      "importer": "theo.application.ports.ai_registry",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.application.ports.ai_registry",
+      "imported": "theo.application.interfaces"
+    },
+    {
+      "importer": "theo.application.ports.secrets",
+      "imported": "theo.adapters.secrets.aws"
+    },
+    {
+      "importer": "theo.application.ports.secrets",
+      "imported": "theo.adapters.secrets.vault"
+    },
+    {
+      "importer": "theo.application.reasoner",
+      "imported": "theo.adapters.graph"
+    },
+    {
+      "importer": "theo.application.reasoner",
+      "imported": "theo.application.interfaces"
+    },
+    {
+      "importer": "theo.application.reasoner",
+      "imported": "theo.application.reasoner.events"
+    },
+    {
+      "importer": "theo.application.repositories",
+      "imported": "theo.application.repositories.chat_repository"
+    },
+    {
+      "importer": "theo.application.repositories",
+      "imported": "theo.application.repositories.discovery_repository"
+    },
+    {
+      "importer": "theo.application.repositories",
+      "imported": "theo.application.repositories.document_repository"
+    },
+    {
+      "importer": "theo.application.repositories",
+      "imported": "theo.application.repositories.ingestion_job_repository"
+    },
+    {
+      "importer": "theo.application.repositories.chat_repository",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.application.repositories.discovery_repository",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.application.repositories.document_repository",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.application.repositories.document_repository",
+      "imported": "theo.domain.discoveries"
+    },
+    {
+      "importer": "theo.application.repositories.transcript_repository",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.application.research",
+      "imported": "theo.application.research.service"
+    },
+    {
+      "importer": "theo.application.research.service",
+      "imported": "theo.domain"
+    },
+    {
+      "importer": "theo.application.research.service",
+      "imported": "theo.domain.repositories"
+    },
+    {
+      "importer": "theo.application.research.service",
+      "imported": "theo.domain.research.datasets"
+    },
+    {
+      "importer": "theo.application.search",
+      "imported": "theo.application.search.query_rewriter"
+    },
+    {
+      "importer": "theo.application.search.query_rewriter",
+      "imported": "theo.domain.research.osis"
+    },
+    {
+      "importer": "theo.application.services",
+      "imported": "theo.application.interfaces"
+    },
+    {
+      "importer": "theo.application.services",
+      "imported": "theo.application.research"
+    },
+    {
+      "importer": "theo.application.services",
+      "imported": "theo.domain"
+    },
+    {
+      "importer": "theo.cli",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.cli",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.cli",
+      "imported": "theo.services.api.app.ingest.sanitizer"
+    },
+    {
+      "importer": "theo.cli",
+      "imported": "theo.services.bootstrap"
+    },
+    {
+      "importer": "theo.domain",
+      "imported": "theo.domain.documents"
+    },
+    {
+      "importer": "theo.domain",
+      "imported": "theo.domain.references"
+    },
+    {
+      "importer": "theo.domain",
+      "imported": "theo.domain.research"
+    },
+    {
+      "importer": "theo.domain.discoveries",
+      "imported": "theo.domain.discoveries.anomaly_engine"
+    },
+    {
+      "importer": "theo.domain.discoveries",
+      "imported": "theo.domain.discoveries.connection_engine"
+    },
+    {
+      "importer": "theo.domain.discoveries",
+      "imported": "theo.domain.discoveries.contradiction_engine"
+    },
+    {
+      "importer": "theo.domain.discoveries",
+      "imported": "theo.domain.discoveries.engine"
+    },
+    {
+      "importer": "theo.domain.discoveries",
+      "imported": "theo.domain.discoveries.gap_engine"
+    },
+    {
+      "importer": "theo.domain.discoveries",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.domain.discoveries",
+      "imported": "theo.domain.discoveries.trend_engine"
+    },
+    {
+      "importer": "theo.domain.discoveries.anomaly_engine",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.domain.discoveries.connection_engine",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.domain.discoveries.contradiction_engine",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.domain.discoveries.engine",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.domain.discoveries.gap_engine",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.domain.discoveries.trend_engine",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.domain.repositories",
+      "imported": "theo.domain.repositories.hypotheses"
+    },
+    {
+      "importer": "theo.domain.repositories",
+      "imported": "theo.domain.repositories.research_notes"
+    },
+    {
+      "importer": "theo.domain.repositories.hypotheses",
+      "imported": "theo.domain.research"
+    },
+    {
+      "importer": "theo.domain.repositories.research_notes",
+      "imported": "theo.domain.research"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.crossrefs"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.dss_links"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.entities"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.fallacies"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.historicity"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.morphology"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.overview"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.scripture"
+    },
+    {
+      "importer": "theo.domain.research",
+      "imported": "theo.domain.research.variants"
+    },
+    {
+      "importer": "theo.domain.research.crossrefs",
+      "imported": "theo.domain.research.datasets"
+    },
+    {
+      "importer": "theo.domain.research.dss_links",
+      "imported": "theo.domain.research.datasets"
+    },
+    {
+      "importer": "theo.domain.research.fallacies",
+      "imported": "theo.domain.research.datasets"
+    },
+    {
+      "importer": "theo.domain.research.historicity",
+      "imported": "theo.domain.research.datasets"
+    },
+    {
+      "importer": "theo.domain.research.morphology",
+      "imported": "theo.domain.research.datasets"
+    },
+    {
+      "importer": "theo.domain.research.overview",
+      "imported": "theo.domain.research.entities"
+    },
+    {
+      "importer": "theo.domain.research.overview",
+      "imported": "theo.domain.research.variants"
+    },
+    {
+      "importer": "theo.domain.research.scripture",
+      "imported": "theo.domain.research.datasets"
+    },
+    {
+      "importer": "theo.domain.research.scripture",
+      "imported": "theo.domain.research.osis"
+    },
+    {
+      "importer": "theo.domain.research.variants",
+      "imported": "theo.domain.research.datasets"
+    },
+    {
+      "importer": "theo.platform",
+      "imported": "theo.platform.application"
+    },
+    {
+      "importer": "theo.platform",
+      "imported": "theo.platform.bootstrap"
+    },
+    {
+      "importer": "theo.platform",
+      "imported": "theo.platform.events"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.adapters"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.adapters.research"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.application"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.application.reasoner"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.application.research"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.domain"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.domain.research"
+    },
+    {
+      "importer": "theo.platform.application",
+      "imported": "theo.platform.bootstrap"
+    },
+    {
+      "importer": "theo.platform.bootstrap",
+      "imported": "theo.adapters"
+    },
+    {
+      "importer": "theo.platform.bootstrap",
+      "imported": "theo.application"
+    },
+    {
+      "importer": "theo.services.api.app.adapters",
+      "imported": "theo.services.api.app.adapters.resilience"
+    },
+    {
+      "importer": "theo.services.api.app.adapters",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.adapters",
+      "imported": "theo.services.api.app.adapters.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.adapters.resilience",
+      "imported": "theo.application.resilience"
+    },
+    {
+      "importer": "theo.services.api.app.adapters.security",
+      "imported": "theo.application.facades.security"
+    },
+    {
+      "importer": "theo.services.api.app.adapters.security",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.adapters.security",
+      "imported": "theo.application.security"
+    },
+    {
+      "importer": "theo.services.api.app.adapters.telemetry",
+      "imported": "theo.application.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai",
+      "imported": "theo.services.api.app.ai.rag"
+    },
+    {
+      "importer": "theo.services.api.app.ai.audit_logging",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.cache",
+      "imported": "theo.services.api.app.ai.cache.cache_manager"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients",
+      "imported": "theo.services.api.app.ai.clients.anthropic_client"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients",
+      "imported": "theo.services.api.app.ai.clients.factory"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients",
+      "imported": "theo.services.api.app.ai.clients.openai_client"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients",
+      "imported": "theo.services.api.app.ai.legacy_clients"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients.anthropic_client",
+      "imported": "theo.services.api.app.ai"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients.factory",
+      "imported": "theo.services.api.app.ai"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients.factory",
+      "imported": "theo.services.api.app.ai.clients.anthropic_client"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients.factory",
+      "imported": "theo.services.api.app.ai.clients.openai_client"
+    },
+    {
+      "importer": "theo.services.api.app.ai.clients.openai_client",
+      "imported": "theo.services.api.app.ai"
+    },
+    {
+      "importer": "theo.services.api.app.ai.digest_service",
+      "imported": "theo.services.api.app.routes.ai"
+    },
+    {
+      "importer": "theo.services.api.app.ai.guardrails",
+      "imported": "theo.services.api.app.ai.guardrails.schemas"
+    },
+    {
+      "importer": "theo.services.api.app.ai.guardrails.schemas",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.ai.guardrails.schemas",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.ledger",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.ledger.usage_tracker",
+      "imported": "theo.services.api.app.ai"
+    },
+    {
+      "importer": "theo.services.api.app.ai.legacy_clients",
+      "imported": "theo.application.interfaces"
+    },
+    {
+      "importer": "theo.services.api.app.ai.legacy_clients",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.memory_index",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.ai.memory_index",
+      "imported": "theo.services.api.app.ingest.stages.base"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.chat"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.collaboration"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.corpus"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.deliverables"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.guardrails"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.refusals"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.retrieval"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.verse"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.rag.workflow"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.cache",
+      "imported": "theo.application.facades.runtime"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.cache",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.cache",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.cache",
+      "imported": "theo.application.facades.version"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.cache",
+      "imported": "theo.application.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.cache_ops",
+      "imported": "theo.services.api.app.ai.rag.cache"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.cache_ops",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.cache"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.cache_ops"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.prompts"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.reasoning"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.refusals"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.retrieval"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.rag.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.router"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.ai.trails"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.chat",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.collaboration",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.collaboration",
+      "imported": "theo.services.api.app.ai.rag.chat"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.collaboration",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.collaboration",
+      "imported": "theo.services.api.app.ai.rag.retrieval"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.collaboration",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.collaboration",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.corpus",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.corpus",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.corpus",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.deliverables",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.deliverables",
+      "imported": "theo.services.api.app.ai.rag.chat"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.deliverables",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.deliverables",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.deliverables",
+      "imported": "theo.services.api.app.ai.rag.retrieval"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.deliverables",
+      "imported": "theo.services.api.app.ai.rag.workflow"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.deliverables",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.deliverables",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.exports",
+      "imported": "theo.application.facades.version"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.exports",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.exports",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.exports",
+      "imported": "theo.services.api.app.export.formatters"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.exports",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.exports",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrail_helpers",
+      "imported": "theo.services.api.app.ai.rag.guardrails"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrail_helpers",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrail_helpers",
+      "imported": "theo.services.api.app.ai.rag.prompts"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrail_helpers",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrail_helpers",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrails",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrails",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrails",
+      "imported": "theo.services.api.app.ai.rag.prompts"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrails",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.guardrails",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.models",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.prompts",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.prompts",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning",
+      "imported": "theo.services.api.app.ai.rag.reasoning_trace"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning",
+      "imported": "theo.services.api.app.ai.rag.revisions"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning",
+      "imported": "theo.services.api.app.ai.rag.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning",
+      "imported": "theo.services.api.app.ai.reasoning.chain_of_thought"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning",
+      "imported": "theo.services.api.app.ai.reasoning.metacognition"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning_trace",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.reasoning_trace",
+      "imported": "theo.services.api.app.ai.reasoning.chain_of_thought"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.refusals",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.refusals",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.refusals",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.refusals",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.retrieval",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.retrieval",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.retrieval",
+      "imported": "theo.services.api.app.retriever.hybrid"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.revisions",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.revisions",
+      "imported": "theo.services.api.app.ai.reasoning.metacognition"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.telemetry",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.verse",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.verse",
+      "imported": "theo.services.api.app.ai.rag.chat"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.verse",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.verse",
+      "imported": "theo.services.api.app.ai.rag.retrieval"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.verse",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.verse",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.chat"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.collaboration"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.corpus"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.deliverables"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.exports"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.refusals"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.retrieval"
+    },
+    {
+      "importer": "theo.services.api.app.ai.rag.workflow",
+      "imported": "theo.services.api.app.ai.rag.verse"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning",
+      "imported": "theo.services.api.app.ai.reasoning.chain_of_thought"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning",
+      "imported": "theo.services.api.app.ai.reasoning.fallacies"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning",
+      "imported": "theo.services.api.app.ai.reasoning.hypotheses"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning",
+      "imported": "theo.services.api.app.ai.reasoning.insights"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning",
+      "imported": "theo.services.api.app.ai.reasoning.metacognition"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning",
+      "imported": "theo.services.api.app.ai.reasoning.perspectives"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.chain_of_thought",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.chain_of_thought",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.hypotheses",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.hypotheses",
+      "imported": "theo.services.api.app.ai.clients"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.hypotheses",
+      "imported": "theo.services.api.app.ai.rag.retrieval"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.hypotheses",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.hypotheses",
+      "imported": "theo.services.api.app.ai.router"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.hypotheses",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.metacognition",
+      "imported": "theo.services.api.app.ai.clients"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.metacognition",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.metacognition",
+      "imported": "theo.services.api.app.ai.reasoning.fallacies"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.perspectives",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.perspectives",
+      "imported": "theo.services.api.app.infra.retrieval_service"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.perspectives",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.reasoning.perspectives",
+      "imported": "theo.services.api.app.retriever.hybrid"
+    },
+    {
+      "importer": "theo.services.api.app.ai.registry",
+      "imported": "theo.application.facades.settings_store"
+    },
+    {
+      "importer": "theo.services.api.app.ai.registry",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.registry",
+      "imported": "theo.services.api.app.ai.clients"
+    },
+    {
+      "importer": "theo.services.api.app.ai.research_loop",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.ai.research_loop",
+      "imported": "theo.services.api.app.models.research_plan"
+    },
+    {
+      "importer": "theo.services.api.app.ai.research_loop",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.router",
+      "imported": "theo.application.ports.ai_registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.router",
+      "imported": "theo.services.api.app.ai.ledger"
+    },
+    {
+      "importer": "theo.services.api.app.ai.router",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.ai.routing",
+      "imported": "theo.services.api.app.ai.routing.router"
+    },
+    {
+      "importer": "theo.services.api.app.ai.routing.router",
+      "imported": "theo.services.api.app.ai"
+    },
+    {
+      "importer": "theo.services.api.app.ai.routing.router",
+      "imported": "theo.services.api.app.ai.cache.cache_manager"
+    },
+    {
+      "importer": "theo.services.api.app.ai.routing.router",
+      "imported": "theo.services.api.app.ai.ledger.usage_tracker"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails",
+      "imported": "theo.services.api.app.ai.rag"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails",
+      "imported": "theo.services.api.app.ai.trails_memory_bridge"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails_memory_bridge",
+      "imported": "theo.services.api.app.ai.rag"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails_memory_bridge",
+      "imported": "theo.services.api.app.ai.trails"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails_memory_bridge",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails_memory_bridge",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails_memory_bridge",
+      "imported": "theo.services.api.app.routes.ai.workflows.chat"
+    },
+    {
+      "importer": "theo.services.api.app.ai.trails_memory_bridge",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.app.ai.watchlists_service",
+      "imported": "theo.services.api.app.models.watchlists"
+    },
+    {
+      "importer": "theo.services.api.app.ai.watchlists_service",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap",
+      "imported": "theo.services.api.app.bootstrap.app_factory"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.application.facades.research"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.application.facades.resilience"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.application.facades.runtime"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.application.facades.secret_migration"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.adapters.resilience"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.adapters.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.bootstrap.lifecycle"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.bootstrap.middleware"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.bootstrap.routes"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.error_handlers"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.events"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.infra.router_registry"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.api.app.versioning"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.app_factory",
+      "imported": "theo.services.bootstrap"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.lifecycle",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.lifecycle",
+      "imported": "theo.services.api.app.workers.discovery_scheduler"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.middleware",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.middleware",
+      "imported": "theo.services.api.app.debug"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.middleware",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.middleware",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.middleware",
+      "imported": "theo.services.api.app.tracing"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.infra.health"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.infra.registry"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.ai"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.analytics"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.creators"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.documents"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.export"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.features"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.ingest"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.jobs"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.notebooks"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.realtime"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.research"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.search"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.trails"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.transcripts"
+    },
+    {
+      "importer": "theo.services.api.app.bootstrap.routes",
+      "imported": "theo.services.api.app.routes.verses"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder",
+      "imported": "theo.services.api.app.case_builder.ingest"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder",
+      "imported": "theo.services.api.app.case_builder.sync"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.ingest",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.ingest",
+      "imported": "theo.platform.events"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.ingest",
+      "imported": "theo.platform.events.types"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.ingest",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.sync",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.sync",
+      "imported": "theo.platform.events"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.sync",
+      "imported": "theo.platform.events.types"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.sync",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.case_builder.sync",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.core.database",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.core.runtime",
+      "imported": "theo.application.facades.runtime"
+    },
+    {
+      "importer": "theo.services.api.app.core.secret_migration",
+      "imported": "theo.application.facades.secret_migration"
+    },
+    {
+      "importer": "theo.services.api.app.core.settings",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.core.settings_store",
+      "imported": "theo.application.facades.settings_store"
+    },
+    {
+      "importer": "theo.services.api.app.core.version",
+      "imported": "theo.application.facades.version"
+    },
+    {
+      "importer": "theo.services.api.app.creators.service",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.creators.verse_perspectives",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.creators.verse_perspectives",
+      "imported": "theo.services.api.app.models.creators"
+    },
+    {
+      "importer": "theo.services.api.app.creators.verse_perspectives",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.debug",
+      "imported": "theo.services.api.app.debug.middleware"
+    },
+    {
+      "importer": "theo.services.api.app.debug",
+      "imported": "theo.services.api.app.debug.reporting"
+    },
+    {
+      "importer": "theo.services.api.app.debug.middleware",
+      "imported": "theo.services.api.app.debug.reporting"
+    },
+    {
+      "importer": "theo.services.api.app.debug.middleware",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.debug.reporting",
+      "imported": "theo.services.api.app.tracing"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries",
+      "imported": "theo.services.api.app.discoveries.service"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries",
+      "imported": "theo.services.api.app.discoveries.tasks"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries.service",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries.service",
+      "imported": "theo.application.repositories"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries.service",
+      "imported": "theo.domain.discoveries"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries.service",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries.tasks",
+      "imported": "theo.adapters.persistence.discovery_repository"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries.tasks",
+      "imported": "theo.adapters.persistence.document_repository"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries.tasks",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.discoveries.tasks",
+      "imported": "theo.services.api.app.discoveries.service"
+    },
+    {
+      "importer": "theo.services.api.app.enrich",
+      "imported": "theo.services.api.app.enrich.metadata"
+    },
+    {
+      "importer": "theo.services.api.app.enrich.metadata",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.enrich.metadata",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.error_handlers",
+      "imported": "theo.domain.errors"
+    },
+    {
+      "importer": "theo.services.api.app.error_handlers",
+      "imported": "theo.services.api.app.tracing"
+    },
+    {
+      "importer": "theo.services.api.app.events",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.events",
+      "imported": "theo.platform.events"
+    },
+    {
+      "importer": "theo.services.api.app.events",
+      "imported": "theo.platform.events.types"
+    },
+    {
+      "importer": "theo.services.api.app.events",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.events",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.app.export.citations",
+      "imported": "theo.services.api.app.export.formatters"
+    },
+    {
+      "importer": "theo.services.api.app.export.citations",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.app.export.formatters",
+      "imported": "theo.application.facades.version"
+    },
+    {
+      "importer": "theo.services.api.app.export.formatters",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.export.formatters",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.export.formatters",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.app.export.zotero",
+      "imported": "theo.services.api.app.export.citations"
+    },
+    {
+      "importer": "theo.services.api.app.graphql",
+      "imported": "theo.services.api.app.graphql.schema"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.context",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.context",
+      "imported": "theo.application.research"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.context",
+      "imported": "theo.application.security"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.context",
+      "imported": "theo.application.services"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.context",
+      "imported": "theo.services.bootstrap"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.router",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.router",
+      "imported": "theo.services.api.app.graphql.context"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.router",
+      "imported": "theo.services.api.app.graphql.schema"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.schema",
+      "imported": "theo.domain"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.schema",
+      "imported": "theo.services.api.app.graphql.context"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.schema",
+      "imported": "theo.services.api.app.graphql.types"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.types",
+      "imported": "theo.domain"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.types",
+      "imported": "theo.domain.research.overview"
+    },
+    {
+      "importer": "theo.services.api.app.graphql.types",
+      "imported": "theo.domain.research.scripture"
+    },
+    {
+      "importer": "theo.services.api.app.infra",
+      "imported": "theo.services.api.app.infra.ingestion_service"
+    },
+    {
+      "importer": "theo.services.api.app.infra",
+      "imported": "theo.services.api.app.infra.registry"
+    },
+    {
+      "importer": "theo.services.api.app.infra",
+      "imported": "theo.services.api.app.infra.retrieval_service"
+    },
+    {
+      "importer": "theo.services.api.app.infra.health",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.infra.health",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.infra.health",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.infra.ingestion_service",
+      "imported": "theo.application.facades.events"
+    },
+    {
+      "importer": "theo.services.api.app.infra.ingestion_service",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.infra.ingestion_service",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.infra.ingestion_service",
+      "imported": "theo.application.ports.events"
+    },
+    {
+      "importer": "theo.services.api.app.infra.ingestion_service",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.infra.ingestion_service",
+      "imported": "theo.services.api.app.ingest.pipeline"
+    },
+    {
+      "importer": "theo.services.api.app.infra.ingestion_service",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.infra.ingestion_service",
+      "imported": "theo.services.api.app.utils.imports"
+    },
+    {
+      "importer": "theo.services.api.app.infra.retrieval_service",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.infra.retrieval_service",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.infra.retrieval_service",
+      "imported": "theo.application.search"
+    },
+    {
+      "importer": "theo.services.api.app.infra.retrieval_service",
+      "imported": "theo.application.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.infra.retrieval_service",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.infra.retrieval_service",
+      "imported": "theo.services.api.app.ranking.mlflow_integration"
+    },
+    {
+      "importer": "theo.services.api.app.infra.retrieval_service",
+      "imported": "theo.services.api.app.ranking.re_ranker"
+    },
+    {
+      "importer": "theo.services.api.app.infra.retrieval_service",
+      "imported": "theo.services.api.app.retriever.hybrid"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.graphql.router"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.infra.registry"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.ai"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.analytics"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.creators"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.dashboard"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.discoveries"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.discoveries_v1"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.documents"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.export"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.features"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.ingest"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.jobs"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.notebooks"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.realtime"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.research"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.search"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.trails"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.transcripts"
+    },
+    {
+      "importer": "theo.services.api.app.infra.router_registry",
+      "imported": "theo.services.api.app.routes.verses"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.chunking",
+      "imported": "theo.services.api.app.ingest.parsers"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.embeddings",
+      "imported": "theo.application.facades.resilience"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.embeddings",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.embeddings",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.events",
+      "imported": "theo.application.reasoner.events"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.events",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.metadata",
+      "imported": "theo.services.api.app.ingest.chunking"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.metadata",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.metadata",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.metadata",
+      "imported": "theo.services.api.app.ingest.parsers"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.metadata",
+      "imported": "theo.services.api.app.ingest.sanitizer"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.network",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.network",
+      "imported": "theo.services.api.app.ingest.metadata"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.network",
+      "imported": "theo.services.api.app.ingest.parsers"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.orchestrator",
+      "imported": "theo.services.api.app.ingest.stages"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.osis",
+      "imported": "theo.domain.research.osis"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.parsers",
+      "imported": "theo.services.api.app.ingest.chunking"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.parsers",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.application.graph"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.platform.events"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.platform.events.types"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.case_builder"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.case_builder.ingest"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.creators.verse_perspectives"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.ingest.chunking"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.ingest.events"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.ingest.metadata"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.ingest.sanitizer"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.ingest.stages"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.persistence",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.application.facades.graph"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.application.facades.resilience"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.application.graph"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.metadata"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.network"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.orchestrator"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.persistence"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.stages"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.stages.enrichers"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.stages.fetchers"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.stages.parsers"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.ingest.stages.persisters"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.pipeline",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages",
+      "imported": "theo.services.api.app.ingest.stages.base"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.base",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.enrichers",
+      "imported": "theo.services.api.app.ingest.stages"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.fetchers",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.fetchers",
+      "imported": "theo.services.api.app.ingest.metadata"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.fetchers",
+      "imported": "theo.services.api.app.ingest.network"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.fetchers",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.fetchers",
+      "imported": "theo.services.api.app.ingest.stages"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.parsers",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.parsers",
+      "imported": "theo.services.api.app.ingest.metadata"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.parsers",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.parsers",
+      "imported": "theo.services.api.app.ingest.parsers"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.parsers",
+      "imported": "theo.services.api.app.ingest.stages"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.persisters",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.persisters",
+      "imported": "theo.services.api.app.ingest.persistence"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.stages.persisters",
+      "imported": "theo.services.api.app.ingest.stages"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.tei_pipeline",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.tei_pipeline",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.tei_pipeline",
+      "imported": "theo.services.api.app.ingest.chunking"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.tei_pipeline",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.tei_pipeline",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.tei_pipeline",
+      "imported": "theo.services.api.app.ingest.sanitizer"
+    },
+    {
+      "importer": "theo.services.api.app.ingest.tei_pipeline",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.intent",
+      "imported": "theo.services.api.app.intent.tagger"
+    },
+    {
+      "importer": "theo.services.api.app.main",
+      "imported": "theo.services.api.app.bootstrap"
+    },
+    {
+      "importer": "theo.services.api.app.main",
+      "imported": "theo.services.api.app.bootstrap.lifecycle"
+    },
+    {
+      "importer": "theo.services.api.app.mcp",
+      "imported": "theo.services.api.app.mcp.tools"
+    },
+    {
+      "importer": "theo.services.api.app.mcp.tools",
+      "imported": "theo.application.facades.research"
+    },
+    {
+      "importer": "theo.services.api.app.mcp.tools",
+      "imported": "theo.services.api.app.models.research"
+    },
+    {
+      "importer": "theo.services.api.app.mcp.tools",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.models",
+      "imported": "theo.services.api.app.models.audit"
+    },
+    {
+      "importer": "theo.services.api.app.models",
+      "imported": "theo.services.api.app.models.trails"
+    },
+    {
+      "importer": "theo.services.api.app.models",
+      "imported": "theo.services.api.app.models.watchlists"
+    },
+    {
+      "importer": "theo.services.api.app.models.ai",
+      "imported": "theo.services.api.app.ai.rag"
+    },
+    {
+      "importer": "theo.services.api.app.models.ai",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.ai",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.app.models.ai",
+      "imported": "theo.services.api.app.models.research_plan"
+    },
+    {
+      "importer": "theo.services.api.app.models.ai",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.models.analytics",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.audit",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.creators",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.dashboard",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.discoveries",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.documents",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.models.documents",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.export",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.export",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.models.export",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.models.notebooks",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.research",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.research_plan",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.search",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.trails",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.transcripts",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.verses",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.models.watchlists",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.ranking",
+      "imported": "theo.services.api.app.ranking.features"
+    },
+    {
+      "importer": "theo.services.api.app.ranking",
+      "imported": "theo.services.api.app.ranking.metrics"
+    },
+    {
+      "importer": "theo.services.api.app.ranking",
+      "imported": "theo.services.api.app.ranking.re_ranker"
+    },
+    {
+      "importer": "theo.services.api.app.ranking.features",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ranking.re_ranker",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.ranking.re_ranker",
+      "imported": "theo.services.api.app.ranking.features"
+    },
+    {
+      "importer": "theo.services.api.app.ranking.re_ranker",
+      "imported": "theo.services.api.app.ranking.mlflow_integration"
+    },
+    {
+      "importer": "theo.services.api.app.research",
+      "imported": "theo.services.api.app.research.commentaries"
+    },
+    {
+      "importer": "theo.services.api.app.research",
+      "imported": "theo.services.api.app.research.contradictions"
+    },
+    {
+      "importer": "theo.services.api.app.research",
+      "imported": "theo.services.api.app.research.evidence_cards"
+    },
+    {
+      "importer": "theo.services.api.app.research",
+      "imported": "theo.services.api.app.research.geo"
+    },
+    {
+      "importer": "theo.services.api.app.research.commentaries",
+      "imported": "theo.services.api.app.models.research"
+    },
+    {
+      "importer": "theo.services.api.app.research.contradictions",
+      "imported": "theo.services.api.app.models.research"
+    },
+    {
+      "importer": "theo.services.api.app.research.contradictions",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.research.evidence_cards",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.research.geo",
+      "imported": "theo.application.facades.settings_store"
+    },
+    {
+      "importer": "theo.services.api.app.research.geo",
+      "imported": "theo.domain.research.osis"
+    },
+    {
+      "importer": "theo.services.api.app.research.geo",
+      "imported": "theo.services.api.app.models.research"
+    },
+    {
+      "importer": "theo.services.api.app.research.geo",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.annotations",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.annotations",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.documents",
+      "imported": "theo.services.api.app.case_builder"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.documents",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.documents",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.documents",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.documents",
+      "imported": "theo.services.api.app.retriever.annotations"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.export",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.export",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.export",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.export",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.export",
+      "imported": "theo.services.api.app.models.verses"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.export",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.export",
+      "imported": "theo.services.api.app.retriever.hybrid"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.export",
+      "imported": "theo.services.api.app.retriever.verses"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.graph",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.graph",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.graph",
+      "imported": "theo.services.api.app.models.verses"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.graph",
+      "imported": "theo.services.api.app.retriever.verses"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.adapters.persistence.types"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.services.api.app.retriever.annotations"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.hybrid",
+      "imported": "theo.services.api.app.retriever.utils"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_export_mentions",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_export_mentions",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_export_mentions",
+      "imported": "theo.services.api.app.models.verses"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_export_mentions",
+      "imported": "theo.services.api.app.retriever.export"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_filters",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_filters",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_filters",
+      "imported": "theo.services.api.app.models.verses"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_filters",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.tests.test_filters",
+      "imported": "theo.services.api.app.retriever.verses"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.utils",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.verses",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.verses",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.verses",
+      "imported": "theo.services.api.app.models.verses"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.verses",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.retriever.verses",
+      "imported": "theo.services.api.app.retriever.utils"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai",
+      "imported": "theo.services.api.app.routes.ai.digest"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai",
+      "imported": "theo.services.api.app.routes.ai.watchlists"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai",
+      "imported": "theo.services.api.app.routes.ai.workflows"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.digest",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.digest",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.digest",
+      "imported": "theo.services.api.app.ai.digest_service"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.watchlists",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.watchlists",
+      "imported": "theo.application.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.watchlists",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.watchlists",
+      "imported": "theo.services.api.app.ai.watchlists_service"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.watchlists",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.watchlists",
+      "imported": "theo.services.api.app.models.watchlists"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows",
+      "imported": "theo.services.api.app.routes.ai.workflows.chat"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows",
+      "imported": "theo.services.api.app.routes.ai.workflows.exports"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows",
+      "imported": "theo.services.api.app.routes.ai.workflows.features"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows",
+      "imported": "theo.services.api.app.routes.ai.workflows.flows"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows",
+      "imported": "theo.services.api.app.routes.ai.workflows.guardrails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows",
+      "imported": "theo.services.api.app.routes.ai.workflows.llm"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows",
+      "imported": "theo.services.api.app.routes.ai.workflows.perspectives"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows",
+      "imported": "theo.services.api.app.routes.ai.workflows.settings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.ai.audit_logging"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.ai.memory_index"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.ai.memory_metadata"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.ai.rag"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.ai.research_loop"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.ai.trails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.intent.tagger"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.models.research_plan"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.routes.ai.workflows.guardrails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.chat",
+      "imported": "theo.services.api.app.routes.ai.workflows.utils"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.ai.audit_logging"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.ai.rag"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.ai.rag.deliverables"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.ai.rag.exports"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.export.citations"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.models.base"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.exports",
+      "imported": "theo.services.api.app.routes.ai.workflows.guardrails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.features",
+      "imported": "theo.services.api.app.ai.guardrails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.ai.passage"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.ai.rag"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.ai.rag.collaboration"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.ai.rag.corpus"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.ai.rag.deliverables"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.ai.rag.verse"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.ai.trails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.flows",
+      "imported": "theo.services.api.app.routes.ai.workflows.guardrails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.guardrails",
+      "imported": "theo.services.api.app.ai.guardrails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.guardrails",
+      "imported": "theo.services.api.app.ai.rag"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.guardrails",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.guardrails",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.guardrails",
+      "imported": "theo.services.api.app.routes.ai.workflows.utils"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.llm",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.llm",
+      "imported": "theo.services.api.app.ai.registry"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.llm",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.llm",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.perspectives",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.perspectives",
+      "imported": "theo.services.api.app.ai.reasoning"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.perspectives",
+      "imported": "theo.services.api.app.ai.reasoning.perspectives"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.perspectives",
+      "imported": "theo.services.api.app.infra.retrieval_service"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.perspectives",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.settings",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.settings",
+      "imported": "theo.application.facades.settings_store"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.settings",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.settings",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ai.workflows.utils",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.routes.analytics",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.analytics",
+      "imported": "theo.services.api.app.models.analytics"
+    },
+    {
+      "importer": "theo.services.api.app.routes.creators",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.creators",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.creators",
+      "imported": "theo.services.api.app.creators.service"
+    },
+    {
+      "importer": "theo.services.api.app.routes.creators",
+      "imported": "theo.services.api.app.creators.verse_perspectives"
+    },
+    {
+      "importer": "theo.services.api.app.routes.creators",
+      "imported": "theo.services.api.app.models.creators"
+    },
+    {
+      "importer": "theo.services.api.app.routes.dashboard",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.app.routes.dashboard",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.dashboard",
+      "imported": "theo.services.api.app.models.dashboard"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries",
+      "imported": "theo.adapters.persistence.discovery_repository"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries",
+      "imported": "theo.adapters.persistence.document_repository"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries",
+      "imported": "theo.application.repositories"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries",
+      "imported": "theo.application.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries",
+      "imported": "theo.services.api.app.discoveries"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries",
+      "imported": "theo.services.api.app.models.discoveries"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries_v1",
+      "imported": "theo.adapters.persistence.discovery_repository"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries_v1",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries_v1",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries_v1",
+      "imported": "theo.application.repositories"
+    },
+    {
+      "importer": "theo.services.api.app.routes.discoveries_v1",
+      "imported": "theo.domain.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.documents",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.documents",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.documents",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.routes.documents",
+      "imported": "theo.services.api.app.retriever.documents"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.export.citations"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.export.formatters"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.export.zotero"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.models.verses"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.retriever.export"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.retriever.verses"
+    },
+    {
+      "importer": "theo.services.api.app.routes.export",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.app.routes.features",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.application.facades.resilience"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.application.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.services.api.app.discoveries.tasks"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.services.api.app.errors"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.services.api.app.infra.ingestion_service"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.services.api.app.ingest.exceptions"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.services.api.app.ingest.pipeline"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.app.routes.ingest",
+      "imported": "theo.services.api.app.utils.imports"
+    },
+    {
+      "importer": "theo.services.api.app.routes.jobs",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.jobs",
+      "imported": "theo.services.api.app.models.jobs"
+    },
+    {
+      "importer": "theo.services.api.app.routes.jobs",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.routes.jobs",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.app.routes.notebooks",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.notebooks",
+      "imported": "theo.application.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.notebooks",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.notebooks",
+      "imported": "theo.services.api.app.models.notebooks"
+    },
+    {
+      "importer": "theo.services.api.app.routes.realtime",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.realtime",
+      "imported": "theo.application.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.realtime",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.app.routes.realtime",
+      "imported": "theo.services.api.app.models.notebooks"
+    },
+    {
+      "importer": "theo.services.api.app.routes.research",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.research",
+      "imported": "theo.application.facades.research"
+    },
+    {
+      "importer": "theo.services.api.app.routes.research",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.research",
+      "imported": "theo.domain.research"
+    },
+    {
+      "importer": "theo.services.api.app.routes.research",
+      "imported": "theo.services.api.app.models.research"
+    },
+    {
+      "importer": "theo.services.api.app.routes.research",
+      "imported": "theo.services.api.app.research"
+    },
+    {
+      "importer": "theo.services.api.app.routes.search",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.search",
+      "imported": "theo.services.api.app.infra.retrieval_service"
+    },
+    {
+      "importer": "theo.services.api.app.routes.search",
+      "imported": "theo.services.api.app.ingest.embeddings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.search",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.routes.trails",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.trails",
+      "imported": "theo.services.api.app.ai.trails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.trails",
+      "imported": "theo.services.api.app.models.trails"
+    },
+    {
+      "importer": "theo.services.api.app.routes.transcripts",
+      "imported": "theo.adapters.persistence.transcript_repository"
+    },
+    {
+      "importer": "theo.services.api.app.routes.transcripts",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.transcripts",
+      "imported": "theo.services.api.app.models.transcripts"
+    },
+    {
+      "importer": "theo.services.api.app.routes.transcripts",
+      "imported": "theo.services.api.app.transcripts.service"
+    },
+    {
+      "importer": "theo.services.api.app.routes.verses",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.app.routes.verses",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.app.routes.verses",
+      "imported": "theo.services.api.app.models.verses"
+    },
+    {
+      "importer": "theo.services.api.app.routes.verses",
+      "imported": "theo.services.api.app.retriever.graph"
+    },
+    {
+      "importer": "theo.services.api.app.routes.verses",
+      "imported": "theo.services.api.app.retriever.verses"
+    },
+    {
+      "importer": "theo.services.api.app.transcripts.service",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.services.api.app.transcripts.service",
+      "imported": "theo.application.repositories.transcript_repository"
+    },
+    {
+      "importer": "theo.services.api.app.transcripts.service",
+      "imported": "theo.domain.research.osis"
+    },
+    {
+      "importer": "theo.services.api.app.use_cases",
+      "imported": "theo.services.api.app.use_cases.refresh_discoveries"
+    },
+    {
+      "importer": "theo.services.api.app.use_cases.refresh_discoveries",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.services.api.app.use_cases.refresh_discoveries",
+      "imported": "theo.application.repositories"
+    },
+    {
+      "importer": "theo.services.api.app.use_cases.refresh_discoveries",
+      "imported": "theo.domain.discoveries"
+    },
+    {
+      "importer": "theo.services.api.app.use_cases.refresh_discoveries",
+      "imported": "theo.domain.discoveries.models"
+    },
+    {
+      "importer": "theo.services.api.app.utils",
+      "imported": "theo.services.api.app.utils.imports"
+    },
+    {
+      "importer": "theo.services.api.app.workers.discovery_scheduler",
+      "imported": "theo.adapters.persistence.discovery_repository"
+    },
+    {
+      "importer": "theo.services.api.app.workers.discovery_scheduler",
+      "imported": "theo.adapters.persistence.document_repository"
+    },
+    {
+      "importer": "theo.services.api.app.workers.discovery_scheduler",
+      "imported": "theo.services.api.app.discoveries"
+    },
+    {
+      "importer": "theo.services.api.app.workers.discovery_scheduler",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.workers.discovery_scheduler",
+      "imported": "theo.services.bootstrap"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.adapters.persistence.chat_repository"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.adapters.persistence.ingestion_job_repository"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.adapters.persistence.types"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.application.facades.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.application.reasoner.events"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.application.telemetry"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.ai.rag.deliverables"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.ai.rag.exports"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.ai.rag.guardrail_helpers"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.ai.rag.models"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.creators.verse_perspectives"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.enrich"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.ingest.pipeline"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.models.ai"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.persistence_models"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.api.app.retriever.hybrid"
+    },
+    {
+      "importer": "theo.services.api.app.workers.tasks",
+      "imported": "theo.services.bootstrap"
+    },
+    {
+      "importer": "theo.services.api.tests.conftest",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.conftest",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.tests.conftest",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.tests.conftest",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_agent_evaluation",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.test_agent_evaluation",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_ai_routes",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.test_ai_routes",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_ai_routes",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_ai_routes",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.tests.test_creator_profiles",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.test_creator_profiles",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.tests.test_creator_profiles",
+      "imported": "theo.services.api.app.ingest.pipeline"
+    },
+    {
+      "importer": "theo.services.api.tests.test_creator_profiles",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_creator_profiles",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.tests.test_enrich_metadata",
+      "imported": "theo.services.api.app.enrich.metadata"
+    },
+    {
+      "importer": "theo.services.api.tests.test_error_handling",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_export_formatters",
+      "imported": "theo.services.api.app.export.formatters"
+    },
+    {
+      "importer": "theo.services.api.tests.test_export_formatters",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.tests.test_export_formatters",
+      "imported": "theo.services.api.app.models.export"
+    },
+    {
+      "importer": "theo.services.api.tests.test_features",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_features",
+      "imported": "theo.services.api.app.routes.features"
+    },
+    {
+      "importer": "theo.services.api.tests.test_hybrid_retriever",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.test_hybrid_retriever",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_hybrid_retriever",
+      "imported": "theo.services.api.app.models.documents"
+    },
+    {
+      "importer": "theo.services.api.tests.test_hybrid_retriever",
+      "imported": "theo.services.api.app.models.search"
+    },
+    {
+      "importer": "theo.services.api.tests.test_hybrid_retriever",
+      "imported": "theo.services.api.app.retriever.hybrid"
+    },
+    {
+      "importer": "theo.services.api.tests.test_ingest_and_search",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_jobs",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.test_jobs",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_jobs",
+      "imported": "theo.services.api.app.routes.ingest"
+    },
+    {
+      "importer": "theo.services.api.tests.test_jobs",
+      "imported": "theo.services.api.app.routes.jobs"
+    },
+    {
+      "importer": "theo.services.api.tests.test_lazy_import_module",
+      "imported": "theo.services.api.app.utils.imports"
+    },
+    {
+      "importer": "theo.services.api.tests.test_notifications",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.api.tests.test_osis",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.tests.test_osis_utils",
+      "imported": "theo.application.dtos"
+    },
+    {
+      "importer": "theo.services.api.tests.test_osis_utils",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_osis_utils",
+      "imported": "theo.services.api.app.ingest.osis"
+    },
+    {
+      "importer": "theo.services.api.tests.test_osis_utils",
+      "imported": "theo.services.api.app.transcripts.service"
+    },
+    {
+      "importer": "theo.services.api.tests.test_passage_parser",
+      "imported": "theo.services.api.app.ai.passage"
+    },
+    {
+      "importer": "theo.services.api.tests.test_reasoning_trace",
+      "imported": "theo.services.api.app.ai.rag.reasoning_trace"
+    },
+    {
+      "importer": "theo.services.api.tests.test_research_routes",
+      "imported": "theo.application.facades.research"
+    },
+    {
+      "importer": "theo.services.api.tests.test_research_routes",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.tests.test_research_routes",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_security",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.tests.test_security",
+      "imported": "theo.services.api.app.adapters.security"
+    },
+    {
+      "importer": "theo.services.api.tests.test_settings",
+      "imported": "theo.application.facades.settings"
+    },
+    {
+      "importer": "theo.services.api.tests.test_topics",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.test_topics",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_topics",
+      "imported": "theo.application.ports.events"
+    },
+    {
+      "importer": "theo.services.api.tests.test_trails",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.test_trails",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_trails",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_transcript_ingest",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.test_transcript_search",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_transcript_search",
+      "imported": "theo.services.api.app.routes.ingest"
+    },
+    {
+      "importer": "theo.services.api.tests.test_transcript_search",
+      "imported": "theo.services.api.app.routes.transcripts"
+    },
+    {
+      "importer": "theo.services.api.tests.test_watchlists",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.test_watchlists",
+      "imported": "theo.application.facades.database"
+    },
+    {
+      "importer": "theo.services.api.tests.test_watchlists",
+      "imported": "theo.services.api.app.main"
+    },
+    {
+      "importer": "theo.services.api.tests.workers.test_discovery_scheduler",
+      "imported": "theo.services.api.app.workers.discovery_scheduler"
+    },
+    {
+      "importer": "theo.services.api.tests.workers.test_tasks_properties",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.api.tests.workers.test_tasks_properties",
+      "imported": "theo.services.api.app.workers.tasks"
+    },
+    {
+      "importer": "theo.services.bootstrap",
+      "imported": "theo.platform.application"
+    },
+    {
+      "importer": "theo.services.geo",
+      "imported": "theo.services.geo.seed_openbible_geo"
+    },
+    {
+      "importer": "theo.services.geo.seed_openbible_geo",
+      "imported": "theo.adapters.persistence.models"
+    },
+    {
+      "importer": "theo.services.geo.seed_openbible_geo",
+      "imported": "theo.application.facades.settings_store"
+    },
+    {
+      "importer": "theo.services.geo.seed_openbible_geo",
+      "imported": "theo.domain.research.osis"
+    }
+  ]
+}

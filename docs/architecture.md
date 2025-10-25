@@ -46,3 +46,17 @@ task architecture:check
 
 These commands run automatically in CI to block merges that break the enforced
 module boundaries.
+
+## Visualising the dependency graph
+
+Generate snapshot artefacts with the Taskfile helper:
+
+```sh
+task architecture:graph
+```
+
+The command writes `dependency-graph.json` and `dependency-graph.svg` into
+`dashboard/dependency-graph/`. Commit these files whenever the architecture
+changes so reviewers can inspect the rendered diagram. To check for drift
+between branches, compare the JSON metadata (`git diff -- dashboard/dependency-graph/dependency-graph.json`)
+or open the SVGs in a viewer and toggle between versions.
