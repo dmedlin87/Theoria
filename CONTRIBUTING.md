@@ -75,6 +75,10 @@ Once the Makefile façade is introduced the following convenience commands will 
 - Type-check selective modules with `mypy` via `python -m mypy` (install the `[dev]` extra for stub packages such as `types-PyYAML`).
 - Frontend formatting uses `prettier` with repo defaults.
 
+## Debugging Utilities & Local Artifacts
+- Reusable maintenance helpers and scratch scripts live in [`scripts/debug/`](scripts/debug/). If you create a new diagnostic script, place it there so others can discover and rerun it.
+- Store ad-hoc transcripts or large local investigation logs under `docs/process/` when they are worth sharing, or `.debug/` when they should stay out of version control. Avoid committing machine-specific transcripts, temporary exports (for example `test_results*.txt`), or other local debugging output at the repository root.
+
 ## Pull Request Expectations
 - Reference relevant sections of the Test Map when adding or updating tests.
 - Include coverage outputs when enabling gates.

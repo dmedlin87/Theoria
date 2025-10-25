@@ -56,6 +56,12 @@ build/
 # Metrics artifacts
 metrics/*.prom
 
+# Local debugging scratch files
+.debug/
+tmp_debug*.py
+temp_debug*.py
+test_results*.txt
+
 # OS-specific
 Thumbs.db
 trufflehog-findings.json
