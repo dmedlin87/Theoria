@@ -15,8 +15,15 @@ from theo.application.facades.settings import Settings, get_settings
 from theo.application.graph import GraphProjector, NullGraphProjector
 from theo.services.api.app.persistence_models import Document, TranscriptSegment
 
-from theo.application.facades.resilience import ResilienceError, ResilienceSettings, resilient_operation
+from theo.application.facades.resilience import (
+    ResilienceError,
+    ResilienceSettings,
+    create_policy,
+    resilient_operation,
+    set_resilience_policy_factory,
+)
 from theo.application.facades.telemetry import instrument_workflow, set_span_attribute
+from ..adapters.resilience import resilience_policy_factory
 from . import network as ingest_network
 from .embeddings import get_embedding_service
 from .exceptions import UnsupportedSourceError
@@ -69,6 +76,16 @@ _parse_text_file = parse_text_file
 
 
 _resolve_host_addresses = ingest_network.resolve_host_addresses
+
+
+def _ensure_resilience_policy_factory() -> None:
+    try:
+        create_policy()
+    except RuntimeError:
+        set_resilience_policy_factory(resilience_policy_factory)
+
+
+_ensure_resilience_policy_factory()
 
 
 __all__ = [
