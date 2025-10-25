@@ -74,7 +74,10 @@ def export_search(
         )
     field_set = parse_fields(fields)
     limit_value = limit if limit is not None else k
-    fetch_k = min(k, (limit + 1) if limit is not None else k + 1)
+    if limit is not None:
+        fetch_k = min(k, limit + 1)
+    else:
+        fetch_k = k + 1
 
     search_request = HybridSearchRequest(
         query=q,
