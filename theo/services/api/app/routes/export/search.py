@@ -9,7 +9,7 @@ from ...errors import ExportError, Severity
 from ...export.formatters import build_search_export, render_bundle
 from ...models.search import HybridSearchFilters, HybridSearchRequest
 from ...retriever.export import export_search_results
-from ...facades.database import get_session
+from theo.application.facades.database import get_session
 from .utils import _BAD_REQUEST_RESPONSE, finalize_response, parse_fields
 
 router = APIRouter()
@@ -74,10 +74,7 @@ def export_search(
         )
     field_set = parse_fields(fields)
     limit_value = limit if limit is not None else k
-    if limit is not None:
-        fetch_k = min(k, limit + 1)
-    else:
-        fetch_k = k + 1
+    fetch_k = min(k, (limit + 1) if limit is not None else k + 1)
 
     search_request = HybridSearchRequest(
         query=q,

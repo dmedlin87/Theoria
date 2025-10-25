@@ -6,11 +6,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 import sys
-
-import pytest
-from sqlalchemy import create_engine
+import time
+from sqlalchemy import create_engine, event, Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -20,7 +20,9 @@ from theo.services.api.app.ai.trails import TrailService, TrailStepDigest
 from theo.application.facades.database import Base
 from theo.adapters.persistence.models import AgentTrail, ChatSession
 from theo.services.api.app.models.ai import ChatGoalState, ChatMemoryEntry
+from tests.utils.query_profiler import before_cursor_execute, after_cursor_execute, print_query_profile
 
+query_data = {"queries": [], "total_time": 0}
 
 @pytest.fixture()
 def session() -> Generator[Session, None, None]:
@@ -281,6 +283,12 @@ def test_trail_digest_updates_goal_progress(
 def test_trail_digest_deduplicates_entries(
     session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+
+    event.listen(Engine, "before_cursor_execute", before_cursor_execute)
+    event.listen(Engine, "after_cursor_execute", after_cursor_execute)
+
     service = TrailService(session)
     recorded_tasks: list[tuple[str, dict[str, str]]] = []
     monkeypatch.setattr(
@@ -339,3 +347,5 @@ def test_trail_digest_deduplicates_entries(
             },
         )
     ]
+
+    print_query_profile()

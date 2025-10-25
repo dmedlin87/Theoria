@@ -13,7 +13,7 @@ from ...export.formatters import render_bundle
 from ...models.export import CitationExportRequest
 from ...models.verses import VerseMentionsFilters
 from ...retriever.verses import get_mentions_for_osis
-from ...facades.database import get_session
+from theo.application.facades.database import get_session
 from .utils import _BAD_REQUEST_RESPONSE, fetch_documents_by_ids, finalize_response
 
 router = APIRouter()
@@ -66,10 +66,8 @@ def export_citation_bundle(
                 source_type=filters.source_type,
                 author=filters.author,
             ),
+            limit=payload.limit,
         )
-
-        if payload.limit is not None:
-            mentions = mentions[: payload.limit]
 
         for mention in mentions:
             document_id = mention.passage.document_id
