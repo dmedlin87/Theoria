@@ -249,11 +249,11 @@ def _optimise_lifespan():
         _noop_migrations,
     )
     patcher.setattr(
-        "theo.services.api.app.main.run_sql_migrations",
+        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
         _noop_migrations,
     )
     patcher.setattr(
-        "theo.services.api.app.main.seed_reference_data",
+        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
         _noop_seed,
     )
     patcher.setattr(

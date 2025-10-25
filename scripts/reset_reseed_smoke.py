@@ -92,7 +92,7 @@ def _reset_schema(engine: Engine) -> None:
 
 
 def _run_smoke_test(api_key: str, osis_reference: str) -> None:
-    from theo.services.api.app.main import create_app
+    from theo.services.api.app.bootstrap import create_app
 
     logging.info("Running smoke test against /research/contradictions")
     with TestClient(create_app()) as client:

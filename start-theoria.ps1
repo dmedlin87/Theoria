@@ -876,7 +876,17 @@ function Start-TheoriaApi {
         }
 
         Set-Location $ProjectRoot
-        $arguments = @('-m', 'uvicorn', 'theo.services.api.app.main:app', '--reload', '--host', '127.0.0.1', '--port', $Port)
+        $arguments = @(
+            '-m',
+            'uvicorn',
+            'theo.services.api.app.bootstrap.app_factory:create_app',
+            '--factory',
+            '--reload',
+            '--host',
+            '127.0.0.1',
+            '--port',
+            $Port
+        )
         if ($UseHttps -and $Certificate -and $Certificate.KeyPath -and $Certificate.CertPath) {
             $arguments += @('--ssl-keyfile', $Certificate.KeyPath, '--ssl-certfile', $Certificate.CertPath)
         }
