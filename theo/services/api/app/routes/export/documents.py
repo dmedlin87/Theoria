@@ -9,7 +9,7 @@ from ...errors import ExportError, Severity
 from ...export.formatters import build_document_export, render_bundle
 from ...models.export import DocumentExportFilters
 from ...retriever.export import export_documents
-from theo.application.facades.database import get_session
+from theo.application.facades.database import get_session as get_db_session
 from .utils import _BAD_REQUEST_RESPONSE, finalize_response, parse_fields
 
 router = APIRouter()
@@ -46,7 +46,7 @@ def export_documents_endpoint(
         alias="format",
         description="Response format (json, ndjson, html, obsidian, or pdf).",
     ),
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db_session),
 ):
     """Return documents and their passages for offline processing."""
 

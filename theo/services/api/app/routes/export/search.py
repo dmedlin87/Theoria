@@ -9,7 +9,7 @@ from ...errors import ExportError, Severity
 from ...export.formatters import build_search_export, render_bundle
 from ...models.search import HybridSearchFilters, HybridSearchRequest
 from ...retriever.export import export_search_results
-from theo.application.facades.database import get_session
+from theo.application.facades.database import get_session as get_db_session
 from .utils import _BAD_REQUEST_RESPONSE, finalize_response, parse_fields
 
 router = APIRouter()
@@ -50,7 +50,7 @@ def export_search(
         alias="format",
         description="Response format (json, ndjson, csv, html, obsidian, or pdf).",
     ),
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db_session),
 ):
     """Return export payload for hybrid search results or verse mentions."""
 

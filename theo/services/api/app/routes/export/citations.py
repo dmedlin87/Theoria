@@ -13,7 +13,7 @@ from ...export.formatters import render_bundle
 from ...models.export import CitationExportRequest
 from ...models.verses import VerseMentionsFilters
 from ...retriever.verses import get_mentions_for_osis
-from theo.application.facades.database import get_session
+from theo.application.facades.database import get_session as get_db_session
 from .utils import _BAD_REQUEST_RESPONSE, fetch_documents_by_ids, finalize_response
 
 router = APIRouter()
@@ -36,7 +36,7 @@ def _format_anchor_label(passage: Any) -> str | None:
 def export_citation_bundle(
     request: Request,
     payload: CitationExportRequest,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db_session),
 ):
     """Return rendered citations for selected documents or verse mentions."""
 

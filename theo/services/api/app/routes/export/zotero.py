@@ -12,7 +12,7 @@ from ...export.zotero import (
     export_to_zotero,
 )
 from ...models.export import ZoteroExportRequest, ZoteroExportResponse
-from theo.application.facades.database import get_session
+from theo.application.facades.database import get_session as get_db_session
 from .utils import _BAD_REQUEST_RESPONSE, fetch_documents_by_ids
 
 router = APIRouter()
@@ -21,7 +21,7 @@ router = APIRouter()
 @router.post("/zotero", response_model=ZoteroExportResponse, responses=_BAD_REQUEST_RESPONSE)
 async def export_to_zotero_endpoint(
     payload: ZoteroExportRequest,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db_session),
 ) -> ZoteroExportResponse:
     """Export selected documents to a Zotero library."""
 
