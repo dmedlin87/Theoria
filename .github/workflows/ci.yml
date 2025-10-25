@@ -78,6 +78,12 @@ jobs:
         working-directory: theo/services/web
         run: npm run quality:gates
 
+      - name: Run architecture tests
+        run: pytest tests/architecture -q
+
+      - name: Enforce Python import boundaries
+        run: lint-imports --config importlinter.ini
+
       - name: Run Jest unit tests
         working-directory: theo/services/web
         run: npm test
