@@ -1,6 +1,10 @@
 # Theoria
 
-> **Deterministic research engine for theology.** Index your sources, normalize Scripture references, and retrieve verse-anchored evidence with AI assistance you can trust.
+<p align="center">
+  <em>Deterministic research engine for theology.</em>
+</p>
+
+Index your sources, normalize Scripture references, and retrieve verse-anchored evidence with AI assistance you can trust. Theoria keeps citations primary and models secondary so that every automated summary, paraphrase, or comparison is traceable back to the canon text that informed it.
 
 ## Table of Contents
 1. [Why Theoria](#why-theoria)
@@ -22,6 +26,8 @@ Theoria unifies your theological research library—papers, notes, transcripts, 
 - **Productivity workflows** that combine AI summarization with strict reference enforcement.
 - **Operational confidence** with observability, testing, and performance guardrails baked in.
 
+> "Theoria keeps our exegetical work anchored to the text, even when we move fast." — Early access user
+
 ---
 
 ## Core Capabilities
@@ -35,7 +41,7 @@ Theoria unifies your theological research library—papers, notes, transcripts, 
 | Experience | Modern Next.js UI, command palette (⌘K/CTRL+K), dark mode, WCAG 2.1 AA accessibility |
 | Integrations | Model Context Protocol (MCP) server, API + CLI automation hooks |
 
-Additional feature deep-dives live in [`docs/archive/`](docs/archive/).
+Additional feature deep-dives live in [`docs/archive/`](docs/archive/). The public roadmap and current areas of focus are tracked in [`NEXT_STEPS.md`](NEXT_STEPS.md).
 
 ---
 
@@ -57,11 +63,13 @@ Additional feature deep-dives live in [`docs/archive/`](docs/archive/).
 - **Automation Scripts**: `scripts/` (dev orchestration, reseeding, evaluation).
 - **Quality Gates**: `tests/` (unit, integration, ranking, MCP, UI smoke suites).
 
-For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and the ADR directory under [`docs/adr/`](docs/adr/).
+For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and the ADR directory under [`docs/adr/`](docs/adr/). The [Architecture Overview](README_ARCHITECTURE_UPDATES.md) file captures ongoing platform investments at a glance.
 
 ---
 
 ## Quick Start
+
+> **Prerequisites:** Python 3.11+, Node.js 20+, and a running PostgreSQL instance (local or remote). The CLI scripts will provision a development database automatically when none is specified.
 
 1. **Clone & prepare environment**
    ```bash
@@ -87,13 +95,18 @@ For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and
    export THEO_AUTH_ALLOW_ANONYMOUS=1  # development only
    ```
 
-4. **Launch API**
+4. **Launch background services**
+   ```bash
+   task db:start  # optional helper; defaults to local dockerized postgres
+   ```
+
+5. **Launch API**
    ```bash
    uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
    ```
    Visit the interactive docs at <http://localhost:8000/docs>.
 
-5. **Launch Web UI**
+6. **Launch Web UI**
    ```bash
    cd theo/services/web
    export NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8000"
@@ -101,6 +114,12 @@ For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and
    npm run dev
    ```
    Open <http://localhost:3000> and press ⌘K/CTRL+K to explore the command palette.
+
+7. **Seed demo content (optional)**
+   ```bash
+   ./scripts/reset_reseed_smoke.py --log-level INFO
+   ```
+   The command loads a small corpus of sample sermons, research snippets, and evaluation datasets for experimentation.
 
 ---
 
@@ -128,7 +147,7 @@ Both scripts boot the API and Next.js app, wiring ports and environment variable
 - Unix/macOS: `./scripts/reset_reseed_smoke.py --log-level DEBUG`
 - PowerShell: `./scripts/reset-reseed-smoke.ps1 -LogLevel DEBUG`
 
-Override database URLs or API keys through the script flags when targeting Postgres or remote services.
+Override database URLs or API keys through the script flags when targeting Postgres or remote services. The scripts are idempotent and safe to run repeatedly as you iterate on ingestion pipelines.
 
 ### Docker Compose
 ```bash
