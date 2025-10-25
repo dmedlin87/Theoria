@@ -66,8 +66,10 @@ def export_citation_bundle(
                 source_type=filters.source_type,
                 author=filters.author,
             ),
-            limit=payload.limit,
         )
+
+        if payload.limit is not None:
+            mentions = mentions[: payload.limit]
 
         for mention in mentions:
             document_id = mention.passage.document_id
