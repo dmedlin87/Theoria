@@ -104,7 +104,7 @@ def _speed_up_redteam_startup() -> Generator[None, None, None]:
         return None
 
     monkeypatch.setattr(
-        "theo.services.api.app.main.run_sql_migrations",
+        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
         _noop_run_sql_migrations,
     )
     monkeypatch.setattr(
@@ -112,7 +112,7 @@ def _speed_up_redteam_startup() -> Generator[None, None, None]:
         _noop_run_sql_migrations,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.main.seed_reference_data",
+        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
         _noop,
     )
     monkeypatch.setattr(

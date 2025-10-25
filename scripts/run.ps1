@@ -378,7 +378,8 @@ function Start-ApiService {
     
     $uvicornArgs = @(
         '-m', 'uvicorn',
-        'theo.services.api.app.main:app',
+        'theo.services.api.app.bootstrap.app_factory:create_app',
+        '--factory',
         '--host', '127.0.0.1',
         '--port', $Port,
         '--reload'

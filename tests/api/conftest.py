@@ -241,7 +241,7 @@ def _disable_migrations(
         _noop_run_sql_migrations,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.main.run_sql_migrations",
+        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
         _noop_run_sql_migrations,
     )
 
@@ -297,17 +297,17 @@ def _skip_heavy_startup() -> None:
             original_seed_reference_data(session)
 
     monkeypatch.setattr(
-        "theo.services.api.app.main.seed_reference_data",
+        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
         _maybe_seed_reference_data,
         raising=False,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.main.start_discovery_scheduler",
+        "theo.services.api.app.bootstrap.lifecycle.start_discovery_scheduler",
         lambda: None,
         raising=False,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.main.stop_discovery_scheduler",
+        "theo.services.api.app.bootstrap.lifecycle.stop_discovery_scheduler",
         lambda: None,
         raising=False,
     )

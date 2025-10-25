@@ -410,13 +410,13 @@ def test_api_boots_contradiction_seeding_without_migrations(
     database_module._engine = None  # type: ignore[attr-defined]
     database_module._SessionLocal = None  # type: ignore[attr-defined]
 
-    if "theo.services.api.app.main" in sys.modules:
-        importlib.reload(sys.modules["theo.services.api.app.main"])
+    module_name = "theo.services.api.app.bootstrap.app_factory"
+    if module_name in sys.modules:
+        importlib.reload(sys.modules[module_name])
     else:
-        importlib.import_module("theo.services.api.app.main")
-    main_module = sys.modules["theo.services.api.app.main"]
+        importlib.import_module(module_name)
+    app_factory_module = sys.modules[module_name]
 
-    monkeypatch.setattr(main_module, "run_sql_migrations", lambda *_, **__: [])
     from theo.services.api.app.db import run_sql_migrations as migrations_module
 
     monkeypatch.setattr(
@@ -450,7 +450,7 @@ def test_api_boots_contradiction_seeding_without_migrations(
     monkeypatch.setattr(seeds_module, "seed_geo_places", lambda session: None)
     monkeypatch.setattr(seeds_module, "seed_openbible_geo", lambda session: None)
 
-    app = main_module.create_app()
+    app = app_factory_module.create_app()
 
     async def _run_lifespan() -> None:
         async with app.router.lifespan_context(app):

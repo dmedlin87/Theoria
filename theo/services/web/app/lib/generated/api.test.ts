@@ -11,7 +11,7 @@ function normalize(value: string): string {
 }
 
 function generateOpenAPISchema(): string {
-  const code = `from fastapi.openapi.utils import get_openapi\nfrom theo.services.api.app.main import create_app\nimport json\napp = create_app()\nprint(json.dumps(get_openapi(title=app.title, version=app.version, routes=app.routes)))`;
+  const code = `from fastapi.openapi.utils import get_openapi\nfrom theo.services.api.app.bootstrap import create_app\nimport json\napp = create_app()\nprint(json.dumps(get_openapi(title=app.title, version=app.version, routes=app.routes)))`;
   const env = {
     ...process.env,
     PYTHONPATH: [repoRoot, process.env.PYTHONPATH ?? ""].filter(Boolean).join(path.delimiter),

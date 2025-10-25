@@ -209,7 +209,8 @@ def test_sqlite_startup_without_migrations_creates_contradiction_table(
 
     monkeypatch.setattr(migrations_module, "run_sql_migrations", _noop_migrations)
     monkeypatch.setattr(
-        "theo.services.api.app.main.run_sql_migrations", _noop_migrations
+        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
+        _noop_migrations,
     )
 
     try:
@@ -345,7 +346,7 @@ def test_sqlite_startup_restores_missing_perspective_column(
 
     monkeypatch.setattr(seeds_module, "seed_reference_data", _lightweight_seed_reference_data)
     monkeypatch.setattr(
-        "theo.services.api.app.main.seed_reference_data",
+        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
         _lightweight_seed_reference_data,
     )
 
