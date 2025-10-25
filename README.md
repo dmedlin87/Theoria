@@ -7,9 +7,10 @@
 2. [Core Capabilities](#core-capabilities)
 3. [System Overview](#system-overview)
 4. [Quick Start](#quick-start)
-5. [Local Development](#local-development)
-6. [Documentation Map](#documentation-map)
-7. [Support & Contribution](#support--contribution)
+5. [For AI Agents](#for-ai-agents)
+6. [Local Development](#local-development)
+7. [Documentation Map](#documentation-map)
+8. [Support & Contribution](#support--contribution)
 
 ---
 
@@ -104,6 +105,19 @@ For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and
 
 ---
 
+## For AI Agents
+
+Incoming agents can jump straight into the maintained handoff package:
+
+- **Orientation**: [`QUICK_START_FOR_AGENTS.md`](QUICK_START_FOR_AGENTS.md) provides the mission briefing, tech stack cheatsheet, and day-one checklist.
+- **Delivery context**: [`AGENT_HANDOFF_COMPLETE.md`](AGENT_HANDOFF_COMPLETE.md) links every artifact that shipped with the Cognitive Scholar engagement.
+- **Active scope**: [`HANDOFF_NEXT_PHASE.md`](HANDOFF_NEXT_PHASE.md) and [`NEXT_STEPS.md`](NEXT_STEPS.md) describe the phased roadmap, acceptance criteria, and open threads.
+- **Background reading**: [`IMPLEMENTATION_CONTEXT.md`](IMPLEMENTATION_CONTEXT.md) captures architecture constraints, and [`COGNITIVE_SCHOLAR_HANDOFF_NEW.md`](COGNITIVE_SCHOLAR_HANDOFF_NEW.md) summarizes domain decisions.
+
+Pair this packet with the [Documentation Map](#documentation-map) to locate deep dives, runbooks, and historical context.
+
+---
+
 ## Local Development
 
 ### One command dev loop
@@ -145,16 +159,19 @@ Stop with `docker compose down`.
 
 ## Documentation Map
 
-| Category | Start Here |
+| Need | Where to Look |
 | --- | --- |
-| Architecture & Decisions | [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md), [`docs/adr/`](docs/adr/) |
-| APIs & Integration | [`docs/API.md`](docs/API.md), [`docs/mcp_integration_guide.md`](docs/mcp_integration_guide.md), [`docs/authentication.md`](docs/authentication.md) |
-| CLI & Automation | [`docs/CLI.md`](docs/CLI.md), [`theo/services/cli`](theo/services/cli) |
-| UI & UX | [`docs/archive/2025-10/`](docs/archive/2025-10/), [`theo/services/web/app/components/ui`](theo/services/web/app/components/ui) |
-| Testing & Quality | [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md), [`docs/performance.md`](docs/performance.md), [`SECURITY.md`](SECURITY.md) |
-| Roadmaps & Case Builder | [`docs/CASE_BUILDER.md`](docs/CASE_BUILDER.md), [`docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md`](docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md) |
+| **Project entry points** | [`docs/INDEX.md`](docs/INDEX.md) for navigation, [`START_HERE.md`](START_HERE.md) for local launch, [`README.md`](README.md) for the product story |
+| **AI agent briefings** | [`QUICK_START_FOR_AGENTS.md`](QUICK_START_FOR_AGENTS.md), [`AGENT_HANDOFF_COMPLETE.md`](AGENT_HANDOFF_COMPLETE.md), [`HANDOFF_NEXT_PHASE.md`](HANDOFF_NEXT_PHASE.md) |
+| **Product & roadmap** | [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/status/`](docs/status/) indexes, [`docs/tasks/`](docs/tasks/) planning artifacts |
+| **Architecture & engineering** | [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md), [`docs/architecture.md`](docs/architecture.md), [`docs/adr/`](docs/adr/), [`docs/reviews/`](docs/reviews/) |
+| **APIs & integrations** | [`docs/API.md`](docs/API.md), [`docs/CLI.md`](docs/CLI.md), [`docs/authentication.md`](docs/authentication.md), [`docs/mcp_integration_guide.md`](docs/mcp_integration_guide.md) |
+| **Operations & runbooks** | [`docs/SERVICE_MANAGEMENT.md`](docs/SERVICE_MANAGEMENT.md), [`docs/runbooks/`](docs/runbooks/), [`docs/process/`](docs/process/) |
+| **Quality & observability** | [`docs/testing/`](docs/testing/), [`docs/ui-quality-gates.md`](docs/ui-quality-gates.md), [`docs/dashboards/`](docs/dashboards/), [`dashboard/`](dashboard/) snapshots |
+| **Security & risk** | [`SECURITY.md`](SECURITY.md), [`docs/security/`](docs/security/), [`docs/AGENT_CONFINEMENT.md`](docs/AGENT_CONFINEMENT.md), [`docs/redteam.md`](docs/redteam.md) |
+| **Historical context** | [`docs/archive/`](docs/archive/) for superseded plans, audits, and UI session logs |
 
-Use [`docs/INDEX.md`](docs/INDEX.md) as the master directory of all documentation.
+Use the [Documentation Guide](docs/DOCUMENTATION_GUIDE.md) for maintenance policy and curation tips.
 
 ---
 

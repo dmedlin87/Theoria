@@ -9,7 +9,7 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
 
 - **Canonical entry points**: `README.md`, `CONTRIBUTING.md`, `START_HERE.md`, `SECURITY.md`, `DEPLOYMENT.md`, `THREATMODEL.md`.
 - **Agent handoff package**: `AGENT_HANDOFF_COMPLETE.md`, `HANDOFF_SESSION_2025_10_15.md`, `HANDOFF_MYPY_FIXES_2025_10_17.md`, `HANDOFF_NEXT_PHASE.md`, `IMPLEMENTATION_CONTEXT.md`, `QUICK_START_FOR_AGENTS.md`.
-- **Navigation aids**: `docs/INDEX.md` (master index) and `docs/DOCUMENTATION_GUIDE.md` (maintenance guide) are the definitive sources for researchers and contributors.
+- **Navigation & governance**: `docs/INDEX.md` (master index), `docs/DOCUMENTATION_GUIDE.md` (maintenance guide), and `docs/status/` (feature + bug ledgers) direct contributors to the right places.
 - **Historical materials**: All October 2025 implementation notes, audits, and improvement logs live under `docs/archive/`.
 
 ## Root-Level Canonical Documents
@@ -33,29 +33,35 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
 
 ## `docs/` Highlights
 
-- **Navigation & Maintenance**
-  - `docs/INDEX.md` — Comprehensive index organized by persona.
+- **Navigation & Governance**
+  - `docs/INDEX.md` — Navigation hub aligned to the new taxonomy.
   - `docs/DOCUMENTATION_GUIDE.md` — Structure, naming, and archive policy.
+  - `docs/status/README.md` — Governance workflow that keeps feature docs and bug ledgers in sync.
 
-- **Cognitive Scholar**
-  - `docs/ROADMAP.md` — MVP/Alpha/Beta milestones for hypothesis, gate, TMS, debate, and visualization layers.
+- **AI Agents & Cognitive Scholar**
+  - `QUICK_START_FOR_AGENTS.md` — Orientation packet for incoming agents.
   - `HANDOFF_NEXT_PHASE.md` — Phase-by-phase implementation guide for the Cognitive Scholar stack.
   - `docs/AGENT_AND_PROMPTING_GUIDE.md` — Prompting guardrails and gate operations documentation.
 
-- **Architecture & Operations**
+- **Architecture & Engineering**
   - `docs/BLUEPRINT.md` — System design blueprint.
-  - `docs/AGENT_AND_PROMPTING_GUIDE.md` / `docs/AGENT_CONFINEMENT.md` — Agent framework and safety guardrails.
-  - `docs/SERVICE_MANAGEMENT.md` — Service orchestration and runbooks.
+  - `docs/architecture.md` / `docs/adr/` — Dependency guardrails and decisions.
+  - `docs/reviews/` — Architecture and safety reviews with required follow-ups.
 
 - **Feature Specifications**
   - `docs/CASE_BUILDER.md` — Consolidated case builder roadmap (v4 is canonical).
+  - `docs/DISCOVERY_FEATURE.md` — Discovery feed specification paired with quick start.
   - `docs/FUTURE_FEATURES_ROADMAP.md` — Prioritized backlog of 25 features.
-  - `docs/UI_NAVIGATION_LOADING_IMPROVEMENTS.md` — Active UI guidance that replaced the archived session logs.
 
-- **Testing & Quality**
+- **Operations & Runbooks**
+  - `docs/SERVICE_MANAGEMENT.md` — Service orchestration and runbooks.
+  - `docs/runbooks/` — Incident and escalation playbooks.
+  - `docs/process/` — Execution logs, retrospectives, and postmortems awaiting archival.
+
+- **Quality & Observability**
   - `docs/testing/TEST_MAP.md` — Comprehensive testing matrix.
   - `docs/ui-quality-gates.md` — UI acceptance thresholds.
-  - `docs/typing-standards.md` — Python and TypeScript typing policy.
+  - `docs/dashboards/` — Quality dashboards and telemetry snapshots.
 
 ## Archive Layout (`docs/archive/`)
 
@@ -72,7 +78,7 @@ Archived documents are **not** maintained. When referencing historical context, 
 ## Maintenance Guidance
 
 - Update this inventory after major documentation reorganizations or when adding/removing canonical files.
-- Keep `docs/INDEX.md` and `docs/DOCUMENTATION_GUIDE.md` synchronized with structural changes.
+- Keep `docs/INDEX.md`, `docs/DOCUMENTATION_GUIDE.md`, and `docs/status/FEATURE_INDEX.md` synchronized with structural changes.
 - When a document becomes historical, move it to the appropriate archive subdirectory and add a note to the relevant README inside the archive.
 - For roadmap and implementation status, treat `HANDOFF_NEXT_PHASE.md` as canonical and ensure downstream docs (e.g., `docs/ROADMAP.md`, `docs/DISCOVERY_FEATURE.md`) remain in sync.
 

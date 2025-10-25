@@ -5,86 +5,77 @@
 ## Finding Documentation
 
 ### Start Here
-- **📚 [docs/INDEX.md](INDEX.md)** - Complete documentation index organized by topic
-- **🏠 [README.md](../README.md)** - Project overview and quick start
-- **🤝 [CONTRIBUTING.md](../CONTRIBUTING.md)** - How to contribute
+- **📚 [docs/INDEX.md](INDEX.md)** – Navigation across the updated taxonomy
+- **🏠 [README.md](../README.md)** – Product overview and capability tour
+- **🚀 [START_HERE.md](../START_HERE.md)** – Launcher scripts and troubleshooting
 
-### By Role
+### By Persona
 
-**New Users:**
-1. [README.md](../README.md) - What is Theoria?
-2. [START_HERE.md](../START_HERE.md) - Launch the application
-3. [docs/DISCOVERY_QUICK_START.md](DISCOVERY_QUICK_START.md) - Try the Discovery Feed
+**New Contributors**
+1. [CONTRIBUTING.md](../CONTRIBUTING.md) – Development workflow and tooling
+2. [docs/BLUEPRINT.md](BLUEPRINT.md) – Architecture context before diving into code
+3. [docs/testing/TEST_MAP.md](testing/TEST_MAP.md) – Quality gates and coverage expectations
 
-**Contributors:**
-1. [CONTRIBUTING.md](../CONTRIBUTING.md) - Setup and workflow
-2. [docs/ui_guidelines.md](ui_guidelines.md) - UI development standards
-3. [docs/typing-standards.md](typing-standards.md) - Type system conventions
-4. [docs/testing/TEST_MAP.md](testing/TEST_MAP.md) - Testing strategy
+**AI Agents & Research Assistants**
+1. [QUICK_START_FOR_AGENTS.md](../QUICK_START_FOR_AGENTS.md) – Mission briefing and onboarding checklist
+2. [AGENT_HANDOFF_COMPLETE.md](../AGENT_HANDOFF_COMPLETE.md) – Canonical artifact bundle
+3. [docs/AGENT_AND_PROMPTING_GUIDE.md](AGENT_AND_PROMPTING_GUIDE.md) – Guardrails and reasoning frameworks
 
-**API Developers:**
-1. [docs/API.md](API.md) - API reference
-2. [docs/authentication.md](authentication.md) - Auth setup
-3. [docs/BLUEPRINT.md](BLUEPRINT.md) - System architecture
+**Product & Program Leads**
+1. [docs/ROADMAP.md](ROADMAP.md) – Milestones aligned to the Cognitive Scholar phases
+2. [docs/status/FEATURE_INDEX.md](status/FEATURE_INDEX.md) – Review cadence for feature documentation
+3. [docs/tasks/README.md](tasks/README.md) – Planning stubs and follow-up ledgers
 
-**DevOps:**
-1. [DEPLOYMENT.md](../DEPLOYMENT.md) - Deployment guide
-2. [docs/SERVICE_MANAGEMENT.md](SERVICE_MANAGEMENT.md) - Service orchestration
-3. [SECURITY.md](../SECURITY.md) - Security policy
+**Platform & API Engineers**
+1. [docs/API.md](API.md) – Endpoint reference and SDK notes
+2. [docs/CLI.md](CLI.md) – Automation entry points
+3. [docs/architecture.md](architecture.md) & [docs/adr/](adr/) – Dependency rules and decisions
+
+**Operations & Reliability**
+1. [docs/SERVICE_MANAGEMENT.md](SERVICE_MANAGEMENT.md) – Service orchestration
+2. [docs/runbooks/](runbooks/) – Incident and escalation playbooks
+3. [docs/dashboards/](dashboards/) – Observability and quality dashboards
 
 ## Documentation Structure
 
 ```
 Theoria/
-├── README.md                   # Entry point
-├── CONTRIBUTING.md             # Developer guide
-├── SECURITY.md                 # Security policy
-├── DEPLOYMENT.md               # Deployment guide
-├── START_HERE.md               # Quick start
-├── THREATMODEL.md              # Threat model
-├── DOCUMENTATION_CLEANUP_SUMMARY.md  # Cleanup report
+├── README.md                       # Product overview
+├── START_HERE.md                   # Launcher & troubleshooting
+├── QUICK_START_FOR_AGENTS.md       # Agent onboarding packet
+├── AGENT_HANDOFF_COMPLETE.md       # Handoff artifact manifest
+├── HANDOFF_NEXT_PHASE.md           # Cognitive Scholar roadmap
+├── NEXT_STEPS.md                   # Active follow-up queue
+├── CONTRIBUTING.md                 # Developer workflow
+├── SECURITY.md / THREATMODEL.md    # Security posture
+├── DEPLOYMENT.md                   # Deployment guide
 │
 └── docs/
-    ├── INDEX.md                # Master index (START HERE)
-    ├── DOCUMENTATION_GUIDE.md  # This file
-    ├── CASE_BUILDER.md         # Case Builder spec
-    │
-    ├── [Feature Docs]
-    │   ├── DISCOVERY_FEATURE.md
-    │   ├── DISCOVERY_QUICK_START.md
-    │   └── FUTURE_FEATURES_ROADMAP.md
-    │
-    ├── [API & Development]
-    │   ├── API.md
-    │   ├── CLI.md
-    │   ├── authentication.md
-    │   ├── Chunking.md
-    │   └── ...
-    │
-    ├── [Architecture]
-    │   ├── BLUEPRINT.md
-    │   ├── CODEBASE_REVIEW.md
-    │   ├── AGENT_CONFINEMENT.md
-    │   └── adr/                # Architecture Decision Records
-    │
-    ├── [Operations]
-    │   ├── SERVICE_MANAGEMENT.md
-    │   ├── performance.md
-    │   ├── debugging-guide.md
-    │   └── runbooks/
-    │
-    ├── [Testing]
-    │   ├── testing/TEST_MAP.md
-    │   ├── ui-quality-gates.md
-    │   └── ui_guidelines.md
-    │
-    └── archive/                # Historical docs (not actively maintained)
-        ├── README.md           # Archive policy
-        ├── 2025-10/           # October 2025 sessions
-        ├── fixes/             # Bug fix reports
-        ├── audits/            # Audit snapshots
-        ├── planning/          # Completed plans
-        └── ui-sessions/       # UI refactoring notes
+    ├── INDEX.md                    # Navigation hub (topic-based)
+    ├── DOCUMENTATION_GUIDE.md      # This guide
+    ├── ROADMAP.md                  # Program milestones
+    ├── BLUEPRINT.md                # Architecture blueprint
+    ├── architecture.md             # Dependency guardrails
+    ├── API.md / CLI.md / authentication.md
+    ├── AGENT_AND_PROMPTING_GUIDE.md
+    ├── CASE_BUILDER.md / DISCOVERY_FEATURE.md
+    ├── reviews/                    # Architecture & safety reviews
+    ├── status/                     # Feature index + bug ledgers
+    ├── tasks/                      # Planning docs & checklists
+    ├── runbooks/                   # Operational playbooks
+    ├── dashboards/                 # Observability snapshots
+    ├── testing/                    # Strategies, matrices, suites
+    ├── security/                   # Scan outputs & governance
+    ├── process/                    # Execution logs & retros
+    ├── dev/                        # Environment notes
+    ├── adr/                        # Architecture decision records
+    └── archive/                    # Historical (not maintained)
+        ├── README.md
+        ├── 2025-10/
+        ├── audits/
+        ├── fixes/
+        ├── planning/
+        └── ui-sessions/
 ```
 
 ## Document Types
@@ -92,13 +83,12 @@ Theoria/
 ### Canonical References
 **Status:** Always current and authoritative
 
-- Root-level guides (README, CONTRIBUTING, SECURITY, etc.)
-- docs/API.md, docs/CLI.md, docs/BLUEPRINT.md
-- Feature specifications (DISCOVERY_FEATURE.md, CASE_BUILDER.md)
-- Architecture Decision Records (docs/adr/)
-- Testing strategy (docs/testing/TEST_MAP.md)
+- Root-level guides (README, START_HERE, QUICK_START_FOR_AGENTS, CONTRIBUTING, SECURITY, DEPLOYMENT, THREATMODEL)
+- Core specs under `docs/` (API.md, CLI.md, BLUEPRINT.md, ROADMAP.md, AGENT_AND_PROMPTING_GUIDE.md, architecture.md)
+- Governance directories (`docs/status/`, `docs/security/`, `docs/testing/`)
+- Architecture Decision Records (`docs/adr/`)
 
-**Maintenance:** Update immediately when behavior changes
+**Maintenance:** Update immediately when behavior, process, or guardrail expectations change.
 
 ### Implementation Guides
 **Status:** Living documentation
@@ -107,18 +97,21 @@ Theoria/
 - docs/ui_guidelines.md
 - docs/typing-standards.md
 - docs/debugging-guide.md
+- docs/runbooks/
+- docs/reviews/
 
-**Maintenance:** Update as patterns evolve
+**Maintenance:** Refresh as patterns evolve or after post-incident reviews.
 
 ### Historical Archives
 **Status:** Point-in-time snapshots, not maintained
 
-- docs/archive/2025-10/ - Session summaries
-- docs/archive/fixes/ - Bug reports
-- docs/archive/audits/ - Audit snapshots
-- docs/archive/planning/ - Completed plans
+- docs/archive/2025-10/ – October 2025 session summaries
+- docs/archive/fixes/ – Bug reports and one-off mitigations
+- docs/archive/audits/ – Historical audit snapshots
+- docs/archive/planning/ – Completed plans and agent task logs
+- docs/archive/ui-sessions/ – UI refactoring notes
 
-**Maintenance:** Add new archives, rarely modify existing
+**Maintenance:** Only add new materials or README context; avoid editing existing records.
 
 ## When to Archive
 
@@ -140,11 +133,11 @@ Move documents to `docs/archive/` when they are:
 
 ### Making Changes
 
-1. **Edit canonical docs directly** for behavior changes
-2. **Update the INDEX.md** when adding/removing major docs
-3. **Archive completed session notes** after merging features
-4. **Update branding** consistently (use "Theoria", not "Theo Engine")
-5. **Cross-reference** related documents with links
+1. **Edit canonical docs directly** when behavior or guardrails change.
+2. **Update `docs/INDEX.md` and `docs/status/FEATURE_INDEX.md`** when adding, renaming, or retiring major docs.
+3. **Stage retros and worklogs in `docs/process/`** until the effort ships; archive once closed out.
+4. **Maintain consistent naming** (“Theoria”) and taxonomy tags across directories.
+5. **Cross-reference** related documents so newcomers can pivot between directories quickly.
 
 ### Adding New Documentation
 
@@ -162,7 +155,7 @@ docs/runbooks/issue_name_runbook.md
 docs/testing/test_type_guide.md
 ```
 
-After creating, update `docs/INDEX.md` in the appropriate section.
+After creating, update `docs/INDEX.md` and the relevant directory README (for example `docs/status/README.md`).
 
 ### Archiving Documents
 
@@ -174,7 +167,7 @@ After creating, update `docs/INDEX.md` in the appropriate section.
 # UI refactoring → archive/ui-sessions/
 ```
 
-Add context in the archive directory's README.md.
+Add context in the archive directory's README.md and surface the new link in `docs/INDEX.md` under **Historical context**.
 
 ## Documentation Standards
 
@@ -241,6 +234,7 @@ Brief description...
 |-------|------|
 | **Navigation** | [docs/INDEX.md](INDEX.md) |
 | **Getting Started** | [README.md](../README.md), [START_HERE.md](../START_HERE.md) |
+| **AI Agents** | [QUICK_START_FOR_AGENTS.md](../QUICK_START_FOR_AGENTS.md), [docs/AGENT_AND_PROMPTING_GUIDE.md](AGENT_AND_PROMPTING_GUIDE.md) |
 | **API Reference** | [docs/API.md](API.md) |
 | **Architecture** | [docs/BLUEPRINT.md](BLUEPRINT.md) |
 | **Security** | [SECURITY.md](../SECURITY.md), [THREATMODEL.md](../THREATMODEL.md) |
