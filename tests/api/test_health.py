@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from theo.services.api.app.main import app
 
-from theo.services.api.app.services import health as health_module
+from theo.services.api.app.infra import health as health_module
 
 
 def test_health_service_propagates_degraded_status() -> None:

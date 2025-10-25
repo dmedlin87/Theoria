@@ -14,7 +14,7 @@ We audited the Theo Engine HTTP and GraphQL APIs for security and robustness iss
 ## Findings
 
 ### 1. GraphQL router bypasses authentication
-- **Location:** `theo/services/api/app/services/router_registry.py` registers `graphql_router` without enforcing the shared `require_principal` dependency. See @theo/services/api/app/services/router_registry.py#28-95 and @theo/services/api/app/main.py#291-347.
+- **Location:** `theo/services/api/app/infra/router_registry.py` registers `graphql_router` without enforcing the shared `require_principal` dependency. See @theo/services/api/app/infra/router_registry.py#28-95 and @theo/services/api/app/main.py#291-347.
 - **Impact:** `/graphql` appears publicly accessible, allowing unauthenticated queries into the schema.
 - **Recommendation:** Wrap the router with the security dependency (e.g., include via an authenticated prefix or attach `dependencies=[Depends(require_principal)]`). Add regression tests for unauthenticated access.
 
@@ -39,7 +39,7 @@ We audited the Theo Engine HTTP and GraphQL APIs for security and robustness iss
 - **Recommendation:** Scope metrics to the authenticated user or document why global totals are acceptable.
 
 ### 6. Duplicate export router registration
-- **Location:** `export.router` is included twice, once at `/export` and once via `api_router` (@theo/services/api/app/services/router_registry.py#32-34 and @theo/services/api/app/routes/export.py#50-661).
+- **Location:** `export.router` is included twice, once at `/export` and once via `api_router` (@theo/services/api/app/infra/router_registry.py#32-34 and @theo/services/api/app/routes/export.py#50-661).
 - **Impact:** Confusing surface area; the unprefixed mount may bypass security middleware or documentation expectations.
 - **Recommendation:** Consolidate on a single mount path and verify dependency injection matches security requirements.
 

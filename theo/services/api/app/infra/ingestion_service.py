@@ -1,4 +1,4 @@
-"""Ingestion service encapsulating pipeline orchestration."""
+"""Ingestion adapter encapsulating pipeline orchestration."""
 
 from __future__ import annotations
 

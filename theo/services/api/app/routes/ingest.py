@@ -36,7 +36,7 @@ from theo.application.facades.resilience import (
 from theo.application.security import Principal
 
 from ..adapters.security import require_principal
-from ..services.ingestion_service import IngestionService, get_ingestion_service
+from ..infra.ingestion_service import IngestionService, get_ingestion_service
 from ..utils.imports import LazyImportModule
 
 cli_ingest = LazyImportModule("theo.services.cli.ingest_folder")

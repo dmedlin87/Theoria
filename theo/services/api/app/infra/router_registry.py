@@ -1,4 +1,4 @@
-"""Default router registrations for the Theo Engine API."""
+"""Default router registrations for Theo's API infrastructure layer."""
 
 from __future__ import annotations
 

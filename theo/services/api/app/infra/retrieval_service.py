@@ -1,4 +1,4 @@
-"""Retrieval service orchestrating hybrid search and reranking."""
+"""Retrieval adapter orchestrating hybrid search and reranking."""
 
 from __future__ import annotations
 

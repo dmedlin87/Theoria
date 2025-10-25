@@ -20,7 +20,7 @@ from theo.adapters.persistence.models import Discovery, Document
 from theo.application.facades.database import get_engine
 from theo.services.api.app.main import app
 from theo.services.api.app.adapters.security import require_principal
-from theo.services.api.app.services.ingestion_service import get_ingestion_service
+from theo.services.api.app.infra.ingestion_service import get_ingestion_service
 
 # ---------------------------------------------------------------------------
 # Ensure the real discovery service is used for the duration of these tests.

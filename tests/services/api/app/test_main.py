@@ -190,7 +190,7 @@ def test_register_health_routes_return_service_data(monkeypatch):
             return FakeReport()
 
     monkeypatch.setattr(
-        "theo.services.api.app.services.health.get_health_service",
+        "theo.services.api.app.infra.health.get_health_service",
         lambda: FakeService(),
     )
 

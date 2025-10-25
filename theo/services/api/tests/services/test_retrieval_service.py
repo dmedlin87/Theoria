@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from theo.services.api.app.models.search import HybridSearchRequest, HybridSearchResult
-from theo.services.api.app.services import retrieval_service as retrieval_module
-from theo.services.api.app.services.retrieval_service import (
+from theo.services.api.app.infra import retrieval_service as retrieval_module
+from theo.services.api.app.infra.retrieval_service import (
     RetrievalService,
     _RerankerCache,
 )

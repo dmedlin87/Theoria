@@ -13,7 +13,7 @@ from ..models.search import (
     HybridSearchRequest,
     HybridSearchResponse,
 )
-from ..services.retrieval_service import (
+from ..infra.retrieval_service import (
     RetrievalService,
     get_retrieval_service,
     reset_reranker_cache as _reset_reranker_cache,

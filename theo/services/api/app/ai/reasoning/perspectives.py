@@ -17,11 +17,11 @@ if TYPE_CHECKING:
         HybridSearchRequest,
         HybridSearchResult,
     )
-    from ...services.retrieval_service import RetrievalService
+    from ...infra.retrieval_service import RetrievalService
 
 from ...models.search import HybridSearchFilters, HybridSearchRequest
 from ...retriever.hybrid import hybrid_search
-from ...services.retrieval_service import RetrievalService
+from ...infra.retrieval_service import RetrievalService
 
 
 @dataclass(slots=True)

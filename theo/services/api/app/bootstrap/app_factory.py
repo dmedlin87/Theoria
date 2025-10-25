@@ -14,7 +14,7 @@ from theo.application.facades.settings import Settings, get_settings, get_settin
 from theo.application.facades.telemetry import set_telemetry_provider
 
 from .. import events as _app_events  # noqa: F401  (ensure handlers register)
-from ..services import router_registry as _router_registry  # noqa: F401
+from ..infra import router_registry as _router_registry  # noqa: F401
 from ..error_handlers import install_error_handlers
 from ..adapters.resilience import resilience_policy_factory
 from ..adapters.security import configure_principal_resolver

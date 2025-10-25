@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from theo.application.facades.settings import Settings
-from theo.services.api.app.services.retrieval_service import (
+from theo.services.api.app.infra.retrieval_service import (
     _RerankerCache,
     _format_reranker_header,
     _iter_reranker_references,
@@ -112,7 +112,7 @@ def test_reranker_cache_resets_failure_after_artifact_update(
     # Simulate artifact change by bumping timestamp and disabling failure.
     loader_state["raise"] = False
     monkeypatch.setattr(
-        "theo.services.api.app.services.retrieval_service._RerankerCache._snapshot_artifact",
+        "theo.services.api.app.infra.retrieval_service._RerankerCache._snapshot_artifact",
         staticmethod(lambda path: ("new", 1)),
     )
     cache.failed = True

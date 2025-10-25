@@ -15,7 +15,7 @@ from theo.services.api.app.models.search import HybridSearchResult
 from theo.services.api.app.ranking.features import FEATURE_NAMES, extract_features
 from theo.services.api.app.ranking.re_ranker import Reranker, load_reranker
 from theo.services.api.app.routes import search as search_route
-from theo.services.api.app.services import retrieval_service as retrieval_service_module
+from theo.services.api.app.infra import retrieval_service as retrieval_service_module
 
 
 class _WeightedModel:

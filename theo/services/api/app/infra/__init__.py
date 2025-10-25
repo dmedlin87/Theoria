@@ -1,4 +1,4 @@
-"""Service layer abstractions for the Theo Engine API."""
+"""Infrastructure adapters for the Theo Engine API."""
 
 from .ingestion_service import IngestionService, get_ingestion_service
 from .registry import (

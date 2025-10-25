@@ -1,4 +1,4 @@
-"""Router registration utilities for the Theo Engine API."""
+"""Router registration utilities for Theo's API infrastructure adapters."""
 
 from __future__ import annotations
 

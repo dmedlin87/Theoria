@@ -15,7 +15,7 @@ from ....models.ai import (
     PerspectiveSynthesisResponse,
     PerspectiveViewModel,
 )
-from ....services.retrieval_service import (
+from ....infra.retrieval_service import (
     RetrievalService,
     get_retrieval_service,
 )
