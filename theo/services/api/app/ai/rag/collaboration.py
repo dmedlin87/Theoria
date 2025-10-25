@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING, Sequence
 from sqlalchemy.orm import Session
 
 from ...models.search import HybridSearchFilters
-from ...telemetry import instrument_workflow, log_workflow_event, set_span_attribute
+from theo.application.facades.telemetry import (
+    instrument_workflow,
+    log_workflow_event,
+    set_span_attribute,
+)
 from ..registry import get_llm_registry
 from .models import CollaborationResponse
 from .retrieval import record_used_citation_feedback, search_passages

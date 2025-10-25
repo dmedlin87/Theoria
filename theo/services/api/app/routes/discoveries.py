@@ -17,7 +17,9 @@ from ..models.discoveries import (
     DiscoveryResponse,
     DiscoveryStats,
 )
-from ..security import Principal, require_principal
+from theo.application.security import Principal
+
+from ..adapters.security import require_principal
 
 router = APIRouter()
 

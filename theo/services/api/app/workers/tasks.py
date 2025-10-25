@@ -59,7 +59,8 @@ from ..models.ai import ChatMemoryEntry
 from ..models.export import DeliverableDownload
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.hybrid import hybrid_search
-from ..telemetry import CITATION_DRIFT_EVENTS, log_workflow_event
+from theo.application.facades.telemetry import log_workflow_event, record_counter
+from theo.application.telemetry import CITATION_DRIFT_EVENTS_METRIC
 
 APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
 settings = _ADAPTER_REGISTRY.resolve("settings")
@@ -256,13 +257,19 @@ def validate_citations(
                     question = (entry.question or "").strip()
                     if not question:
                         metrics["skipped"] += 1
-                        CITATION_DRIFT_EVENTS.labels(status="skipped").inc()
+                        record_counter(
+                            CITATION_DRIFT_EVENTS_METRIC,
+                            labels={"status": "skipped"},
+                        )
                         continue
 
                     cached_citations = _normalise_cached_citations(entry.citations)
                     if not cached_citations:
                         metrics["skipped"] += 1
-                        CITATION_DRIFT_EVENTS.labels(status="skipped").inc()
+                        record_counter(
+                            CITATION_DRIFT_EVENTS_METRIC,
+                            labels={"status": "skipped"},
+                        )
                         continue
 
                     metrics["entries"] += 1
@@ -290,7 +297,10 @@ def validate_citations(
                             }
                         )
                         metrics["failed"] += 1
-                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
+                        record_counter(
+                            CITATION_DRIFT_EVENTS_METRIC,
+                            labels={"status": "failed"},
+                        )
                         continue
 
                     expected_citations = build_citations(results)
@@ -308,7 +318,10 @@ def validate_citations(
                             }
                         )
                         metrics["failed"] += 1
-                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
+                        record_counter(
+                            CITATION_DRIFT_EVENTS_METRIC,
+                            labels={"status": "failed"},
+                        )
                         continue
 
                     completion = _compose_cached_completion(entry, cached_citations)
@@ -343,11 +356,17 @@ def validate_citations(
                             }
                         )
                         metrics["failed"] += 1
-                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
+                        record_counter(
+                            CITATION_DRIFT_EVENTS_METRIC,
+                            labels={"status": "failed"},
+                        )
                         continue
 
                     metrics["passed"] += 1
-                    CITATION_DRIFT_EVENTS.labels(status="passed").inc()
+                    record_counter(
+                        CITATION_DRIFT_EVENTS_METRIC,
+                        labels={"status": "passed"},
+                    )
                     log_workflow_event(
                         "workflow.citation_drift",
                         workflow="citation_validation",

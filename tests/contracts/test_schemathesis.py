@@ -91,7 +91,7 @@ from theo.application.facades.database import (  # noqa: E402
     get_session,
 )
 from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.security import require_principal  # noqa: E402
+from theo.services.api.app.adapters.security import require_principal  # noqa: E402
 
 CONFIG_PATH = PROJECT_ROOT / "contracts" / "schemathesis.toml"
 with CONFIG_PATH.open("rb") as config_file:

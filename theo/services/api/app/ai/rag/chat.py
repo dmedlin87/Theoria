@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from theo.application.ports.ai_registry import GenerationError
 from ...models.search import HybridSearchFilters, HybridSearchResult
-from ...telemetry import instrument_workflow, set_span_attribute
+from theo.application.facades.telemetry import instrument_workflow, set_span_attribute
 from ..registry import LLMModel, LLMRegistry, get_llm_registry
 from ..router import get_router
 from ..trails import TrailStepDigest

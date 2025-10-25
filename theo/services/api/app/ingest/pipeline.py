@@ -15,8 +15,8 @@ from theo.application.facades.settings import Settings, get_settings
 from theo.application.graph import GraphProjector, NullGraphProjector
 from theo.services.api.app.persistence_models import Document, TranscriptSegment
 
-from ..resilience import ResilienceError, ResiliencePolicy, resilient_operation
-from ..telemetry import instrument_workflow, set_span_attribute
+from theo.application.facades.resilience import ResilienceError, ResilienceSettings, resilient_operation
+from theo.application.facades.telemetry import instrument_workflow, set_span_attribute
 from . import network as ingest_network
 from .embeddings import get_embedding_service
 from .exceptions import UnsupportedSourceError
@@ -300,7 +300,7 @@ def run_pipeline_for_file(
                 path.read_bytes,
                 key=f"ingest:file:read:{path.suffix or 'bin'}",
                 classification="file",
-                policy=ResiliencePolicy(max_attempts=2),
+                settings=ResilienceSettings(max_attempts=2),
             )
         except ResilienceError as exc:
             set_span_attribute(span, "resilience.file_read.category", exc.metadata.category)

@@ -18,7 +18,7 @@ from starlette.responses import Response
 from ..debug import ErrorReportingMiddleware
 from ..errors import TheoError
 from ..ingest.exceptions import UnsupportedSourceError
-from ..security import require_principal
+from ..adapters.security import require_principal
 from ..tracing import TRACE_ID_HEADER_NAME, get_current_trace_headers
 
 __all__ = [

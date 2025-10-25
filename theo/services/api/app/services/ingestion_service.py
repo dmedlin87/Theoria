@@ -30,7 +30,7 @@ from ..ingest.pipeline import (
     run_pipeline_for_url,
 )
 from ..models.documents import SimpleIngestRequest
-from ..telemetry import log_workflow_event
+from theo.application.facades.telemetry import log_workflow_event
 from ..utils.imports import LazyImportModule
 
 cli_ingest = LazyImportModule("theo.services.cli.ingest_folder")
