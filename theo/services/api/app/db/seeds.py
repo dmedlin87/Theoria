@@ -833,10 +833,11 @@ def seed_contradiction_claims(session: Session) -> None:
                 try:
                     record = target_session.get(ContradictionSeed, identifier)
                 except OperationalError as exc:
-                    if _handle_missing_perspective_error(
+                    handled = _handle_missing_perspective_error(
                         target_session, "contradiction", exc
-                    ):
-                        return
+                    )
+                    if not handled:
+                        raise
                     raise
                 tags = _coerce_list(entry.get("tags"))
                 weight = float(entry.get("weight", 1.0))
