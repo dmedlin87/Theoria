@@ -25,14 +25,17 @@ from theo.application.reasoner.events import DocumentPersistedEvent
 from theo.services.api.app.persistence_models import Document, Passage
 from theo.services.bootstrap import resolve_application
 
-from ..ai import rag
-from ..ai.rag import (
-    GuardrailError,
-    RAGCitation,
+from ..ai.rag.deliverables import generate_sermon_prep_outline
+from ..ai.rag.exports import (
     build_sermon_deliverable,
     build_transcript_deliverable,
-    generate_sermon_prep_outline,
 )
+from ..ai.rag.guardrail_helpers import (
+    GuardrailError,
+    build_citations,
+    validate_model_completion,
+)
+from ..ai.rag.models import RAGCitation
 from ..analytics.openalex_enrichment import enrich_document_openalex_details
 from ..analytics.topic_map import TopicMapBuilder
 from ..analytics.topics import (
@@ -290,7 +293,7 @@ def validate_citations(
                         CITATION_DRIFT_EVENTS.labels(status="failed").inc()
                         continue
 
-                    expected_citations = rag.build_citations(results)
+                    expected_citations = build_citations(results)
                     if not expected_citations:
                         logger.warning(
                             "Citation validation missing retrieval citations",
@@ -311,7 +314,7 @@ def validate_citations(
                     completion = _compose_cached_completion(entry, cached_citations)
 
                     try:
-                        rag.validate_model_completion(completion, expected_citations)
+                        validate_model_completion(completion, expected_citations)
                     except GuardrailError as exc:
                         error_message = str(exc)
                         logger.warning(

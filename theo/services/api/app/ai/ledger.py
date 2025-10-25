@@ -776,6 +776,18 @@ class SharedLedger:
                     or row.completed_at >= comparison_floor
                 )
             ):
+                if row.status == "error":
+                    message = (row.error or "").strip().lower()
+                    if "completed without a result" in message:
+                        last_error_message = row.error or "Deduplicated generation failed"
+                        _record_event(
+                            "transient_error",
+                            cache_key,
+                            status=row.status,
+                            error=row.error,
+                        )
+                        time.sleep(poll_interval)
+                        continue
                 if row.status == "success":
                     last_error_message = None
                 _record_event(
@@ -956,6 +968,16 @@ class SharedLedger:
                     )
                     success_missing_output_since = None
                     return preserved_record
+                message = (row.error or "").strip().lower()
+                if "completed without a result" in message:
+                    _record_event(
+                        "transient_error",
+                        cache_key,
+                        status=row.status,
+                        error=row.error,
+                    )
+                    time.sleep(poll_interval)
+                    continue
                 _record_event(
                     "error_raised",
                     cache_key,
