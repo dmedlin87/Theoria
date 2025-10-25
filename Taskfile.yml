@@ -27,6 +27,16 @@ tasks:
       - task: architecture:test
       - task: architecture:imports
 
+  test:fast:
+    desc: Run the fast pytest suite without contract, GPU, or pgvector tests
+    cmds:
+      - pytest -m "not (slow or gpu or contract)"
+
+  test:full:
+    desc: Run the full pytest suite including pgvector and contract suites
+    cmds:
+      - pytest --schema --pgvector --contract
+
   deps:lock:
     desc: Regenerate pip-compile lockfiles for all extras
     cmds:

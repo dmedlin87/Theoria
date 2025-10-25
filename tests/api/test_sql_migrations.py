@@ -28,7 +28,7 @@ from theo.services.api.app.db.run_sql_migrations import (
 from theo.services.api.app.db.seeds import seed_contradiction_claims
 
 
-@pytest.mark.enable_migrations
+@pytest.mark.schema
 @pytest.mark.usefixtures("_bypass_authentication")
 def test_sql_migrations_run_on_startup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     db_path = tmp_path / "app.db"
@@ -193,7 +193,7 @@ def test_sqlite_reapplies_missing_perspective_migration(tmp_path: Path) -> None:
             residual.unlink(missing_ok=True)
 
 
-@pytest.mark.enable_migrations
+@pytest.mark.schema
 def test_sqlite_startup_without_migrations_creates_contradiction_table(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -136,7 +136,7 @@ def client(
     yield module_api_test_client
 
 
-@pytest.mark.enable_migrations
+@pytest.mark.schema
 def test_api_startup_recovers_missing_perspective_column(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -238,7 +238,7 @@ def test_api_startup_recovers_missing_perspective_column(
         database_module._SessionLocal = previous_session_factory
 
 
-@pytest.mark.enable_migrations
+@pytest.mark.schema
 def test_api_startup_handles_operational_error_from_missing_columns(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -443,7 +443,7 @@ def test_build_csl_entry_uses_expected_type(source_type: str, expected: str) -> 
     assert entry["type"] == expected
 
 
-@pytest.mark.enable_migrations
+@pytest.mark.schema
 def test_sqlite_migration_backfills_contradiction_perspective(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

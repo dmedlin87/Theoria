@@ -11,6 +11,8 @@ from uuid import uuid4
 import tomllib
 
 import pytest
+
+pytestmark = pytest.mark.contract
 import schemathesis
 from schemathesis import openapi as schemathesis_openapi
 
