@@ -1,19 +1,22 @@
 # Theoria
 
 <p align="center">
-  <em>Deterministic research engine for theology.</em>
+  <em>Your theological research, unified and verse-anchored.</em>
 </p>
 
-Index your sources, normalize Scripture references, and retrieve verse-anchored evidence with AI assistance you can trust. Theoria keeps citations primary and models secondary so that every automated summary, paraphrase, or comparison is traceable back to the canon text that informed it.
+Stop losing citations in scattered notes and unreliable AI summaries. Theoria transforms your research library into a searchable, verse-aware knowledge graph where every automated insight traces back to canonical text. Index your sources, normalize Scripture references, and retrieve evidence with AI assistance you can trust.
 
 ## Table of Contents
 1. [Why Theoria](#why-theoria)
 2. [Core Capabilities](#core-capabilities)
-3. [System Overview](#system-overview)
-4. [Quick Start](#quick-start)
-5. [Local Development](#local-development)
-6. [Documentation Map](#documentation-map)
-7. [Support & Contribution](#support--contribution)
+3. [System Requirements](#system-requirements)
+4. [Real-World Workflows](#real-world-workflows)
+5. [Quick Start](#quick-start)
+6. [Architecture Overview](#architecture-overview)
+7. [Local Development](#local-development)
+8. [Common Issues](#common-issues)
+9. [Documentation Map](#documentation-map)
+10. [Support & Contribution](#support--contribution)
 
 ---
 
@@ -45,7 +48,100 @@ Additional feature deep-dives live in [`docs/archive/`](docs/archive/). The publ
 
 ---
 
-## System Overview
+## System Requirements
+
+| Resource | Minimum | Recommended | Notes |
+| --- | --- | --- | --- |
+| RAM | 8 GB | 16 GB | ML-powered enrichment and embedding jobs benefit from additional memory. |
+| Storage | 2 GB | Depends on corpus | Allocate extra space for audio/video ingestion pipelines and cached embeddings. |
+| CPU | 4 cores | 8+ cores | Parallel ingestion and evaluation suites scale with available cores. |
+| OS | macOS, Linux, Windows (WSL2) |  | Verified on macOS Sonoma, Ubuntu 22.04, and Windows 11 with WSL2. |
+
+GPU acceleration is optional. When available, configure the ML extras (see [`docs/ML_SETUP.md`](docs/ML_SETUP.md)) for accelerated embedding generation.
+
+---
+
+## Real-World Workflows
+
+- 📖 **Sermon Preparation**: Search “faith works James” to surface James 2:14–26 plus relevant excerpts from your personal library.
+- 🔍 **Comparative Studies**: Query “trinity early church” to retrieve patristic sources with normalized verse cross references.
+- ✍️ **Academic Writing**: Export structured citations suitable for papers and dissertations straight from the evidence panel.
+- 🧭 **Research Synthesis**: Combine deterministic retrieval with curated LLM prompts while preserving traceability to canonical text.
+
+---
+
+## Quick Start
+
+> **Prerequisites:** Python 3.11+, Node.js 20+, and a running PostgreSQL instance (local or remote). The CLI scripts will provision a development database automatically when none is specified. Installing [go-task](https://taskfile.dev/) is encouraged but not required—raw shell equivalents are noted for every critical step.
+
+### Phase 1: Environment Setup
+
+1. **Clone & prepare environment**
+   ```bash
+   git clone https://github.com/dmedlin87/theoria.git
+   cd theoria
+   python -m venv .venv && source .venv/bin/activate
+   pip install ".[api]" -c constraints/api.txt
+   pip install ".[ml]" -c constraints/ml.txt
+   pip install ".[dev]" -c constraints/dev.txt
+   ```
+
+2. **Provision frontend tooling**
+   ```bash
+   cd theo/services/web
+   npm install
+   cd -
+   ```
+
+3. **Configure authentication** (choose one)
+   ```bash
+   # API key-based auth (recommended)
+   export THEO_API_KEYS='["local-dev-key"]'
+
+   # or temporarily allow unauthenticated requests (development only)
+   export THEO_AUTH_ALLOW_ANONYMOUS=1
+   ```
+   Additional authentication strategies (OIDC, session-based, API tokens) are documented in [`docs/authentication.md`](docs/authentication.md).
+
+### Phase 2: Launch Services
+
+4. **Launch background services**
+   ```bash
+   task db:start  # optional helper; defaults to local dockerized postgres
+   ```
+   The repository uses [go-task](https://taskfile.dev/) for orchestration. If you prefer raw commands or do not have `task` installed, set `DATABASE_URL` and start PostgreSQL manually—for example:
+   ```bash
+   docker run --rm --name theoria-db -e POSTGRES_PASSWORD=theoria -e POSTGRES_USER=theoria -e POSTGRES_DB=theoria \
+     -p 5432:5432 postgres:16
+   export DATABASE_URL="postgresql://theoria:theoria@127.0.0.1:5432/theoria"
+   ```
+
+5. **Launch API**
+   ```bash
+   uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+   ```
+   Visit the interactive docs at <http://localhost:8000/docs>.
+
+6. **Launch Web UI**
+   ```bash
+   cd theo/services/web
+   export NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8000"
+   export THEO_SEARCH_API_KEY="Bearer local-dev-key"  # remove "Bearer" to send via X-API-Key header
+   npm run dev
+   ```
+   Open <http://localhost:3000> and press ⌘K/CTRL+K to explore the command palette.
+
+### Phase 3: Explore (Optional)
+
+7. **Seed demo content**
+   ```bash
+   ./scripts/reset_reseed_smoke.py --log-level INFO
+   ```
+   The command loads a small corpus of sample sermons, research snippets, and evaluation datasets for experimentation.
+
+---
+
+## Architecture Overview
 
 ```
 ┌──────────────┐      ┌───────────────────────┐      ┌────────────────┐
@@ -63,63 +159,7 @@ Additional feature deep-dives live in [`docs/archive/`](docs/archive/). The publ
 - **Automation Scripts**: `scripts/` (dev orchestration, reseeding, evaluation).
 - **Quality Gates**: `tests/` (unit, integration, ranking, MCP, UI smoke suites).
 
-For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and the ADR directory under [`docs/adr/`](docs/adr/). The [Architecture Overview](README_ARCHITECTURE_UPDATES.md) file captures ongoing platform investments at a glance.
-
----
-
-## Quick Start
-
-> **Prerequisites:** Python 3.11+, Node.js 20+, and a running PostgreSQL instance (local or remote). The CLI scripts will provision a development database automatically when none is specified.
-
-1. **Clone & prepare environment**
-   ```bash
-   git clone https://github.com/.../theoria.git
-   cd theoria
-   python -m venv .venv && source .venv/bin/activate
-   pip install ".[api]" -c constraints/api.txt
-   pip install ".[ml]" -c constraints/ml.txt
-   pip install ".[dev]" -c constraints/dev.txt
-   ```
-
-2. **Provision frontend tooling**
-   ```bash
-   cd theo/services/web
-   npm install
-   cd -
-   ```
-
-3. **Configure authentication** (choose one)
-   ```bash
-   export THEO_API_KEYS='["local-dev-key"]'
-   # or
-   export THEO_AUTH_ALLOW_ANONYMOUS=1  # development only
-   ```
-
-4. **Launch background services**
-   ```bash
-   task db:start  # optional helper; defaults to local dockerized postgres
-   ```
-
-5. **Launch API**
-   ```bash
-   uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
-   ```
-   Visit the interactive docs at <http://localhost:8000/docs>.
-
-6. **Launch Web UI**
-   ```bash
-   cd theo/services/web
-   export NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8000"
-   export THEO_SEARCH_API_KEY="Bearer local-dev-key"  # remove "Bearer" to send via X-API-Key
-   npm run dev
-   ```
-   Open <http://localhost:3000> and press ⌘K/CTRL+K to explore the command palette.
-
-7. **Seed demo content (optional)**
-   ```bash
-   ./scripts/reset_reseed_smoke.py --log-level INFO
-   ```
-   The command loads a small corpus of sample sermons, research snippets, and evaluation datasets for experimentation.
+For detailed architecture patterns, see the [System Blueprint](docs/BLUEPRINT.md) covering service boundaries, data flow, and scaling considerations. The [Architecture Overview](README_ARCHITECTURE_UPDATES.md) file captures ongoing platform investments at a glance, and additional ADRs live under [`docs/adr/`](docs/adr/).
 
 ---
 
@@ -130,6 +170,8 @@ For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and
 - **Bash**: `./scripts/run.sh`
 
 Both scripts boot the API and Next.js app, wiring ports and environment variables automatically. Pass `-IncludeMcp` or `-McpPort` to enable the MCP server alongside the stack.
+
+Install the orchestration tooling with `brew install go-task/tap/go-task`, `scoop install task`, or download binaries from the [go-task releases](https://github.com/go-task/task/releases). All commands listed in this README include raw equivalents when Task is optional.
 
 ### Dependency management
 - Python extras live in `pyproject.toml` (`base`, `api`, `ml`, `dev`) with corresponding lockfiles under `constraints/`.
@@ -159,6 +201,19 @@ docker compose up --build -d
 - MCP: `docker compose up mcp`
 
 Stop with `docker compose down`.
+
+### Deployment options
+
+For staging and production scenarios—including container images, Fly.io, and bare-metal strategies—consult [`DEPLOYMENT.md`](DEPLOYMENT.md) and the infrastructure manifests under [`infra/`](infra/). Observability, scaling, and backup recommendations live in [`docs/operations/OPERATIONS_GUIDE.md`](docs/operations/OPERATIONS_GUIDE.md).
+
+---
+
+## Common Issues
+
+- **PostgreSQL connection errors**: Ensure port 5432 is available or override `DATABASE_URL` to target your preferred instance.
+- **Node.js version conflicts**: Verify `node --version` returns 20.x or higher; use `nvm use` from `theo/services/web/.nvmrc` if installed.
+- **Missing Task runner**: Either install go-task (see above) or run the equivalent shell commands provided alongside each task.
+- **ML model downloads failing**: Confirm internet access and disk space, then rerun `pip install .[ml] -c constraints/ml.txt` or use the offline cache instructions in [`docs/ML_SETUP.md`](docs/ML_SETUP.md).
 
 ---
 
