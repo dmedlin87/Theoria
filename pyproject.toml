@@ -133,6 +133,8 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--timeout=60",
+    "--durations=50",
+    "--durations-min=0.05",
 ]
 testpaths = ["tests"]
 norecursedirs = [
