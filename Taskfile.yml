@@ -55,3 +55,23 @@ tasks:
       - pip-compile --resolver=backtracking --extra api --output-file constraints/api.txt pyproject.toml
       - pip-compile --resolver=backtracking --extra ml --output-file constraints/ml.txt pyproject.toml
       - pip-compile --resolver=backtracking --extra dev --output-file constraints/dev.txt pyproject.toml
+
+  docs:migrate:
+    desc: Backup docs and move files into the new taxonomy
+    cmds:
+      - python scripts/docs/migrate_docs.py
+
+  docs:agent-context:
+    desc: Rebuild AGENT_CONTEXT.md and QUICK_START_AGENTS.md bundles
+    cmds:
+      - python scripts/docs/create_agent_context.py
+
+  docs:validate-links:
+    desc: Validate internal Markdown links resolve to files and anchors
+    cmds:
+      - python scripts/docs/validate_doc_links.py
+
+  docs:find-orphans:
+    desc: Report Markdown files that are outside the taxonomy
+    cmds:
+      - python scripts/docs/find_orphaned_docs.py

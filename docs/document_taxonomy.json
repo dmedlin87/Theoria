@@ -1,0 +1,73 @@
+{
+  "root_documents": [
+    "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "DEPLOYMENT.md",
+    "THREATMODEL.md",
+    "START_HERE.md",
+    "AGENT_HANDOFF_COMPLETE.md",
+    "HANDOFF_SESSION_2025_10_15.md",
+    "HANDOFF_MYPY_FIXES_2025_10_17.md",
+    "HANDOFF_NEXT_PHASE.md",
+    "IMPLEMENTATION_CONTEXT.md",
+    "QUICK_START_FOR_AGENTS.md",
+    "DOCUMENTATION_CLEANUP_SUMMARY.md"
+  ],
+  "collections": {
+    "agents": [
+      "docs/agents"
+    ],
+    "architecture": [
+      "docs/architecture",
+      "docs/adr"
+    ],
+    "features": [
+      "docs/features"
+    ],
+    "guides": [
+      "docs/guides",
+      "docs/reference"
+    ],
+    "operations": [
+      "docs/operations",
+      "docs/runbooks",
+      "docs/status"
+    ],
+    "platform": [
+      "docs/platform",
+      "docs/dev"
+    ],
+    "security": [
+      "docs/security"
+    ],
+    "testing": [
+      "docs/testing"
+    ],
+    "data": [
+      "docs/dashboards",
+      "docs/keys"
+    ],
+    "reviews": [
+      "docs/reviews"
+    ],
+    "tasks": [
+      "docs/tasks"
+    ],
+    "process": [
+      "docs/process"
+    ],
+    "migrations": [
+      "docs/migrations"
+    ],
+    "archive": [
+      "docs/archive"
+    ]
+  },
+  "ignored_globs": [
+    "docs/archive/**"
+  ],
+  "expected_directories": [
+    "docs/assets"
+  ]
+}
