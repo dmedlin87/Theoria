@@ -84,9 +84,43 @@ def _normalise_section(title: str, content: str) -> str:
     if not lines:
         return f"## {title}\n\n_(empty source)_"
 
+    def _fence_marker(text: str) -> str:
+        if text.startswith("```") or text.startswith("~~~"):
+            marker_char = text[0]
+            marker_len = 0
+            for char in text:
+                if char == marker_char:
+                    marker_len += 1
+                else:
+                    break
+            return marker_char * marker_len
+        return ""
+
     adjusted: list[str] = []
+    in_code_fence = False
+    fence_char = ""
+    fence_len = 0
+
     for line in lines:
         stripped = line.lstrip()
+
+        marker = _fence_marker(stripped)
+        if marker:
+            if not in_code_fence:
+                in_code_fence = True
+                fence_char = marker[0]
+                fence_len = len(marker)
+            elif marker[0] == fence_char and len(marker) >= fence_len:
+                in_code_fence = False
+                fence_char = ""
+                fence_len = 0
+            adjusted.append(line)
+            continue
+
+        if in_code_fence:
+            adjusted.append(line)
+            continue
+
         if stripped.startswith("#") and not line.startswith("    ") and not line.startswith("\t"):
             # Promote headings to at least H2 to avoid multiple H1 entries.
             level = len(stripped) - len(stripped.lstrip("#"))
