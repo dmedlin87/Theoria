@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.dtos import ChatSessionDTO
+from theo.application.observability import trace_repository_call
 from theo.application.repositories import ChatSessionRepository
 
 from .mappers import chat_session_to_dto
@@ -21,13 +22,20 @@ class SQLAlchemyChatSessionRepository(ChatSessionRepository):
     def list_recent(self, limit: int) -> list[ChatSessionDTO]:
         if limit < 1:
             raise ValueError("limit must be a positive integer")
-        stmt = (
-            select(ChatSession)
-            .order_by(ChatSession.updated_at.desc())
-            .limit(limit)
-        )
-        results = self.session.scalars(stmt).all()
-        return [chat_session_to_dto(model) for model in results]
+
+        with trace_repository_call(
+            "chat_session",
+            "list_recent",
+            attributes={"limit": limit},
+        ) as trace:
+            stmt = (
+                select(ChatSession)
+                .order_by(ChatSession.updated_at.desc())
+                .limit(limit)
+            )
+            results = self.session.scalars(stmt).all()
+            trace.record_result_count(len(results))
+            return [chat_session_to_dto(model) for model in results]
 
 
 __all__ = ["SQLAlchemyChatSessionRepository"]

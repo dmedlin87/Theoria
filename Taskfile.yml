@@ -21,6 +21,12 @@ tasks:
     cmds:
       - lint-imports --config importlinter.ini
 
+  architecture:graph:
+    desc: Generate dependency graph artefacts for theo
+    cmds:
+      - mkdir -p dashboard/dependency-graph
+      - python scripts/perf/generate_dependency_graph.py
+
   architecture:check:
     desc: Run all architecture boundary checks
     cmds:
