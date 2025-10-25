@@ -59,11 +59,39 @@ from ..models.ai import ChatMemoryEntry
 from ..models.export import DeliverableDownload
 from ..models.search import HybridSearchFilters, HybridSearchRequest
 from ..retriever.hybrid import hybrid_search
-from theo.application.facades.telemetry import log_workflow_event, record_counter
+from theo.application.facades.resilience import create_policy, set_resilience_policy_factory
+from theo.application.facades.telemetry import (
+    get_telemetry_provider,
+    log_workflow_event,
+    record_counter,
+    set_telemetry_provider,
+)
 from theo.application.telemetry import CITATION_DRIFT_EVENTS_METRIC
+from ..adapters.resilience import resilience_policy_factory
+from ..adapters.telemetry import ApiTelemetryProvider
 
 APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
 settings = _ADAPTER_REGISTRY.resolve("settings")
+
+
+def _ensure_worker_bootstrap() -> None:
+    try:
+        get_telemetry_provider()
+    except RuntimeError:
+        set_telemetry_provider(ApiTelemetryProvider())
+
+    try:
+        create_policy()
+    except RuntimeError:
+        set_resilience_policy_factory(resilience_policy_factory)
+
+
+class TheoTask(CeleryTask):
+    abstract = True
+
+    def __call__(self, *args: Any, **kwargs: Any):
+        _ensure_worker_bootstrap()
+        return super().__call__(*args, **kwargs)
 
 
 def get_engine():  # pragma: no cover - transitional wiring helper
@@ -76,6 +104,8 @@ celery = Celery(
     broker=settings.redis_url,
     backend=settings.redis_url,
 )
+
+celery.Task = TheoTask  # type: ignore[assignment]
 
 celery.conf.beat_schedule = getattr(celery.conf, "beat_schedule", {}) or {}
 celery.conf.beat_schedule.setdefault(
