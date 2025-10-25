@@ -23,7 +23,7 @@ from theo.application.facades.database import (  # noqa: E402
 )
 from theo.adapters.persistence.models import UserWatchlist  # noqa: E402
 from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.security import require_principal  # noqa: E402
+from theo.services.api.app.adapters.security import require_principal  # noqa: E402
 
 
 @pytest.fixture()

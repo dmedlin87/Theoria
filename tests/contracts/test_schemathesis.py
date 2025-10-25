@@ -91,7 +91,7 @@ from theo.application.facades.database import (  # noqa: E402
     get_session,
 )
 from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.security import require_principal  # noqa: E402
+from theo.services.api.app.adapters.security import require_principal  # noqa: E402
 
 CONFIG_PATH = PROJECT_ROOT / "contracts" / "schemathesis.toml"
 with CONFIG_PATH.open("rb") as config_file:
@@ -249,11 +249,11 @@ def _optimise_lifespan():
         _noop_migrations,
     )
     patcher.setattr(
-        "theo.services.api.app.main.run_sql_migrations",
+        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
         _noop_migrations,
     )
     patcher.setattr(
-        "theo.services.api.app.main.seed_reference_data",
+        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
         _noop_seed,
     )
     patcher.setattr(

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from theo.application.facades.settings import get_settings
 from theo.services.api.app.persistence_models import Document, Passage
 
-from ..telemetry import instrument_workflow, set_span_attribute
+from theo.application.facades.telemetry import instrument_workflow, set_span_attribute
 from .chunking import Chunk, chunk_text
 from .embeddings import get_embedding_service, lexical_representation
 from .osis import detect_osis_references

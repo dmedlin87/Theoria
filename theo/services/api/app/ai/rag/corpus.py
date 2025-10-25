@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 
 from theo.services.api.app.persistence_models import Document
 
-from ...telemetry import instrument_workflow, log_workflow_event, set_span_attribute
+from theo.application.facades.telemetry import (
+    instrument_workflow,
+    log_workflow_event,
+    set_span_attribute,
+)
 from .models import CorpusCurationReport
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only

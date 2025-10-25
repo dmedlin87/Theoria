@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from theo.application.facades import settings as settings_module
-from theo.services.api.app.security import require_principal
+from theo.services.api.app.adapters.security import require_principal
 
 
 @pytest.fixture(autouse=True)
