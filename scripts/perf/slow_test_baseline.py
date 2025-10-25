@@ -16,8 +16,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
+# Only collect call entries so fixture setup/teardown durations are ignored.
 DURATIONS_REGEX = re.compile(
-    r"^\s*([0-9]*\.?[0-9]+)s\s+(call|setup|teardown)\s+(?P<nodeid>\S+)"
+    r"^\s*([0-9]*\.?[0-9]+)s\s+call\s+(?P<nodeid>\S+)"
 )
 
 
