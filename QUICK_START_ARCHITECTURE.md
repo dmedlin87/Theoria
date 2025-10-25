@@ -183,8 +183,8 @@ v1.include_router(router, prefix="/my-feature", tags=["my-feature"])
 
 | Document | Purpose |
 |----------|---------|
-| `docs/ARCHITECTURE_IMPROVEMENTS.md` | Full implementation guide |
-| `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md` | Before/after code examples |
+| `docs/architecture/improvements.md` | Full implementation guide |
+| `docs/architecture/migration-example.md` | Before/after code examples |
 | `examples/architecture_migration_step_by_step.py` | Step-by-step migration |
 | `ARCHITECTURE_REVIEW_IMPLEMENTATION_SUMMARY.md` | Executive summary |
 

@@ -127,7 +127,7 @@ The test `tests/db/test_seeds.py::test_seeders_remove_stale_records` still fails
 1. `tests/conftest.py` - Added migrations to SQLite fixture
 2. `tests/api/conftest.py` - Simplified migration-disabling fixture
 3. `theo/services/api/app/db/run_sql_migrations.py` - Fixed missing regex pattern
-4. `docs/TEST_DATABASE_SCHEMA_ISSUE.md` - Root cause documentation (created earlier)
+4. `docs/testing/test-database-schema-issue.md` - Root cause documentation (created earlier)
 5. `scripts/clear-python-cache.ps1` - Cache clearing utility (created earlier)
 
 ## Rollback Plan

@@ -12,4 +12,4 @@ Historical UI development sessions:
 
 ## Status
 
-Changes documented here have been **completed and integrated**. For current UI guidelines, see docs/ui_guidelines.md and docs/UI_NAVIGATION_LOADING_IMPROVEMENTS.md.
+Changes documented here have been **completed and integrated**. For current UI guidelines, see docs/development/ui-guidelines.md and docs/features/ux/navigation-loading-improvements.md.

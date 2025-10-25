@@ -29,7 +29,7 @@ Use this playbook when Lighthouse, rag_eval, or production telemetry diverge fro
 
 ## 5. Post-incident documentation
 1. Summarise the timeline, root cause, and remediation in the Jira ticket.
-2. Update `docs/performance.md` with new lessons or links if observability coverage changes.
+2. Update `docs/operations/performance.md` with new lessons or links if observability coverage changes.
 3. File follow-up tasks for tech debt (e.g., missing baselines, flaky dashboards).
 4. Close the ticket only after confirming metrics are back within tolerance for two consecutive reporting windows.
 

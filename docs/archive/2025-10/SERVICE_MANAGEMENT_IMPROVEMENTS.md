@@ -451,7 +451,7 @@ Get-Content logs/theoria-launcher.log | ConvertFrom-Json | Where-Object { $_.lev
 
 **New Documentation Created**:
 
-- `docs/SERVICE_MANAGEMENT.md` - Comprehensive reference guide
+- `docs/operations/service-management.md` - Comprehensive reference guide
 
 **Updated Files**:
 

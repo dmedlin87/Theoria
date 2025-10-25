@@ -15,7 +15,7 @@
 | --- | --- | --- | --- |
 | P0 | Missing automated SAST/SBOM/reporting pipelines | Unknown exposure to critical vulnerabilities | Activate CodeQL, Scorecard, and CycloneDX workflows; surface SARIF in security tab. |
 | P0 | Lack of threat model & disclosure policy | Delayed incident response, poor triage | Publish `SECURITY.md` and `THREATMODEL.md`; route reports via security@ alias. |
-| P1 | Direct access from framework layers into persistence/utilities | Tight coupling blocks modular refactors | Execute modularization roadmap in `docs/Modularity-Plan.md` and enforce via architecture tests. |
+| P1 | Direct access from framework layers into persistence/utilities | Tight coupling blocks modular refactors | Execute modularization roadmap in `docs/architecture/modularity-plan.md` and enforce via architecture tests. |
 | P1 | Dependency drift across Python & Node ecosystems | Increased CVE surface, breakage risk | Dependabot schedule with grouped updates; add policy for emergency patch windows. |
 | P2 | Secrets passed via environment without rotation guidance | Risk of long-lived credentials | Document rotation cadence & use of vault/SM; add tests covering encryption paths. |
 
@@ -25,7 +25,7 @@
 - **Permissions:** Workflows default to `contents: read` and granular scopes per job; hardened against token leakage.
 - **Untrusted Code Execution:** PR-triggered jobs avoid persistent credentials, run with minimal permissions, and guard caches with explicit keys.
 - **Cache Safety:** Disabled implicit cache reuse; all caches keyed on lockfiles to prevent poisoned artefacts.
-- **Artifact Integrity:** SBOMs uploaded as immutable build artifacts; roadmap includes in-toto attestations for staged builds (see `DEPLOYMENT.md`).
+- **Artifact Integrity:** SBOMs uploaded as immutable build artifacts; roadmap includes in-toto attestations for staged builds (see `docs/operations/deployment-overview.md`).
 
 ## Dependency Risk & Update Plan
 
@@ -45,7 +45,7 @@
 ### Supply-Chain Controls
 - SBOM generation (Python + Node) on each CI run.
 - Dependabot configuration for both ecosystems with weekly cadence and security-only immediate patches.
-- Plan to adopt Sigstore provenance for container builds as part of the SLSA roadmap (see `DEPLOYMENT.md`).
+- Plan to adopt Sigstore provenance for container builds as part of the SLSA roadmap (see `docs/operations/deployment-overview.md`).
 
 ## Observability & Testing Coverage
 

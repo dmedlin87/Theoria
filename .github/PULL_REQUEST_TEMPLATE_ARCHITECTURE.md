@@ -46,7 +46,7 @@
 
 ## Checklist
 
-- [ ] Followed patterns in `docs/ARCHITECTURE_IMPROVEMENTS.md`
+- [ ] Followed patterns in `docs/architecture/improvements.md`
 - [ ] DTOs are frozen dataclasses
 - [ ] Repositories use dependency injection
 - [ ] Domain errors used instead of HTTPException
@@ -57,6 +57,6 @@
 
 ## References
 
-- Architecture Guide: `docs/ARCHITECTURE_IMPROVEMENTS.md`
-- Migration Examples: `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
+- Architecture Guide: `docs/architecture/improvements.md`
+- Migration Examples: `docs/architecture/migration-example.md`
 - Reference Implementation: `routes/discoveries_v1.py`

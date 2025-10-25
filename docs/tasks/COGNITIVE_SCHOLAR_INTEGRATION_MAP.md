@@ -351,4 +351,4 @@ class ResearchLoopOrchestrator:
 - **Repository Pattern**: `theo/application/repositories/*.py` (existing)
 - **Cognitive Scholar Spec**: `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`
 - **MVP Tickets**: `docs/tasks/TASK_005_Cognitive_Scholar_MVP_Tickets.md`
-- **Architecture Guide**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
+- **Architecture Guide**: `docs/architecture/improvements.md`

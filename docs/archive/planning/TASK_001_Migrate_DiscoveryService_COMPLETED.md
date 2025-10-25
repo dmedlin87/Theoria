@@ -386,8 +386,8 @@ print(f"Improvement: {((duration_before - duration_after) / duration_before) * 1
 ## 📚 References
 
 - **Pattern Reference**: `theo/services/api/app/routes/discoveries_v1.py`
-- **Migration Guide**: `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
-- **Architecture Guide**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
+- **Migration Guide**: `docs/architecture/migration-example.md`
+- **Architecture Guide**: `docs/architecture/improvements.md`
 - **Quick Start**: `QUICK_START_ARCHITECTURE.md`
 
 ---

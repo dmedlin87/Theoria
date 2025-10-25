@@ -215,7 +215,7 @@ def list_documents(session, user_id):
 ## Documentation Created
 
 ### 1. Implementation Guide ✅
-**File**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
+**File**: `docs/architecture/improvements.md`
 
 Comprehensive guide covering:
 - Problem statements for each improvement
@@ -226,7 +226,7 @@ Comprehensive guide covering:
 - Backward compatibility notes
 
 ### 2. Migration Examples ✅
-**File**: `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
+**File**: `docs/architecture/migration-example.md`
 
 Before/after comparisons showing:
 - Tightly coupled code → Clean architecture
@@ -447,8 +447,8 @@ All changes are **backward compatible** and provide a **clear migration path**. 
 
 - **Architecture Review Document**: See comprehensive review above
 - **ADR 0001**: docs/adr/0001-hexagonal-architecture.md
-- **Implementation Guide**: docs/ARCHITECTURE_IMPROVEMENTS.md
-- **Migration Examples**: docs/ARCHITECTURE_MIGRATION_EXAMPLE.md
+- **Implementation Guide**: docs/architecture/improvements.md
+- **Migration Examples**: docs/architecture/migration-example.md
 - **Code Map**: @Theoria Hexagonal Architecture Flows
 
 ---

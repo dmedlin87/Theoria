@@ -47,7 +47,7 @@ in lockstep.
 - **Integration & Telemetry**
   - Wire gate decisions into research/chat flows in `GuardedAnswerPipeline`.
   - Emit structured telemetry (scores, policy, overrides) to metrics stream.
-  - Document gate operations, fail-open criteria, and override workflow in `docs/AGENT_AND_PROMPTING_GUIDE.md`.
+  - Document gate operations, fail-open criteria, and override workflow in `docs/agents/prompting-guide.md`.
 
 ## Phase 2 (Week 3): POU Loop Swap & Research UI Refresh
 

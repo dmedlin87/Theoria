@@ -87,7 +87,7 @@ theo/services/web/app/api/discoveries/
 ## 📚 Documentation Created
 
 ### 1. DISCOVERY_FEATURE.md
-**Location**: `docs/DISCOVERY_FEATURE.md`
+**Location**: `docs/features/discovery/overview.md`
 
 **Contents**:
 - Complete technical architecture
@@ -115,7 +115,7 @@ theo/services/web/app/api/discoveries/
 - Design system details
 
 ### 3. DISCOVERY_QUICK_START.md
-**Location**: `docs/DISCOVERY_QUICK_START.md`
+**Location**: `docs/features/discovery/quick-start.md`
 
 **Contents**:
 - User-facing guide
@@ -125,7 +125,7 @@ theo/services/web/app/api/discoveries/
 - Current status
 
 ### 4. FUTURE_FEATURES_ROADMAP.md
-**Location**: `docs/FUTURE_FEATURES_ROADMAP.md`
+**Location**: `docs/features/roadmap/future-features-roadmap.md`
 
 **Contents**:
 - 25 planned features categorized
@@ -170,7 +170,7 @@ theo/services/web/app/api/discoveries/
 2. **Backend Foundation**
    - Create database schema:
      ```sql
-     -- See docs/DISCOVERY_FEATURE.md for full schema
+     -- See docs/features/discovery/overview.md for full schema
      CREATE TABLE discoveries (...);
      CREATE TABLE corpus_snapshots (...);
      ```
@@ -456,9 +456,9 @@ Theoria/
 ### For Next Developer/AI Agent
 
 1. **Review Documentation**
-   - Start with `docs/DISCOVERY_QUICK_START.md`
-   - Read `docs/DISCOVERY_FEATURE.md` for architecture
-   - Check `docs/FUTURE_FEATURES_ROADMAP.md` for vision
+   - Start with `docs/features/discovery/quick-start.md`
+   - Read `docs/features/discovery/overview.md` for architecture
+   - Check `docs/features/roadmap/future-features-roadmap.md` for vision
 
 2. **Test Current Implementation**
    ```powershell
@@ -657,8 +657,8 @@ Once live, measure:
 **This handoff contains everything needed to continue the Discovery Feature implementation and execute on the broader product vision.** 🎉
 
 **Key files to reference**:
-- `docs/DISCOVERY_FEATURE.md` - Technical deep dive
-- `docs/FUTURE_FEATURES_ROADMAP.md` - Product vision
+- `docs/features/discovery/overview.md` - Technical deep dive
+- `docs/features/roadmap/future-features-roadmap.md` - Product vision
 - `DISCOVERY_IMPLEMENTATION_SUMMARY.md` - What's done
 
 Good luck! 🚀

@@ -1,7 +1,7 @@
 # Newly Identified Maintenance Tasks
 
 ## Typo fix task
-- **Location**: `docs/more_features.md`
+- **Location**: `docs/features/roadmap/more-features.md`
 - **Issue**: The goal statement reads "evidence-on tap", leaving a stray hyphen that splits the phrase awkwardly.
 - **Proposed task**: Replace the fragment with "evidence on tap" (or add the closing hyphen) so the sentence reads naturally.
 
@@ -11,7 +11,7 @@
 - **Proposed task**: Update the condition to drop the key when the set exists but is empty (e.g., `if connections is not None and not connections:`) so idle notebooks release resources.
 
 ## Documentation correction task
-- **Location**: `docs/API.md`
+- **Location**: `docs/development/api-reference.md`
 - **Issue**: The introduction still claims "Authentication: not required", but the README and API defaults now require API keys or explicit anonymous mode.
 - **Proposed task**: Revise the authentication note to explain the current credential requirements and how to enable anonymous access for development.
 

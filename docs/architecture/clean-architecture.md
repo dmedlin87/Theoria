@@ -227,7 +227,7 @@ All seed loaders live in `theo/services/api/app/db/seeds.py` and are idempotent;
 
 ## 6) Chunking & Normalization (algorithms)
 
-Document these in docs/Chunking.md & docs/OSIS.md. Implement in services/api/app/ingest/.
+Document these in docs/development/chunking.md & docs/development/osis.md. Implement in services/api/app/ingest/.
 
 6.1 Parsing
 
@@ -289,7 +289,7 @@ Deduplicate near-duplicates by same document_id and overlapping anchors.
 
 ## 8) API Contract
 
-Document in docs/API.md. Implement in services/api/app/routes/.
+Document in docs/development/api-reference.md. Implement in services/api/app/routes/.
 
 8.1 Ingest
 

@@ -79,7 +79,7 @@ and architectural plans are organized under `docs/`.
   audits. Radix UI primitives, cmdk (command palette), and lucide icons power
   the UI.
 - **Quality Gates** – The `scripts/quality` utilities enforce animation, a11y,
-  and performance baselines documented in `docs/ui-quality-gates.md`. Playwright
+  and performance baselines documented in `docs/testing/ui-quality-gates.md`. Playwright
   tags cover smoke, visual, and accessibility runs for CI pipelines.
 - **Integration** – Environment variables `NEXT_PUBLIC_API_BASE_URL` and
   `THEO_SEARCH_API_KEY` (see `README.md`) connect the web proxy to the FastAPI
@@ -99,7 +99,7 @@ and architectural plans are organized under `docs/`.
   same settings facade and share the ingestion pipeline with the API.
 - **Scripts & Infra** – `scripts/` includes telemetry, database seeding, and
   launcher helpers. `infra/` contains TLS assets, deployment manifests, and
-  observability templates referenced in `DEPLOYMENT.md` and `SECURITY.md`.
+  observability templates referenced in `docs/operations/deployment-overview.md` and `SECURITY.md`.
 
 ## Testing & Quality Assurance
 
@@ -112,7 +112,7 @@ and architectural plans are organized under `docs/`.
 - **Front-End Tests** – The Next.js app runs ESLint, TypeScript, Jest, Vitest,
   and Playwright via npm scripts. Percy snapshots and Lighthouse smoke tests
   enforce visual and performance regressions.
-- **Data Contracts** – JSON Schema specs in `docs/case_builder.schema.json` and
+- **Data Contracts** – JSON Schema specs in `docs/features/case-builder/case-builder.schema.json` and
   contract tests under `tests/contracts` ensure API compatibility with case
   builder clients and MCP integrations.
 
@@ -139,10 +139,10 @@ above:
 | --- | --- |
 | `README.md` | Highlights, feature matrix, quick start, and service bootstrapping. |
 | `START_HERE.md` | Smart launcher workflow and troubleshooting. |
-| `docs/BLUEPRINT.md` | End-to-end architecture design with diagrams. |
-| `docs/Repo-Health.md` | Security, dependency, and observability posture. |
-| `docs/ROADMAP.md` | Strategic priorities and phased delivery. |
-| `docs/UI_NAVIGATION_LOADING_IMPROVEMENTS.md` | Summary of UI polish and accessibility upgrades. |
+| `docs/architecture/clean-architecture.md` | End-to-end architecture design with diagrams. |
+| `docs/security/repo-health.md` | Security, dependency, and observability posture. |
+| `docs/features/roadmap/roadmap.md` | Strategic priorities and phased delivery. |
+| `docs/features/ux/navigation-loading-improvements.md` | Summary of UI polish and accessibility upgrades. |
 | `SECURITY.md` & `THREATMODEL.md` | Incident response, disclosure, and threat modeling guidance. |
 | `docs/testing/` | Pytest, Playwright, and quality gate runbooks. |
 | `docs/runbooks/` | Incident and operations playbooks for ingestion, search, and worker recovery. |
@@ -154,7 +154,7 @@ match the latest implementation.
 ## Recommended Next Steps
 
 1. Keep dependency update automation (Dependabot/ Renovate) aligned with the
-   cadence outlined in `docs/Repo-Health.md` to maintain supply-chain hygiene.
+   cadence outlined in `docs/security/repo-health.md` to maintain supply-chain hygiene.
 2. Expand typed coverage beyond the API package by incrementally enabling mypy
    for domain and adapter modules.
 3. Finish wiring reranker checkpoints via settings once the preferred model is

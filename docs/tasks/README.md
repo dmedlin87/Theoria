@@ -42,9 +42,9 @@ Cognitive Scholar experience—complete with hypotheses, guardrails, and debate 
 ## 📚 Common References
 
 - **Cognitive Scholar Brainstorm**: `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`
-- **Reasoning Architecture**: `docs/AGENT_THINKING_ENHANCEMENT.md`
-- **API Patterns**: `docs/IMPLEMENTATION_GUIDE.md`
-- **UI Standards**: `docs/ui_guidelines.md`
+- **Reasoning Architecture**: `docs/agents/thinking-enhancement.md`
+- **API Patterns**: `docs/agents/implementation-guide.md`
+- **UI Standards**: `docs/development/ui-guidelines.md`
 
 ---
 

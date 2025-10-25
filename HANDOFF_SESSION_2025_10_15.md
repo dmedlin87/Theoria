@@ -11,7 +11,7 @@ This session implemented **background auto-discovery** and completed **Phase 1.1
 ### 1. Background Discovery Scheduler
 - **File:** `theo/services/api/app/workers/discovery_scheduler.py`
 - **Integration:** `theo/services/api/app/main.py` (FastAPI lifecycle)
-- **Docs:** `docs/DISCOVERY_SCHEDULER.md`
+- **Docs:** `docs/features/discovery/scheduler.md`
 - **Dependency:** `apscheduler>=3.10,<4`
 
 **Features:**
@@ -23,7 +23,7 @@ This session implemented **background auto-discovery** and completed **Phase 1.1
 ### 2. Contradiction Detection Engine
 - **File:** `theo/domain/discoveries/contradiction_engine.py`
 - **Tests:** `tests/domain/discoveries/test_contradiction_engine.py`
-- **Docs:** `docs/CONTRADICTION_DETECTION.md`
+- **Docs:** `docs/features/discovery/contradiction-detection.md`
 - **Dependencies:** `transformers>=4.30,<5`, `torch>=2.0,<3`, `sentencepiece>=0.1.99,<0.2`
 
 **Features:**
@@ -34,9 +34,9 @@ This session implemented **background auto-discovery** and completed **Phase 1.1
 
 ### 3. Comprehensive Documentation
 - `HANDOFF_NEXT_PHASE.md` - 6-8 week Cognitive Scholar roadmap
-- `docs/AGENT_AND_PROMPTING_GUIDE.md` - Agent architecture
-- `docs/DISCOVERY_SCHEDULER.md` - Scheduler details
-- `docs/CONTRADICTION_DETECTION.md` - Implementation guide
+- `docs/agents/prompting-guide.md` - Agent architecture
+- `docs/features/discovery/scheduler.md` - Scheduler details
+- `docs/features/discovery/contradiction-detection.md` - Implementation guide
 
 ---
 
@@ -158,9 +158,9 @@ tail -f logs/api.log | grep "Discovery scheduler"
 - `theo/services/api/app/workers/discovery_scheduler.py`
 - `theo/domain/discoveries/contradiction_engine.py`
 - `tests/domain/discoveries/test_contradiction_engine.py`
-- `docs/DISCOVERY_SCHEDULER.md`
-- `docs/CONTRADICTION_DETECTION.md`
-- `docs/AGENT_AND_PROMPTING_GUIDE.md`
+- `docs/features/discovery/scheduler.md`
+- `docs/features/discovery/contradiction-detection.md`
+- `docs/agents/prompting-guide.md`
 - `HANDOFF_NEXT_PHASE.md`
 
 ### Modified This Session
@@ -168,7 +168,7 @@ tail -f logs/api.log | grep "Discovery scheduler"
 - `theo/services/api/app/main.py` (scheduler lifecycle)
 - `theo/domain/discoveries/__init__.py` (export engine)
 - `theo/services/api/app/discoveries/service.py` (integrate contradiction detection)
-- `docs/INDEX.md` (added links)
+- `docs/meta/index.md` (added links)
 
 ### Important Existing Files
 - `theo/domain/discoveries/engine.py` (pattern detection)

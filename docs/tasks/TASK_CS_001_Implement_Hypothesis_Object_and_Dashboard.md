@@ -52,7 +52,7 @@ humans see the same structured view.
 - API returns paginated results with filter support (`statuses`, `min_confidence`, free-text `query`).
 - Dashboard lists hypotheses, allows status/confidence edits, and shows counters without console/runtime errors.
 - Unit + integration tests cover repository CRUD + API surfaces + dashboard interactions.
-- Documentation updated in `docs/ROADMAP.md` to link to the dashboard feature flag/URL.
+- Documentation updated in `docs/features/roadmap/roadmap.md` to link to the dashboard feature flag/URL.
 
 ---
 

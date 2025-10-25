@@ -110,7 +110,7 @@ The Discovery Feed is **Explorer Mode** - perfect for lazy Sunday browsing and u
 ## Documentation
 
 - **Quick Start**: You're reading it! 📄
-- **Full Docs**: [DISCOVERY_FEATURE.md](DISCOVERY_FEATURE.md) 📚
+- **Full Docs**: [Discovery Feature Overview](overview.md) 📚
 - **Implementation**: [DISCOVERY_IMPLEMENTATION_SUMMARY.md](../DISCOVERY_IMPLEMENTATION_SUMMARY.md) 🔧
 
 ## ML Strategy (Answer to Your Question)

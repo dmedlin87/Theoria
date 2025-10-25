@@ -142,11 +142,11 @@ Your AI agents have everything they need to continue development:
 - `theo/services/api/app/discoveries/service.py` - Integration point
 
 ### Documentation
-- `docs/INDEX.md` - Master documentation index
-- `docs/AGENT_AND_PROMPTING_GUIDE.md` - Agent architecture
-- `docs/DISCOVERY_FEATURE.md` - Discovery system spec
-- `docs/DISCOVERY_SCHEDULER.md` - Scheduler details
-- `docs/CONTRADICTION_DETECTION.md` - Contradiction implementation
+- `docs/meta/index.md` - Master documentation index
+- `docs/agents/prompting-guide.md` - Agent architecture
+- `docs/features/discovery/overview.md` - Discovery system spec
+- `docs/features/discovery/scheduler.md` - Scheduler details
+- `docs/features/discovery/contradiction-detection.md` - Contradiction implementation
 
 ### Existing Code
 - `theo/services/api/app/main.py` - FastAPI app with scheduler
@@ -314,7 +314,7 @@ All context is in the documentation. If agents need clarification:
 
 1. Check `IMPLEMENTATION_CONTEXT.md` for patterns
 2. Look at existing engines for examples
-3. Review `docs/DISCOVERY_FEATURE.md` for requirements
+3. Review `docs/features/discovery/overview.md` for requirements
 4. Examine tests for expected behavior
 
 ---

@@ -329,7 +329,7 @@ These will be resolved with backend implementation.
 ## 📚 Documentation
 
 Comprehensive docs available at:
-- **[DISCOVERY_FEATURE.md](docs/DISCOVERY_FEATURE.md)** - Complete implementation guide
+- **[DISCOVERY_FEATURE.md](docs/features/discovery/overview.md)** - Complete implementation guide
 
 ---
 

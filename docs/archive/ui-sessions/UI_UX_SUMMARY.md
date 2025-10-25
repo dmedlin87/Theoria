@@ -214,7 +214,7 @@ To keep refactors on track we now fail CI when the following regressions occur:
 2. If you removed inline styles or broke down components, regenerate the baseline via `npm run quality:baseline` and commit the updated JSON.
 3. Fix failing axe scans by addressing the violation details attached to the Playwright report artifact.
 4. Use `npm run test:lighthouse:smoke` to reproduce Lighthouse failures locally; consult `.lighthouseci/` artifacts for detailed scores.
-5. Review the dashboard at `docs/dashboards/ui-quality-dashboard.md` for progress trends and reference the remediation checklist in `docs/ui-quality-gates.md` when planning sprint work.
+5. Review the dashboard at `docs/dashboards/ui-quality-dashboard.md` for progress trends and reference the remediation checklist in `docs/testing/ui-quality-gates.md` when planning sprint work.
 
 ---
 

@@ -85,6 +85,6 @@ Once the Makefile façade is introduced the following convenience commands will 
 - Update documentation for any new fixtures, commands, or workflows.
 
 ## Getting Help
-- Review the architectural context in `docs/BLUEPRINT.md` and `docs/API.md`.
-- For ingestion-specific questions, check `docs/OSIS.md` and `docs/Chunking.md`.
+- Review the architectural context in `docs/architecture/clean-architecture.md` and `docs/development/api-reference.md`.
+- For ingestion-specific questions, check `docs/development/osis.md` and `docs/development/chunking.md`.
 - Reach out via the project Slack channel or open a GitHub discussion for design clarifications.

@@ -1,11 +1,11 @@
 # Proposed follow-up tasks
 
 ## Fix typo in product vision goal
-- **Location**: `docs/more_features.md`
+- **Location**: `docs/features/roadmap/more-features.md`
 - **Issue**: The goal statement says "citable evidence-on tap" with an extra hyphen that breaks the phrase.
 - **Why it matters**: Polishing copy in public-facing vision docs keeps the messaging professional.
 - **Suggested fix**: Replace "evidence-on" with "evidence on" in the goal sentence.
-- **References**: [`docs/more_features.md`](../docs/more_features.md) line 3. 
+- **References**: [`docs/features/roadmap/more-features.md`](../docs/features/roadmap/more-features.md) line 3. 
 
 ## Make reranker retry after transient load failures
 - **Location**: `theo/services/api/app/routes/search.py`
@@ -15,11 +15,11 @@
 - **References**: [`theo/services/api/app/routes/search.py`](../theo/services/api/app/routes/search.py) lines 47-84.
 
 ## Update feature discovery documentation
-- **Location**: `docs/API.md`
+- **Location**: `docs/development/api-reference.md`
 - **Issue**: The documented `/features` response lists only four keys, but the route currently exposes additional toggles (cross references, textual variants, morphology, verse timeline, etc.), so the example payload is stale.
 - **Why it matters**: Accurate examples help client developers rely on the available feature flags without inspecting the source.
 - **Suggested fix**: Expand the example JSON (or add a note) to reflect the full set of flags returned by `list_features()`.
-- **References**: [`docs/API.md`](../docs/API.md) lines 647-665 and [`theo/services/api/app/routes/features.py`](../theo/services/api/app/routes/features.py) lines 12-44.
+- **References**: [`docs/development/api-reference.md`](../docs/development/api-reference.md) lines 647-665 and [`theo/services/api/app/routes/features.py`](../theo/services/api/app/routes/features.py) lines 12-44.
 
 ## Strengthen feature flag tests
 - **Location**: `theo/services/api/tests/test_features.py`
@@ -29,11 +29,11 @@
 - **References**: [`theo/services/api/tests/test_features.py`](../theo/services/api/tests/test_features.py) lines 1-24 and [`theo/services/api/app/routes/features.py`](../theo/services/api/app/routes/features.py) lines 12-44.
 
 ## Update CLI documentation spelling consistency
-- **Location**: `docs/CLI.md`
+- **Location**: `docs/development/cli-reference.md`
 - **Issue**: The supported sources section uses the British spelling "recognises" even though the rest of the developer docs adopt American English, which reads like a typo in context.
 - **Why it matters**: Keeping terminology consistent avoids distracting nits during reviews and keeps the docs feeling polished.
 - **Suggested fix**: Change the verb to "recognizes" in the supported sources bullet list.
-- **References**: [`docs/CLI.md`](../docs/CLI.md) line 12. 【F:docs/CLI.md†L12-L20】
+- **References**: [`docs/development/cli-reference.md`](../docs/development/cli-reference.md) line 12. 【F:docs/development/cli-reference.md†L12-L20】
 
 ## Ensure decrypted credentials helper returns a defined value on failure
 - **Location**: `theo/services/web/app/lib/api-config-store.ts`

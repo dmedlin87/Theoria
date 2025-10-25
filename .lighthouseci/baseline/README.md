@@ -101,4 +101,4 @@ If scores drop unexpectedly:
 - **Comparison Script:** `scripts/compare-lighthouse-baseline.mjs`  
 - **Workflow:** `.github/workflows/lighthouse.yml`
 - **Config:** `lighthouserc.json`
-- **Full Docs:** `docs/LIGHTHOUSE_ENHANCEMENTS.md`
+- **Full Docs:** `docs/operations/lighthouse-enhancements.md`

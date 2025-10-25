@@ -286,9 +286,9 @@ engine = ContradictionDiscoveryEngine(
 
 ## Related Documentation
 
-- [DISCOVERY_FEATURE.md](DISCOVERY_FEATURE.md) - Complete discovery feature spec
+- [Discovery Feature Overview](overview.md) - Complete discovery feature spec
 - [DISCOVERY_SCHEDULER.md](DISCOVERY_SCHEDULER.md) - Background scheduler
-- [AGENT_AND_PROMPTING_GUIDE.md](AGENT_AND_PROMPTING_GUIDE.md) - Agent architecture
+- [Prompting Guide](../../agents/prompting-guide.md) - Agent architecture
 - [HANDOFF_NEXT_PHASE.md](../HANDOFF_NEXT_PHASE.md) - Next development phases
 
 ---

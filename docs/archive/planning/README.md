@@ -11,4 +11,4 @@ Historical planning artifacts:
 
 ## Status
 
-Tasks documented here have been **completed or migrated** to the active project backlog. For current roadmap, see docs/ROADMAP.md.
+Tasks documented here have been **completed or migrated** to the active project backlog. For current roadmap, see docs/features/roadmap/roadmap.md.

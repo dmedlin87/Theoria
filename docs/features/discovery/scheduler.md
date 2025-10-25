@@ -365,9 +365,9 @@ Expand beyond pattern detection:
 
 ## Related Documentation
 
-- [DISCOVERY_FEATURE.md](DISCOVERY_FEATURE.md) - Complete feature specification
-- [AGENT_AND_PROMPTING_GUIDE.md](AGENT_AND_PROMPTING_GUIDE.md) - Agent architecture
-- [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) - Reasoning framework
+- [Discovery Feature Overview](overview.md) - Complete feature specification
+- [Prompting Guide](../../agents/prompting-guide.md) - Agent architecture
+- [Implementation Guide](../../agents/implementation-guide.md) - Reasoning framework
 
 ---
 

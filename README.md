@@ -57,7 +57,7 @@ Additional feature deep-dives live in [`docs/archive/`](docs/archive/).
 - **Automation Scripts**: `scripts/` (dev orchestration, reseeding, evaluation).
 - **Quality Gates**: `tests/` (unit, integration, ranking, MCP, UI smoke suites).
 
-For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and the ADR directory under [`docs/adr/`](docs/adr/).
+For architecture detail, start with [`docs/architecture/clean-architecture.md`](docs/architecture/clean-architecture.md) and the ADR directory under [`docs/adr/`](docs/adr/).
 
 ---
 
@@ -122,7 +122,7 @@ Both scripts boot the API and Next.js app, wiring ports and environment variable
 - **Full Python suite**: `task test:full` or `pytest --schema --pgvector --contract`
 - **Web tests**: from `theo/services/web`, run `npm test` or `npm run test:vitest`
 - **Playwright smoke**: `npm run test:e2e:smoke`
-- **Performance baselines**: Lighthouse CI policy lives in [`docs/performance.md`](docs/performance.md)
+- **Performance baselines**: Lighthouse CI policy lives in [`docs/operations/performance.md`](docs/operations/performance.md)
 
 ### Database seeding
 - Unix/macOS: `./scripts/reset_reseed_smoke.py --log-level DEBUG`
@@ -147,14 +147,14 @@ Stop with `docker compose down`.
 
 | Category | Start Here |
 | --- | --- |
-| Architecture & Decisions | [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md), [`docs/adr/`](docs/adr/) |
-| APIs & Integration | [`docs/API.md`](docs/API.md), [`docs/mcp_integration_guide.md`](docs/mcp_integration_guide.md), [`docs/authentication.md`](docs/authentication.md) |
-| CLI & Automation | [`docs/CLI.md`](docs/CLI.md), [`theo/services/cli`](theo/services/cli) |
+| Architecture & Decisions | [`docs/architecture/clean-architecture.md`](docs/architecture/clean-architecture.md), [`docs/adr/`](docs/adr/) |
+| APIs & Integration | [`docs/development/api-reference.md`](docs/development/api-reference.md), [`docs/agents/mcp-integration-guide.md`](docs/agents/mcp-integration-guide.md), [`docs/development/authentication.md`](docs/development/authentication.md) |
+| CLI & Automation | [`docs/development/cli-reference.md`](docs/development/cli-reference.md), [`theo/services/cli`](theo/services/cli) |
 | UI & UX | [`docs/archive/2025-10/`](docs/archive/2025-10/), [`theo/services/web/app/components/ui`](theo/services/web/app/components/ui) |
-| Testing & Quality | [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md), [`docs/performance.md`](docs/performance.md), [`SECURITY.md`](SECURITY.md) |
-| Roadmaps & Case Builder | [`docs/CASE_BUILDER.md`](docs/CASE_BUILDER.md), [`docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md`](docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md) |
+| Testing & Quality | [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md), [`docs/operations/performance.md`](docs/operations/performance.md), [`SECURITY.md`](SECURITY.md) |
+| Roadmaps & Case Builder | [`docs/features/case-builder/overview.md`](docs/features/case-builder/overview.md), [`docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md`](docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md) |
 
-Use [`docs/INDEX.md`](docs/INDEX.md) as the master directory of all documentation.
+Use [`docs/meta/index.md`](docs/meta/index.md) as the master directory of all documentation.
 
 ---
 

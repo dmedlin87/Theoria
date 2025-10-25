@@ -33,8 +33,8 @@ Conducted comprehensive architectural review of Theoria's hexagonal architecture
 12. ✅ `tests/api/routes/test_discoveries_v1.py` - Integration tests
 
 ### Documentation (8 files)
-13. ✅ `docs/ARCHITECTURE_IMPROVEMENTS.md` - Implementation guide (695 lines)
-14. ✅ `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md` - Before/after examples (400+ lines)
+13. ✅ `docs/architecture/improvements.md` - Implementation guide (695 lines)
+14. ✅ `docs/architecture/migration-example.md` - Before/after examples (400+ lines)
 15. ✅ `ARCHITECTURE_REVIEW_IMPLEMENTATION_SUMMARY.md` - Executive summary
 16. ✅ `ARCHITECTURE_COMPLETE.md` - Completion summary
 17. ✅ `QUICK_START_ARCHITECTURE.md` - 5-minute guide
@@ -224,10 +224,10 @@ Created Cognitive Scholar task handoffs for future work:
 `QUICK_START_ARCHITECTURE.md` - Get started immediately
 
 ### Migration Examples
-`docs/ARCHITECTURE_MIGRATION_EXAMPLE.md` - Before/after code
+`docs/architecture/migration-example.md` - Before/after code
 
 ### Implementation Guide
-`docs/ARCHITECTURE_IMPROVEMENTS.md` - Full technical details
+`docs/architecture/improvements.md` - Full technical details
 
 ### Task Handoffs
 `docs/tasks/` - Ready-to-execute tasks with acceptance criteria

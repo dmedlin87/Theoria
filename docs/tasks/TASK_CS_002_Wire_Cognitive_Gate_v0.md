@@ -35,7 +35,7 @@ entropy, citation coverage, and hypothesis alignment before allowing the router 
 - `theo/services/api/app/ai/registry.py` – expose configuration toggles (`cognitive_gate.enabled`, thresholds, bypass roles).
 - `theo/services/api/tests/research/test_hypotheses.py` & `theo/services/api/tests/test_ai_routes.py` – add coverage for gate
   acceptance/rejection paths, ensuring hypotheses without citations are blocked until evidence arrives.
-- `docs/AGENT_THINKING_ENHANCEMENT.md` – document the new gate flow and configuration knobs.
+- `docs/agents/thinking-enhancement.md` – document the new gate flow and configuration knobs.
 
 ---
 

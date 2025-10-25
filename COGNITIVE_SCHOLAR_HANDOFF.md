@@ -245,7 +245,7 @@ class SQLAlchemyHypothesisRepository(HypothesisRepository):
 - **Master Spec**: `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`
 - **Execution Plan**: `docs/tasks/TASK_005_Cognitive_Scholar_MVP_Tickets.md`
 - **Integration Map**: `docs/tasks/COGNITIVE_SCHOLAR_INTEGRATION_MAP.md`
-- **Architecture Guide**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
+- **Architecture Guide**: `docs/architecture/improvements.md`
 - **Tasks README**: `docs/tasks/README.md`
 
 ---

@@ -29,8 +29,8 @@ tests/api/ai/
 └── test_reasoning_modules.py      # Comprehensive tests
 
 docs/
-├── AGENT_THINKING_ENHANCEMENT.md  # Full design doc
-├── IMPLEMENTATION_GUIDE.md         # This file
+├── thinking-enhancement.md        # Full design doc
+├── implementation-guide.md     # This file
 └── migrations/
     └── add_reasoning_tables.sql    # Database schema
 ```
@@ -631,7 +631,7 @@ At GPT-4 pricing (~$0.03/1K input, ~$0.06/1K output):
 
 ## Support & Questions
 
-- **Design doc:** `docs/AGENT_THINKING_ENHANCEMENT.md`
+- **Design doc:** `docs/agents/thinking-enhancement.md`
 - **Module code:** `theo/services/api/app/ai/reasoning/`
 - **Tests:** `tests/api/ai/test_reasoning_modules.py`
 - **Migration:** `docs/migrations/add_reasoning_tables.sql`

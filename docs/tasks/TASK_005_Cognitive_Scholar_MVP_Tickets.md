@@ -384,7 +384,7 @@ Break down the Cognitive Scholar MVP into discrete, implementable tickets follow
 - **Master Spec**: `theoria_feature_brainstorm_cognitive_scholar_v_1.md`
 - **Execution Order**: Spec Appendix §A
 - **Acceptance Checks**: Spec Appendix §B
-- **Architecture Patterns**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
+- **Architecture Patterns**: `docs/architecture/improvements.md`
 
 ---
 

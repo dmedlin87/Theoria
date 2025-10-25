@@ -106,40 +106,40 @@ Each archive directory includes a README explaining its contents and retention p
 
 Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
 
-- docs/API.md
-- docs/AGENT_CONFINEMENT.md
-- docs/BLUEPRINT.md
-- docs/SERVICE_MANAGEMENT.md
-- docs/theoria_instruction_prompt.md
-- docs/ui_overhaul_proposal.md
-- docs/performance.md
-- docs/debugging-guide.md
-- docs/AGENT_THINKING_ENHANCEMENT.md
-- docs/Chunking.md
-- docs/Frontmatter.md
-- docs/IMPLEMENTATION_GUIDE.md
-- docs/LIGHTHOUSE_ENHANCEMENTS.md
-- docs/OSIS.md
-- docs/authentication.md
-- docs/mcp_integration_guide.md
-- docs/production_readiness_gaps.md
-- docs/Modularity-Plan.md
-- docs/refactor_modularity_plan.md
-- docs/redteam.md
-- docs/telemetry.md
-- docs/document_inventory.md
+- docs/development/api-reference.md
+- docs/agents/confinement.md
+- docs/architecture/clean-architecture.md
+- docs/operations/service-management.md
+- docs/agents/system-prompt.md
+- docs/features/ux/ui-overhaul-proposal.md
+- docs/operations/performance.md
+- docs/development/debugging-guide.md
+- docs/agents/thinking-enhancement.md
+- docs/development/chunking.md
+- docs/development/frontmatter.md
+- docs/agents/implementation-guide.md
+- docs/operations/lighthouse-enhancements.md
+- docs/development/osis.md
+- docs/development/authentication.md
+- docs/agents/mcp-integration-guide.md
+- docs/operations/production-readiness-gaps.md
+- docs/architecture/modularity-plan.md
+- docs/architecture/modularity-refactor-plan.md
+- docs/security/red-team.md
+- docs/operations/telemetry.md
+- docs/meta/document-inventory.md
 - docs/adr/0001-mcp-tools-and-apps-sdk.md
 
 ### 4. ✅ Consolidated Documentation
 
 **Case Builder:**
-- Created `docs/CASE_BUILDER.md` as consolidated reference
+- Created `docs/features/case-builder/overview.md` as consolidated reference
 - Documents v4 as current specification
 - Links to archived versions (v1-v3) and related fixtures
 - Provides implementation roadmap and integration points
 
 **Documentation Index:**
-- Created `docs/INDEX.md` with comprehensive navigation
+- Created `docs/meta/index.md` with comprehensive navigation
 - Organized by topic: Getting Started, Development, Features, Architecture, Operations, Security, Testing
 - Links to all active documentation
 - References archived content
@@ -152,7 +152,7 @@ Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
 - README.md
 - CONTRIBUTING.md
 - SECURITY.md
-- DEPLOYMENT.md
+- docs/operations/deployment-overview.md
 - THREATMODEL.md
 - START_HERE.md
 - test-ui-enhancements.md
@@ -168,16 +168,16 @@ Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
 ├── README.md                    # Project overview
 ├── CONTRIBUTING.md              # Contributor guide
 ├── SECURITY.md                  # Security policy
-├── DEPLOYMENT.md                # Deployment guide
+├── docs/operations/deployment-overview.md                # Deployment guide
 ├── THREATMODEL.md               # Threat model
 ├── START_HERE.md                # Getting started
 └── docs/
     ├── INDEX.md                 # ← NEW: Master navigation
-    ├── CASE_BUILDER.md          # ← NEW: Consolidated case builder spec
+    ├── features/case-builder/overview.md   # ← NEW: Consolidated case builder spec
     ├── API.md                   # API reference (updated branding)
-    ├── DISCOVERY_FEATURE.md     # Discovery feed spec
-    ├── BLUEPRINT.md             # System architecture
-    ├── AGENT_CONFINEMENT.md     # MCP security framework
+    ├── features/discovery/overview.md   # Discovery feed spec
+    ├── architecture/clean-architecture.md   # System architecture
+    ├── agents/confinement.md       # MCP security framework
     ├── [... 80+ active docs]
     └── archive/                 # ← NEW: Historical documentation
         ├── README.md            # Archive overview
@@ -191,7 +191,7 @@ Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
 ## Benefits
 
 ### For Contributors
-- ✅ Clear entry point via `docs/INDEX.md`
+- ✅ Clear entry point via `docs/meta/index.md`
 - ✅ Reduced cognitive load - focus on active docs
 - ✅ Easy to find historical context when needed
 - ✅ Consistent branding throughout
@@ -213,16 +213,16 @@ Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
 All authoritative references remain current and accessible:
 
 **User-Facing:**
-- README.md, CONTRIBUTING.md, SECURITY.md, DEPLOYMENT.md, THREATMODEL.md, START_HERE.md
+- README.md, CONTRIBUTING.md, SECURITY.md, docs/operations/deployment-overview.md, THREATMODEL.md, START_HERE.md
 
 **Development:**
 - API.md, CLI.md, Chunking.md, Frontmatter.md, OSIS.md, authentication.md
 
 **Features:**
-- DISCOVERY_FEATURE.md, DISCOVERY_QUICK_START.md, CASE_BUILDER.md, IMPLEMENTATION_GUIDE.md
+- features/discovery/overview.md, features/discovery/quick-start.md, features/case-builder/overview.md, agents/implementation-guide.md
 
 **Architecture:**
-- BLUEPRINT.md, CODEBASE_REVIEW.md, AGENT_CONFINEMENT.md, SERVICE_MANAGEMENT.md
+- architecture/clean-architecture.md, architecture/codebase-review.md, agents/confinement.md, operations/service-management.md
 
 **Operations:**
 - performance.md, lighthouse-ci.md, debugging-guide.md, telemetry.md, runbooks/
@@ -234,8 +234,8 @@ All authoritative references remain current and accessible:
 
 While the cleanup is complete, consider these follow-up improvements:
 
-1. **README Updates:** Ensure root README links to `docs/INDEX.md` for detailed navigation
-2. **CONTRIBUTING Updates:** Reference `docs/INDEX.md` for documentation guidelines
+1. **README Updates:** Ensure root README links to `docs/meta/index.md` for detailed navigation
+2. **CONTRIBUTING Updates:** Reference `docs/meta/index.md` for documentation guidelines
 3. **Archive Review:** Periodically review archive for documents that can be removed entirely
 4. **Documentation Health:** Set up quarterly reviews to keep canonical docs current
 5. **Link Validation:** Run link checker to find any broken references post-move
@@ -261,8 +261,8 @@ Select-String -Path docs\*.md -Pattern "Theo Engine|TheoEngine" | Where-Object {
 ## Files Generated
 
 **New Documentation:**
-1. `docs/INDEX.md` - Master navigation index
-2. `docs/CASE_BUILDER.md` - Consolidated case builder spec
+1. `docs/meta/index.md` - Master navigation index
+2. `docs/features/case-builder/overview.md` - Consolidated case builder spec
 3. `docs/archive/README.md` - Archive overview
 4. `docs/archive/2025-10/README.md` - October summaries index
 5. `docs/archive/fixes/README.md` - Bug fixes index
@@ -289,6 +289,6 @@ Select-String -Path docs\*.md -Pattern "Theo Engine|TheoEngine" | Where-Object {
 
 The documentation cleanup successfully organized the project's knowledge base while preserving all historical context. The new structure makes it easier for contributors to find current information and for maintainers to keep documentation up-to-date.
 
-The archive system ensures that historical context remains accessible without cluttering active development documentation. The new `docs/INDEX.md` provides a clear entry point for all documentation needs.
+The archive system ensures that historical context remains accessible without cluttering active development documentation. The new `docs/meta/index.md` provides a clear entry point for all documentation needs.
 
 **Status:** Documentation cleanup complete. All canonical references remain current, historical content is preserved in organized archives, and branding is consistent throughout active documentation.

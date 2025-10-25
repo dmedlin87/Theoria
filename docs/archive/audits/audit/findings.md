@@ -11,7 +11,7 @@
 - **Proposed task**: Respect nested metadata selections by keeping the `metadata` object when sub-fields are requested, letting `_filter_values` perform the final pruning.
 
 ## Documentation correction task
-- **Location**: `docs/API.md`
+- **Location**: `docs/development/api-reference.md`
 - **Issue**: The `GET /research/contradictions` section omits the `perspective` query parameter that the FastAPI route already supports.
 - **Proposed task**: Document the `perspective` list parameter (with the allowed values) so client developers discover the full filtering surface.
 

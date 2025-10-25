@@ -178,7 +178,7 @@ jobs:
             echo "";
             echo "**Action items**";
             echo "- Document Lighthouse score deltas in your PR summary and capture hypotheses for any regressions.";
-            echo "- Coordinate required load tests with infrastructure changes per [Performance Monitoring Policy](docs/performance.md).";
+            echo "- Coordinate required load tests with infrastructure changes per [Performance Monitoring Policy](docs/operations/performance.md).";
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Lighthouse artifacts

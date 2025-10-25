@@ -3,7 +3,7 @@
 > **Status:** Archived playbook. The automation, dashboards, and roles referenced below are not available in the current product. The live system only writes raw audit logs; this runbook is preserved for future implementation planning.
 
 ## Purpose
-Provide a consistent escalation workflow for unsupported or high-risk claims emitted by the Theoria audit subsystem. This runbook aligns with the reporting layer defined in `docs/audit_mode_spec.md` §7–§8 and ensures regulatory compliance by prescribing human review checkpoints and documentation standards.
+Provide a consistent escalation workflow for unsupported or high-risk claims emitted by the Theoria audit subsystem. This runbook aligns with the reporting layer defined in `docs/security/audit-mode-spec.md` §7–§8 and ensures regulatory compliance by prescribing human review checkpoints and documentation standards.
 
 ## Trigger Conditions
 Escalate a claim when any of the following occur:
@@ -19,7 +19,7 @@ Escalate a claim when any of the following occur:
 - **Audit Engineering Liaison (AEL)** – Provides tooling support, regenerates reports, and coordinates fixes in the RAG pipeline.
 
 ## Tooling
-- **Audit Dashboard** (reporting layer in `docs/audit_mode_spec.md` §7–§8): Escalation queue, claim drill-down, and approval controls.
+- **Audit Dashboard** (reporting layer in `docs/security/audit-mode-spec.md` §7–§8): Escalation queue, claim drill-down, and approval controls.
 - **Claim Card Detail View**: Displays provenance, verification metrics, and evidence attachments.
 - **Case Management Ticketing** (Jira project `AUD`): Tracks remediation tasks with SLA timers.
 - **Notification Channels**: Slack channel `#audit-escalations` for asynchronous updates; PagerDuty service `Audit Compliance` for urgent breaches.

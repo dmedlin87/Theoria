@@ -10,7 +10,7 @@
 - Docker Compose codifies a full-stack topology (Postgres, Redis, API, MCP, Web) yet exposes default credentials and volumes without guidance on production hardening or cost controls.【F:infra/docker-compose.yml†L1-L88】
 - Frontend API proxies centralize auth header management and trace propagation, but environment defaults leak localhost URLs, suggesting gaps in deployment configuration management.【F:theo/services/web/app/api/search/route.ts†L1-L55】【F:theo/services/web/app/lib/api.ts†L1-L59】
 - Secrets persistence uses Fernet encryption but only if `SETTINGS_SECRET_KEY` is present; the lack of automated rotation or secret-source integration complicates compliance stories.【F:theo/application/facades/settings.py†L15-L488】【F:theo/application/facades/settings_store.py†L1-L104】
-- Documentation (README, BLUEPRINT, telemetry guide) is rich, and an ADR register now captures foundational choices (architecture, CI, typing), yet gaps remain for operational guardrails (e.g., when to enable `allow_insecure_startup`).【F:README.md†L1-L126】【F:docs/BLUEPRINT.md†L1-L120】【F:docs/telemetry.md†L1-L120】【F:docs/adr/0001-hexagonal-architecture.md†L1-L19】【F:docs/adr/0002-ci-security-guardrails.md†L1-L16】【F:docs/adr/0003-testing-and-coverage.md†L1-L16】
+- Documentation (README, BLUEPRINT, telemetry guide) is rich, and an ADR register now captures foundational choices (architecture, CI, typing), yet gaps remain for operational guardrails (e.g., when to enable `allow_insecure_startup`).【F:README.md†L1-L126】【F:docs/architecture/clean-architecture.md†L1-L120】【F:docs/operations/telemetry.md†L1-L120】【F:docs/adr/0001-hexagonal-architecture.md†L1-L19】【F:docs/adr/0002-ci-security-guardrails.md†L1-L16】【F:docs/adr/0003-testing-and-coverage.md†L1-L16】
 
 ## B) Quality Attribute Scorecard (0 = Poor, 3 = Excellent)
 | Attribute | Score | Rationale |
@@ -23,7 +23,7 @@
 | Operability | 2 | Telemetry hooks and `/metrics` endpoint are present, yet dependent on optional installs and lacking deployment automation for tracing exporters.【F:theo/services/api/app/telemetry.py†L200-L307】 |
 | Modularity | 2 | Clear service boundaries and dependency injection, but ingestion error policy tightly couples stage reliability to a single global default.【F:theo/services/api/app/ingest/orchestrator.py†L24-L108】【F:theo/services/api/app/ingest/stages/base.py†L39-L129】 |
 | Data Architecture | 2 | Schema models the domain but mixes relational and JSON blobs without lifecycle/index strategy, complicating analytics and migrations.【F:theo/services/api/app/db/models.py†L49-L360】 |
-| Observability | 2 | Structured logs, metrics, and trace propagation exist, yet require manual toggles (`THEO_ENABLE_CONSOLE_TRACES`) and optional deps, risking uneven coverage.【F:theo/services/api/app/telemetry.py†L200-L307】【F:docs/telemetry.md†L1-L120】 |
+| Observability | 2 | Structured logs, metrics, and trace propagation exist, yet require manual toggles (`THEO_ENABLE_CONSOLE_TRACES`) and optional deps, risking uneven coverage.【F:theo/services/api/app/telemetry.py†L200-L307】【F:docs/operations/telemetry.md†L1-L120】 |
 
 ## C) Findings
 | Severity | Area | Finding | Evidence | Why it matters | Recommendation | Effort | Owner |
@@ -33,7 +33,7 @@
 | Medium | Reliability/Observability | Reranker exceptions are swallowed silently, so degraded search quality or cost overruns go unnoticed.|【F:theo/services/api/app/infra/retrieval_service.py†L151-L205】|Users get lower relevance without alerts, undermining perceived quality while still incurring model costs.|Log exceptions with workflow telemetry, expose counters for reranker failures, and surface health in `/metrics`.|Low|Search Platform|
 | Medium | Data | Document/passages tables store polymorphic JSON without governance (no partial indexes, TTL, or migration notes), risking slow queries and migration pain.|【F:theo/services/api/app/db/models.py†L49-L360】|Unbounded JSON fields hurt planner selectivity and complicate analytics/reporting as corpus grows.|Define JSON schema fragments, add GIN/partial indexes for frequent keys, and document migration/versioning strategy.|Medium|Data Engineering|
 | Medium | Security/Config | Docker Compose ships with default Postgres credentials and no guidance for secrets/volume hardening, encouraging insecure defaults in staging/prod.|【F:infra/docker-compose.yml†L1-L88】|Developers may promote insecure compose configs to shared environments, exposing data and enabling lateral movement.|Document secure overrides (env var templates), enforce secrets via `.env.example`, and add lint/checks preventing default creds outside dev.|Low|DevOps|
-| Medium | Operability | Telemetry relies on optional dependencies and manual env toggles, so production deployments can quietly run without traces/metrics.|【F:theo/services/api/app/telemetry.py†L200-L307】【F:docs/telemetry.md†L1-L120】|Missing observability impairs incident response and SLO monitoring.|Add startup checks that fail or warn loudly when telemetry backends are absent in non-dev environments; supply IaC snippets for exporters.|Medium|SRE|
+| Medium | Operability | Telemetry relies on optional dependencies and manual env toggles, so production deployments can quietly run without traces/metrics.|【F:theo/services/api/app/telemetry.py†L200-L307】【F:docs/operations/telemetry.md†L1-L120】|Missing observability impairs incident response and SLO monitoring.|Add startup checks that fail or warn loudly when telemetry backends are absent in non-dev environments; supply IaC snippets for exporters.|Medium|SRE|
 
 ## D) Hotspots
 1. `theo/services/api/app/main.py` – centralizes startup policy, auth, and router wiring; refactoring here can enforce environment-aware security gates and telemetry requirements.【F:theo/services/api/app/main.py†L135-L305】
@@ -61,7 +61,7 @@
 - **Later (Roadmap)**
   - Integrate secrets storage with managed services (e.g., AWS KMS, HashiCorp Vault) and plan rotation workflows to meet compliance audits.【F:theo/application/facades/settings_store.py†L1-L104】
   - Expand cost-awareness in the LLM router (dynamic budgets, sustainability signals) and expose metrics for carbon/cost per workflow.【F:theo/services/api/app/ai/router.py†L1-L200】
-  - Extend ADR coverage to include security modes (e.g., `allow_insecure_startup`), ingestion resilience, and observability strategy to aid future audits.【F:docs/BLUEPRINT.md†L1-L120】【F:docs/adr/0001-hexagonal-architecture.md†L1-L19】
+  - Extend ADR coverage to include security modes (e.g., `allow_insecure_startup`), ingestion resilience, and observability strategy to aid future audits.【F:docs/architecture/clean-architecture.md†L1-L120】【F:docs/adr/0001-hexagonal-architecture.md†L1-L19】
 
 ## F) Appendices
 - **Service Topology**: Docker Compose defines Postgres, Redis, API, MCP, and Web containers with shared storage volumes and port mappings.【F:infra/docker-compose.yml†L1-L88】

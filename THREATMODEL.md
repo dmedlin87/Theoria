@@ -48,6 +48,6 @@ Theo Engine ingests theological content, normalizes scripture references, and ex
 
 ## Mitigation Tracking
 
-- `docs/Repo-Health.md` records outstanding action items.
+- `docs/security/repo-health.md` records outstanding action items.
 - CI workflows block merges when architecture tests or security scans fail.
 - ADRs capture acceptance of residual risks and future improvements.

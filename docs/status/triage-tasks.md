@@ -9,8 +9,8 @@
 ## Update feature discovery documentation
 - **Issue**: The API guide shows `/features` returning only four keys, but the implementation exposes additional toggles (cross references, textual variants, morphology, verse timeline, etc.), so the example response is outdated.
 - **Why it matters**: Accurate examples help client developers understand which flags they can rely on without inspecting the source.
-- **Proposed task**: Refresh the example JSON in `docs/API.md` to reflect the full response (or note that additional keys may be present), and mention the newer flags.
-- **Context**: [`docs/API.md`](API.md) lines 658-665 vs. [`theo/services/api/app/routes/features.py`](../theo/services/api/app/routes/features.py) lines 9-33. 【F:docs/API.md†L647-L665】【F:theo/services/api/app/routes/features.py†L9-L33】
+- **Proposed task**: Refresh the example JSON in `docs/development/api-reference.md` to reflect the full response (or note that additional keys may be present), and mention the newer flags.
+- **Context**: [`docs/development/api-reference.md`](API.md) lines 658-665 vs. [`theo/services/api/app/routes/features.py`](../theo/services/api/app/routes/features.py) lines 9-33. 【F:docs/development/api-reference.md†L647-L665】【F:theo/services/api/app/routes/features.py†L9-L33】
 
 ## Strengthen feature flag tests
 - **Issue**: `test_features.py` only asserts that certain keys exist in the payloads. It does not validate that environment-driven flags (e.g., `contradictions_enabled`, `geo_enabled`) toggle the responses, leaving regressions undetected.

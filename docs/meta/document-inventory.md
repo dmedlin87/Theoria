@@ -7,9 +7,9 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
 
 ## Snapshot
 
-- **Canonical entry points**: `README.md`, `CONTRIBUTING.md`, `START_HERE.md`, `SECURITY.md`, `DEPLOYMENT.md`, `THREATMODEL.md`.
+- **Canonical entry points**: `README.md`, `CONTRIBUTING.md`, `START_HERE.md`, `SECURITY.md`, `docs/operations/deployment-overview.md`, `THREATMODEL.md`.
 - **Agent handoff package**: `AGENT_HANDOFF_COMPLETE.md`, `HANDOFF_SESSION_2025_10_15.md`, `HANDOFF_MYPY_FIXES_2025_10_17.md`, `HANDOFF_NEXT_PHASE.md`, `IMPLEMENTATION_CONTEXT.md`, `QUICK_START_FOR_AGENTS.md`.
-- **Navigation aids**: `docs/INDEX.md` (master index) and `docs/DOCUMENTATION_GUIDE.md` (maintenance guide) are the definitive sources for researchers and contributors.
+- **Navigation aids**: `docs/meta/index.md` (master index) and `docs/meta/documentation-guide.md` (maintenance guide) are the definitive sources for researchers and contributors.
 - **Historical materials**: All October 2025 implementation notes, audits, and improvement logs live under `docs/archive/`.
 
 ## Root-Level Canonical Documents
@@ -20,7 +20,7 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
 | `START_HERE.md` | Launch instructions and troubleshooting for local setup | Authoritative |
 | `CONTRIBUTING.md` | Contribution workflow, tooling, and conventions | Authoritative |
 | `SECURITY.md` | Security policy and disclosure process | Authoritative |
-| `DEPLOYMENT.md` | Deployment and signing guidance | Authoritative |
+| `docs/operations/deployment-overview.md` | Deployment and signing guidance | Authoritative |
 | `THREATMODEL.md` | Current threat model for Theoria | Authoritative |
 | `AGENT_HANDOFF_COMPLETE.md` | Summary of delivered handoff materials | Active |
 | `HANDOFF_SESSION_2025_10_15.md` | Session recap and deployment notes | Active |
@@ -34,28 +34,28 @@ This inventory reflects the post-cleanup documentation structure. Canonical refe
 ## `docs/` Highlights
 
 - **Navigation & Maintenance**
-  - `docs/INDEX.md` — Comprehensive index organized by persona.
-  - `docs/DOCUMENTATION_GUIDE.md` — Structure, naming, and archive policy.
+  - `docs/meta/index.md` — Comprehensive index organized by persona.
+  - `docs/meta/documentation-guide.md` — Structure, naming, and archive policy.
 
 - **Cognitive Scholar**
-  - `docs/ROADMAP.md` — MVP/Alpha/Beta milestones for hypothesis, gate, TMS, debate, and visualization layers.
+  - `docs/features/roadmap/roadmap.md` — MVP/Alpha/Beta milestones for hypothesis, gate, TMS, debate, and visualization layers.
   - `HANDOFF_NEXT_PHASE.md` — Phase-by-phase implementation guide for the Cognitive Scholar stack.
-  - `docs/AGENT_AND_PROMPTING_GUIDE.md` — Prompting guardrails and gate operations documentation.
+  - `docs/agents/prompting-guide.md` — Prompting guardrails and gate operations documentation.
 
 - **Architecture & Operations**
-  - `docs/BLUEPRINT.md` — System design blueprint.
-  - `docs/AGENT_AND_PROMPTING_GUIDE.md` / `docs/AGENT_CONFINEMENT.md` — Agent framework and safety guardrails.
-  - `docs/SERVICE_MANAGEMENT.md` — Service orchestration and runbooks.
+  - `docs/architecture/clean-architecture.md` — System design blueprint.
+  - `docs/agents/prompting-guide.md` / `docs/agents/confinement.md` — Agent framework and safety guardrails.
+  - `docs/operations/service-management.md` — Service orchestration and runbooks.
 
 - **Feature Specifications**
-  - `docs/CASE_BUILDER.md` — Consolidated case builder roadmap (v4 is canonical).
-  - `docs/FUTURE_FEATURES_ROADMAP.md` — Prioritized backlog of 25 features.
-  - `docs/UI_NAVIGATION_LOADING_IMPROVEMENTS.md` — Active UI guidance that replaced the archived session logs.
+  - `docs/features/case-builder/overview.md` — Consolidated case builder roadmap (v4 is canonical).
+  - `docs/features/roadmap/future-features-roadmap.md` — Prioritized backlog of 25 features.
+  - `docs/features/ux/navigation-loading-improvements.md` — Active UI guidance that replaced the archived session logs.
 
 - **Testing & Quality**
   - `docs/testing/TEST_MAP.md` — Comprehensive testing matrix.
-  - `docs/ui-quality-gates.md` — UI acceptance thresholds.
-  - `docs/typing-standards.md` — Python and TypeScript typing policy.
+  - `docs/testing/ui-quality-gates.md` — UI acceptance thresholds.
+  - `docs/development/typing-standards.md` — Python and TypeScript typing policy.
 
 ## Archive Layout (`docs/archive/`)
 
@@ -72,9 +72,9 @@ Archived documents are **not** maintained. When referencing historical context, 
 ## Maintenance Guidance
 
 - Update this inventory after major documentation reorganizations or when adding/removing canonical files.
-- Keep `docs/INDEX.md` and `docs/DOCUMENTATION_GUIDE.md` synchronized with structural changes.
+- Keep `docs/meta/index.md` and `docs/meta/documentation-guide.md` synchronized with structural changes.
 - When a document becomes historical, move it to the appropriate archive subdirectory and add a note to the relevant README inside the archive.
-- For roadmap and implementation status, treat `HANDOFF_NEXT_PHASE.md` as canonical and ensure downstream docs (e.g., `docs/ROADMAP.md`, `docs/DISCOVERY_FEATURE.md`) remain in sync.
+- For roadmap and implementation status, treat `HANDOFF_NEXT_PHASE.md` as canonical and ensure downstream docs (e.g., `docs/features/roadmap/roadmap.md`, `docs/features/discovery/overview.md`) remain in sync.
 
 ## Automation
 
@@ -82,4 +82,4 @@ The legacy per-file tables from earlier audits have been retired. When you need 
 
 ---
 
-For questions about documentation maintenance, reach out in `docs/DOCUMENTATION_GUIDE.md` or open an issue with the affected paths and desired changes.
+For questions about documentation maintenance, reach out in `docs/meta/documentation-guide.md` or open an issue with the affected paths and desired changes.

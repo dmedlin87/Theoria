@@ -170,4 +170,4 @@ gh workflow run lighthouse.yml --ref main
 - **Baseline:** `.lighthouseci/baseline/manifest.json`
 - **Init Script:** `scripts/lighthouse-init-baseline.mjs`
 - **Comparison Script:** `scripts/compare-lighthouse-baseline.mjs`
-- **Previous Fix:** `docs/LIGHTHOUSE_FIX.md` (2025-01-14)
+- **Previous Fix:** `docs/operations/lighthouse-fix.md` (2025-01-14)

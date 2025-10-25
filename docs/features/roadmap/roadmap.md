@@ -61,5 +61,5 @@ Hypothesis & Debate stack. Refer to `HANDOFF_NEXT_PHASE.md` for detailed task br
 ## Maintenance Notes
 
 - Keep this summary synchronized with `HANDOFF_NEXT_PHASE.md` after each milestone.
-- Update dependent documentation (`docs/AGENT_AND_PROMPTING_GUIDE.md`, `docs/document_inventory.md`) whenever milestone names or
+- Update dependent documentation (`docs/agents/prompting-guide.md`, `docs/meta/document-inventory.md`) whenever milestone names or
   scopes change.

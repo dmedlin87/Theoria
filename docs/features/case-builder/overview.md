@@ -42,7 +42,7 @@ This implementation plan outlines a phased rollout:
 
 ## Schema
 
-The canonical schema is defined in `docs/case_builder.schema.json` with sample fixtures:
+The canonical schema is defined in `docs/features/case-builder/case-builder.schema.json` with sample fixtures:
 - `fixtures/case_builder/sample_convergence.json`
 - `fixtures/case_builder/sample_bundle.ndjson`
 - `fixtures/case_builder/bundle_record.json`

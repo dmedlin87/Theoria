@@ -151,7 +151,7 @@ read_metrics = read_policy.get_security_metrics()
 - ✅ Safe content validation tests
 - ✅ Edge case handling tests
 
-### 6. Documentation (`docs/AGENT_CONFINEMENT.md`)
+### 6. Documentation (`docs/agents/confinement.md`)
 
 **Created comprehensive security documentation:**
 
@@ -234,7 +234,7 @@ pytest tests/mcp_tools/test_security_confinement.py --cov=mcp_server --cov-repor
    - `mcp_server/validators.py` (217 lines) - Input validation module
    - `tests/mcp_tools/test_security_confinement.py` (392 lines) - Security tests
    - `tests/api/test_rag_guardrails_enhanced.py` (326 lines) - Guardrail tests
-   - `docs/AGENT_CONFINEMENT.md` (533 lines) - Documentation
+   - `docs/agents/confinement.md` (533 lines) - Documentation
    - `AGENT_CONFINEMENT_IMPROVEMENTS.md` (this file)
 
 2. **Modified:**

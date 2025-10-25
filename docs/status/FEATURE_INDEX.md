@@ -6,10 +6,10 @@ Each entry lists the canonical document, owning group, last review date, and cur
 | Feature / Area | Canonical Doc | Owner | Last Reviewed | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Cognitive Scholar MVP (CS-002 → CS-016) | `COGNITIVE_SCHOLAR_HANDOFF_NEW.md` | Cognitive Scholar Team | 2025-10-19 | Active | Update after each CS ticket milestone |
-| Roadmap Overview | `docs/ROADMAP.md` | Product | 2025-10-19 | Active | Mirrors `HANDOFF_NEXT_PHASE.md` |
+| Roadmap Overview | `docs/features/roadmap/roadmap.md` | Product | 2025-10-19 | Active | Mirrors `HANDOFF_NEXT_PHASE.md` |
 | Next Steps Playbook | `NEXT_STEPS.md` | Cognitive Scholar Team | 2025-10-19 | Active | Refresh every 48h during MVP push |
-| Discovery Feature | `docs/DISCOVERY_FEATURE.md` | Discovery Squad | 2025-10-19 | Stable | Update when engines change behaviour |
-| Architecture Improvements | `docs/ARCHITECTURE_IMPROVEMENTS.md` | Platform | 2025-10-18 | Stable | Quarterly review |
+| Discovery Feature | `docs/features/discovery/overview.md` | Discovery Squad | 2025-10-19 | Stable | Update when engines change behaviour |
+| Architecture Improvements | `docs/architecture/improvements.md` | Platform | 2025-10-18 | Stable | Quarterly review |
 | Tasks Index | `docs/tasks/README.md` | PMO | 2025-10-18 | Stable | Sync with TASK_005 |
 
 ## Governance Notes

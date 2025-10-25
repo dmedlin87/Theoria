@@ -36,8 +36,8 @@ Comprehensive architectural review conducted and **all high-priority improvement
 15. ✅ `theo/services/api/app/use_cases/refresh_discoveries.py` - Use case pattern
 
 ### Documentation (5 files)
-16. ✅ `docs/ARCHITECTURE_IMPROVEMENTS.md` - Implementation guide (695 lines)
-17. ✅ `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md` - Before/after examples (400+ lines)
+16. ✅ `docs/architecture/improvements.md` - Implementation guide (695 lines)
+17. ✅ `docs/architecture/migration-example.md` - Before/after examples (400+ lines)
 18. ✅ `ARCHITECTURE_REVIEW_IMPLEMENTATION_SUMMARY.md` - Executive summary
 19. ✅ `QUICK_START_ARCHITECTURE.md` - 5-minute quick start
 20. ✅ `.github/PULL_REQUEST_TEMPLATE_ARCHITECTURE.md` - PR template
@@ -145,14 +145,14 @@ def list_documents(session):
 ### For Developers
 
 1. **Read Quick Start** → `QUICK_START_ARCHITECTURE.md` (5 min)
-2. **See Examples** → `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
+2. **See Examples** → `docs/architecture/migration-example.md`
 3. **Reference Implementation** → `routes/discoveries_v1.py`
 4. **Start Coding** → Use patterns in new features
 
 ### For Reviewers
 
 1. **Executive Summary** → `ARCHITECTURE_REVIEW_IMPLEMENTATION_SUMMARY.md`
-2. **Implementation Details** → `docs/ARCHITECTURE_IMPROVEMENTS.md`
+2. **Implementation Details** → `docs/architecture/improvements.md`
 3. **Test Coverage** → Run `pytest tests/architecture/`
 4. **Verify** → All tests passing, no breaking changes
 
@@ -252,8 +252,8 @@ Tests verify:
 
 ### Documentation
 - **Quick Start**: `QUICK_START_ARCHITECTURE.md`
-- **Full Guide**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
-- **Examples**: `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
+- **Full Guide**: `docs/architecture/improvements.md`
+- **Examples**: `docs/architecture/migration-example.md`
 - **Summary**: `ARCHITECTURE_REVIEW_IMPLEMENTATION_SUMMARY.md`
 
 ### Code References

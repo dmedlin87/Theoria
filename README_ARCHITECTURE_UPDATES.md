@@ -63,7 +63,7 @@ Then adapt for your domain.
 
 ### For Existing Code
 
-**Migrate gradually** - See `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md` for step-by-step guide.
+**Migrate gradually** - See `docs/architecture/migration-example.md` for step-by-step guide.
 
 ### For Testing
 
@@ -82,8 +82,8 @@ mock_repo.list.return_value = [...]  # Fast tests!
 | If you want to... | Read this |
 |-------------------|-----------|
 | **Get started quickly** | `QUICK_START_ARCHITECTURE.md` |
-| **See code examples** | `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md` |
-| **Understand the changes** | `docs/ARCHITECTURE_IMPROVEMENTS.md` |
+| **See code examples** | `docs/architecture/migration-example.md` |
+| **Understand the changes** | `docs/architecture/improvements.md` |
 | **Review the decision** | `ARCHITECTURE_REVIEW_IMPLEMENTATION_SUMMARY.md` |
 | **Migrate step-by-step** | `examples/architecture_migration_step_by_step.py` |
 
@@ -155,8 +155,8 @@ mock_repo.list.return_value = [...]  # Fast tests!
 
 ## 📞 Questions?
 
-- **Architecture patterns**: See `docs/ARCHITECTURE_IMPROVEMENTS.md`
-- **Code examples**: See `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
+- **Architecture patterns**: See `docs/architecture/improvements.md`
+- **Code examples**: See `docs/architecture/migration-example.md`
 - **Quick reference**: See `QUICK_START_ARCHITECTURE.md`
 - **Original review**: See architecture review document
 

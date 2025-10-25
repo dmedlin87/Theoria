@@ -361,7 +361,7 @@ class Insight:
 ## Layer 3: Theoria Research Orchestrator (TRO)
 
 ### Location
-- `docs/theoria_instruction_prompt.md`
+- `docs/agents/system-prompt.md`
 
 ### Purpose
 Master instruction prompt that orchestrates all agent behaviors
@@ -754,11 +754,11 @@ pytest tests/api/ai/test_guardrails.py -v
 
 ## Related Documentation
 
-- **[AGENT_THINKING_ENHANCEMENT.md](AGENT_THINKING_ENHANCEMENT.md)** - Full design doc for reasoning framework
-- **[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)** - Step-by-step implementation guide
+- **[Agent Thinking Enhancement](thinking-enhancement.md)** - Full design doc for reasoning framework
+- **[Implementation Guide](implementation-guide.md)** - Step-by-step implementation guide
 - **[theoria_instruction_prompt.md](theoria_instruction_prompt.md)** - Master TRO instruction prompt
-- **[AGENT_CONFINEMENT.md](AGENT_CONFINEMENT.md)** - Security framework for AI agents
-- **[DISCOVERY_FEATURE.md](DISCOVERY_FEATURE.md)** - Auto-discovery engine design
+- **[Agent Confinement](confinement.md)** - Security framework for AI agents
+- **[Discovery Feature Overview](../features/discovery/overview.md)** - Auto-discovery engine design
 - **[mcp_integration_guide.md](mcp_integration_guide.md)** - Model Context Protocol integration
 
 ---

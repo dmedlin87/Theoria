@@ -1,6 +1,6 @@
 # Case Builder v4 Implementation Plan
 
-> Schema reference: See [`docs/case_builder.schema.json`](docs/case_builder.schema.json) for the authoritative payload contract alongside sample fixtures such as [`sample_convergence.json`](fixtures/case_builder/sample_convergence.json) and [`sample_bundle.ndjson`](fixtures/case_builder/sample_bundle.ndjson) for end-to-end examples.
+> Schema reference: See [`docs/features/case-builder/case-builder.schema.json`](docs/features/case-builder/case-builder.schema.json) for the authoritative payload contract alongside sample fixtures such as [`sample_convergence.json`](fixtures/case_builder/sample_convergence.json) and [`sample_bundle.ndjson`](fixtures/case_builder/sample_bundle.ndjson) for end-to-end examples.
 
 ## Phase 0 – Domain model & ingestion scaffolding (Weeks 0-1)
 - Introduce SQLAlchemy models and migrations for the case-builder tables—`CaseObject`, `CaseSource`, `CaseEdge`, `CaseInsight`, and `CaseUserAction`—mirroring the blueprint’s storage contract while reusing existing vector/JSON column helpers in `theo.services.api.app.db.models`.

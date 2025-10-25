@@ -107,8 +107,8 @@ Each document includes:
 
 ### For New Patterns
 - **Quick Start**: `QUICK_START_ARCHITECTURE.md` (5 min)
-- **Examples**: `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
-- **Full Guide**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
+- **Examples**: `docs/architecture/migration-example.md`
+- **Full Guide**: `docs/architecture/improvements.md`
 
 ### For Reference
 - **Clean Routes**: `theo/services/api/app/routes/discoveries_v1.py`
@@ -163,7 +163,7 @@ mypy theo/
 1. **Start Small**: Prototype a thin slice of TASK_CS_001 (e.g., repository + list API) before expanding scope.
 2. **Use References**: Reuse patterns from `theo/services/api/app/routes/discoveries_v1.py` and existing research tests.
 3. **Test First**: Capture repository + API expectations in `theo/services/api/tests/research/test_hypotheses.py` before wiring UI.
-4. **Ask for Help**: Architectural patterns remain documented—cross-check `docs/IMPLEMENTATION_GUIDE.md`.
+4. **Ask for Help**: Architectural patterns remain documented—cross-check `docs/agents/implementation-guide.md`.
 5. **Document Lessons**: Add Cognitive Scholar insights to `docs/tasks/theoria_feature_brainstorm_cognitive_scholar_v_1.md`.
 
 ---
@@ -172,7 +172,7 @@ mypy theo/
 
 ### Documentation
 - Architecture overview: `ARCHITECTURE_COMPLETE.md`
-- Migration guide: `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
+- Migration guide: `docs/architecture/migration-example.md`
 - Task details: `docs/tasks/README.md`
 
 ### Code References
