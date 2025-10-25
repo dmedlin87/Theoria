@@ -654,6 +654,10 @@ def _run_with_sqlite_lock_retry(
             return True
         except OperationalError as exc:
             if getattr(exc, "_theoria_missing_column_handled", False):
+                working_session.rollback()
+                _dispose_sqlite_engine(working_session.get_bind())
+                if working_session is not session:
+                    working_session.close()
                 raise
             if _handle_missing_perspective_error(working_session, dataset_label, exc):
                 bind = working_session.get_bind()
@@ -711,6 +715,8 @@ def _run_seed_with_perspective_guard(
         except OperationalError as exc:
             if getattr(exc, "_theoria_missing_column_handled", False):
                 attempts += 1
+                if attempts >= 2:
+                    return
                 continue
             handled = _handle_missing_perspective_error(session, dataset_label, exc)
             if not handled:
