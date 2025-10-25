@@ -115,3 +115,12 @@ def test_trace_repository_call_marks_failure() -> None:
     failure_attrs = [value for key, value in provider.span_attributes if key == "repository.status"]
     assert failure_attrs[-1] == "failed"
     assert provider.histograms[-1][0] == REPOSITORY_LATENCY_METRIC
+
+
+def test_trace_repository_call_without_provider_is_noop() -> None:
+    with trace_repository_call("document", "list") as trace:
+        trace.record_result_count(1)
+        trace.set_attribute("ignored", True)
+
+    assert getattr(trace, "repository") == "document"
+    assert getattr(trace, "operation") == "list"
