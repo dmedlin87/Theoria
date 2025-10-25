@@ -3,10 +3,10 @@ version: '3'
 tasks:
   start_api:
     cmds:
-      - poetry run uvicorn theo.services.api.app:app --reload --port 8000
+      - poetry run uvicorn theo.services.api.app.bootstrap.app_factory:create_app --factory --reload --port 8000
     silent: true
 
   stop_api:
     cmds:
-      - pkill -f "uvicorn .*theo.services.api.app" || true
+      - pkill -f "uvicorn .*theo.services.api.app.bootstrap.app_factory" || true
     silent: true

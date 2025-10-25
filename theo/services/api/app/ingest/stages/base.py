@@ -31,7 +31,7 @@ class Instrumentation:
         setter = self.setter
         if setter is None:
             try:
-                from ..telemetry import set_span_attribute as default_setter
+                from theo.application.facades.telemetry import set_span_attribute as default_setter
             except Exception:  # pragma: no cover - defensive import
                 return
             setter = default_setter

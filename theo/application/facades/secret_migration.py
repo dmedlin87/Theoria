@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from theo.adapters.persistence.models import AppSetting
 from theo.application.facades.settings import get_settings_cipher
@@ -17,12 +17,19 @@ from theo.application.ports.ai_registry import (
     SETTINGS_KEY as LLM_SETTINGS_KEY,
     registry_from_payload,
 )
-from theo.services.api.app.ai.registry import save_llm_registry
-
 logger = logging.getLogger(__name__)
 
 _ENCRYPTED_FIELD = "__encrypted__"
 _PROVIDER_SETTINGS_KEY = "ai_providers"
+
+_save_llm_registry: Callable[[SessionProtocol, Any], None] | None = None
+
+
+def set_llm_registry_saver(callback: Callable[[SessionProtocol, Any], None]) -> None:
+    """Register the persistence hook used to store LLM registries."""
+
+    global _save_llm_registry
+    _save_llm_registry = callback
 
 
 def migrate_secret_settings(
@@ -61,7 +68,9 @@ def _migrate_llm_registry(session: SessionProtocol, *, dry_run: bool) -> bool:
     if dry_run:
         return True
     registry, _ = registry_from_payload(payload if isinstance(payload, dict) else None)
-    save_llm_registry(session, registry)
+    if _save_llm_registry is None:
+        raise RuntimeError("LLM registry saver has not been configured")
+    _save_llm_registry(session, registry)
     return True
 
 

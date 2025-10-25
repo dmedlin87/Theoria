@@ -32,7 +32,7 @@ from ..models.notebooks import (
     NotebookUpdatePayload,
 )
 from ..routes.realtime import publish_notebook_update
-from ..security import Principal
+from theo.application.security import Principal
 
 
 def _principal_subject(principal: Principal | None) -> str | None:

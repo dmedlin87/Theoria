@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 from sqlalchemy.orm import Session
 
@@ -16,10 +16,29 @@ from ..models.ai import (
     ChatSessionMessage,
     ChatSessionPreferences,
 )
-from ..workers.tasks import celery
 from .trails import TrailStepDigest
 
 LOGGER = logging.getLogger(__name__)
+
+
+if TYPE_CHECKING:  # pragma: no cover - typing support only
+    from celery import Celery
+
+
+_celery_app: "Celery" | None = None
+
+
+def _resolve_celery() -> "Celery" | None:
+    global _celery_app
+    if _celery_app is not None:
+        return _celery_app
+    try:
+        from ..workers.tasks import celery as celery_app
+    except Exception:  # pragma: no cover - defensive import guard
+        LOGGER.debug("Unable to import celery application", exc_info=True)
+        return None
+    _celery_app = celery_app
+    return _celery_app
 
 
 class TrailsMemoryBridge:
@@ -188,9 +207,13 @@ class TrailsMemoryBridge:
         actions = digest.normalised_recommended_actions()
         if not actions:
             return
+        celery_app = _resolve_celery()
+        if celery_app is None:
+            return
+
         for action in actions:
             try:
-                celery.send_task(
+                celery_app.send_task(
                     "tasks.enqueue_follow_up_retrieval",
                     kwargs={
                         "session_id": session_id,

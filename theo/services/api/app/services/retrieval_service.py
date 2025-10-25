@@ -26,7 +26,8 @@ from ..models.search import HybridSearchRequest, HybridSearchResult
 from ..ranking.mlflow_integration import is_mlflow_uri, mlflow_signature
 from ..ranking.re_ranker import Reranker, load_reranker
 from ..retriever.hybrid import hybrid_search
-from ..telemetry import SEARCH_RERANKER_EVENTS
+from theo.application.facades.telemetry import record_counter
+from theo.application.telemetry import SEARCH_RERANKER_EVENTS_METRIC
 
 LOGGER = logging.getLogger(__name__)
 
@@ -128,7 +129,10 @@ class _RerankerCache:
                                 "error": str(exc),
                             },
                         )
-                        SEARCH_RERANKER_EVENTS.labels(event="load_failed").inc()
+                        record_counter(
+                            SEARCH_RERANKER_EVENTS_METRIC,
+                            labels={"event": "load_failed"},
+                        )
                     retry_in = self.cooldown_seconds
                     retry_at = datetime.now(timezone.utc) + timedelta(
                         seconds=retry_in
@@ -392,7 +396,10 @@ class RetrievalService:
                 "duration_ms": duration_ms,
             }
             LOGGER.exception("search.reranker_failed", extra=failure_payload)
-            SEARCH_RERANKER_EVENTS.labels(event="failed").inc()
+            record_counter(
+                SEARCH_RERANKER_EVENTS_METRIC,
+                labels={"event": "failed"},
+            )
             return [item.model_copy(deep=True) for item in result_list], False
 
         duration_ms = round((time.perf_counter() - start_time) * 1000, 3)
@@ -432,7 +439,10 @@ class RetrievalService:
             "ordering_changed": ordering_changed,
         }
         LOGGER.info("search.reranker_applied", extra=success_payload)
-        SEARCH_RERANKER_EVENTS.labels(event="applied").inc()
+        record_counter(
+            SEARCH_RERANKER_EVENTS_METRIC,
+            labels={"event": "applied"},
+        )
 
         return reranked_results, True
 

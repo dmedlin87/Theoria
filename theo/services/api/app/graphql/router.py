@@ -5,13 +5,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from strawberry.fastapi import GraphQLRouter
 
-from ..security import require_principal
+from ..adapters.security import require_principal
 from .context import get_graphql_context
 from .schema import schema
 
 _graphql_app = GraphQLRouter(
     schema,
-    path="/",
+    path="/graphql",
     context_getter=get_graphql_context,
 )
 

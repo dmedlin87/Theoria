@@ -351,3 +351,24 @@
 - Prioritise migrating any worker/task imports off the package root before deleting compatibility exports to avoid Celery startup regressions.
 - Keep running `tests/api/ai/test_ai_package_exports.py` after each migration to ensure the narrowing namespace remains intentional and documented.
 - Continue appending detailed entries here so future agents can track the shrinking compatibility surface and outstanding documentation updates.
+
+## Entry – 2025-11-09
+
+### Delivered in this PR
+- Migrated the Celery worker tasks to import guardrail helpers and deliverable builders from the modular `ai.rag` subpackages, eliminating the final worker dependency on the root `theo.services.api.app.ai` shim.
+- Updated the citation validation worker to call `build_citations` and `validate_model_completion` directly from `ai.rag.guardrail_helpers`, keeping the workflow aligned with the modular guardrail surface.
+- Verified the compatibility layer still passes by running `pytest tests/api/ai/test_ai_package_exports.py`.
+
+### Follow-up / Remaining Scope for Phase 2
+1. **Finish auditing background workers for legacy imports:**
+   - Review other worker utilities (e.g., discovery scheduling, analytics) for lingering `theo.services.api.app.ai` imports and migrate them to the relevant modular packages so the shim can be narrowed further.
+   - Confirm no deferred imports reinstall the root `rag` dependency at runtime after these changes.
+2. **Trim the root AI package exports once consumers migrate:**
+   - After confirming background workers are clean, remove the redundant guardrail and deliverable re-exports from `theo/services/api/app/ai/__init__.py` and update regression tests to reflect the slimmer surface.
+3. **Document the worker import expectations:**
+   - Add a short note to the Phase 2 architecture update (or worker module docstrings) describing the new modular import paths so future worker additions avoid the legacy shim by default.
+
+### Guidance for the Next Agent
+- Keep running the package export regression suite after each compatibility change to ensure the shim remains intentional until it can be deleted.
+- Prioritise locating any remaining worker imports that still reference `theo.services.api.app.ai` so the root package can eventually shed its guardrail exports entirely.
+- Continue appending structured entries to this log after every Phase 2 PR to preserve the migration narrative.

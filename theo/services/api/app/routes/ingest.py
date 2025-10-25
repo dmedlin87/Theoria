@@ -28,8 +28,14 @@ from ..models.documents import (
     SimpleIngestRequest,
     UrlIngestRequest,
 )
-from ..resilience import ResilienceError, ResiliencePolicy, resilient_async_operation
-from ..security import Principal, require_principal
+from theo.application.facades.resilience import (
+    ResilienceError,
+    ResilienceSettings,
+    resilient_async_operation,
+)
+from theo.application.security import Principal
+
+from ..adapters.security import require_principal
 from ..services.ingestion_service import IngestionService, get_ingestion_service
 from ..utils.imports import LazyImportModule
 
@@ -189,7 +195,7 @@ async def _stream_upload_to_path(
             _write,
             key=f"ingest:upload:{destination.suffix or 'bin'}",
             classification="file",
-            policy=ResiliencePolicy(max_attempts=1),
+            settings=ResilienceSettings(max_attempts=1),
         )
     except ResilienceError as exc:
         cause = exc.__cause__

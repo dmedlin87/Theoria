@@ -189,7 +189,7 @@ from theo.services.api.app.main import app
 from theo.services.api.app.db import run_sql_migrations as migrations_module
 from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, configure_engine, get_engine
-from theo.services.api.app.security import require_principal
+from theo.services.api.app.adapters.security import require_principal
 
 @pytest.fixture(autouse=True)
 def _bypass_authentication(request: pytest.FixtureRequest):
@@ -241,7 +241,7 @@ def _disable_migrations(
         _noop_run_sql_migrations,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.main.run_sql_migrations",
+        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
         _noop_run_sql_migrations,
     )
 
@@ -297,17 +297,17 @@ def _skip_heavy_startup() -> None:
             original_seed_reference_data(session)
 
     monkeypatch.setattr(
-        "theo.services.api.app.main.seed_reference_data",
+        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
         _maybe_seed_reference_data,
         raising=False,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.main.start_discovery_scheduler",
+        "theo.services.api.app.bootstrap.lifecycle.start_discovery_scheduler",
         lambda: None,
         raising=False,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.main.stop_discovery_scheduler",
+        "theo.services.api.app.bootstrap.lifecycle.stop_discovery_scheduler",
         lambda: None,
         raising=False,
     )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 import types
 
-from ...telemetry import instrument_workflow
+from theo.application.facades.telemetry import instrument_workflow
 from ..registry import get_llm_registry
 from . import (
     chat as _chat_module,

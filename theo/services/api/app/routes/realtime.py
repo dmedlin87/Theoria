@@ -14,7 +14,9 @@ from sqlalchemy.orm import Session
 from theo.application.facades.database import get_session
 
 from ..models.notebooks import NotebookRealtimeSnapshot
-from ..security import Principal, require_principal
+from theo.application.security import Principal
+
+from ..adapters.security import require_principal
 
 if TYPE_CHECKING:  # pragma: no cover - used only for type hints
     from ..notebooks.service import NotebookService
