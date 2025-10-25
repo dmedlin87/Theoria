@@ -44,21 +44,37 @@ def _run_generation(router: LLMRouterService, workflow: str = "chat"):
     raise AssertionError("router failed to produce a generation")
 
 
+@pytest.fixture
+def sleep_stub() -> Callable[[float], bool]:
+    """Return a ``threading.Event.wait`` stub for injectable sleep."""
+
+    waiter = threading.Event()
+    waiter.set()
+    return waiter.wait
+
+
 def _wait_until(
-    predicate: Callable[[], bool], *, timeout: float = 1.0, interval: float = 0.001
+    predicate: Callable[[], bool], *, timeout: float = 1.0, interval: float = 0.001,
+    sleep_fn: Callable[[float], bool | None] | None = None,
 ) -> None:
     """Spin until ``predicate`` evaluates truthy or raise after ``timeout``."""
 
+    sleeper = time.sleep if sleep_fn is None else sleep_fn
     deadline = time.perf_counter() + timeout
     while time.perf_counter() < deadline:
         if predicate():
             return
-        time.sleep(interval)
+        sleeper(interval)
     raise AssertionError("timed out waiting for condition")
 
 
 def _wait_for_inflight_status(
-    ledger: SharedLedger, cache_key: str, status: str, *, timeout: float = 1.0
+    ledger: SharedLedger,
+    cache_key: str,
+    status: str,
+    *,
+    timeout: float = 1.0,
+    sleep_fn: Callable[[float], bool | None] | None = None,
 ) -> None:
     """Block until an inflight row reaches the requested ``status``."""
 
@@ -67,11 +83,15 @@ def _wait_for_inflight_status(
             row = txn.get_inflight(cache_key)
         return row is not None and row.status == status
 
-    _wait_until(_predicate, timeout=timeout)
+    _wait_until(_predicate, timeout=timeout, sleep_fn=sleep_fn)
 
 
 def _wait_for_inflight_absence(
-    ledger: SharedLedger, cache_key: str, *, timeout: float = 1.0
+    ledger: SharedLedger,
+    cache_key: str,
+    *,
+    timeout: float = 1.0,
+    sleep_fn: Callable[[float], bool | None] | None = None,
 ) -> None:
     """Block until no inflight row exists for ``cache_key``."""
 
@@ -79,10 +99,15 @@ def _wait_for_inflight_absence(
         with ledger.transaction() as txn:
             return txn.get_inflight(cache_key) is None
 
-    _wait_until(_predicate, timeout=timeout)
+    _wait_until(_predicate, timeout=timeout, sleep_fn=sleep_fn)
 
 
-def _wait_for_wal_cleanup(path: Path | str, *, timeout: float = 1.0) -> None:
+def _wait_for_wal_cleanup(
+    path: Path | str,
+    *,
+    timeout: float = 1.0,
+    sleep_fn: Callable[[float], bool | None] | None = None,
+) -> None:
     """Wait until SQLite WAL/shm sidecar files disappear."""
 
     base = Path(path)
@@ -91,7 +116,7 @@ def _wait_for_wal_cleanup(path: Path | str, *, timeout: float = 1.0) -> None:
     def _missing_all() -> bool:
         return all(not candidate.exists() for candidate in candidates)
 
-    _wait_until(_missing_all, timeout=timeout)
+    _wait_until(_missing_all, timeout=timeout, sleep_fn=sleep_fn)
 
 
 def _process_budget_run(ledger_path: str, result_queue: mp.Queue) -> None:
@@ -129,7 +154,11 @@ def _process_budget_run(ledger_path: str, result_queue: mp.Queue) -> None:
 
 
 def _process_latency_run(
-    ledger_path: str, result_queue: mp.Queue, *, delay: float
+    ledger_path: str,
+    result_queue: mp.Queue,
+    *,
+    delay: float,
+    sleep_fn: Callable[[float], bool | None] | None = None,
 ) -> None:
     registry = LLMRegistry()
     registry.add_model(
@@ -154,11 +183,13 @@ def _process_latency_run(
 
     slow_calls = 0
 
+    sleeper = time.sleep if sleep_fn is None else sleep_fn
+
     class _SlowClient:
         def generate(self, **_: object) -> str:
             nonlocal slow_calls
             slow_calls += 1
-            time.sleep(delay)
+            sleeper(delay)
             return "slow-response"
 
     class _FastClient:
@@ -483,7 +514,7 @@ def test_router_reuses_cache_entry(monkeypatch):
     assert router.get_spend("cached") == pytest.approx(first.cost)
 
 
-def test_router_deduplicates_inflight_requests(monkeypatch):
+def test_router_deduplicates_inflight_requests(monkeypatch, sleep_stub):
     registry = LLMRegistry()
     registry.add_model(
         LLMModel(
@@ -517,6 +548,9 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
     monkeypatch.setattr(router._ledger, "_read_inflight", _instrumented_read)
 
     class _SlowClient:
+        def __init__(self, sleeper: Callable[[float], bool | None]):
+            self._sleep = sleeper
+
         def generate(self, **_: object) -> str:
             nonlocal call_count
             with call_lock:
@@ -526,11 +560,11 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
                 first_started.set()
                 if not allow_first_to_finish.wait(timeout=5.0):  # pragma: no cover - safeguard
                     raise TimeoutError("test did not release first generation")
-                time.sleep(0.001)
+                self._sleep(0.001)
                 return "shared-output"
             pytest.fail("Unexpected follower generation invocation")
 
-    monkeypatch.setattr(model, "build_client", lambda: _SlowClient())
+    monkeypatch.setattr(model, "build_client", lambda: _SlowClient(sleep_stub))
 
     start_barrier = threading.Barrier(3)
 
@@ -588,7 +622,9 @@ def test_router_deduplicates_inflight_requests(monkeypatch):
     assert replayed_record.output == "shared-output"
 
 
-def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch):
+def test_router_deduplicates_inflight_requests_handles_restart_error(
+    monkeypatch, sleep_stub
+):
     registry = LLMRegistry()
     registry.add_model(
         LLMModel(
@@ -612,6 +648,9 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
     retry_attempted = threading.Event()
 
     class _FlakyClient:
+        def __init__(self, sleeper: Callable[[float], bool | None]):
+            self._sleep = sleeper
+
         def generate(self, **_: object) -> str:
             nonlocal call_count
             with call_lock:
@@ -621,12 +660,12 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
                 first_call_done.set()
                 if not first_call_release.wait(timeout=5.0):  # pragma: no cover - safeguard
                     raise TimeoutError("test did not release initial generation")
-                time.sleep(0.001)
+                self._sleep(0.001)
                 return "shared-output"
             retry_attempted.set()
             raise GenerationError("boom")
 
-    monkeypatch.setattr(model, "build_client", lambda: _FlakyClient())
+    monkeypatch.setattr(model, "build_client", lambda: _FlakyClient(sleep_stub))
 
     original_wait = router._ledger.wait_for_inflight
 
@@ -668,15 +707,15 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
             if snapshot is not None:
                 initial_updated_at = snapshot.updated_at
             else:
-                time.sleep(0.01)
+                sleep_stub(0.01)
         first_call_release.set()
-        time.sleep(0.01)
+        sleep_stub(0.01)
 
         def _expect_error() -> None:
             router.execute_generation(workflow="chat", model=model, prompt="simultaneous")
 
         error_future = executor.submit(_expect_error)
-        _wait_until(retry_attempted.is_set, timeout=1.0)
+        _wait_until(retry_attempted.is_set, timeout=1.0, sleep_fn=sleep_stub)
         with pytest.raises(GenerationError):
             error_future.result()
 
@@ -707,7 +746,7 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(monkeypatch
     assert replayed_record.output == "shared-output"
 
 
-def test_wait_for_inflight_handles_transient_absence(tmp_path):
+def test_wait_for_inflight_handles_transient_absence(tmp_path, sleep_stub):
     ledger_path = tmp_path / "transient-inflight.db"
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
@@ -746,7 +785,7 @@ def test_wait_for_inflight_handles_transient_absence(tmp_path):
     with ledger.transaction() as txn:
         txn.create_inflight(cache_key, model_name="model", workflow="workflow")
 
-    _wait_for_inflight_status(ledger, cache_key, "waiting")
+    _wait_for_inflight_status(ledger, cache_key, "waiting", sleep_fn=sleep_stub)
 
     with ledger.transaction() as txn:
         txn.mark_inflight_success(
@@ -767,7 +806,7 @@ def test_wait_for_inflight_handles_transient_absence(tmp_path):
     assert outputs == ["shared-output"] * waiter_count
 
 
-def test_wait_for_inflight_recovers_from_transient_error(tmp_path):
+def test_wait_for_inflight_recovers_from_transient_error(tmp_path, sleep_stub):
     ledger_path = tmp_path / "transient-error.db"
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
@@ -801,7 +840,7 @@ def test_wait_for_inflight_recovers_from_transient_error(tmp_path):
     with ledger.transaction() as txn:
         txn.mark_inflight_error(cache_key, "transient failure")
 
-    _wait_for_inflight_status(ledger, cache_key, "error")
+    _wait_for_inflight_status(ledger, cache_key, "error", sleep_fn=sleep_stub)
 
     with ledger.transaction() as txn:
         txn.mark_inflight_success(
@@ -821,7 +860,7 @@ def test_wait_for_inflight_recovers_from_transient_error(tmp_path):
 
 
 def test_wait_for_inflight_preserves_completed_output_after_restart_failure(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, sleep_stub
 ):
     ledger_path = tmp_path / "restart-failure.db"
     ledger = SharedLedger(str(ledger_path))
@@ -1005,7 +1044,7 @@ def test_wait_for_inflight_returns_empty_output(tmp_path):
     assert outputs == [""]
 
 
-def test_wait_for_inflight_waits_for_late_cache_write(tmp_path):
+def test_wait_for_inflight_waits_for_late_cache_write(tmp_path, sleep_stub):
     ledger_path = tmp_path / "late-cache.db"
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
@@ -1039,7 +1078,7 @@ def test_wait_for_inflight_waits_for_late_cache_write(tmp_path):
     with ledger.transaction() as txn:
         txn.clear_single_inflight(cache_key)
 
-    _wait_for_inflight_absence(ledger, cache_key)
+    _wait_for_inflight_absence(ledger, cache_key, sleep_fn=sleep_stub)
 
     with ledger.transaction() as txn:
         txn.store_cache_entry(
@@ -1101,7 +1140,7 @@ def test_wait_for_inflight_handles_restart_requeue(tmp_path):
     with ledger.transaction() as txn:
         txn.create_inflight(cache_key, model_name="model", workflow="workflow")
 
-    _wait_for_inflight_status(ledger, cache_key, "waiting")
+    _wait_for_inflight_status(ledger, cache_key, "waiting", sleep_fn=sleep_stub)
 
     with ledger.transaction() as txn:
         txn.mark_inflight_success(
@@ -1120,13 +1159,13 @@ def test_wait_for_inflight_handles_restart_requeue(tmp_path):
     assert outputs == ["after-restart"]
 
 
-def test_router_shared_spend_across_processes(tmp_path):
+def test_router_shared_spend_across_processes(tmp_path, sleep_stub):
     ledger_path = tmp_path / "shared-ledger.db"
     # Reset in a context to ensure cleanup
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
     del ledger  # Ensure connections are closed
-    _wait_for_wal_cleanup(ledger_path)
+    _wait_for_wal_cleanup(ledger_path, sleep_fn=sleep_stub)
     results: mp.Queue = mp.Queue()
 
     first = mp.Process(target=_process_budget_run, args=(str(ledger_path), results))
@@ -1158,13 +1197,13 @@ def test_router_shared_spend_across_processes(tmp_path):
     assert second_result["backup_spend"] > 0.0
 
 
-def test_router_shared_latency_across_processes(tmp_path):
+def test_router_shared_latency_across_processes(tmp_path, sleep_stub):
     ledger_path = tmp_path / "latency-ledger.db"
     # Reset in a context to ensure cleanup
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
     del ledger  # Ensure connections are closed
-    _wait_for_wal_cleanup(ledger_path)
+    _wait_for_wal_cleanup(ledger_path, sleep_fn=sleep_stub)
     results: mp.Queue = mp.Queue()
 
     first = mp.Process(
