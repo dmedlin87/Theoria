@@ -1103,7 +1103,7 @@ def test_wait_for_inflight_waits_for_late_cache_write(tmp_path, sleep_stub):
     assert outputs == ["cached-output"]
 
 
-def test_wait_for_inflight_handles_restart_requeue(tmp_path):
+def test_wait_for_inflight_handles_restart_requeue(tmp_path, sleep_stub):
     ledger_path = tmp_path / "restart-requeue.db"
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
