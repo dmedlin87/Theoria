@@ -193,40 +193,39 @@ function Initialize-VirtualEnvironment {
 
 function Install-PythonDependencies {
     param([string]$PythonExe)
-    
-    Write-Step "Checking Python dependencies..."
-    
-    $requirementsFile = Join-Path $Script:ProjectRoot "requirements.txt"
-    if (-not (Test-Path $requirementsFile)) {
-        Write-Warn "requirements.txt not found, skipping Python dependencies"
+
+    Write-Step "Installing Python dependencies..."
+
+    $pyproject = Join-Path $Script:ProjectRoot "pyproject.toml"
+    if (-not (Test-Path $pyproject)) {
+        Write-Warn "pyproject.toml not found, skipping Python dependencies"
         return
     }
-    
-    # Check if dependencies are already installed
-    $pipList = & $PythonExe -m pip list --format=json 2>&1 | ConvertFrom-Json
-    $installedPackages = $pipList.name
-    
-    # Check each requirement against installed packages
-    $missingPackages = Get-Content $requirementsFile | ForEach-Object {
-        $line = $_.Trim()
-        if ($line -and -not $line.StartsWith('#')) {
-            $packageName = ($line -split '[>=<]')[0].Trim()
-            if ($packageName -notin $installedPackages) {
-                $packageName
-            }
+
+    $constraintsDir = Join-Path $Script:ProjectRoot "constraints"
+    $apiConstraints = Join-Path $constraintsDir "api.txt"
+    $mlConstraints = Join-Path $constraintsDir "ml.txt"
+    $devConstraints = Join-Path $constraintsDir "dev.txt"
+
+    foreach ($file in @($apiConstraints, $mlConstraints, $devConstraints)) {
+        if (-not (Test-Path $file)) {
+            throw "Missing constraints file: $file"
         }
     }
-    
-    if ($missingPackages) {
-        Write-Step "Installing Python dependencies..."
+
+    Push-Location $Script:ProjectRoot
+    try {
         & $PythonExe -m pip install -q --upgrade pip
-        & $PythonExe -m pip install -q -r $requirementsFile
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to install Python dependencies"
-        }
+        & $PythonExe -m pip install -q '.[api]' -c $apiConstraints
+        if ($LASTEXITCODE -ne 0) { throw "Failed to install api dependencies" }
+        & $PythonExe -m pip install -q '.[ml]' -c $mlConstraints
+        if ($LASTEXITCODE -ne 0) { throw "Failed to install ml dependencies" }
+        & $PythonExe -m pip install -q '.[dev]' -c $devConstraints
+        if ($LASTEXITCODE -ne 0) { throw "Failed to install dev dependencies" }
         Write-Success "Python dependencies installed"
-    } else {
-        Write-Success "Python dependencies up to date"
+    }
+    finally {
+        Pop-Location
     }
 }
 

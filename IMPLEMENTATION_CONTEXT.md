@@ -589,8 +589,9 @@ THEORIA_CONTRADICTION_THRESHOLD=0.7
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+pip install ".[api]" -c constraints/api.txt
+pip install ".[ml]" -c constraints/ml.txt
+pip install ".[dev]" -c constraints/dev.txt
 
 # Setup database
 docker-compose up -d postgres

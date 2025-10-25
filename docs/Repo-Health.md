@@ -30,7 +30,7 @@
 ## Dependency Risk & Update Plan
 
 ### Python
-- Core runtime pinned in `requirements.txt`; add `requirements-dev.txt` for tooling (ruff, mypy, pytest-cov, cyclonedx-bom).
+- Core runtime published via extras in `pyproject.toml` (install with `pip install .[api] -c constraints/api.txt` plus `[ml]`/`[dev]` as needed).
 - **Grouped Releases:**
   - **Monthly functional upgrades:** Framework stack (FastAPI, SQLAlchemy, Celery).
   - **Bi-weekly security sweeps:** Cryptography, JWT, HTTP clients.

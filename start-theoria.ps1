@@ -844,7 +844,7 @@ function Start-TheoriaApi {
         & $venvPython -m uvicorn --version 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-TheoriaLog "Uvicorn not found in virtual environment" -Level Error
-            Write-TheoriaLog "Please install dependencies: .venv\Scripts\pip install -r requirements.txt" -Level Error
+            Write-TheoriaLog "Please install dependencies: .venv\Scripts\pip install .[api] -c constraints\\api.txt; .venv\\Scripts\\pip install .[ml] -c constraints\\ml.txt; .venv\\Scripts\\pip install .[dev] -c constraints\\dev.txt" -Level Error
             return $false
         }
     } catch {

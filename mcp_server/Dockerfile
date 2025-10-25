@@ -16,12 +16,12 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --upgrade pip \
-    && pip install -r /tmp/requirements.txt
-
 COPY . /app
 ENV PYTHONPATH=/app
+
+RUN pip install --upgrade pip \
+    && pip install ".[api]" -c constraints/api.txt \
+    && pip install ".[ml]" -c constraints/ml.txt
 
 ENV MCP_TOOLS_ENABLED=1 \
     MCP_HOST=0.0.0.0 \

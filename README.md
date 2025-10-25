@@ -68,7 +68,9 @@ For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and
    git clone https://github.com/.../theoria.git
    cd theoria
    python -m venv .venv && source .venv/bin/activate
-   pip install -r requirements.txt
+   pip install ".[api]" -c constraints/api.txt
+   pip install ".[ml]" -c constraints/ml.txt
+   pip install ".[dev]" -c constraints/dev.txt
    ```
 
 2. **Provision frontend tooling**
@@ -109,6 +111,11 @@ For architecture detail, start with [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) and
 - **Bash**: `./scripts/run.sh`
 
 Both scripts boot the API and Next.js app, wiring ports and environment variables automatically. Pass `-IncludeMcp` or `-McpPort` to enable the MCP server alongside the stack.
+
+### Dependency management
+- Python extras live in `pyproject.toml` (`base`, `api`, `ml`, `dev`) with corresponding lockfiles under `constraints/`.
+- Install extras with `pip install .[api] -c constraints/api.txt` plus `[ml]`/`[dev]` when ML features or tooling are required.
+- Run `task deps:lock` after editing dependency definitions to regenerate the pinned constraints via `pip-compile`.
 
 ### Testing & quality gates
 - **Python tests**: `pytest -q`

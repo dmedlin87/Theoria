@@ -13,8 +13,9 @@ Thank you for investing time into Theoria! This guide captures the current devel
    ```bash
    python3.11 -m venv .venv
    source .venv/bin/activate
-   pip install -r requirements.txt
-   pip install -r requirements-dev.txt  # tooling (e.g., mypy) and stub packages
+   pip install ".[api]" -c constraints/api.txt
+   pip install ".[ml]" -c constraints/ml.txt
+   pip install ".[dev]" -c constraints/dev.txt  # tooling (e.g., mypy) and stub packages
    ```
 2. Install web dependencies:
    ```bash
@@ -71,7 +72,7 @@ Once the Makefile façade is introduced the following convenience commands will 
 
 ## Style & Linting
 - Format Python with `black` and organise imports with `ruff check --select I` (see `pyproject.toml`).
-- Type-check selective modules with `mypy` via `python -m mypy` (install `requirements-dev.txt` for stub packages such as `types-PyYAML`).
+- Type-check selective modules with `mypy` via `python -m mypy` (install the `[dev]` extra for stub packages such as `types-PyYAML`).
 - Frontend formatting uses `prettier` with repo defaults.
 
 ## Pull Request Expectations
