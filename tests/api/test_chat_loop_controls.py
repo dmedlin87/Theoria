@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import shutil
 from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from theo.application.facades.database import get_session
@@ -13,12 +15,23 @@ from theo.services.api.app.persistence_models import ChatSession
 from theo.services.api.app.models.research_plan import ResearchPlanStepStatus
 
 
-@pytest.fixture()
-def _session_factory(api_engine):
-    return sessionmaker(bind=api_engine, future=True)
+@pytest.fixture(scope="module")
+def module_api_engine(tmp_path_factory, _api_engine_template):
+    database_path = tmp_path_factory.mktemp("chat-loop-db") / "api.sqlite"
+    shutil.copy2(_api_engine_template, database_path)
+    engine = create_engine(f"sqlite:///{database_path}", future=True)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
+def _session_factory(module_api_engine):
+    return sessionmaker(bind=module_api_engine, future=True)
+
+
+@pytest.fixture(scope="module")
 def client(_session_factory) -> TestClient:
     def _override_session():
         with _session_factory() as session:
@@ -32,47 +45,41 @@ def client(_session_factory) -> TestClient:
         app.dependency_overrides.pop(get_session, None)
 
 
-def _create_chat_session(session_id: str) -> None:
-    session_gen = get_session()
-    db_session = next(session_gen)
-    try:
-        now = datetime.now(UTC)
-        record = ChatSession(
-            id=session_id,
-            user_id=None,
-            stance=None,
-            summary=None,
-            memory_snippets=[],
-            document_ids=[],
-            goals=[],
-            preferences={},
-            created_at=now,
-            updated_at=now,
-            last_interaction_at=now,
-        )
-        db_session.merge(record)
-        db_session.commit()
-    finally:
-        session_gen.close()
+@pytest.fixture()
+def prepare_loop_session(_session_factory):
+    def _prepare(session_id: str, *, partial: str | None = None) -> None:
+        with _session_factory() as db_session:
+            now = datetime.now(UTC)
+            record = ChatSession(
+                id=session_id,
+                user_id=None,
+                stance=None,
+                summary=None,
+                memory_snippets=[],
+                document_ids=[],
+                goals=[],
+                preferences={},
+                created_at=now,
+                updated_at=now,
+                last_interaction_at=now,
+            )
+            db_session.merge(record)
+
+            controller = ResearchLoopController(db_session)
+            controller.initialise(session_id, question="What is justification?")
+            if partial is not None:
+                controller.set_partial_answer(session_id, partial, commit=False)
+
+            db_session.commit()
+
+    return _prepare
 
 
-def _initialise_loop_state(session_id: str, *, partial: str | None = None) -> None:
-    session_gen = get_session()
-    db_session = next(session_gen)
-    try:
-        controller = ResearchLoopController(db_session)
-        controller.initialise(session_id, question="What is justification?")
-        if partial is not None:
-            controller.set_partial_answer(session_id, partial, commit=True)
-        db_session.commit()
-    finally:
-        session_gen.close()
-
-
-def test_loop_control_pause_updates_state(client: TestClient) -> None:
+def test_loop_control_pause_updates_state(
+    client: TestClient, prepare_loop_session
+) -> None:
     session_id = "loop-pause-session"
-    _create_chat_session(session_id)
-    _initialise_loop_state(session_id)
+    prepare_loop_session(session_id)
 
     response = client.post(
         f"/ai/chat/{session_id}/loop/control",
@@ -87,10 +94,13 @@ def test_loop_control_pause_updates_state(client: TestClient) -> None:
     assert follow_up.json()["status"] == "paused"
 
 
-def test_loop_control_stop_returns_partial_answer(client: TestClient) -> None:
+def test_loop_control_stop_returns_partial_answer(
+    client: TestClient, prepare_loop_session
+) -> None:
     session_id = "loop-stop-session"
-    _create_chat_session(session_id)
-    _initialise_loop_state(session_id, partial="Draft response on justification by faith.")
+    prepare_loop_session(
+        session_id, partial="Draft response on justification by faith."
+    )
 
     response = client.post(
         f"/ai/chat/{session_id}/loop/control",
@@ -103,10 +113,11 @@ def test_loop_control_stop_returns_partial_answer(client: TestClient) -> None:
     assert payload["partial_answer"].startswith("Draft response")
 
 
-def test_loop_control_step_advances_index(client: TestClient) -> None:
+def test_loop_control_step_advances_index(
+    client: TestClient, prepare_loop_session
+) -> None:
     session_id = "loop-step-session"
-    _create_chat_session(session_id)
-    _initialise_loop_state(session_id)
+    prepare_loop_session(session_id)
 
     response = client.post(
         f"/ai/chat/{session_id}/loop/control",
@@ -118,10 +129,11 @@ def test_loop_control_step_advances_index(client: TestClient) -> None:
     assert payload["state"]["current_step_index"] >= 1
 
 
-def test_get_research_plan_returns_steps(client: TestClient) -> None:
+def test_get_research_plan_returns_steps(
+    client: TestClient, prepare_loop_session
+) -> None:
     session_id = "plan-get-session"
-    _create_chat_session(session_id)
-    _initialise_loop_state(session_id)
+    prepare_loop_session(session_id)
 
     response = client.get(f"/ai/chat/{session_id}/plan")
     assert response.status_code == 200
@@ -132,10 +144,11 @@ def test_get_research_plan_returns_steps(client: TestClient) -> None:
     assert steps[0]["status"] == ResearchPlanStepStatus.IN_PROGRESS.value
 
 
-def test_reorder_research_plan(client: TestClient) -> None:
+def test_reorder_research_plan(
+    client: TestClient, prepare_loop_session
+) -> None:
     session_id = "plan-reorder-session"
-    _create_chat_session(session_id)
-    _initialise_loop_state(session_id)
+    prepare_loop_session(session_id)
 
     initial = client.get(f"/ai/chat/{session_id}/plan").json()
     steps = initial["steps"]
@@ -150,10 +163,11 @@ def test_reorder_research_plan(client: TestClient) -> None:
     assert reordered[0]["index"] == 0
 
 
-def test_update_research_plan_step(client: TestClient) -> None:
+def test_update_research_plan_step(
+    client: TestClient, prepare_loop_session
+) -> None:
     session_id = "plan-update-session"
-    _create_chat_session(session_id)
-    _initialise_loop_state(session_id)
+    prepare_loop_session(session_id)
 
     initial = client.get(f"/ai/chat/{session_id}/plan").json()
     target = initial["steps"][0]
@@ -168,10 +182,11 @@ def test_update_research_plan_step(client: TestClient) -> None:
     assert step["tool"] == "semantic_search"
 
 
-def test_skip_research_plan_step(client: TestClient) -> None:
+def test_skip_research_plan_step(
+    client: TestClient, prepare_loop_session
+) -> None:
     session_id = "plan-skip-session"
-    _create_chat_session(session_id)
-    _initialise_loop_state(session_id)
+    prepare_loop_session(session_id)
 
     initial = client.get(f"/ai/chat/{session_id}/plan").json()
     target = initial["steps"][0]
