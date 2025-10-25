@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from theo.application.dtos import DocumentDTO, DocumentSummaryDTO
+from theo.application.observability import trace_repository_call
 from theo.application.repositories.document_repository import DocumentRepository
 from theo.domain.discoveries import DocumentEmbedding
 
@@ -26,78 +27,107 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
     def list_with_embeddings(self, user_id: str) -> list[DocumentEmbedding]:
         """Return documents belonging to *user_id* with averaged embeddings."""
 
-        stmt = (
-            select(Document)
-            .where(Document.collection == user_id)
-            .options(selectinload(Document.passages))
-        )
-        documents = self.session.scalars(stmt).all()
-
-        results: list[DocumentEmbedding] = []
-        for document in documents:
-            vectors = [
-                passage.embedding
-                for passage in document.passages
-                if isinstance(passage.embedding, Sequence)
-                and len(passage.embedding) > 0
-            ]
-            if not vectors:
-                continue
-
-            averaged = self._average_vectors(vectors)
-            if not averaged:
-                continue
-
-            verse_ids = self._collect_verse_ids(document.passages)
-            topics = self._extract_topics(document.topics)
-
-            results.append(
-                DocumentEmbedding(
-                    document_id=document.id,
-                    title=document.title or "Untitled Document",
-                    abstract=document.abstract,
-                    topics=topics,
-                    verse_ids=verse_ids,
-                    embedding=averaged,
-                    metadata={"keywords": topics, "documentId": document.id},
-                )
+        with trace_repository_call(
+            "document",
+            "list_with_embeddings",
+            attributes={"user_id": user_id},
+        ) as trace:
+            stmt = (
+                select(Document)
+                .where(Document.collection == user_id)
+                .options(selectinload(Document.passages))
             )
+            documents = self.session.scalars(stmt).all()
 
-        return results
+            trace.set_attribute("documents_fetched", len(documents))
+
+            results: list[DocumentEmbedding] = []
+            for document in documents:
+                vectors = [
+                    passage.embedding
+                    for passage in document.passages
+                    if isinstance(passage.embedding, Sequence)
+                    and len(passage.embedding) > 0
+                ]
+                if not vectors:
+                    continue
+
+                averaged = self._average_vectors(vectors)
+                if not averaged:
+                    continue
+
+                verse_ids = self._collect_verse_ids(document.passages)
+                topics = self._extract_topics(document.topics)
+
+                results.append(
+                    DocumentEmbedding(
+                        document_id=document.id,
+                        title=document.title or "Untitled Document",
+                        abstract=document.abstract,
+                        topics=topics,
+                        verse_ids=verse_ids,
+                        embedding=averaged,
+                        metadata={"keywords": topics, "documentId": document.id},
+                    )
+                )
+
+            trace.record_result_count(len(results))
+            return results
 
     def get_by_id(self, document_id: str) -> DocumentDTO | None:
         """Retrieve a single document by identifier."""
 
-        document = self.session.get(Document, document_id)
-        if document is None:
-            return None
-        return document_to_dto(document)
+        with trace_repository_call(
+            "document",
+            "get_by_id",
+            attributes={"document_id": document_id},
+        ) as trace:
+            document = self.session.get(Document, document_id)
+            trace.set_attribute("hit", document is not None)
+            if document is None:
+                trace.record_result_count(0)
+                return None
+
+            trace.record_result_count(1)
+            return document_to_dto(document)
 
     def list_summaries(
         self, user_id: str, limit: int | None = None
     ) -> list[DocumentSummaryDTO]:
         """Return summaries for *user_id* limited by *limit* if provided."""
 
-        stmt = select(Document).where(Document.collection == user_id)
-        if limit is not None:
-            stmt = stmt.limit(limit)
-        documents = self.session.scalars(stmt).all()
-        return [document_summary_to_dto(doc) for doc in documents]
+        with trace_repository_call(
+            "document",
+            "list_summaries",
+            attributes={"user_id": user_id, "limit": limit},
+        ) as trace:
+            stmt = select(Document).where(Document.collection == user_id)
+            if limit is not None:
+                stmt = stmt.limit(limit)
+            documents = self.session.scalars(stmt).all()
+            trace.record_result_count(len(documents))
+            return [document_summary_to_dto(doc) for doc in documents]
 
     def list_created_since(
         self, since: datetime, limit: int | None = None
     ) -> list[DocumentDTO]:
         """Return documents created on/after *since* ordered by timestamp."""
 
-        stmt = (
-            select(Document)
-            .where(Document.created_at >= since)
-            .order_by(Document.created_at.asc())
-        )
-        if limit is not None:
-            stmt = stmt.limit(limit)
-        documents = self.session.scalars(stmt).all()
-        return [document_to_dto(doc) for doc in documents]
+        with trace_repository_call(
+            "document",
+            "list_created_since",
+            attributes={"limit": limit, "since": since.isoformat()},
+        ) as trace:
+            stmt = (
+                select(Document)
+                .where(Document.created_at >= since)
+                .order_by(Document.created_at.asc())
+            )
+            if limit is not None:
+                stmt = stmt.limit(limit)
+            documents = self.session.scalars(stmt).all()
+            trace.record_result_count(len(documents))
+            return [document_to_dto(doc) for doc in documents]
 
     @staticmethod
     def _average_vectors(vectors: Sequence[Sequence[float]]) -> list[float]:
