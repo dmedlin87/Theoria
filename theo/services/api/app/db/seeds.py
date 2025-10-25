@@ -651,6 +651,8 @@ def _run_with_sqlite_lock_retry(
                 working_session.close()
             return True
         except OperationalError as exc:
+            if getattr(exc, "_theoria_missing_column_handled", False):
+                raise
             if _handle_missing_perspective_error(working_session, dataset_label, exc):
                 bind = working_session.get_bind()
                 _dispose_sqlite_engine(bind)
@@ -703,6 +705,11 @@ def _run_seed_with_perspective_guard(
             seed_fn(session)
             return
         except OperationalError as exc:
+            if getattr(exc, "_theoria_missing_column_handled", False):
+                attempts += 1
+                if attempts >= 2:
+                    return
+                continue
             handled = _handle_missing_perspective_error(session, dataset_label, exc)
             if not handled:
                 raise
@@ -838,6 +845,7 @@ def seed_contradiction_claims(session: Session) -> None:
                     )
                     if not handled:
                         raise
+                    setattr(exc, "_theoria_missing_column_handled", True)
                     raise
                 tags = _coerce_list(entry.get("tags"))
                 weight = float(entry.get("weight", 1.0))
@@ -908,6 +916,8 @@ def seed_contradiction_claims(session: Session) -> None:
                             str(osis_b),
                         )
         except OperationalError as exc:
+            if getattr(exc, "_theoria_missing_column_handled", False):
+                raise
             if _handle_missing_perspective_error(
                 target_session, "contradiction", exc
             ):
