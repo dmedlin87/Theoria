@@ -37,6 +37,11 @@ tasks:
     cmds:
       - pytest --schema --pgvector --contract
 
+  test:slow-baseline:
+    desc: Collect the slowest pytest tests and rerun them to build a flake baseline
+    cmds:
+      - poetry run python scripts/perf/slow_test_baseline.py
+
   deps:lock:
     desc: Regenerate pip-compile lockfiles for all extras
     cmds:
