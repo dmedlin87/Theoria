@@ -7,7 +7,7 @@ from theo.platform.events import event_bus
 from theo.platform.events.types import CaseObjectsUpsertedEvent, DocumentIngestedEvent
 
 from .ingest.embeddings import get_embedding_service
-from .telemetry import log_workflow_event
+from theo.application.facades.telemetry import log_workflow_event
 
 logger = logging.getLogger(__name__)
 

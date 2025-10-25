@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 if TYPE_CHECKING:
     from sqlalchemy.orm import InstrumentedAttribute
 
-from ..telemetry import record_counter, record_histogram
+from theo.application.facades.telemetry import record_counter, record_histogram
 
 T = TypeVar("T")
 

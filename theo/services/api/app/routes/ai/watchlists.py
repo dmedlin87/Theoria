@@ -17,7 +17,9 @@ from ...models.watchlists import (
     WatchlistRunResponse,
     WatchlistUpdateRequest,
 )
-from ...security import Principal, require_principal
+from theo.application.security import Principal
+
+from ...adapters.security import require_principal
 
 _WATCHLIST_NOT_FOUND_RESPONSE = {
     status.HTTP_404_NOT_FOUND: {"description": "Watchlist not found"}

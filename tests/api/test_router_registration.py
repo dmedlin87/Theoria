@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from theo.services.api.app.adapters.security import require_principal
 from theo.services.api.app.bootstrap import ROUTER_REGISTRATIONS, create_app
-from theo.services.api.app.security import require_principal
 
 
 def test_router_registration_metadata(monkeypatch):

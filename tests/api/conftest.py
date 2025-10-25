@@ -189,7 +189,7 @@ from theo.services.api.app.main import app
 from theo.services.api.app.db import run_sql_migrations as migrations_module
 from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, configure_engine, get_engine
-from theo.services.api.app.security import require_principal
+from theo.services.api.app.adapters.security import require_principal
 
 @pytest.fixture(autouse=True)
 def _bypass_authentication(request: pytest.FixtureRequest):

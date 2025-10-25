@@ -6,14 +6,22 @@ import logging
 import os
 from fastapi import FastAPI
 
+from theo.application.facades.resilience import set_resilience_policy_factory
+from theo.application.facades.research import set_application_resolver
+from theo.application.facades.secret_migration import set_llm_registry_saver
 from theo.application.facades.runtime import allow_insecure_startup
 from theo.application.facades.settings import Settings, get_settings, get_settings_secret
+from theo.application.facades.telemetry import set_telemetry_provider
 
 from .. import events as _app_events  # noqa: F401  (ensure handlers register)
 from ..services import router_registry as _router_registry  # noqa: F401
 from ..error_handlers import install_error_handlers
-from ..telemetry import configure_console_tracer
+from ..adapters.resilience import resilience_policy_factory
+from ..adapters.security import configure_principal_resolver
+from ..adapters.telemetry import ApiTelemetryProvider
+from ..ai.registry import save_llm_registry
 from ..versioning import get_version_manager
+from theo.services.bootstrap import resolve_application
 from .lifecycle import lifespan
 from .middleware import (
     configure_cors,
@@ -35,9 +43,9 @@ logger = logging.getLogger(__name__)
 __all__ = ["create_app", "ROUTER_REGISTRATIONS", "get_router_registrations"]
 
 
-def _configure_console_traces(settings: Settings) -> None:
+def _configure_console_traces(settings: Settings, telemetry_provider: ApiTelemetryProvider) -> None:
     if os.getenv("THEO_ENABLE_CONSOLE_TRACES", "0").lower() in {"1", "true", "yes"}:
-        configure_console_tracer()
+        telemetry_provider.configure_console_tracer()
 
 
 def _enforce_authentication_requirements(settings: Settings) -> None:
@@ -94,9 +102,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     _enforce_authentication_requirements(resolved_settings)
     _enforce_secret_requirements()
 
+    telemetry_provider = ApiTelemetryProvider()
+    set_telemetry_provider(telemetry_provider)
+    set_resilience_policy_factory(resilience_policy_factory)
+    configure_principal_resolver()
+    set_application_resolver(lambda: resolve_application()[0])
+    set_llm_registry_saver(save_llm_registry)
+
     app = FastAPI(title="Theo Engine API", version="0.2.0", lifespan=lifespan)
 
-    _configure_console_traces(resolved_settings)
+    app.state.telemetry_provider = telemetry_provider
+
+    _configure_console_traces(resolved_settings, telemetry_provider)
     configure_cors(app, allow_origins=resolved_settings.cors_allowed_origins)
     install_error_reporting(app)
     register_health_routes(app)

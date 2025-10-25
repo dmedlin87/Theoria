@@ -44,7 +44,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.services.api.app.main import app
 from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
-from theo.services.api.app.security import require_principal
+from theo.services.api.app.adapters.security import require_principal
 
 
 def _use_pgvector_backend(request: pytest.FixtureRequest) -> bool:

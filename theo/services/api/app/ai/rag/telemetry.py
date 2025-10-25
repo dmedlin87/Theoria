@@ -7,7 +7,7 @@ from typing import Any, Iterator
 
 from opentelemetry import trace
 
-from ...telemetry import log_workflow_event
+from theo.application.facades.telemetry import log_workflow_event
 
 _RAG_TRACER = trace.get_tracer("theo.rag")
 
