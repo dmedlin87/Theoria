@@ -7,13 +7,13 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
+from theo.application.facades.database import get_session
 from ...errors import ExportError, Severity
 from ...export.citations import build_citation_export, render_citation_markdown
 from ...export.formatters import render_bundle
 from ...models.export import CitationExportRequest
 from ...models.verses import VerseMentionsFilters
 from ...retriever.verses import get_mentions_for_osis
-from ...facades.database import get_session
 from .utils import _BAD_REQUEST_RESPONSE, fetch_documents_by_ids, finalize_response
 
 router = APIRouter()
