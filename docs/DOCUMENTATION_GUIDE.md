@@ -255,6 +255,15 @@ Brief description...
 - **Quarterly:** Archive completed session notes and reports
 - **Yearly:** Review entire documentation structure for relevance
 
+## Automation Scripts
+
+Use the helper tasks to keep the documentation taxonomy healthy:
+
+- `task docs:migrate` — backup `docs/` and move files according to `docs/migrations/document_migration_map.json`.
+- `task docs:agent-context` — regenerate `AGENT_CONTEXT.md` and `QUICK_START_AGENTS.md` from the latest handoff sources.
+- `task docs:validate-links` — assert that internal Markdown links resolve to real files and anchors.
+- `task docs:find-orphans` — list Markdown files that fall outside `docs/document_taxonomy.json`.
+
 ## Questions?
 
 - Check [docs/INDEX.md](INDEX.md) for comprehensive navigation

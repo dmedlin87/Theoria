@@ -62,6 +62,9 @@ tmp_debug*.py
 temp_debug*.py
 test_results*.txt
 
+# Documentation automation artefacts
+docs/backups/
+
 # OS-specific
 Thumbs.db
 trufflehog-findings.json
