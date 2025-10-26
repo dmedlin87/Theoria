@@ -167,6 +167,7 @@ async function decryptData(encrypted: string): Promise<object | null> {
     return JSON.parse(decoder.decode(decrypted));
   } catch (err) {
     console.error("Failed to decrypt API credentials:", err);
+    return null;
   }
 }
 
