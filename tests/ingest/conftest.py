@@ -45,3 +45,23 @@ def pipeline_session_factory(pipeline_engine) -> Callable[[], Session]:
             session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture(autouse=True)
+def _stub_pythonbible(monkeypatch: pytest.MonkeyPatch):
+    """Replace heavy pythonbible lookups with a lightweight stub during tests."""
+
+    try:
+        from theo.services.api.app.ingest import osis as ingest_osis
+    except ModuleNotFoundError:  # pragma: no cover - dependency not installed
+        yield
+        return
+
+    pb_module = getattr(ingest_osis, "pb", None)
+    if pb_module is None:
+        yield
+        return
+
+    monkeypatch.setattr(pb_module, "get_references", lambda _text: [], raising=False)
+    monkeypatch.setattr(pb_module, "get_bible_book_id", lambda *_args, **_kwargs: None, raising=False)
+    yield
