@@ -27,7 +27,7 @@
   `cosign attest --type https://theoria.dev/attestations/container-build` so both provenance and bill-of-materials are
   traceable.
 - Workflow artifacts (`sbom-image.cdx.json`, `build-attestation.json`, `image-metadata.json`, `image-signature.sig`, and
-  `image-provenance.intoto.jsonl`) are uploaded as run artifacts and published to the matching GitHub release tag to satisfy
+  `image-provenance.in-toto.jsonl`) are uploaded as run artifacts and published to the matching GitHub release tag to satisfy
   archival requirements.
 - Consumers should verify signatures and attestations before rollout:
   ```bash
