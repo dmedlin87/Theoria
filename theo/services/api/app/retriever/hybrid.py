@@ -25,6 +25,9 @@ from .utils import compose_passage_meta
 
 _TRACER = trace.get_tracer("theo.retriever")
 
+_PRESELECT_CANDIDATE_FACTOR = 3
+_PRESELECT_CANDIDATE_MIN = 50
+
 
 def _annotate_retrieval_span(
     span, request: HybridSearchRequest, *, cache_status: str, backend: str
@@ -157,49 +160,77 @@ def _apply_document_ranks(
     return results
 
 
-def _score_candidates(
-    candidates: dict[str, _Candidate],
-    annotations_by_passage: dict[str, list],
+def _calculate_candidate_score(
+    candidate: _Candidate,
     request: HybridSearchRequest,
-    query_tokens: list[str],
-) -> list[tuple[HybridSearchResult, float]]:
+    query_tokens: Sequence[str],
+    annotation_notes: Sequence[DocumentAnnotationResponse] | None,
+) -> float | None:
     vector_weight = 0.65
     lexical_weight = 0.35
     osis_bonus = 0.2 if request.osis else 0.0
+
+    passage = candidate.passage
+    vector_score = candidate.vector_score or 0.0
+    lexical_score = candidate.lexical_score or 0.0
+    tei_score = _tei_match_score(passage, query_tokens)
+
+    score = 0.0
+    if vector_score:
+        score += vector_weight * vector_score
+    if lexical_score:
+        score += lexical_weight * lexical_score
+
+    annotation_bonus = 0.0
+    if request.query and annotation_notes:
+        note_text = " \n".join(note.body for note in annotation_notes if note.body)
+        if note_text:
+            annotation_bonus = lexical_weight * _lexical_score(note_text, query_tokens)
+            score += annotation_bonus
+
+    if (
+        request.query
+        and lexical_score == 0.0
+        and vector_score == 0.0
+        and tei_score == 0.0
+        and not candidate.osis_match
+        and annotation_bonus == 0.0
+    ):
+        return None
+
+    if (
+        request.query is None
+        and lexical_score == 0.0
+        and vector_score == 0.0
+        and tei_score == 0.0
+        and annotation_bonus == 0.0
+    ):
+        score = max(score, 0.1)
+
+    if tei_score:
+        score += 0.35 * tei_score
+    if candidate.osis_match:
+        score += osis_bonus
+
+    return score
+
+
+def _score_candidates(
+    candidates: dict[str, _Candidate],
+    annotations_by_passage: dict[str, Sequence[DocumentAnnotationResponse]],
+    request: HybridSearchRequest,
+    query_tokens: list[str],
+) -> list[tuple[HybridSearchResult, float]]:
     scored: list[tuple[HybridSearchResult, float]] = []
     for candidate in candidates.values():
         passage = candidate.passage
         document = candidate.document
-        tei_score = _tei_match_score(passage, query_tokens)
-        score = 0.0
-        if candidate.vector_score:
-            score += vector_weight * candidate.vector_score
-        if candidate.lexical_score:
-            score += lexical_weight * candidate.lexical_score
         annotation_notes = annotations_by_passage.get(passage.id, [])
-        if request.query and annotation_notes:
-            note_text = " \n".join(note.body for note in annotation_notes if note.body)
-            if note_text:
-                score += lexical_weight * _lexical_score(note_text, query_tokens)
-        if (
-            request.query
-            and candidate.lexical_score == 0.0
-            and candidate.vector_score == 0.0
-            and tei_score == 0.0
-            and not candidate.osis_match
-        ):
+        score = _calculate_candidate_score(
+            candidate, request, query_tokens, annotation_notes
+        )
+        if score is None:
             continue
-        if (
-            request.query is None
-            and candidate.lexical_score == 0.0
-            and candidate.vector_score == 0.0
-            and tei_score == 0.0
-        ):
-            score = max(score, 0.1)
-        if tei_score:
-            score += 0.35 * tei_score
-        if candidate.osis_match:
-            score += osis_bonus
         result = _build_result(
             passage,
             document,
@@ -211,6 +242,30 @@ def _score_candidates(
         )
         scored.append((result, score))
     return scored
+
+
+def _preselect_candidates(
+    candidates: dict[str, _Candidate],
+    request: HybridSearchRequest,
+    query_tokens: list[str],
+) -> set[str]:
+    if not candidates:
+        return set()
+
+    provisional_scores: list[tuple[str, float]] = []
+    for passage_id, candidate in candidates.items():
+        score = _calculate_candidate_score(candidate, request, query_tokens, [])
+        if score is None:
+            continue
+        provisional_scores.append((passage_id, score))
+
+    if not provisional_scores:
+        return set()
+
+    limit = max(request.k * _PRESELECT_CANDIDATE_FACTOR, _PRESELECT_CANDIDATE_MIN)
+    provisional_scores.sort(key=lambda item: item[1], reverse=True)
+    trimmed = provisional_scores[: min(limit, len(provisional_scores))]
+    return {passage_id for passage_id, _ in trimmed}
 
 
 def _merge_scored_candidates(
@@ -245,21 +300,42 @@ class _Candidate:
     osis_distance: float | None = None
 
 
-def _osis_distance_value(candidate_ref: str | None, target_ref: str | None) -> float | None:
-    if not candidate_ref or not target_ref:
+def _span_from_reference(reference: str | None) -> tuple[int, int] | None:
+    if not reference:
         return None
-    candidate_ids = expand_osis_reference(candidate_ref)
-    target_ids = expand_osis_reference(target_ref)
-    if not candidate_ids or not target_ids:
+    verse_ids = expand_osis_reference(reference)
+    if not verse_ids:
         return None
-    if not candidate_ids.isdisjoint(target_ids):
+    return min(verse_ids), max(verse_ids)
+
+
+def _passage_span(passage: Passage) -> tuple[int, int] | None:
+    start = getattr(passage, "osis_start_verse_id", None)
+    end = getattr(passage, "osis_end_verse_id", None)
+    if start is not None and end is not None:
+        return start, end
+    return _span_from_reference(passage.osis_ref)
+
+
+def _osis_distance_value(passage: Passage, target_ref: str | None) -> float | None:
+    if not target_ref:
+        return None
+    candidate_span = _passage_span(passage)
+    target_span = _span_from_reference(target_ref)
+    if not candidate_span or not target_span:
+        return None
+    candidate_start, candidate_end = candidate_span
+    target_start, target_end = target_span
+    if candidate_end >= target_start and candidate_start <= target_end:
         return 0.0
-    return float(min(abs(a - b) for a in candidate_ids for b in target_ids))
+    if candidate_end < target_start:
+        return float(target_start - candidate_end)
+    return float(candidate_start - target_end)
 
 
 def _mark_candidate_osis(candidate: _Candidate, target_ref: str) -> None:
     candidate.osis_match = True
-    distance = _osis_distance_value(candidate.passage.osis_ref, target_ref)
+    distance = _osis_distance_value(candidate.passage, target_ref)
     if distance is None:
         return
     if candidate.osis_distance is None or distance < candidate.osis_distance:
@@ -451,7 +527,7 @@ def _fallback_search(
             )
             lexical = _lexical_score(combined_text, query_tokens)
             tei_score = _tei_match_score(passage, query_tokens)
-            osis_distance = _osis_distance_value(passage.osis_ref, request.osis)
+            osis_distance = _osis_distance_value(passage, request.osis)
             osis_match = bool(osis_distance == 0.0)
             if request.osis and not osis_match and lexical == 0.0:
                 continue
@@ -611,19 +687,36 @@ def _postgres_hybrid_search(
                     candidates[key] = candidate
                 _mark_candidate_osis(candidate, request.osis)
 
-        if not candidates and not request.query:
+        if not candidates:
             latency_ms = (perf_counter() - start) * 1000.0
             span.set_attribute("retrieval.hit_count", 0)
             span.set_attribute("retrieval.latency_ms", round(latency_ms, 2))
             return []
 
-        doc_ids = [candidate.document.id for candidate in candidates.values()]
+        selected_passage_ids = _preselect_candidates(candidates, request, query_tokens)
+        if not selected_passage_ids:
+            latency_ms = (perf_counter() - start) * 1000.0
+            span.set_attribute("retrieval.hit_count", 0)
+            span.set_attribute("retrieval.latency_ms", round(latency_ms, 2))
+            return []
+
+        candidate_subset = {
+            passage_id: candidates[passage_id]
+            for passage_id in selected_passage_ids
+            if passage_id in candidates
+        }
+
+        doc_ids = {
+            candidate.document.id for candidate in candidate_subset.values()
+        }
         annotations_by_document = load_annotations_for_documents(session, doc_ids)
         annotations_by_passage = index_annotations_by_passage(
             annotations_by_document
         )
 
-        scored = _score_candidates(candidates, annotations_by_passage, request, query_tokens)
+        scored = _score_candidates(
+            candidate_subset, annotations_by_passage, request, query_tokens
+        )
         results = _merge_scored_candidates(scored, request, query_tokens)
         latency_ms = (perf_counter() - start) * 1000.0
         span.set_attribute("retrieval.hit_count", len(results))

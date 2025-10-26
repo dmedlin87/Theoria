@@ -47,6 +47,8 @@ def _make_passage(**overrides):
         "text": "Grace teaches love and mercy in every heart.",
         "raw_text": "Grace teaches love",
         "osis_ref": "Gen.1.1",
+        "osis_start_verse_id": None,
+        "osis_end_verse_id": None,
         "start_char": 0,
         "end_char": 42,
         "page_no": 1,
@@ -285,6 +287,30 @@ def test_merge_scored_candidates_assigns_ranks_and_document_scores():
     assert all(result.highlights for result in merged)
 
 
+def test_preselect_candidates_filters_empty_signals():
+    request = HybridSearchRequest(query="Grace", k=5)
+    query_tokens = ["grace"]
+
+    active_candidate = hybrid._Candidate(
+        passage=_make_passage(id="p-signal"),
+        document=_make_document(id="doc-signal"),
+        lexical_score=0.5,
+    )
+    zero_candidate = hybrid._Candidate(
+        passage=_make_passage(id="p-zero", meta={}),
+        document=_make_document(id="doc-zero"),
+    )
+
+    selected = hybrid._preselect_candidates(
+        {"p-signal": active_candidate, "p-zero": zero_candidate},
+        request,
+        query_tokens,
+    )
+
+    assert "p-signal" in selected
+    assert "p-zero" not in selected
+
+
 def test_osis_distance_value_prefers_nearest_reference(monkeypatch):
     def _fake_expand(value: str | None):
         mapping = {
@@ -295,9 +321,17 @@ def test_osis_distance_value_prefers_nearest_reference(monkeypatch):
         return mapping.get(value, set()) if value else set()
 
     monkeypatch.setattr(hybrid, "expand_osis_reference", _fake_expand)
-    assert hybrid._osis_distance_value("Gen.1.1", "Gen.1.5") == 0.0
-    assert hybrid._osis_distance_value("Gen.1.10", "Gen.1.5") == 5.0
-    assert hybrid._osis_distance_value(None, "Gen.1.5") is None
+    passage_near = _make_passage(
+        osis_ref="Gen.1.1", osis_start_verse_id=1, osis_end_verse_id=5
+    )
+    passage_far = _make_passage(
+        osis_ref="Gen.1.10", osis_start_verse_id=10, osis_end_verse_id=10
+    )
+    passage_missing = _make_passage(osis_ref=None)
+
+    assert hybrid._osis_distance_value(passage_near, "Gen.1.5") == 0.0
+    assert hybrid._osis_distance_value(passage_far, "Gen.1.5") == 5.0
+    assert hybrid._osis_distance_value(passage_missing, "Gen.1.5") is None
 
 
 def test_passes_author_and_guardrail_filters():

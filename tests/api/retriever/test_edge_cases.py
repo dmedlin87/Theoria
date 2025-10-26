@@ -44,8 +44,26 @@ def test_osis_distance_and_marking():
     assert candidate.osis_distance is not None
     assert candidate.osis_distance >= 0.0
 
-    assert hybrid._osis_distance_value(None, None) is None
-    assert hybrid._osis_distance_value("John.3.16", "John.3.16") == 0.0
+    assert (
+        hybrid._osis_distance_value(
+            DummyPassage(id="p-none", document_id="d1", text="", osis_ref=None), None
+        )
+        is None
+    )
+    assert (
+        hybrid._osis_distance_value(
+            DummyPassage(
+                id="p-match",
+                document_id="d1",
+                text="",
+                osis_ref="John.3.16",
+                osis_start_verse_id=123456,
+                osis_end_verse_id=123456,
+            ),
+            "John.3.16",
+        )
+        == 0.0
+    )
 
 
 def test_tei_term_extraction_handles_nested_meta():
