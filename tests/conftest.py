@@ -170,11 +170,18 @@ def regression_factory():
     """Provide a seeded factory for synthesising regression datasets."""
 
     try:
-        from tests.fixtures import RegressionDataFactory  # type: ignore
+        from tests.fixtures import (  # type: ignore
+            REGRESSION_FIXTURES_AVAILABLE,
+            REGRESSION_IMPORT_ERROR,
+            RegressionDataFactory,
+        )
     except ModuleNotFoundError as exc:  # pragma: no cover - thin local envs
         pytest.skip(f"faker not installed for regression factory: {exc}")
     except Exception as exc:  # pragma: no cover - guard against optional deps
         pytest.skip(f"regression fixtures unavailable: {exc}")
+    if not REGRESSION_FIXTURES_AVAILABLE:
+        reason = REGRESSION_IMPORT_ERROR or ModuleNotFoundError("unknown dependency")
+        pytest.skip(f"regression fixtures unavailable: {reason}")
     return RegressionDataFactory()
 
 

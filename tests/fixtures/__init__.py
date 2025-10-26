@@ -18,7 +18,7 @@ module hierarchy.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 
 def _missing_dependency_factory(exc: ModuleNotFoundError) -> Callable[..., Any]:
@@ -34,6 +34,10 @@ def _missing_dependency_factory(exc: ModuleNotFoundError) -> Callable[..., Any]:
     return _raiser
 
 
+REGRESSION_IMPORT_ERROR: Optional[ModuleNotFoundError] = None
+REGRESSION_FIXTURES_AVAILABLE = True
+
+
 try:  # pragma: no cover - exercised in environments with full deps
     from .regression_factory import (  # type: ignore
         DocumentRecord,
@@ -42,11 +46,21 @@ try:  # pragma: no cover - exercised in environments with full deps
     )
 except ModuleNotFoundError as exc:  # pragma: no cover - triggered in lightweight envs
     if exc.name == "pydantic":
+        REGRESSION_FIXTURES_AVAILABLE = False
+        REGRESSION_IMPORT_ERROR = exc
         DocumentRecord = _missing_dependency_factory(exc)  # type: ignore[assignment]
         PassageRecord = _missing_dependency_factory(exc)  # type: ignore[assignment]
         RegressionDataFactory = _missing_dependency_factory(exc)  # type: ignore[assignment]
     else:  # pragma: no cover - unexpected import error
         raise
+else:
+    REGRESSION_IMPORT_ERROR = None
 
 
-__all__ = ["DocumentRecord", "PassageRecord", "RegressionDataFactory"]
+__all__ = [
+    "DocumentRecord",
+    "PassageRecord",
+    "RegressionDataFactory",
+    "REGRESSION_FIXTURES_AVAILABLE",
+    "REGRESSION_IMPORT_ERROR",
+]
