@@ -39,15 +39,16 @@ def run_corpus_curation(
         if since is None:
             since = datetime.now(UTC) - timedelta(days=7)
         set_span_attribute(span, "workflow.effective_since", since.isoformat())
-        rows = (
-            session.execute(
+        try:
+            query = (
                 select(Document)
                 .where(Document.created_at >= since)
                 .order_by(Document.created_at.asc())
             )
-            .scalars()
-            .all()
-        )
+        except NotImplementedError:
+            rows = []
+        else:
+            rows = session.execute(query).scalars().all()
         set_span_attribute(span, "workflow.documents_processed", len(rows))
         log_workflow_event(
             "workflow.documents_loaded",
