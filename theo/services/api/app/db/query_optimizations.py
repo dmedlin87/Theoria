@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import functools
 import time
-from typing import TYPE_CHECKING, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Sequence, TypeVar
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Load, Session, joinedload, selectinload
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import InstrumentedAttribute
@@ -25,21 +25,21 @@ def with_eager_loading(
     model_class: type[T],
     *relationships: InstrumentedAttribute,
     strategy: str = "selectin",
-) -> type[T]:
-    """Configure eager loading for relationships.
+) -> tuple[Load[Any], ...]:
+    """Build eager-loading loader options for SQLAlchemy queries.
 
     Args:
-        session: SQLAlchemy session
-        model_class: The model to query
-        relationships: Relationships to eager load
-        strategy: Either 'selectin' (default) or 'joined'
+        session: SQLAlchemy session (kept for interface symmetry; not used).
+        model_class: The model class whose relationships should be eagerly loaded.
+        relationships: Instrumented relationship attributes to eager load.
+        strategy: Loader strategy to apply, either ``"selectin"`` (default) or ``"joined"``.
 
     Returns:
-        Configured query with eager loading
+        Tuple of loader options to unpack into ``Query.options`` or ``Select.options``.
 
     Example:
         stmt = select(Document).options(
-            *with_eager_loading_options(Document.passages, strategy="selectin")
+            *with_eager_loading(session, Document, Document.passages, strategy="selectin")
         )
     """
     load_strategy = selectinload if strategy == "selectin" else joinedload
