@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 import sys
@@ -8,12 +9,16 @@ import types
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, List
+from typing import Any, Iterable, Iterator, List
+
 import importlib.machinery as importlib_machinery
 
 import pytest
 from click.testing import CliRunner
 
+try:  # pragma: no cover - optional dependency in lightweight test runs
+    from sqlalchemy.exc import SQLAlchemyError
+except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
 
 if "fastapi" not in sys.modules:
     fastapi_stub = types.ModuleType("fastapi")
@@ -61,25 +66,39 @@ def _install_sqlalchemy_stub() -> None:
     exc_module = types.ModuleType("sqlalchemy.exc")
 
     class SQLAlchemyError(Exception):
-        """Stub SQLAlchemyError used for import-time compatibility."""
+        """Fallback SQLAlchemyError when the real dependency is unavailable."""
 
-    exc_module.SQLAlchemyError = SQLAlchemyError
 
-    orm_module = types.ModuleType("sqlalchemy.orm")
+@pytest.fixture
+def cli_module(
+    stub_sqlalchemy: types.ModuleType, stub_pythonbible: types.ModuleType
+) -> Iterator[types.ModuleType]:
+    """Import :mod:`theo.cli` with stubbed heavy dependencies."""
 
-    class Session:  # pragma: no cover - placeholder
-        def __init__(self, *_args: object, **_kwargs: object) -> None:
-            raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
+    module_name = "theo.cli"
+    original = sys.modules.pop(module_name, None)
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if original is not None:
+            sys.modules[module_name] = original
+        pytest.skip(f"theo.cli unavailable: {exc}")
+    try:
+        yield module
+    finally:
+        sys.modules.pop(module_name, None)
+        if original is not None:
+            sys.modules[module_name] = original
 
-    orm_module.Session = Session
 
-    engine_module = types.ModuleType("sqlalchemy.engine")
+@pytest.fixture
+def rebuild_embeddings_cmd(cli_module: types.ModuleType):
+    return cli_module.rebuild_embeddings_cmd
 
-    class Engine:  # pragma: no cover - placeholder
-        pass
 
-    engine_module.Engine = Engine
-
+@pytest.fixture
+def cli(cli_module: types.ModuleType):
+    return cli_module.cli
     sql_module = types.ModuleType("sqlalchemy.sql")
     sql_module.__path__ = []  # type: ignore[attr-defined]
     sql_module.__package__ = "sqlalchemy"
@@ -553,7 +572,10 @@ def runner() -> CliRunner:
 
 
 def test_rebuild_embeddings_fast_ids_checkpoint(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(
@@ -609,7 +631,10 @@ def test_rebuild_embeddings_fast_ids_checkpoint(
 
 
 def test_rebuild_embeddings_resume_from_checkpoint(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="First", embedding=None)
@@ -681,7 +706,9 @@ def test_rebuild_embeddings_resume_with_invalid_checkpoint_logs_error(
 
 
 def test_rebuild_embeddings_errors_on_mismatched_vectors(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
@@ -694,7 +721,9 @@ def test_rebuild_embeddings_errors_on_mismatched_vectors(
 
 
 def test_rebuild_embeddings_clears_cache_when_requested(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
@@ -707,20 +736,22 @@ def test_rebuild_embeddings_clears_cache_when_requested(
     assert "Completed embedding rebuild for 1 passage(s)" in result.output
 
 
-def test_cli_help_lists_rebuild_command(runner: CliRunner) -> None:
+def test_cli_help_lists_rebuild_command(runner: CliRunner, cli) -> None:
     result = runner.invoke(cli, ["--help"])
     assert result.exit_code == 0
     assert "rebuild_embeddings" in result.output
 
 
-def test_rebuild_embeddings_invalid_changed_since_format(runner: CliRunner) -> None:
+def test_rebuild_embeddings_invalid_changed_since_format(
+    runner: CliRunner, rebuild_embeddings_cmd
+) -> None:
     result = runner.invoke(rebuild_embeddings_cmd, ["--changed-since", "not-a-date"])
     assert result.exit_code == 2
     assert "Invalid value for '--changed-since'" in result.output
 
 
 def test_rebuild_embeddings_requires_existing_ids_file(
-    runner: CliRunner, tmp_path: Path
+    runner: CliRunner, tmp_path: Path, rebuild_embeddings_cmd
 ) -> None:
     missing_path = tmp_path / "missing.txt"
     result = runner.invoke(rebuild_embeddings_cmd, ["--ids-file", str(missing_path)])
@@ -729,7 +760,10 @@ def test_rebuild_embeddings_requires_existing_ids_file(
 
 
 def test_rebuild_embeddings_handles_empty_ids_file(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    tmp_path: Path,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     ids_file = tmp_path / "ids.txt"
@@ -743,7 +777,9 @@ def test_rebuild_embeddings_handles_empty_ids_file(
 
 
 def test_rebuild_embeddings_fast_skips_existing_embeddings(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="New", embedding=None)
@@ -759,7 +795,9 @@ def test_rebuild_embeddings_fast_skips_existing_embeddings(
 
 
 def test_rebuild_embeddings_uses_standard_batch_size_when_not_fast(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="One", embedding=None)
@@ -772,7 +810,10 @@ def test_rebuild_embeddings_uses_standard_batch_size_when_not_fast(
 
 
 def test_rebuild_embeddings_changed_since_filters_passages(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    tmp_path: Path,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(
@@ -819,7 +860,9 @@ def test_rebuild_embeddings_changed_since_filters_passages(
 
 
 def test_rebuild_embeddings_processes_multiple_batches(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     for idx in range(65):
@@ -835,7 +878,9 @@ def test_rebuild_embeddings_processes_multiple_batches(
 
 
 def test_rebuild_embeddings_handles_application_resolution_failure(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     def _fail() -> tuple[object, object]:
         raise RuntimeError("boom")
@@ -849,7 +894,9 @@ def test_rebuild_embeddings_handles_application_resolution_failure(
 
 
 def test_rebuild_embeddings_handles_session_initialisation_error(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     class _Registry:
         def __init__(self, engine: object) -> None:
@@ -882,7 +929,9 @@ def test_rebuild_embeddings_handles_session_initialisation_error(
 
 
 def test_rebuild_embeddings_reports_embedding_backend_failure(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
@@ -899,7 +948,10 @@ def test_rebuild_embeddings_reports_embedding_backend_failure(
 
 
 def test_rebuild_embeddings_resume_with_missing_checkpoint(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    tmp_path: Path,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
@@ -926,6 +978,7 @@ def test_rebuild_embeddings_integration_with_sqlite(
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session as SQLASession
 
+    from theo.cli import rebuild_embeddings_cmd
     from theo.adapters.persistence.models import Base, Document, Passage
 
     db_path = tmp_path / "theo.db"

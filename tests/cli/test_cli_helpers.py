@@ -81,6 +81,8 @@ if "sqlalchemy" not in sys.modules:
 import json
 import pytest
 from click import ClickException
+
+pytest.importorskip("sqlalchemy")
 from sqlalchemy.exc import SQLAlchemyError
 
 from theo.checkpoints import CURRENT_EMBEDDING_CHECKPOINT_VERSION
