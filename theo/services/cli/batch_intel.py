@@ -13,8 +13,8 @@ from ..api.app.analytics.topics import (
     store_topic_digest,
     upsert_digest_document,
 )
-from theo.adapters.persistence.models import Document
-from theo.adapters.persistence.types import DocumentId
+from theo.adapters.persistence.models import Document, Passage
+from theo.services.api.app.ai.rag.corpus import run_corpus_curation
 from theo.services.bootstrap import resolve_application
 
 
