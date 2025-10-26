@@ -125,7 +125,16 @@ Respond in JSON array format.
     def _convert_to_morphological_tag(self, data: Dict) -> MorphologicalTag:
         """Convert AI response data to MorphologicalTag object."""
         
-        pos = POS(data.get("pos", "noun"))
+        raw_pos = data.get("pos", "noun")
+        if isinstance(raw_pos, str):
+            normalized_pos = raw_pos.strip().lower()
+        else:
+            normalized_pos = "noun"
+
+        try:
+            pos = POS(normalized_pos)
+        except ValueError:
+            pos = POS.NOUN
         
         return MorphologicalTag(
             word=data["word"],
