@@ -8,6 +8,8 @@ from ...errors import ExportError
 from ...export.zotero import export_to_zotero
 from . import citations, deliverables, documents, search, zotero
 
+_normalise_formats = deliverables._normalise_formats
+
 router = APIRouter()
 router.include_router(citations.router)
 router.include_router(deliverables.router)
@@ -28,4 +30,5 @@ __all__ = [
     "documents",
     "search",
     "zotero",
+    "_normalise_formats",
 ]

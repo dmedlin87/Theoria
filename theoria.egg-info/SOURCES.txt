@@ -42,6 +42,7 @@ theo/adapters/secrets/vault.py
 theo/application/__init__.py
 theo/application/graph.py
 theo/application/interfaces.py
+theo/application/observability.py
 theo/application/resilience.py
 theo/application/security.py
 theo/application/services.py
@@ -131,6 +132,8 @@ theo/services/api/app/errors.py
 theo/services/api/app/events.py
 theo/services/api/app/main.py
 theo/services/api/app/persistence_models.py
+theo/services/api/app/resilience.py
+theo/services/api/app/telemetry.py
 theo/services/api/app/tracing.py
 theo/services/api/app/versioning.py
 theo/services/api/app/adapters/__init__.py
@@ -329,7 +332,6 @@ theo/services/api/app/routes/dashboard.py
 theo/services/api/app/routes/discoveries.py
 theo/services/api/app/routes/discoveries_v1.py
 theo/services/api/app/routes/documents.py
-theo/services/api/app/routes/export.py
 theo/services/api/app/routes/features.py
 theo/services/api/app/routes/ingest.py
 theo/services/api/app/routes/jobs.py
@@ -353,6 +355,13 @@ theo/services/api/app/routes/ai/workflows/llm.py
 theo/services/api/app/routes/ai/workflows/perspectives.py
 theo/services/api/app/routes/ai/workflows/settings.py
 theo/services/api/app/routes/ai/workflows/utils.py
+theo/services/api/app/routes/export/__init__.py
+theo/services/api/app/routes/export/citations.py
+theo/services/api/app/routes/export/deliverables.py
+theo/services/api/app/routes/export/documents.py
+theo/services/api/app/routes/export/search.py
+theo/services/api/app/routes/export/utils.py
+theo/services/api/app/routes/export/zotero.py
 theo/services/api/app/transcripts/__init__.py
 theo/services/api/app/transcripts/service.py
 theo/services/api/app/use_cases/__init__.py
