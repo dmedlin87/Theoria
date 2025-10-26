@@ -13,6 +13,8 @@ except ModuleNotFoundError:  # pragma: no cover - provide basic fallback helpers
 
     pb = _PythonBibleStub()  # type: ignore[assignment]
 
+from collections.abc import Mapping
+
 from .datasets import scripture_dataset
 from .osis import expand_osis_reference, verse_ids_to_osis
 
@@ -44,7 +46,7 @@ def fetch_passage(osis: str, translation: str | None = None) -> list[Verse]:
     if "." not in osis:
         raise ValueError("OSIS references must include book and chapter segments")
 
-    verse_keys = _expand_osis_to_keys(osis)
+    verse_keys = _expand_osis_to_keys(osis, verses_by_osis)
     if not verse_keys:
         verse_keys = [osis]
 
@@ -68,7 +70,9 @@ def fetch_passage(osis: str, translation: str | None = None) -> list[Verse]:
     return verses
 
 
-def _expand_osis_to_keys(osis: str) -> list[str]:
+def _expand_osis_to_keys(
+    osis: str, verses_by_osis: Mapping[str, Mapping[str, object]] | None = None
+) -> list[str]:
     """Expand *osis* into individual verse keys in canonical order."""
 
     verse_ids = expand_osis_reference(osis)
@@ -84,11 +88,36 @@ def _expand_osis_to_keys(osis: str) -> list[str]:
                 for verse_id in range(lower, upper + 1)
                 if pb.is_valid_verse_id(verse_id)
             )
+        elif verses_by_osis is not None:
+            fallback_keys = _fallback_expand_osis_by_dataset(osis, verses_by_osis)
+            if fallback_keys:
+                return fallback_keys
     if not verse_ids:
         return []
 
     sorted_ids = sorted(set(verse_ids))
     return list(verse_ids_to_osis(sorted_ids))
+
+
+def _fallback_expand_osis_by_dataset(
+    osis: str, verses_by_osis: Mapping[str, Mapping[str, object]]
+) -> list[str]:
+    """Fallback when pythonbible is unavailable by slicing the dataset order."""
+
+    if "-" not in osis:
+        return []
+
+    start, end = osis.split("-", 1)
+    keys = list(verses_by_osis.keys())
+    try:
+        start_index = keys.index(start)
+        end_index = keys.index(end)
+    except ValueError:
+        return []
+
+    lower = min(start_index, end_index)
+    upper = max(start_index, end_index)
+    return keys[lower : upper + 1]
 
 
 __all__ = ["Verse", "fetch_passage"]
