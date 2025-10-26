@@ -17,7 +17,6 @@ from ..routes import (  # noqa: F401  (ensure handlers register)
     export,
     features,
     ingest,
-    jobs,
     notebooks,
     realtime,
     research,
@@ -27,6 +26,10 @@ from ..routes import (  # noqa: F401  (ensure handlers register)
     verses,
 )
 from ..infra.registry import RouterRegistration, iter_router_registrations
+try:  # pragma: no cover - optional dependency guard
+    from ..routes import jobs  # noqa: F401  (ensure handlers register)
+except Exception:  # pragma: no cover - Celery extras not installed
+    pass
 
 logger = logging.getLogger(__name__)
 

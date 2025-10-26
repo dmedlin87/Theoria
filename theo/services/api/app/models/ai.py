@@ -14,7 +14,10 @@ from ..models.search import HybridSearchFilters
 from .base import APIModel
 
 try:  # pragma: no cover - optional AI dependencies may be unavailable in tests
-    from ..ai.rag import RAGCitation as _RAGCitationRuntime
+    from ..ai.rag import (
+        RAGAnswer as _RAGAnswerRuntime,
+        RAGCitation as _RAGCitationRuntime,
+    )
 except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
     class _RAGCitationRuntime(_PydanticBaseModel):
         index: int
@@ -25,6 +28,14 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
         document_title: str | None = None
         snippet: str | None = None
         source_url: str | None = None
+
+    class _RAGAnswerRuntime(_PydanticBaseModel):
+        summary: str
+        citations: list[_RAGCitationRuntime] = Field(default_factory=list)
+        model_name: str | None = None
+        model_output: str | None = None
+        guardrail_profile: dict[str, str] | None = None
+        fallacy_warnings: list[dict[str, str]] = Field(default_factory=list)
 
 if TYPE_CHECKING:  # pragma: no cover - import for static analysis only
     from ..ai.rag import (
@@ -37,6 +48,9 @@ if TYPE_CHECKING:  # pragma: no cover - import for static analysis only
         SermonPrepResponse,
         VerseCopilotResponse,
     )
+
+RAGAnswer = _RAGAnswerRuntime
+RAGCitation = _RAGCitationRuntime
 
 
 class RecorderMetadata(APIModel):

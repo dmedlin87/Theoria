@@ -7,8 +7,9 @@ import logging
 import re
 from collections.abc import Mapping
 from contextlib import AbstractContextManager, contextmanager
+from threading import Lock
 from time import perf_counter
-from typing import Any, Iterable, Iterator, Protocol, Self, cast
+from typing import Any, ClassVar, Iterable, Iterator, Protocol, Self, cast
 
 from theo.application.telemetry import TelemetryProvider, WorkflowSpan
 
@@ -145,19 +146,23 @@ def _serialise_context(context: Mapping[str, Any]) -> dict[str, Any]:
 class ApiTelemetryProvider(TelemetryProvider):
     """Telemetry provider backed by OpenTelemetry and Prometheus."""
 
+    _CACHE_LOCK: ClassVar[Lock] = Lock()
+    _COUNTER_CACHE: ClassVar[dict[tuple[str, tuple[str, ...]], _CounterMetric]] = {}
+    _HISTOGRAM_CACHE: ClassVar[dict[tuple[str, tuple[str, ...]], _HistogramMetric]] = {}
+
     def __init__(self) -> None:
         self._logger = logging.getLogger("theo.workflow")
-        self._counter_cache: dict[tuple[str, tuple[str, ...]], _CounterMetric] = {}
-        self._histogram_cache: dict[tuple[str, tuple[str, ...]], _HistogramMetric] = {}
-        self._workflow_runs = self._build_counter(
+        self._counter_cache = self._COUNTER_CACHE
+        self._histogram_cache = self._HISTOGRAM_CACHE
+        self._workflow_runs = self._get_counter_metric(
             "theo_workflow_runs_total",
-            "Count of Theo Engine workflow executions by status.",
-            labelnames=("workflow", "status"),
+            ("workflow", "status"),
+            description="Count of Theo Engine workflow executions by status.",
         )
-        self._workflow_latency = self._build_histogram(
+        self._workflow_latency = self._get_histogram_metric(
             "theo_workflow_latency_seconds",
-            "Theo Engine workflow execution latency.",
-            labelnames=("workflow",),
+            ("workflow",),
+            description="Theo Engine workflow execution latency.",
             buckets=(0.25, 0.5, 1, 2, 4, 8, 16, float("inf")),
         )
 
@@ -308,32 +313,52 @@ class ApiTelemetryProvider(TelemetryProvider):
         return cast(_HistogramMetric, Histogram(*args, **kwargs))
 
     def _get_counter_metric(
-        self, name: str, label_names: tuple[str, ...]
+        self,
+        name: str,
+        label_names: tuple[str, ...],
+        *,
+        description: str | None = None,
     ) -> _CounterMetric:
         key = (name, label_names)
         metric = self._counter_cache.get(key)
-        if metric is None:
-            metric = self._build_counter(
-                name,
-                f"Auto-generated counter for {name}",
-                labelnames=label_names,
-            )
-            self._counter_cache[key] = metric
-        return metric
+        if metric is not None:
+            return metric
+        with self._CACHE_LOCK:
+            metric = self._counter_cache.get(key)
+            if metric is None:
+                metric = self._build_counter(
+                    name,
+                    description or f"Auto-generated counter for {name}",
+                    labelnames=label_names,
+                )
+                self._counter_cache[key] = metric
+        return cast(_CounterMetric, metric)
 
     def _get_histogram_metric(
-        self, name: str, label_names: tuple[str, ...]
+        self,
+        name: str,
+        label_names: tuple[str, ...],
+        *,
+        description: str | None = None,
+        buckets: tuple[float, ...] | None = None,
     ) -> _HistogramMetric:
         key = (name, label_names)
         metric = self._histogram_cache.get(key)
-        if metric is None:
-            metric = self._build_histogram(
-                name,
-                f"Auto-generated histogram for {name}",
-                labelnames=label_names,
-            )
-            self._histogram_cache[key] = metric
-        return metric
+        if metric is not None:
+            return metric
+        with self._CACHE_LOCK:
+            metric = self._histogram_cache.get(key)
+            if metric is None:
+                histogram_kwargs: dict[str, Any] = {"labelnames": label_names}
+                if buckets is not None:
+                    histogram_kwargs["buckets"] = buckets
+                metric = self._build_histogram(
+                    name,
+                    description or f"Auto-generated histogram for {name}",
+                    **histogram_kwargs,
+                )
+                self._histogram_cache[key] = metric
+        return cast(_HistogramMetric, metric)
 
 
 __all__ = ["ApiTelemetryProvider"]
