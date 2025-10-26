@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -32,6 +33,26 @@ def celery_app():  # type: ignore[override]
         app.conf.task_always_eager = original_always_eager
         app.conf.task_eager_propagates = original_propagates
 
+
+@pytest.fixture(autouse=True)
+def _stub_pythonbible(monkeypatch: pytest.MonkeyPatch):
+    """Replace heavy pythonbible lookups with a lightweight stub during worker tests."""
+
+    try:
+        from theo.services.api.app.ingest import osis as ingest_osis
+    except ModuleNotFoundError:  # pragma: no cover - dependency not installed
+        yield
+        return
+
+    pb_module = getattr(ingest_osis, "pb", None)
+    if pb_module is None:
+        yield
+        return
+
+    monkeypatch.setattr(pb_module, "get_references", lambda _text: [], raising=False)
+    monkeypatch.setattr(pb_module, "get_bible_book_id", lambda *_args, **_kwargs: None, raising=False)
+    yield
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -55,9 +76,52 @@ from theo.services.api.app.models.export import (  # noqa: E402
     DeliverablePackage,
 )
 
-from theo.services.api.app.ai.rag import RAGCitation  # noqa: E402
-from theo.services.api.app.models.ai import ChatMemoryEntry  # noqa: E402
-from theo.services.api.app.models.search import HybridSearchResult  # noqa: E402
+try:  # noqa: E402 - optional dependency fallback for lightweight profiling
+    from theo.services.api.app.ai.rag import RAGCitation
+except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean environments
+    @dataclass(slots=True)
+    class RAGCitation:
+        index: int
+        osis: str
+        anchor: str
+
+try:  # noqa: E402 - optional dependency fallback for lightweight profiling
+    from theo.services.api.app.models.ai import ChatMemoryEntry
+except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean environments
+    @dataclass(slots=True)
+    class ChatMemoryEntry:
+        question: str | None = None
+        answer: str = ""
+        answer_summary: str | None = None
+
+        @classmethod
+        def model_validate(cls, payload: dict[str, Any]) -> "ChatMemoryEntry":
+            return cls(**payload)
+
+try:  # noqa: E402 - optional dependency fallback for lightweight profiling
+    from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchResult
+except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean environments
+    @dataclass(slots=True)
+    class HybridSearchFilters:
+        collection: str | None = None
+        tags: list[str] | None = None
+
+        @classmethod
+        def model_validate(cls, payload: dict[str, Any]) -> "HybridSearchFilters":
+            return cls(**payload)
+
+        def model_dump(self, *, exclude_none: bool = False) -> dict[str, Any]:
+            data = {"collection": self.collection, "tags": self.tags}
+            if exclude_none:
+                return {k: v for k, v in data.items() if v is not None}
+            return data
+
+    @dataclass(slots=True)
+    class HybridSearchResult:
+        document_id: str
+        passage_id: str
+        distance: float
+        title: str | None = None
 from theo.services.api.app.workers import tasks  # noqa: E402
 
 
@@ -86,13 +150,8 @@ class _FakeMetric:
         return self._Child(self, str(status))
 
 
-def test_process_url_ingests_fixture_url(tmp_path) -> None:
+def test_process_url_ingests_fixture_url(tmp_path, worker_engine) -> None:
     """The URL worker ingests a YouTube fixture without raising."""
-
-    db_path = tmp_path / "test.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -116,7 +175,7 @@ def test_process_url_ingests_fixture_url(tmp_path) -> None:
         settings.storage_root = original_storage
         tasks.settings.storage_root = original_task_storage
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         documents = session.query(Document).all()
 
     assert len(documents) == 1
@@ -126,13 +185,8 @@ def test_process_url_ingests_fixture_url(tmp_path) -> None:
     assert document.channel == "Theo Channel"
 
 
-def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
+def test_process_url_updates_job_status_and_document_id(tmp_path, worker_engine) -> None:
     """URL ingestion jobs transition status and persist the ingested document."""
-
-    db_path = tmp_path / "job.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -142,7 +196,7 @@ def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
     settings.storage_root = storage_root
     tasks.settings.storage_root = storage_root
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         job = IngestionJob(job_type="url_ingest", status="queued")
         session.add(job)
         session.commit()
@@ -196,7 +250,7 @@ def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
         setattr(process_url_task, "retry", original_retry)
         settings.storage_root = original_storage
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         job_record = session.get(IngestionJob, job_id)
         assert job_record is not None
         document_id = job_record.document_id
@@ -212,16 +266,11 @@ def test_process_url_updates_job_status_and_document_id(tmp_path) -> None:
 
 
 def test_process_url_retries_with_backoff(
-    monkeypatch: pytest.MonkeyPatch, tmp_path, celery_app
+    monkeypatch: pytest.MonkeyPatch, worker_engine, celery_app
 ) -> None:
     """Transient failures should trigger Celery retry with exponential backoff."""
 
-    db_path = tmp_path / "retry.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
-
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         job = IngestionJob(job_type="url_ingest", status="queued")
         session.add(job)
         session.commit()
@@ -254,7 +303,7 @@ def test_process_url_retries_with_backoff(
     assert retry_counts == [0]
     assert retry_exc.sig.kwargs["job_id"] == job_id
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         job_record = session.get(IngestionJob, job_id)
 
     assert job_record is not None
@@ -263,16 +312,11 @@ def test_process_url_retries_with_backoff(
 
 
 def test_process_url_idempotent_completion(
-    monkeypatch: pytest.MonkeyPatch, tmp_path, celery_app
+    monkeypatch: pytest.MonkeyPatch, worker_engine, celery_app
 ) -> None:
     """Successful retries should keep job metadata stable."""
 
-    db_path = tmp_path / "idempotent.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
-
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         job = IngestionJob(job_type="url_ingest", status="queued")
         session.add(job)
         session.commit()
@@ -310,7 +354,7 @@ def test_process_url_idempotent_completion(
     assert second.result is None
     assert call_counter == 2
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         job_record = session.get(IngestionJob, job_id)
         document = session.get(Document, "doc-stable")
 
@@ -321,13 +365,8 @@ def test_process_url_idempotent_completion(
     assert document.title == "Stable Replay Document"
 
 
-def test_build_deliverable_task_writes_assets(monkeypatch, tmp_path) -> None:
+def test_build_deliverable_task_writes_assets(monkeypatch, tmp_path, worker_engine) -> None:
     """Deliverable tasks persist manifests and assets under the export root."""
-
-    db_path = tmp_path / "deliverable.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
 
     settings = get_settings()
     original_storage = settings.storage_root
@@ -391,15 +430,10 @@ def test_build_deliverable_task_writes_assets(monkeypatch, tmp_path) -> None:
     assert result["assets"][0]["size_bytes"] == len(asset.content.encode("utf-8"))
 
 
-def test_enrich_document_populates_metadata(tmp_path) -> None:
+def test_enrich_document_populates_metadata(tmp_path, worker_engine) -> None:
     """Metadata enrichment hydrates bibliographic fields from fixtures."""
 
-    db_path = tmp_path / "enrich.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
-
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         document = Document(
             title="Theo Engine Sample Work",
             source_type="pdf",
@@ -412,7 +446,7 @@ def test_enrich_document_populates_metadata(tmp_path) -> None:
 
     _task(tasks.enrich_document).run(document_id)
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         enriched = session.get(Document, document_id)
 
     assert enriched is not None
@@ -434,15 +468,10 @@ def test_enrich_document_populates_metadata(tmp_path) -> None:
     assert enriched.bib_json.get("primary_topic") == "Theology"
 
 
-def test_enrich_document_missing_document_marks_job_failed(tmp_path, caplog) -> None:
+def test_enrich_document_missing_document_marks_job_failed(worker_engine, caplog) -> None:
     """When a document is missing the enrichment job is marked failed."""
 
-    db_path = tmp_path / "missing_enrich.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
-
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         job = IngestionJob(job_type="enrich", status="queued")
         session.add(job)
         session.commit()
@@ -452,7 +481,7 @@ def test_enrich_document_missing_document_marks_job_failed(tmp_path, caplog) -> 
 
     _task(tasks.enrich_document).run(document_id="missing", job_id=job_id)
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         updated_job = session.get(IngestionJob, job_id)
 
     assert updated_job is not None
@@ -464,13 +493,8 @@ def test_enrich_document_missing_document_marks_job_failed(tmp_path, caplog) -> 
     )
 
 
-def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
-    db_path = tmp_path / "topic.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
-
-    with Session(engine) as session:
+def test_topic_digest_worker_updates_job_status(tmp_path, worker_engine) -> None:
+    with Session(worker_engine) as session:
         source = Document(
             id="source-doc",
             title="Digest Source",
@@ -500,7 +524,7 @@ def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
     finally:
         setattr(notification_task, "delay", original_delay)
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         updated = session.get(IngestionJob, job_id)
         digest_doc = (
             session.query(Document)
@@ -521,13 +545,8 @@ def test_topic_digest_worker_updates_job_status(tmp_path) -> None:
     assert "Digest Topic" in captured["context"].get("topics", [])
 
 
-def test_generate_document_summary_creates_summary_document(tmp_path) -> None:
-    db_path = tmp_path / "summary.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.create_all(engine)
-
-    with Session(engine) as session:
+def test_generate_document_summary_creates_summary_document(worker_engine) -> None:
+    with Session(worker_engine) as session:
         document = Document(
             title="Creation Sermon",
             source_type="markdown",
@@ -554,7 +573,7 @@ def test_generate_document_summary_creates_summary_document(tmp_path) -> None:
 
     _task(tasks.generate_document_summary).run(document_id=document_id, job_id=job_id)
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         summary_doc = (
             session.query(Document)
             .filter(Document.source_type == "ai_summary")
@@ -617,13 +636,7 @@ def test_refresh_hnsw_executes_rebuild_sql(monkeypatch) -> None:
     assert any("ANALYZE passages" in statement for statement in executed)
     assert metrics["sample_size"] == 0
 
-def test_validate_citations_passes_and_updates_job(monkeypatch, tmp_path) -> None:
-    db_path = tmp_path / "validate-success.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
-
+def test_validate_citations_passes_and_updates_job(monkeypatch, worker_engine) -> None:
     now = datetime.now(UTC)
     citation = RAGCitation(
         index=1,
@@ -644,7 +657,7 @@ def test_validate_citations_passes_and_updates_job(monkeypatch, tmp_path) -> Non
         created_at=now,
     )
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         session_record = ChatSession(
             id="session-success",
             user_id="user-1",
@@ -694,7 +707,7 @@ def test_validate_citations_passes_and_updates_job(monkeypatch, tmp_path) -> Non
     assert result["discrepancies"] == []
     assert metric.counts == {"passed": 1.0}
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         job_record = session.get(IngestionJob, job_id)
         assert job_record is not None
         assert job_record.status == "completed"
@@ -703,13 +716,7 @@ def test_validate_citations_passes_and_updates_job(monkeypatch, tmp_path) -> Non
         assert job_record.payload.get("limit") == 1
 
 
-def test_validate_citations_logs_mismatch(monkeypatch, tmp_path, caplog) -> None:
-    db_path = tmp_path / "validate-failure.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
-
+def test_validate_citations_logs_mismatch(monkeypatch, worker_engine, caplog) -> None:
     now = datetime.now(UTC)
     citation = RAGCitation(
         index=1,
@@ -729,7 +736,7 @@ def test_validate_citations_logs_mismatch(monkeypatch, tmp_path, caplog) -> None
         created_at=now,
     )
 
-    with Session(engine) as session:
+    with Session(worker_engine) as session:
         session_record = ChatSession(
             id="session-failure",
             user_id="user-2",
