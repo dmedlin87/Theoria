@@ -38,6 +38,26 @@ tasks:
     cmds:
       - pytest -m "not (slow or gpu or contract)"
 
+  test:parallel:
+    desc: Run the pytest suite with automatic parallelisation
+    cmds:
+      - pytest -n auto --dist worksteal -m "not (slow or gpu or contract or pgvector)"
+
+  test:incremental:
+    desc: Run only the tests impacted by recent changes
+    cmds:
+      - python scripts/perf/incremental_test_runner.py --since {{.SINCE | default "HEAD~1"}}
+
+  test:profile:
+    desc: Execute pytest with duration profiling enabled
+    cmds:
+      - pytest --durations=0 --profile-svg tests/
+
+  test:split:
+    desc: Run pytest in split mode for CI matrix builds
+    cmds:
+      - pytest --splits={{.SPLITS | default 4}} --group={{.GROUP | default 1}}
+
   test:full:
     desc: Run the full pytest suite including pgvector and contract suites
     cmds:
