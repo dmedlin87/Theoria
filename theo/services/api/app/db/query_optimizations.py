@@ -63,16 +63,22 @@ def query_with_monitoring(metric_name: str):
                 duration = time.perf_counter() - start_time
 
                 # Record metrics
-                record_histogram(f"{metric_name}.duration_seconds", duration)
+                record_histogram(
+                    f"{metric_name}.duration_seconds", value=duration
+                )
 
                 # Count results if it's a sequence
                 if isinstance(result, Sequence):
-                    record_counter(f"{metric_name}.result_count", len(result))
+                    record_counter(
+                        f"{metric_name}.result_count", amount=len(result)
+                    )
 
                 return result
             except Exception:
                 duration = time.perf_counter() - start_time
-                record_histogram(f"{metric_name}.error_duration_seconds", duration)
+                record_histogram(
+                    f"{metric_name}.error_duration_seconds", value=duration
+                )
                 raise
         return wrapper
     return decorator
