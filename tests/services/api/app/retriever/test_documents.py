@@ -3,9 +3,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+
+try:  # pragma: no cover - optional dependency for lightweight environments
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session, sessionmaker
+    from sqlalchemy.pool import StaticPool
+except ModuleNotFoundError:  # pragma: no cover - gracefully skip when SQLAlchemy missing
+    pytest.skip("sqlalchemy not installed", allow_module_level=True)
+except ImportError:  # pragma: no cover - minimal stubs without pool support
+    pytest.skip("sqlalchemy pool utilities unavailable", allow_module_level=True)
 
 from theo.services.api.app.models.documents import (
     DocumentAnnotationCreate,
@@ -150,6 +156,44 @@ def test_get_document_includes_passages_and_annotations(session: Session):
     assert {passage.id for passage in detail.passages} == {first.id, second.id}
     assert detail.annotations[0].body == "Insight"
     assert detail.metadata == {"primary_topic": "Grace"}
+
+
+def test_get_document_enriches_passages_with_biblical_meta(session: Session):
+    document = _add_document(session, id="doc-biblical")
+    meta = {
+        "biblical_text": {
+            "reference": {
+                "book": "Genesis",
+                "chapter": 1,
+                "verse": 1,
+                "book_id": "gen",
+                "osis_id": "Gen.1.1",
+            },
+            "language": "hebrew",
+            "text": {
+                "raw": "בְּרֵאשִׁית בָּרָא אֱלֹהִים",
+                "normalized": "בראשית ברא אלהים",
+            },
+        }
+    }
+    _add_passage(
+        session,
+        document.id,
+        id="p-biblical",
+        text="בראשית ברא אלהים",
+        raw_text="בְּרֵאשִׁית בָּרָא אֱלֹהִים",
+        osis_ref="Gen.1.1",
+        meta=meta,
+    )
+
+    detail = documents.get_document(session, document.id)
+    passage_lookup = {item.id: item for item in detail.passages}
+    verse_passage = passage_lookup["p-biblical"]
+
+    assert verse_passage.text == "בראשית ברא אלהים"
+    assert verse_passage.meta is not None
+    assert "biblical_text" in verse_passage.meta
+    assert verse_passage.meta["biblical_text"]["reference"]["osis_id"] == "Gen.1.1"
 
 
 def test_get_document_missing_raises_key_error(session: Session):
