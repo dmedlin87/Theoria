@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -55,6 +56,15 @@ def patched_app_environment(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         "theo.services.api.app.bootstrap.app_factory.set_application_resolver",
         lambda resolver: application_resolvers.append(resolver),
+    )
+
+    @asynccontextmanager
+    async def fake_lifespan(_: object):
+        yield
+
+    monkeypatch.setattr(
+        "theo.services.api.app.bootstrap.app_factory.lifespan",
+        fake_lifespan,
     )
 
     registry_savers: list[object] = []
