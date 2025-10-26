@@ -436,3 +436,79 @@ async def ingest_transcript(
     schedule_discovery_refresh(background_tasks, user_id)
     return DocumentIngestResponse(document_id=document.id, status="processed")
 
+
+@router.post(
+    "/audio",
+    response_model=DocumentIngestResponse,
+    responses=_INGEST_ERROR_RESPONSES,
+)
+async def ingest_audio(
+    background_tasks: BackgroundTasks,
+    audio: UploadFile = File(...),
+    source_type: str = Form(default="user_upload"),
+    frontmatter: str | None = Form(default=None),
+    notebooklm_metadata: str | None = Form(default=None),
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
+    ingestion_service: IngestionService = Depends(
+        _ingestion_service_with_overrides
+    ),
+) -> DocumentIngestResponse:
+    """Ingest an audio file (MP3, WAV) or video file (MP4) with transcription."""
+    try:
+        # Parse NotebookLM metadata if provided
+        nb_metadata = {}
+        if notebooklm_metadata:
+            try:
+                nb_metadata = json.loads(notebooklm_metadata)
+            except json.JSONDecodeError:
+                raise IngestionError(
+                    "Invalid NotebookLM metadata JSON",
+                    code="INGESTION_INVALID_NOTEBOOKLM_METADATA",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    severity=Severity.USER,
+                    hint="Ensure NotebookLM metadata is valid JSON before submitting the request.",
+                )
+
+        # Merge with frontmatter
+        parsed_frontmatter = _parse_frontmatter(frontmatter)
+        enriched_frontmatter = _frontmatter_with_owner(parsed_frontmatter, _principal_subject(principal))
+        enriched_frontmatter.update({
+            "notebooklm": nb_metadata,
+            "content_type": "audio",
+            "source_type": source_type,
+        })
+
+        # Create temp file
+        tmp_dir = Path(tempfile.mkdtemp(prefix="theo-ingest-"))
+        tmp_path = _unique_safe_path(tmp_dir, audio.filename, "audio.bin")
+        settings = get_settings()
+        limit = getattr(settings, "ingest_upload_max_bytes", None)
+        await _stream_upload_to_path(
+            audio,
+            tmp_path,
+            max_bytes=limit,
+        )
+
+        # Process via ingestion service
+        document = ingestion_service.ingest_audio(
+            session,
+            tmp_path,
+            source_type=source_type,
+            frontmatter=enriched_frontmatter,
+        )
+
+        background_tasks.add_task(tmp_path.unlink, missing_ok=True)
+        background_tasks.add_task(tmp_dir.rmdir)
+        return DocumentIngestResponse(document_id=document.id, status="processed")
+
+    except IngestionError as e:
+        raise
+    except Exception as e:
+        raise IngestionError(
+            "Audio ingestion failed",
+            code="INGESTION_AUDIO_FAILURE",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            severity=Severity.TRANSIENT,
+            hint="Retry once the ingestion service is healthy.",
+        ) from e

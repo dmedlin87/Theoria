@@ -230,3 +230,106 @@ class OsisCommentaryParser(Parser):
             "commentary_entries": entries,
             "frontmatter": frontmatter,
         }
+
+
+@dataclass(slots=True)
+class AudioTranscriptionParser(Parser):
+    """Transcribe audio using Whisper and detect verses."""
+
+    name: str = "audio_transcription_parser"
+
+    def parse(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
+        audio_path = state["audio_path"]
+        frontmatter = state.get("frontmatter", {})
+
+        # Transcribe audio
+        transcript_segments = self._transcribe_audio(
+            audio_path, context.settings
+        )
+        
+        # Detect scripture references
+        verse_anchors = self._detect_scripture_references(
+            transcript_segments, context.settings
+        )
+
+        # Prepare searchable chunks
+        parser_result = prepare_transcript_chunks(
+            transcript_segments, settings=context.settings
+        )
+        
+        return {
+            "parser_result": parser_result,
+            "transcript_segments": transcript_segments,
+            "verse_anchors": verse_anchors,
+            "frontmatter": frontmatter,
+        }
+
+    def _transcribe_audio(self, audio_path: Path, settings) -> list[dict]:
+        """Transcribe audio using Whisper model."""
+        try:
+            import whisper
+            from whisper.utils import get_writer
+        except ImportError:
+            raise RuntimeError(
+                "Whisper not installed. Run 'pip install -U openai-whisper'"
+            )
+            
+        # Load model based on settings
+        model_size = getattr(settings, "whisper_model_size", "base")
+        device = getattr(settings, "whisper_device", "cpu")
+        model = whisper.load_model(model_size, device=device)
+        
+        # Transcribe audio
+        result = model.transcribe(
+            str(audio_path),
+            verbose=False,
+            language="en",
+            fp16=False if device == "cpu" else True
+        )
+        
+        # Format segments
+        segments = []
+        for seg in result["segments"]:
+            segments.append({
+                "start": seg["start"],
+                "end": seg["end"],
+                "text": seg["text"].strip(),
+                "confidence": seg["no_speech_prob"]  # Probability of no speech
+            })
+            
+        return segments
+
+    def _detect_scripture_references(self, segments, settings) -> list[dict]:
+        """Detect scripture references in transcript."""
+        try:
+            from transformers import pipeline
+        except ImportError:
+            raise RuntimeError("Verse detection requires transformers library")
+            
+        # Combine segments into full text
+        full_text = " ".join(seg["text"] for seg in segments)
+        
+        # Load model
+        model_name = getattr(settings, "verse_detection_model", "biblical-ai/verse-detection-bert")
+        detector = pipeline(
+            "token-classification",
+            model=model_name,
+            aggregation_strategy="simple",
+            device=getattr(settings, "verse_detection_device", "cpu")
+        )
+        
+        # Detect verses
+        results = detector(full_text)
+        
+        # Format and filter
+        verse_anchors = []
+        for res in results:
+            if res["entity_group"] == "VERSE":
+                verse_anchors.append({
+                    "verse": res["word"],
+                    "confidence": res["score"],
+                    "start_index": res["start"],
+                    "end_index": res["end"]
+                })
+        
+        return verse_anchors
