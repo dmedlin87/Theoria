@@ -13,7 +13,11 @@ from celery.app.task import Task as CeleryTask
 from celery.exceptions import Retry as CeleryRetry
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
-from sqlalchemy import func, literal, select, text
+from sqlalchemy import func, select, text
+try:  # pragma: no cover - SQLAlchemy literal helper moves across versions
+    from sqlalchemy import literal
+except ImportError:  # pragma: no cover - compatibility shim for lean builds
+    from sqlalchemy.sql.expression import literal
 from sqlalchemy.orm import Session
 
 from theo.adapters.persistence.chat_repository import SQLAlchemyChatSessionRepository

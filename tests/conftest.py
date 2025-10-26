@@ -25,7 +25,16 @@ from sqlalchemy.engine import Engine
 from tests.factories.application import isolated_application_container
 
 if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE"}:
-    pytest_plugins = ["tests.fixtures.mocks"]
+    try:
+        import pydantic  # type: ignore  # noqa: F401
+    except ModuleNotFoundError:  # pragma: no cover - exercised in lightweight envs
+        warnings.warn(
+            "pydantic not installed; skipping heavy pytest fixtures that depend on it.",
+            RuntimeWarning,
+        )
+        pytest_plugins = []
+    else:
+        pytest_plugins = ["tests.fixtures.mocks"]
 else:  # pragma: no cover - exercised in lightweight CI and profiling flows
     pytest_plugins: list[str] = []
 
@@ -170,11 +179,18 @@ def regression_factory():
     """Provide a seeded factory for synthesising regression datasets."""
 
     try:
-        from tests.fixtures import RegressionDataFactory  # type: ignore
+        from tests.fixtures import (  # type: ignore
+            REGRESSION_FIXTURES_AVAILABLE,
+            REGRESSION_IMPORT_ERROR,
+            RegressionDataFactory,
+        )
     except ModuleNotFoundError as exc:  # pragma: no cover - thin local envs
         pytest.skip(f"faker not installed for regression factory: {exc}")
     except Exception as exc:  # pragma: no cover - guard against optional deps
         pytest.skip(f"regression fixtures unavailable: {exc}")
+    if not REGRESSION_FIXTURES_AVAILABLE:
+        reason = REGRESSION_IMPORT_ERROR or ModuleNotFoundError("unknown dependency")
+        pytest.skip(f"regression fixtures unavailable: {reason}")
     return RegressionDataFactory()
 
 

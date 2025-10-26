@@ -66,8 +66,8 @@ def test_services_no_direct_orm_imports():
     ]
 
     for path in _iter_python_files("theo/services/api/app"):
-        # Skip database and adapter-specific modules
-        if "db/" in str(path) or "compat/" in str(path):
+        # Skip database and adapter-specific modules (handle any path separators)
+        if "db" in path.parts or "compat" in path.parts:
             continue
 
         imports = _gather_imports(path)

@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from ...errors import ExportError
+from ...export.formatters import build_search_export, render_bundle
+from ...retriever.export import export_search_results
 from ...export.zotero import export_to_zotero as _zotero_export_adapter
 from . import citations, deliverables, documents, search, zotero
 
@@ -33,4 +35,7 @@ __all__ = [
     "search",
     "zotero",
     "_normalise_formats",
+    "export_search_results",
+    "build_search_export",
+    "render_bundle",
 ]

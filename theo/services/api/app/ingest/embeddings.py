@@ -12,7 +12,19 @@ from collections import OrderedDict
 from collections.abc import Iterable, Sequence
 from typing import Protocol, cast
 
-from opentelemetry import trace
+try:  # pragma: no cover - optional telemetry dependency
+    from opentelemetry import trace
+except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
+    from ..ai.router import _NoopTracer
+
+    class _TraceProxy:
+        def get_tracer(self, *_args, **_kwargs) -> _NoopTracer:
+            return _NoopTracer()
+
+        def get_current_span(self):  # pragma: no cover - parity with opentelemetry
+            return _NoopTracer().start_as_current_span()
+
+    trace = _TraceProxy()  # type: ignore[assignment]
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ClauseElement
 

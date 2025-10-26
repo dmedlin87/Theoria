@@ -25,11 +25,15 @@ if TYPE_CHECKING:  # pragma: no cover - typing support only
     from celery import Celery
 
 
+# Exposed for monkeypatch-in-place in tests and warm caching in production.
+celery: "Celery" | None = None
 _celery_app: "Celery" | None = None
 
 
 def _resolve_celery() -> "Celery" | None:
-    global _celery_app
+    global celery, _celery_app
+    if celery is not None:
+        return celery
     if _celery_app is not None:
         return _celery_app
     try:
@@ -38,6 +42,7 @@ def _resolve_celery() -> "Celery" | None:
         LOGGER.debug("Unable to import celery application", exc_info=True)
         return None
     _celery_app = celery_app
+    celery = celery_app
     return _celery_app
 
 
@@ -240,4 +245,4 @@ class TrailsMemoryBridge:
         return None
 
 
-__all__ = ["TrailsMemoryBridge"]
+__all__ = ["TrailsMemoryBridge", "celery"]

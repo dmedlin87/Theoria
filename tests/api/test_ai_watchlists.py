@@ -136,6 +136,14 @@ def watchlists_service_stub(monkeypatch: pytest.MonkeyPatch) -> WatchlistsServic
     return stub
 
 
+def _parse_datetime(value: str) -> datetime:
+    """Normalise ISO 8601 strings that may include trailing Z."""
+
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    return datetime.fromisoformat(value)
+
+
 def test_create_watchlist_assigns_principal_subject(
     watchlist_client: tuple[TestClient, Session]
 ) -> None:
@@ -268,20 +276,19 @@ def test_watchlist_events_forward_since_parameter(
     )
 
     assert response.status_code == 200
-    assert response.json() == [
-        {
-            "id": "event-1",
-            "watchlist_id": "watch-abc",
-            "run_started": since.isoformat(),
-            "run_completed": since.isoformat(),
-            "window_start": since.isoformat(),
-            "matches": [],
-            "document_ids": [],
-            "passage_ids": [],
-            "delivery_status": "delivered",
-            "error": None,
-        }
-    ]
+    payload = response.json()
+    assert len(payload) == 1
+    event = payload[0]
+    assert event["id"] == "event-1"
+    assert event["watchlist_id"] == "watch-abc"
+    assert _parse_datetime(event["run_started"]) == since
+    assert _parse_datetime(event["run_completed"]) == since
+    assert _parse_datetime(event["window_start"]) == since
+    assert event["matches"] == []
+    assert event["document_ids"] == []
+    assert event["passage_ids"] == []
+    assert event["delivery_status"] == "delivered"
+    assert event["error"] is None
     assert watchlists_service_stub.list_events_calls == [
         ("watch-abc", "reader", since)
     ]
@@ -310,18 +317,17 @@ def test_preview_watchlist_returns_stub_payload(
     response = client.get("/ai/digest/watchlists/watch-preview/preview")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "id": "preview-1",
-        "watchlist_id": "watch-preview",
-        "run_started": now.isoformat(),
-        "run_completed": now.isoformat(),
-        "window_start": now.isoformat(),
-        "matches": [],
-        "document_ids": [],
-        "passage_ids": [],
-        "delivery_status": None,
-        "error": None,
-    }
+    payload = response.json()
+    assert payload["id"] == "preview-1"
+    assert payload["watchlist_id"] == "watch-preview"
+    assert _parse_datetime(payload["run_started"]) == now
+    assert _parse_datetime(payload["run_completed"]) == now
+    assert _parse_datetime(payload["window_start"]) == now
+    assert payload["matches"] == []
+    assert payload["document_ids"] == []
+    assert payload["passage_ids"] == []
+    assert payload["delivery_status"] is None
+    assert payload["error"] is None
     assert watchlists_service_stub.preview_calls == [("watch-preview", "runner")]
 
 
@@ -348,18 +354,17 @@ def test_run_watchlist_returns_stub_payload(
     response = client.post("/ai/digest/watchlists/watch-run/run")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "id": "run-1",
-        "watchlist_id": "watch-run",
-        "run_started": now.isoformat(),
-        "run_completed": now.isoformat(),
-        "window_start": now.isoformat(),
-        "matches": [],
-        "document_ids": [],
-        "passage_ids": [],
-        "delivery_status": "queued",
-        "error": None,
-    }
+    payload = response.json()
+    assert payload["id"] == "run-1"
+    assert payload["watchlist_id"] == "watch-run"
+    assert _parse_datetime(payload["run_started"]) == now
+    assert _parse_datetime(payload["run_completed"]) == now
+    assert _parse_datetime(payload["window_start"]) == now
+    assert payload["matches"] == []
+    assert payload["document_ids"] == []
+    assert payload["passage_ids"] == []
+    assert payload["delivery_status"] == "queued"
+    assert payload["error"] is None
     assert watchlists_service_stub.run_calls == [("watch-run", "runner")]
 
 

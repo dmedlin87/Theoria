@@ -4,24 +4,39 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Sequence
+from typing import TYPE_CHECKING, Any, Literal, Sequence, TypeAlias
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel as _PydanticBaseModel, Field, model_validator
 
-from ..ai.rag import (
-    CollaborationResponse,
-    ComparativeAnalysisResponse,
-    DevotionalResponse,
-    MultimediaDigestResponse,
-    RAGAnswer,
-    RAGCitation,
-    SermonPrepResponse,
-    VerseCopilotResponse,
-)
 from ..models.export import ExportManifest
 from ..models.research_plan import ResearchPlan
 from ..models.search import HybridSearchFilters
 from .base import APIModel
+
+try:  # pragma: no cover - optional AI dependencies may be unavailable in tests
+    from ..ai.rag import RAGCitation as _RAGCitationRuntime
+except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
+    class _RAGCitationRuntime(_PydanticBaseModel):
+        index: int
+        osis: str
+        anchor: str
+        passage_id: str | None = None
+        document_id: str | None = None
+        document_title: str | None = None
+        snippet: str | None = None
+        source_url: str | None = None
+
+if TYPE_CHECKING:  # pragma: no cover - import for static analysis only
+    from ..ai.rag import (
+        CollaborationResponse,
+        ComparativeAnalysisResponse,
+        DevotionalResponse,
+        MultimediaDigestResponse,
+        RAGAnswer,
+        RAGCitation,
+        SermonPrepResponse,
+        VerseCopilotResponse,
+    )
 
 
 class RecorderMetadata(APIModel):
@@ -97,7 +112,7 @@ class ChatMemoryEntry(APIModel):
     prompt: str | None = None
     intent_tags: list[IntentTagPayload] | None = None
     answer_summary: str | None = None
-    citations: list[RAGCitation] = Field(default_factory=list)
+    citations: list[_RAGCitationRuntime] = Field(default_factory=list)
     document_ids: list[str] = Field(default_factory=list)
     goal_id: str | None = None
     trail_id: str | None = None
@@ -395,13 +410,13 @@ class ResearchLoopState(APIModel):
     updated_at: datetime | None = None
 
 
-AIResponse = (
-    VerseCopilotResponse
-    | SermonPrepResponse
-    | ComparativeAnalysisResponse
-    | MultimediaDigestResponse
-    | DevotionalResponse
-    | CollaborationResponse
+AIResponse: TypeAlias = (
+    "VerseCopilotResponse"
+    " | SermonPrepResponse"
+    " | ComparativeAnalysisResponse"
+    " | MultimediaDigestResponse"
+    " | DevotionalResponse"
+    " | CollaborationResponse"
 )
 
 
@@ -437,3 +452,8 @@ __all__ = [
     "ResearchLoopStatus",
     "ResearchLoopState",
 ]
+
+try:  # pragma: no cover - ensure forward references resolve in lightweight builds
+    ChatMemoryEntry.model_rebuild()
+except Exception:
+    pass

@@ -37,7 +37,11 @@ def test_guarded_answer_or_refusal_uses_fallback_results(monkeypatch: pytest.Mon
     session = object()
     fallback = [_result(identifier="fallback", osis="John.3.16")]
 
-    monkeypatch.setattr(workflow, "load_passages_for_osis", lambda s, osis: fallback)
+    monkeypatch.setattr(
+        workflow,
+        "load_passages_for_osis",
+        lambda s, osis, **kwargs: fallback,
+    )
 
     captured: dict[str, object] = {}
 

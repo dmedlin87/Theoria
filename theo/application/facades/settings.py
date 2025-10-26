@@ -10,7 +10,20 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from cryptography.fernet import Fernet
+try:  # pragma: no cover - cryptography is optional for lightweight tests
+    from cryptography.fernet import Fernet
+except ModuleNotFoundError:  # pragma: no cover - provide lazy failure for optional feature
+    class Fernet:  # type: ignore[override]
+        def __init__(self, *_args, **_kwargs) -> None:
+            raise ModuleNotFoundError(
+                "cryptography is required for Fernet secrets support"
+            )
+
+        @staticmethod
+        def generate_key() -> bytes:
+            raise ModuleNotFoundError(
+                "cryptography is required for Fernet secrets support"
+            )
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -715,11 +728,25 @@ def get_settings_cipher() -> Fernet | None:
 
     secret = get_settings_secret()
     if secret:
-        return Fernet(_derive_fernet_key(secret))
+        try:
+            return Fernet(_derive_fernet_key(secret))
+        except Exception:  # pragma: no cover - cryptography optional in tests
+            LOGGER.warning(
+                "Falling back to plaintext settings; cryptography unavailable",
+                exc_info=True,
+            )
+            return None
     if allow_insecure_startup():
         fallback = "theoria-insecure-test-secret"
         LOGGER.warning(
             "SETTINGS_SECRET_KEY not configured; using insecure fallback for tests",
         )
-        return Fernet(_derive_fernet_key(fallback))
+        try:
+            return Fernet(_derive_fernet_key(fallback))
+        except Exception:  # pragma: no cover - cryptography optional in tests
+            LOGGER.warning(
+                "Plaintext settings store active; cryptography unavailable",
+                exc_info=True,
+            )
+            return None
     return None

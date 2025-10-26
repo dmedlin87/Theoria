@@ -197,14 +197,7 @@ Provide JSON with: themes, theological_keywords, cross_references, textual_varia
         )
         
         try:
-            semantic_data = json.loads(response.choices[0].message.content)
-            return SemanticAnalysis(
-                themes=semantic_data.get("themes", []),
-                theological_keywords=semantic_data.get("theological_keywords", []),
-                cross_references=semantic_data.get("cross_references", []),
-                textual_variants=semantic_data.get("textual_variants", []),
-                translation_notes=semantic_data.get("translation_notes", {})
-            )
+            raw_semantic_data = json.loads(response.choices[0].message.content)
         except json.JSONDecodeError:
             return SemanticAnalysis(
                 themes=[],
@@ -212,6 +205,36 @@ Provide JSON with: themes, theological_keywords, cross_references, textual_varia
                 cross_references=[],
                 textual_variants=[]
             )
+
+        if not isinstance(raw_semantic_data, dict):
+            return SemanticAnalysis(
+                themes=[],
+                theological_keywords=[],
+                cross_references=[],
+                textual_variants=[]
+            )
+
+        return SemanticAnalysis(
+            themes=self._safe_string_list(raw_semantic_data.get("themes", [])),
+            theological_keywords=self._safe_string_list(raw_semantic_data.get("theological_keywords", [])),
+            cross_references=self._safe_string_list(raw_semantic_data.get("cross_references", [])),
+            textual_variants=self._safe_string_list(raw_semantic_data.get("textual_variants", [])),
+            translation_notes=self._safe_dict(raw_semantic_data.get("translation_notes", {}))
+        )
+
+    @staticmethod
+    def _safe_string_list(candidate: Optional[List[str]]) -> List[str]:
+        """Return a list of strings, discarding malformed AI payloads."""
+        if not isinstance(candidate, list):
+            return []
+        return [str(item) for item in candidate if isinstance(item, str)]
+
+    @staticmethod
+    def _safe_dict(candidate: Optional[Dict]) -> Dict:
+        """Ensure translation notes are a dictionary."""
+        if not isinstance(candidate, dict):
+            return {}
+        return candidate
 
 
 class CrossLanguageComparator:

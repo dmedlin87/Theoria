@@ -5,7 +5,19 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Iterator
 
-from opentelemetry import trace
+try:  # pragma: no cover - optional dependency
+    from opentelemetry import trace
+except ModuleNotFoundError:  # pragma: no cover - fallback for lightweight tests
+    from ..router import _NoopTracer
+
+    class _TraceProxy:
+        def get_tracer(self, *_args, **_kwargs) -> _NoopTracer:
+            return _NoopTracer()
+
+        def get_current_span(self):  # pragma: no cover - parity with opentelemetry
+            return _NoopTracer().start_as_current_span()
+
+    trace = _TraceProxy()  # type: ignore[assignment]
 
 from theo.application.facades.telemetry import log_workflow_event
 
