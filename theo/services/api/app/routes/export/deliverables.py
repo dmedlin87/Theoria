@@ -70,7 +70,7 @@ def _normalise_formats(formats: Sequence[str] | None) -> list[str]:
     responses=_DELIVERABLE_ERROR_RESPONSES,
 )
 def export_deliverable(payload: DeliverableRequest) -> DeliverableResponse:
-"""Normalise formats, enqueue ``build_deliverable``, and report manifest metadata."""
+    """Normalise formats, enqueue ``build_deliverable``, and report manifest metadata."""
 
     formats = _normalise_formats(payload.formats)
     filters = payload.filters.model_dump(exclude_none=True)
