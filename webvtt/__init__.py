@@ -3,6 +3,7 @@
 The lightweight parser bundled with the repository keeps worker tests running in
 minimal environments.  When the third-party dependency is installed we defer to
 it so production code receives the full implementation.
+"""Minimal WebVTT parser used for worker tests.
 
 Minimal WebVTT parser used for worker tests.
 
