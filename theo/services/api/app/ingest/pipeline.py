@@ -35,20 +35,23 @@ from .stages import (
     Persister,
     SourceFetcher,
 )
-from .stages.enrichers import DocumentEnricher
+from .stages.enrichers import DocumentEnricher, VerseDetectionEnricher
 from .stages.fetchers import (
+    AudioSourceFetcher,
     FileSourceFetcher,
     OsisSourceFetcher,
     TranscriptSourceFetcher,
     UrlSourceFetcher,
 )
 from .stages.parsers import (
+    AudioTranscriptionParser,
     FileParser,
     OsisCommentaryParser,
     TranscriptParser,
     UrlParser,
 )
 from .stages.persisters import (
+    AudioDocumentPersister,
     CommentarySeedPersister,
     TextDocumentPersister,
     TranscriptDocumentPersister,
@@ -518,24 +521,12 @@ def run_pipeline_for_audio(
     frontmatter: dict[str, Any] | None = None,
     dependencies: PipelineDependencies | None = None,
 ) -> Document:
-    """Run ingestion pipeline for audio files.
+    """Ingest an audio asset by transcribing and persisting its content."""
 
-    Args:
-        session: Database session
-        audio_path: Path to audio file
-        source_type: Source type (e.g., "sermon", "podcast", "ai_generated")
-        frontmatter: Additional metadata
-        dependencies: Pipeline dependencies (optional)
-
-    Returns:
-        Ingested Document object
-    """
-    if dependencies is None:
-        dependencies = PipelineDependencies.build()
-
-    # Prepare frontmatter with audio-specific defaults
-    frontmatter_payload = frontmatter or {}
+    pipeline_dependencies = dependencies or PipelineDependencies()
+    frontmatter_payload = merge_metadata({}, load_frontmatter(frontmatter))
     frontmatter_payload.setdefault("source_type", source_type or "audio")
+    frontmatter_payload.setdefault("audio_path", str(audio_path))
 
     stages = [
         AudioSourceFetcher(
@@ -550,7 +541,7 @@ def run_pipeline_for_audio(
 
     return _orchestrate(
         session=session,
-        dependencies=dependencies,
+        dependencies=pipeline_dependencies,
         stages=stages,
         workflow="ingest.audio",
         workflow_kwargs={

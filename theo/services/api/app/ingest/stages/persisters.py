@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -111,6 +112,84 @@ class TranscriptDocumentPersister(Persister):
             duration_seconds=frontmatter.get("duration_seconds"),
             transcript_path=state.get("transcript_path"),
             audio_path=state.get("audio_path"),
+            transcript_filename=state.get("transcript_filename"),
+            audio_filename=state.get("audio_filename"),
+        )
+        context.instrumentation.set("ingest.document_id", document.id)
+        metadata.setdefault("document_id", document.id)
+        return {
+            "document": document,
+            "document_metadata": metadata,
+        }
+
+
+@dataclass(slots=True)
+class AudioDocumentPersister(Persister):
+    """Persist audio-derived transcripts and metadata."""
+
+    session: Session
+    name: str = "audio_document_persister"
+
+    def persist(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
+        parser_result = state["parser_result"]
+        _set_chunk_metrics(context, parser_result)
+        cache_status = state.get("cache_status")
+        if cache_status is not None:
+            context.instrumentation.set("ingest.cache_status", cache_status)
+
+        frontmatter = dict(state.get("frontmatter") or {})
+        metadata = dict(state.get("document_metadata") or {})
+        audio_path = state.get("audio_path")
+        audio_metadata = dict(state.get("audio_metadata") or {})
+        verse_anchors = list(state.get("verse_anchors") or ())
+        transcript_segments = list(state.get("transcript_segments") or ())
+
+        if audio_metadata:
+            frontmatter.setdefault("audio_metadata", audio_metadata)
+            metadata.setdefault("audio_metadata", audio_metadata)
+        if verse_anchors:
+            frontmatter.setdefault("verse_anchors", verse_anchors)
+            metadata.setdefault("verse_anchors", verse_anchors)
+        if transcript_segments:
+            metadata.setdefault("transcript_segments", transcript_segments)
+
+        sha256 = state.get("sha256") or metadata.get("sha256")
+        if not sha256:
+            raise ValueError("sha256 missing from orchestration state")
+
+        title = (
+            frontmatter.get("title")
+            or metadata.get("title")
+            or (audio_path.stem if isinstance(audio_path, Path) else None)
+            or "Audio Transcript"
+        )
+
+        source_type = str(
+            state.get("source_type")
+            or frontmatter.get("source_type")
+            or "audio"
+        )
+
+        document = persist_transcript_document(
+            self.session,
+            context=context,
+            chunks=parser_result.chunks,
+            parser=parser_result.parser,
+            parser_version=parser_result.parser_version,
+            frontmatter=frontmatter,
+            sha256=sha256,
+            source_type=source_type,
+            title=title,
+            source_url=(
+                state.get("source_url")
+                or frontmatter.get("source_url")
+                or metadata.get("source_url")
+            ),
+            channel=frontmatter.get("channel"),
+            video_id=frontmatter.get("video_id"),
+            duration_seconds=audio_metadata.get("duration_seconds"),
+            transcript_path=state.get("transcript_path"),
+            audio_path=audio_path,
             transcript_filename=state.get("transcript_filename"),
             audio_filename=state.get("audio_filename"),
         )

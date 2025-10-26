@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import contextlib
+import wave
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -153,6 +155,66 @@ class TranscriptSourceFetcher(SourceFetcher):
                     merged_frontmatter.get("source_type") or "transcript"
                 ),
             },
+        }
+
+
+@dataclass(slots=True)
+class AudioSourceFetcher(SourceFetcher):
+    """Load local audio files and derive basic metadata."""
+
+    audio_path: Path
+    frontmatter: dict[str, Any]
+    source_type: str | None = None
+    name: str = "audio_source_fetcher"
+
+    def fetch(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]:
+        instrumentation: Instrumentation = context.instrumentation
+        raw_bytes = self.audio_path.read_bytes()
+        sha256 = hashlib.sha256(raw_bytes).hexdigest()
+        merged_frontmatter = merge_metadata({}, load_frontmatter(self.frontmatter))
+        resolved_source_type = (
+            self.source_type
+            or str(merged_frontmatter.get("source_type") or "audio")
+        )
+        instrumentation.set("ingest.source_type", resolved_source_type)
+        instrumentation.set("ingest.audio_path", str(self.audio_path))
+        instrumentation.set("ingest.audio_size_bytes", len(raw_bytes))
+
+        audio_metadata: dict[str, Any] = {}
+        with contextlib.suppress(OSError, wave.Error):
+            if self.audio_path.suffix.lower() in {".wav", ".wave"}:
+                with wave.open(str(self.audio_path), "rb") as stream:
+                    frames = stream.getnframes()
+                    framerate = stream.getframerate() or 1
+                    n_channels = stream.getnchannels()
+                    duration = frames / framerate if framerate else 0.0
+                    audio_metadata["duration_seconds"] = round(duration, 2)
+                    audio_metadata["sample_rate_hz"] = framerate
+                    audio_metadata["channels"] = n_channels
+        if audio_metadata:
+            instrumentation.set(
+                "ingest.audio_duration_seconds",
+                audio_metadata.get("duration_seconds"),
+            )
+
+        document_metadata = {
+            "sha256": sha256,
+            "origin": str(self.audio_path),
+            "source_type": resolved_source_type,
+        }
+        if audio_metadata:
+            document_metadata["audio_metadata"] = audio_metadata
+
+        return {
+            "audio_path": self.audio_path,
+            "audio_filename": self.audio_path.name,
+            "raw_bytes": raw_bytes,
+            "sha256": sha256,
+            "frontmatter": merged_frontmatter,
+            "source_type": resolved_source_type,
+            "audio_metadata": audio_metadata,
+            "cache_status": "n/a",
+            "document_metadata": document_metadata,
         }
 
 

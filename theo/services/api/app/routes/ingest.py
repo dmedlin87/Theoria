@@ -28,7 +28,7 @@ from ..models.documents import (
     SimpleIngestRequest,
     UrlIngestRequest,
 )
-from ..models.orm import Document
+from ..persistence_models import Document
 from theo.application.facades.resilience import (
     ResilienceError,
     ResilienceSettings,

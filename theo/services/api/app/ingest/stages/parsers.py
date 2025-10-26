@@ -28,6 +28,50 @@ from ..parsers import (
 from . import Parser
 
 
+class WhisperModel:
+    """Lightweight wrapper around Whisper for easier testing and patching."""
+
+    def __init__(self, model_size: str, *, device: str):
+        self._model = self._load_model(model_size, device)
+
+    @staticmethod
+    def _load_model(model_size: str, device: str):
+        try:
+            import whisper
+        except ImportError as exc:  # pragma: no cover - defensive import
+            raise RuntimeError(
+                "Whisper not installed. Run 'pip install -U openai-whisper'"
+            ) from exc
+        return whisper.load_model(model_size, device=device)
+
+    def transcribe(self, *args, **kwargs):
+        return self._model.transcribe(*args, **kwargs)
+
+
+class VerseDetector:
+    """Wrapper around the transformers pipeline for verse detection."""
+
+    def __init__(self, model_name: str, *, device: str):
+        self._pipeline = self._build_pipeline(model_name, device)
+
+    @staticmethod
+    def _build_pipeline(model_name: str, device: str):
+        try:
+            from transformers import pipeline
+        except ImportError as exc:  # pragma: no cover - defensive import
+            raise RuntimeError("Verse detection requires transformers library") from exc
+
+        return pipeline(
+            "token-classification",
+            model=model_name,
+            aggregation_strategy="simple",
+            device=device,
+        )
+
+    def detect(self, text: str):
+        return self._pipeline(text)
+
+
 def _hash_parser_result(parser_result: ParserResult) -> str:
     payload = "\n".join(chunk.text for chunk in parser_result.chunks).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
@@ -266,17 +310,9 @@ class AudioTranscriptionParser(Parser):
 
     def _transcribe_audio(self, audio_path: Path, settings) -> list[dict]:
         """Transcribe audio using Whisper model."""
-        try:
-            import whisper
-        except ImportError:
-            raise RuntimeError(
-                "Whisper not installed. Run 'pip install -U openai-whisper'"
-            )
-            
-        # Load model based on settings
         model_size = getattr(settings, "whisper_model_size", "base")
         device = getattr(settings, "whisper_device", "cpu")
-        model = whisper.load_model(model_size, device=device)
+        model = WhisperModel(model_size, device=device)
         
         # Transcribe audio
         result = model.transcribe(
@@ -288,13 +324,16 @@ class AudioTranscriptionParser(Parser):
         
         # Format segments
         segments = []
-        for seg in result["segments"]:
+        for seg in result.get("segments", []):
             speech_confidence = 1.0 - float(seg.get("no_speech_prob", 0.0))
+            start = float(seg.get("start", 0.0))
+            end = float(seg.get("end", start))
+            text = str(seg.get("text") or "").strip()
             segments.append(
                 {
-                    "start": seg["start"],
-                    "end": seg["end"],
-                    "text": seg["text"].strip(),
+                    "start": start,
+                    "end": end,
+                    "text": text,
                     "confidence": max(0.0, min(1.0, speech_confidence)),
                 }
             )
@@ -303,35 +342,35 @@ class AudioTranscriptionParser(Parser):
 
     def _detect_scripture_references(self, segments, settings) -> list[dict]:
         """Detect scripture references in transcript."""
-        try:
-            from transformers import pipeline
-        except ImportError:
-            raise RuntimeError("Verse detection requires transformers library")
-            
         # Combine segments into full text
         full_text = " ".join(seg["text"] for seg in segments)
         
         # Load model
         model_name = getattr(settings, "verse_detection_model", "biblical-ai/verse-detection-bert")
-        detector = pipeline(
-            "token-classification",
-            model=model_name,
-            aggregation_strategy="simple",
-            device=getattr(settings, "verse_detection_device", "cpu")
+        detector = VerseDetector(
+            model_name,
+            device=getattr(settings, "verse_detection_device", "cpu"),
         )
         
         # Detect verses
-        results = detector(full_text)
+        results = detector.detect(full_text)
         
         # Format and filter
         verse_anchors = []
         for res in results:
-            if res["entity_group"] == "VERSE":
-                verse_anchors.append({
-                    "verse": res["word"],
-                    "confidence": res["score"],
-                    "start_index": res["start"],
-                    "end_index": res["end"]
-                })
+            entity = str(res.get("entity_group") or res.get("label") or "").upper()
+            if entity and entity != "VERSE":
+                continue
+            verse_value = res.get("word") or res.get("text") or res.get("verse")
+            if not verse_value:
+                continue
+            verse_anchors.append(
+                {
+                    "verse": verse_value,
+                    "confidence": float(res.get("score") or res.get("confidence") or 0.0),
+                    "start_index": res.get("start", 0),
+                    "end_index": res.get("end", 0),
+                }
+            )
         
         return verse_anchors
