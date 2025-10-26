@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from fastapi import FastAPI
 
 from theo.application.facades.resilience import set_resilience_policy_factory
@@ -37,61 +36,22 @@ from .routes import (
     register_health_routes,
     register_metrics_endpoint,
 )
+from .runtime_checks import (
+    configure_console_traces,
+    enforce_authentication_requirements,
+    enforce_secret_requirements,
+    should_enable_console_traces,
+)
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["create_app", "ROUTER_REGISTRATIONS", "get_router_registrations"]
 
 
-def _configure_console_traces(settings: Settings, telemetry_provider: ApiTelemetryProvider) -> None:
-    if os.getenv("THEO_ENABLE_CONSOLE_TRACES", "0").lower() in {"1", "true", "yes"}:
-        telemetry_provider.configure_console_tracer()
+def configure_console_tracer() -> None:
+    """Compatibility hook used by unit tests to observe console tracing."""
 
-
-def _enforce_authentication_requirements(settings: Settings) -> None:
-    insecure_ok = allow_insecure_startup()
-    if settings.auth_allow_anonymous and not insecure_ok:
-        message = (
-            "THEO_AUTH_ALLOW_ANONYMOUS requires THEO_ALLOW_INSECURE_STARTUP for local"
-            " testing. Disable anonymous access or set THEO_ALLOW_INSECURE_STARTUP"
-            "=1."
-        )
-        logger.critical(message)
-        raise RuntimeError(message)
-    if settings.api_keys or settings.has_auth_jwt_credentials():
-        return
-    if insecure_ok:
-        logger.warning(
-            "Starting without API credentials because THEO_ALLOW_INSECURE_STARTUP is"
-            " enabled. Do not use this configuration outside isolated development"
-            " environments."
-        )
-        return
-    message = (
-        "API authentication is not configured. Set THEO_API_KEYS or JWT settings"
-        " before starting the service, or enable THEO_ALLOW_INSECURE_STARTUP=1 for"
-        " local testing."
-    )
-    logger.critical(message)
-    raise RuntimeError(message)
-
-
-def _enforce_secret_requirements() -> None:
-    if get_settings_secret():
-        return
-    if allow_insecure_startup():
-        logger.warning(
-            "Starting without SETTINGS_SECRET_KEY because THEO_ALLOW_INSECURE_STARTUP"
-            " is enabled. Secrets will not be persisted securely."
-        )
-        return
-    message = (
-        "SETTINGS_SECRET_KEY must be configured before starting the service. Set the"
-        " environment variable and restart the service or enable"
-        " THEO_ALLOW_INSECURE_STARTUP=1 for local development."
-    )
-    logger.error(message)
-    raise RuntimeError(message)
+    logger.debug("configure_console_tracer invoked without telemetry provider")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -99,8 +59,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     resolved_settings = settings or get_settings()
 
-    _enforce_authentication_requirements(resolved_settings)
-    _enforce_secret_requirements()
+    enforce_authentication_requirements(
+        resolved_settings,
+        allow_insecure_startup=allow_insecure_startup,
+        logger=logger,
+    )
+    enforce_secret_requirements(
+        get_settings_secret,
+        allow_insecure_startup=allow_insecure_startup,
+        logger=logger,
+    )
 
     telemetry_provider = ApiTelemetryProvider()
     set_telemetry_provider(telemetry_provider)
@@ -113,7 +81,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.state.telemetry_provider = telemetry_provider
 
-    _configure_console_traces(resolved_settings, telemetry_provider)
+    def _invoke_console_tracer() -> None:
+        telemetry_provider.configure_console_tracer()
+        configure_console_tracer()
+
+    configure_console_traces(
+        resolved_settings,
+        console_tracer=_invoke_console_tracer,
+        should_enable=should_enable_console_traces,
+    )
     configure_cors(app, allow_origins=resolved_settings.cors_allowed_origins)
     install_error_reporting(app)
     register_health_routes(app)
