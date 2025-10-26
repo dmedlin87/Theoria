@@ -45,6 +45,9 @@ class Neo4jGraphProjector(GraphProjector):
             auth = None
         else:
             auth = (user, password or "")
+        if database is not None and "database" not in driver_kwargs:
+            # Ensure the default database is communicated to the driver instance.
+            driver_kwargs["database"] = database
         driver = GraphDatabase.driver(uri, auth=auth, **driver_kwargs)
         return cls(driver, database=database)
 
