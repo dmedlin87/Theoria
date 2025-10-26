@@ -43,8 +43,18 @@ def test_dashboard_summary_returns_counts_and_activity(api_engine) -> None:
         assert metric_values["notebooks"]["value"] == 1
 
         assert len(payload["quick_actions"]) >= 4
-        activity_types = {entry["type"] for entry in payload["activity"]}
+        activity_entries = payload["activity"]
+        activity_types = {entry["type"] for entry in activity_entries}
         assert {"document_ingested", "note_created", "discovery_published", "notebook_updated"}.issubset(activity_types)
+
+        occurred_at_values = [datetime.fromisoformat(entry["occurred_at"]) for entry in activity_entries]
+        assert occurred_at_values == sorted(occurred_at_values, reverse=True)
+        assert [entry["id"] for entry in activity_entries[:4]] == [
+            "document-doc-current",
+            "note-note-1",
+            "discovery-1",
+            "notebook-nb-1",
+        ]
 
         deltas = {metric_id: metric["delta_percentage"] for metric_id, metric in metric_values.items()}
         assert deltas["notes"] == 100.0
@@ -71,15 +81,18 @@ def test_dashboard_handles_empty_dataset(api_engine) -> None:
 
 
 def _seed_dashboard_records(session: Session, now: datetime) -> None:
-    last_week = now - timedelta(days=6)
+    one_day_ago = now - timedelta(days=1)
+    two_days_ago = now - timedelta(days=2)
+    three_days_ago = now - timedelta(days=3)
+    four_days_ago = now - timedelta(days=4)
     previous_week = now - timedelta(days=10)
 
     documents = [
         models.Document(
             id="doc-current",
             title="Recent sermon",
-            created_at=last_week,
-            updated_at=last_week,
+            created_at=one_day_ago,
+            updated_at=one_day_ago,
             collection="Sermons",
         ),
         models.Document(
@@ -96,8 +109,8 @@ def _seed_dashboard_records(session: Session, now: datetime) -> None:
         osis="John.3.16",
         title="Love of God",
         body="Observation",
-        created_at=last_week,
-        updated_at=last_week,
+        created_at=two_days_ago,
+        updated_at=two_days_ago,
     )
 
     discovery = models.Discovery(
@@ -108,7 +121,7 @@ def _seed_dashboard_records(session: Session, now: datetime) -> None:
         description="New cross-reference surfaced",
         confidence=0.7,
         relevance_score=0.8,
-        created_at=last_week,
+        created_at=three_days_ago,
     )
 
     notebook = models.Notebook(
@@ -117,7 +130,7 @@ def _seed_dashboard_records(session: Session, now: datetime) -> None:
         description="Shared reflections",
         created_by="test",
         created_at=previous_week,
-        updated_at=last_week,
+        updated_at=four_days_ago,
     )
 
     session.add_all(documents + [note, discovery, notebook])
