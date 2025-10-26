@@ -8,16 +8,20 @@ on:
     - cron: '30 3 * * 1'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  actions: read
-  security-events: write
+# Global permissions set to read-all for OSSF Scorecard compliance
+permissions: read-all
 
 jobs:
   zap-baseline:
     name: Scan staging API
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Job-specific permissions only for what this job needs
+    permissions:
+      contents: read
+      actions: read
+      # security-events: write moved from global to job level
+      security-events: write
     steps:
       - name: Verify staging URL secret
         id: verify-secret

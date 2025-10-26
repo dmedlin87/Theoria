@@ -7,15 +7,20 @@ on:
   schedule:
     - cron: '0 6 * * 1'
 
-permissions:
-  contents: read
-  security-events: write
-  actions: read
-  id-token: write  # Required for OIDC-based Sigstore signing
+# Global permissions set to read-all for OSSF Scorecard compliance
+permissions: read-all
 
 jobs:
   analysis:
     runs-on: ubuntu-latest
+    # Job-specific permissions only for what this job needs
+    permissions:
+      contents: read
+      actions: read
+      # security-events: write moved from global to job level
+      security-events: write
+      # id-token: write moved from global to job level (required for OIDC-based Sigstore signing)
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5

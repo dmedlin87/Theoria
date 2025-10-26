@@ -7,6 +7,11 @@ import types
 from typing import Any
 
 from . import chat as _chat_module
+from . import collaboration as _collaboration_module
+from . import corpus as _corpus_module
+from . import deliverables as _deliverables_module
+from . import telemetry as _telemetry_module
+from . import verse as _verse_module
 from .collaboration import run_research_reconciliation
 from .corpus import run_corpus_curation
 from .deliverables import (
@@ -41,6 +46,25 @@ from .models import (
 from .refusals import REFUSAL_MESSAGE, REFUSAL_MODEL_NAME, build_guardrail_refusal
 from .retrieval import record_used_citation_feedback, search_passages
 from .verse import generate_verse_brief
+
+
+def _propagate_log_workflow_event(callback: Any) -> None:
+    """Ensure guardrail modules share the same workflow logging hook."""
+
+    _telemetry_module.log_workflow_event = callback
+    _deliverables_module.log_workflow_event = callback
+    _collaboration_module.log_workflow_event = callback
+    _corpus_module.log_workflow_event = callback
+    _verse_module.log_workflow_event = callback
+    # ``cache`` also logs workflow events (e.g., cache hits/misses).
+    # Import lazily to avoid circular imports during module initialisation.
+    from . import cache as _cache_module  # noqa: WPS433  (local import for dependency cycle)
+
+    _cache_module.log_workflow_event = callback
+
+
+log_workflow_event = _telemetry_module.log_workflow_event
+_propagate_log_workflow_event(log_workflow_event)
 
 _chat_module.configure_deliverable_hooks(
     _chat_module.DeliverableHooks(
@@ -86,6 +110,7 @@ __all__ = [
     "generate_multimedia_digest",
     "generate_sermon_prep_outline",
     "generate_verse_brief",
+    "log_workflow_event",
     "record_used_citation_feedback",
     "run_corpus_curation",
     "run_guarded_chat",
@@ -105,6 +130,8 @@ class _WorkflowModule(types.ModuleType):
     def __setattr__(self, name: str, value: Any) -> None:
         if hasattr(_chat_module, name):
             setattr(_chat_module, name, value)
+        if name == "log_workflow_event":
+            _propagate_log_workflow_event(value)
         super().__setattr__(name, value)
 
 

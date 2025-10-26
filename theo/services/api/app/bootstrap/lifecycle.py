@@ -6,14 +6,47 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
+
+SQLALCHEMY_AVAILABLE = True
+try:  # pragma: no cover - optional dependency bridge
+    from sqlalchemy.exc import OperationalError
+    from sqlalchemy.orm import Session
+except ImportError:  # pragma: no cover - fallback when SQLAlchemy missing
+    SQLALCHEMY_AVAILABLE = False
+
+    class OperationalError(RuntimeError):
+        """Fallback operational error when SQLAlchemy is unavailable."""
+
+    class Session:  # type: ignore[too-many-ancestors]
+        """Fallback session stub when SQLAlchemy is unavailable."""
+
+        def __init__(self, *_args, **_kwargs):  # type: ignore[unused-argument]
+            raise OperationalError("SQLAlchemy is required for application startup tasks")
+
+        def execute(self, *_args, **_kwargs):  # type: ignore[unused-argument]
+            raise OperationalError("SQLAlchemy is required for application startup tasks")
+
+try:  # pragma: no cover - optional dependency bridge
+    from ..db.run_sql_migrations import run_sql_migrations as _run_sql_migrations
+except Exception:  # pragma: no cover - fallback for tests / optional deps
+
+    def _run_sql_migrations(*_args, **_kwargs):  # type: ignore[unused-argument]
+        raise OperationalError("Database migrations are unavailable without SQLAlchemy")
+
+try:  # pragma: no cover - optional dependency bridge
+    from ..db.seeds import seed_reference_data as _seed_reference_data
+except Exception:  # pragma: no cover - fallback for tests / optional deps
+
+    def _seed_reference_data(*_args, **_kwargs):  # type: ignore[unused-argument]
+        raise OperationalError("Database seeds are unavailable without SQLAlchemy")
+
+
+run_sql_migrations = _run_sql_migrations
+seed_reference_data = _seed_reference_data
 
 from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, get_engine
 
-from ..db.run_sql_migrations import run_sql_migrations
-from ..db.seeds import seed_reference_data
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +59,20 @@ async def lifespan(_: FastAPI):
     discovery_scheduler = None
 
     try:
-        Base.metadata.create_all(bind=engine)
-        run_sql_migrations(engine)
-        with Session(engine) as session:
+        if SQLALCHEMY_AVAILABLE:
+            Base.metadata.create_all(bind=engine)
             try:
-                seed_reference_data(session)
-            except OperationalError as exc:  # pragma: no cover - defensive startup guard
-                session.rollback()
-                logger.warning(
-                    "Skipping reference data seeding due to database error", exc_info=exc
-                )
+                run_sql_migrations(engine)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                logger.warning("Failed to run SQL migrations during startup", exc_info=exc)
+            with Session(engine) as session:
+                try:
+                    seed_reference_data(session)
+                except OperationalError as exc:  # pragma: no cover - defensive startup guard
+                    session.rollback()
+                    logger.warning(
+                        "Skipping reference data seeding due to database error", exc_info=exc
+                    )
 
         # Start background discovery scheduler
         try:

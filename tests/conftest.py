@@ -24,7 +24,10 @@ from sqlalchemy.engine import Engine
 
 from tests.factories.application import isolated_application_container
 
-pytest_plugins = ["tests.fixtures.mocks"]
+if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE"}:
+    pytest_plugins = ["tests.fixtures.mocks"]
+else:  # pragma: no cover - exercised in lightweight CI and profiling flows
+    pytest_plugins: list[str] = []
 
 try:  # pragma: no cover - optional dependency in local test harness
     import pytest_cov  # type: ignore  # noqa: F401

@@ -29,7 +29,9 @@ class _StubFlagModel:
         return vectors
 
 
-sys.modules.setdefault("FlagEmbedding", types.SimpleNamespace(FlagModel=_StubFlagModel))
+flag_module = types.ModuleType("FlagEmbedding")
+flag_module.FlagModel = _StubFlagModel  # type: ignore[attr-defined]
+sys.modules.setdefault("FlagEmbedding", flag_module)
 
 
 def _register_sklearn_stubs() -> None:
