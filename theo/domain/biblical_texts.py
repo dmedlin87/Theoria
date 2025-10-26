@@ -248,8 +248,8 @@ class TheologicalTermTracker:
                                 term: str) -> Dict[str, List[str]]:
         """Compare how a Hebrew term is rendered in the LXX."""
         hebrew_matches = [
-            tag.word for tag in hebrew_verse.morphology 
-            if term in tag.lemma or term in tag.root
+            tag.word for tag in hebrew_verse.morphology
+            if term in tag.lemma or (tag.root and term in tag.root)
         ]
         
         # This would need semantic alignment data
