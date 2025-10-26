@@ -196,20 +196,33 @@ def test_project_document_deduplicates_relationships(fake_projector) -> None:
 
 
 def test_projector_from_config_uses_supplied_auth(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, object] = {}
+    captured: dict[str, object] = {"session_databases": []}
+
+    class _StubSession:
+        def __enter__(self) -> "_StubSession":  # pragma: no cover - interface compatibility
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - interface compatibility
+            return None
+
+        def execute_write(self, func: Callable[[Any], Any]) -> Any:  # pragma: no cover - not used
+            return func(object())
+
+        def close(self) -> None:  # pragma: no cover - interface compatibility
+            return None
 
     class _StubDriver:
-        def __init__(self, uri: str, auth: tuple[str, str] | None, database: str | None) -> None:
+        def __init__(self, uri: str, auth: tuple[str, str] | None, **kwargs: Any) -> None:
             captured["uri"] = uri
             captured["auth"] = auth
-            captured["database"] = database
+            captured["kwargs"] = kwargs
 
-        def session(self, database: str | None = None):  # pragma: no cover - not used
-            raise AssertionError("Session should not be created in this test")
+        def session(self, *, database: str | None = None) -> _StubSession:
+            captured["session_databases"].append(database)
+            return _StubSession()
 
     def fake_driver(uri: str, auth=None, **kwargs):  # noqa: ANN001 - mimic GraphDatabase.driver signature
-        captured["kwargs"] = kwargs
-        return _StubDriver(uri, auth, kwargs.get("database"))
+        return _StubDriver(uri, auth, **kwargs)
 
     monkeypatch.setattr("theo.adapters.graph.neo4j.GraphDatabase.driver", fake_driver)
 
@@ -221,8 +234,11 @@ def test_projector_from_config_uses_supplied_auth(monkeypatch: pytest.MonkeyPatc
         max_connection_lifetime=30,
     )
 
+    # Trigger a session open to verify the configured database is used when creating sessions.
+    projector._factory()
+
     assert isinstance(projector, Neo4jGraphProjector)
     assert captured["uri"] == "neo4j://graph:7687"
     assert captured["auth"] == ("reader", "secret")
     assert captured["kwargs"]["max_connection_lifetime"] == 30
-    assert captured["database"] == "theoria"
+    assert captured["session_databases"] == ["theoria"]
