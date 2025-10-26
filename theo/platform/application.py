@@ -15,6 +15,10 @@ from theo.adapters.research import (
     SqlAlchemyHypothesisRepositoryFactory,
     SqlAlchemyResearchNoteRepositoryFactory,
 )
+from theo.adapters.persistence.embedding_repository import (
+    SQLAlchemyPassageEmbeddingRepository,
+)
+from theo.application.embeddings import EmbeddingRebuildService
 from theo.application import ApplicationContainer
 from theo.application.facades.database import get_engine
 from theo.application.facades.settings import get_settings
@@ -250,6 +254,35 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
         return _factory
 
     registry.register("reasoner_factory", _build_reasoner_factory)
+
+    def _build_embedding_rebuild_service() -> EmbeddingRebuildService:
+        from theo.services.api.app.ingest.embeddings import (
+            clear_embedding_cache,
+            get_embedding_service,
+        )
+        from theo.services.api.app.ingest.sanitizer import sanitize_passage_text
+
+        embedding_service = get_embedding_service()
+
+        def _session_factory() -> Session:
+            engine = registry.resolve("engine")
+            return Session(engine)
+
+        def _repository_factory(session: Session):
+            return SQLAlchemyPassageEmbeddingRepository(session)
+
+        return EmbeddingRebuildService(
+            session_factory=_session_factory,
+            repository_factory=_repository_factory,
+            embedding_service=embedding_service,
+            sanitize_text=sanitize_passage_text,
+            cache_clearer=clear_embedding_cache,
+        )
+
+    embedding_rebuild_service = _build_embedding_rebuild_service()
+    registry.register(
+        "embedding_rebuild_service", lambda: embedding_rebuild_service
+    )
 
     def _build_ingest_callable() -> Callable[[Document], DocumentId]:
         return lambda document: _ingest_document(registry, document)
