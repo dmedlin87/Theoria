@@ -19,6 +19,8 @@ import {
   buildErrorMessage,
   createHttpClient,
   handleResponse,
+  NetworkError,
+  subscribeToHttpErrors,
 } from "../../app/lib/http";
 
 describe("buildErrorMessage", () => {
@@ -129,5 +131,41 @@ describe("createHttpClient", () => {
         headers: expect.objectContaining({ Authorization: "Bearer stored" }),
       }),
     );
+  });
+
+  it("retries transient failures and only notifies on terminal errors", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.useFakeTimers();
+
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new NetworkError("offline"))
+      .mockRejectedValueOnce(new NetworkError("still offline"))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    globalThis.fetch = fetchMock;
+
+    const client = createHttpClient("https://api.test");
+    const listener = vi.fn();
+    const unsubscribe = subscribeToHttpErrors(listener);
+
+    try {
+      const requestPromise = client.request("/retry", { retries: 2 });
+
+      await vi.runAllTimersAsync();
+      const result = await requestPromise;
+
+      expect(result).toEqual({ ok: true });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      vi.useRealTimers();
+      randomSpy.mockRestore();
+    }
   });
 });
