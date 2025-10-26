@@ -2,20 +2,33 @@
 
 from __future__ import annotations
 
+from importlib import import_module
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ...errors import ExportError, Severity
 from ...export.citations import CitationSource, build_citation_export
-from ...export.zotero import (
-    ZoteroExportError,
-    export_to_zotero,
-)
+from ...export.zotero import ZoteroExportError
 from ...models.export import ZoteroExportRequest, ZoteroExportResponse
 from theo.application.facades.database import get_session as get_db_session
 from .utils import _BAD_REQUEST_RESPONSE, fetch_documents_by_ids
 
 router = APIRouter()
+
+
+def _get_route_exporter():
+    """Return the export adapter exposed via the package namespace."""
+
+    module = import_module("theo.services.api.app.routes.export")
+    return module.export_to_zotero
+
+
+async def export_to_zotero(*args, **kwargs):  # type: ignore[override]
+    """Proxy to the package-level export adapter for compatibility."""
+
+    exporter = _get_route_exporter()
+    return await exporter(*args, **kwargs)
 
 
 @router.post("/zotero", response_model=ZoteroExportResponse, responses=_BAD_REQUEST_RESPONSE)
@@ -56,7 +69,8 @@ async def export_to_zotero_endpoint(
     sources: list[CitationSource] = [CitationSource.from_object(doc) for doc in documents]
 
     try:
-        result = await export_to_zotero(
+        exporter = _get_route_exporter()
+        result = await exporter(
             sources=sources,
             csl_entries=csl_entries,
             api_key=payload.api_key,
