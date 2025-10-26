@@ -5,7 +5,6 @@ in environments without the heavy third-party dependency.  When the genuine
 package is installed we should defer to it to avoid shadowing production
 behaviour.  Only if the real dependency is unavailable do we provide the local
 fallback implementation.
-"""Lightweight Celery stubs used in optional test environments.
 
 This module provides a minimal subset of the public Celery API sufficient for
 unit tests that exercise Theoria's worker task wiring.  The real Celery
