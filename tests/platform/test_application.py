@@ -1,6 +1,8 @@
 import pytest
 from types import SimpleNamespace
 
+from theo.adapters import AdapterRegistry
+
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.platform import application as application_module
 
@@ -101,6 +103,157 @@ def test_resolve_application_wires_container(monkeypatch):
     # Registry should expose registered factories
     assert "settings" in registry.factories
     assert "engine" in registry.factories
+
+
+def test_resolve_application_caches_bootstrap(monkeypatch):
+    calls: list[dict[str, object]] = []
+
+    fake_container = SimpleNamespace(
+        ingest_document=lambda document: document.id,
+        retire_document=lambda document_id: None,
+        get_document=lambda document_id: None,
+        list_documents=lambda limit=20: [],
+        research_service_factory=lambda: None,
+    )
+
+    def fake_bootstrap(**kwargs):
+        calls.append(kwargs)
+        return fake_container
+
+    monkeypatch.setattr(application_module, "bootstrap_application", fake_bootstrap)
+
+    first_container, first_registry = application_module.resolve_application()
+    second_container, second_registry = application_module.resolve_application()
+
+    assert first_container is fake_container
+    assert second_container is fake_container
+    assert first_registry is second_registry
+    assert len(calls) == 1
+
+
+def test_resolve_application_registers_environment_adapters(monkeypatch):
+    settings_instance = object()
+    engine_instance = object()
+
+    monkeypatch.setattr(application_module, "get_settings", lambda: settings_instance)
+    monkeypatch.setattr(application_module, "get_engine", lambda: engine_instance)
+
+    container, registry = application_module.resolve_application()
+
+    assert registry.resolve("settings") is settings_instance
+    assert registry.resolve("engine") is engine_instance
+    assert callable(container.list_documents)
+
+
+def test_platform_restart_reinitializes_bootstrap(monkeypatch):
+    bootstrap_calls: list[int] = []
+
+    def fake_bootstrap(**kwargs):
+        bootstrap_calls.append(len(bootstrap_calls))
+        return SimpleNamespace(
+            ingest_document=lambda document: document.id,
+            retire_document=lambda document_id: None,
+            get_document=lambda document_id: None,
+            list_documents=lambda limit=20: [],
+            research_service_factory=lambda: None,
+        )
+
+    monkeypatch.setattr(application_module, "bootstrap_application", fake_bootstrap)
+
+    first_container, first_registry = application_module.resolve_application()
+    assert bootstrap_calls == [0]
+
+    application_module.resolve_application.cache_clear()
+
+    second_container, second_registry = application_module.resolve_application()
+    assert bootstrap_calls == [0, 1]
+
+    assert first_container is not second_container
+    assert first_registry is not second_registry
+
+
+def test_session_scope_uses_registry_engine(monkeypatch):
+    registry = AdapterRegistry()
+    engine = object()
+    registry.register("engine", lambda: engine)
+
+    lifecycle: list[tuple[str, object]] = []
+
+    class DummySession:
+        def __init__(self, bound_engine):
+            lifecycle.append(("init", bound_engine))
+            self.engine = bound_engine
+
+        def __enter__(self):
+            lifecycle.append(("enter", self.engine))
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            lifecycle.append(("exit", self.engine))
+
+    monkeypatch.setattr(application_module, "Session", DummySession)
+
+    with application_module._session_scope(registry) as session:
+        assert session.engine is engine
+
+    assert lifecycle == [("init", engine), ("enter", engine), ("exit", engine)]
+
+
+def test_list_documents_enforces_minimum_limit(monkeypatch):
+    registry = AdapterRegistry()
+    engine = object()
+    registry.register("engine", lambda: engine)
+
+    active_sessions: list[object] = []
+
+    class RecordingQuery:
+        def __init__(self):
+            self.limit_value = None
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def limit(self, value):
+            self.limit_value = value
+            return self
+
+    def fake_select(model):
+        query = RecordingQuery()
+        query.model = model
+        return query
+
+    class DummySession:
+        def __init__(self, bound_engine):
+            assert bound_engine is engine
+            self.statements = []
+
+        def __enter__(self):
+            active_sessions.append(self)
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def scalars(self, statement):
+            self.statements.append(statement)
+
+            class _Result:
+                def all(self_nonlocal):
+                    return ["doc-a", "doc-b"]
+
+            return _Result()
+
+    monkeypatch.setattr(application_module, "Session", DummySession)
+    monkeypatch.setattr(application_module, "select", fake_select)
+    monkeypatch.setattr(application_module, "_document_from_record", lambda session, record: record)
+
+    results = application_module._list_documents(registry, limit=-5)
+
+    assert results == ["doc-a", "doc-b"]
+    assert active_sessions
+    recorded_query = active_sessions[0].statements[0]
+    assert isinstance(recorded_query, RecordingQuery)
+    assert recorded_query.limit_value == 1
 
 
 def test_extract_language_prefers_explicit_language_key():
