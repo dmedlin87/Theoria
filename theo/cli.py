@@ -24,6 +24,7 @@ from theo.application.telemetry import (
     EMBEDDING_REBUILD_BATCH_LATENCY_METRIC,
     EMBEDDING_REBUILD_COMMIT_LATENCY_METRIC,
     EMBEDDING_REBUILD_PROGRESS_METRIC,
+)
 from theo.adapters.persistence.models import Document, Passage
 from theo.checkpoints import (
     EmbeddingRebuildCheckpoint,
@@ -34,7 +35,6 @@ from theo.services.api.app.ingest.embeddings import (
     clear_embedding_cache,
     get_embedding_service,
 )
-from theo.adapters.persistence.models import Document, Passage
 from theo.services.bootstrap import resolve_application
 from theo.services.embeddings import (
     EmbeddingRebuildConfig,
@@ -355,16 +355,8 @@ def rebuild_embeddings_cmd(
         set_span_attribute(span, "embedding_rebuild.mode", telemetry_mode)
         set_span_attribute(span, "embedding_rebuild.processed", processed)
         if skip_count:
-            set_span_attribute(
-                span, "embedding_rebuild.resume.skip_count", skip_count
+            set_span_attribute(span, "embedding_rebuild.resume.skip_count", skip_count)
         processed = min(processed, total)
-
-        if ids:
-            expected_ids = set(
-                session.execute(
-                    select(Passage.id).where(Passage.id.in_(ids))
-                ).scalars()
-            )
 
         log_workflow_event(
             "embedding_rebuild.initialising",
@@ -373,10 +365,9 @@ def rebuild_embeddings_cmd(
             resume=resume,
             skip_count=skip_count,
             ids_count=len(ids) if ids else None,
-            changed_since=
-                normalized_changed_since.isoformat()
-                if normalized_changed_since
-                else None,
+            changed_since=normalized_changed_since.isoformat()
+            if normalized_changed_since
+            else None,
         )
 
         with Session(engine) as session:

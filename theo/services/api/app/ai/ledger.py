@@ -1043,6 +1043,41 @@ class SharedLedger:
             txn.clear_inflight()
         with self._preserved_lock:
             self._preserved_records.clear()
+        self._checkpoint_and_cleanup()
+
+    def _checkpoint_and_cleanup(self) -> None:
+        """Flush the WAL to the main database and remove sidecar files."""
+        try:
+            connection = self._connect()
+        except Exception:  # pragma: no cover - defensive, unexpected in tests
+            logger.debug("Failed to connect to ledger for checkpoint", exc_info=True)
+            return
+        try:
+            try:
+                connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except Exception:  # pragma: no cover - checkpoint failures should not abort
+                logger.debug("Failed to checkpoint ledger WAL", exc_info=True)
+        finally:
+            connection.close()
+        for suffix in ("-wal", "-shm"):
+            sidecar = self._path.with_name(self._path.name + suffix)
+            try:
+                if sidecar.exists():
+                    sidecar.unlink()
+            except FileNotFoundError:
+                continue
+            except PermissionError:
+                logger.debug(
+                    "Permission denied while deleting ledger sidecar %s",
+                    sidecar,
+                    exc_info=True,
+                )
+            except OSError:  # pragma: no cover - guard unexpected errors
+                logger.debug(
+                    "Failed to delete ledger sidecar %s due to OS error",
+                    sidecar,
+                    exc_info=True,
+                )
 
 
 __all__ = ["SharedLedger", "LedgerTransaction", "CacheRecord", "InflightRow"]

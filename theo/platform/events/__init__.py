@@ -108,10 +108,17 @@ class EventBus:
                 result = handler(event)
                 if inspect.isawaitable(result):
                     result = asyncio.run(result)  # type: ignore[arg-type]
-            except RuntimeError:
-                logger.exception(
-                    "async handler requires publish_async", extra={"handler": handler}
-                )
+            except RuntimeError as exc:
+                message = str(exc)
+                if "asyncio.run" in message:
+                    logger.exception(
+                        "async handler requires publish_async",
+                        extra={"handler": handler},
+                    )
+                else:  # pragma: no cover - unexpected runtime errors
+                    logger.exception(
+                        "event handler failed", extra={"handler": handler}
+                    )
                 continue
             except Exception:  # pragma: no cover - handler failure safety
                 logger.exception("event handler failed", extra={"handler": handler})

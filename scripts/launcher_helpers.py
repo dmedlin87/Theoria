@@ -164,7 +164,8 @@ def command_check(project_root: Path) -> Dict[str, Any]:
     runtimes.append(detect_docker_compose())
     result = {
         "generated_at": datetime.now(UTC).isoformat(),
-        "project_root": str(project_root),
+        # Use POSIX style to keep launcher output consistent across platforms.
+        "project_root": project_root.as_posix(),
         "runtimes": runtimes,
     }
     return result
