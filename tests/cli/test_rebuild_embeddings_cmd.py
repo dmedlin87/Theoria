@@ -16,6 +16,15 @@ import importlib.machinery as importlib_machinery
 import pytest
 from click.testing import CliRunner
 
+from theo.application.embeddings import (
+    EmbeddingRebuildError,
+    EmbeddingRebuildOptions,
+    EmbeddingRebuildProgress,
+    EmbeddingRebuildResult,
+    EmbeddingRebuildService,
+    EmbeddingRebuildStart,
+    EmbeddingRebuildState,
+)
 try:  # pragma: no cover - optional dependency in lightweight test runs
     from sqlalchemy.exc import SQLAlchemyError
 except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
