@@ -38,10 +38,20 @@ tasks:
     cmds:
       - pytest -m "not (slow or gpu or contract)"
 
+  test:
+    desc: Run pytest with automatic plugin detection
+    cmds:
+      - python run_tests.py
+
   test:parallel:
     desc: Run the pytest suite with automatic parallelisation
     cmds:
-      - pytest -n auto --dist worksteal -m "not (slow or gpu or contract or pgvector)"
+      - pytest -n=auto --dist=worksteal -m "not (slow or gpu or contract or pgvector)"
+
+  test:sequential:
+    desc: Run pytest sequentially with the default configuration
+    cmds:
+      - pytest -ra --strict-markers --durations=50 --durations-min=0.05
 
   test:incremental:
     desc: Run only the tests impacted by recent changes
@@ -67,6 +77,16 @@ tasks:
     desc: Collect the slowest pytest tests and rerun them to build a flake baseline
     cmds:
       - poetry run python scripts/perf/slow_test_baseline.py
+
+  test:validate-env:
+    desc: Validate required pytest plugins are installed
+    cmds:
+      - python validate_test_env.py
+
+  install:dev:
+    desc: Install development dependencies
+    cmds:
+      - pip install -e ".[dev]"
 
   deps:lock:
     desc: Regenerate pip-compile lockfiles for all extras
