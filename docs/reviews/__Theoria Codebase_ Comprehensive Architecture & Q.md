@@ -75,9 +75,8 @@ from theo.services.api.app.ingest.sanitizer import sanitize_passage_text
 
 **Repository Hygiene**
 
-- **Temp files in root**: `temp_import.py`, `temp_integration.py`
-- Break cognitive load and risk accidental includes
-- Should move to `tests/fixtures/` or be removed
+- **Resolved** – previously checked-in scratch files (`temp_import.py`, `temp_integration.py`) have been removed and ignored.
+- Reduces cognitive load and prevents accidental imports from temporary helpers.
 
 **Error Handling Patterns**
 

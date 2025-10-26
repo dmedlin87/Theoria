@@ -60,6 +60,10 @@ metrics/*.prom
 .debug/
 tmp_debug*.py
 temp_debug*.py
+temp_*.py
+temp_*.xml
+temp_*.db
+temp_*/
 test_results*.txt
 
 # OS-specific
