@@ -11,11 +11,11 @@ literal strings in multiple places.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from importlib.util import module_from_spec, spec_from_file_location
 from itertools import count
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 import pythonbible as pb
 
@@ -105,11 +105,100 @@ def _resolve_faker() -> type[_FallbackFaker]:
 Faker = _resolve_faker()
 
 from theo.domain.research.osis import format_osis, osis_to_readable
-from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
 
-CANONICAL_BOOKS: tuple[pb.Book, ...] = tuple(
-    book for book in pb.Book if book.value <= pb.Book.REVELATION.value
-)
+try:  # pragma: no cover - exercised in lightweight environments
+    from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
+except Exception:  # pragma: no cover - allows running without pydantic
+    @dataclass(frozen=True)
+    class RAGCitation:  # type: ignore[override]
+        """Fallback citation model used when Pydantic models are unavailable."""
+
+        index: int
+        osis: str
+        anchor: str
+        passage_id: str
+        document_id: str
+        document_title: str | None = None
+        snippet: str = ""
+        source_url: str | None = None
+        raw_snippet: str | None = None
+
+        def model_dump(self, mode: str | None = None) -> dict[str, Any]:
+            """Provide a Pydantic-compatible serialisation hook."""
+
+            return {
+                "index": self.index,
+                "osis": self.osis,
+                "anchor": self.anchor,
+                "passage_id": self.passage_id,
+                "document_id": self.document_id,
+                "document_title": self.document_title,
+                "snippet": self.snippet,
+                "source_url": self.source_url,
+                "raw_snippet": self.raw_snippet,
+            }
+
+    @dataclass
+    class RAGAnswer:  # type: ignore[override]
+        """Fallback answer model mirroring the Pydantic interface."""
+
+        summary: str
+        citations: list[RAGCitation]
+        model_name: str | None = None
+        model_output: str | None = None
+        guardrail_profile: dict[str, str] | None = None
+        fallacy_warnings: list[Any] = field(default_factory=list)
+        critique: Any = None
+        revision: Any = None
+        reasoning_trace: Any = None
+
+        def model_dump(self, mode: str | None = None) -> dict[str, Any]:
+            """Mirror ``BaseModel.model_dump`` for guardrail helpers."""
+
+            return {
+                "summary": self.summary,
+                "citations": [
+                    citation.model_dump(mode=mode)
+                    if hasattr(citation, "model_dump")
+                    else asdict(citation)
+                    for citation in self.citations
+                ],
+                "model_name": self.model_name,
+                "model_output": self.model_output,
+                "guardrail_profile": self.guardrail_profile,
+                "fallacy_warnings": self.fallacy_warnings,
+                "critique": self.critique,
+                "revision": self.revision,
+                "reasoning_trace": self.reasoning_trace,
+            }
+
+def _canonical_books() -> tuple[pb.Book, ...]:
+    """Return the canonical set of books supported by the stub and real package."""
+
+    books = tuple(pb.Book)
+    revelation = getattr(pb.Book, "REVELATION", None)
+    if revelation is None:
+        return books
+
+    revelation_value = getattr(revelation, "value", None)
+    if isinstance(revelation_value, int):
+        result: list[pb.Book] = []
+        for book in books:
+            value = getattr(book, "value", None)
+            if isinstance(value, int) and value <= revelation_value:
+                result.append(book)
+        if result:
+            return tuple(result)
+
+    try:
+        end_index = books.index(revelation)
+    except ValueError:
+        return books
+
+    return books[: end_index + 1]
+
+
+CANONICAL_BOOKS: tuple[pb.Book, ...] = _canonical_books()
 
 __all__ = ["DocumentRecord", "PassageRecord", "RegressionDataFactory"]
 
