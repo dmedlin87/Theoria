@@ -1,3 +1,5 @@
+import pytest
+
 from theo.application.search import QueryRewriter
 from theo.services.api.app.models.search import HybridSearchRequest
 
@@ -34,3 +36,16 @@ def test_query_rewriter_applies_guardrail_sanitization() -> None:
     assert "[filtered-override]" in result.request.query
     assert "drop table" not in result.request.query.lower()
     assert result.metadata["guardrail_sanitized"].lower() != query.lower()
+
+
+def test_query_rewriter_invalid_osis_and_no_changes(monkeypatch: pytest.MonkeyPatch) -> None:
+    rewriter = QueryRewriter(synonym_index={"atonement": ("propitiation",)})
+    request = HybridSearchRequest(query="love", osis="invalid")
+
+    monkeypatch.setattr("theo.application.search.query_rewriter.osis_to_readable", lambda value: (_ for _ in ()).throw(RuntimeError()))
+
+    result = rewriter.rewrite(request)
+
+    assert result.request.query == "love"
+    assert result.metadata["rewrite_applied"] is False
+    assert "osis_hints" not in result.metadata

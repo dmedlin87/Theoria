@@ -172,3 +172,57 @@ def test_remove_document_detaches_relationships(fake_projector) -> None:
     # Concepts and verses remain available for other documents
     assert "Rom.8.1" in graph.verses
     assert "freedom" in graph.concepts
+
+
+def test_project_document_deduplicates_relationships(fake_projector) -> None:
+    projector, driver = fake_projector
+    projection = GraphDocumentProjection(
+        document_id="doc-3",
+        title="Duplicates",
+        verses=("John.3.16", "John.3.16", ""),
+        concepts=("love", "love", None),
+        topic_domains=("agape", "agape"),
+    )
+
+    projector.project_document(projection)
+
+    relationships = driver.graph.relationships
+    verse_edges = {rel for rel in relationships if rel[2] == "MENTIONS"}
+    concept_edges = {rel for rel in relationships if rel[2] == "DISCUSSES"}
+
+    assert verse_edges == {("Document", "doc-3", "MENTIONS", "Verse", "John.3.16")}
+    assert concept_edges == {("Document", "doc-3", "DISCUSSES", "Concept", "love")}
+    assert driver.graph.documents["doc-3"]["topic_domains"] == ["agape"]
+
+
+def test_projector_from_config_uses_supplied_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _StubDriver:
+        def __init__(self, uri: str, auth: tuple[str, str] | None, database: str | None) -> None:
+            captured["uri"] = uri
+            captured["auth"] = auth
+            captured["database"] = database
+
+        def session(self, database: str | None = None):  # pragma: no cover - not used
+            raise AssertionError("Session should not be created in this test")
+
+    def fake_driver(uri: str, auth=None, **kwargs):  # noqa: ANN001 - mimic GraphDatabase.driver signature
+        captured["kwargs"] = kwargs
+        return _StubDriver(uri, auth, kwargs.get("database"))
+
+    monkeypatch.setattr("theo.adapters.graph.neo4j.GraphDatabase.driver", fake_driver)
+
+    projector = Neo4jGraphProjector.from_config(
+        "neo4j://graph:7687",
+        user="reader",
+        password="secret",
+        database="theoria",
+        max_connection_lifetime=30,
+    )
+
+    assert isinstance(projector, Neo4jGraphProjector)
+    assert captured["uri"] == "neo4j://graph:7687"
+    assert captured["auth"] == ("reader", "secret")
+    assert captured["kwargs"]["max_connection_lifetime"] == 30
+    assert captured["database"] == "theoria"

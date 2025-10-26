@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+from types import SimpleNamespace
 
 from theo.adapters.secrets.vault import VaultSecretsAdapter
 from theo.application.ports.secrets import SecretRequest, SecretRetrievalError
@@ -49,3 +50,47 @@ def test_vault_adapter_surfaces_backend_errors() -> None:
         adapter.get_secret(SecretRequest(identifier="settings"))
 
     assert "boom" in str(excinfo.value)
+
+
+def test_vault_adapter_detects_malformed_payload() -> None:
+    client = DummyVaultClient({"data": "unexpected"})
+    adapter = VaultSecretsAdapter(client=client)
+
+    with pytest.raises(SecretRetrievalError):
+        adapter.get_secret(SecretRequest(identifier="broken"))
+
+
+def test_vault_adapter_from_config_requires_hvac(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("theo.adapters.secrets.vault.hvac", None)
+
+    with pytest.raises(RuntimeError):
+        VaultSecretsAdapter.from_config(url="http://vault", token="token")
+
+
+def test_vault_adapter_from_config_with_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Client:
+        class secrets:  # noqa: N801 - mimic hvac attribute naming
+            class kv:
+                class v2:
+                    @staticmethod
+                    def read_secret_version(*, path: str, mount_point: str | None = None):
+                        captured["path"] = path
+                        captured["mount_point"] = mount_point
+                        return {"data": {"data": {"token": "value"}}}
+
+    monkeypatch.setattr("theo.adapters.secrets.vault.hvac", SimpleNamespace(Client=lambda **_: _Client()))
+
+    adapter = VaultSecretsAdapter.from_config(
+        url="http://vault",
+        token="token",
+        mount_point="kv",
+        default_field="token",
+    )
+
+    secret = adapter.get_secret(SecretRequest(identifier="app/config"))
+
+    assert secret == "value"
+    assert captured["path"] == "app/config"
+    assert captured["mount_point"] == "kv"
