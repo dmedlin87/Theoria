@@ -9,6 +9,7 @@ import time
 from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
@@ -110,13 +111,24 @@ def _verse_bounds(reference: str | None) -> tuple[int | None, int | None]:
     return (min(verse_ids), max(verse_ids))
 
 
-def _iter_seed_entries(*paths: Path) -> list[dict]:
+@lru_cache(maxsize=32)
+def _cached_seed_entries(paths_key: tuple[str, ...]) -> tuple[dict, ...]:
+    """Load structured seed payloads once per unique path set."""
+
     entries: list[dict] = []
-    for path in paths:
+    for raw_path in paths_key:
+        path = Path(raw_path)
         if not path.exists():
             continue
         entries.extend(_load_structured(path))
-    return entries
+    return tuple(entries)
+
+
+def _iter_seed_entries(*paths: Path) -> list[dict]:
+    """Return seed records, caching disk reads for repeat calls."""
+
+    normalized = tuple(Path(path).resolve(strict=False).as_posix() for path in paths)
+    return list(_cached_seed_entries(normalized))
 
 
 def _verse_range(reference: str | None) -> tuple[int, int] | None:
