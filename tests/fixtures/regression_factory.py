@@ -126,7 +126,7 @@ except Exception:  # pragma: no cover - allows running without pydantic
         def model_dump(self, mode: str | None = None) -> dict[str, Any]:
             """Provide a Pydantic-compatible serialisation hook."""
 
-            return {
+            data = {
                 "index": self.index,
                 "osis": self.osis,
                 "anchor": self.anchor,
@@ -135,8 +135,13 @@ except Exception:  # pragma: no cover - allows running without pydantic
                 "document_title": self.document_title,
                 "snippet": self.snippet,
                 "source_url": self.source_url,
-                "raw_snippet": self.raw_snippet,
             }
+
+            # ``raw_snippet`` is marked with ``Field(exclude=True)`` on the
+            # Pydantic model so it never appears in serialised output. Mirror
+            # that behaviour to avoid fixture mismatches when the fallback is
+            # used in lightweight environments.
+            return data
 
     @dataclass
     class RAGAnswer:  # type: ignore[override]
