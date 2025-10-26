@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import json
 import pytest
 from click import ClickException
 from sqlalchemy.exc import SQLAlchemyError
@@ -65,14 +66,20 @@ def test_load_ids_strips_and_deduplicates(tmp_path: Path) -> None:
     assert _load_ids(ids_file) == ["a", "A", "b", "B"]
 
 
-def test_read_checkpoint_handles_missing_and_invalid(tmp_path: Path) -> None:
+def test_read_checkpoint_handles_missing_file(tmp_path: Path) -> None:
     missing_path = tmp_path / "missing.json"
     assert _read_checkpoint(missing_path) == {}
 
+
+def test_read_checkpoint_raises_on_invalid_json(tmp_path: Path) -> None:
     invalid_path = tmp_path / "invalid.json"
     invalid_path.write_text("not-json", encoding="utf-8")
-    assert _read_checkpoint(invalid_path) == {}
 
+    with pytest.raises(json.JSONDecodeError):
+        _read_checkpoint(invalid_path)
+
+
+def test_read_checkpoint_handles_non_mapping_payload(tmp_path: Path) -> None:
     wrong_type_path = tmp_path / "wrong.json"
     wrong_type_path.write_text("[]", encoding="utf-8")
     assert _read_checkpoint(wrong_type_path) == {}

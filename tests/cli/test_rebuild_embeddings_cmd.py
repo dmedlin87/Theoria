@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 import types
 
@@ -24,7 +25,13 @@ def _install_sqlalchemy_stub() -> None:
     except ModuleNotFoundError:
         pass
 
+    from importlib.machinery import ModuleSpec
+
     sqlalchemy_stub = types.ModuleType("sqlalchemy")
+    sqlalchemy_stub.__path__ = []  # type: ignore[attr-defined]
+    sqlalchemy_spec = ModuleSpec("sqlalchemy", loader=None, is_package=True)
+    sqlalchemy_spec.submodule_search_locations = []  # type: ignore[assignment]
+    sqlalchemy_stub.__spec__ = sqlalchemy_spec  # type: ignore[attr-defined]
 
     class _FuncProxy:
         def __getattr__(self, name: str) -> Any:  # pragma: no cover - defensive
@@ -63,14 +70,35 @@ def _install_sqlalchemy_stub() -> None:
 
     engine_module.Engine = Engine
 
+    sql_module = types.ModuleType("sqlalchemy.sql")
+    sql_module.__path__ = []  # type: ignore[attr-defined]
+    sql_module.__package__ = "sqlalchemy"
+    sql_spec = ModuleSpec("sqlalchemy.sql", loader=None, is_package=True)
+    sql_spec.submodule_search_locations = []  # type: ignore[assignment]
+    sql_module.__spec__ = sql_spec  # type: ignore[attr-defined]
+    elements_module = types.ModuleType("sqlalchemy.sql.elements")
+    elements_module.__package__ = "sqlalchemy.sql"
+    elements_spec = ModuleSpec("sqlalchemy.sql.elements", loader=None, is_package=False)
+    elements_spec.submodule_search_locations = []  # type: ignore[assignment]
+    elements_module.__spec__ = elements_spec  # type: ignore[attr-defined]
+
+    class ClauseElement:  # pragma: no cover - placeholder type
+        pass
+
+    elements_module.ClauseElement = ClauseElement
+    sql_module.elements = elements_module  # type: ignore[attr-defined]
+
     sqlalchemy_stub.exc = exc_module
     sqlalchemy_stub.orm = orm_module
     sqlalchemy_stub.engine = engine_module
+    sqlalchemy_stub.sql = sql_module  # type: ignore[attr-defined]
 
     sys.modules["sqlalchemy"] = sqlalchemy_stub
     sys.modules["sqlalchemy.exc"] = exc_module
     sys.modules["sqlalchemy.orm"] = orm_module
     sys.modules["sqlalchemy.engine"] = engine_module
+    sys.modules["sqlalchemy.sql"] = sql_module
+    sys.modules["sqlalchemy.sql.elements"] = elements_module
 
 
 def _install_pythonbible_stub() -> None:
@@ -206,8 +234,60 @@ def _install_pythonbible_stub() -> None:
     sys.modules["pythonbible"] = module
 
 
+def _install_fastapi_stub() -> None:
+    if "fastapi" in sys.modules:
+        return
+
+    fastapi_module = types.ModuleType("fastapi")
+    status_module = types.ModuleType("fastapi.status")
+    # Provide the attributes referenced during import
+    status_module.HTTP_422_UNPROCESSABLE_ENTITY = 422
+    status_module.HTTP_422_UNPROCESSABLE_CONTENT = 422
+    fastapi_module.status = status_module  # type: ignore[attr-defined]
+
+    sys.modules["fastapi"] = fastapi_module
+    sys.modules["fastapi.status"] = status_module
+
+
+def _install_opentelemetry_stub() -> None:
+    if "opentelemetry" in sys.modules:
+        return
+
+    opentelemetry_module = types.ModuleType("opentelemetry")
+    trace_module = types.ModuleType("opentelemetry.trace")
+
+    class _Span:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def set_attribute(self, *_args, **_kwargs) -> None:
+            return None
+
+    class _Tracer:
+        def start_as_current_span(self, *_args, **_kwargs):
+            return _Span()
+
+    def get_tracer(*_args, **_kwargs) -> _Tracer:
+        return _Tracer()
+
+    def get_current_span() -> _Span:
+        return _Span()
+
+    trace_module.get_tracer = get_tracer  # type: ignore[assignment]
+    trace_module.get_current_span = get_current_span  # type: ignore[assignment]
+    opentelemetry_module.trace = trace_module  # type: ignore[attr-defined]
+
+    sys.modules["opentelemetry"] = opentelemetry_module
+    sys.modules["opentelemetry.trace"] = trace_module
+
+
 _install_sqlalchemy_stub()
 _install_pythonbible_stub()
+_install_fastapi_stub()
+_install_opentelemetry_stub()
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -535,6 +615,33 @@ def test_rebuild_embeddings_resume_from_checkpoint(
         "ids_count": None,
         "resume": True,
     }
+
+
+def test_rebuild_embeddings_resume_with_invalid_checkpoint_logs_error(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    runner: CliRunner,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    FakeCLIEnvironment(monkeypatch)
+    checkpoint_path = tmp_path / "checkpoint.json"
+    checkpoint_path.write_text("{invalid", encoding="utf-8")
+
+    caplog.set_level(logging.ERROR, logger="theo.cli")
+
+    result = runner.invoke(
+        rebuild_embeddings_cmd,
+        ["--checkpoint-file", str(checkpoint_path), "--resume"],
+    )
+
+    assert result.exit_code == 1
+    assert "contains invalid JSON" in result.output
+
+    error_records = [record for record in caplog.records if record.levelno == logging.ERROR]
+    assert error_records, "Expected an error log when checkpoint decoding fails"
+    record = error_records[-1]
+    assert record.event == "cli.rebuild_embeddings.checkpoint_decode_error"
+    assert record.checkpoint_file == str(checkpoint_path)
 
 
 def test_rebuild_embeddings_errors_on_mismatched_vectors(
