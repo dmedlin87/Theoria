@@ -8,7 +8,19 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Iterable, Sequence
 
-from opentelemetry import trace
+try:  # pragma: no cover - optional tracing dependency
+    from opentelemetry import trace
+except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
+    from ..ai.router import _NoopTracer  # reuse shim defined in router
+
+    class _TraceProxy:
+        def get_tracer(self, *_args, **_kwargs) -> _NoopTracer:
+            return _NoopTracer()
+
+        def get_current_span(self):  # pragma: no cover - parity with opentelemetry
+            return _NoopTracer().start_as_current_span()
+
+    trace = _TraceProxy()  # type: ignore[assignment]
 from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
