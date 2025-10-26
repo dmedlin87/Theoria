@@ -16,6 +16,19 @@ import importlib.machinery as importlib_machinery
 import pytest
 from click.testing import CliRunner
 
+try:  # pragma: no cover - optional dependency in lightweight test runs
+    from sqlalchemy.exc import SQLAlchemyError
+except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
+    class SQLAlchemyError(Exception):
+        """Fallback SQLAlchemyError when the real dependency is unavailable."""
+
+
+@pytest.fixture
+def cli_module(
+    stub_sqlalchemy: types.ModuleType, stub_pythonbible: types.ModuleType
+) -> Iterator[types.ModuleType]:
+    """Import :mod:`theo.cli` with stubbed heavy dependencies."""
+
 from theo.application.embeddings import (
     EmbeddingRebuildError,
     EmbeddingRebuildOptions,
@@ -98,6 +111,32 @@ def cli_module(
         sys.modules.pop(module_name, None)
         if original is not None:
             sys.modules[module_name] = original
+
+
+@pytest.fixture
+def rebuild_embeddings_cmd(cli_module: types.ModuleType):
+    return cli_module.rebuild_embeddings_cmd
+
+
+@pytest.fixture
+def cli(cli_module: types.ModuleType):
+    return cli_module.cli
+
+
+@dataclass
+class FakePassageRow:
+    id: str
+    text: str
+    embedding: list[float] | None
+    document_updated_at: datetime | None = None
+
+
+class FakeCriterion:
+    def __init__(self, op: str, getter, value: Any) -> None:
+        self.op = op
+        self.getter = getter
+        self.value = value
+
 
 
 @pytest.fixture
