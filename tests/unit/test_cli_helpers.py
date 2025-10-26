@@ -9,6 +9,11 @@ from typing import Iterable, List
 import click
 import json
 import pytest
+
+pytest.importorskip(
+    "sqlalchemy",
+    reason="CLI helper tests require SQLAlchemy; install optional dependency to run.",
+)
 from sqlalchemy.exc import SQLAlchemyError
 
 from theo import cli
