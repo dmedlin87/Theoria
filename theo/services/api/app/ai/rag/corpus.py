@@ -45,10 +45,9 @@ def run_corpus_curation(
                 .where(Document.created_at >= since)
                 .order_by(Document.created_at.asc())
             )
+            rows = session.execute(query).scalars().all()
         except NotImplementedError:
             rows = []
-        else:
-            rows = session.execute(query).scalars().all()
         set_span_attribute(span, "workflow.documents_processed", len(rows))
         log_workflow_event(
             "workflow.documents_loaded",
