@@ -144,6 +144,35 @@ def rebuild_embeddings_cmd(cli_module: types.ModuleType):
     return cli_module.rebuild_embeddings_cmd
 
 
+
+
+@pytest.fixture
+def cli_module(
+    stub_sqlalchemy: types.ModuleType, stub_pythonbible: types.ModuleType
+) -> Iterator[types.ModuleType]:
+    """Import :mod:`theo.cli` with stubbed heavy dependencies."""
+
+    module_name = "theo.cli"
+    original = sys.modules.pop(module_name, None)
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if original is not None:
+            sys.modules[module_name] = original
+        pytest.skip(f"theo.cli unavailable: {exc}")
+    try:
+        yield module
+    finally:
+        sys.modules.pop(module_name, None)
+        if original is not None:
+            sys.modules[module_name] = original
+
+
+@pytest.fixture
+def rebuild_embeddings_cmd(cli_module: types.ModuleType):
+    return cli_module.rebuild_embeddings_cmd
+
+
 @pytest.fixture
 def cli(cli_module: types.ModuleType):
     return cli_module.cli
