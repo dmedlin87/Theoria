@@ -8,7 +8,7 @@ export function forwardAuthHeaders(source: Headers, target: Headers): void {
   for (const header of AUTH_HEADER_NAMES) {
     const value = source.get(header);
     if (value && value.trim()) {
-      target.set(header, value);
+      target.set(header, value.trim());
     }
   }
 }

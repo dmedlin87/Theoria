@@ -18,17 +18,58 @@ def set_resilience_policy_factory(factory: Callable[[ResilienceSettings], Resili
     _factory = factory
 
 
-def _ensure_factory() -> Callable[[ResilienceSettings], ResiliencePolicy]:
-    if _factory is None:
-        raise RuntimeError("Resilience policy factory has not been configured")
-    return _factory
+class _NoOpResiliencePolicy:
+    """Fallback policy that executes operations without retries."""
+
+    def __init__(self, settings: ResilienceSettings) -> None:
+        self._settings = settings
+
+    def run(
+        self,
+        operation: Callable[[], T],
+        *,
+        key: str,
+        classification: str,
+    ) -> tuple[T, ResilienceMetadata]:
+        result = operation()
+        metadata = ResilienceMetadata(
+            attempts=1,
+            category=key,
+            circuit_open=False,
+            last_exception=None,
+            duration=0.0,
+            classification=classification,
+            policy={"name": "noop"},
+        )
+        return result, metadata
+
+    async def run_async(
+        self,
+        operation: Callable[[], Awaitable[T]],
+        *,
+        key: str,
+        classification: str,
+    ) -> tuple[T, ResilienceMetadata]:
+        result = await operation()
+        metadata = ResilienceMetadata(
+            attempts=1,
+            category=key,
+            circuit_open=False,
+            last_exception=None,
+            duration=0.0,
+            classification=classification,
+            policy={"name": "noop"},
+        )
+        return result, metadata
 
 
 def create_policy(settings: Optional[ResilienceSettings] = None) -> ResiliencePolicy:
     """Create a resilience policy using the registered factory."""
 
-    factory = _ensure_factory()
-    return factory(settings or ResilienceSettings())
+    active_settings = settings or ResilienceSettings()
+    if _factory is None:
+        return _NoOpResiliencePolicy(active_settings)
+    return _factory(active_settings)
 
 
 def resilient_operation(
