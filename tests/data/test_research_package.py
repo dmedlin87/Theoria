@@ -57,7 +57,7 @@ def test_open_text_respects_encoding() -> None:
         payload = json.load(handle)
 
     verse = payload["SBLGNT"]["John.1.1"]["text"]
-    assert verse.startswith("Ἐν ἀρχῆ ἦν ὁ Λόγος")
+    assert verse.startswith("Ἐν ἀρχῇ ἦν ὁ Λόγος")
 
 
 def test_read_text_matches_open_text() -> None:
