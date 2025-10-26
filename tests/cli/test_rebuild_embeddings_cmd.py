@@ -16,6 +16,13 @@ from click.testing import CliRunner
 def _install_sqlalchemy_stub() -> None:
     if "sqlalchemy" in sys.modules:
         return
+    try:  # Prefer the real package when available.
+        import importlib
+
+        importlib.import_module("sqlalchemy")
+        return
+    except ModuleNotFoundError:
+        pass
 
     sqlalchemy_stub = types.ModuleType("sqlalchemy")
 
@@ -68,6 +75,13 @@ def _install_sqlalchemy_stub() -> None:
 def _install_pythonbible_stub() -> None:
     if "pythonbible" in sys.modules:
         return
+    try:
+        import importlib
+
+        importlib.import_module("pythonbible")
+        return
+    except ModuleNotFoundError:
+        pass
 
     module = types.ModuleType("pythonbible")
 
@@ -194,7 +208,9 @@ def _install_pythonbible_stub() -> None:
 _install_sqlalchemy_stub()
 _install_pythonbible_stub()
 
-from theo.cli import rebuild_embeddings_cmd
+from sqlalchemy.exc import SQLAlchemyError
+
+from theo.cli import cli, rebuild_embeddings_cmd
 
 
 @dataclass
@@ -545,3 +561,287 @@ def test_rebuild_embeddings_clears_cache_when_requested(
     assert result.exit_code == 0, result.output
     assert env.clear_cache_called is True
     assert "Completed embedding rebuild for 1 passage(s)" in result.output
+
+
+def test_cli_help_lists_rebuild_command(runner: CliRunner) -> None:
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "rebuild_embeddings" in result.output
+
+
+def test_rebuild_embeddings_invalid_changed_since_format(runner: CliRunner) -> None:
+    result = runner.invoke(rebuild_embeddings_cmd, ["--changed-since", "not-a-date"])
+    assert result.exit_code == 2
+    assert "Invalid value for '--changed-since'" in result.output
+
+
+def test_rebuild_embeddings_requires_existing_ids_file(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    missing_path = tmp_path / "missing.txt"
+    result = runner.invoke(rebuild_embeddings_cmd, ["--ids-file", str(missing_path)])
+    assert result.exit_code == 2
+    assert "Invalid value for '--ids-file'" in result.output
+
+
+def test_rebuild_embeddings_handles_empty_ids_file(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+) -> None:
+    env = FakeCLIEnvironment(monkeypatch)
+    ids_file = tmp_path / "ids.txt"
+    ids_file.write_text("\n\n", encoding="utf-8")
+
+    result = runner.invoke(rebuild_embeddings_cmd, ["--fast", "--ids-file", str(ids_file)])
+
+    assert result.exit_code == 0
+    assert "No passage IDs were found" in result.output
+    assert env.embedding_service.embed_calls == []
+
+
+def test_rebuild_embeddings_fast_skips_existing_embeddings(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+) -> None:
+    env = FakeCLIEnvironment(monkeypatch)
+    env.add_passage(id="p1", text="New", embedding=None)
+    env.add_passage(id="p2", text="Old", embedding=[0.0, 0.1])
+
+    result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
+
+    assert result.exit_code == 0, result.output
+    assert env.embedding_service.embed_calls == [(["New"], 64)]
+    assert env.passages[0].embedding is not None
+    assert env.passages[1].embedding == [0.0, 0.1]
+    assert "Rebuilding embeddings for 1 passage(s) using batch size 64." in result.output
+
+
+def test_rebuild_embeddings_uses_standard_batch_size_when_not_fast(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+) -> None:
+    env = FakeCLIEnvironment(monkeypatch)
+    env.add_passage(id="p1", text="One", embedding=None)
+
+    result = runner.invoke(rebuild_embeddings_cmd, [])
+
+    assert result.exit_code == 0, result.output
+    assert env.embedding_service.embed_calls == [(["One"], 128)]
+    assert "Rebuilding embeddings for 1 passage(s) using batch size 128." in result.output
+
+
+def test_rebuild_embeddings_changed_since_filters_passages(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+) -> None:
+    env = FakeCLIEnvironment(monkeypatch)
+    env.add_passage(
+        id="p1",
+        text="Early",
+        embedding=None,
+        document_updated_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+    )
+    env.add_passage(
+        id="p2",
+        text="Recent",
+        embedding=None,
+        document_updated_at=datetime(2024, 2, 1, tzinfo=timezone.utc),
+    )
+    env.add_passage(
+        id="p3",
+        text="Latest",
+        embedding=None,
+        document_updated_at=datetime(2024, 3, 1, tzinfo=timezone.utc),
+    )
+
+    checkpoint = tmp_path / "checkpoint.json"
+    result = runner.invoke(
+        rebuild_embeddings_cmd,
+        [
+            "--changed-since",
+            "2024-02-01T00:00:00",
+            "--checkpoint-file",
+            str(checkpoint),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert len(env.embedding_service.embed_calls) == 1
+    assert env.embedding_service.embed_calls[0][0] == ["Recent", "Latest"]
+    checkpoint_data = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert checkpoint_data["metadata"]["changed_since"] == "2024-02-01T00:00:00+00:00"
+    assert env.passages[0].embedding is None
+    assert env.passages[1].embedding is not None
+    assert env.passages[2].embedding is not None
+
+
+def test_rebuild_embeddings_processes_multiple_batches(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+) -> None:
+    env = FakeCLIEnvironment(monkeypatch)
+    for idx in range(65):
+        env.add_passage(id=f"p{idx:03d}", text=f"Passage {idx}", embedding=None)
+
+    result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
+
+    assert result.exit_code == 0, result.output
+    assert len(env.embedding_service.embed_calls) == 2
+    assert len(env.embedding_service.embed_calls[0][0]) == 64
+    assert len(env.embedding_service.embed_calls[1][0]) == 1
+    assert "Batch 2" in result.output
+
+
+def test_rebuild_embeddings_handles_application_resolution_failure(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+) -> None:
+    def _fail() -> tuple[object, object]:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("theo.cli.resolve_application", _fail)
+
+    result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
+
+    assert result.exit_code == 1
+    assert "Failed to resolve application" in result.output
+
+
+def test_rebuild_embeddings_handles_session_initialisation_error(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+) -> None:
+    class _Registry:
+        def __init__(self, engine: object) -> None:
+            self.engine = engine
+
+        def resolve(self, name: str) -> object:
+            assert name == "engine"
+            return self.engine
+
+    engine = object()
+    monkeypatch.setattr("theo.cli.resolve_application", lambda: (object(), _Registry(engine)))
+
+    def _failing_session(_engine: object) -> None:
+        raise SQLAlchemyError("cannot connect")
+
+    monkeypatch.setattr("theo.cli.Session", _failing_session)
+
+    result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SQLAlchemyError)
+
+
+def test_rebuild_embeddings_reports_embedding_backend_failure(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+) -> None:
+    env = FakeCLIEnvironment(monkeypatch)
+    env.add_passage(id="p1", text="Only", embedding=None)
+
+    def _raise(_texts: list[str], *, batch_size: int) -> list[list[float]]:
+        raise RuntimeError("backend offline")
+
+    monkeypatch.setattr(env.embedding_service, "embed", _raise)
+
+    result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
+
+    assert result.exit_code == 1
+    assert "Embedding generation failed" in result.output
+
+
+def test_rebuild_embeddings_resume_with_missing_checkpoint(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+) -> None:
+    env = FakeCLIEnvironment(monkeypatch)
+    env.add_passage(id="p1", text="Only", embedding=None)
+
+    checkpoint = tmp_path / "checkpoint.json"
+
+    result = runner.invoke(
+        rebuild_embeddings_cmd,
+        ["--checkpoint-file", str(checkpoint), "--resume"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Resuming from checkpoint" not in result.output
+    assert env.embedding_service.embed_calls == [(["Only"], 128)]
+
+
+def test_rebuild_embeddings_integration_with_sqlite(
+    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+) -> None:
+    pytest.importorskip("sqlalchemy")
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session as SQLASession
+
+    from theo.adapters.persistence.models import Base, Document, Passage
+
+    db_path = tmp_path / "theo.db"
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(engine, tables=[Document.__table__, Passage.__table__])
+
+    with SQLASession(engine) as session:
+        doc1 = Document(id="d1", title="Doc 1")
+        doc1.updated_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        doc2 = Document(id="d2", title="Doc 2")
+        doc2.updated_at = datetime(2024, 2, 1, tzinfo=timezone.utc)
+        session.add_all([doc1, doc2])
+        session.flush()
+        passage1 = Passage(id="p1", document_id=doc1.id, text="Doc 1 text", embedding=None)
+        passage2 = Passage(id="p2", document_id=doc2.id, text="Doc 2 text", embedding=None)
+        session.add_all([passage1, passage2])
+        session.commit()
+
+    class _IntegrationRegistry:
+        def __init__(self, engine: object) -> None:
+            self.engine = engine
+
+        def resolve(self, name: str) -> object:
+            assert name == "engine"
+            return self.engine
+
+    class _SimpleEmbeddingService:
+        def __init__(self) -> None:
+            self.calls: list[tuple[list[str], int]] = []
+
+        def embed(self, texts: list[str], *, batch_size: int) -> list[list[float]]:
+            self.calls.append((list(texts), batch_size))
+            return [[0.1, 0.2] for _ in texts]
+
+    embedding_service = _SimpleEmbeddingService()
+    cache_calls: list[bool] = []
+
+    monkeypatch.setattr(
+        "theo.cli.resolve_application",
+        lambda: (object(), _IntegrationRegistry(engine)),
+    )
+    monkeypatch.setattr("theo.cli.get_embedding_service", lambda: embedding_service)
+    monkeypatch.setattr("theo.cli.clear_embedding_cache", lambda: cache_calls.append(True))
+
+    ids_file = tmp_path / "ids.txt"
+    ids_file.write_text("p2\n", encoding="utf-8")
+    checkpoint = tmp_path / "checkpoint.json"
+
+    result = runner.invoke(
+        rebuild_embeddings_cmd,
+        [
+            "--no-cache",
+            "--changed-since",
+            "2024-02-01",
+            "--ids-file",
+            str(ids_file),
+            "--checkpoint-file",
+            str(checkpoint),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert cache_calls == [True]
+    assert embedding_service.calls == [(["Doc 2 text"], 128)]
+
+    with SQLASession(engine) as session:
+        refreshed = session.get(Passage, "p2")
+        assert refreshed is not None
+        assert refreshed.embedding == [0.1, 0.2]
+        skipped = session.get(Passage, "p1")
+        assert skipped is not None
+        assert skipped.embedding is None
+
+    checkpoint_data = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert checkpoint_data["processed"] == 1
+    assert checkpoint_data["metadata"]["ids_count"] == 1
