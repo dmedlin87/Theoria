@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import sys
 import types
@@ -408,29 +409,33 @@ def _install_cachetools_stub() -> None:
 
 
 def _install_settings_stub() -> None:
-    if "theo.application.facades.settings" in sys.modules:
+    module_name = "theo.application.facades.settings"
+    if module_name in sys.modules:
         return
 
-    settings_module = types.ModuleType("theo.application.facades.settings")
+    try:  # pragma: no cover - run only when dependency missing
+        importlib.import_module(module_name)
+    except ModuleNotFoundError:
+        settings_module = types.ModuleType(module_name)
 
-    class Settings:  # pragma: no cover - placeholder
-        def __init__(self) -> None:
-            self.embedding_dim = 768
+        class Settings:  # pragma: no cover - placeholder
+            def __init__(self) -> None:
+                self.embedding_dim = 768
 
-    def get_settings() -> Settings:  # pragma: no cover - placeholder
-        return Settings()
+        def get_settings() -> Settings:  # pragma: no cover - placeholder
+            return Settings()
 
-    def _noop_cache_clear() -> None:  # pragma: no cover - placeholder
-        return None
+        def _noop_cache_clear() -> None:  # pragma: no cover - placeholder
+            return None
 
-    get_settings.cache_clear = _noop_cache_clear  # type: ignore[attr-defined]
+        get_settings.cache_clear = _noop_cache_clear  # type: ignore[attr-defined]
 
-    settings_module.Settings = Settings
-    settings_module.get_settings = get_settings
-    settings_module.get_settings_secret = lambda: None
-    settings_module.get_settings_cipher = lambda: None
+        settings_module.Settings = Settings
+        settings_module.get_settings = get_settings
+        settings_module.get_settings_secret = lambda: None
+        settings_module.get_settings_cipher = lambda: None
 
-    sys.modules.setdefault("theo.application.facades.settings", settings_module)
+        sys.modules.setdefault(module_name, settings_module)
 
 
 _install_sqlalchemy_stub()
