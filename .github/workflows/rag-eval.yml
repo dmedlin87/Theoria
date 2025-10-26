@@ -15,6 +15,9 @@ on:
       - 'data/eval/**'
       - 'scripts/perf/**'
 
+# Global permissions set to read-all for OSSF Scorecard compliance
+permissions: read-all
+
 jobs:
   rag-eval:
     runs-on: ubuntu-latest

@@ -6,12 +6,8 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: read
-  packages: write
-  id-token: write
-  attestations: write
-  security-events: write
+# Global permissions set to read-all for OSSF Scorecard compliance
+permissions: read-all
 
 env:
   REGISTRY: ghcr.io
@@ -20,6 +16,15 @@ jobs:
   build-sign-attest:
     name: Build, sign, and attest API image
     runs-on: ubuntu-latest
+    # Job-specific permissions only for what this job needs
+    permissions:
+      contents: read
+      packages: write
+      # id-token: write removed from global, kept only at job level
+      id-token: write
+      attestations: write
+      # security-events: write removed from global, kept only at job level
+      security-events: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
