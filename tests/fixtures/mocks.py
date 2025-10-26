@@ -28,16 +28,4 @@ def optimize_mocks() -> None:
             async_client.get.return_value = response_mock
             async_client_patch.return_value = async_client
 
-        try:
-            celery_patch = stack.enter_context(
-                patch("theo.services.api.app.workers.tasks.celery")
-            )
-        except ModuleNotFoundError:
-            celery_patch = None
-        else:
-            celery_patch.conf.task_always_eager = True
-            celery_patch.conf.task_ignore_result = True
-            if hasattr(celery_patch.conf, "task_store_eager_result"):
-                celery_patch.conf.task_store_eager_result = False
-
         yield
