@@ -28,7 +28,7 @@ from theo.adapters.persistence.types import VectorType
 from theo.application.facades.settings import get_settings
 from theo.services.api.app.persistence_models import Document, Passage
 
-from ..db.query_optimizations import query_with_monitoring
+from ..db.query_optimizations import execute_with_metrics, query_with_monitoring
 from ..ingest.embeddings import get_embedding_service
 from ..ingest.osis import expand_osis_reference, osis_intersects
 from ..models.documents import DocumentAnnotationResponse
@@ -577,7 +577,7 @@ def _fallback_search(
         limit = max(request.k * 10, 100)
         stmt = stmt.limit(limit)
 
-        rows = session.execute(stmt).all()
+        rows = execute_with_metrics(session, stmt, "search.fallback.base").all()
         doc_ids = [document.id for _passage, document in rows]
         annotations_by_document = load_annotations_for_documents(session, doc_ids)
         annotations_by_passage = index_annotations_by_passage(
@@ -677,7 +677,9 @@ def _postgres_hybrid_search(
             vector_stmt = _build_vector_statement(
                 base_stmt, query_embedding, limit, embedding_dim=settings.embedding_dim
             )
-            for row in session.execute(vector_stmt):
+            for row in execute_with_metrics(
+                session, vector_stmt, "search.hybrid.vector"
+            ):
                 passage: Passage = row[0]
                 document: Document = row[1]
                 if not _passes_author_filter(document, request.filters.author):
@@ -701,7 +703,9 @@ def _postgres_hybrid_search(
 
         if request.query:
             lexical_stmt = _build_lexical_statement(base_stmt, request, limit)
-            for row in session.execute(lexical_stmt):
+            for row in execute_with_metrics(
+                session, lexical_stmt, "search.hybrid.lexical"
+            ):
                 passage: Passage = row[0]
                 document: Document = row[1]
                 if not _passes_author_filter(document, request.filters.author):
@@ -724,7 +728,9 @@ def _postgres_hybrid_search(
                     _mark_candidate_osis(candidate, request.osis)
 
             tei_stmt = _build_tei_statement(base_stmt, query_tokens, limit)
-            for passage, document in session.execute(tei_stmt):
+            for passage, document in execute_with_metrics(
+                session, tei_stmt, "search.hybrid.tei"
+            ):
                 if not _passes_author_filter(document, request.filters.author):
                     continue
                 if not _passes_guardrail_filters(document, request.filters):
@@ -743,7 +749,9 @@ def _postgres_hybrid_search(
 
         if request.osis and (not request.query or not candidates):
             osis_stmt = base_stmt.where(Passage.osis_ref.isnot(None)).limit(limit)
-            for passage, document in session.execute(osis_stmt):
+            for passage, document in execute_with_metrics(
+                session, osis_stmt, "search.hybrid.osis"
+            ):
                 if not _passes_author_filter(document, request.filters.author):
                     continue
                 if not _passes_guardrail_filters(document, request.filters):
