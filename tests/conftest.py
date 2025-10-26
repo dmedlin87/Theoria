@@ -19,10 +19,39 @@ if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
     from tests.fixtures import RegressionDataFactory
 
 import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
 
-from tests.factories.application import isolated_application_container
+try:  # pragma: no cover - optional dependency for integration fixtures
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import Engine
+except ModuleNotFoundError:  # pragma: no cover - allows running lightweight suites
+    create_engine = None  # type: ignore[assignment]
+    text = None  # type: ignore[assignment]
+    Engine = object  # type: ignore[assignment]
+
+try:  # pragma: no cover - factory depends on optional domain extras
+    from tests.factories.application import isolated_application_container
+except ModuleNotFoundError as exc:  # pragma: no cover - light environments
+    isolated_application_container = None  # type: ignore[assignment]
+    _APPLICATION_FACTORY_IMPORT_ERROR = exc
+else:
+    _APPLICATION_FACTORY_IMPORT_ERROR: ModuleNotFoundError | None = None
+
+
+_SQLALCHEMY_AVAILABLE = create_engine is not None
+
+if not _SQLALCHEMY_AVAILABLE:
+
+    def _sqlalchemy_missing(*_args: object, **_kwargs: object):  # type: ignore[misc]
+        pytest.skip("sqlalchemy not installed")
+
+    create_engine = _sqlalchemy_missing  # type: ignore[assignment]
+    text = _sqlalchemy_missing  # type: ignore[assignment]
+
+
+def _require_application_factory() -> None:
+    if isolated_application_container is None:
+        reason = _APPLICATION_FACTORY_IMPORT_ERROR or ModuleNotFoundError("pythonbible")
+        pytest.skip(f"application factory unavailable: {reason}")
 
 if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE"}:
     try:
@@ -198,6 +227,7 @@ def regression_factory():
 def application_container() -> Iterator[tuple["ApplicationContainer", "AdapterRegistry"]]:
     """Yield an isolated application container and backing registry."""
 
+    _require_application_factory()
     with isolated_application_container() as resources:
         yield resources
 
@@ -208,6 +238,7 @@ def optimized_application_container() -> Generator[
 ]:
     """Create the application container once per session for heavy suites."""
 
+    _require_application_factory()
     with isolated_application_container() as resources:
         yield resources
 
@@ -215,6 +246,8 @@ def optimized_application_container() -> Generator[
 @pytest.fixture
 def application_container_factory():
     """Provide a factory returning isolated application containers."""
+
+    _require_application_factory()
 
     def _factory(**overrides):
         return isolated_application_container(overrides=overrides or None)

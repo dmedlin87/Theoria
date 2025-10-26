@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 import types
@@ -7,211 +8,48 @@ import types
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, List
+from typing import Any, Iterable, Iterator, List
 
 import pytest
 from click.testing import CliRunner
 
-
-def _install_sqlalchemy_stub() -> None:
-    if "sqlalchemy" in sys.modules:
-        return
-    try:  # Prefer the real package when available.
-        import importlib
-
-        importlib.import_module("sqlalchemy")
-        return
-    except ModuleNotFoundError:
-        pass
-
-    sqlalchemy_stub = types.ModuleType("sqlalchemy")
-
-    class _FuncProxy:
-        def __getattr__(self, name: str) -> Any:  # pragma: no cover - defensive
-            raise NotImplementedError(
-                f"sqlalchemy.func placeholder accessed for '{name}'"
-            )
-
-    def _raise(*_args: object, **_kwargs: object) -> None:  # pragma: no cover
-        raise NotImplementedError("sqlalchemy placeholder accessed")
-
-    sqlalchemy_stub.__theoria_sqlalchemy_stub__ = True
-    sqlalchemy_stub.func = _FuncProxy()
-    sqlalchemy_stub.select = _raise
-    sqlalchemy_stub.create_engine = _raise
-    sqlalchemy_stub.text = lambda statement: statement
-
-    exc_module = types.ModuleType("sqlalchemy.exc")
-
+try:  # pragma: no cover - optional dependency in lightweight test runs
+    from sqlalchemy.exc import SQLAlchemyError
+except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
     class SQLAlchemyError(Exception):
-        """Stub SQLAlchemyError used for import-time compatibility."""
-
-    exc_module.SQLAlchemyError = SQLAlchemyError
-
-    orm_module = types.ModuleType("sqlalchemy.orm")
-
-    class Session:  # pragma: no cover - placeholder
-        def __init__(self, *_args: object, **_kwargs: object) -> None:
-            raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
-
-    orm_module.Session = Session
-
-    engine_module = types.ModuleType("sqlalchemy.engine")
-
-    class Engine:  # pragma: no cover - placeholder
-        pass
-
-    engine_module.Engine = Engine
-
-    sqlalchemy_stub.exc = exc_module
-    sqlalchemy_stub.orm = orm_module
-    sqlalchemy_stub.engine = engine_module
-
-    sys.modules["sqlalchemy"] = sqlalchemy_stub
-    sys.modules["sqlalchemy.exc"] = exc_module
-    sys.modules["sqlalchemy.orm"] = orm_module
-    sys.modules["sqlalchemy.engine"] = engine_module
+        """Fallback SQLAlchemyError when the real dependency is unavailable."""
 
 
-def _install_pythonbible_stub() -> None:
-    if "pythonbible" in sys.modules:
-        return
+@pytest.fixture
+def cli_module(
+    stub_sqlalchemy: types.ModuleType, stub_pythonbible: types.ModuleType
+) -> Iterator[types.ModuleType]:
+    """Import :mod:`theo.cli` with stubbed heavy dependencies."""
+
+    module_name = "theo.cli"
+    original = sys.modules.pop(module_name, None)
     try:
-        import importlib
-
-        importlib.import_module("pythonbible")
-        return
-    except ModuleNotFoundError:
-        pass
-
-    module = types.ModuleType("pythonbible")
-
-    class _BookEntry:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-        def __repr__(self) -> str:  # pragma: no cover - debug helper
-            return f"Book.{self.name}"
-
-        def __hash__(self) -> int:
-            return hash(self.name)
-
-        def __eq__(self, other: object) -> bool:
-            return isinstance(other, _BookEntry) and other.name == self.name
-
-    class _BookMeta(type):
-        def __iter__(cls) -> Iterable["_BookEntry"]:  # pragma: no cover
-            return iter(cls._members)
-
-    class Book(metaclass=_BookMeta):
-        _members: list[_BookEntry] = []
-
-    def _register(name: str) -> _BookEntry:
-        entry = _BookEntry(name)
-        setattr(Book, name, entry)
-        Book._members.append(entry)
-        return entry
-
-    for book_name in [
-        "GENESIS",
-        "EXODUS",
-        "LEVITICUS",
-        "NUMBERS",
-        "DEUTERONOMY",
-        "JOSHUA",
-        "JUDGES",
-        "RUTH",
-        "SAMUEL_1",
-        "SAMUEL_2",
-        "KINGS_1",
-        "KINGS_2",
-        "CHRONICLES_1",
-        "CHRONICLES_2",
-        "EZRA",
-        "NEHEMIAH",
-        "ESTHER",
-        "JOB",
-        "PSALMS",
-        "PROVERBS",
-        "ECCLESIASTES",
-        "SONG_OF_SONGS",
-        "ISAIAH",
-        "JEREMIAH",
-        "LAMENTATIONS",
-        "EZEKIEL",
-        "DANIEL",
-        "HOSEA",
-        "JOEL",
-        "AMOS",
-        "OBADIAH",
-        "JONAH",
-        "MICAH",
-        "NAHUM",
-        "HABAKKUK",
-        "ZEPHANIAH",
-        "HAGGAI",
-        "ZECHARIAH",
-        "MALACHI",
-        "MATTHEW",
-        "MARK",
-        "LUKE",
-        "JOHN",
-        "ACTS",
-        "ROMANS",
-        "CORINTHIANS_1",
-        "CORINTHIANS_2",
-        "GALATIANS",
-        "EPHESIANS",
-        "PHILIPPIANS",
-        "COLOSSIANS",
-        "THESSALONIANS_1",
-        "THESSALONIANS_2",
-        "TIMOTHY_1",
-        "TIMOTHY_2",
-        "TITUS",
-        "PHILEMON",
-        "HEBREWS",
-        "JAMES",
-        "PETER_1",
-        "PETER_2",
-        "JOHN_1",
-        "JOHN_2",
-        "JOHN_3",
-        "JUDE",
-        "REVELATION",
-        "TOBIT",
-        "WISDOM_OF_SOLOMON",
-        "ECCLESIASTICUS",
-        "ESDRAS_1",
-        "MACCABEES_1",
-        "MACCABEES_2",
-    ]:
-        _register(book_name)
-
-    @dataclass(frozen=True)
-    class NormalizedReference:
-        book: _BookEntry
-        start_chapter: int
-        start_verse: int
-        end_chapter: int
-        end_verse: int
-
-    def is_valid_verse_id(verse_id: int) -> bool:  # pragma: no cover - stub
-        return isinstance(verse_id, int) and verse_id >= 0
-
-    module.Book = Book
-    module.NormalizedReference = NormalizedReference
-    module.is_valid_verse_id = is_valid_verse_id
-
-    sys.modules["pythonbible"] = module
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if original is not None:
+            sys.modules[module_name] = original
+        pytest.skip(f"theo.cli unavailable: {exc}")
+    try:
+        yield module
+    finally:
+        sys.modules.pop(module_name, None)
+        if original is not None:
+            sys.modules[module_name] = original
 
 
-_install_sqlalchemy_stub()
-_install_pythonbible_stub()
+@pytest.fixture
+def rebuild_embeddings_cmd(cli_module: types.ModuleType):
+    return cli_module.rebuild_embeddings_cmd
 
-from sqlalchemy.exc import SQLAlchemyError
 
-from theo.cli import cli, rebuild_embeddings_cmd
+@pytest.fixture
+def cli(cli_module: types.ModuleType):
+    return cli_module.cli
 
 
 @dataclass
@@ -447,7 +285,10 @@ def runner() -> CliRunner:
 
 
 def test_rebuild_embeddings_fast_ids_checkpoint(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(
@@ -498,7 +339,10 @@ def test_rebuild_embeddings_fast_ids_checkpoint(
 
 
 def test_rebuild_embeddings_resume_from_checkpoint(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="First", embedding=None)
@@ -538,7 +382,9 @@ def test_rebuild_embeddings_resume_from_checkpoint(
 
 
 def test_rebuild_embeddings_errors_on_mismatched_vectors(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
@@ -551,7 +397,9 @@ def test_rebuild_embeddings_errors_on_mismatched_vectors(
 
 
 def test_rebuild_embeddings_clears_cache_when_requested(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
@@ -564,20 +412,22 @@ def test_rebuild_embeddings_clears_cache_when_requested(
     assert "Completed embedding rebuild for 1 passage(s)" in result.output
 
 
-def test_cli_help_lists_rebuild_command(runner: CliRunner) -> None:
+def test_cli_help_lists_rebuild_command(runner: CliRunner, cli) -> None:
     result = runner.invoke(cli, ["--help"])
     assert result.exit_code == 0
     assert "rebuild_embeddings" in result.output
 
 
-def test_rebuild_embeddings_invalid_changed_since_format(runner: CliRunner) -> None:
+def test_rebuild_embeddings_invalid_changed_since_format(
+    runner: CliRunner, rebuild_embeddings_cmd
+) -> None:
     result = runner.invoke(rebuild_embeddings_cmd, ["--changed-since", "not-a-date"])
     assert result.exit_code == 2
     assert "Invalid value for '--changed-since'" in result.output
 
 
 def test_rebuild_embeddings_requires_existing_ids_file(
-    runner: CliRunner, tmp_path: Path
+    runner: CliRunner, tmp_path: Path, rebuild_embeddings_cmd
 ) -> None:
     missing_path = tmp_path / "missing.txt"
     result = runner.invoke(rebuild_embeddings_cmd, ["--ids-file", str(missing_path)])
@@ -586,7 +436,10 @@ def test_rebuild_embeddings_requires_existing_ids_file(
 
 
 def test_rebuild_embeddings_handles_empty_ids_file(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    tmp_path: Path,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     ids_file = tmp_path / "ids.txt"
@@ -600,7 +453,9 @@ def test_rebuild_embeddings_handles_empty_ids_file(
 
 
 def test_rebuild_embeddings_fast_skips_existing_embeddings(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="New", embedding=None)
@@ -616,7 +471,9 @@ def test_rebuild_embeddings_fast_skips_existing_embeddings(
 
 
 def test_rebuild_embeddings_uses_standard_batch_size_when_not_fast(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="One", embedding=None)
@@ -629,7 +486,10 @@ def test_rebuild_embeddings_uses_standard_batch_size_when_not_fast(
 
 
 def test_rebuild_embeddings_changed_since_filters_passages(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    tmp_path: Path,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(
@@ -673,7 +533,9 @@ def test_rebuild_embeddings_changed_since_filters_passages(
 
 
 def test_rebuild_embeddings_processes_multiple_batches(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     for idx in range(65):
@@ -689,7 +551,9 @@ def test_rebuild_embeddings_processes_multiple_batches(
 
 
 def test_rebuild_embeddings_handles_application_resolution_failure(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     def _fail() -> tuple[object, object]:
         raise RuntimeError("boom")
@@ -703,7 +567,9 @@ def test_rebuild_embeddings_handles_application_resolution_failure(
 
 
 def test_rebuild_embeddings_handles_session_initialisation_error(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     class _Registry:
         def __init__(self, engine: object) -> None:
@@ -728,7 +594,9 @@ def test_rebuild_embeddings_handles_session_initialisation_error(
 
 
 def test_rebuild_embeddings_reports_embedding_backend_failure(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
@@ -745,7 +613,10 @@ def test_rebuild_embeddings_reports_embedding_backend_failure(
 
 
 def test_rebuild_embeddings_resume_with_missing_checkpoint(
-    monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    runner: CliRunner,
+    tmp_path: Path,
+    rebuild_embeddings_cmd,
 ) -> None:
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
@@ -772,6 +643,7 @@ def test_rebuild_embeddings_integration_with_sqlite(
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session as SQLASession
 
+    from theo.cli import rebuild_embeddings_cmd
     from theo.adapters.persistence.models import Base, Document, Passage
 
     db_path = tmp_path / "theo.db"

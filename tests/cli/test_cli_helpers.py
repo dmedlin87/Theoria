@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 from click import ClickException
+
+pytest.importorskip("sqlalchemy")
 from sqlalchemy.exc import SQLAlchemyError
 
 from theo.cli import (
