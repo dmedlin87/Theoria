@@ -6,7 +6,27 @@ import json
 import logging
 from typing import Any
 
-from cryptography.fernet import Fernet, InvalidToken
+try:  # pragma: no cover - cryptography optional in lightweight tests
+    from cryptography.fernet import Fernet, InvalidToken
+except ModuleNotFoundError:  # pragma: no cover - provide sentinel fallbacks
+    class InvalidToken(Exception):
+        pass
+
+    class Fernet:  # type: ignore[override]
+        def __init__(self, *_args, **_kwargs) -> None:
+            raise ModuleNotFoundError(
+                "cryptography is required for Fernet secrets support"
+            )
+
+        def encrypt(self, *_args, **_kwargs):  # pragma: no cover - defensive
+            raise ModuleNotFoundError(
+                "cryptography is required for Fernet secrets support"
+            )
+
+        def decrypt(self, *_args, **_kwargs):  # pragma: no cover - defensive
+            raise ModuleNotFoundError(
+                "cryptography is required for Fernet secrets support"
+            )
 
 from theo.adapters.persistence.models import AppSetting
 from theo.application.facades.settings import get_settings_cipher

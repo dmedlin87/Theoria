@@ -9,7 +9,31 @@ import time
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from opentelemetry import trace
+try:  # pragma: no cover - optional tracing dependency
+    from opentelemetry import trace
+except ModuleNotFoundError:  # pragma: no cover - lightweight fallback used in tests
+    class _NoopSpan:
+        def __enter__(self):  # noqa: D401 - simple context manager interface
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def set_attribute(self, *_args, **_kwargs) -> None:
+            return None
+
+    class _NoopTracer:
+        def start_as_current_span(self, *_args, **_kwargs):
+            return _NoopSpan()
+
+    class _NoopTraceModule:
+        def get_tracer(self, *_args, **_kwargs) -> _NoopTracer:
+            return _NoopTracer()
+
+        def get_current_span(self) -> _NoopSpan:
+            return _NoopSpan()
+
+    trace = _NoopTraceModule()  # type: ignore[assignment]
 from sqlalchemy.orm import Session
 
 from theo.application.ports.ai_registry import GenerationError
