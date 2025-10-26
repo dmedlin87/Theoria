@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
@@ -62,6 +63,26 @@ def _stub_pythonbible(monkeypatch: pytest.MonkeyPatch):
         yield
         return
 
-    monkeypatch.setattr(pb_module, "get_references", lambda _text: [], raising=False)
-    monkeypatch.setattr(pb_module, "get_bible_book_id", lambda *_args, **_kwargs: None, raising=False)
+    get_references = getattr(pb_module, "get_references", None)
+    get_bible_book_id = getattr(pb_module, "get_bible_book_id", None)
+    if get_references is None or get_bible_book_id is None:
+        yield
+        return
+
+    @lru_cache(maxsize=512)
+    def _cached_get_references(text: str):
+        try:
+            return get_references(text)
+        except Exception:
+            return []
+
+    @lru_cache(maxsize=128)
+    def _cached_get_bible_book_id(*args, **kwargs):
+        try:
+            return get_bible_book_id(*args, **kwargs)
+        except Exception:
+            return None
+
+    monkeypatch.setattr(pb_module, "get_references", _cached_get_references, raising=False)
+    monkeypatch.setattr(pb_module, "get_bible_book_id", _cached_get_bible_book_id, raising=False)
     yield

@@ -1,6 +1,9 @@
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from theo.application.facades.database import Base
 from theo.services.api.app.ingest.pipeline import run_pipeline_for_audio
 from theo.services.api.app.ingest.stages.fetchers import AudioSourceFetcher
 from theo.services.api.app.ingest.stages.parsers import AudioTranscriptionParser
@@ -11,6 +14,25 @@ def sample_audio_path(tmp_path):
     audio_file = tmp_path / "test_audio.mp3"
     audio_file.write_bytes(b"fake audio data")
     return audio_file
+
+
+@pytest.fixture()
+def db_session() -> Session:
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    TestingSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+        future=True,
+    )
+    session = TestingSession()
+    try:
+        yield session
+    finally:
+        session.close()
+        engine.dispose()
 
 @patch.object(AudioSourceFetcher, 'fetch')
 @patch.object(AudioTranscriptionParser, 'parse')

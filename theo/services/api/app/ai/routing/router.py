@@ -8,9 +8,17 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any, AsyncIterator, Dict, Optional
 
+from time import perf_counter
+
 from .. import BaseAIClient
 from ..cache.cache_manager import CacheManager
 from ..ledger.usage_tracker import UsageTracker
+from theo.application.facades.telemetry import record_counter, record_histogram
+from theo.application.telemetry import (
+    LLM_INFERENCE_ERROR_METRIC,
+    LLM_INFERENCE_LATENCY_METRIC,
+    LLM_INFERENCE_REQUESTS_METRIC,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,14 +113,20 @@ class SafeAIRouter:
 
         last_error: Optional[Exception] = None
         for client in providers_to_try:
+            wall_start: Optional[float] = None
             try:
                 request_id = await self.usage_tracker.start_request(
                     client.get_provider(),
                     client.get_model_name(),
                 )
                 start_time = datetime.utcnow()
+                wall_start = perf_counter()
                 result = await client.complete(prompt, **kwargs)
+                wall_duration = perf_counter() - wall_start
                 duration = (datetime.utcnow() - start_time).total_seconds()
+                self._record_inference_metrics(
+                    client, wall_duration, status="success"
+                )
                 await self.usage_tracker.complete_request(
                     provider=client.get_provider(),
                     model=client.get_model_name(),
@@ -123,6 +137,12 @@ class SafeAIRouter:
                 )
                 return result
             except Exception as exc:  # pragma: no cover - exercised in integration paths
+                wall_duration = (
+                    perf_counter() - wall_start if wall_start is not None else 0.0
+                )
+                self._record_inference_metrics(
+                    client, wall_duration, status="error"
+                )
                 logger.warning(
                     "AI client %s failed: %s", client.get_provider().value, exc
                 )
@@ -159,6 +179,26 @@ class SafeAIRouter:
         async with self._global_lock:
             self._inflight_requests.clear()
             self._locks.clear()
+
+    def _record_inference_metrics(
+        self, client: BaseAIClient, duration: float, *, status: str
+    ) -> None:
+        """Record latency and throughput metrics for an inference attempt."""
+
+        provider = client.get_provider().value
+        model = client.get_model_name()
+        labels = {"provider": provider, "model": model, "status": status}
+        record_histogram(
+            LLM_INFERENCE_LATENCY_METRIC,
+            value=duration,
+            labels=labels,
+        )
+        record_counter(LLM_INFERENCE_REQUESTS_METRIC, labels=labels)
+        if status == "error":
+            record_counter(
+                LLM_INFERENCE_ERROR_METRIC,
+                labels={"provider": provider, "model": model},
+            )
 
 
 __all__ = ["SafeAIRouter"]

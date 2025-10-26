@@ -25,8 +25,20 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
             return _NoopTracer().start_as_current_span()
 
     trace = _TraceProxy()  # type: ignore[assignment]
-from sqlalchemy.orm import Session
-from sqlalchemy.sql.elements import ClauseElement
+try:  # pragma: no cover - optional dependency in lightweight test envs
+    from sqlalchemy.orm import Session
+    from sqlalchemy.sql.elements import ClauseElement
+except ModuleNotFoundError:  # pragma: no cover - fallback used in unit tests
+    class ClauseElement:  # type: ignore[no-redef]
+        """Placeholder representing SQLAlchemy clause elements when SQLAlchemy is absent."""
+
+        pass
+
+    class Session:  # type: ignore[no-redef]
+        """Stub session used when SQLAlchemy is unavailable."""
+
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            raise NotImplementedError("sqlalchemy is not installed")
 
 try:  # pragma: no cover - heavy dependency may be unavailable in tests
     from FlagEmbedding import FlagModel as _RuntimeFlagModel

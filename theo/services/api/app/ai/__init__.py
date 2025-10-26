@@ -76,13 +76,12 @@ try:  # pragma: no cover - prefer full implementation when dependencies availabl
 except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
     from .rag import RAGCitation  # type: ignore  # fallback module exposes minimal API
 
+    rag = None  # type: ignore[assignment]
+
     def _missing(*_args, **_kwargs):  # pragma: no cover - invoked only in unsupported flows
         raise ModuleNotFoundError(
             "Optional AI dependencies are not installed in this environment."
         )
-
-    rag = ModuleType(f"{__name__}.rag")
-    rag.__dict__.update({"_missing": _missing, "RAGCitation": RAGCitation})
 
     CollaborationResponse = ComparativeAnalysisResponse = CorpusCurationReport = (  # type: ignore
         DevotionalResponse
@@ -96,33 +95,6 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
     ) = generate_verse_brief = record_used_citation_feedback = run_corpus_curation = (
         run_guarded_chat
     ) = run_research_reconciliation = search_passages = _missing
-
-    rag.__dict__.update(
-        {
-            "CollaborationResponse": CollaborationResponse,
-            "ComparativeAnalysisResponse": ComparativeAnalysisResponse,
-            "CorpusCurationReport": CorpusCurationReport,
-            "DevotionalResponse": DevotionalResponse,
-            "GuardrailError": GuardrailError,
-            "MultimediaDigestResponse": MultimediaDigestResponse,
-            "RAGAnswer": RAGAnswer,
-            "SermonPrepResponse": SermonPrepResponse,
-            "VerseCopilotResponse": VerseCopilotResponse,
-            "build_guardrail_refusal": build_guardrail_refusal,
-            "build_sermon_deliverable": build_sermon_deliverable,
-            "build_transcript_deliverable": build_transcript_deliverable,
-            "generate_comparative_analysis": generate_comparative_analysis,
-            "generate_devotional_flow": generate_devotional_flow,
-            "generate_multimedia_digest": generate_multimedia_digest,
-            "generate_sermon_prep_outline": generate_sermon_prep_outline,
-            "generate_verse_brief": generate_verse_brief,
-            "record_used_citation_feedback": record_used_citation_feedback,
-            "run_corpus_curation": run_corpus_curation,
-            "run_guarded_chat": run_guarded_chat,
-            "run_research_reconciliation": run_research_reconciliation,
-            "search_passages": search_passages,
-        }
-    )
 
 # Backwards compatibility ---------------------------------------------------
 # Keep historically imported submodules addressable from the package root so

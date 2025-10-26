@@ -69,7 +69,9 @@ def test_multimedia_digest_emits_span_and_records_steps(monkeypatch: pytest.Monk
 
     monkeypatch.setattr(rag, "search_passages", lambda *_, **__: [fake_result])
     monkeypatch.setattr(rag, "get_llm_registry", lambda session: MagicMock())
-    monkeypatch.setattr(rag, "_guarded_answer", lambda *_, **__: fake_answer)
+    monkeypatch.setattr(
+        rag, "_guarded_answer_or_refusal", lambda *_, **__: fake_answer, raising=False
+    )
 
     session = MagicMock(spec=Session)
     recorder = MagicMock()
@@ -116,7 +118,9 @@ def test_devotional_flow_emits_span(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(rag, "search_passages", lambda *_, **__: [fake_result])
     monkeypatch.setattr(rag, "get_llm_registry", lambda session: MagicMock())
-    monkeypatch.setattr(rag, "_guarded_answer", lambda *_, **__: fake_answer)
+    monkeypatch.setattr(
+        rag, "_guarded_answer_or_refusal", lambda *_, **__: fake_answer, raising=False
+    )
 
     session = MagicMock(spec=Session)
     recorder = MagicMock()
@@ -164,7 +168,9 @@ def test_research_reconciliation_emits_span(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr(rag, "search_passages", lambda *_, **__: [fake_result])
     monkeypatch.setattr(rag, "get_llm_registry", lambda session: MagicMock())
-    monkeypatch.setattr(rag, "_guarded_answer", lambda *_, **__: fake_answer)
+    monkeypatch.setattr(
+        rag, "_guarded_answer_or_refusal", lambda *_, **__: fake_answer, raising=False
+    )
 
     session = MagicMock(spec=Session)
     recorder = MagicMock()

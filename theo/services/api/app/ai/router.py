@@ -125,6 +125,7 @@ class LLMRouterService:
     DEFAULT_CIRCUIT_BREAKER_THRESHOLD = 3
     DEFAULT_CIRCUIT_BREAKER_TIMEOUT = 60.0
     DEFAULT_INFLIGHT_WAIT_TIMEOUT = 120.0
+    DEFAULT_LATE_JOIN_WINDOW = 0.05
 
     def __init__(self, registry: LLMRegistry, ledger: SharedLedger | None = None) -> None:
         self.registry = registry
@@ -134,6 +135,8 @@ class LLMRouterService:
         # Allow timeout override for testing
         env_timeout = os.environ.get("THEO_ROUTER_INFLIGHT_TIMEOUT")
         self._inflight_timeout = float(env_timeout) if env_timeout else self.DEFAULT_INFLIGHT_WAIT_TIMEOUT
+        env_late_join = os.environ.get("THEO_ROUTER_LATE_JOIN_WINDOW")
+        self._late_join_window = float(env_late_join) if env_late_join else self.DEFAULT_LATE_JOIN_WINDOW
 
     # ------------------------------------------------------------------
     # Candidate selection
@@ -178,6 +181,7 @@ class LLMRouterService:
     ) -> RoutedGeneration:
         """Generate content using ``model`` if it meets routing constraints."""
 
+        request_started_at = time.time()
         prompt_tokens = self._estimate_tokens(prompt, model.model)
         with _TRACER.start_as_current_span("router.execute_generation") as span:
             span.set_attribute("llm.workflow", workflow)
@@ -212,6 +216,7 @@ class LLMRouterService:
             )
             cache_status = "bypass"
             now = time.monotonic()
+            late_join = False
 
             stale_status: str | None = None
             wait_observed_updated_at: float | None = None
@@ -286,6 +291,8 @@ class LLMRouterService:
                     cache_status = "wait"
                     owns_inflight = False
                     wait_observed_updated_at = inflight.updated_at
+                    if request_started_at - inflight.updated_at > self._late_join_window:
+                        late_join = True
                     _record_router_ledger_event(
                         "dedup_waiting",
                         cache_key=cache_key,
@@ -303,6 +310,14 @@ class LLMRouterService:
                         model=model.name,
                         workflow=workflow,
                     )
+
+            if not owns_inflight and stale_status is None:
+                # Re-read after releasing the transaction to catch owners that
+                # finished between the initial check and now.
+                refreshed = self._ledger._read_inflight(cache_key)
+                if refreshed is not None and refreshed.status != "waiting":
+                    stale_status = refreshed.status
+                    wait_observed_updated_at = refreshed.updated_at
 
             if stale_status is not None:
                 _record_router_ledger_event(
@@ -348,25 +363,63 @@ class LLMRouterService:
                 owns_inflight = True
 
             if not owns_inflight:
+                wait_cache_status = cache_status
                 _record_router_ledger_event(
                     "wait_for_primary",
                     cache_key=cache_key,
-                    status=cache_status,
+                    status=wait_cache_status,
                     model=model.name,
                     workflow=workflow,
                 )
-                span.set_attribute("llm.cache_status", cache_status)
-                record = self._ledger.wait_for_inflight(
-                    cache_key, observed_updated_at=wait_observed_updated_at, timeout=self._inflight_timeout
-                )
-                _record_router_ledger_event(
-                    "wait_for_primary_complete",
-                    cache_key=cache_key,
-                    status=cache_status,
-                    model=model.name,
-                    workflow=workflow,
-                )
-                return self._record_to_generation(record)
+                try:
+                    record = self._ledger.wait_for_inflight(
+                        cache_key, observed_updated_at=wait_observed_updated_at, timeout=self._inflight_timeout
+                    )
+                except GenerationError:
+                    _record_router_ledger_event(
+                        "wait_for_primary_error",
+                        cache_key=cache_key,
+                        status=wait_cache_status,
+                        model=model.name,
+                        workflow=workflow,
+                    )
+                    with self._ledger.transaction() as txn:
+                        stale_row = txn.get_inflight(cache_key)
+                        if stale_row is not None:
+                            wait_observed_updated_at = stale_row.updated_at
+                        txn.create_inflight(
+                            cache_key, model_name=model.name, workflow=workflow
+                        )
+                    cache_status = "miss" if cache_settings.enabled else "bypass"
+                    owns_inflight = True
+                    span.set_attribute("llm.cache_status", cache_status)
+                else:
+                    if late_join:
+                        _record_router_ledger_event(
+                            "wait_for_primary_late_join",
+                            cache_key=cache_key,
+                            status=wait_cache_status,
+                            model=model.name,
+                            workflow=workflow,
+                        )
+                        with self._ledger.transaction() as txn:
+                            txn.create_inflight(
+                                cache_key, model_name=model.name, workflow=workflow
+                            )
+                        cache_status = "miss" if cache_settings.enabled else "bypass"
+                        owns_inflight = True
+                        span.set_attribute("llm.cache_status", cache_status)
+                        late_join = False
+                    else:
+                        _record_router_ledger_event(
+                            "wait_for_primary_complete",
+                            cache_key=cache_key,
+                            status=wait_cache_status,
+                            model=model.name,
+                            workflow=workflow,
+                        )
+                        span.set_attribute("llm.cache_status", wait_cache_status)
+                        return self._record_to_generation(record)
 
             span.set_attribute("llm.cache_status", cache_status)
 
@@ -404,7 +457,6 @@ class LLMRouterService:
                 latency_threshold = self._as_float(config.get("latency_threshold_ms"))
                 with self._ledger.transaction() as txn:
                     txn.set_latency(model.name, latency_ms)
-
                 if (
                     latency_threshold is not None
                     and warning_ratio > 0.0
@@ -443,9 +495,16 @@ class LLMRouterService:
                         txn.mark_inflight_error(cache_key, str(error))
                     raise error
 
-                completion_tokens = self._estimate_tokens(output, model.model) if isinstance(output, str) else 0
-                cost = self._estimate_cost_from_tokens(model, prompt_tokens, completion_tokens)
+                completion_tokens = 0
+                cost = 0.0
+                error_after_generation: GenerationError | None = None
                 with self._ledger.transaction() as txn:
+                    completion_tokens = (
+                        self._estimate_tokens(output, model.model) if isinstance(output, str) else 0
+                    )
+                    cost = self._estimate_cost_from_tokens(
+                        model, prompt_tokens, completion_tokens
+                    )
                     spent = txn.get_spend(model.name)
                     total_spend = spent + cost
                     if (
@@ -484,8 +543,39 @@ class LLMRouterService:
                             total_spend,
                             ceiling,
                         )
-                        raise error
-                    txn.set_spend(model.name, total_spend)
+                        error_after_generation = error
+                    else:
+                        txn.set_spend(model.name, total_spend)
+                        txn.mark_inflight_success(
+                            cache_key,
+                            model_name=model.name,
+                            workflow=workflow,
+                            output=output if isinstance(output, str) else str(output),
+                            latency_ms=latency_ms,
+                            cost=cost,
+                        )
+                        if cache_settings.enabled:
+                            current = time.monotonic()
+                            txn.purge_expired_cache(current, cache_settings.ttl_seconds)
+                            while txn.cache_size() >= cache_settings.max_entries:
+                                txn.pop_oldest_cache_entry()
+                            txn.store_cache_entry(
+                                CacheRecord(
+                                    cache_key=cache_key,
+                                    model_name=model.name,
+                                    workflow=workflow,
+                                    prompt=prompt,
+                                    temperature=float(temperature),
+                                    max_output_tokens=int(max_output_tokens),
+                                    output=output if isinstance(output, str) else str(output),
+                                    latency_ms=latency_ms,
+                                    cost=cost,
+                                    created_at=current,
+                                )
+                            )
+
+                if error_after_generation is not None:
+                    raise error_after_generation
 
                 span.set_attribute("llm.latency_ms", round(latency_ms, 2))
                 span.set_attribute("llm.completion_tokens", completion_tokens)
@@ -495,7 +585,7 @@ class LLMRouterService:
                 # Record success for circuit breaker
                 self._record_model_success(model.name)
 
-                generation = RoutedGeneration(
+                return RoutedGeneration(
                     model=model,
                     output=output,
                     latency_ms=latency_ms,
@@ -504,37 +594,6 @@ class LLMRouterService:
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                 )
-
-                with self._ledger.transaction() as txn:
-                    txn.mark_inflight_success(
-                        cache_key,
-                        model_name=model.name,
-                        workflow=workflow,
-                        output=output if isinstance(output, str) else str(output),
-                        latency_ms=latency_ms,
-                        cost=cost,
-                    )
-                    if cache_settings.enabled:
-                        current = time.monotonic()
-                        txn.purge_expired_cache(current, cache_settings.ttl_seconds)
-                        while txn.cache_size() >= cache_settings.max_entries:
-                            txn.pop_oldest_cache_entry()
-                        txn.store_cache_entry(
-                            CacheRecord(
-                                cache_key=cache_key,
-                                model_name=model.name,
-                                workflow=workflow,
-                                prompt=prompt,
-                                temperature=float(temperature),
-                                max_output_tokens=int(max_output_tokens),
-                                output=output if isinstance(output, str) else str(output),
-                                latency_ms=latency_ms,
-                                cost=cost,
-                                created_at=current,
-                            )
-                        )
-
-                return generation
             except GenerationError as exc:
                 # Record failure for circuit breaker
                 self._record_model_failure(model.name)

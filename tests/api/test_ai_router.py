@@ -710,6 +710,13 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(
             else:
                 sleep_stub(0.01)
         first_call_release.set()
+        _wait_for_inflight_status(
+            router._ledger,
+            cache_key,
+            "success",
+            timeout=2.0,
+            sleep_fn=sleep_stub,
+        )
         sleep_stub(0.01)
 
         def _expect_error() -> None:

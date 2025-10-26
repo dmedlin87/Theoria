@@ -13,6 +13,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Iterable
 
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import Session
@@ -31,6 +32,140 @@ _MIGRATION_KEY_PREFIX = "db:migration:"
 
 
 _SUPPORTED_EXTENSIONS = {".sql", ".py"}
+
+_PERFORMANCE_INDEXES_POSTGRES = (
+    {
+        "name": "idx_passages_embedding_null",
+        "table": "passages",
+        "statement": (
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_passages_embedding_null "
+            "ON passages (id) WHERE embedding IS NULL"
+        ),
+    },
+    {
+        "name": "idx_documents_updated_at",
+        "table": "documents",
+        "statement": (
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_updated_at "
+            "ON documents (updated_at)"
+        ),
+    },
+    {
+        "name": "idx_passages_document_id",
+        "table": "passages",
+        "statement": (
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_passages_document_id "
+            "ON passages (document_id)"
+        ),
+    },
+)
+
+_PERFORMANCE_INDEXES_GENERIC = (
+    {
+        "name": "idx_passages_embedding_null",
+        "table": "passages",
+        "statement": (
+            "CREATE INDEX IF NOT EXISTS idx_passages_embedding_null "
+            "ON passages (id) WHERE embedding IS NULL"
+        ),
+    },
+    {
+        "name": "idx_documents_updated_at",
+        "table": "documents",
+        "statement": (
+            "CREATE INDEX IF NOT EXISTS idx_documents_updated_at ON documents (updated_at)"
+        ),
+    },
+    {
+        "name": "idx_passages_document_id",
+        "table": "passages",
+        "statement": (
+            "CREATE INDEX IF NOT EXISTS idx_passages_document_id ON passages (document_id)"
+        ),
+    },
+)
+
+
+def _ensure_performance_indexes(engine: Engine) -> list[str]:
+    """Ensure critical query indexes exist across supported dialects."""
+
+    created: list[str] = []
+    dialect_name: str | None = None
+    pending_postgres: list[dict[str, str]] = []
+
+    with engine.connect() as connection:
+        dialect_name = getattr(connection.dialect, "name", None)
+        if dialect_name == "postgresql":
+            for entry in _PERFORMANCE_INDEXES_POSTGRES:
+                index_name = entry["name"]
+                table_name = entry["table"]
+                table_exists = connection.execute(
+                    text("SELECT to_regclass(:table)"),
+                    {"table": table_name},
+                ).scalar()
+                if not table_exists:
+                    logger.debug(
+                        "Skipping index %s; table %s missing", index_name, table_name
+                    )
+                    continue
+                exists = connection.execute(
+                    text("SELECT to_regclass(:name)"),
+                    {"name": index_name},
+                ).scalar()
+                if exists:
+                    continue
+                pending_postgres.append(entry)
+        elif dialect_name == "sqlite":
+            for entry in _PERFORMANCE_INDEXES_GENERIC:
+                index_name = entry["name"]
+                table_name = entry["table"]
+                table_exists = connection.execute(
+                    text(
+                        "SELECT 1 FROM sqlite_master "
+                        "WHERE type='table' AND name=:name"
+                    ),
+                    {"name": table_name},
+                ).scalar()
+                if not table_exists:
+                    logger.debug(
+                        "Skipping index %s; table %s missing", index_name, table_name
+                    )
+                    continue
+                exists = connection.execute(
+                    text(
+                        "SELECT 1 FROM sqlite_master "
+                        "WHERE type='index' AND name=:name"
+                    ),
+                    {"name": index_name},
+                ).scalar()
+                if exists:
+                    continue
+                connection.exec_driver_sql(entry["statement"])
+                created.append(index_name)
+        else:
+            logger.debug(
+                "Skipping performance index enforcement for unsupported dialect: %s",
+                dialect_name,
+            )
+            return created
+
+    if dialect_name == "postgresql":
+        for entry in pending_postgres:
+            index_name = entry["name"]
+            with engine.connect().execution_options(
+                isolation_level="AUTOCOMMIT"
+            ) as autocommit_conn:
+                autocommit_conn.exec_driver_sql(entry["statement"])
+            created.append(index_name)
+
+    return created
+
+
+def _log_created_indexes(indexes: list[str]) -> None:
+    if indexes:
+        logger.info(
+            "Ensured database indexes: %s", ", ".join(sorted(indexes))
+        )
 
 
 def _iter_migration_files(migrations_path: Path) -> Iterable[Path]:
@@ -460,6 +595,7 @@ def run_sql_migrations(
     applied: list[str] = []
     migration_files = list(_iter_migration_files(migrations_path))
     if not migration_files:
+        _log_created_indexes(_ensure_performance_indexes(engine))
         return applied
 
     with Session(engine) as session:
@@ -678,5 +814,8 @@ def run_sql_migrations(
                 )
                 session.commit()
                 applied.append(migration_name)
+
+    created_indexes = _ensure_performance_indexes(engine)
+    _log_created_indexes(created_indexes)
 
     return applied
