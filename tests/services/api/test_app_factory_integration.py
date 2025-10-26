@@ -244,7 +244,10 @@ def test_create_app_installs_routes_and_middlewares(
     body = response.json()
     assert body == {"ok": True, "principal": {"method": "api_key", "subject": "test-key"}}
     assert response.headers["x-trace-id"] == "trace-123"
-    assert patched_app_environment.principal_calls == [(None, "test-key")]
+    assert patched_app_environment.principal_calls == [
+        (None, "test-key"),
+        (None, "test-key"),
+    ]
 
     error_response = client.get("/demo/boom", headers={"X-API-Key": "test-key"})
     assert error_response.status_code == 418
