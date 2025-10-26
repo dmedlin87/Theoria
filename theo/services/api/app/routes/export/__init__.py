@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from ...errors import ExportError
-from .zotero import export_to_zotero
+from ...export.zotero import export_to_zotero as _zotero_export_adapter
 from . import citations, deliverables, documents, search, zotero
 
 _normalise_formats = deliverables._normalise_formats
@@ -19,6 +19,8 @@ router.include_router(zotero.router)
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(router, prefix="/export")
+
+export_to_zotero = _zotero_export_adapter
 
 __all__ = [
     "router",
