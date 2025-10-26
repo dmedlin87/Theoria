@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from ...errors import ExportError
-from ...export.zotero import export_to_zotero
+from .zotero import export_to_zotero
 from . import citations, deliverables, documents, search, zotero
 
 _normalise_formats = deliverables._normalise_formats
