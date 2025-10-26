@@ -372,7 +372,7 @@ export default function VerseGraphSection({ graph }: VerseGraphSectionProps) {
         >
           {visibleLinks.length === 0 && visibleNodes.length <= 1 ? (
             <p className={styles.emptyMessage}>
-              We couldn&apos;t find related mentions or research seeds for these filters yet.
+              We couldn't find related mentions or research seeds for these filters yet.
             </p>
           ) : (
             <svg
