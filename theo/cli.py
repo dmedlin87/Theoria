@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import itertools
-import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +12,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from theo.adapters.persistence.models import Document, Passage
+from theo.checkpoints import (
+    EmbeddingRebuildCheckpoint,
+    load_embedding_rebuild_checkpoint,
+    save_embedding_rebuild_checkpoint,
+)
 from theo.services.api.app.ingest.embeddings import (
     clear_embedding_cache,
     get_embedding_service,
@@ -56,18 +60,8 @@ def _load_ids(path: Path) -> list[str]:
     return deduped
 
 
-def _read_checkpoint(path: Path) -> dict[str, object]:
-    try:
-        raw = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return {}
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return data
+def _read_checkpoint(path: Path) -> EmbeddingRebuildCheckpoint | None:
+    return load_embedding_rebuild_checkpoint(path)
 
 
 def _write_checkpoint(
@@ -77,16 +71,17 @@ def _write_checkpoint(
     total: int,
     last_id: str | None,
     metadata: dict[str, object],
-) -> None:
-    payload = {
-        "processed": processed,
-        "total": total,
-        "last_id": last_id,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "metadata": metadata,
-    }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    previous: EmbeddingRebuildCheckpoint | None = None,
+) -> EmbeddingRebuildCheckpoint:
+    checkpoint = EmbeddingRebuildCheckpoint.build(
+        processed=processed,
+        total=total,
+        last_id=last_id,
+        metadata=metadata,
+        previous=previous,
+    )
+    save_embedding_rebuild_checkpoint(path, checkpoint)
+    return checkpoint
 
 
 def _commit_with_retry(session: Session, *, max_attempts: int = 3, backoff: float = 0.5) -> None:
@@ -166,12 +161,12 @@ def rebuild_embeddings_cmd(
             click.echo("No passage IDs were found in the provided file.")
             return
 
-    checkpoint_state: dict[str, object] = {}
+    checkpoint_state: EmbeddingRebuildCheckpoint | None = None
     skip_count = 0
     if checkpoint_file is not None:
         if resume:
             checkpoint_state = _read_checkpoint(checkpoint_file)
-            skip_count = int(checkpoint_state.get("processed", 0)) if checkpoint_state else 0
+            skip_count = checkpoint_state.processed if checkpoint_state else 0
             if skip_count:
                 click.echo(
                     f"Resuming from checkpoint at {checkpoint_file} "
@@ -282,12 +277,13 @@ def rebuild_embeddings_cmd(
 
             if checkpoint_file is not None:
                 last_id = batch[-1].id
-                _write_checkpoint(
+                checkpoint_state = _write_checkpoint(
                     checkpoint_file,
                     processed=processed,
                     total=total,
                     last_id=last_id,
                     metadata=metadata,
+                    previous=checkpoint_state,
                 )
         if checkpoint_file is not None:
             click.echo(f"Checkpoint written to {checkpoint_file}")

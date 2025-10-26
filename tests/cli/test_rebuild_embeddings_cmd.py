@@ -8,10 +8,16 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, List
+import importlib.machinery as importlib_machinery
 
 import pytest
 from click.testing import CliRunner
 
+
+if "fastapi" not in sys.modules:
+    fastapi_stub = types.ModuleType("fastapi")
+    fastapi_stub.status = types.SimpleNamespace()
+    sys.modules["fastapi"] = fastapi_stub
 
 def _install_sqlalchemy_stub() -> None:
     if "sqlalchemy" in sys.modules:
@@ -36,6 +42,10 @@ def _install_sqlalchemy_stub() -> None:
         raise NotImplementedError("sqlalchemy placeholder accessed")
 
     sqlalchemy_stub.__theoria_sqlalchemy_stub__ = True
+    sqlalchemy_stub.__path__ = []
+    sqlalchemy_stub.__spec__ = importlib_machinery.ModuleSpec(
+        "sqlalchemy", loader=None, is_package=True
+    )
     sqlalchemy_stub.func = _FuncProxy()
     sqlalchemy_stub.select = _raise
     sqlalchemy_stub.create_engine = _raise
@@ -66,11 +76,29 @@ def _install_sqlalchemy_stub() -> None:
     sqlalchemy_stub.exc = exc_module
     sqlalchemy_stub.orm = orm_module
     sqlalchemy_stub.engine = engine_module
+    sql_module = types.ModuleType("sqlalchemy.sql")
+    sql_module.__path__ = []
+    sql_module.__spec__ = importlib_machinery.ModuleSpec(
+        "sqlalchemy.sql", loader=None, is_package=True
+    )
+    elements_module = types.ModuleType("sqlalchemy.sql.elements")
+    elements_module.__spec__ = importlib_machinery.ModuleSpec(
+        "sqlalchemy.sql.elements", loader=None, is_package=True
+    )
+
+    class ClauseElement:  # pragma: no cover - placeholder
+        pass
+
+    elements_module.ClauseElement = ClauseElement
+    sql_module.elements = elements_module
+    sqlalchemy_stub.sql = sql_module
 
     sys.modules["sqlalchemy"] = sqlalchemy_stub
     sys.modules["sqlalchemy.exc"] = exc_module
     sys.modules["sqlalchemy.orm"] = orm_module
     sys.modules["sqlalchemy.engine"] = engine_module
+    sys.modules["sqlalchemy.sql"] = sql_module
+    sys.modules["sqlalchemy.sql.elements"] = elements_module
 
 
 def _install_pythonbible_stub() -> None:
@@ -211,6 +239,7 @@ _install_pythonbible_stub()
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from theo.checkpoints import CURRENT_EMBEDDING_CHECKPOINT_VERSION
 from theo.cli import cli, rebuild_embeddings_cmd
 
 
@@ -482,9 +511,14 @@ def test_rebuild_embeddings_fast_ids_checkpoint(
     assert "Completed embedding rebuild for 1 passage(s)" in result.output
 
     checkpoint_data = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert (
+        checkpoint_data["version"] == CURRENT_EMBEDDING_CHECKPOINT_VERSION
+    )
     assert checkpoint_data["processed"] == 1
     assert checkpoint_data["total"] == 1
     assert checkpoint_data["last_id"] == "p1"
+    assert "created_at" in checkpoint_data
+    assert "updated_at" in checkpoint_data
     metadata = checkpoint_data["metadata"]
     assert metadata == {
         "fast": True,
@@ -525,9 +559,14 @@ def test_rebuild_embeddings_resume_from_checkpoint(
     assert env.embedding_service.embed_calls == [(["Second"], 128)]
 
     updated_data = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert (
+        updated_data["version"] == CURRENT_EMBEDDING_CHECKPOINT_VERSION
+    )
     assert updated_data["processed"] == 2
     assert updated_data["total"] == 2
     assert updated_data["last_id"] == "p2"
+    assert "created_at" in updated_data
+    assert "updated_at" in updated_data
     assert updated_data["metadata"] == {
         "fast": False,
         "changed_since": None,
@@ -666,6 +705,9 @@ def test_rebuild_embeddings_changed_since_filters_passages(
     assert len(env.embedding_service.embed_calls) == 1
     assert env.embedding_service.embed_calls[0][0] == ["Recent", "Latest"]
     checkpoint_data = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert (
+        checkpoint_data["version"] == CURRENT_EMBEDDING_CHECKPOINT_VERSION
+    )
     assert checkpoint_data["metadata"]["changed_since"] == "2024-02-01T00:00:00+00:00"
     assert env.passages[0].embedding is None
     assert env.passages[1].embedding is not None
@@ -720,6 +762,14 @@ def test_rebuild_embeddings_handles_session_initialisation_error(
         raise SQLAlchemyError("cannot connect")
 
     monkeypatch.setattr("theo.cli.Session", _failing_session)
+    monkeypatch.setattr(
+        "theo.cli.get_embedding_service",
+        lambda: types.SimpleNamespace(embed=lambda texts, batch_size: [[0.0] * batch_size for _ in texts]),
+    )
+    monkeypatch.setattr(
+        "theo.cli.Passage",
+        types.SimpleNamespace(embedding=types.SimpleNamespace(is_=lambda _value: None)),
+    )
 
     result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
 
@@ -846,5 +896,8 @@ def test_rebuild_embeddings_integration_with_sqlite(
         assert skipped.embedding is None
 
     checkpoint_data = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert (
+        checkpoint_data["version"] == CURRENT_EMBEDDING_CHECKPOINT_VERSION
+    )
     assert checkpoint_data["processed"] == 1
     assert checkpoint_data["metadata"]["ids_count"] == 1
