@@ -27,11 +27,9 @@ from theo.services.api.app.infra import ingestion_service as ingestion_service_m
 from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E402
 from theo.services.api.app.ingest import network as network_module  # noqa: E402
 
-PAYLOAD_TOO_LARGE = getattr(
-    status,
-    "HTTP_413_CONTENT_TOO_LARGE",
-    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-)
+PAYLOAD_TOO_LARGE = getattr(status, "HTTP_413_CONTENT_TOO_LARGE", None)
+if PAYLOAD_TOO_LARGE is None:  # pragma: no cover - compatibility path
+    PAYLOAD_TOO_LARGE = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
 
 @pytest.fixture(scope="module")
 def api_engine(tmp_path_factory: pytest.TempPathFactory):

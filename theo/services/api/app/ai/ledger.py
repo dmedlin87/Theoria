@@ -12,7 +12,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ContextManager
+from typing import Callable, ContextManager
 
 try:  # pragma: no cover - optional dependency
     from prometheus_client import Counter
@@ -582,6 +582,7 @@ class SharedLedger:
         poll_interval: float = 0.05,
         timeout: float | None = None,
         observed_updated_at: float | None = None,
+        sleep_fn: Callable[[float], bool | None] | None = None,
     ) -> CacheRecord:
         """Block until the inflight entry completes or raises.
 
@@ -590,6 +591,7 @@ class SharedLedger:
             poll_interval: How often to check status (seconds)
             timeout: Maximum wait time before raising (seconds)
             observed_updated_at: Initial timestamp to detect stale entries
+            sleep_fn: Optional callable used to sleep between polls
 
         Returns:
             CacheRecord containing the completed generation
@@ -597,6 +599,8 @@ class SharedLedger:
         Raises:
             GenerationError: If timeout occurs or generation fails
         """
+
+        sleeper = time.sleep if sleep_fn is None else sleep_fn
 
         start = time.time()
         comparison_floor = observed_updated_at if observed_updated_at is not None else start
@@ -696,7 +700,7 @@ class SharedLedger:
                         status=last_status,
                     )
                     return preserved_record
-                time.sleep(poll_interval)
+                sleeper(poll_interval)
                 continue
             else:
                 if missing_logged:
@@ -830,7 +834,7 @@ class SharedLedger:
                             preserved_record = shared_preserved
                             preserved_completed_at = shared_preserved.created_at
                         if row is None:
-                            time.sleep(poll_interval)
+                            sleeper(poll_interval)
                             continue
                         continue
                 if _can_use_preserved():
@@ -847,7 +851,7 @@ class SharedLedger:
                         if refreshed is not None:
                             row = refreshed
                             if row.status == "waiting" and row.output is not None:
-                                time.sleep(0)
+                                sleeper(0)
                                 continue
                     _record_event(
                         "delivered",
@@ -873,7 +877,7 @@ class SharedLedger:
                         delivery_floor = min(delivery_floor, comparison_floor)
                     observed_updated_at = row.updated_at
                     delivery_floor = min(delivery_floor, observed_updated_at)
-                time.sleep(poll_interval)
+                sleeper(poll_interval)
                 continue
             if row.status == "success":
                 if row.output is not None:
@@ -903,7 +907,7 @@ class SharedLedger:
                     "Inflight success for %s missing output; waiting for owner to finish",
                     cache_key,
                 )
-                time.sleep(poll_interval)
+                sleeper(poll_interval)
                 continue
             if row.status == "error":
                 last_error_message = row.error or "Deduplicated generation failed"
@@ -947,7 +951,7 @@ class SharedLedger:
                         status=row.status,
                         error=row.error,
                     )
-                    time.sleep(poll_interval)
+                    sleeper(poll_interval)
                     continue
                 # Preserve the inflight row so earlier waiters that began
                 # before a restart can still observe the preserved success
@@ -976,7 +980,7 @@ class SharedLedger:
                         status=row.status,
                         error=row.error,
                     )
-                    time.sleep(poll_interval)
+                    sleeper(poll_interval)
                     continue
                 _record_event(
                     "error_raised",

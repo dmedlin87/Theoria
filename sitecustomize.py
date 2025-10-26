@@ -98,3 +98,18 @@ if (
     and _should_install_workers_stub()
 ):  # pragma: no cover - import-time wiring only
     _install_workers_stub()
+try:
+    importlib.import_module("theo.services.api.app.workers.tasks")
+except Exception:  # pragma: no cover - executed only when optional deps missing
+    workers_pkg = importlib.import_module("theo.services.api.app.workers")
+    celery_stub = types.SimpleNamespace(
+        conf=types.SimpleNamespace(
+            task_always_eager=False,
+            task_ignore_result=False,
+            task_store_eager_result=False,
+        )
+    )
+    stub_module = types.ModuleType("theo.services.api.app.workers.tasks")
+    stub_module.celery = celery_stub
+    sys.modules[stub_module.__name__] = stub_module
+    setattr(workers_pkg, "tasks", stub_module)

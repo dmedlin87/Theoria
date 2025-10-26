@@ -1,0 +1,54 @@
+name: "Westminster Leningrad Codex"
+abbreviation: "WLC"
+language: "hebrew"
+script: "hebrew"
+license: "Public Domain"
+source_url: "https://www.tanach.us/Tanach.xml"
+version: "4.20"
+description: "Masoretic Hebrew Bible based on Leningrad Codex"
+
+features:
+  - morphology
+  - masoretic_notes
+  - cantillation
+  - vowel_points
+  - ai_enhanced_analysis
+
+books:
+  - id: "gen"
+    name: "Genesis"
+    hebrew_name: "בראשית"
+    chapters: 50
+    filename: "genesis.jsonl"
+  - id: "exo"
+    name: "Exodus" 
+    hebrew_name: "שמות"
+    chapters: 40
+    filename: "exodus.jsonl"
+  - id: "lev"
+    name: "Leviticus"
+    hebrew_name: "ויקרא"
+    chapters: 27
+    filename: "leviticus.jsonl"
+  - id: "num"
+    name: "Numbers"
+    hebrew_name: "במדבר"
+    chapters: 36
+    filename: "numbers.jsonl"
+  - id: "deu"
+    name: "Deuteronomy"
+    hebrew_name: "דברים"
+    chapters: 34
+    filename: "deuteronomy.jsonl"
+
+theological_focus:
+  - divine_names
+  - messianic_prophecies
+  - covenant_theology
+  - creation_narrative
+
+ai_analysis_config:
+  model: "gpt-4"
+  morphology_confidence_threshold: 0.85
+  semantic_confidence_threshold: 0.80
+  theological_significance_threshold: 0.75
