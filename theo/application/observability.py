@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, Iterator, Mapping
@@ -70,17 +70,19 @@ def trace_repository_call(
 
     workflow_name = f"repository.{repository}.{operation}"
 
-    try:
-        workflow_cm = instrument_workflow(workflow_name, **enriched_attributes)
-    except RuntimeError:
-        workflow_cm = nullcontext(None)
-        telemetry_enabled = False
-    else:
-        telemetry_enabled = True
+    with ExitStack() as stack:
+        try:
+            span = stack.enter_context(
+                instrument_workflow(workflow_name, **enriched_attributes)
+            )
+        except RuntimeError:
+            span = stack.enter_context(nullcontext(None))
+            telemetry_enabled = False
+        else:
+            telemetry_enabled = True
 
-    start_time = perf_counter() if telemetry_enabled else None
+        start_time = perf_counter() if telemetry_enabled else None
 
-    with workflow_cm as span:
         if telemetry_enabled:
             trace: RepositoryCallTrace | _NullRepositoryCallTrace = RepositoryCallTrace(
                 repository=repository,
