@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gc
 import importlib
 import inspect
 import os
 import sys
-from collections.abc import Generator, Iterator
+import warnings
+from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
@@ -22,12 +24,19 @@ from sqlalchemy.engine import Engine
 
 from tests.factories.application import isolated_application_container
 
+pytest_plugins = ["tests.fixtures.mocks"]
+
 try:  # pragma: no cover - optional dependency in local test harness
     import pytest_cov  # type: ignore  # noqa: F401
 
     _HAS_PYTEST_COV = True
 except ModuleNotFoundError:  # pragma: no cover - executed when plugin is missing
     _HAS_PYTEST_COV = False
+
+try:  # pragma: no cover - psutil optional for lightweight environments
+    import psutil
+except ModuleNotFoundError:  # pragma: no cover - allows running without psutil
+    psutil = None
 
 
 def _register_randomly_plugin(pluginmanager: pytest.PluginManager) -> bool:
@@ -42,6 +51,21 @@ def _register_randomly_plugin(pluginmanager: pytest.PluginManager) -> bool:
         return False
 
     pluginmanager.register(plugin_module, "pytest_randomly")
+    return True
+
+
+def _register_xdist_plugin(pluginmanager: pytest.PluginManager) -> bool:
+    """Ensure pytest-xdist is eagerly registered when the dependency exists."""
+
+    if pluginmanager.hasplugin("xdist"):
+        return True
+
+    try:
+        plugin_module = importlib.import_module("xdist.plugin")
+    except ModuleNotFoundError:
+        return False
+
+    pluginmanager.register(plugin_module, "xdist")
     return True
 
 
@@ -118,6 +142,8 @@ def pytest_configure(config: pytest.Config) -> None:
     if _register_randomly_plugin(config.pluginmanager):
         config.option.randomly_seed = 1337
 
+    _register_xdist_plugin(config.pluginmanager)
+
     config.addinivalue_line(
         "markers",
         "asyncio: mark a test function as running with an asyncio event loop.",
@@ -133,6 +159,7 @@ def pytest_load_initial_conftests(
     """Ensure required plugins are available before parsing ini options."""
 
     _register_randomly_plugin(early_config.pluginmanager)
+    _register_xdist_plugin(early_config.pluginmanager)
 
 
 @pytest.fixture
@@ -151,6 +178,16 @@ def regression_factory():
 @pytest.fixture
 def application_container() -> Iterator[tuple["ApplicationContainer", "AdapterRegistry"]]:
     """Yield an isolated application container and backing registry."""
+
+    with isolated_application_container() as resources:
+        yield resources
+
+
+@pytest.fixture(scope="session")
+def optimized_application_container() -> Generator[
+    tuple["ApplicationContainer", "AdapterRegistry"], None, None
+]:
+    """Create the application container once per session for heavy suites."""
 
     with isolated_application_container() as resources:
         yield resources
@@ -253,6 +290,27 @@ _MARKER_OPTIONS: dict[str, str] = {
 }
 
 
+def _resolve_xdist_group(item: pytest.Item) -> str | None:
+    """Return the logical xdist group for a collected test item."""
+
+    keywords = item.keywords
+    if "db" in keywords or "schema" in keywords:
+        return "database"
+
+    if "network" in keywords:
+        return "network"
+
+    if "gpu" in keywords:
+        return "ml"
+
+    item_path = Path(str(getattr(item, "path", getattr(item, "fspath", ""))))
+    lower_parts = {part.lower() for part in item_path.parts}
+    if "ml" in lower_parts or "gpu" in lower_parts:
+        return "ml"
+
+    return None
+
+
 def _ensure_cli_opt_in(
     request: pytest.FixtureRequest, *, option: str, marker: str
 ) -> None:
@@ -272,6 +330,8 @@ def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:
     """Enforce marker usage and CLI opt-ins for costly test suites."""
+
+    has_xdist = config.pluginmanager.hasplugin("xdist")
 
     for item in items:
         fixture_names = set(item.fixturenames)
@@ -299,6 +359,18 @@ def pytest_collection_modifyitems(
                         reason=f"requires --{cli_flag} opt-in to run @{marker_name} tests"
                     )
                 )
+
+        if has_xdist:
+            group_name = _resolve_xdist_group(item)
+            if group_name is None:
+                continue
+
+            existing_groups = {
+                marker.kwargs.get("name")
+                for marker in item.iter_markers(name="xdist_group")
+            }
+            if group_name not in existing_groups:
+                item.add_marker(pytest.mark.xdist_group(name=group_name))
 
 
 POSTGRES_IMAGE = os.environ.get("PYTEST_PGVECTOR_IMAGE", "ankane/pgvector:0.5.2")
@@ -393,6 +465,40 @@ def pgvector_migrated_database_url(
         engine.dispose()
 
 
+def _initialise_shared_database(db_path: Path) -> str:
+    from theo.application.facades.database import Base
+    from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+
+    url = f"sqlite:///{db_path}"
+    engine = create_engine(url, future=True)
+    try:
+        Base.metadata.create_all(bind=engine)
+        run_sql_migrations(engine)
+    finally:
+        engine.dispose()
+
+    return url
+
+
+def _load_model_from_registry(model_name: str) -> Any:
+    """Attempt to import an expensive ML model using common naming conventions."""
+
+    candidate_modules = [
+        f"theo.ml.models.{model_name}",
+        f"theo.services.ml.{model_name}",
+        f"theo.services.ml.models.{model_name}",
+    ]
+
+    for module_path in candidate_modules:
+        with contextlib.suppress(ModuleNotFoundError, AttributeError):
+            module = importlib.import_module(module_path)
+            loader = getattr(module, "load_model")
+            if callable(loader):
+                return loader()
+
+    raise LookupError(f"Unable to locate loader for ML model '{model_name}'")
+
+
 def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     """Create a SQLite database URL with migrations applied."""
     from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
@@ -412,6 +518,32 @@ def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[s
         yield url
     finally:
         engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def shared_test_database(tmp_path_factory: pytest.TempPathFactory) -> str:
+    """Create a session-scoped SQLite database that can be reused across tests."""
+
+    database_dir = tmp_path_factory.mktemp("shared_db", numbered=False)
+    db_path = database_dir / "test.db"
+    return _initialise_shared_database(db_path)
+
+
+@pytest.fixture(scope="session")
+def ml_models() -> Callable[[str], Any]:
+    """Load expensive ML models lazily and cache them for reuse."""
+
+    cache: dict[str, Any] = {}
+
+    def _load(model_name: str, *, loader: Callable[[], Any] | None = None) -> Any:
+        if model_name not in cache:
+            if loader is not None:
+                cache[model_name] = loader()
+            else:
+                cache[model_name] = _load_model_from_registry(model_name)
+        return cache[model_name]
+
+    return _load
 
 
 @pytest.fixture(scope="session")
@@ -453,6 +585,19 @@ def integration_engine(
         engine.dispose()
 
 
+@pytest.fixture(scope="function")
+def db_transaction(integration_engine: Engine) -> Generator[Any, None, None]:
+    """Wrap tests in a transaction that is rolled back afterwards."""
+
+    connection = integration_engine.connect()
+    transaction = connection.begin()
+    try:
+        yield connection
+    finally:
+        transaction.rollback()
+        connection.close()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _set_database_url_env(
     request: pytest.FixtureRequest, pytestconfig: pytest.Config
@@ -481,6 +626,29 @@ def _set_database_url_env(
 
 
 @pytest.fixture(autouse=True)
+def manage_memory() -> Generator[None, None, None]:
+    """Collect garbage eagerly and warn about potential leaks."""
+
+    process = psutil.Process() if psutil is not None else None
+    before = process.memory_info().rss if process is not None else 0
+
+    yield
+
+    gc.collect()
+
+    if process is None or before == 0:
+        return
+
+    after = process.memory_info().rss
+    if after > before * 1.5:
+        warnings.warn(
+            "Potential memory leak detected in test execution",
+            ResourceWarning,
+            stacklevel=2,
+        )
+
+
+@pytest.fixture(autouse=True)
 def mock_sleep(request):
     if "allow_sleep" in request.keywords:
         # Don't mock sleep for tests marked with @pytest.mark.allow_sleep
@@ -490,3 +658,33 @@ def mock_sleep(request):
     with patch("time.sleep", return_value=None):
         with patch("asyncio.sleep", new=AsyncMock()):
             yield
+
+
+class TestResourcePool:
+    """Pool expensive resources for reuse across the test session."""
+
+    def __init__(self) -> None:
+        self._engines: dict[str, Engine] = {}
+
+    def get_db_engine(self, url: str) -> Engine:
+        engine = self._engines.get(url)
+        if engine is None:
+            engine = create_engine(url, future=True)
+            self._engines[url] = engine
+        return engine
+
+    def cleanup(self) -> None:
+        for engine in self._engines.values():
+            engine.dispose()
+        self._engines.clear()
+
+
+@pytest.fixture(scope="session")
+def resource_pool() -> Generator[TestResourcePool, None, None]:
+    """Expose a shared resource pool for integration-heavy tests."""
+
+    pool = TestResourcePool()
+    try:
+        yield pool
+    finally:
+        pool.cleanup()
