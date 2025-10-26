@@ -380,7 +380,6 @@ class LLMRouterService:
                 latency_threshold = self._as_float(config.get("latency_threshold_ms"))
                 with self._ledger.transaction() as txn:
                     txn.set_latency(model.name, latency_ms)
-
                 if (
                     latency_threshold is not None
                     and warning_ratio > 0.0
@@ -419,9 +418,16 @@ class LLMRouterService:
                         txn.mark_inflight_error(cache_key, str(error))
                     raise error
 
-                completion_tokens = self._estimate_tokens(output, model.model) if isinstance(output, str) else 0
-                cost = self._estimate_cost_from_tokens(model, prompt_tokens, completion_tokens)
+                completion_tokens = 0
+                cost = 0.0
+                error_after_generation: GenerationError | None = None
                 with self._ledger.transaction() as txn:
+                    completion_tokens = (
+                        self._estimate_tokens(output, model.model) if isinstance(output, str) else 0
+                    )
+                    cost = self._estimate_cost_from_tokens(
+                        model, prompt_tokens, completion_tokens
+                    )
                     spent = txn.get_spend(model.name)
                     total_spend = spent + cost
                     if (
@@ -460,8 +466,39 @@ class LLMRouterService:
                             total_spend,
                             ceiling,
                         )
-                        raise error
-                    txn.set_spend(model.name, total_spend)
+                        error_after_generation = error
+                    else:
+                        txn.set_spend(model.name, total_spend)
+                        txn.mark_inflight_success(
+                            cache_key,
+                            model_name=model.name,
+                            workflow=workflow,
+                            output=output if isinstance(output, str) else str(output),
+                            latency_ms=latency_ms,
+                            cost=cost,
+                        )
+                        if cache_settings.enabled:
+                            current = time.monotonic()
+                            txn.purge_expired_cache(current, cache_settings.ttl_seconds)
+                            while txn.cache_size() >= cache_settings.max_entries:
+                                txn.pop_oldest_cache_entry()
+                            txn.store_cache_entry(
+                                CacheRecord(
+                                    cache_key=cache_key,
+                                    model_name=model.name,
+                                    workflow=workflow,
+                                    prompt=prompt,
+                                    temperature=float(temperature),
+                                    max_output_tokens=int(max_output_tokens),
+                                    output=output if isinstance(output, str) else str(output),
+                                    latency_ms=latency_ms,
+                                    cost=cost,
+                                    created_at=current,
+                                )
+                            )
+
+                if error_after_generation is not None:
+                    raise error_after_generation
 
                 span.set_attribute("llm.latency_ms", round(latency_ms, 2))
                 span.set_attribute("llm.completion_tokens", completion_tokens)
@@ -471,7 +508,7 @@ class LLMRouterService:
                 # Record success for circuit breaker
                 self._record_model_success(model.name)
 
-                generation = RoutedGeneration(
+                return RoutedGeneration(
                     model=model,
                     output=output,
                     latency_ms=latency_ms,
@@ -480,37 +517,6 @@ class LLMRouterService:
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                 )
-
-                with self._ledger.transaction() as txn:
-                    txn.mark_inflight_success(
-                        cache_key,
-                        model_name=model.name,
-                        workflow=workflow,
-                        output=output if isinstance(output, str) else str(output),
-                        latency_ms=latency_ms,
-                        cost=cost,
-                    )
-                    if cache_settings.enabled:
-                        current = time.monotonic()
-                        txn.purge_expired_cache(current, cache_settings.ttl_seconds)
-                        while txn.cache_size() >= cache_settings.max_entries:
-                            txn.pop_oldest_cache_entry()
-                        txn.store_cache_entry(
-                            CacheRecord(
-                                cache_key=cache_key,
-                                model_name=model.name,
-                                workflow=workflow,
-                                prompt=prompt,
-                                temperature=float(temperature),
-                                max_output_tokens=int(max_output_tokens),
-                                output=output if isinstance(output, str) else str(output),
-                                latency_ms=latency_ms,
-                                cost=cost,
-                                created_at=current,
-                            )
-                        )
-
-                return generation
             except GenerationError as exc:
                 # Record failure for circuit breaker
                 self._record_model_failure(model.name)

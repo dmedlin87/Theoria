@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -396,6 +398,39 @@ class LedgerTransaction:
 
 class SharedLedger:
     """Persistent routing ledger accessed by all router instances."""
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "wait_for_inflight" and callable(value):
+            value = self._wrap_wait_for_inflight_override(value)
+        super().__setattr__(name, value)
+
+    @staticmethod
+    def _wrap_wait_for_inflight_override(
+        override: Callable[..., CacheRecord]
+    ) -> Callable[..., CacheRecord]:
+        params = inspect.signature(override).parameters
+
+        @functools.wraps(override)
+        def _wrapped(
+            cache_key: str,
+            *,
+            poll_interval: float = 0.05,
+            timeout: float | None = None,
+            observed_updated_at: float | None = None,
+            sleep_fn: Callable[[float], bool | None] | None = None,
+        ) -> CacheRecord:
+            kwargs: dict[str, object] = {}
+            if "poll_interval" in params:
+                kwargs["poll_interval"] = poll_interval
+            if "timeout" in params:
+                kwargs["timeout"] = timeout
+            if "observed_updated_at" in params:
+                kwargs["observed_updated_at"] = observed_updated_at
+            if "sleep_fn" in params:
+                kwargs["sleep_fn"] = sleep_fn
+            return override(cache_key, **kwargs)
+
+        return _wrapped
 
     def __init__(self, path: str | None = None) -> None:
         default_path = Path(tempfile.gettempdir()) / "theo_router_ledger.db"
