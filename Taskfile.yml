@@ -91,7 +91,7 @@ tasks:
   deps:lock:
     desc: Regenerate pip-compile lockfiles for all extras
     cmds:
-      - pip-compile --resolver=backtracking --extra base --output-file constraints/base.txt pyproject.toml
-      - pip-compile --resolver=backtracking --extra api --output-file constraints/api.txt pyproject.toml
-      - pip-compile --resolver=backtracking --extra ml --output-file constraints/ml.txt pyproject.toml
-      - pip-compile --resolver=backtracking --extra dev --output-file constraints/dev.txt pyproject.toml
+      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra base --output-file constraints/base-constraints.txt pyproject.toml
+      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra api --output-file constraints/api-constraints.txt pyproject.toml
+      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra ml --output-file constraints/ml-constraints.txt --pip-args "--index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple" pyproject.toml
+      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra dev --output-file constraints/dev-constraints.txt pyproject.toml
