@@ -1,12 +1,14 @@
 import os
+from inspect import isawaitable
 
 import pytest
 from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
-from starlette.testclient import WebSocketDenialResponse
+from starlette.websockets import WebSocket
 
 from theo.application.facades import settings as settings_module
 from theo.application.facades.database import get_session
+from theo.services.api.app.adapters.security import configure_principal_resolver
 from theo.services.api.app.routes import realtime
 from theo.services.api.app.routes.realtime import NotebookEventBroker
 
@@ -101,7 +103,7 @@ async def test_broadcast_disconnects_failed_connections() -> None:
 
 
 @pytest.fixture()
-def realtime_client() -> TestClient:
+def realtime_app() -> FastAPI:
     app = FastAPI()
     app.include_router(realtime.router, prefix="/realtime")
 
@@ -118,10 +120,56 @@ def realtime_client() -> TestClient:
         yield _DummySession()
 
     app.dependency_overrides[get_session] = _override_session
+    configure_principal_resolver()
 
-    with TestClient(app) as client:
+    try:
+        yield app
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+        settings_module.get_settings.cache_clear()
+
+
+@pytest.fixture()
+def realtime_client(realtime_app: FastAPI) -> TestClient:
+    with TestClient(realtime_app) as client:
         yield client
-    settings_module.get_settings.cache_clear()
+
+
+def _build_websocket(headers: dict[str, str] | None = None) -> WebSocket:
+    base_headers = [
+        (b"host", b"testserver"),
+        (b"connection", b"upgrade"),
+        (b"upgrade", b"websocket"),
+        (b"sec-websocket-version", b"13"),
+        (b"sec-websocket-key", b"testing"),
+    ]
+    if headers:
+        base_headers.extend(
+            (name.lower().encode("latin-1"), value.encode("latin-1"))
+            for name, value in headers.items()
+        )
+
+    scope = {
+        "type": "websocket",
+        "asgi": {"version": "3.0"},
+        "scheme": "ws",
+        "path": "/realtime/notebooks/example",
+        "raw_path": b"/realtime/notebooks/example",
+        "query_string": b"",
+        "headers": base_headers,
+        "client": ("testclient", 12345),
+        "server": ("testserver", 80),
+        "subprotocols": [],
+        "extensions": {"websocket.http.response": {}},
+    }
+
+    async def _receive() -> dict[str, object]:  # pragma: no cover - unused in tests
+        return {"type": "websocket.disconnect"}
+
+    async def _send(_message: dict[str, object]) -> None:  # pragma: no cover - unused
+        return None
+
+    return WebSocket(scope, _receive, _send)
 
 
 @pytest.mark.no_auth_override
@@ -132,25 +180,22 @@ def test_realtime_poll_requires_authentication(realtime_client: TestClient) -> N
 
 
 @pytest.mark.no_auth_override
-@pytest.mark.skip(reason="TestClient doesn't properly handle WebSocket dependency exceptions - causes infinite hang. Authentication is tested via HTTP poll endpoint instead.")
-def test_realtime_websocket_requires_authentication(
-    realtime_client: TestClient,
+async def test_realtime_websocket_requires_authentication(
+    realtime_app: FastAPI,
 ) -> None:
-    # WebSocket connection should be denied immediately without credentials
-    # NOTE: This test hangs because TestClient.websocket_connect enters the
-    # context manager before checking dependencies, triggering the infinite
-    # message loop in the WebSocket handler.
-    with pytest.raises(WebSocketDenialResponse) as exc:
-        with realtime_client.websocket_connect("/realtime/notebooks/example"):
-            pytest.fail("Should not accept unauthenticated connection")
+    async with realtime_app.router.lifespan_context(realtime_app):
+        websocket = _build_websocket()
+        with pytest.raises(HTTPException) as exc:
+            result = realtime.require_websocket_principal(websocket)
+            if isawaitable(result):
+                await result
 
     assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.no_auth_override
-@pytest.mark.skip(reason="TestClient doesn't properly handle WebSocket dependency exceptions - causes infinite hang. Access control is tested via HTTP poll endpoint instead.")
-def test_realtime_websocket_denies_forbidden_access(
-    realtime_client: TestClient, monkeypatch: pytest.MonkeyPatch
+async def test_realtime_websocket_denies_forbidden_access(
+    realtime_app: FastAPI, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     class _ForbiddenService:
         def ensure_accessible(self, _notebook_id: str) -> None:
@@ -168,16 +213,22 @@ def test_realtime_websocket_denies_forbidden_access(
     monkeypatch.setattr(realtime, "_service", _service_override)
     monkeypatch.setattr(realtime._BROKER, "connect", _connect_override)
 
-    # WebSocket connection should be denied when access check fails
-    # NOTE: This test hangs because TestClient.websocket_connect enters the
-    # context manager before checking dependencies, triggering the infinite
-    # message loop in the WebSocket handler.
-    with pytest.raises(WebSocketDenialResponse) as exc:
-        with realtime_client.websocket_connect(
-            "/realtime/notebooks/example",
-            headers={"X-API-Key": "pytest-default-key"},
-        ):
-            pytest.fail("Should not accept forbidden connection")
+    async with realtime_app.router.lifespan_context(realtime_app):
+        websocket = _build_websocket(headers={"X-API-Key": "pytest-default-key"})
+        principal_result = realtime.require_websocket_principal(websocket)
+        principal = (
+            await principal_result
+            if isawaitable(principal_result)
+            else principal_result
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            await realtime.notebook_updates(
+                websocket,
+                "example",
+                session=object(),
+                principal=principal,
+            )
 
     assert exc.value.status_code == status.HTTP_403_FORBIDDEN
     assert connect_called is False
