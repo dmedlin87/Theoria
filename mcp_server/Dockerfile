@@ -21,7 +21,8 @@ ENV PYTHONPATH=/app
 
 RUN pip install --upgrade pip \
     && pip install ".[api]" -c constraints/api-constraints.txt \
-    && pip install ".[ml]" -c constraints/ml-constraints.txt
+    && pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+        ".[ml]" -c constraints/ml-constraints.txt
 
 ENV MCP_TOOLS_ENABLED=1 \
     MCP_HOST=0.0.0.0 \
