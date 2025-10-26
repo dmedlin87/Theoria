@@ -234,7 +234,7 @@ class EmbeddingService:
 
 
 _service: EmbeddingService | None = None
-_NON_ALNUM_RE = re.compile(r"[^0-9a-zA-Z]+")
+_NON_WORD_RE = re.compile(r"[\W_]+", re.UNICODE)
 
 
 def get_embedding_service() -> EmbeddingService:
@@ -276,6 +276,6 @@ def lexical_representation(session: Session, text: str) -> ClauseElement | str:
         from sqlalchemy import func
 
         return func.to_tsvector("english", text)
-    normalised = _NON_ALNUM_RE.sub(" ", text.lower())
+    normalised = _NON_WORD_RE.sub(" ", text.lower())
     tokens = [token for token in normalised.split() if token]
     return " ".join(tokens)
