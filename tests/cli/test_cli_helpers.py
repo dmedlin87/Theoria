@@ -102,9 +102,10 @@ def test_write_checkpoint_roundtrip(tmp_path: Path) -> None:
 def test_commit_with_retry_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch, failures: int) -> None:
     session = _FlakySession(failures)
     monkeypatch.setattr("time.sleep", lambda _seconds: None)
-    _commit_with_retry(session, max_attempts=3, backoff=0)
+    duration = _commit_with_retry(session, max_attempts=3, backoff=0)
     assert session.commits == 1
     assert session.rollbacks == failures
+    assert duration >= 0
 
 
 def test_commit_with_retry_raises_after_exhausting_attempts(monkeypatch: pytest.MonkeyPatch) -> None:

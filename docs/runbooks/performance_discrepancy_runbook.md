@@ -2,6 +2,15 @@
 
 Use this playbook when Lighthouse, rag_eval, or production telemetry diverge from expectations. The goal is to capture evidence quickly, coordinate mitigations, and align on next steps before customer impact grows.
 
+## New observability signals
+
+- **Embedding rebuild workflow**
+  - `theo_embedding_rebuild_batch_latency_seconds` tracks end-to-end batch timings. Slice by the `mode` label (`fast` vs `full`) and watch for regressions above the historical p95. Companion metric `theo_embedding_rebuild_commit_latency_seconds` isolates database commit latency for each batch, and the counter `theo_embedding_rebuild_processed_total` increments as passages are rewritten. Structured events (`embedding_rebuild.*`) now capture resume progress, checkpoint updates, and failures directly in the log stream.
+- **Database query health**
+  - `theo_db_query_latency_seconds` emits per-query latency with `query` and `status` labels (e.g., `search.hybrid.vector`). Pair it with `theo_db_query_requests_total` to monitor throughput and derive success rates. Error spikes automatically increment `theo_db_query_errors_total`, highlighting failing statements in Grafana/Prometheus without manual log scraping.
+- **Model inference coverage**
+  - `theo_llm_inference_latency_seconds` and `theo_llm_inference_requests_total` expose provider/model latency and throughput, respectively. Every failed attempt increments `theo_llm_inference_errors_total`, giving the on-call immediate visibility into provider degradations and fallback frequency.
+
 ## 1. Log the discrepancy
 1. Create an incident ticket in Jira using the "Performance Regression" template.
 2. Record the triggering metrics:

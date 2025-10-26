@@ -112,11 +112,12 @@ def test_commit_with_retry_succeeds_immediately(monkeypatch: pytest.MonkeyPatch)
     sleeps: list[float] = []
     monkeypatch.setattr(cli.time, "sleep", lambda duration: sleeps.append(duration))
 
-    cli._commit_with_retry(session)
+    duration = cli._commit_with_retry(session)
 
     assert session.commit_calls == 1
     assert session.rollback_calls == 0
     assert sleeps == []
+    assert duration >= 0
 
 
 def test_commit_with_retry_retries_and_eventually_succeeds(
@@ -126,11 +127,12 @@ def test_commit_with_retry_retries_and_eventually_succeeds(
     sleeps: list[float] = []
     monkeypatch.setattr(cli.time, "sleep", lambda duration: sleeps.append(duration))
 
-    cli._commit_with_retry(session)
+    duration = cli._commit_with_retry(session)
 
     assert session.commit_calls == 2
     assert session.rollback_calls == 1
     assert sleeps == [pytest.approx(0.5)]
+    assert duration >= 0
 
 
 def test_commit_with_retry_raises_after_max_attempts(
