@@ -435,7 +435,11 @@ def _install_settings_stub() -> None:
         settings_module.get_settings_secret = lambda: None
         settings_module.get_settings_cipher = lambda: None
 
-        sys.modules.setdefault(module_name, settings_module)
+        # If the import above failed partway through initialising the module, Python
+        # will have inserted a partially constructed module object into sys.modules.
+        # Replace it with the stub so downstream imports receive the fallback.
+        sys.modules.pop(module_name, None)
+        sys.modules[module_name] = settings_module
 
 
 _install_sqlalchemy_stub()
