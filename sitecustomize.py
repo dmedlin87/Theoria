@@ -136,7 +136,17 @@ def _register_workers_import_fallback() -> None:
             except ValueError:
                 raise exc
 
-            if absolute != _WORKERS_TASKS_MODULE or _WORKERS_TASKS_MODULE in sys.modules:
+            requested = {absolute}
+            if fromlist:
+                for entry in fromlist:
+                    if entry in {"", "*"}:
+                        continue
+                    requested.add(f"{absolute}.{entry}")
+
+            if (
+                _WORKERS_TASKS_MODULE not in requested
+                or _WORKERS_TASKS_MODULE in sys.modules
+            ):
                 raise exc
 
             _install_workers_stub()
