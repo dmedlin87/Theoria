@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import itertools
+import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
 
 import click
 from sqlalchemy import func, select
@@ -23,19 +23,15 @@ from theo.services.api.app.ingest.embeddings import (
 )
 from theo.services.api.app.ingest.sanitizer import sanitize_passage_text
 from theo.services.bootstrap import resolve_application
+from theo.services.embeddings import (
+    EmbeddingRebuildConfig,
+    EmbeddingRebuildInstrumentation,
+)
 
 
 @click.group()
 def cli() -> None:
     """Theo CLI entry point."""
-
-
-def _batched(iterator: Iterator, size: int) -> Iterator[list]:
-    while True:
-        batch = list(itertools.islice(iterator, size))
-        if not batch:
-            break
-        yield batch
 
 
 def _normalise_timestamp(value: datetime | None) -> datetime | None:
@@ -125,6 +121,11 @@ def _commit_with_retry(session: Session, *, max_attempts: int = 3, backoff: floa
     help="Persist progress to this file so long-running runs can resume later.",
 )
 @click.option(
+    "--metrics-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Write aggregate throughput metrics to this JSON file.",
+)
+@click.option(
     "--resume/--fresh",
     default=False,
     help="Resume from an existing checkpoint file instead of starting from scratch.",
@@ -135,6 +136,7 @@ def rebuild_embeddings_cmd(
     changed_since: datetime | None,
     ids_file: Path | None,
     checkpoint_file: Path | None,
+    metrics_file: Path | None,
     resume: bool,
 ) -> None:
     """Rebuild vector store from normalized artifacts."""
@@ -145,7 +147,8 @@ def rebuild_embeddings_cmd(
     except Exception as exc:  # pragma: no cover - defensive
         raise click.ClickException(f"Failed to resolve application: {exc}") from exc
 
-    batch_size = 64 if fast else 128
+    config = EmbeddingRebuildConfig.for_mode(fast=fast)
+    batch_size = config.initial_batch_size
     embedding_service = get_embedding_service()
     if no_cache:
         clear_embedding_cache()
@@ -170,13 +173,14 @@ def rebuild_embeddings_cmd(
             if skip_count:
                 click.echo(
                     f"Resuming from checkpoint at {checkpoint_file} "
-                    f"(already processed {skip_count} passage(s))."
+                    f"(already processed {processed} passage(s))."
                 )
         else:
             try:
                 checkpoint_file.unlink()
             except FileNotFoundError:
                 pass
+    processed = int(checkpoint_state.get("processed", 0)) if checkpoint_state else 0
 
     where_clause = Passage.embedding.is_(None) if fast else None
 
@@ -202,6 +206,8 @@ def rebuild_embeddings_cmd(
             click.echo("No passages require embedding updates.")
             return
 
+        processed = min(processed, total)
+
         if ids:
             expected_ids = set(
                 session.execute(
@@ -214,28 +220,15 @@ def rebuild_embeddings_cmd(
                     f"{len(missing_ids)} passage ID(s) were not found and will be skipped."
                 )
 
-        click.echo(
-            f"Rebuilding embeddings for {total} passage(s) using batch size {batch_size}."
-        )
-
-        stmt = (
-            select(Passage)
-            .order_by(Passage.id)
-            .execution_options(stream_results=True, yield_per=batch_size)
-        )
+        base_stmt = select(Passage).order_by(Passage.id)
         if where_clause is not None:
-            stmt = stmt.where(where_clause)
+            base_stmt = base_stmt.where(where_clause)
         if join_document:
-            stmt = stmt.join(Document)
+            base_stmt = base_stmt.join(Document)
         for criterion in filters:
             if criterion is where_clause:
-                continue  # already applied
-            stmt = stmt.where(criterion)
-
-        stream = session.execute(stmt).scalars()
-        if skip_count:
-            stream = itertools.islice(stream, skip_count, None)
-            processed = min(skip_count, total)
+                continue
+            base_stmt = base_stmt.where(criterion)
 
         metadata = {
             "fast": fast,
@@ -245,48 +238,146 @@ def rebuild_embeddings_cmd(
             "ids_file": str(ids_file) if ids_file else None,
             "ids_count": len(ids) if ids else None,
             "resume": resume,
+            "config": config.to_metadata(),
+            "metrics_file": str(metrics_file) if metrics_file else None,
         }
 
-        for batch_index, batch in enumerate(_batched(stream, batch_size), start=1):
-            if not batch:
-                continue
-            texts = [sanitize_passage_text(item.text or "") for item in batch]
-            batch_start = time.perf_counter()
-            try:
-                vectors = embedding_service.embed(texts, batch_size=batch_size)
-            except Exception as exc:  # pragma: no cover - defensive
-                raise click.ClickException(f"Embedding generation failed: {exc}") from exc
+        instrumentation = EmbeddingRebuildInstrumentation()
 
-            if len(vectors) != len(batch):
-                raise click.ClickException("Embedding backend returned mismatched batch size")
+        pending_payload: list[dict[str, object]] = []
+        pending_update_count = 0
+        pending_batches = 0
+        batch_index = 0
 
-            payload = [
-                {"id": passage.id, "embedding": list(vector)}
-                for passage, vector in zip(batch, vectors)
-            ]
-
-            session.bulk_update_mappings(Passage, payload)
+        def _flush_pending(last_id_value: str | None) -> None:
+            nonlocal pending_payload, pending_update_count, pending_batches
+            if not pending_payload:
+                return
+            session.bulk_update_mappings(Passage, pending_payload)
             _commit_with_retry(session)
-            processed += len(batch)
-            batch_duration = time.perf_counter() - batch_start
-            rate = batch_duration / len(batch)
+            instrumentation.record_commit()
             click.echo(
-                f"Batch {batch_index}: updated {processed}/{total} passages "
-                f"in {batch_duration:.2f}s ({rate:.3f}s/pass)"
+                f"Committed {pending_update_count} passage embedding(s); "
+                f"{processed}/{total} processed."
             )
-
             if checkpoint_file is not None:
                 last_id = batch[-1].id
                 checkpoint_state = _write_checkpoint(
                     checkpoint_file,
                     processed=processed,
                     total=total,
-                    last_id=last_id,
+                    last_id=last_id_value,
                     metadata=metadata,
                     previous=checkpoint_state,
                 )
+            pending_payload = []
+            pending_update_count = 0
+            pending_batches = 0
+
+        current_batch_size = batch_size
+        current_yield_size = config.compute_yield_size(current_batch_size)
+        resource_probe = config.resource_probe
+        click.echo(
+            "Rebuilding embeddings for "
+            f"{total} passage(s) with initial batch size {current_batch_size} "
+            f"and commit cadence {config.commit_cadence}."
+        )
+        if processed:
+            remaining = max(total - processed, 0)
+            click.echo(
+                f"{remaining} passage(s) remain after resuming from checkpoint."
+            )
+
+        while processed < total:
+            stmt = base_stmt
+            if last_processed_id:
+                stmt = stmt.where(Passage.id > last_processed_id)
+            stmt = stmt.limit(current_yield_size).execution_options(stream_results=True)
+            rows = session.execute(stmt).scalars().all()
+            if not rows:
+                break
+
+            offset = 0
+            while offset < len(rows):
+                batch = rows[offset : offset + current_batch_size]
+                if not batch:
+                    break
+                batch_index += 1
+                texts = [sanitize_passage_text(item.text or "") for item in batch]
+                batch_start = time.perf_counter()
+                try:
+                    vectors = embedding_service.embed(texts, batch_size=len(batch))
+                except Exception as exc:  # pragma: no cover - defensive
+                    raise click.ClickException(
+                        f"Embedding generation failed: {exc}"
+                    ) from exc
+
+                if len(vectors) != len(batch):
+                    raise click.ClickException(
+                        "Embedding backend returned mismatched batch size"
+                    )
+
+                payload = [
+                    {"id": passage.id, "embedding": list(vector)}
+                    for passage, vector in zip(batch, vectors)
+                ]
+
+                pending_payload.extend(payload)
+                batch_duration = time.perf_counter() - batch_start
+                processed += len(batch)
+                pending_update_count += len(batch)
+                pending_batches += 1
+                last_processed_id = str(batch[-1].id)
+
+                snapshot = resource_probe()
+                instrumentation.record_batch(
+                    size=len(batch),
+                    duration=batch_duration,
+                    resource_snapshot=snapshot,
+                )
+
+                per_pass_duration = batch_duration / len(batch) if batch else 0.0
+                click.echo(
+                    f"Batch {batch_index}: processed {len(batch)} passages "
+                    f"in {batch_duration:.2f}s ({per_pass_duration:.3f}s/pass)"
+                )
+
+                adjusted_batch_size = config.adjust_batch_size(
+                    batch_size=current_batch_size,
+                    duration=batch_duration,
+                    resource_snapshot=snapshot,
+                )
+                if adjusted_batch_size != current_batch_size:
+                    click.echo(
+                        f"Adjusted batch size from {current_batch_size} to "
+                        f"{adjusted_batch_size} based on resource probes."
+                    )
+                    current_batch_size = adjusted_batch_size
+                    current_yield_size = config.compute_yield_size(current_batch_size)
+
+                if pending_batches >= config.commit_cadence:
+                    _flush_pending(last_processed_id)
+
+                offset += len(batch)
+
+            if last_processed_id is None and rows:
+                last_processed_id = str(rows[-1].id)
+
+        _flush_pending(last_processed_id)
         if checkpoint_file is not None:
+            _write_checkpoint(
+                checkpoint_file,
+                processed=processed,
+                total=total,
+                last_id=last_processed_id,
+                metadata=metadata,
+            )
             click.echo(f"Checkpoint written to {checkpoint_file}")
+
+        instrumentation.emit(echo=click.echo)
+        if metrics_file is not None:
+            instrumentation.dump(metrics_file)
+            click.echo(f"Metrics written to {metrics_file}")
 
     duration = time.perf_counter() - start
     click.echo(
