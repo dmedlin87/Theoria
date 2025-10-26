@@ -25,7 +25,16 @@ from sqlalchemy.engine import Engine
 from tests.factories.application import isolated_application_container
 
 if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE"}:
-    pytest_plugins = ["tests.fixtures.mocks"]
+    try:
+        import pydantic  # type: ignore  # noqa: F401
+    except ModuleNotFoundError:  # pragma: no cover - exercised in lightweight envs
+        warnings.warn(
+            "pydantic not installed; skipping heavy pytest fixtures that depend on it.",
+            RuntimeWarning,
+        )
+        pytest_plugins = []
+    else:
+        pytest_plugins = ["tests.fixtures.mocks"]
 else:  # pragma: no cover - exercised in lightweight CI and profiling flows
     pytest_plugins: list[str] = []
 

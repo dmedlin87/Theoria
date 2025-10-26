@@ -5,7 +5,11 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
-from cryptography.fernet import InvalidToken
+try:  # pragma: no cover - optional dependency in lightweight tests
+    from cryptography.fernet import InvalidToken
+except ModuleNotFoundError:  # pragma: no cover - provide fallback sentinel
+    class InvalidToken(Exception):
+        pass
 
 from theo.application.facades.settings import get_settings, get_settings_cipher
 from theo.application.interfaces import LanguageModelClientProtocol

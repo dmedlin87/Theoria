@@ -45,32 +45,55 @@ class BaseAIClient(ABC):
         """Return the active model name."""
 
 
-from . import rag as rag
-from .rag import (
-    CollaborationResponse,
-    ComparativeAnalysisResponse,
-    CorpusCurationReport,
-    DevotionalResponse,
-    GuardrailError,
-    MultimediaDigestResponse,
-    RAGAnswer,
-    RAGCitation,
-    SermonPrepResponse,
-    VerseCopilotResponse,
-    build_guardrail_refusal,
-    build_sermon_deliverable,
-    build_transcript_deliverable,
-    generate_comparative_analysis,
-    generate_devotional_flow,
-    generate_multimedia_digest,
-    generate_sermon_prep_outline,
-    generate_verse_brief,
-    record_used_citation_feedback,
-    run_corpus_curation,
-    run_guarded_chat,
-    run_research_reconciliation,
-    search_passages,
-)
+try:  # pragma: no cover - prefer full implementation when dependencies available
+    from . import rag as rag
+    from .rag import (
+        CollaborationResponse,
+        ComparativeAnalysisResponse,
+        CorpusCurationReport,
+        DevotionalResponse,
+        GuardrailError,
+        MultimediaDigestResponse,
+        RAGAnswer,
+        RAGCitation,
+        SermonPrepResponse,
+        VerseCopilotResponse,
+        build_guardrail_refusal,
+        build_sermon_deliverable,
+        build_transcript_deliverable,
+        generate_comparative_analysis,
+        generate_devotional_flow,
+        generate_multimedia_digest,
+        generate_sermon_prep_outline,
+        generate_verse_brief,
+        record_used_citation_feedback,
+        run_corpus_curation,
+        run_guarded_chat,
+        run_research_reconciliation,
+        search_passages,
+    )
+except ModuleNotFoundError:  # pragma: no cover - lightweight fallback for tests
+    from .rag import RAGCitation  # type: ignore  # fallback module exposes minimal API
+
+    rag = None  # type: ignore[assignment]
+
+    def _missing(*_args, **_kwargs):  # pragma: no cover - invoked only in unsupported flows
+        raise ModuleNotFoundError(
+            "Optional AI dependencies are not installed in this environment."
+        )
+
+    CollaborationResponse = ComparativeAnalysisResponse = CorpusCurationReport = (  # type: ignore
+        DevotionalResponse
+    ) = GuardrailError = MultimediaDigestResponse = RAGAnswer = SermonPrepResponse = (
+        VerseCopilotResponse
+    ) = type("_Unavailable", (), {"__call__": staticmethod(_missing)})
+    build_guardrail_refusal = build_sermon_deliverable = build_transcript_deliverable = (
+        generate_comparative_analysis
+    ) = generate_devotional_flow = generate_multimedia_digest = (
+        generate_sermon_prep_outline
+    ) = generate_verse_brief = record_used_citation_feedback = run_corpus_curation = (
+        run_guarded_chat
+    ) = run_research_reconciliation = search_passages = _missing
 
 # Backwards compatibility ---------------------------------------------------
 # Keep historically imported submodules addressable from the package root so
