@@ -91,6 +91,9 @@ def _install_sqlalchemy_stub() -> None:
             def __init__(self, *_args: object, **_kwargs: object) -> None:
                 raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
 
+            def execute(self, *_args: object, **_kwargs: object) -> None:
+                raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
+
         class DeclarativeBase:  # pragma: no cover - placeholder
             metadata: Any | None = None
             registry: Any | None = None
