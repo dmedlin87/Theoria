@@ -35,6 +35,7 @@ def _install_sqlalchemy_stub() -> None:
     def _raise(*_args: object, **_kwargs: object) -> None:  # pragma: no cover
         raise NotImplementedError("sqlalchemy placeholder accessed")
 
+    sqlalchemy_stub.__theoria_sqlalchemy_stub__ = True
     sqlalchemy_stub.func = _FuncProxy()
     sqlalchemy_stub.select = _raise
     sqlalchemy_stub.create_engine = _raise
@@ -764,7 +765,9 @@ def test_rebuild_embeddings_resume_with_missing_checkpoint(
 def test_rebuild_embeddings_integration_with_sqlite(
     monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path
 ) -> None:
-    pytest.importorskip("sqlalchemy")
+    sqlalchemy = pytest.importorskip("sqlalchemy")
+    if getattr(sqlalchemy, "__theoria_sqlalchemy_stub__", False):
+        pytest.skip("sqlalchemy stub active")
 
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session as SQLASession
