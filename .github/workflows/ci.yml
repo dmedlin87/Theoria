@@ -41,9 +41,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install ".[api]" -c constraints/api.txt -c constraints-ci.txt
-          pip install ".[ml]" -c constraints/ml.txt -c constraints-ci.txt
-          pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install -e . -c constraints/api.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/ml.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
@@ -211,9 +211,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install ".[api]" -c constraints/api.txt -c constraints-ci.txt
-          pip install ".[ml]" -c constraints/ml.txt -c constraints-ci.txt
-          pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install -e . -c constraints/api.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/ml.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Run ${{ matrix.suite }} pytest suite
         run: |
@@ -384,9 +384,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install ".[api]" -c constraints/api.txt -c constraints-ci.txt
-          pip install ".[ml]" -c constraints/ml.txt -c constraints-ci.txt
-          pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install -e . -c constraints/api.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/ml.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
