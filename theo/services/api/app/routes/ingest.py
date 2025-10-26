@@ -28,6 +28,7 @@ from ..models.documents import (
     SimpleIngestRequest,
     UrlIngestRequest,
 )
+from ..models.orm import Document
 from theo.application.facades.resilience import (
     ResilienceError,
     ResilienceSettings,
@@ -455,6 +456,8 @@ async def ingest_audio(
     ),
 ) -> DocumentIngestResponse:
     """Ingest an audio file (MP3, WAV) or video file (MP4) with transcription."""
+    principal_subject = _principal_subject(principal)
+
     try:
         # Parse NotebookLM metadata if provided
         nb_metadata = {}
@@ -472,37 +475,48 @@ async def ingest_audio(
 
         # Merge with frontmatter
         parsed_frontmatter = _parse_frontmatter(frontmatter)
-        enriched_frontmatter = _frontmatter_with_owner(parsed_frontmatter, _principal_subject(principal))
-        enriched_frontmatter.update({
-            "notebooklm": nb_metadata,
-            "content_type": "audio",
-            "source_type": source_type,
-        })
+        enriched_frontmatter = _frontmatter_with_owner(
+            parsed_frontmatter, principal_subject
+        )
+        if nb_metadata:
+            enriched_frontmatter.setdefault("notebooklm", nb_metadata)
+        enriched_frontmatter.setdefault("content_type", "audio")
+        enriched_frontmatter.setdefault("source_type", source_type)
 
         # Create temp file
         tmp_dir = Path(tempfile.mkdtemp(prefix="theo-ingest-"))
         tmp_path = _unique_safe_path(tmp_dir, audio.filename, "audio.bin")
         settings = get_settings()
         limit = getattr(settings, "ingest_upload_max_bytes", None)
-        await _stream_upload_to_path(
-            audio,
-            tmp_path,
-            max_bytes=limit,
-        )
+        document: Document | None = None
+        try:
+            await _stream_upload_to_path(
+                audio,
+                tmp_path,
+                max_bytes=limit,
+            )
 
-        # Process via ingestion service
-        document = ingestion_service.ingest_audio(
-            session,
-            tmp_path,
-            source_type=source_type,
-            frontmatter=enriched_frontmatter,
-        )
+            # Process via ingestion service
+            document = ingestion_service.ingest_audio(
+                session,
+                tmp_path,
+                source_type=source_type,
+                frontmatter=enriched_frontmatter,
+            )
+        finally:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except FileNotFoundError:
+                pass
+            try:
+                tmp_dir.rmdir()
+            except OSError:
+                pass
 
-        background_tasks.add_task(tmp_path.unlink, missing_ok=True)
-        background_tasks.add_task(tmp_dir.rmdir)
+        schedule_discovery_refresh(background_tasks, principal_subject)
         return DocumentIngestResponse(document_id=document.id, status="processed")
 
-    except IngestionError as e:
+    except IngestionError:
         raise
     except Exception as e:
         raise IngestionError(

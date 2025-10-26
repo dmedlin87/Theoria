@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useCallback, useState } from 'react';
+import { useDropzone, FileWithPath } from 'react-dropzone';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
 
 type DocumentType = {
   id: string;
-  title: string;
-  // Add other document properties as needed
+  title?: string;
 };
 
 type AudioUploaderProps = {
@@ -20,15 +21,19 @@ export default function AudioUploader({
   const [sourceType, setSourceType] = useState('sermon');
   const [notebookLmMetadata, setNotebookLmMetadata] = useState('');
   
+  const onDrop = useCallback((acceptedFiles: FileWithPath[]) => {
+    if (acceptedFiles.length > 0) {
+      handleUpload(acceptedFiles[0]);
+    }
+  }, []);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'audio/*': ['.mp3', '.wav'],
       'video/*': ['.mp4']
     },
     maxFiles: 1,
-    onDrop: acceptedFiles => {
-      handleUpload(acceptedFiles[0]);
-    },
+    onDrop,
   });
 
   const handleUpload = async (file: File) => {
@@ -43,7 +48,7 @@ export default function AudioUploader({
     }
     
     try {
-      const response = await fetch('/api/ingest/audio', {
+      const response = await fetch(`${API_BASE_URL}/ingest/audio`, {
         method: 'POST',
         body: formData,
       });
@@ -55,7 +60,8 @@ export default function AudioUploader({
       const result = await response.json();
       onUploadSuccess(result);
     } catch (error) {
-      onUploadError(error.message || 'Upload failed');
+      const message = error instanceof Error ? error.message : 'Upload failed';
+      onUploadError(message);
     } finally {
       setIsUploading(false);
     }

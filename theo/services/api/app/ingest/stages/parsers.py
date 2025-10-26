@@ -268,7 +268,6 @@ class AudioTranscriptionParser(Parser):
         """Transcribe audio using Whisper model."""
         try:
             import whisper
-            from whisper.utils import get_writer
         except ImportError:
             raise RuntimeError(
                 "Whisper not installed. Run 'pip install -U openai-whisper'"
@@ -290,12 +289,15 @@ class AudioTranscriptionParser(Parser):
         # Format segments
         segments = []
         for seg in result["segments"]:
-            segments.append({
-                "start": seg["start"],
-                "end": seg["end"],
-                "text": seg["text"].strip(),
-                "confidence": seg["no_speech_prob"]  # Probability of no speech
-            })
+            speech_confidence = 1.0 - float(seg.get("no_speech_prob", 0.0))
+            segments.append(
+                {
+                    "start": seg["start"],
+                    "end": seg["end"],
+                    "text": seg["text"].strip(),
+                    "confidence": max(0.0, min(1.0, speech_confidence)),
+                }
+            )
             
         return segments
 
