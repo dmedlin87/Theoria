@@ -222,14 +222,21 @@ For staging and production scenarios—including container images, Fly.io, and b
 
 | Category | Start Here |
 | --- | --- |
-| Architecture & Decisions | [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md), [`docs/adr/`](docs/adr/) |
-| APIs & Integration | [`docs/API.md`](docs/API.md), [`docs/mcp_integration_guide.md`](docs/mcp_integration_guide.md), [`docs/authentication.md`](docs/authentication.md) |
-| CLI & Automation | [`docs/CLI.md`](docs/CLI.md), [`theo/services/cli`](theo/services/cli) |
-| UI & UX | [`docs/archive/2025-10/`](docs/archive/2025-10/), [`theo/services/web/app/components/ui`](theo/services/web/app/components/ui) |
-| Testing & Quality | [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md), [`docs/performance.md`](docs/performance.md), [`SECURITY.md`](SECURITY.md) |
-| Roadmaps & Case Builder | [`docs/CASE_BUILDER.md`](docs/CASE_BUILDER.md), [`docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md`](docs/archive/2025-10/UI_OVERHAUL_SUMMARY.md) |
+| Architecture | [`docs/architecture.md`](docs/architecture.md), [`docs/architecture_review.md`](docs/architecture_review.md) |
+| API & Agents | [`docs/API.md`](docs/API.md), [`docs/theoria_instruction_prompt.md`](docs/theoria_instruction_prompt.md), [`docs/AGENT_CONFINEMENT.md`](docs/AGENT_CONFINEMENT.md) |
+| Operations | [`docs/codebase_stabilization_plan.md`](docs/codebase_stabilization_plan.md), [`docs/Repo-Health.md`](docs/Repo-Health.md) |
+| Documentation Index | [`docs/document_inventory.md`](docs/document_inventory.md), [`docs/INDEX.md`](docs/INDEX.md) |
+| Testing & Quality | [`docs/testing.md`](docs/testing.md), [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md) |
+| Legacy Archive | [`docs/archive/2025-10-26_core/`](docs/archive/2025-10-26_core/), [`docs/archive/`](docs/archive/) |
 
 Use [`docs/INDEX.md`](docs/INDEX.md) as the master directory of all documentation.
+
+### Documentation Archival Workflow
+
+- **When to archive:** Any reference doc that is superseded or dormant for a full release cycle should move under `docs/archive/<YYYY-MM-DD>_<context>/`.
+- **How to archive:** Create the dated folder, prepend the file with an archive banner (Markdown: `> **Archived on YYYY-MM-DD**`, text: `# Archived on YYYY-MM-DD`, JSON: `// Archived on YYYY-MM-DD`), and move the file into the new folder.
+- **Binary assets:** Move the asset and add a sibling note (e.g., `*.archive-note.md`) that records the archive date and reason.
+- **Index updates:** Remove archived docs from the table above and from `docs/INDEX.md`, then add a brief pointer to the new archive folder so other agents can still discover the material.
 
 ---
 
