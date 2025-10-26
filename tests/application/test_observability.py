@@ -124,3 +124,27 @@ def test_trace_repository_call_without_provider_is_noop() -> None:
 
     assert getattr(trace, "repository") == "document"
     assert getattr(trace, "operation") == "list"
+
+
+def test_trace_repository_call_handles_instrumentation_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FailingProvider:
+        def instrument_workflow(self, workflow: str, **attributes: object):  # pragma: no cover - context manager protocol
+            raise RuntimeError("telemetry disabled")
+
+        def set_span_attribute(self, span: object, key: str, value: object) -> None:
+            raise AssertionError("should not be called when span missing")
+
+        def log_workflow_event(self, event: str, *, workflow: str, **context: object) -> None:
+            raise AssertionError("no logging expected")
+
+        def record_counter(self, metric_name: str, *, amount: float = 1.0, labels: dict[str, object] | None = None) -> None:
+            raise AssertionError("no counters expected")
+
+        def record_histogram(self, metric_name: str, *, value: float, labels: dict[str, object] | None = None) -> None:
+            raise AssertionError("no histograms expected")
+
+    telemetry_facade.set_telemetry_provider(_FailingProvider())
+
+    with trace_repository_call("document", "noop") as trace:
+        assert isinstance(trace, object)
+        trace.set_attribute("ignored", "value")
