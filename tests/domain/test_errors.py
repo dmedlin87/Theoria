@@ -13,6 +13,14 @@ from theo.domain.errors import (
 )
 
 
+def test_error_hierarchy_inheritance():
+    assert issubclass(AuthorizationError, DomainError)
+    assert issubclass(ConflictError, DomainError)
+    assert issubclass(RateLimitError, DomainError)
+    assert issubclass(ValidationError, DomainError)
+    assert issubclass(NotFoundError, DomainError)
+
+
 @pytest.mark.parametrize(
     "error_cls, kwargs, expected_code",
     [

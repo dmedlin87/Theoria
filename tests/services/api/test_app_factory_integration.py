@@ -46,165 +46,143 @@ def patched_app_environment(monkeypatch: pytest.MonkeyPatch):
     )
 
     principal_configured: list[bool] = []
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.app_factory.configure_principal_resolver",
-        lambda: principal_configured.append(True),
-    )
+    principal_calls: list[tuple[str | None, str]] = []
 
-    application_resolvers: list[object] = []
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.app_factory.set_application_resolver",
-        lambda resolver: application_resolvers.append(resolver),
-    )
-
-    registry_savers: list[object] = []
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.app_factory.set_llm_registry_saver",
-        lambda saver: registry_savers.append(saver),
-    )
-
-    stub_container = object()
-    stub_registry = {"settings": object(), "engine": object()}
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.app_factory.resolve_application",
-        lambda: (stub_container, stub_registry),
-    )
-
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.app_factory.get_settings_secret",
-        lambda: "shared-secret",
-    )
-
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.routes.generate_latest", lambda: b"metrics"
-    )
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.routes.CONTENT_TYPE_LATEST",
-        "text/plain",
-    )
-
-    principal_calls: list[tuple[str | None, str | None]] = []
-
-    async def fake_require_principal(
-        request: Request,
-        authorization: str | None = Header(default=None),
-        api_key_header: str | None = Header(default=None, alias="X-API-Key"),
-    ) -> dict[str, object]:
-        principal_calls.append((authorization, api_key_header))
-        if not api_key_header:
-            raise HTTPException(status_code=403, detail="Missing API key")
-        principal = {"method": "api_key", "subject": api_key_header}
-        request.state.principal = principal
-        return principal
-
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.middleware.require_principal",
-        fake_require_principal,
-    )
-
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.middleware.get_current_trace_headers",
-        lambda: {"x-trace-id": "trace-123"},
-    )
-
-    # Provide a deterministic router registry for the test application.
-    router = APIRouter()
-
-    @router.get("/ping")
-    async def ping(request: Request) -> dict[str, object]:
-        return {
-            "ok": True,
-            "principal": getattr(request.state, "principal", None),
-        }
-
-    @router.get("/boom")
-    async def boom() -> dict[str, object]:
-        raise TheoError(
-            message="Exploded",
-            code="EXPLODED",
-            status_code=418,
-            hint="Try again",
-        )
-
-    registration = RouterRegistration(
-        router=router,
-        prefix="/demo",
-        tags=("demo",),
-        requires_security=True,
-    )
-
-    monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.routes.iter_router_registrations",
-        lambda: (registration,),
-    )
-
-    summary_payload = {
-        "status": "healthy",
-        "message": "All systems operational.",
-        "checked_at": "2024-01-01T00:00:00+00:00",
-        "adapters": {"dummy": "healthy"},
-    }
-    detail_payload = {
-        "status": "healthy",
-        "message": "All systems operational.",
-        "checked_at": "2024-01-01T00:00:00+00:00",
-        "adapters": [
-            {
-                "name": "dummy",
-                "status": "healthy",
-                "latency_ms": 1.23,
-                "message": "ok",
-            }
-        ],
-    }
-
-    class DummyReport(SimpleNamespace):
-        def to_summary(self) -> dict[str, object]:
-            return summary_payload
-
-        def to_detail(self) -> dict[str, object]:
-            return detail_payload
-
-    monkeypatch.setattr(
-        "theo.services.api.app.infra.health.get_health_service",
-        lambda: SimpleNamespace(check=lambda: DummyReport()),
-    )
-
-    class EnvState(SimpleNamespace):
+    class StubContainer:
         pass
 
-    state = EnvState(
+    stub_container = StubContainer()
+
+    def fake_principal(config: str | None, key: str):
+        principal_calls.append((config, key))
+        principal_configured.append(True)
+
+    monkeypatch.setattr(
+        "theo.services.api.app.bootstrap.app_factory.configure_principal_resolver",
+        fake_principal,
+    )
+
+    application_resolvers: list = []
+
+    def save_application_resolver(resolver):
+        application_resolvers.append(resolver)
+
+    monkeypatch.setattr(
+        "theo.services.api.app.bootstrap.app_factory.set_application_resolver",
+        save_application_resolver,
+    )
+
+    monkeypatch.setattr(
+        "theo.services.api.app.bootstrap.app_factory.create_dependency_container",
+        lambda: stub_container,
+    )
+
+    registry_savers: list = []
+
+    def save_registry(reg):
+        registry_savers.append(reg)
+
+    monkeypatch.setattr(
+        "theo.services.api.app.bootstrap.app_factory.set_registry",
+        save_registry,
+    )
+
+    health_summary = {"status": "healthy"}
+    health_detail = {"details": []}
+
+    class HealthEndpoint:
+        @staticmethod
+        def summary():
+            return health_summary
+
+        @staticmethod
+        def detail():
+            return health_detail
+
+    monkeypatch.setattr(
+        "theo.services.api.app.bootstrap.app_factory.HealthEndpoint",
+        HealthEndpoint,
+    )
+
+    trace_context = SimpleNamespace(trace_id="trace-123")
+
+    def get_trace():
+        return trace_context
+
+    monkeypatch.setattr(
+        "theo.services.api.app.bootstrap.app_factory.get_trace_context",
+        get_trace,
+    )
+
+    class DummyMetrics:
+        @staticmethod
+        def emit():
+            return "metrics"
+
+    monkeypatch.setattr(
+        "theo.services.api.app.bootstrap.app_factory.PrometheusMetrics",
+        DummyMetrics,
+    )
+
+    env = SimpleNamespace(
         telemetry_instances=telemetry_instances,
         registered_providers=registered_providers,
         resilience_factories=resilience_factories,
         principal_configured=principal_configured,
-        application_resolvers=application_resolvers,
-        registry_savers=registry_savers,
         principal_calls=principal_calls,
+        application_resolvers=application_resolvers,
         stub_container=stub_container,
-        stub_registry=stub_registry,
-        health_summary=summary_payload,
-        health_detail=detail_payload,
+        registry_savers=registry_savers,
+        health_summary=health_summary,
+        health_detail=health_detail,
     )
-    return state
+
+    return env
+
+
+@pytest.fixture()
+def example_router():
+    router = APIRouter(prefix="/demo")
+
+    @router.get("/ping")
+    async def ping(request: Request):
+        principal = request.state.principal
+        return {
+            "ok": True,
+            "principal": {
+                "method": principal.method,
+                "subject": principal.subject,
+            },
+        }
+
+    @router.get("/boom")
+    async def boom():
+        raise TheoError(
+            message="Something exploded",
+            code="EXPLODED",
+            hint="Try again",
+            status_code=418,
+        )
+
+    return RouterRegistration(router=router, tags=["demo"])
 
 
 def _build_settings() -> Settings:
     return Settings(
         api_keys=["test-key"],
-        settings_secret_key="shared-secret",
-        cors_allowed_origins=["https://example.test"],
-        mcp_tools_enabled=False,
+        settings_secret_key="test-secret",
     )
 
 
-def test_create_app_installs_routes_and_middlewares(
-    patched_app_environment: SimpleNamespace,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_create_app_with_components(
+    patched_app_environment, example_router, monkeypatch: pytest.MonkeyPatch
+):
+    def fake_discover():
+        return [example_router]
+
     monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.app_factory.allow_insecure_startup",
-        lambda: True,
+        "theo.services.api.app.bootstrap.app_factory.discover_router_registrations",
+        fake_discover,
     )
 
     settings = _build_settings()
@@ -244,9 +222,7 @@ def test_create_app_installs_routes_and_middlewares(
     body = response.json()
     assert body == {"ok": True, "principal": {"method": "api_key", "subject": "test-key"}}
     assert response.headers["x-trace-id"] == "trace-123"
-    assert patched_app_environment.principal_calls == [
-        (None, "test-key"),
-    ]
+    assert patched_app_environment.principal_calls == [(None, "test-key")]
 
     error_response = client.get("/demo/boom", headers={"X-API-Key": "test-key"})
     assert error_response.status_code == 418
@@ -256,10 +232,7 @@ def test_create_app_installs_routes_and_middlewares(
     assert payload["trace_id"] == "trace-123"
     assert error_response.headers["x-trace-id"] == "trace-123"
 
-    assert patched_app_environment.principal_calls == [
-        (None, "test-key"),
-        (None, "test-key"),
-    ]
+    assert patched_app_environment.principal_calls == [(None, "test-key"), (None, "test-key")]
 
     middleware_names = {middleware.cls.__name__ for middleware in app.user_middleware}
     assert "ErrorReportingMiddleware" in middleware_names

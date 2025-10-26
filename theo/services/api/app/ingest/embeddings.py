@@ -6,6 +6,7 @@ import hashlib
 import logging
 import math
 import os
+import re
 import threading
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
@@ -233,6 +234,7 @@ class EmbeddingService:
 
 
 _service: EmbeddingService | None = None
+_NON_ALNUM_RE = re.compile(r"[^0-9a-zA-Z]+")
 
 
 def get_embedding_service() -> EmbeddingService:
@@ -274,5 +276,6 @@ def lexical_representation(session: Session, text: str) -> ClauseElement | str:
         from sqlalchemy import func
 
         return func.to_tsvector("english", text)
-    tokens = [token for token in text.lower().split() if token]
+    normalised = _NON_ALNUM_RE.sub(" ", text.lower())
+    tokens = [token for token in normalised.split() if token]
     return " ".join(tokens)
