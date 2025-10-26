@@ -16,6 +16,11 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import InstrumentedAttribute
 
 from theo.application.facades.telemetry import record_counter, record_histogram
+from theo.application.telemetry import (
+    DB_QUERY_ERROR_METRIC,
+    DB_QUERY_LATENCY_METRIC,
+    DB_QUERY_REQUESTS_METRIC,
+)
 
 T = TypeVar("T")
 
@@ -66,6 +71,7 @@ def query_with_monitoring(metric_name: str):
                 record_histogram(
                     f"{metric_name}.duration_seconds", value=duration
                 )
+                _record_db_query_metrics(metric_name, duration, status="success")
 
                 # Count results if it's a sequence
                 if isinstance(result, Sequence):
@@ -79,9 +85,26 @@ def query_with_monitoring(metric_name: str):
                 record_histogram(
                     f"{metric_name}.error_duration_seconds", value=duration
                 )
+                _record_db_query_metrics(metric_name, duration, status="error")
                 raise
         return wrapper
     return decorator
+
+
+def execute_with_metrics(session: Session, statement, metric_name: str):
+    """Execute a SQL statement while recording latency and error metrics."""
+
+    start_time = time.perf_counter()
+    try:
+        result = session.execute(statement)
+    except Exception:
+        duration = time.perf_counter() - start_time
+        _record_db_query_metrics(metric_name, duration, status="error")
+        raise
+
+    duration = time.perf_counter() - start_time
+    _record_db_query_metrics(metric_name, duration, status="success")
+    return result
 
 
 def batch_load(
@@ -112,8 +135,17 @@ def batch_load(
     return results
 
 
+def _record_db_query_metrics(metric_name: str, duration: float, *, status: str) -> None:
+    labels = {"query": metric_name, "status": status}
+    record_histogram(DB_QUERY_LATENCY_METRIC, value=duration, labels=labels)
+    record_counter(DB_QUERY_REQUESTS_METRIC, labels=labels)
+    if status == "error":
+        record_counter(DB_QUERY_ERROR_METRIC, labels={"query": metric_name})
+
+
 __all__ = [
     "with_eager_loading",
     "query_with_monitoring",
+    "execute_with_metrics",
     "batch_load",
 ]
