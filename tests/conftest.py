@@ -56,10 +56,12 @@ def _require_application_factory() -> None:
         pytest.skip(f"application factory unavailable: {reason}")
 
 
-if "fastapi" not in sys.modules:
+try:
+    import fastapi as _fastapi  # type: ignore  # noqa: F401
+except ModuleNotFoundError:
     fastapi_stub = types.ModuleType("fastapi")
     fastapi_stub.status = types.SimpleNamespace()
-    sys.modules["fastapi"] = fastapi_stub
+    sys.modules.setdefault("fastapi", fastapi_stub)
 
 
 if "pydantic" not in sys.modules:

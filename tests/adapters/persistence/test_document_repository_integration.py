@@ -3,11 +3,19 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import importlib
+import importlib.util
 import sys
 import types
 
-if "theo.domain.discoveries" not in sys.modules:
+try:
+    importlib.import_module("theo.domain.discoveries")
+except ModuleNotFoundError:
     mock_module = types.ModuleType("theo.domain.discoveries")
+    mock_module.__path__ = []  # mark as package for submodule imports
+    mock_module.__spec__ = importlib.util.spec_from_loader(
+        "theo.domain.discoveries", loader=None, is_package=True
+    )
 
     @dataclass
     class DocumentEmbedding:
