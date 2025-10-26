@@ -1,4 +1,7 @@
+from datetime import UTC, datetime
+
 from theo.domain.biblical_texts import (
+    AIAnalysis,
     BiblicalVerse,
     Language,
     MorphologicalTag,
@@ -58,7 +61,7 @@ def test_to_domain_parses_biblical_payload() -> None:
                 "critical_apparatus": [],
             },
             "ai_analysis": {
-                "generated_at": "2024-01-01T00:00:00+00:00",
+                "generated_at": "2024-01-01T00:00:00",
                 "model_version": "gpt-4",
                 "confidence_scores": {"morphology": 0.9},
             },
@@ -78,6 +81,28 @@ def test_to_domain_parses_biblical_payload() -> None:
     assert verse.manuscript_data.source == "WLC"
     assert verse.ai_analysis is not None
     assert verse.ai_analysis.model_version == "gpt-4"
+    assert verse.ai_analysis.generated_at.tzinfo is UTC
+
+
+def test_to_meta_payload_normalizes_naive_generated_at() -> None:
+    mapper = PassageMapper()
+    verse = BiblicalVerse(
+        reference=Reference("Genesis", 1, 1, "gen", "Gen.1.1"),
+        language=Language.ENGLISH,
+        text=TextContent(raw="In the beginning", normalized="In the beginning"),
+        ai_analysis=AIAnalysis(
+            generated_at=datetime(2024, 1, 1, 0, 0, 0),
+            model_version="gpt-4",
+            confidence_scores={"semantic": 0.8},
+        ),
+    )
+
+    payload = mapper.to_meta_payload(verse)
+
+    assert "ai_analysis" in payload
+    generated_at = payload["ai_analysis"]["generated_at"]
+    assert generated_at.startswith("2024-01-01T00:00:00")
+    assert generated_at.endswith("+00:00")
 
 
 def test_update_orm_merges_meta_and_text_fields() -> None:

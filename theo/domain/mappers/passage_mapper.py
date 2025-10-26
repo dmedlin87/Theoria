@@ -92,7 +92,11 @@ class PassageMapper:
             ai_dict = asdict(verse.ai_analysis)
             generated_at = ai_dict.get("generated_at")
             if isinstance(generated_at, datetime):
-                ai_dict["generated_at"] = generated_at.astimezone(UTC).isoformat()
+                if generated_at.tzinfo is None:
+                    normalized = generated_at.replace(tzinfo=UTC)
+                else:
+                    normalized = generated_at.astimezone(UTC)
+                ai_dict["generated_at"] = normalized.isoformat()
             payload["ai_analysis"] = ai_dict
 
         return payload
@@ -273,7 +277,10 @@ class PassageMapper:
         if candidate.endswith("Z"):
             candidate = candidate[:-1] + "+00:00"
         try:
-            return datetime.fromisoformat(candidate)
+            parsed = datetime.fromisoformat(candidate)
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=UTC)
+            return parsed
         except ValueError:
             return datetime.now(tz=UTC)
 
