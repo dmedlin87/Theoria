@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
+import sys
 from typing import Any, Iterable, Sequence
 
 from theo.application.reasoner.events import DocumentPersistedEvent
@@ -63,11 +65,15 @@ def emit_document_persisted_event(
 
 
 def _dispatch_neighborhood_event(payload: dict[str, Any]) -> None:
-    try:
-        from ..workers import tasks as worker_tasks
-    except ImportError:  # pragma: no cover - worker import optional in tests
-        LOGGER.debug("Workers unavailable; skipping neighborhood analytics dispatch")
-        return
+    module_name = "theo.services.api.app.workers.tasks"
+
+    worker_tasks = sys.modules.get(module_name)
+    if worker_tasks is None:
+        try:
+            worker_tasks = importlib.import_module(module_name)
+        except ImportError:  # pragma: no cover - worker import optional in tests
+            LOGGER.debug("Workers unavailable; skipping neighborhood analytics dispatch")
+            return
 
     task = getattr(worker_tasks, "update_neighborhood_analytics", None)
     if task is None:

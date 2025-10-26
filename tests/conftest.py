@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import gc
 import importlib
+import importlib.machinery as importlib_machinery
 import inspect
 import os
 import sys
@@ -11,6 +12,7 @@ import warnings
 from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+import types
 from unittest.mock import AsyncMock, patch
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
@@ -19,10 +21,138 @@ if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
     from tests.fixtures import RegressionDataFactory
 
 import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
 
-from tests.factories.application import isolated_application_container
+try:  # pragma: no cover - optional dependency for integration fixtures
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import Engine
+except ModuleNotFoundError:  # pragma: no cover - allows running lightweight suites
+    create_engine = None  # type: ignore[assignment]
+    text = None  # type: ignore[assignment]
+    Engine = object  # type: ignore[assignment]
+
+try:  # pragma: no cover - factory depends on optional domain extras
+    from tests.factories.application import isolated_application_container
+except ModuleNotFoundError as exc:  # pragma: no cover - light environments
+    isolated_application_container = None  # type: ignore[assignment]
+    _APPLICATION_FACTORY_IMPORT_ERROR = exc
+else:
+    _APPLICATION_FACTORY_IMPORT_ERROR: ModuleNotFoundError | None = None
+
+
+_SQLALCHEMY_AVAILABLE = create_engine is not None
+
+if not _SQLALCHEMY_AVAILABLE:
+
+    def _sqlalchemy_missing(*_args: object, **_kwargs: object):  # type: ignore[misc]
+        pytest.skip("sqlalchemy not installed")
+
+    create_engine = _sqlalchemy_missing  # type: ignore[assignment]
+    text = _sqlalchemy_missing  # type: ignore[assignment]
+
+
+def _require_application_factory() -> None:
+    if isolated_application_container is None:
+        reason = _APPLICATION_FACTORY_IMPORT_ERROR or ModuleNotFoundError("pythonbible")
+        pytest.skip(f"application factory unavailable: {reason}")
+
+
+if "fastapi" not in sys.modules:
+    fastapi_stub = types.ModuleType("fastapi")
+    fastapi_stub.status = types.SimpleNamespace()
+    sys.modules["fastapi"] = fastapi_stub
+
+
+if "pydantic" not in sys.modules:
+    class _BaseModel:
+        def __init__(self, **kwargs: Any) -> None:
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+        def model_dump(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            return dict(self.__dict__)
+
+    def Field(default: Any = None, **_kwargs: Any) -> Any:  # pragma: no cover
+        return default
+
+    class ValidationError(Exception):  # pragma: no cover - simple stub
+        pass
+
+    pydantic_stub = types.ModuleType("pydantic")
+    pydantic_stub.BaseModel = _BaseModel
+    pydantic_stub.Field = Field
+    pydantic_stub.ValidationError = ValidationError
+    pydantic_stub.ConfigDict = dict
+    sys.modules["pydantic"] = pydantic_stub
+
+
+if "sqlalchemy" not in sys.modules:
+    try:
+        import importlib
+
+        importlib.import_module("sqlalchemy")
+    except ModuleNotFoundError:
+        sqlalchemy_stub = types.ModuleType("sqlalchemy")
+
+        class _FuncProxy:
+            def __getattr__(self, name: str) -> Any:  # pragma: no cover - stub
+                raise NotImplementedError(f"sqlalchemy.func placeholder accessed for '{name}'")
+
+        def _raise(*_args: object, **_kwargs: object) -> None:  # pragma: no cover
+            raise NotImplementedError("sqlalchemy placeholder accessed")
+
+        sqlalchemy_stub.__path__ = []
+        sqlalchemy_stub.__spec__ = importlib_machinery.ModuleSpec(
+            "sqlalchemy", loader=None, is_package=True
+        )
+        sqlalchemy_stub.func = _FuncProxy()
+        sqlalchemy_stub.select = _raise
+        sqlalchemy_stub.create_engine = _raise
+        sqlalchemy_stub.text = lambda statement: statement
+
+        exc_module = types.ModuleType("sqlalchemy.exc")
+
+        class SQLAlchemyError(Exception):  # pragma: no cover - stub
+            pass
+
+        exc_module.SQLAlchemyError = SQLAlchemyError
+
+        orm_module = types.ModuleType("sqlalchemy.orm")
+
+        class Session:  # pragma: no cover - stub
+            def __init__(self, *_args: object, **_kwargs: object) -> None:
+                raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
+
+        orm_module.Session = Session
+
+        engine_module = types.ModuleType("sqlalchemy.engine")
+
+        class Engine:  # pragma: no cover - stub
+            pass
+
+        engine_module.Engine = Engine
+
+        sql_module = types.ModuleType("sqlalchemy.sql")
+        sql_module.__path__ = []
+        sql_module.__spec__ = importlib_machinery.ModuleSpec(
+            "sqlalchemy.sql", loader=None, is_package=True
+        )
+        elements_module = types.ModuleType("sqlalchemy.sql.elements")
+        elements_module.__spec__ = importlib_machinery.ModuleSpec(
+            "sqlalchemy.sql.elements", loader=None, is_package=True
+        )
+
+        class ClauseElement:  # pragma: no cover - stub
+            pass
+
+        elements_module.ClauseElement = ClauseElement
+        sql_module.elements = elements_module
+
+        sys.modules["sqlalchemy"] = sqlalchemy_stub
+        sys.modules["sqlalchemy.exc"] = exc_module
+        sys.modules["sqlalchemy.orm"] = orm_module
+        sys.modules["sqlalchemy.engine"] = engine_module
+        sys.modules["sqlalchemy.sql"] = sql_module
+        sys.modules["sqlalchemy.sql.elements"] = elements_module
 
 if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE"}:
     try:
@@ -198,6 +328,7 @@ def regression_factory():
 def application_container() -> Iterator[tuple["ApplicationContainer", "AdapterRegistry"]]:
     """Yield an isolated application container and backing registry."""
 
+    _require_application_factory()
     with isolated_application_container() as resources:
         yield resources
 
@@ -208,6 +339,7 @@ def optimized_application_container() -> Generator[
 ]:
     """Create the application container once per session for heavy suites."""
 
+    _require_application_factory()
     with isolated_application_container() as resources:
         yield resources
 
@@ -215,6 +347,8 @@ def optimized_application_container() -> Generator[
 @pytest.fixture
 def application_container_factory():
     """Provide a factory returning isolated application containers."""
+
+    _require_application_factory()
 
     def _factory(**overrides):
         return isolated_application_container(overrides=overrides or None)

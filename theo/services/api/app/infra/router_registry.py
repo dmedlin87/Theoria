@@ -23,7 +23,6 @@ from ..routes import (
     export,
     features,
     ingest,
-    jobs,
     notebooks,
     realtime,
     research,
@@ -49,7 +48,6 @@ if graphql_router is not None:
 _DEFAULT_REGISTRATIONS.extend(
     [
         RouterRegistration(router=ingest.router, prefix="/ingest", tags=("ingest",)),
-        RouterRegistration(router=jobs.router, prefix="/jobs", tags=("jobs",)),
         RouterRegistration(router=search.router, prefix="/search", tags=("search",)),
         RouterRegistration(router=export.router, prefix="/export", tags=("export",)),
         RouterRegistration(router=export.api_router, prefix=None, tags=("export",)),
@@ -115,6 +113,15 @@ _DEFAULT_REGISTRATIONS.extend(
         ),
     ]
 )
+
+try:
+    from ..routes import jobs  # noqa: WPS433 - optional dependency guard
+except Exception:  # pragma: no cover - exercised when Celery extras absent
+    jobs = None
+else:
+    _DEFAULT_REGISTRATIONS.append(
+        RouterRegistration(router=jobs.router, prefix="/jobs", tags=("jobs",))
+    )
 
 for _registration in _DEFAULT_REGISTRATIONS:
     register_router(_registration)

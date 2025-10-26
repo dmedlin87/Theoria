@@ -5,6 +5,8 @@ minimal environments.  When the third-party dependency is installed we defer to
 it so production code receives the full implementation.
 """Minimal WebVTT parser used for worker tests.
 
+Minimal WebVTT parser used for worker tests.
+
 The real :mod:`webvtt` dependency pulls in a number of optional packages.  The
 worker suites only rely on a tiny subset of its functionality (parsing timestamps
 and yielding caption entries), so we provide a lightweight pure-Python

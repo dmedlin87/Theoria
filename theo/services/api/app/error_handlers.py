@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 # Map domain errors to HTTP status codes
 ERROR_STATUS_MAP = {
     NotFoundError: status.HTTP_404_NOT_FOUND,
-    ValidationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    # FastAPI/Starlette deprecated HTTP_422_UNPROCESSABLE_ENTITY in favor of CONTENT
+    ValidationError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     AuthorizationError: status.HTTP_403_FORBIDDEN,
     ConflictError: status.HTTP_409_CONFLICT,
     RateLimitError: status.HTTP_429_TOO_MANY_REQUESTS,

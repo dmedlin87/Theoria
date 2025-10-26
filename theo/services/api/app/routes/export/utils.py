@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from fastapi import Request, status
 from fastapi.responses import Response
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ...errors import ExportError, Severity
 from ...export.formatters import DEFAULT_FILENAME_PREFIX
@@ -88,7 +88,9 @@ def fetch_documents_by_ids(
         )
 
     rows = session.execute(
-        select(Document).where(Document.id.in_(document_ids))
+        select(Document)
+        .options(selectinload(Document.passages))
+        .where(Document.id.in_(document_ids))
     ).scalars()
     document_index = {row.id: row for row in rows}
     missing = [doc_id for doc_id in document_ids if doc_id not in document_index]
