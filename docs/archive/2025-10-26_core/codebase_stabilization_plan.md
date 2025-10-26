@@ -1,3 +1,5 @@
+> **Archived on 2025-10-26**
+
 # Codebase Stabilization Plan
 
 ## Validated Context
