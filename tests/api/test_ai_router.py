@@ -589,7 +589,7 @@ def test_router_deduplicates_inflight_requests(monkeypatch, sleep_stub):
 
         ledger_wait_future = executor.submit(
             lambda: router._ledger.wait_for_inflight(
-                cache_key, poll_interval=0.01, timeout=2.0
+                cache_key, poll_interval=0.01, timeout=2.0, sleep_fn=sleep_stub
             )
         )
         assert error_observed.wait(timeout=1.0)
@@ -604,7 +604,7 @@ def test_router_deduplicates_inflight_requests(monkeypatch, sleep_stub):
     with router._ledger.transaction() as txn:
         txn.clear_single_inflight(cache_key)
     late_record = router._ledger.wait_for_inflight(
-        cache_key, poll_interval=0.01, timeout=1.0
+        cache_key, poll_interval=0.01, timeout=1.0, sleep_fn=sleep_stub
     )
     assert late_record.output == "shared-output"
     assert router.get_spend("primary") == pytest.approx(results[0].cost)
@@ -618,6 +618,7 @@ def test_router_deduplicates_inflight_requests(monkeypatch, sleep_stub):
         poll_interval=0.01,
         timeout=1.0,
         observed_updated_at=initial_updated_at,
+        sleep_fn=sleep_stub,
     )
     assert replayed_record.output == "shared-output"
 
@@ -729,7 +730,7 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(
     with router._ledger.transaction() as txn:
         txn.clear_single_inflight(cache_key)
     preserved_record = router._ledger.wait_for_inflight(
-        cache_key, poll_interval=0.01, timeout=1.0
+        cache_key, poll_interval=0.01, timeout=1.0, sleep_fn=sleep_stub
     )
     assert preserved_record.output == "shared-output"
 
@@ -742,6 +743,7 @@ def test_router_deduplicates_inflight_requests_handles_restart_error(
         poll_interval=0.01,
         timeout=1.0,
         observed_updated_at=initial_updated_at,
+        sleep_fn=sleep_stub,
     )
     assert replayed_record.output == "shared-output"
 
@@ -769,7 +771,7 @@ def test_wait_for_inflight_handles_transient_absence(tmp_path, sleep_stub):
                 entered.set()
         try:
             record = ledger.wait_for_inflight(
-                cache_key, poll_interval=0.01, timeout=2.0
+                cache_key, poll_interval=0.01, timeout=2.0, sleep_fn=sleep_stub
             )
             outputs.append(record.output)
         except Exception as exc:  # pragma: no cover - unexpected
@@ -825,7 +827,7 @@ def test_wait_for_inflight_recovers_from_transient_error(tmp_path, sleep_stub):
         entered_wait.set()
         try:
             record = ledger.wait_for_inflight(
-                cache_key, poll_interval=0.01, timeout=2.0
+                cache_key, poll_interval=0.01, timeout=2.0, sleep_fn=sleep_stub
             )
             outputs.append(record.output)
         except Exception as exc:  # pragma: no cover - unexpected
@@ -896,7 +898,7 @@ def test_wait_for_inflight_preserves_completed_output_after_restart_failure(
     def _waiter() -> None:
         try:
             record = ledger.wait_for_inflight(
-                cache_key, poll_interval=0.01, timeout=2.0
+                cache_key, poll_interval=0.01, timeout=2.0, sleep_fn=sleep_stub
             )
             outputs.append(record.output)
         except Exception as exc:  # pragma: no cover - unexpected
@@ -932,7 +934,7 @@ def test_wait_for_inflight_preserves_completed_output_after_restart_failure(
     assert outputs == ["shared-output"]
 
 
-def test_wait_for_inflight_replays_preserved_after_restart_for_new_waiter(tmp_path):
+def test_wait_for_inflight_replays_preserved_after_restart_for_new_waiter(tmp_path, sleep_stub):
     ledger_path = tmp_path / "restart-new-waiter.db"
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
@@ -956,11 +958,12 @@ def test_wait_for_inflight_replays_preserved_after_restart_for_new_waiter(tmp_pa
         cache_key,
         poll_interval=0.01,
         timeout=0.3,
+        sleep_fn=sleep_stub,
     )
     assert record.output == "shared-output"
 
 
-def test_wait_for_inflight_delivers_preserved_after_error_message(tmp_path):
+def test_wait_for_inflight_delivers_preserved_after_error_message(tmp_path, sleep_stub):
     ledger_path = tmp_path / "preserved-after-error.db"
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
@@ -989,6 +992,7 @@ def test_wait_for_inflight_delivers_preserved_after_error_message(tmp_path):
         cache_key,
         poll_interval=0.01,
         timeout=1.0,
+        sleep_fn=sleep_stub,
     )
     elapsed = time.perf_counter() - start
 
@@ -996,7 +1000,7 @@ def test_wait_for_inflight_delivers_preserved_after_error_message(tmp_path):
     assert elapsed < 0.5
 
 
-def test_wait_for_inflight_returns_empty_output(tmp_path):
+def test_wait_for_inflight_returns_empty_output(tmp_path, sleep_stub):
     ledger_path = tmp_path / "empty-output.db"
     ledger = SharedLedger(str(ledger_path))
     ledger.reset()
@@ -1015,7 +1019,7 @@ def test_wait_for_inflight_returns_empty_output(tmp_path):
         entered_wait.set()
         try:
             record = ledger.wait_for_inflight(
-                cache_key, poll_interval=0.01, timeout=2.0
+                cache_key, poll_interval=0.01, timeout=2.0, sleep_fn=sleep_stub
             )
             outputs.append(record.output)
         except Exception as exc:  # pragma: no cover - unexpected
@@ -1063,7 +1067,7 @@ def test_wait_for_inflight_waits_for_late_cache_write(tmp_path, sleep_stub):
         entered_wait.set()
         try:
             record = ledger.wait_for_inflight(
-                cache_key, poll_interval=0.01, timeout=2.0
+                cache_key, poll_interval=0.01, timeout=2.0, sleep_fn=sleep_stub
             )
             outputs.append(record.output)
         except Exception as exc:  # pragma: no cover - unexpected
@@ -1122,7 +1126,7 @@ def test_wait_for_inflight_handles_restart_requeue(tmp_path, sleep_stub):
         entered_wait.set()
         try:
             record = ledger.wait_for_inflight(
-                cache_key, poll_interval=0.01, timeout=2.0
+                cache_key, poll_interval=0.01, timeout=2.0, sleep_fn=sleep_stub
             )
             outputs.append(record.output)
         except Exception as exc:  # pragma: no cover - unexpected
