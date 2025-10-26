@@ -38,6 +38,7 @@ from ..models.research import (
     HypothesisUpdate,
     MorphologyResponse,
     MorphToken,
+    NoteEvidenceCreate,
     OverviewBullet,
     ReliabilityOverviewResponse,
     ReportBuildRequest,
