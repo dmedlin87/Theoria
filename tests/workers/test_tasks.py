@@ -79,20 +79,42 @@ from theo.services.api.app.models.export import (  # noqa: E402
 try:  # noqa: E402 - optional dependency fallback for lightweight profiling
     from theo.services.api.app.ai.rag import RAGCitation
 except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean environments
-    @dataclass(slots=True)
     class RAGCitation:
-        index: int
-        osis: str
-        anchor: str
+        """Flexible stand-in for the real citation model when RAG is unavailable."""
+
+        def __init__(
+            self,
+            *,
+            index: int = 0,
+            osis: str | None = None,
+            anchor: str | None = None,
+            **extra: Any,
+        ) -> None:
+            self.index = index
+            self.osis = osis or ""
+            self.anchor = anchor or ""
+            for key, value in extra.items():
+                setattr(self, key, value)
 
 try:  # noqa: E402 - optional dependency fallback for lightweight profiling
     from theo.services.api.app.models.ai import ChatMemoryEntry
 except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean environments
-    @dataclass(slots=True)
     class ChatMemoryEntry:
-        question: str | None = None
-        answer: str = ""
-        answer_summary: str | None = None
+        """Lightweight replacement for the Pydantic chat memory model."""
+
+        def __init__(
+            self,
+            *,
+            question: str | None = None,
+            answer: str = "",
+            answer_summary: str | None = None,
+            **extra: Any,
+        ) -> None:
+            self.question = question
+            self.answer = answer
+            self.answer_summary = answer_summary
+            for key, value in extra.items():
+                setattr(self, key, value)
 
         @classmethod
         def model_validate(cls, payload: dict[str, Any]) -> "ChatMemoryEntry":
@@ -115,13 +137,24 @@ except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean envi
             if exclude_none:
                 return {k: v for k, v in data.items() if v is not None}
             return data
-
-    @dataclass(slots=True)
     class HybridSearchResult:
-        document_id: str
-        passage_id: str
-        distance: float
-        title: str | None = None
+        """Fallback hybrid search result that accepts arbitrary metadata."""
+
+        def __init__(
+            self,
+            *,
+            document_id: str,
+            passage_id: str,
+            distance: float,
+            title: str | None = None,
+            **extra: Any,
+        ) -> None:
+            self.document_id = document_id
+            self.passage_id = passage_id
+            self.distance = distance
+            self.title = title
+            for key, value in extra.items():
+                setattr(self, key, value)
 from theo.services.api.app.workers import tasks  # noqa: E402
 
 
