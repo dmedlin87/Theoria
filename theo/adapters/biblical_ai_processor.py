@@ -118,13 +118,32 @@ Respond in JSON array format.
         
         try:
             morphology_data = json.loads(response.choices[0].message.content)
-            return [self._convert_to_morphological_tag(data) for data in morphology_data]
         except json.JSONDecodeError:
             return []
-    
-    def _convert_to_morphological_tag(self, data: Dict) -> MorphologicalTag:
+
+        if not isinstance(morphology_data, list):
+            return []
+
+        tags: List[MorphologicalTag] = []
+        for item in morphology_data:
+            if not isinstance(item, dict):
+                continue
+
+            tag = self._convert_to_morphological_tag(item)
+            if tag is not None:
+                tags.append(tag)
+
+        return tags
+
+    def _convert_to_morphological_tag(self, data: Dict) -> Optional[MorphologicalTag]:
         """Convert AI response data to MorphologicalTag object."""
-        
+
+        word = data.get("word")
+        lemma = data.get("lemma")
+
+        if not isinstance(word, str) or not isinstance(lemma, str):
+            return None
+
         raw_pos = data.get("pos", "noun")
         if isinstance(raw_pos, str):
             normalized_pos = raw_pos.strip().lower()
@@ -137,8 +156,8 @@ Respond in JSON array format.
             pos = POS.NOUN
         
         return MorphologicalTag(
-            word=data["word"],
-            lemma=data["lemma"],
+            word=word,
+            lemma=lemma,
             root=data.get("root"),
             pos=pos,
             gender=data.get("gender"),
