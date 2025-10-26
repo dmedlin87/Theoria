@@ -155,6 +155,21 @@ def test_document_query_returns_single_document(api_engine, graphql_app_setup):
     assert data["document"]["metadata"]["source"] == "tests"
 
 
+def test_document_query_unknown_id_returns_none(api_engine, graphql_app_setup):
+    data = _execute_graphql(
+        """
+        query Document($id: ID!) {
+          document(id: $id) {
+            id
+          }
+        }
+        """,
+        {"id": "missing"},
+    )
+
+    assert data["document"] is None
+
+
 def test_passage_query_returns_verses(api_engine, graphql_app_setup):
     data = _execute_graphql(
         """
@@ -171,6 +186,24 @@ def test_passage_query_returns_verses(api_engine, graphql_app_setup):
 
     verse = data["passage"][0]
     assert verse["osis"] == "John.3.16"
+    assert verse["text"].startswith("For God so loved")
+
+
+def test_passage_query_respects_translation_argument(api_engine, graphql_app_setup):
+    data = _execute_graphql(
+        """
+        query PassageWithTranslation($osis: String!, $translation: String!) {
+          passage(osis: $osis, translation: $translation) {
+            translation
+            text
+          }
+        }
+        """,
+        {"osis": "John.3.16", "translation": "KJV"},
+    )
+
+    verse = data["passage"][0]
+    assert verse["translation"] == "KJV"
     assert verse["text"].startswith("For God so loved")
 
 
@@ -191,6 +224,57 @@ def test_insights_query_flattens_overview(api_engine, graphql_app_setup):
     insights = data["insights"]
     assert {insight["category"] for insight in insights} == {"consensus", "manuscript"}
     assert insights[0]["citations"]
+
+
+def test_insights_query_includes_disputed_and_tracks_mode(
+    api_engine, graphql_app_setup, monkeypatch
+):
+    research_service = graphql_app_setup["research_service"]
+    existing = research_service.overview
+    disputed_bullet = OverviewBullet(summary="Challenged reading", citations=("Source",))
+    enriched_overview = ReliabilityOverview(
+        osis=existing.osis,
+        mode=existing.mode,
+        consensus=existing.consensus,
+        disputed=existing.disputed + (disputed_bullet,),
+        manuscripts=existing.manuscripts,
+    )
+    monkeypatch.setattr(research_service, "overview", enriched_overview)
+
+    captured: dict[str, str | None] = {}
+
+    def capture_build_overview(
+        self,
+        *,
+        osis: str,
+        mode: str | None = None,
+        note_limit: int = 3,
+        manuscript_limit: int = 3,
+    ) -> ReliabilityOverview:
+        captured["mode"] = mode
+        return self.overview
+
+    monkeypatch.setattr(_FakeResearchService, "build_reliability_overview", capture_build_overview)
+
+    data = _execute_graphql(
+        """
+        query InsightsWithMode($osis: String!, $mode: String) {
+          insights(osis: $osis, mode: $mode) {
+            category
+            summary
+          }
+        }
+        """,
+        {"osis": "John.3.16", "mode": "skeptical"},
+    )
+
+    insights = data["insights"]
+    assert {insight["category"] for insight in insights} == {
+        "consensus",
+        "disputed",
+        "manuscript",
+    }
+    assert captured["mode"] == "skeptical"
 
 
 def test_ingest_document_mutation_invokes_container(api_engine, graphql_app_setup):
