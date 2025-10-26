@@ -210,6 +210,22 @@ def test_api_key_allows_access(api_client, method: str, path: str, kwargs: dict[
         path, headers={"X-API-Key": "valid-key"}, **kwargs
     )
     assert response.status_code == 200
+    payload = response.json()
+
+    if path == "/ingest/url":
+        assert payload["document_id"] == "doc-1"
+        assert payload["status"] == "processed"
+    elif path == "/ai/llm":
+        assert isinstance(payload["models"], list)
+        assert "default_model" in payload
+    elif path == "/ai/digest":
+        assert "generated_at" in payload
+        assert isinstance(payload["topics"], list)
+    elif path == "/documents":
+        assert isinstance(payload["items"], list)
+        assert payload["total"] == 0
+    elif path == "/jobs":
+        assert isinstance(payload["jobs"], list)
 
 
 def test_hs256_jwt_allows_access(api_client):
