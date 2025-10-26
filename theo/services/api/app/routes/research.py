@@ -38,7 +38,7 @@ from ..models.research import (
     HypothesisUpdate,
     MorphologyResponse,
     MorphToken,
-    NoteEvidenceCreate,
+    NoteEvidenceCreate,  # required for note evidence payload conversion
     OverviewBullet,
     ReliabilityOverviewResponse,
     ReportBuildRequest,
