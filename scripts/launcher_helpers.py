@@ -191,7 +191,7 @@ def check_prereqs(args: argparse.Namespace) -> None:
 def ensure_crypto_available() -> None:
     if x509 is None or rsa is None:
         raise RuntimeError(
-            "The 'cryptography' package is required to generate certificates. Install dependencies with 'pip install .[dev] -c constraints/dev.txt'."
+            "The 'cryptography' package is required to generate certificates. Install dependencies with 'pip install .[dev] -c constraints/dev-constraints.txt'."
         )
 
 

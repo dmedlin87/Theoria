@@ -13,9 +13,11 @@ Thank you for investing time into Theoria! This guide captures the current devel
    ```bash
    python3.11 -m venv .venv
    source .venv/bin/activate
-   pip install ".[api]" -c constraints/api.txt
-   pip install ".[ml]" -c constraints/ml.txt
-   pip install ".[dev]" -c constraints/dev.txt  # tooling (e.g., mypy) and stub packages
+   pip install ".[api]" -c constraints/api-constraints.txt
+   pip install ".[ml]" -c constraints/ml-constraints.txt
+   pip install ".[dev]" -c constraints/dev-constraints.txt  # tooling (e.g., mypy) and stub packages
+
+After editing dependency ranges in `pyproject.toml`, regenerate the constraint lockfiles via `python scripts/update_constraints.py` and commit the results. Use `python scripts/update_constraints.py --check` locally or in CI to ensure constraints stay in sync.
    ```
 2. Install web dependencies:
    ```bash

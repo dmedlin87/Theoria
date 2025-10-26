@@ -10,9 +10,9 @@ RUN apt-get update \
 
 RUN python3 -m venv .venv \
     && ./.venv/bin/pip install --upgrade pip \
-    && ./.venv/bin/pip install ".[api]" -c constraints/api.txt \
-    && ./.venv/bin/pip install ".[ml]" -c constraints/ml.txt \
-    && ./.venv/bin/pip install ".[dev]" -c constraints/dev.txt \
+    && ./.venv/bin/pip install ".[api]" -c constraints/api-constraints.txt \
+    && ./.venv/bin/pip install ".[ml]" -c constraints/ml-constraints.txt \
+    && ./.venv/bin/pip install ".[dev]" -c constraints/dev-constraints.txt \
     && npm install --prefix theo/services/web
 
 EXPOSE 8000 8100 3000 3300 9101
