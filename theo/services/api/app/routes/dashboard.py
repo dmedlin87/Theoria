@@ -120,70 +120,70 @@ def _count_total(session: Session, model) -> int:
 def _collect_activities(session: Session, limit: int = 8) -> list[DashboardActivity]:
     """Gather a blended feed from recent domain artefacts."""
 
-    activities: list[DashboardActivity] = []
+    activity_entries: list[DashboardActivity] = []
 
     document_rows = session.execute(
         select(models.Document).order_by(models.Document.created_at.desc()).limit(limit)
     ).scalars()
-    for document in document_rows:
-        activities.append(
-            DashboardActivity(
-                id=f"document-{document.id}",
-                type="document_ingested",
-                title=document.title or "Document uploaded",
-                description=document.collection,
-                occurred_at=document.created_at,
-                href=f"/doc/{document.id}",
-            )
+    activity_entries.extend(
+        DashboardActivity(
+            id=f"document-{document.id}",
+            type="document_ingested",
+            title=document.title or "Document uploaded",
+            description=document.collection,
+            occurred_at=document.created_at,
+            href=f"/doc/{document.id}",
         )
+        for document in document_rows
+    )
 
     note_rows = session.execute(
         select(models.ResearchNote).order_by(models.ResearchNote.created_at.desc()).limit(limit)
     ).scalars()
-    for note in note_rows:
-        activities.append(
-            DashboardActivity(
-                id=f"note-{note.id}",
-                type="note_created",
-                title=note.title or note.osis,
-                description=(note.stance or note.claim_type),
-                occurred_at=note.created_at,
-                href=f"/research/notes/{note.id}",
-            )
+    activity_entries.extend(
+        DashboardActivity(
+            id=f"note-{note.id}",
+            type="note_created",
+            title=note.title or note.osis,
+            description=(note.stance or note.claim_type),
+            occurred_at=note.created_at,
+            href=f"/research/notes/{note.id}",
         )
+        for note in note_rows
+    )
 
     discovery_rows = session.execute(
         select(models.Discovery).order_by(models.Discovery.created_at.desc()).limit(limit)
     ).scalars()
-    for discovery in discovery_rows:
-        activities.append(
-            DashboardActivity(
-                id=f"discovery-{discovery.id}",
-                type="discovery_published",
-                title=discovery.title,
-                description=discovery.description,
-                occurred_at=discovery.created_at,
-                href="/discoveries",
-            )
+    activity_entries.extend(
+        DashboardActivity(
+            id=f"discovery-{discovery.id}",
+            type="discovery_published",
+            title=discovery.title,
+            description=discovery.description,
+            occurred_at=discovery.created_at,
+            href="/discoveries",
         )
+        for discovery in discovery_rows
+    )
 
     notebook_rows = session.execute(
         select(models.Notebook).order_by(models.Notebook.updated_at.desc()).limit(limit)
     ).scalars()
-    for notebook in notebook_rows:
-        activities.append(
-            DashboardActivity(
-                id=f"notebook-{notebook.id}",
-                type="notebook_updated",
-                title=notebook.title,
-                description=notebook.description,
-                occurred_at=notebook.updated_at,
-                href=f"/notebooks/{notebook.id}",
-            )
+    activity_entries.extend(
+        DashboardActivity(
+            id=f"notebook-{notebook.id}",
+            type="notebook_updated",
+            title=notebook.title,
+            description=notebook.description,
+            occurred_at=notebook.updated_at,
+            href=f"/notebooks/{notebook.id}",
         )
+        for notebook in notebook_rows
+    )
 
-    activities.sort(key=lambda item: item.occurred_at, reverse=True)
-    return activities[:limit]
+    activity_entries.sort(key=lambda item: item.occurred_at, reverse=True)
+    return activity_entries[:limit]
 
 
 def _quick_actions() -> list[DashboardQuickAction]:
