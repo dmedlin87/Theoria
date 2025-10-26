@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import itertools
 import json
 import logging
 import time
@@ -211,10 +210,14 @@ def rebuild_embeddings_cmd(
 
     try:
         _, registry = resolve_application()
-        engine = registry.resolve("engine")
+        service = registry.resolve("embedding_rebuild_service")
     except Exception as exc:  # pragma: no cover - defensive
         raise click.ClickException(f"Failed to resolve application: {exc}") from exc
 
+    if not isinstance(service, EmbeddingRebuildService):
+        raise click.ClickException("Embedding rebuild service unavailable")
+
+    batch_size = 64 if fast else 128
     config = EmbeddingRebuildConfig.for_mode(fast=fast)
     batch_size = config.initial_batch_size
     embedding_service = get_embedding_service()
@@ -226,7 +229,7 @@ def rebuild_embeddings_cmd(
     total = 0
 
     normalized_changed_since = _normalise_timestamp(changed_since)
-    ids: list[str] | None = None
+    ids: Sequence[str] | None = None
     if ids_file is not None:
         ids = _load_ids(ids_file)
         if not ids:
@@ -263,6 +266,73 @@ def rebuild_embeddings_cmd(
             except FileNotFoundError:
                 pass
     processed = int(checkpoint_state.get("processed", 0)) if checkpoint_state else 0
+
+    metadata = {
+        "fast": fast,
+        "changed_since": normalized_changed_since.isoformat()
+        if normalized_changed_since
+        else None,
+        "ids_file": str(ids_file) if ids_file else None,
+        "ids_count": len(ids) if ids else None,
+        "resume": resume,
+    }
+
+    checkpoint_written = False
+
+    def _on_start(start: EmbeddingRebuildStart) -> None:
+        if start.missing_ids:
+            click.echo(
+                f"{len(start.missing_ids)} passage ID(s) were not found and will be skipped."
+            )
+        if start.total == 0:
+            click.echo("No passages require embedding updates.")
+        else:
+            click.echo(
+                f"Rebuilding embeddings for {start.total} passage(s) "
+                f"using batch size {batch_size}."
+            )
+
+    def _on_progress(progress: EmbeddingRebuildProgress) -> None:
+        nonlocal checkpoint_written
+        click.echo(
+            f"Batch {progress.batch_index}: updated {progress.state.processed}/"
+            f"{progress.state.total} passages in {progress.batch_duration:.2f}s "
+            f"({progress.rate_per_passage:.3f}s/pass)"
+        )
+        if checkpoint_file is not None:
+            _write_checkpoint(
+                checkpoint_file,
+                processed=progress.state.processed,
+                total=progress.state.total,
+                last_id=progress.state.last_id,
+                metadata=dict(progress.state.metadata),
+            )
+            checkpoint_written = True
+
+    options = EmbeddingRebuildOptions(
+        fast=fast,
+        batch_size=batch_size,
+        changed_since=normalized_changed_since,
+        ids=ids,
+        skip_count=skip_count,
+        metadata=metadata,
+        clear_cache=no_cache,
+    )
+
+    try:
+        result: EmbeddingRebuildResult = service.rebuild_embeddings(
+            options,
+            on_start=_on_start,
+            on_progress=_on_progress,
+        )
+    except EmbeddingRebuildError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if result.total == 0:
+        return
+
+    if checkpoint_file is not None and checkpoint_written:
+        click.echo(f"Checkpoint written to {checkpoint_file}")
 
     where_clause = Passage.embedding.is_(None) if fast else None
 
@@ -681,7 +751,8 @@ def rebuild_embeddings_cmd(
 
     duration = time.perf_counter() - start
     click.echo(
-        f"Completed embedding rebuild for {processed} passage(s) in {duration:.2f}s."
+        f"Completed embedding rebuild for {result.processed} passage(s) "
+        f"in {result.duration:.2f}s."
     )
 
 

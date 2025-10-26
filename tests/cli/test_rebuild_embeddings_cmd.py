@@ -16,6 +16,15 @@ import importlib.machinery as importlib_machinery
 import pytest
 from click.testing import CliRunner
 
+from theo.application.embeddings import (
+    EmbeddingRebuildError,
+    EmbeddingRebuildOptions,
+    EmbeddingRebuildProgress,
+    EmbeddingRebuildResult,
+    EmbeddingRebuildService,
+    EmbeddingRebuildStart,
+    EmbeddingRebuildState,
+)
 try:  # pragma: no cover - optional dependency in lightweight test runs
     from sqlalchemy.exc import SQLAlchemyError
 except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
@@ -339,231 +348,64 @@ from theo.checkpoints import CURRENT_EMBEDDING_CHECKPOINT_VERSION
 from theo.cli import cli, rebuild_embeddings_cmd
 
 
-@dataclass
-class FakePassageRow:
-    id: str
-    text: str
-    embedding: list[float] | None
-    document_updated_at: datetime | None = None
+class StubEmbeddingRebuildService(EmbeddingRebuildService):
+    def __init__(self) -> None:
+        self.calls: list[EmbeddingRebuildOptions] = []
+        self.progress_events: list[EmbeddingRebuildProgress] = []
+        self.start_events: list[EmbeddingRebuildStart] = []
+        self.result = EmbeddingRebuildResult(
+            processed=1,
+            total=1,
+            duration=0.5,
+            missing_ids=[],
+            metadata={},
+        )
+
+    # type: ignore[override]
+    def rebuild_embeddings(
+        self,
+        options: EmbeddingRebuildOptions,
+        *,
+        on_start=None,
+        on_progress=None,
+    ) -> EmbeddingRebuildResult:
+        self.calls.append(options)
+        if on_start is not None:
+            start = EmbeddingRebuildStart(total=1, missing_ids=[], skip_count=0)
+            self.start_events.append(start)
+            on_start(start)
+        if on_progress is not None:
+            state = EmbeddingRebuildState(
+                processed=1,
+                total=1,
+                last_id="p1",
+                metadata=options.metadata,
+            )
+            progress = EmbeddingRebuildProgress(
+                batch_index=1,
+                batch_size=1,
+                batch_duration=0.1,
+                rate_per_passage=0.1,
+                state=state,
+            )
+            self.progress_events.append(progress)
+            on_progress(progress)
+        return self.result
 
 
-class FakeCriterion:
-    def __init__(self, op: str, getter, value: Any) -> None:
-        self.op = op
-        self.getter = getter
-        self.value = value
-
-
-class FakeColumn:
-    def __init__(self, name: str, getter) -> None:
-        self.name = name
-        self.getter = getter
-
-    def in_(self, values: Iterable[str]) -> "FakeCriterion":
-        return FakeCriterion("in", self.getter, tuple(values))
-
-    def is_(self, value: Any) -> "FakeCriterion":
-        return FakeCriterion("is", self.getter, value)
-
-    def __ge__(self, other: Any) -> "FakeCriterion":
-        return FakeCriterion("ge", self.getter, other)
-
-
-class FakePassageModel:
-    id = FakeColumn("id", lambda row: row.id)
-    embedding = FakeColumn("embedding", lambda row: row.embedding)
-
-
-class FakeDocumentModel:
-    updated_at = FakeColumn(
-        "document_updated_at", lambda row: getattr(row, "document_updated_at", None)
-    )
-
-
-class FakeFunc:
-    def count(self, column: FakeColumn) -> tuple[str, FakeColumn]:
-        return ("count", column)
-
-
-class FakeSelect:
-    def __init__(self, mode: str, column: FakeColumn | None = None) -> None:
-        self.mode = mode
-        self.column = column
-        self.filters: list[FakeCriterion] = []
-        self.order_getter = None
-        self.execution_kwargs: dict[str, Any] = {}
-
-    def select_from(self, _entity: object) -> "FakeSelect":
-        return self
-
-    def where(self, criterion: FakeCriterion) -> "FakeSelect":
-        self.filters.append(criterion)
-        return self
-
-    def join(self, _entity: object) -> "FakeSelect":
-        return self
-
-    def order_by(self, column: FakeColumn) -> "FakeSelect":
-        self.order_getter = column.getter
-        return self
-
-    def execution_options(self, **kwargs: Any) -> "FakeSelect":
-        self.execution_kwargs.update(kwargs)
-        return self
-
-
-def fake_select(target: object) -> FakeSelect:
-    if isinstance(target, tuple) and target and target[0] == "count":
-        return FakeSelect("count")
-    if isinstance(target, FakeColumn):
-        return FakeSelect("ids", column=target)
-    if target is FakePassageModel:
-        return FakeSelect("passages")
-    raise AssertionError(f"Unexpected select target: {target!r}")
-
-
-class FakeResult:
-    def __init__(self, values: List[Any]) -> None:
-        self._values = values
-
-    def scalar_one(self) -> Any:
-        if not self._values:
-            raise AssertionError("No scalar available")
-        return self._values[0]
-
-    def scalars(self) -> Iterable[Any]:
-        return iter(self._values)
+class FailingEmbeddingRebuildService(StubEmbeddingRebuildService):
+    def rebuild_embeddings(self, *args: Any, **kwargs: Any) -> EmbeddingRebuildResult:
+        raise EmbeddingRebuildError("boom")
 
 
 class FakeRegistry:
-    def __init__(self, engine: object) -> None:
-        self.engine = engine
-        self.resolved: list[str] = []
+    def __init__(self, service: EmbeddingRebuildService) -> None:
+        self.service = service
 
-    def resolve(self, name: str) -> object:
-        self.resolved.append(name)
-        if name != "engine":
-            raise KeyError(name)
-        return self.engine
-
-
-class FakeEmbeddingService:
-    def __init__(self) -> None:
-        self.embed_calls: list[tuple[list[str], int]] = []
-        self._responses: list[list[list[float]]] = []
-
-    def queue_response(self, vectors: list[list[float]]) -> None:
-        self._responses.append(vectors)
-
-    def embed(self, texts: list[str], *, batch_size: int) -> list[list[float]]:
-        self.embed_calls.append((list(texts), batch_size))
-        if self._responses:
-            return self._responses.pop(0)
-        return [[float(idx)] for idx, _ in enumerate(texts)]
-
-
-class FakeSession:
-    def __init__(self, env: "FakeCLIEnvironment") -> None:
-        self.env = env
-        self.bulk_updates: list[list[dict[str, Any]]] = []
-        self.commits = 0
-        self.rollback_called = False
-
-    def __enter__(self) -> "FakeSession":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[override]
-        return None
-
-    def execute(self, stmt: FakeSelect) -> FakeResult:
-        filtered = self._apply_filters(stmt.filters)
-        if stmt.mode == "count":
-            return FakeResult([len(filtered)])
-        if stmt.mode == "ids":
-            assert stmt.column is not None
-            values = [stmt.column.getter(row) for row in filtered]
-            return FakeResult(values)
-        if stmt.mode == "passages":
-            items = list(filtered)
-            if stmt.order_getter is not None:
-                items.sort(key=stmt.order_getter)
-            return FakeResult(items)
-        raise AssertionError(f"Unknown select mode: {stmt.mode}")
-
-    def bulk_update_mappings(self, _model: object, payload: list[dict[str, Any]]) -> None:
-        self.bulk_updates.append(payload)
-        for entry in payload:
-            for row in self.env.passages:
-                if row.id == entry["id"]:
-                    row.embedding = entry.get("embedding")
-                    break
-
-    def commit(self) -> None:
-        self.commits += 1
-
-    def rollback(self) -> None:
-        self.rollback_called = True
-
-    def _apply_filters(self, filters: list[FakeCriterion]) -> list[FakePassageRow]:
-        items = self.env.passages
-        for criterion in filters:
-            items = [row for row in items if self._match(row, criterion)]
-        return items
-
-    @staticmethod
-    def _match(row: FakePassageRow, criterion: FakeCriterion) -> bool:
-        value = criterion.getter(row)
-        if criterion.op == "is":
-            if criterion.value is None:
-                return value is None
-            return value is criterion.value
-        if criterion.op == "in":
-            return value in criterion.value
-        if criterion.op == "ge":
-            if value is None:
-                return False
-            return value >= criterion.value
-        raise AssertionError(f"Unsupported criterion: {criterion.op}")
-
-
-class FakeCLIEnvironment:
-    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        self.passages: list[FakePassageRow] = []
-        self.embedding_service = FakeEmbeddingService()
-        self.clear_cache_called = False
-        self.registry = FakeRegistry(object())
-
-        monkeypatch.setattr("theo.cli.resolve_application", self._resolve_application)
-        monkeypatch.setattr("theo.cli.Session", lambda _engine: FakeSession(self))
-        monkeypatch.setattr("theo.cli.get_embedding_service", lambda: self.embedding_service)
-        monkeypatch.setattr("theo.cli.clear_embedding_cache", self._clear_embedding_cache)
-        monkeypatch.setattr("theo.cli.select", fake_select)
-        monkeypatch.setattr("theo.cli.func", FakeFunc())
-        monkeypatch.setattr("theo.cli.Passage", FakePassageModel)
-        monkeypatch.setattr("theo.cli.Document", FakeDocumentModel)
-
-    def _resolve_application(self) -> tuple[object, FakeRegistry]:
-        return object(), self.registry
-
-    def _clear_embedding_cache(self) -> None:
-        self.clear_cache_called = True
-
-    def add_passage(
-        self,
-        *,
-        id: str,
-        text: str,
-        embedding: list[float] | None = None,
-        document_updated_at: datetime | None = None,
-    ) -> FakePassageRow:
-        row = FakePassageRow(
-            id=id,
-            text=text,
-            embedding=embedding,
-            document_updated_at=document_updated_at,
-        )
-        self.passages.append(row)
-        return row
+    def resolve(self, name: str) -> EmbeddingRebuildService:
+        if name != "embedding_rebuild_service":  # pragma: no cover - defensive
+            raise LookupError(name)
+        return self.service
 
 
 @pytest.fixture()
@@ -571,6 +413,11 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
+def _patch_registry(monkeypatch: pytest.MonkeyPatch, service: EmbeddingRebuildService) -> None:
+    def _resolve_application() -> tuple[object, FakeRegistry]:
+        return object(), FakeRegistry(service)
+
+    monkeypatch.setattr("theo.cli.resolve_application", _resolve_application)
 def test_rebuild_embeddings_fast_ids_checkpoint(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -647,10 +494,12 @@ def test_rebuild_embeddings_resume_from_checkpoint(
         encoding="utf-8",
     )
 
-    result = runner.invoke(
-        rebuild_embeddings_cmd,
-        ["--checkpoint-file", str(checkpoint_path), "--resume"],
-    )
+
+def test_cli_rebuild_embeddings_invokes_service(monkeypatch: pytest.MonkeyPatch, runner: CliRunner) -> None:
+    service = StubEmbeddingRebuildService()
+    _patch_registry(monkeypatch, service)
+
+    result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
 
     assert result.exit_code == 0, result.output
     assert "Resuming from checkpoint" in result.output
@@ -732,16 +581,27 @@ def test_rebuild_embeddings_clears_cache_when_requested(
     result = runner.invoke(rebuild_embeddings_cmd, ["--no-cache", "--fast"])
 
     assert result.exit_code == 0, result.output
-    assert env.clear_cache_called is True
+    assert "Rebuilding embeddings for 1 passage(s)" in result.output
+    assert "Batch 1: updated 1/1 passages" in result.output
     assert "Completed embedding rebuild for 1 passage(s)" in result.output
+    assert service.calls
 
 
+def test_cli_handles_checkpoint_resume(monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path) -> None:
+    service = StubEmbeddingRebuildService()
+    _patch_registry(monkeypatch, service)
 def test_cli_help_lists_rebuild_command(runner: CliRunner, cli) -> None:
     result = runner.invoke(cli, ["--help"])
     assert result.exit_code == 0
     assert "rebuild_embeddings" in result.output
 
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text(json.dumps({"processed": 2}), encoding="utf-8")
 
+    result = runner.invoke(
+        rebuild_embeddings_cmd,
+        ["--checkpoint-file", str(checkpoint), "--resume"],
+    )
 def test_rebuild_embeddings_invalid_changed_since_format(
     runner: CliRunner, rebuild_embeddings_cmd
 ) -> None:
@@ -749,6 +609,13 @@ def test_rebuild_embeddings_invalid_changed_since_format(
     assert result.exit_code == 2
     assert "Invalid value for '--changed-since'" in result.output
 
+    assert result.exit_code == 0, result.output
+    assert "Resuming from checkpoint" in result.output
+    payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert payload["processed"] == 1
+    assert payload["total"] == 1
+    assert payload["last_id"] == "p1"
+    assert "Checkpoint written" in result.output
 
 def test_rebuild_embeddings_requires_existing_ids_file(
     runner: CliRunner, tmp_path: Path, rebuild_embeddings_cmd
@@ -758,6 +625,12 @@ def test_rebuild_embeddings_requires_existing_ids_file(
     assert result.exit_code == 2
     assert "Invalid value for '--ids-file'" in result.output
 
+def test_cli_handles_empty_ids_file(monkeypatch: pytest.MonkeyPatch, runner: CliRunner, tmp_path: Path) -> None:
+    service = StubEmbeddingRebuildService()
+    _patch_registry(monkeypatch, service)
+
+    ids_file = tmp_path / "ids.txt"
+    ids_file.write_text("\n\n", encoding="utf-8")
 
 def test_rebuild_embeddings_handles_empty_ids_file(
     monkeypatch: pytest.MonkeyPatch,
@@ -838,15 +711,16 @@ def test_rebuild_embeddings_changed_since_filters_passages(
     checkpoint = tmp_path / "checkpoint.json"
     result = runner.invoke(
         rebuild_embeddings_cmd,
-        [
-            "--changed-since",
-            "2024-02-01T00:00:00",
-            "--checkpoint-file",
-            str(checkpoint),
-        ],
+        ["--ids-file", str(ids_file)],
     )
 
     assert result.exit_code == 0, result.output
+    assert "No passage IDs were found" in result.output
+
+
+def test_cli_handles_service_error(monkeypatch: pytest.MonkeyPatch, runner: CliRunner) -> None:
+    service = FailingEmbeddingRebuildService()
+    _patch_registry(monkeypatch, service)
     assert len(env.embedding_service.embed_calls) == 1
     assert env.embedding_service.embed_calls[0][0] == ["Recent", "Latest"]
     checkpoint_data = json.loads(checkpoint.read_text(encoding="utf-8"))
@@ -890,6 +764,8 @@ def test_rebuild_embeddings_handles_application_resolution_failure(
     result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
 
     assert result.exit_code == 1
+    assert "boom" in result.output
+
     assert "Failed to resolve application" in result.output
 
 
@@ -927,6 +803,10 @@ def test_rebuild_embeddings_handles_session_initialisation_error(
     assert result.exit_code == 1
     assert isinstance(result.exception, SQLAlchemyError)
 
+def test_cli_help_lists_rebuild_command(runner: CliRunner) -> None:
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "rebuild_embeddings" in result.output
 
 def test_rebuild_embeddings_reports_embedding_backend_failure(
     monkeypatch: pytest.MonkeyPatch,
@@ -936,15 +816,17 @@ def test_rebuild_embeddings_reports_embedding_backend_failure(
     env = FakeCLIEnvironment(monkeypatch)
     env.add_passage(id="p1", text="Only", embedding=None)
 
-    def _raise(_texts: list[str], *, batch_size: int) -> list[list[float]]:
-        raise RuntimeError("backend offline")
+def test_cli_handles_application_resolution_failure(monkeypatch: pytest.MonkeyPatch, runner: CliRunner) -> None:
+    def _fail() -> tuple[object, object]:
+        raise RuntimeError("boom")
 
-    monkeypatch.setattr(env.embedding_service, "embed", _raise)
+    monkeypatch.setattr("theo.cli.resolve_application", _fail)
 
     result = runner.invoke(rebuild_embeddings_cmd, ["--fast"])
 
     assert result.exit_code == 1
-    assert "Embedding generation failed" in result.output
+    assert "Failed to resolve application" in result.output
+    
 
 
 def test_rebuild_embeddings_resume_with_missing_checkpoint(
