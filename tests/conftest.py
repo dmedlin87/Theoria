@@ -9,6 +9,7 @@ import sys
 from collections.abc import Generator, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
     from theo.adapters import AdapterRegistry
@@ -299,6 +300,7 @@ def pytest_collection_modifyitems(
                     )
                 )
 
+
 POSTGRES_IMAGE = os.environ.get("PYTEST_PGVECTOR_IMAGE", "ankane/pgvector:0.5.2")
 
 
@@ -476,3 +478,15 @@ def _set_database_url_env(
             os.environ.pop("DATABASE_URL", None)
         else:
             os.environ["DATABASE_URL"] = previous
+
+
+@pytest.fixture(autouse=True)
+def mock_sleep(request):
+    if "allow_sleep" in request.keywords:
+        # Don't mock sleep for tests marked with @pytest.mark.allow_sleep
+        yield
+        return
+
+    with patch("time.sleep", return_value=None):
+        with patch("asyncio.sleep", new=AsyncMock()):
+            yield
