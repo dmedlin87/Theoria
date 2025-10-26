@@ -246,7 +246,6 @@ def test_create_app_installs_routes_and_middlewares(
     assert response.headers["x-trace-id"] == "trace-123"
     assert patched_app_environment.principal_calls == [
         (None, "test-key"),
-        (None, "test-key"),
     ]
 
     error_response = client.get("/demo/boom", headers={"X-API-Key": "test-key"})
@@ -256,6 +255,11 @@ def test_create_app_installs_routes_and_middlewares(
     assert payload["error"]["hint"] == "Try again"
     assert payload["trace_id"] == "trace-123"
     assert error_response.headers["x-trace-id"] == "trace-123"
+
+    assert patched_app_environment.principal_calls == [
+        (None, "test-key"),
+        (None, "test-key"),
+    ]
 
     middleware_names = {middleware.cls.__name__ for middleware in app.user_middleware}
     assert "ErrorReportingMiddleware" in middleware_names
