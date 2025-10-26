@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from theo.domain.mappers import PassageMapper
 from theo.services.api.app.persistence_models import (
     Document,
     DocumentAnnotation,
@@ -26,17 +27,30 @@ from ..models.documents import (
 from .annotations import annotation_to_schema, prepare_annotation_body
 
 
+_PASSAGE_MAPPER = PassageMapper()
+
+
 def _passage_to_schema(passage: Passage) -> PassageSchema:
+    verse = _PASSAGE_MAPPER.to_domain(passage)
+    text_value = verse.text.normalized or verse.text.raw or passage.text
+    raw_text_value = verse.text.raw or passage.raw_text
+    meta = dict(passage.meta or {})
+    if _PASSAGE_MAPPER.has_biblical_payload(passage.meta):
+        meta[_PASSAGE_MAPPER.META_KEY] = _PASSAGE_MAPPER.to_meta_payload(verse)
+
     return PassageSchema(
         id=passage.id,
         document_id=passage.document_id,
-        text=passage.text,
-        osis_ref=passage.osis_ref,
+        text=text_value,
+        raw_text=raw_text_value,
+        osis_ref=verse.reference.osis_id or passage.osis_ref,
+        start_char=passage.start_char,
+        end_char=passage.end_char,
         page_no=passage.page_no,
         t_start=passage.t_start,
         t_end=passage.t_end,
         score=None,
-        meta=passage.meta,
+        meta=meta or None,
     )
 
 @query_with_monitoring("documents.list")

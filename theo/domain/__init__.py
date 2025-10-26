@@ -5,6 +5,7 @@ This package is intentionally framework-agnostic. Only standard library,
 """
 
 from .documents import Document, DocumentId, DocumentMetadata
+from .mappers import PassageMapper
 from .references import ScriptureReference
 from .research import (
     CrossReferenceEntry,
@@ -38,6 +39,7 @@ __all__ = [
     "Document",
     "DocumentId",
     "DocumentMetadata",
+    "PassageMapper",
     "ScriptureReference",
     "CrossReferenceEntry",
     "DssLinkEntry",
