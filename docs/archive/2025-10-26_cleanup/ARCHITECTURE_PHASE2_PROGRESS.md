@@ -1,3 +1,5 @@
+> **Archived on October 26, 2025** - Architecture Phase 2 work has been completed. This progress log is preserved for historical reference and audit trail purposes.
+
 # Theoria Architecture Phase 2 – Progress Log
 
 > **Update cadence:** Update this log at the end of every Phase 2 PR. Each entry should capture (1) changes delivered, (2) remaining scope, and (3) guidance for the next implementer. Keep this document as the canonical hand-off reference until Phase 2 is complete.

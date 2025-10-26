@@ -1,3 +1,5 @@
+> **Archived on October 26, 2025** - Architecture updates documentation. Work has been completed and this overview is preserved for reference.
+
 # 🏗️ Architecture Updates - October 2025
 
 ## What Happened

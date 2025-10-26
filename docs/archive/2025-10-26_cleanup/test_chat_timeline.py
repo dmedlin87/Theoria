@@ -1,3 +1,5 @@
+> **Archived on October 26, 2025** - Development test file for CS-001 timeline integration, preserved for reference.
+
 """Test CS-001 Reasoning Timeline integration with chat."""
 
 import json

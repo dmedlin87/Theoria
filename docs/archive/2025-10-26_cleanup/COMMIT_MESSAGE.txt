@@ -1,3 +1,5 @@
+> **Archived on October 26, 2025** - Temporary commit message file for CS-001 implementation, preserved for reference.
+
 feat(cognitive-scholar): Implement CS-001 Reasoning Timeline UI
 
 Implements the Reasoning Timeline UI component for the Cognitive Scholar MVP,

@@ -1,3 +1,5 @@
+> **Archived on October 26, 2025** - UI enhancements manual testing checklist. This was used during development and is preserved for reference.
+
 # UI Enhancements - Manual Test Checklist
 
 Run through this checklist after starting the dev server to verify all enhancements work correctly.

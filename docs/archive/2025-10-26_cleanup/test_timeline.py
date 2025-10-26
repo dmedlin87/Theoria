@@ -1,3 +1,5 @@
+> **Archived on October 26, 2025** - Development test file for timeline models, preserved for reference.
+
 """Quick test script for CS-001 Reasoning Timeline."""
 
 from datetime import UTC, datetime
