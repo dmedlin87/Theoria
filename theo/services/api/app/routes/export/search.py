@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from importlib import import_module
+
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from ...errors import ExportError, Severity
-from ...export.formatters import build_search_export, render_bundle
 from ...models.search import HybridSearchFilters, HybridSearchRequest
-from ...retriever.export import export_search_results
 from theo.application.facades.database import get_session as get_db_session
 from .utils import _BAD_REQUEST_RESPONSE, finalize_response, parse_fields
 
@@ -76,6 +76,8 @@ def export_search(
     limit_value = limit if limit is not None else k
     fetch_k = min(k, (limit + 1) if limit is not None else k + 1)
 
+    export_package = import_module("theo.services.api.app.routes.export")
+
     search_request = HybridSearchRequest(
         query=q,
         osis=osis,
@@ -87,15 +89,15 @@ def export_search(
             collection=collection, author=author, source_type=source_type
         ),
     )
-    response_payload = export_search_results(session, search_request)
-    manifest, records = build_search_export(
+    response_payload = export_package.export_search_results(session, search_request)
+    manifest, records = export_package.build_search_export(
         response_payload,
         include_text=include_text,
         fields=field_set,
     )
 
     try:
-        body, media_type = render_bundle(
+        body, media_type = export_package.render_bundle(
             manifest,
             records,
             output_format=normalized_format,
