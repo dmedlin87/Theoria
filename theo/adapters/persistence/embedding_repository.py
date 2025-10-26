@@ -35,10 +35,10 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
         filters, join_document = self._build_filters(
             fast=fast, changed_since=changed_since, ids=ids
         )
-        for criterion in filters:
-            stmt = stmt.where(criterion)
         if join_document:
             stmt = stmt.join(Document)
+        for criterion in filters:
+            stmt = stmt.where(criterion)
         return int(self._session.execute(stmt).scalar_one())
 
     def existing_ids(self, ids: Sequence[str]) -> set[str]:
@@ -63,10 +63,10 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
         filters, join_document = self._build_filters(
             fast=fast, changed_since=changed_since, ids=ids
         )
-        for criterion in filters:
-            stmt = stmt.where(criterion)
         if join_document:
             stmt = stmt.join(Document)
+        for criterion in filters:
+            stmt = stmt.where(criterion)
 
         stream = self._session.execute(stmt).scalars()
         for record in stream:
