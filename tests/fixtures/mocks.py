@@ -32,7 +32,7 @@ def optimize_mocks() -> None:
             celery_patch = stack.enter_context(
                 patch("theo.services.api.app.workers.tasks.celery")
             )
-        except ModuleNotFoundError:
+        except (ModuleNotFoundError, AttributeError):
             celery_patch = None
         else:
             celery_patch.conf.task_always_eager = True

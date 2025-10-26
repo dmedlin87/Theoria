@@ -15,6 +15,15 @@ def refresh_cli_module(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         "theo.services.bootstrap.resolve_application", lambda: None
     )
+    celery_module = ModuleType("celery")
+    celery_app_module = ModuleType("celery.app")
+    celery_task_module = ModuleType("celery.app.task")
+    celery_task_module.Task = type("Task", (), {})
+    celery_module.app = celery_app_module
+    celery_app_module.task = celery_task_module
+    monkeypatch.setitem(sys.modules, "celery", celery_module)
+    monkeypatch.setitem(sys.modules, "celery.app", celery_app_module)
+    monkeypatch.setitem(sys.modules, "celery.app.task", celery_task_module)
     fake_tasks_module = ModuleType("theo.services.api.app.workers.tasks")
     fake_tasks_module.refresh_hnsw = SimpleNamespace(
         delay=lambda *args, **kwargs: SimpleNamespace(id=None),
