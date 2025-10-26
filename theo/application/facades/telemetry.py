@@ -25,36 +25,67 @@ def get_telemetry_provider() -> TelemetryProvider:
     return _provider
 
 
+class _NoOpSpan:
+    """Fallback span that safely ignores attribute updates."""
+
+    def set_attribute(self, key: str, value: Any) -> None:  # pragma: no cover - trivial
+        """Ignore span attribute assignments when telemetry is disabled."""
+
+
 @contextmanager
 def instrument_workflow(workflow: str, **attributes: Any) -> AbstractContextManager[WorkflowSpan]:
     """Proxy to :meth:`TelemetryProvider.instrument_workflow`."""
 
-    with get_telemetry_provider().instrument_workflow(workflow, **attributes) as span:
+    provider = _provider
+    if provider is None:
+        yield _NoOpSpan()
+        return
+
+    with provider.instrument_workflow(workflow, **attributes) as span:
         yield span
 
 
 def set_span_attribute(span: WorkflowSpan | None, key: str, value: Any) -> None:
     """Safely attach an attribute to a workflow span."""
 
-    get_telemetry_provider().set_span_attribute(span, key, value)
+    provider = _provider
+    if provider is None:
+        target = span or _NoOpSpan()
+        if hasattr(target, "set_attribute"):
+            target.set_attribute(key, value)
+        return
+
+    provider.set_span_attribute(span, key, value)
 
 
 def log_workflow_event(event: str, *, workflow: str, **context: Any) -> None:
     """Emit a structured telemetry event."""
 
-    get_telemetry_provider().log_workflow_event(event, workflow=workflow, **context)
+    provider = _provider
+    if provider is None:
+        return
+
+    provider.log_workflow_event(event, workflow=workflow, **context)
 
 
 def record_counter(metric_name: str, *, amount: float = 1.0, labels: Optional[Mapping[str, Any]] = None) -> None:
     """Increment a counter metric."""
 
-    get_telemetry_provider().record_counter(metric_name, amount=amount, labels=labels)
+    provider = _provider
+    if provider is None:
+        return
+
+    provider.record_counter(metric_name, amount=amount, labels=labels)
 
 
 def record_histogram(metric_name: str, *, value: float, labels: Optional[Mapping[str, Any]] = None) -> None:
     """Record a histogram observation."""
 
-    get_telemetry_provider().record_histogram(metric_name, value=value, labels=labels)
+    provider = _provider
+    if provider is None:
+        return
+
+    provider.record_histogram(metric_name, value=value, labels=labels)
 
 
 __all__ = [

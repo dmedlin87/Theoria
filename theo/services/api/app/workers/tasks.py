@@ -10,6 +10,7 @@ from typing import Any, Iterable, Sequence, cast
 import httpx
 from celery import Celery
 from celery.app.task import Task as CeleryTask
+from celery.exceptions import Retry as CeleryRetry
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
 from sqlalchemy import func, literal, select, text
@@ -70,6 +71,28 @@ def get_engine():  # pragma: no cover - transitional wiring helper
     return _ADAPTER_REGISTRY.resolve("engine")
 
 logger = get_task_logger(__name__)
+
+
+class _CounterProxy:
+    """Wrap Telemetry counters while allowing test monkeypatching."""
+
+    class _LabelProxy:
+        def __init__(self, metric_name: str, labels: dict[str, Any]) -> None:
+            self._metric_name = metric_name
+            self._labels = labels
+
+        def inc(self, amount: float = 1.0) -> None:
+            record_counter(self._metric_name, amount=amount, labels=self._labels)
+
+    def __init__(self, metric_name: str) -> None:
+        self._metric_name = metric_name
+
+    def labels(self, **labels: Any) -> "_CounterProxy._LabelProxy":
+        return self._LabelProxy(self._metric_name, dict(labels))
+
+
+CITATION_DRIFT_EVENTS = _CounterProxy(CITATION_DRIFT_EVENTS_METRIC)
+
 
 celery = Celery(
     "theo-workers",
@@ -297,10 +320,7 @@ def validate_citations(
                             }
                         )
                         metrics["failed"] += 1
-                        record_counter(
-                            CITATION_DRIFT_EVENTS_METRIC,
-                            labels={"status": "failed"},
-                        )
+                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
                         continue
 
                     expected_citations = build_citations(results)
@@ -318,10 +338,7 @@ def validate_citations(
                             }
                         )
                         metrics["failed"] += 1
-                        record_counter(
-                            CITATION_DRIFT_EVENTS_METRIC,
-                            labels={"status": "failed"},
-                        )
+                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
                         continue
 
                     completion = _compose_cached_completion(entry, cached_citations)
@@ -356,17 +373,11 @@ def validate_citations(
                             }
                         )
                         metrics["failed"] += 1
-                        record_counter(
-                            CITATION_DRIFT_EVENTS_METRIC,
-                            labels={"status": "failed"},
-                        )
+                        CITATION_DRIFT_EVENTS.labels(status="failed").inc()
                         continue
 
                     metrics["passed"] += 1
-                    record_counter(
-                        CITATION_DRIFT_EVENTS_METRIC,
-                        labels={"status": "passed"},
-                    )
+                    CITATION_DRIFT_EVENTS.labels(status="passed").inc()
                     log_workflow_event(
                         "workflow.citation_drift",
                         workflow="citation_validation",
@@ -561,7 +572,31 @@ def process_url(
             with Session(engine) as session:
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
-        retry_delay = _compute_retry_delay(getattr(self.request, "retries", 0))
+        retry_count = getattr(self.request, "retries", 0)
+        retry_delay = _compute_retry_delay(retry_count)
+        is_eager = (
+            getattr(self.request, "is_eager", False)
+            or getattr(self.request, "called_directly", False)
+            or getattr(self.app.conf, "task_always_eager", False)
+        )
+        if is_eager:
+            retries = retry_count + 1
+            setattr(self.request, "retries", retries)
+            signature = self.signature_from_request(
+                self.request,
+                None,
+                None,
+                countdown=retry_delay,
+                eta=None,
+                retries=retries,
+            )
+            raise CeleryRetry(
+                message="Task can be retried",
+                exc=exc,
+                when=retry_delay,
+                is_eager=True,
+                sig=signature,
+            )
         raise self.retry(exc=exc, countdown=retry_delay)
 
 
