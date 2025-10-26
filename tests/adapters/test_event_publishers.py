@@ -114,3 +114,84 @@ def test_build_event_publisher_resolves_sink_configuration(monkeypatch: pytest.M
 
     assert isinstance(publisher, _StubPublisher)
     assert constructed["config"].redis_url == settings.redis_url
+
+
+def test_kafka_event_publisher_propagates_producer_errors() -> None:
+    sink = KafkaEventSink(topic="failures", bootstrap_servers="kafka:9092", producer_config={})
+
+    class _Producer:
+        def __init__(self) -> None:
+            self.polls: list[float] = []
+            self.flushes: list[float] = []
+
+        def produce(self, **kwargs: object) -> None:  # noqa: ANN001 - mimic confluent producer signature
+            raise RuntimeError("produce failed")
+
+        def poll(self, timeout: float) -> None:
+            self.polls.append(timeout)
+
+        def flush(self, timeout: float) -> int:
+            self.flushes.append(timeout)
+            return 0
+
+    created: dict[str, _Producer] = {}
+
+    def factory(options: dict[str, object]) -> _Producer:
+        producer = _Producer()
+        created["producer"] = producer
+        return producer
+
+    publisher = KafkaEventPublisher(sink, producer_factory=factory)
+    event = DomainEvent(type="failure", payload={})
+
+    with pytest.raises(RuntimeError):
+        publisher.publish(event)
+
+    producer = created["producer"]
+    assert producer.polls == []
+    assert producer.flushes == []
+
+
+def test_redis_stream_event_publisher_propagates_client_errors() -> None:
+    sink = RedisStreamEventSink(stream="events", redis_url="redis://redis:6379/0")
+
+    class _Client:
+        def xadd(self, *args, **kwargs):  # noqa: ANN001 - mimic redis client signature
+            raise RuntimeError("redis failure")
+
+    publisher = RedisStreamEventPublisher(sink, redis_client=_Client())
+    event = DomainEvent(type="redis", payload={})
+
+    with pytest.raises(RuntimeError):
+        publisher.publish(event)
+
+
+def test_redis_stream_event_publisher_uses_client_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    sink = RedisStreamEventSink(stream="events", redis_url="redis://custom:6379/0", maxlen=50)
+    captured: dict[str, object] = {}
+
+    class _Client:
+        def __init__(self) -> None:
+            self.calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+        def xadd(self, *args: object, **kwargs: object) -> str:
+            self.calls.append((args, kwargs))
+            return "0-1"
+
+    def factory(url: str) -> _Client:
+        captured["url"] = url
+        client = _Client()
+        captured["client"] = client
+        return client
+
+    publisher = RedisStreamEventPublisher(sink, client_factory=factory)
+    event = DomainEvent(type="redis", payload={"id": 1})
+
+    publisher.publish(event)
+
+    assert captured["url"] == "redis://custom:6379/0"
+    client: _Client = captured["client"]  # type: ignore[assignment]
+    assert len(client.calls) == 1
+    args, kwargs = client.calls[0]
+    assert args[0] == "events"
+    assert kwargs == {"maxlen": 50, "approximate": True}

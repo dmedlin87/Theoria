@@ -68,3 +68,34 @@ def test_aws_adapter_surfaces_backend_errors() -> None:
         adapter.get_secret(SecretRequest(identifier="app"))
 
     assert "error" in str(excinfo.value)
+
+
+def test_aws_adapter_reports_invalid_json_when_extracting_field() -> None:
+    client = DummyAWSClient({"SecretString": "not-json"})
+    adapter = AWSSecretsAdapter(client=client, default_field="token")
+
+    with pytest.raises(SecretRetrievalError):
+        adapter.get_secret(SecretRequest(identifier="bad"))
+
+
+def test_aws_adapter_from_config_requires_boto3(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("theo.adapters.secrets.aws.boto3", None)
+
+    with pytest.raises(RuntimeError):
+        AWSSecretsAdapter.from_config(profile_name="default")
+
+
+def test_aws_adapter_from_config_uses_provided_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Client:
+        def get_secret_value(self, *, SecretId: str) -> dict[str, object]:
+            captured["secret"] = SecretId
+            return {"SecretString": "value"}
+
+    adapter = AWSSecretsAdapter.from_config(client=_Client(), default_field=None)
+
+    secret = adapter.get_secret(SecretRequest(identifier="custom"))
+
+    assert secret == "value"
+    assert captured["secret"] == "custom"
