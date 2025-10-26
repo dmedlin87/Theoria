@@ -15,6 +15,7 @@ from sqlalchemy import (
     Text,
     create_engine,
     inspect,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
@@ -371,3 +372,50 @@ def test_split_sql_statements_handles_comments_and_dollar_quotes() -> None:
     assert statements[1].lstrip().startswith("/* block comment")
     assert "inline comment" in statements[1]
     assert statements[1].strip().endswith("END$$")
+
+
+def test_run_sql_migrations_creates_performance_indexes(tmp_path) -> None:
+    """Index enforcement should create the expected SQLite indexes."""
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'indexes.db'}", future=True)
+    AppSetting.__table__.create(bind=engine)
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE documents (
+                id TEXT PRIMARY KEY,
+                updated_at TIMESTAMP NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE passages (
+                id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                embedding BLOB,
+                text TEXT
+            )
+            """
+        )
+
+    empty_migrations = tmp_path / "migrations"
+    empty_migrations.mkdir()
+
+    applied = run_sql_migrations(engine, migrations_path=empty_migrations)
+    assert applied == []
+
+    with engine.connect() as connection:
+        passage_indexes = {
+            row[1]
+            for row in connection.execute(text("PRAGMA index_list('passages')"))
+        }
+        document_indexes = {
+            row[1]
+            for row in connection.execute(text("PRAGMA index_list('documents')"))
+        }
+
+    assert "idx_passages_embedding_null" in passage_indexes
+    assert "idx_passages_document_id" in passage_indexes
+    assert "idx_documents_updated_at" in document_indexes
