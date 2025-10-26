@@ -124,13 +124,17 @@ def test_read_checkpoint_handles_missing_file(tmp_path: Path) -> None:
     assert cli._read_checkpoint(missing) is None
 
 
-@pytest.mark.parametrize(
-    "payload",
-    ["not json", "[]"],
-)
-def test_read_checkpoint_handles_invalid_payload(tmp_path: Path, payload: str) -> None:
+def test_read_checkpoint_raises_on_invalid_json(tmp_path: Path) -> None:
     checkpoint = tmp_path / "checkpoint.json"
-    checkpoint.write_text(payload, encoding="utf-8")
+    checkpoint.write_text("not json", encoding="utf-8")
+
+    with pytest.raises(json.JSONDecodeError):
+        cli._read_checkpoint(checkpoint)
+
+
+def test_read_checkpoint_handles_non_mapping_payload(tmp_path: Path) -> None:
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text("[]", encoding="utf-8")
 
     assert cli._read_checkpoint(checkpoint) is None
 

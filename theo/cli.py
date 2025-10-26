@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,9 @@ from theo.services.embeddings import (
     EmbeddingRebuildConfig,
     EmbeddingRebuildInstrumentation,
 )
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @click.group()
@@ -56,8 +60,15 @@ def _load_ids(path: Path) -> list[str]:
     return deduped
 
 
-def _read_checkpoint(path: Path) -> EmbeddingRebuildCheckpoint | None:
-    return load_embedding_rebuild_checkpoint(path)
+def _read_checkpoint(path: Path) -> dict[str, object]:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        return {}
+    return data
 
 
 def _write_checkpoint(
@@ -168,8 +179,21 @@ def rebuild_embeddings_cmd(
     skip_count = 0
     if checkpoint_file is not None:
         if resume:
-            checkpoint_state = _read_checkpoint(checkpoint_file)
-            skip_count = checkpoint_state.processed if checkpoint_state else 0
+            try:
+                checkpoint_state = _read_checkpoint(checkpoint_file)
+            except json.JSONDecodeError as exc:
+                _LOGGER.error(
+                    "Failed to decode checkpoint file during resume",
+                    extra={
+                        "event": "cli.rebuild_embeddings.checkpoint_decode_error",
+                        "checkpoint_file": str(checkpoint_file),
+                    },
+                    exc_info=exc,
+                )
+                raise click.ClickException(
+                    f"Checkpoint file {checkpoint_file} contains invalid JSON"
+                ) from exc
+            skip_count = int(checkpoint_state.get("processed", 0)) if checkpoint_state else 0
             if skip_count:
                 click.echo(
                     f"Resuming from checkpoint at {checkpoint_file} "
