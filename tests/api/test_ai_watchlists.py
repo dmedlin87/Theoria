@@ -9,7 +9,8 @@ from typing import Iterator
 import pytest
 from fastapi import Request as FastAPIRequest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -31,17 +32,41 @@ from theo.services.api.app.routes.ai.watchlists import (  # noqa: E402
 )
 
 
-@pytest.fixture()
-def watchlist_client(tmp_path: Path) -> Iterator[tuple[TestClient, Session]]:
-    """Yield a TestClient connected to an isolated SQLite database."""
-
-    configure_engine(f"sqlite:///{tmp_path / 'watchlists.db'}")
+@pytest.fixture(scope="module")
+def _watchlist_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine]:
+    database_path = tmp_path_factory.mktemp("watchlists") / "watchlists.db"
+    configure_engine(f"sqlite:///{database_path}")
     engine = get_engine()
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+        database_module._engine = None  # type: ignore[attr-defined]
+        database_module._SessionLocal = None  # type: ignore[attr-defined]
+
+
+@pytest.fixture(scope="module")
+def _watchlist_test_client(_watchlist_engine: Engine) -> Iterator[TestClient]:
+    with TestClient(app) as client:
+        yield client
+
+
+@pytest.fixture()
+def watchlist_client(
+    _watchlist_test_client: TestClient, _watchlist_engine: Engine
+) -> Iterator[tuple[TestClient, Engine]]:
+    session_factory = sessionmaker(
+        bind=_watchlist_engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+        future=True,
+    )
 
     def _override_session():
-        db = Session(engine)
+        db = session_factory()
         try:
             yield db
         finally:
@@ -49,14 +74,13 @@ def watchlist_client(tmp_path: Path) -> Iterator[tuple[TestClient, Session]]:
 
     app.dependency_overrides[get_session] = _override_session
     try:
-        with TestClient(app) as client:
-            yield client, engine
+        yield _watchlist_test_client, _watchlist_engine
     finally:
         app.dependency_overrides.pop(get_session, None)
         app.dependency_overrides.pop(require_principal, None)
-        engine.dispose()
-        database_module._engine = None  # type: ignore[attr-defined]
-        database_module._SessionLocal = None  # type: ignore[attr-defined]
+        with _watchlist_engine.begin() as connection:
+            for table in reversed(Base.metadata.sorted_tables):
+                connection.execute(table.delete())
 
 
 def _set_principal(subject: str) -> None:
@@ -77,6 +101,9 @@ class WatchlistsServiceStub:
     """Test double that records calls to the watchlist service API."""
 
     def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
         self.raise_not_found_for: set[str] = set()
         self.delete_calls: list[tuple[str, str]] = []
         self.list_events_calls: list[tuple[str, str, datetime | None]] = []
@@ -95,9 +122,9 @@ class WatchlistsServiceStub:
             "delivery_status": None,
             "error": None,
         }
-        self.list_events_return: list[dict[str, object]] = [default_response]
-        self.preview_return: dict[str, object] = default_response
-        self.run_return: dict[str, object] = default_response
+        self.list_events_return = [default_response.copy()]
+        self.preview_return = default_response.copy()
+        self.run_return = default_response.copy()
 
     def _maybe_raise(self, method: str) -> None:
         if method in self.raise_not_found_for:
@@ -125,15 +152,27 @@ class WatchlistsServiceStub:
         return self.run_return
 
 
-@pytest.fixture()
-def watchlists_service_stub(monkeypatch: pytest.MonkeyPatch) -> WatchlistsServiceStub:
+@pytest.fixture(scope="module")
+def _watchlists_service_stub() -> Iterator[WatchlistsServiceStub]:
     stub = WatchlistsServiceStub()
+    monkeypatch = pytest.MonkeyPatch()
 
     def _factory(_session: Session) -> WatchlistsServiceStub:
         return stub
 
     monkeypatch.setattr(watchlists_module, "_service", _factory)
-    return stub
+    try:
+        yield stub
+    finally:
+        monkeypatch.undo()
+
+
+@pytest.fixture()
+def watchlists_service_stub(
+    _watchlists_service_stub: WatchlistsServiceStub,
+) -> Iterator[WatchlistsServiceStub]:
+    _watchlists_service_stub.reset()
+    yield _watchlists_service_stub
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -145,7 +184,7 @@ def _parse_datetime(value: str) -> datetime:
 
 
 def test_create_watchlist_assigns_principal_subject(
-    watchlist_client: tuple[TestClient, Session]
+    watchlist_client: tuple[TestClient, Engine]
 ) -> None:
     client, engine = watchlist_client
 
@@ -162,7 +201,7 @@ def test_create_watchlist_assigns_principal_subject(
 
 
 def test_list_watchlists_filters_by_principal_subject(
-    watchlist_client: tuple[TestClient, Session]
+    watchlist_client: tuple[TestClient, Engine]
 ) -> None:
     client, _ = watchlist_client
 
@@ -190,7 +229,7 @@ def test_list_watchlists_filters_by_principal_subject(
 
 
 def test_other_user_watchlist_returns_not_found(
-    watchlist_client: tuple[TestClient, Session]
+    watchlist_client: tuple[TestClient, Engine]
 ) -> None:
     client, engine = watchlist_client
 
@@ -219,7 +258,7 @@ def test_other_user_watchlist_returns_not_found(
 
 
 def test_delete_watchlist_uses_principal_subject(
-    watchlist_client: tuple[TestClient, Session],
+    watchlist_client: tuple[TestClient, Engine],
     watchlists_service_stub: WatchlistsServiceStub,
 ) -> None:
     client, _ = watchlist_client
@@ -232,7 +271,7 @@ def test_delete_watchlist_uses_principal_subject(
 
 
 def test_delete_watchlist_returns_not_found_error(
-    watchlist_client: tuple[TestClient, Session],
+    watchlist_client: tuple[TestClient, Engine],
     watchlists_service_stub: WatchlistsServiceStub,
 ) -> None:
     client, _ = watchlist_client
@@ -249,7 +288,7 @@ def test_delete_watchlist_returns_not_found_error(
 
 
 def test_watchlist_events_forward_since_parameter(
-    watchlist_client: tuple[TestClient, Session],
+    watchlist_client: tuple[TestClient, Engine],
     watchlists_service_stub: WatchlistsServiceStub,
 ) -> None:
     client, _ = watchlist_client
@@ -295,7 +334,7 @@ def test_watchlist_events_forward_since_parameter(
 
 
 def test_preview_watchlist_returns_stub_payload(
-    watchlist_client: tuple[TestClient, Session],
+    watchlist_client: tuple[TestClient, Engine],
     watchlists_service_stub: WatchlistsServiceStub,
 ) -> None:
     client, _ = watchlist_client
@@ -332,7 +371,7 @@ def test_preview_watchlist_returns_stub_payload(
 
 
 def test_run_watchlist_returns_stub_payload(
-    watchlist_client: tuple[TestClient, Session],
+    watchlist_client: tuple[TestClient, Engine],
     watchlists_service_stub: WatchlistsServiceStub,
 ) -> None:
     client, _ = watchlist_client
@@ -378,7 +417,7 @@ def test_run_watchlist_returns_stub_payload(
     ],
 )
 def test_watchlist_routes_require_subject(
-    watchlist_client: tuple[TestClient, Session],
+    watchlist_client: tuple[TestClient, Engine],
     watchlists_service_stub: WatchlistsServiceStub,
     method: str,
     path: str,
