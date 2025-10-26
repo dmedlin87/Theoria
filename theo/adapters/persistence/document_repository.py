@@ -82,7 +82,12 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             "get_by_id",
             attributes={"document_id": document_id},
         ) as trace:
-            document = self.session.get(Document, document_id)
+            stmt = (
+                select(Document)
+                .options(selectinload(Document.passages))
+                .where(Document.id == document_id)
+            )
+            document = self.session.scalars(stmt).first()
             trace.set_attribute("hit", document is not None)
             if document is None:
                 trace.record_result_count(0)
@@ -120,6 +125,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
         ) as trace:
             stmt = (
                 select(Document)
+                .options(selectinload(Document.passages))
                 .where(Document.created_at >= since)
                 .order_by(Document.created_at.asc())
             )

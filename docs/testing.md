@@ -5,6 +5,14 @@ regression-focused portions of the Python test suite.
 
 ## Regression suites
 
+### Commentary ingestion
+
+* **Scope** – `tests/ingest/test_osis_import.py` exercises the full OSIS commentary pipeline including fixture-backed sample
+  documents and database preparation helpers. 【F:tests/ingest/test_osis_import.py†L1-L142】
+* **Recommended command** – `pytest tests/ingest/test_osis_import.py`
+* **Why it exists** – replaces the ad-hoc `temp_*.py` scratch scripts that previously lived in the repository root and ensures
+  commentary ingestion is validated through real tests rather than manual helpers.
+
 ### Guardrail and RAG regressions
 
 * **Scope** – `tests/api/test_rag_guardrails.py`, `tests/api/test_rag_prompts.py`, and the job enqueue regression under
