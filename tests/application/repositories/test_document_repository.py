@@ -7,47 +7,12 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.orm import Session
 
 from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository
-from theo.adapters.persistence.models import Base, Document, Passage
+from theo.adapters.persistence.models import Document, Passage
 
-
-@pytest.fixture(scope="module")
-def engine():
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        future=True,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    try:
-        yield engine
-    finally:
-        Base.metadata.drop_all(engine)
-        engine.dispose()
-
-
-@pytest.fixture
-def session(engine):
-    connection = engine.connect()
-    transaction = connection.begin()
-    SessionLocal = sessionmaker(
-        bind=connection,
-        autoflush=False,
-        expire_on_commit=False,
-        future=True,
-    )
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        transaction.rollback()
-        connection.close()
+pytestmark = pytest.mark.db
 
 
 def test_list_with_embeddings_averages_vectors(session: Session):
