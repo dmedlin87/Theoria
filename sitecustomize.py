@@ -41,6 +41,21 @@ else:
 # patch ``theo.services.api.app.workers.tasks.celery`` during import. Without a
 # stub the import chain triggers heavy application wiring (Celery, Redis, etc.)
 # which is not needed for unit-level suites.
+_WORKERS_TASKS_MODULE = "theo.services.api.app.workers.tasks"
+
+
+def _resolve_absolute_name(name: str, package: str | None, level: int) -> str:
+    """Resolve an import request to its absolute module name."""
+
+    if level == 0:
+        return name
+
+    if not package:
+        raise ValueError("Relative imports require a package context")
+
+    return importlib.util.resolve_name("." * level + name, package)
+
+
 def _should_install_workers_stub() -> bool:
     """Determine if the Celery stub should be installed."""
 
@@ -86,15 +101,54 @@ def _install_workers_stub() -> None:
         def send_task(self, *args: object, **kwargs: object) -> None:  # pragma: no cover
             raise RuntimeError("Celery stub cannot send tasks")
 
-    module_name = "theo.services.api.app.workers.tasks"
-    stub_module = types.ModuleType(module_name)
+    stub_module = types.ModuleType(_WORKERS_TASKS_MODULE)
     stub_module.celery = _CeleryStub()  # type: ignore[attr-defined]
-    sys.modules[module_name] = stub_module
+    sys.modules[_WORKERS_TASKS_MODULE] = stub_module
     setattr(workers_pkg, "tasks", stub_module)
 
 
-if (
-    "theo.services.api.app.workers.tasks" not in sys.modules
-    and _should_install_workers_stub()
-):  # pragma: no cover - import-time wiring only
-    _install_workers_stub()
+def _register_workers_import_fallback() -> None:
+    """Install an import hook to lazily fall back to the Celery stub."""
+
+    if getattr(_register_workers_import_fallback, "_installed", False):
+        return
+
+    import builtins
+
+    original_import = builtins.__import__
+
+    def guarded_import(
+        name: str,
+        globals: dict[str, object] | None = None,
+        locals: dict[str, object] | None = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ):
+        package = None
+        if globals:
+            package = globals.get("__package__") or globals.get("__name__")
+
+        try:
+            return original_import(name, globals, locals, fromlist, level)
+        except ImportError as exc:
+            try:
+                absolute = _resolve_absolute_name(name, package, level)
+            except ValueError:
+                raise exc
+
+            if absolute != _WORKERS_TASKS_MODULE or _WORKERS_TASKS_MODULE in sys.modules:
+                raise exc
+
+            _install_workers_stub()
+
+            return original_import(name, globals, locals, fromlist, level)
+
+    builtins.__import__ = guarded_import  # type: ignore[assignment]
+    _register_workers_import_fallback._installed = True  # type: ignore[attr-defined]
+
+
+if _WORKERS_TASKS_MODULE not in sys.modules:  # pragma: no cover - import-time wiring only
+    if _should_install_workers_stub():
+        _install_workers_stub()
+    else:
+        _register_workers_import_fallback()
