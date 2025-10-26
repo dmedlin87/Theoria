@@ -181,6 +181,7 @@ Install the orchestration tooling with `brew install go-task/tap/go-task`, `scoo
 ### Testing & quality gates
 - **Python tests (fast)**: `task test:fast` or `pytest -m "not (slow or gpu or contract)"`
 - **Full Python suite**: `task test:full` or `pytest --schema --pgvector --contract`
+- **Regression & slow prerequisites**: [`docs/testing.md`](docs/testing.md)
 - **Web tests**: from `theo/services/web`, run `npm test` or `npm run test:vitest`
 - **Playwright smoke**: `npm run test:e2e:smoke`
 - **Performance baselines**: Lighthouse CI policy lives in [`docs/performance.md`](docs/performance.md)

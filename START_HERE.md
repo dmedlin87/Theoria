@@ -189,6 +189,11 @@ We now ship ready-made VS Code tasks so you can start Theoria right from the Com
 
 Open the Command Palette → *Tasks: Run Task* and choose the launcher you need.
 
+### Testing prerequisites for contributors
+
+Before running the regression or slow-path pytest markers, review [`docs/testing.md`](docs/testing.md) for required services,
+environment variables, and installation steps.
+
 ## How It Works
 
 ### Startup Sequence
