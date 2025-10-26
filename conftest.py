@@ -50,6 +50,7 @@ def _install_sqlalchemy_stub() -> None:
         def _raise(*_args: object, **_kwargs: object) -> _Placeholder:
             raise NotImplementedError("sqlalchemy placeholder accessed")
 
+        sqlalchemy_stub.__theoria_sqlalchemy_stub__ = True
         sqlalchemy_stub.func = _FuncProxy()
         sqlalchemy_stub.select = _raise
         sqlalchemy_stub.create_engine = _raise
