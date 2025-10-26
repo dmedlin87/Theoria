@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_left
 import heapq
 from dataclasses import dataclass
 from time import perf_counter
@@ -317,20 +318,79 @@ def _passage_span(passage: Passage) -> tuple[int, int] | None:
     return _span_from_reference(passage.osis_ref)
 
 
+def _min_distance_between_sorted_lists(
+    first: Sequence[int], second: Sequence[int]
+) -> int:
+    i = 0
+    j = 0
+    min_diff: int | None = None
+    while i < len(first) and j < len(second):
+        diff = first[i] - second[j]
+        if diff == 0:
+            return 0
+        abs_diff = abs(diff)
+        if min_diff is None or abs_diff < min_diff:
+            min_diff = abs_diff
+        if first[i] < second[j]:
+            i += 1
+        else:
+            j += 1
+    return min_diff or 0
+
+
 def _osis_distance_value(passage: Passage, target_ref: str | None) -> float | None:
     if not target_ref:
         return None
-    candidate_span = _passage_span(passage)
-    target_span = _span_from_reference(target_ref)
-    if not candidate_span or not target_span:
+    target_ids = expand_osis_reference(target_ref)
+    if not target_ids:
         return None
-    candidate_start, candidate_end = candidate_span
-    target_start, target_end = target_span
-    if candidate_end >= target_start and candidate_start <= target_end:
-        return 0.0
+    target_sorted = sorted(target_ids)
+    target_start = target_sorted[0]
+    target_end = target_sorted[-1]
+
+    candidate_span = _passage_span(passage)
+    candidate_ids = (
+        expand_osis_reference(passage.osis_ref) if getattr(passage, "osis_ref", None) else None
+    )
+    candidate_sorted = sorted(candidate_ids) if candidate_ids else None
+
+    candidate_start: int | None = None
+    candidate_end: int | None = None
+    if candidate_sorted:
+        candidate_start = candidate_sorted[0]
+        candidate_end = candidate_sorted[-1]
+    elif candidate_span:
+        candidate_start, candidate_end = candidate_span
+
+    if candidate_start is None or candidate_end is None:
+        return None
+
     if candidate_end < target_start:
         return float(target_start - candidate_end)
-    return float(candidate_start - target_end)
+    if candidate_start > target_end:
+        return float(candidate_start - target_end)
+
+    if candidate_sorted:
+        if candidate_ids and candidate_ids.isdisjoint(target_ids):
+            distance = _min_distance_between_sorted_lists(candidate_sorted, target_sorted)
+            return float(distance)
+        return 0.0
+
+    index = bisect_left(target_sorted, candidate_start)
+    if index < len(target_sorted) and target_sorted[index] <= candidate_end:
+        return 0.0
+    if index > 0 and target_sorted[index - 1] >= candidate_start:
+        return 0.0
+
+    distances: list[int] = []
+    if index < len(target_sorted):
+        distances.append(target_sorted[index] - candidate_end)
+    if index > 0:
+        distances.append(candidate_start - target_sorted[index - 1])
+
+    if distances:
+        return float(min(distances))
+    return 0.0
 
 
 def _mark_candidate_osis(candidate: _Candidate, target_ref: str) -> None:

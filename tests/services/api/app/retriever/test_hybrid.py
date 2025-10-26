@@ -334,6 +334,35 @@ def test_osis_distance_value_prefers_nearest_reference(monkeypatch):
     assert hybrid._osis_distance_value(passage_missing, "Gen.1.5") is None
 
 
+def test_osis_distance_value_handles_disjoint_multi_range_references(monkeypatch):
+    def _fake_expand(value: str | None):
+        mapping = {
+            "Gen.1.1-Gen.1.2,Gen.1.10-Gen.1.12": {1, 2, 10, 11, 12},
+            "Gen.1.5": {5},
+            "Gen.1.5-Gen.1.6": {5, 6},
+        }
+        return mapping.get(value, set()) if value else set()
+
+    monkeypatch.setattr(hybrid, "expand_osis_reference", _fake_expand)
+
+    multi_range_passage = _make_passage(
+        osis_ref="Gen.1.1-Gen.1.2,Gen.1.10-Gen.1.12",
+        osis_start_verse_id=1,
+        osis_end_verse_id=12,
+    )
+    contiguous_passage = _make_passage(
+        osis_ref="Gen.1.5-Gen.1.6", osis_start_verse_id=5, osis_end_verse_id=6
+    )
+
+    distance_multi = hybrid._osis_distance_value(multi_range_passage, "Gen.1.5")
+    distance_contiguous = hybrid._osis_distance_value(
+        contiguous_passage, "Gen.1.1-Gen.1.2,Gen.1.10-Gen.1.12"
+    )
+
+    assert distance_multi == pytest.approx(3.0)
+    assert distance_contiguous == pytest.approx(3.0)
+
+
 def test_passes_author_and_guardrail_filters():
     document = _make_document(authors=["Alice", "Bob"], theological_tradition="Catholic", topic_domains=["Ethics"])  # type: ignore[arg-type]
 
