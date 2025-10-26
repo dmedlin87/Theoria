@@ -42,9 +42,37 @@ RAG_CACHE_EVENTS_METRIC = "theo_rag_cache_events_total"
 CITATION_DRIFT_EVENTS_METRIC = "theo_citation_drift_events_total"
 SEARCH_RERANKER_EVENTS_METRIC = "theo_search_reranker_events_total"
 
+# Embedding rebuild workflow ----------------------------------------------------
+EMBEDDING_REBUILD_BATCH_LATENCY_METRIC = (
+    "theo_embedding_rebuild_batch_latency_seconds"
+)
+EMBEDDING_REBUILD_COMMIT_LATENCY_METRIC = (
+    "theo_embedding_rebuild_commit_latency_seconds"
+)
+EMBEDDING_REBUILD_PROGRESS_METRIC = "theo_embedding_rebuild_processed_total"
+
+# Database query monitoring ------------------------------------------------------
+DB_QUERY_LATENCY_METRIC = "theo_db_query_latency_seconds"
+DB_QUERY_REQUESTS_METRIC = "theo_db_query_requests_total"
+DB_QUERY_ERROR_METRIC = "theo_db_query_errors_total"
+
+# ML inference telemetry --------------------------------------------------------
+LLM_INFERENCE_LATENCY_METRIC = "theo_llm_inference_latency_seconds"
+LLM_INFERENCE_REQUESTS_METRIC = "theo_llm_inference_requests_total"
+LLM_INFERENCE_ERROR_METRIC = "theo_llm_inference_errors_total"
+
 
 __all__ = [
     "CITATION_DRIFT_EVENTS_METRIC",
+    "DB_QUERY_ERROR_METRIC",
+    "DB_QUERY_LATENCY_METRIC",
+    "DB_QUERY_REQUESTS_METRIC",
+    "EMBEDDING_REBUILD_BATCH_LATENCY_METRIC",
+    "EMBEDDING_REBUILD_COMMIT_LATENCY_METRIC",
+    "EMBEDDING_REBUILD_PROGRESS_METRIC",
+    "LLM_INFERENCE_ERROR_METRIC",
+    "LLM_INFERENCE_LATENCY_METRIC",
+    "LLM_INFERENCE_REQUESTS_METRIC",
     "RAG_CACHE_EVENTS_METRIC",
     "SEARCH_RERANKER_EVENTS_METRIC",
     "TelemetryProvider",
