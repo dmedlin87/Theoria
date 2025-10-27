@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Sequence
 
 from sqlalchemy import delete, func, select
@@ -90,8 +90,14 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
             self._session.execute(
                 delete(PassageEmbedding).where(PassageEmbedding.passage_id.in_(ids))
             )
+        now = datetime.now(UTC)
         payload = [
-            {"passage_id": update.id, "embedding": list(update.embedding)}
+            {
+                "passage_id": update.id,
+                "embedding": list(update.embedding),
+                "created_at": now,
+                "updated_at": now,
+            }
             for update in updates
         ]
         if payload:
