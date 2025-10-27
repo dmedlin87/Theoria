@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import gc
-import importlib
 import inspect
 import os
 import sys
@@ -12,6 +11,21 @@ from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
+
+from tests.utils.application import (
+    isolated_application_container,
+    require_application_factory,
+)
+from tests.utils.pytest import (
+    FIXTURE_MARKER_REQUIREMENTS,
+    MARKER_OPTIONS,
+    ensure_cli_opt_in,
+    ensure_project_root_on_path,
+    register_randomly_plugin,
+    register_xdist_plugin,
+    resolve_xdist_group,
+)
+from tests.utils.resources import TestResourcePool
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
     from theo.adapters import AdapterRegistry
@@ -28,14 +42,6 @@ except ModuleNotFoundError:  # pragma: no cover - allows running lightweight sui
     text = None  # type: ignore[assignment]
     Engine = object  # type: ignore[assignment]
 
-try:  # pragma: no cover - factory depends on optional domain extras
-    from tests.factories.application import isolated_application_container
-except ModuleNotFoundError as exc:  # pragma: no cover - light environments
-    isolated_application_container = None  # type: ignore[assignment]
-    _APPLICATION_FACTORY_IMPORT_ERROR = exc
-else:
-    _APPLICATION_FACTORY_IMPORT_ERROR: ModuleNotFoundError | None = None
-
 
 _SQLALCHEMY_AVAILABLE = create_engine is not None
 
@@ -48,10 +54,7 @@ if not _SQLALCHEMY_AVAILABLE:
     text = _sqlalchemy_missing  # type: ignore[assignment]
 
 
-def _require_application_factory() -> None:
-    if isolated_application_container is None:
-        reason = _APPLICATION_FACTORY_IMPORT_ERROR or ModuleNotFoundError("pythonbible")
-        pytest.skip(f"application factory unavailable: {reason}")
+ensure_project_root_on_path()
 
 if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE"}:
     try:
@@ -91,38 +94,6 @@ _ENABLE_MEMCHECK = os.getenv("THEORIA_MEMCHECK", "").strip().lower() in {
     "yes",
     "on",
 }
-
-
-def _register_randomly_plugin(pluginmanager: pytest.PluginManager) -> bool:
-    """Ensure pytest-randomly is registered when available."""
-
-    if pluginmanager.hasplugin("randomly"):
-        return True
-
-    try:
-        plugin_module = importlib.import_module("pytest_randomly.plugin")
-    except ModuleNotFoundError:
-        return False
-
-    pluginmanager.register(plugin_module, "pytest_randomly")
-    return True
-
-
-def _register_xdist_plugin(pluginmanager: pytest.PluginManager) -> bool:
-    """Ensure pytest-xdist is eagerly registered when the dependency exists."""
-
-    if pluginmanager.hasplugin("xdist"):
-        return True
-
-    try:
-        plugin_module = importlib.import_module("xdist.plugin")
-    except ModuleNotFoundError:
-        return False
-
-    pluginmanager.register(plugin_module, "xdist")
-    return True
-
-
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Register optional CLI flags and shim coverage arguments when needed."""
 
@@ -193,10 +164,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers used throughout the test suite."""
 
-    if _register_randomly_plugin(config.pluginmanager):
+    if register_randomly_plugin(config.pluginmanager):
         config.option.randomly_seed = 1337
 
-    _register_xdist_plugin(config.pluginmanager)
+    register_xdist_plugin(config.pluginmanager)
 
     config.addinivalue_line(
         "markers",
@@ -220,35 +191,15 @@ def pytest_load_initial_conftests(
 ) -> None:
     """Ensure required plugins are available before parsing ini options."""
 
-    _register_randomly_plugin(early_config.pluginmanager)
-    _register_xdist_plugin(early_config.pluginmanager)
-
-
-@pytest.fixture
-def regression_factory():
-    """Provide a seeded factory for synthesising regression datasets."""
-
-    try:
-        from tests.fixtures import (  # type: ignore
-            REGRESSION_FIXTURES_AVAILABLE,
-            REGRESSION_IMPORT_ERROR,
-            RegressionDataFactory,
-        )
-    except ModuleNotFoundError as exc:  # pragma: no cover - thin local envs
-        pytest.skip(f"faker not installed for regression factory: {exc}")
-    except Exception as exc:  # pragma: no cover - guard against optional deps
-        pytest.skip(f"regression fixtures unavailable: {exc}")
-    if not REGRESSION_FIXTURES_AVAILABLE:
-        reason = REGRESSION_IMPORT_ERROR or ModuleNotFoundError("unknown dependency")
-        pytest.skip(f"regression fixtures unavailable: {reason}")
-    return RegressionDataFactory()
+    register_randomly_plugin(early_config.pluginmanager)
+    register_xdist_plugin(early_config.pluginmanager)
 
 
 @pytest.fixture
 def application_container() -> Iterator[tuple["ApplicationContainer", "AdapterRegistry"]]:
     """Yield an isolated application container and backing registry."""
 
-    _require_application_factory()
+    require_application_factory()
     with isolated_application_container() as resources:
         yield resources
 
@@ -259,7 +210,7 @@ def optimized_application_container() -> Generator[
 ]:
     """Create the application container once per session for heavy suites."""
 
-    _require_application_factory()
+    require_application_factory()
     with isolated_application_container() as resources:
         yield resources
 
@@ -268,7 +219,7 @@ def optimized_application_container() -> Generator[
 def application_container_factory():
     """Provide a factory returning isolated application containers."""
 
-    _require_application_factory()
+    require_application_factory()
 
     def _factory(**overrides):
         return isolated_application_container(overrides=overrides or None)
@@ -336,69 +287,6 @@ def _configure_celery_for_tests() -> Generator[None, None, None]:
         app.conf.update(**previous_config)
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-
-_FIXTURE_MARKER_REQUIREMENTS: dict[str, set[str]] = {
-    "pgvector": {
-        "pgvector_container",
-        "pgvector_database_url",
-        "pgvector_engine",
-        "pgvector_migrated_database_url",
-    },
-    "schema": {
-        "integration_database_url",
-        "integration_engine",
-    },
-}
-
-
-_MARKER_OPTIONS: dict[str, str] = {
-    "pgvector": "pgvector",
-    "schema": "schema",
-    "contract": "contract",
-    "gpu": "gpu",
-}
-
-
-def _resolve_xdist_group(item: pytest.Item) -> str | None:
-    """Return the logical xdist group for a collected test item."""
-
-    keywords = item.keywords
-    if "db" in keywords or "schema" in keywords:
-        return "database"
-
-    if "network" in keywords:
-        return "network"
-
-    if "gpu" in keywords:
-        return "ml"
-
-    item_path = Path(str(getattr(item, "path", getattr(item, "fspath", ""))))
-    lower_parts = {part.lower() for part in item_path.parts}
-    if "ml" in lower_parts or "gpu" in lower_parts:
-        return "ml"
-
-    return None
-
-
-def _ensure_cli_opt_in(
-    request: pytest.FixtureRequest, *, option: str, marker: str
-) -> None:
-    """Skip costly fixtures unless explicitly enabled via CLI flag."""
-
-    if request.config.getoption(option):
-        return
-
-    cli_flag = option.replace("_", "-")
-    pytest.skip(
-        f"@pytest.mark.{marker} fixtures require the --{cli_flag} flag; "
-        f"rerun with --{cli_flag} to enable this opt-in suite."
-    )
-
-
 def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:
@@ -412,10 +300,10 @@ def pytest_collection_modifyitems(
 
         fixture_names = set(item.fixturenames)
 
-        for marker_name, fixtures in _FIXTURE_MARKER_REQUIREMENTS.items():
+        for marker_name, fixtures in FIXTURE_MARKER_REQUIREMENTS.items():
             if fixtures & fixture_names and item.get_closest_marker(marker_name) is None:
                 fixtures_list = ", ".join(sorted(fixtures & fixture_names))
-                cli_flag = _MARKER_OPTIONS[marker_name].replace("_", "-")
+                cli_flag = MARKER_OPTIONS[marker_name].replace("_", "-")
                 raise pytest.UsageError(
                     " ".join(
                         [
@@ -427,7 +315,7 @@ def pytest_collection_modifyitems(
                     )
                 )
 
-        for marker_name, option_name in _MARKER_OPTIONS.items():
+        for marker_name, option_name in MARKER_OPTIONS.items():
             if item.get_closest_marker(marker_name) and not config.getoption(option_name):
                 cli_flag = option_name.replace("_", "-")
                 item.add_marker(
@@ -437,7 +325,7 @@ def pytest_collection_modifyitems(
                 )
 
         if has_xdist:
-            group_name = _resolve_xdist_group(item)
+            group_name = resolve_xdist_group(item)
             if group_name is None:
                 continue
 
@@ -458,7 +346,7 @@ def pgvector_container(
 ) -> Generator["PostgresContainer", None, None]:
     """Launch a pgvector-enabled Postgres container for integration tests."""
 
-    _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
+    ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
 
     try:
         from testcontainers.postgres import PostgresContainer
@@ -494,7 +382,7 @@ def pgvector_database_url(
 ) -> Generator[str, None, None]:
     """Yield a SQLAlchemy-friendly database URL for the running container."""
 
-    _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
+    ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
 
     raw_url = pgvector_container.get_connection_url()
     url = _normalise_database_url(raw_url)
@@ -514,7 +402,7 @@ def pgvector_engine(
 ) -> Generator[Engine, None, None]:
     """Provide a SQLAlchemy engine connected to the pgvector container."""
 
-    _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
+    ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
 
     engine = create_engine(pgvector_database_url, future=True)
     try:
@@ -529,7 +417,7 @@ def pgvector_migrated_database_url(
 ) -> Generator[str, None, None]:
     """Apply SQL migrations to the pgvector database and return the connection URL."""
 
-    _ensure_cli_opt_in(request, option="schema", marker="schema")
+    ensure_cli_opt_in(request, option="schema", marker="schema")
 
     from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
 

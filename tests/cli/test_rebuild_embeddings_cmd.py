@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import importlib
 import json
 import sys
 import types
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import Any, Iterable, List
 
@@ -28,91 +26,6 @@ from theo.application.embeddings import (
     EmbeddingRebuildStart,
     EmbeddingRebuildState,
 )
-if "fastapi" not in sys.modules:
-    fastapi_stub = types.ModuleType("fastapi")
-    fastapi_stub.status = types.SimpleNamespace()
-    sys.modules["fastapi"] = fastapi_stub
-
-def _install_sqlalchemy_stub() -> None:
-    if "sqlalchemy" in sys.modules:
-        return
-    try:  # Prefer the real package when available.
-        importlib.import_module("sqlalchemy")
-        return
-    except ModuleNotFoundError:
-        pass
-
-    sqlalchemy_stub = types.ModuleType("sqlalchemy")
-
-    class _FuncProxy:
-        def __getattr__(self, name: str) -> Any:  # pragma: no cover - defensive
-            raise NotImplementedError(
-                f"sqlalchemy.func placeholder accessed for '{name}'"
-            )
-
-    def _raise(*_args: object, **_kwargs: object) -> None:  # pragma: no cover
-        raise NotImplementedError("sqlalchemy placeholder accessed")
-
-    sqlalchemy_stub.func = _FuncProxy()
-    sqlalchemy_stub.select = _raise
-    sqlalchemy_stub.create_engine = _raise
-    sqlalchemy_stub.text = lambda statement: statement
-
-    exc_module = types.ModuleType("sqlalchemy.exc")
-
-    class SQLAlchemyError(Exception):
-        """Stub SQLAlchemyError used for import-time compatibility."""
-
-    exc_module.SQLAlchemyError = SQLAlchemyError
-
-    orm_module = types.ModuleType("sqlalchemy.orm")
-
-    class Session:  # pragma: no cover - placeholder
-        def __init__(self, *_args: object, **_kwargs: object) -> None:
-            raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
-
-    orm_module.Session = Session
-
-    engine_module = types.ModuleType("sqlalchemy.engine")
-
-    class Engine:  # pragma: no cover - placeholder
-        pass
-
-    engine_module.Engine = Engine
-
-    sql_module = types.ModuleType("sqlalchemy.sql")
-    sql_module.__package__ = "sqlalchemy"
-    sql_module.__path__ = []  # type: ignore[attr-defined]
-    sql_spec = ModuleSpec("sqlalchemy.sql", loader=None, is_package=True)
-    sql_spec.submodule_search_locations = []  # type: ignore[assignment]
-    sql_module.__spec__ = sql_spec  # type: ignore[attr-defined]
-
-    elements_module = types.ModuleType("sqlalchemy.sql.elements")
-    elements_module.__package__ = "sqlalchemy.sql"
-    elements_spec = ModuleSpec(
-        "sqlalchemy.sql.elements",
-        loader=None,
-        is_package=False,
-    )
-    elements_spec.submodule_search_locations = []  # type: ignore[assignment]
-    elements_module.__spec__ = elements_spec  # type: ignore[attr-defined]
-
-    class ClauseElement:  # pragma: no cover - placeholder type
-        pass
-
-    elements_module.ClauseElement = ClauseElement
-
-    sqlalchemy_stub.exc = exc_module
-    sqlalchemy_stub.orm = orm_module
-    sqlalchemy_stub.engine = engine_module
-    sqlalchemy_stub.sql = sql_module
-
-    sys.modules["sqlalchemy"] = sqlalchemy_stub
-    sys.modules["sqlalchemy.exc"] = exc_module
-    sys.modules["sqlalchemy.orm"] = orm_module
-    sys.modules["sqlalchemy.engine"] = engine_module
-    sys.modules["sqlalchemy.sql"] = sql_module
-    sys.modules["sqlalchemy.sql.elements"] = elements_module
 
 
 def _install_pythonbible_stub() -> None:
@@ -247,8 +160,6 @@ def _install_pythonbible_stub() -> None:
 
     sys.modules["pythonbible"] = module
 
-
-_install_sqlalchemy_stub()
 _install_pythonbible_stub()
 
 from sqlalchemy.exc import SQLAlchemyError

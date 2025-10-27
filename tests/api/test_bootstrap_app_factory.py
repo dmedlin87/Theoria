@@ -2,33 +2,8 @@
 
 from __future__ import annotations
 
-import sys
-from types import ModuleType, SimpleNamespace
-
 from fastapi import FastAPI
-
-if "FlagEmbedding" not in sys.modules:
-    flag_module = ModuleType("FlagEmbedding")
-
-    class _StubFlagModel:  # pragma: no cover - simple test double
-        def __init__(self, *args, **kwargs) -> None:  # noqa: D401 - simple stub
-            pass
-
-        def encode(self, texts):
-            return [[] for _ in texts]
-
-    flag_module.FlagModel = _StubFlagModel  # type: ignore[attr-defined]
-    sys.modules["FlagEmbedding"] = flag_module
-
-if "neo4j" not in sys.modules:
-    neo4j_module = ModuleType("neo4j")
-
-    class _StubDriver:  # pragma: no cover - simple test double
-        pass
-
-    neo4j_module.GraphDatabase = object()
-    neo4j_module.Driver = _StubDriver  # type: ignore[attr-defined]
-    sys.modules["neo4j"] = neo4j_module
+from types import SimpleNamespace
 
 from theo.services.api.app.bootstrap import app_factory
 from theo.services.api.app.bootstrap.lifecycle import lifespan as bootstrap_lifespan
