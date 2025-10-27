@@ -9,6 +9,7 @@ from .rebuild_service import (
     EmbeddingRebuildStart,
     EmbeddingRebuildState,
 )
+from .store import PassageEmbeddingService, PassageEmbeddingStore
 
 __all__ = [
     "EmbeddingRebuildError",
@@ -18,4 +19,6 @@ __all__ = [
     "EmbeddingRebuildService",
     "EmbeddingRebuildStart",
     "EmbeddingRebuildState",
+    "PassageEmbeddingService",
+    "PassageEmbeddingStore",
 ]

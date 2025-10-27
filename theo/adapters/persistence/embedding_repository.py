@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from theo.application.repositories.embedding_repository import (
@@ -15,7 +15,7 @@ from theo.application.repositories.embedding_repository import (
     PassageForEmbedding,
 )
 
-from .models import Document, Passage
+from .models import Document, Passage, PassageEmbedding
 
 
 class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
@@ -56,7 +56,8 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
         batch_size: int,
     ) -> Iterable[PassageForEmbedding]:
         stmt = (
-            select(Passage)
+            select(Passage, PassageEmbedding.embedding)
+            .outerjoin(PassageEmbedding)
             .order_by(Passage.id)
             .execution_options(stream_results=True, yield_per=max(1, batch_size))
         )
@@ -65,27 +66,36 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
         )
         if join_document:
             stmt = stmt.join(Document)
+            stmt = stmt.add_columns(Document.updated_at)
         for criterion in filters:
             stmt = stmt.where(criterion)
 
-        stream = self._session.execute(stmt).scalars()
-        for record in stream:
+        stream = self._session.execute(stmt)
+        for row in stream:
+            passage = row[0]
+            embedding = row[1]
+            document_updated_at = row[2] if join_document else None
             yield PassageForEmbedding(
-                id=record.id,
-                text=record.text,
-                embedding=record.embedding,
-                document_updated_at=getattr(record.document, "updated_at", None)
-                if join_document
-                else None,
+                id=passage.id,
+                text=passage.text,
+                embedding=embedding,
+                document_updated_at=document_updated_at,
             )
 
     def update_embeddings(self, updates: Sequence[EmbeddingUpdate]) -> None:
         if not updates:
             return
+        ids = [update.id for update in updates]
+        if ids:
+            self._session.execute(
+                delete(PassageEmbedding).where(PassageEmbedding.passage_id.in_(ids))
+            )
         payload = [
-            {"id": update.id, "embedding": list(update.embedding)} for update in updates
+            {"passage_id": update.id, "embedding": list(update.embedding)}
+            for update in updates
         ]
-        self._session.bulk_update_mappings(Passage, payload)
+        if payload:
+            self._session.bulk_insert_mappings(PassageEmbedding, payload)
 
     def _build_filters(
         self,
@@ -97,7 +107,11 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
         filters: list = []
         join_document = False
         if fast:
-            filters.append(Passage.embedding.is_(None))
+            filters.append(
+                ~select(PassageEmbedding.passage_id)
+                .where(PassageEmbedding.passage_id == Passage.id)
+                .exists()
+            )
         if changed_since is not None:
             join_document = True
             filters.append(Document.updated_at >= changed_since)
