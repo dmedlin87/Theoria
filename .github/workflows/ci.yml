@@ -236,19 +236,21 @@ jobs:
           pip install -e ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
           pip install -e ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
 
-      - name: Run ${{ matrix.suite }} pytest suite
+      - name: Run ${{ matrix.suite }} pytest suite with profiling
+        env:
+          PYTEST_ADDOPTS: -n=auto --dist=loadscope --max-worker-restart=0
         run: |
-          case "${{ matrix.suite }}" in
-            schema)
-              pytest --schema -m schema
-              ;;
-            pgvector)
-              pytest --pgvector -m pgvector
-              ;;
-            contract)
-              pytest --contract -m contract
-              ;;
-          esac
+          python scripts/perf/profile_marker_suites.py \
+            --output perf_metrics/${{ matrix.suite }}-ci.json \
+            ${{ matrix.suite }}
+
+      - name: Upload ${{ matrix.suite }} timing profile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pytest-${{ matrix.suite }}-profile
+          path: perf_metrics/${{ matrix.suite }}-ci.json
+          if-no-files-found: warn
 
   web_accessibility:
     name: Web axe accessibility scans

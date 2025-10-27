@@ -23,10 +23,13 @@ import pytest
 try:  # pragma: no cover - optional dependency for integration fixtures
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import Engine
+    from sqlalchemy.orm import Session, sessionmaker
 except ModuleNotFoundError:  # pragma: no cover - allows running lightweight suites
     create_engine = None  # type: ignore[assignment]
     text = None  # type: ignore[assignment]
     Engine = object  # type: ignore[assignment]
+    Session = object  # type: ignore[assignment]
+    sessionmaker = None  # type: ignore[assignment]
 
 try:  # pragma: no cover - factory depends on optional domain extras
     from tests.factories.application import isolated_application_container
@@ -436,6 +439,9 @@ def pytest_collection_modifyitems(
                     )
                 )
 
+        if item.get_closest_marker("schema"):
+            item.add_marker(pytest.mark.usefixtures("schema_isolation"))
+
         if has_xdist:
             group_name = _resolve_xdist_group(item)
             if group_name is None:
@@ -674,6 +680,33 @@ def db_transaction(integration_engine: Engine) -> Generator[Any, None, None]:
         connection.close()
 
 
+@pytest.fixture(scope="function")
+def integration_session(integration_engine: Engine) -> Generator[Session, None, None]:
+    """Return a SQLAlchemy ``Session`` bound to an isolated transaction."""
+
+    if sessionmaker is None:  # pragma: no cover - lightweight envs without SQLAlchemy
+        pytest.skip("sqlalchemy not installed")
+
+    connection = integration_engine.connect()
+    transaction = connection.begin()
+    SessionFactory = sessionmaker(bind=connection, future=True)  # type: ignore[arg-type]
+    session = SessionFactory()
+    try:
+        yield session
+        session.flush()
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
+
+
+@pytest.fixture(scope="function")
+def schema_isolation(db_transaction: Any) -> Iterator[None]:
+    """Ensure ``@pytest.mark.schema`` tests automatically roll back state."""
+
+    yield
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _set_database_url_env(
     request: pytest.FixtureRequest, pytestconfig: pytest.Config
@@ -725,7 +758,7 @@ def manage_memory() -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _mock_sleep_session() -> dict[str, Any]:
+def mock_sleep_session() -> dict[str, Any]:
     """Patch sleep functions once per session to minimise fixture churn."""
 
     async_sleep_mock = AsyncMock()
@@ -746,8 +779,8 @@ def _mock_sleep_session() -> dict[str, Any]:
 
 
 @pytest.fixture(autouse=True)
-def mock_sleep(request, _mock_sleep_session: dict[str, Any]) -> Iterator[None]:
-    patchers = _mock_sleep_session
+def mock_sleep(request, mock_sleep_session: dict[str, Any]) -> Iterator[None]:
+    patchers = mock_sleep_session
     async_mock: AsyncMock = patchers["async_mock"]
 
     if "allow_sleep" in request.keywords:
