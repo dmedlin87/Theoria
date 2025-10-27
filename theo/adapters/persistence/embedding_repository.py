@@ -16,13 +16,16 @@ from theo.application.repositories.embedding_repository import (
 )
 
 from .models import Document, Passage, PassageEmbedding
+from .base_repository import BaseRepository
 
 
-class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
+class SQLAlchemyPassageEmbeddingRepository(
+    BaseRepository[Passage], PassageEmbeddingRepository
+):
     """Repository coordinating passage reads and embedding updates."""
 
     def __init__(self, session: Session) -> None:
-        self._session = session
+        super().__init__(session)
 
     def count_candidates(
         self,
@@ -39,13 +42,13 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
             stmt = stmt.join(Document)
         for criterion in filters:
             stmt = stmt.where(criterion)
-        return int(self._session.execute(stmt).scalar_one())
+        return int(self.execute(stmt).scalar_one())
 
     def existing_ids(self, ids: Sequence[str]) -> set[str]:
         if not ids:
             return set()
         stmt = select(Passage.id).where(Passage.id.in_(ids))
-        return set(self._session.execute(stmt).scalars())
+        return set(self.execute(stmt).scalars())
 
     def iter_candidates(
         self,

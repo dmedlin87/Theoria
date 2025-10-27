@@ -54,7 +54,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
-          file: theo/services/api/Dockerfile
+          file: theo/infrastructure/api/Dockerfile
           push: true
           tags: |
             ${{ steps.meta.outputs.image }}:${{ github.sha }}
@@ -85,7 +85,7 @@ jobs:
           cosign-release: 'v2.4.1'
 
       - name: Generate CycloneDX image SBOM
-        uses: anchore/sbom-action@aa0e114b2e19480f157109b9922bda359bd98b90 # v0.20.8
+        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84 # v0.20.9
         with:
           image: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
@@ -194,7 +194,7 @@ jobs:
           cosign download attestation ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }} > image-provenance.intoto.jsonl
 
       - name: Upload signing artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: signed-image-metadata
           path: |

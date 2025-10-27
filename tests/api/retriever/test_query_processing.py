@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from theo.services.api.app.retriever import hybrid
+from theo.infrastructure.api.app.retriever import hybrid
 
 
 def test_tokenise_and_lexical_score():

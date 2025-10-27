@@ -55,5 +55,11 @@ def allow_insecure_startup() -> bool:
     return True
 
 
-__all__ = ["allow_insecure_startup"]
+def current_runtime_environment() -> str:
+    """Expose the resolved runtime environment label for diagnostics."""
+
+    return _resolve_environment()
+
+
+__all__ = ["allow_insecure_startup", "current_runtime_environment"]
 

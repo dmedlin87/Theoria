@@ -1,7 +1,7 @@
 import httpx
 from sqlalchemy.orm import Session, sessionmaker
 
-from theo.services.api.app.analytics.openalex_enrichment import (
+from theo.infrastructure.api.app.analytics.openalex_enrichment import (
     enrich_document_openalex_details,
 )
 from theo.adapters.persistence.models import Document

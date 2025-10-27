@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from theo.services.api.app.export.citations import (
+from theo.infrastructure.api.app.export.citations import (
     CitationSource,
     format_citation,
     build_citation_export,

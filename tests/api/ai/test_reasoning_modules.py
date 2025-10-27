@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from theo.services.api.app.ai.reasoning.fallacies import (
+from theo.infrastructure.api.app.ai.reasoning.fallacies import (
     FallacyDetector,
     detect_fallacies,
 )
-from theo.services.api.app.ai.reasoning.chain_of_thought import (
+from theo.infrastructure.api.app.ai.reasoning.chain_of_thought import (
     build_cot_prompt,
     parse_chain_of_thought,
 )
-from theo.services.api.app.ai.reasoning.insights import InsightDetector
-from theo.services.api.app.ai.reasoning.metacognition import (
+from theo.infrastructure.api.app.ai.reasoning.insights import InsightDetector
+from theo.infrastructure.api.app.ai.reasoning.metacognition import (
     Critique,
     MAX_CITATIONS_IN_PROMPT,
     _detect_bias,
@@ -23,7 +23,7 @@ from theo.services.api.app.ai.reasoning.metacognition import (
     critique_reasoning,
     revise_with_critique,
 )
-from theo.services.api.app.ai.rag.models import RAGCitation
+from theo.infrastructure.api.app.ai.rag.models import RAGCitation
 
 
 class TestFallacyDetector:

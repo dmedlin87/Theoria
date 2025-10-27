@@ -41,7 +41,7 @@ api = [
     "click>=8.1,<9",
     "cryptography>=46.0.3,<47",
     "defusedxml>=0.7.1,<0.8",
-    "fastapi>=0.119.0,<0.120",
+    "fastapi>=0.119.0,<0.121",
     "httpx>=0.28.1,<0.29",
     "neo4j>=5.20,<6",
     "opentelemetry-api>=1.25.0,<2",
@@ -120,8 +120,8 @@ combine_as_imports = true
 [tool.mypy]
 python_version = "3.11"
 files = [
-    "theo/services/api/app",
-    "theo/services/api/tests",
+    "theo/infrastructure/api/app",
+    "theo/infrastructure/api/tests",
     "tests/export",
 ]
 ignore_missing_imports = true

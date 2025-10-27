@@ -7,7 +7,7 @@ from typing import Mapping
 
 import pytest
 
-from theo.services.api.app.errors import IngestionError, Severity, TheoError
+from theo.infrastructure.api.app.errors import IngestionError, Severity, TheoError
 
 
 @pytest.mark.parametrize(

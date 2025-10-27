@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from theo.services.api.app.retriever.utils import compose_passage_meta
+from theo.infrastructure.api.app.retriever.utils import compose_passage_meta
 
 
 def test_compose_passage_meta_merges_document_and_passage_metadata() -> None:

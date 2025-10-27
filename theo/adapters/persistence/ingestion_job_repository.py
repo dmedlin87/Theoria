@@ -10,17 +10,20 @@ from sqlalchemy.orm import Session
 from theo.application.observability import trace_repository_call
 from theo.application.repositories import IngestionJobRepository
 
+from .base_repository import BaseRepository
 from .models import IngestionJob
 
 if TYPE_CHECKING:
     from theo.application.dtos import IngestionJobDTO
 
 
-class SQLAlchemyIngestionJobRepository(IngestionJobRepository):
+class SQLAlchemyIngestionJobRepository(
+    BaseRepository[IngestionJob], IngestionJobRepository
+):
     """Persistence adapter for ingestion job bookkeeping."""
 
     def __init__(self, session: Session):
-        self.session = session
+        super().__init__(session)
 
     def update_status(
         self,
@@ -35,7 +38,7 @@ class SQLAlchemyIngestionJobRepository(IngestionJobRepository):
             "update_status",
             attributes={"job_id": job_id, "status": status},
         ) as trace:
-            job = self.session.get(IngestionJob, job_id)
+            job = self.get(IngestionJob, job_id)
             trace.set_attribute("exists", job is not None)
             if job is None:
                 trace.record_result_count(0)
@@ -54,7 +57,7 @@ class SQLAlchemyIngestionJobRepository(IngestionJobRepository):
             "set_payload",
             attributes={"job_id": job_id, "payload_keys": tuple(sorted(payload))},
         ) as trace:
-            job = self.session.get(IngestionJob, job_id)
+            job = self.get(IngestionJob, job_id)
             trace.set_attribute("exists", job is not None)
             if job is None:
                 trace.record_result_count(0)
@@ -69,7 +72,7 @@ class SQLAlchemyIngestionJobRepository(IngestionJobRepository):
             "merge_payload",
             attributes={"job_id": job_id, "payload_keys": tuple(sorted(payload))},
         ) as trace:
-            job = self.session.get(IngestionJob, job_id)
+            job = self.get(IngestionJob, job_id)
             trace.set_attribute("exists", job is not None)
             if job is None:
                 trace.record_result_count(0)

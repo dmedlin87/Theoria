@@ -3,10 +3,10 @@ import pytest
 import json
 from unittest.mock import MagicMock
 
-from theo.services.api.app.ai.rag.guardrails import GuardrailError
-from theo.services.api.app.ai.rag.models import RAGAnswer
-from theo.services.api.app.models.search import HybridSearchFilters
-from theo.services.api.app.routes.ai.workflows.guardrails import (
+from theo.infrastructure.api.app.ai.rag.guardrails import GuardrailError
+from theo.infrastructure.api.app.ai.rag.models import RAGAnswer
+from theo.infrastructure.api.app.models.search import HybridSearchFilters
+from theo.infrastructure.api.app.routes.ai.workflows.guardrails import (
     build_guardrail_metadata,
     extract_refusal_text,
     guardrail_advisory,
@@ -61,7 +61,7 @@ def test_guardrail_http_exception_embeds_error_payload(
     fake_answer = RAGAnswer(summary="Refused", citations=[])
 
     monkeypatch.setattr(
-        "theo.services.api.app.routes.ai.workflows.guardrails.build_guardrail_refusal",
+        "theo.infrastructure.api.app.routes.ai.workflows.guardrails.build_guardrail_refusal",
         lambda _session, reason=None: fake_answer,
     )
 

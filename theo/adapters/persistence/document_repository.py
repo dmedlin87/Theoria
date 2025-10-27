@@ -16,12 +16,13 @@ from theo.domain.discoveries import DocumentEmbedding
 from theo.application.facades.settings import get_settings
 from theo.application.embeddings.store import PassageEmbeddingService
 
+from .base_repository import BaseRepository
 from .mappers import document_summary_to_dto, document_to_dto
 from .models import Document, Passage, _PREFETCHED_EMBEDDING_ATTR
 from .passage_embedding_store import SQLAlchemyPassageEmbeddingStore
 
 
-class SQLAlchemyDocumentRepository(DocumentRepository):
+class SQLAlchemyDocumentRepository(BaseRepository[Document], DocumentRepository):
     """Document repository using SQLAlchemy sessions."""
 
     def __init__(
@@ -52,7 +53,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
                 .where(Document.collection == user_id)
                 .options(selectinload(Document.passages))
             )
-            documents = self.session.scalars(stmt).all()
+            documents = self.scalars(stmt).all()
 
             trace.set_attribute("documents_fetched", len(documents))
 
@@ -106,7 +107,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
                 .options(selectinload(Document.passages))
                 .where(Document.id == document_id)
             )
-            document = self.session.scalars(stmt).first()
+            document = self.scalars(stmt).first()
             trace.set_attribute("hit", document is not None)
             if document is None:
                 trace.record_result_count(0)
@@ -130,7 +131,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             stmt = select(Document).where(Document.collection == user_id)
             if limit is not None:
                 stmt = stmt.limit(limit)
-            documents = self.session.scalars(stmt).all()
+            documents = self.scalars(stmt).all()
             trace.record_result_count(len(documents))
             return [document_summary_to_dto(doc) for doc in documents]
 

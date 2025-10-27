@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from theo.services.api.app.ai.rag.guardrails import (
+from theo.infrastructure.api.app.ai.rag.guardrails import (
     GuardrailError,
     ensure_completion_safe,
 )

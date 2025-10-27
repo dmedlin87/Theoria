@@ -9,14 +9,14 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from theo.services.api.app.ingest.embeddings import (
+from theo.infrastructure.api.app.ingest.embeddings import (
     EmbeddingService,
     ResilienceError,
     lexical_representation,
 )
-from theo.services.api.app.resilience import ResilienceMetadata
+from theo.infrastructure.api.app.resilience import ResilienceMetadata
 
-import theo.services.api.app.ingest.embeddings as embeddings_module
+import theo.infrastructure.api.app.ingest.embeddings as embeddings_module
 
 
 class _RecordingEncoder:

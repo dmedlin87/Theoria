@@ -20,11 +20,11 @@ from theo.application.facades.database import (  # noqa: E402
     get_settings,
 )
 from theo.adapters.persistence.models import CommentaryExcerptSeed  # noqa: E402
-from theo.services.api.app.ingest.pipeline import (  # noqa: E402
+from theo.infrastructure.api.app.ingest.pipeline import (  # noqa: E402
     PipelineDependencies,
     import_osis_commentary,
 )
-from theo.services.cli import ingest_osis as cli  # noqa: E402
+from theo.application.services.cli import ingest_osis as cli  # noqa: E402
 
 
 def _prepare_db(tmp_path: Path) -> None:

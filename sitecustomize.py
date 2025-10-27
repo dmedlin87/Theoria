@@ -13,7 +13,7 @@ import sys
 import types
 from typing import Any
 
-_WORKERS_TASKS_MODULE = "theo.services.api.app.workers.tasks"
+_WORKERS_TASKS_MODULE = "theo.infrastructure.api.app.workers.tasks"
 
 
 def _should_install_workers_stub() -> bool:
@@ -29,7 +29,7 @@ def _install_workers_stub() -> None:
     if _WORKERS_TASKS_MODULE in sys.modules:
         return
 
-    workers_pkg = importlib.import_module("theo.services.api.app.workers")
+    workers_pkg = importlib.import_module("theo.infrastructure.api.app.workers")
     celery_stub = types.SimpleNamespace(
         conf=types.SimpleNamespace(
             task_always_eager=False,
@@ -106,9 +106,9 @@ if _WORKERS_TASKS_MODULE not in sys.modules:  # pragma: no cover - import-time w
     else:
         _register_workers_import_fallback()
 try:
-    importlib.import_module("theo.services.api.app.workers.tasks")
+    importlib.import_module("theo.infrastructure.api.app.workers.tasks")
 except Exception:  # pragma: no cover - executed only when optional deps missing
-    workers_pkg = importlib.import_module("theo.services.api.app.workers")
+    workers_pkg = importlib.import_module("theo.infrastructure.api.app.workers")
     celery_stub = types.SimpleNamespace(
         conf=types.SimpleNamespace(
             task_always_eager=False,
@@ -116,7 +116,7 @@ except Exception:  # pragma: no cover - executed only when optional deps missing
             task_store_eager_result=False,
         )
     )
-    stub_module = types.ModuleType("theo.services.api.app.workers.tasks")
+    stub_module = types.ModuleType("theo.infrastructure.api.app.workers.tasks")
     stub_module.celery = celery_stub
     sys.modules[stub_module.__name__] = stub_module
     setattr(workers_pkg, "tasks", stub_module)

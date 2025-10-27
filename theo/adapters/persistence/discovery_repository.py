@@ -20,6 +20,7 @@ from theo.application.dtos import (
 from theo.application.observability import trace_repository_call
 from theo.application.repositories.discovery_repository import DiscoveryRepository
 
+from .base_repository import BaseRepository
 from .mappers import (
     corpus_snapshot_to_dto,
     discovery_to_dto,
@@ -28,11 +29,11 @@ from .mappers import (
 from .models import CorpusSnapshot, Discovery
 
 
-class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
+class SQLAlchemyDiscoveryRepository(BaseRepository[Discovery], DiscoveryRepository):
     """SQLAlchemy-based discovery repository implementation."""
 
     def __init__(self, session: Session):
-        self.session = session
+        super().__init__(session)
 
     def list(self, filters: DiscoveryListFilters) -> list[DiscoveryDTO]:
         """Retrieve discoveries matching the provided filters."""
@@ -66,7 +67,7 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
             if filters.offset:
                 stmt = stmt.offset(filters.offset)
 
-            results = self.session.scalars(stmt).all()
+            results = self.scalars(stmt).all()
             trace.record_result_count(len(results))
             return [discovery_to_dto(r) for r in results]
 
@@ -81,7 +82,7 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
                 Discovery.id == discovery_id,
                 Discovery.user_id == user_id,
             )
-            result = self.session.scalars(stmt).one_or_none()
+            result = self.scalar_one_or_none(stmt)
             trace.set_attribute("hit", result is not None)
             trace.record_result_count(1 if result else 0)
             return discovery_to_dto(result) if result else None
@@ -102,8 +103,8 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
                 trace.record_result_count(0)
                 return []
             models = [dto_to_discovery(dto) for dto in discoveries]
-            self.session.add_all(models)
-            self.session.flush()  # Assign IDs in a single round-trip
+            self.add_all(models)
+            self.flush()  # Assign IDs in a single round-trip
             trace.record_result_count(len(models))
             return [discovery_to_dto(model) for model in models]
 
@@ -114,7 +115,7 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
             "update",
             attributes={"discovery_id": discovery.id},
         ) as trace:
-            model = self.session.get(Discovery, discovery.id)
+            model = self.get(Discovery, discovery.id)
             if model is None:
                 trace.set_attribute("missing", True)
                 raise LookupError(f"Discovery {discovery.id} not found")
@@ -128,7 +129,7 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
             model.user_reaction = discovery.user_reaction
             model.meta = dict(discovery.metadata) if discovery.metadata else None
 
-            self.session.flush()
+            self.flush()
             trace.record_result_count(1)
             return discovery_to_dto(model)
 
@@ -139,7 +140,7 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
             "delete_by_types",
             attributes={"user_id": user_id, "types": tuple(discovery_types)},
         ) as trace:
-            result = self.session.execute(
+            result = self.execute(
                 delete(Discovery).where(
                     Discovery.user_id == user_id,
                     Discovery.discovery_type.in_(discovery_types),
@@ -156,13 +157,13 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
             "mark_viewed",
             attributes={"discovery_id": discovery_id, "user_id": user_id},
         ) as trace:
-            model = self.session.get(Discovery, discovery_id)
+            model = self.get(Discovery, discovery_id)
             if model is None or model.user_id != user_id:
                 trace.set_attribute("missing", True)
                 raise LookupError(f"Discovery {discovery_id} not found for user {user_id}")
 
             model.viewed = True
-            self.session.flush()
+            self.flush()
             trace.record_result_count(1)
             return discovery_to_dto(model)
 
@@ -179,13 +180,13 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
                 "reaction": reaction,
             },
         ) as trace:
-            model = self.session.get(Discovery, discovery_id)
+            model = self.get(Discovery, discovery_id)
             if model is None or model.user_id != user_id:
                 trace.set_attribute("missing", True)
                 raise LookupError(f"Discovery {discovery_id} not found for user {user_id}")
 
             model.user_reaction = reaction
-            self.session.flush()
+            self.flush()
             trace.record_result_count(1)
             return discovery_to_dto(model)
 
@@ -204,8 +205,8 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
                 dominant_themes=dict(snapshot.dominant_themes),
                 meta=dict(snapshot.metadata) if snapshot.metadata else None,
             )
-            self.session.add(model)
-            self.session.flush()
+            self.add(model)
+            self.flush()
             trace.record_result_count(1)
             return corpus_snapshot_to_dto(model)
 
@@ -224,7 +225,7 @@ class SQLAlchemyDiscoveryRepository(DiscoveryRepository):
                 .order_by(CorpusSnapshot.snapshot_date.desc())
                 .limit(limit)
             )
-            results = list(self.session.scalars(stmt))
+            results = list(self.scalars(stmt))
             trace.record_result_count(len(results))
             results.reverse()  # Return oldest to newest
             return [corpus_snapshot_to_dto(r) for r in results]

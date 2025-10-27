@@ -15,22 +15,24 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONSTRAINTS_DIR = REPO_ROOT / "constraints"
 
-EXTRAS = {
-    "base": CONSTRAINTS_DIR / "base-constraints.txt",
-    "api": CONSTRAINTS_DIR / "api-constraints.txt",
-    "ml": CONSTRAINTS_DIR / "ml-constraints.txt",
-    "dev": CONSTRAINTS_DIR / "dev-constraints.txt",
+TARGETS = {
+    "prod": {
+        "extras": ("base", "api", "ml"),
+        "destination": CONSTRAINTS_DIR / "prod.txt",
+    },
+    "dev": {
+        "extras": ("base", "api", "ml", "dev"),
+        "destination": CONSTRAINTS_DIR / "dev.txt",
+    },
 }
 
 CPU_TORCH_INDEX = "https://download.pytorch.org/whl/cpu"
 DEFAULT_PYPI_INDEX = "https://pypi.org/simple"
-PIP_ARGS = {
-    "ml": f"--index-url {CPU_TORCH_INDEX} --extra-index-url {DEFAULT_PYPI_INDEX}",
-}
+TORCH_PIP_ARGS = f"--index-url {CPU_TORCH_INDEX} --extra-index-url {DEFAULT_PYPI_INDEX}"
 
 
-def run_pip_compile(extra: str, destination: Path) -> Path:
-    """Run pip-compile for a specific extra and return the generated file path."""
+def run_pip_compile(extras: tuple[str, ...], destination: Path) -> Path:
+    """Run pip-compile for a combination of extras and return the generated file path."""
     try:
         relative_output = destination.relative_to(REPO_ROOT)
     except ValueError:
@@ -42,27 +44,31 @@ def run_pip_compile(extra: str, destination: Path) -> Path:
         "piptools",
         "compile",
         "--resolver=backtracking",
-        f"--extra={extra}",
         "--allow-unsafe",
         "--generate-hashes",
         "--quiet",
+    ]
+    for extra in extras:
+        cmd.append(f"--extra={extra}")
+    cmd.extend([
         "--output-file",
         str(relative_output),
         "pyproject.toml",
-    ]
-    pip_args = PIP_ARGS.get(extra)
-    if pip_args:
-        cmd.extend(["--pip-args", pip_args])
+    ])
+    if "ml" in extras:
+        cmd.extend(["--pip-args", TORCH_PIP_ARGS])
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     return destination
 
 
 def check_constraints() -> bool:
     ok = True
-    for extra, destination in EXTRAS.items():
+    for name, config in TARGETS.items():
+        destination = config["destination"]
+        extras = config["extras"]
         original_bytes = destination.read_bytes() if destination.exists() else None
         try:
-            run_pip_compile(extra, destination)
+            run_pip_compile(extras, destination)
         except subprocess.CalledProcessError:
             if original_bytes is None:
                 destination.unlink(missing_ok=True)
@@ -73,7 +79,7 @@ def check_constraints() -> bool:
         updated_bytes = destination.read_bytes()
         if original_bytes is None:
             print(
-                f"Missing constraint file for '{extra}' (expected {destination}).",
+                f"Missing constraint file for target '{name}' (expected {destination}).",
                 file=sys.stderr,
             )
             ok = False
@@ -94,10 +100,14 @@ def check_constraints() -> bool:
 
 def update_constraints() -> None:
     CONSTRAINTS_DIR.mkdir(exist_ok=True)
-    for extra, destination in EXTRAS.items():
+    for name, config in TARGETS.items():
+        destination = config["destination"]
         destination.parent.mkdir(parents=True, exist_ok=True)
-        print(f"Updating constraints for extra '{extra}' -> {destination.relative_to(REPO_ROOT)}")
-        run_pip_compile(extra, destination)
+        print(
+            "Updating constraints for target "
+            f"'{name}' -> {destination.relative_to(REPO_ROOT)} (extras: {', '.join(config['extras'])})"
+        )
+        run_pip_compile(config["extras"], destination)
 
 
 def main(argv: list[str] | None = None) -> int:

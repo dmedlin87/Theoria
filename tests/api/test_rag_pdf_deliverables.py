@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.ai.rag import (
+from theo.infrastructure.api.app.ai.rag import (
     RAGAnswer,
     RAGCitation,
     SermonPrepResponse,

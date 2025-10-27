@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from theo.services.api.app.ai.rag import telemetry
+from theo.infrastructure.api.app.ai.rag import telemetry
 
 
 class DummySpan:

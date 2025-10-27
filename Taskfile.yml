@@ -3,12 +3,12 @@ version: '3'
 tasks:
   start_api:
     cmds:
-      - poetry run uvicorn theo.services.api.app.bootstrap.app_factory:create_app --factory --reload --port 8000
+      - poetry run uvicorn theo.infrastructure.api.app.bootstrap.app_factory:create_app --factory --reload --port 8000
     silent: true
 
   stop_api:
     cmds:
-      - pkill -f "uvicorn .*theo.services.api.app.bootstrap.app_factory" || true
+      - pkill -f "uvicorn .*theo.infrastructure.api.app.bootstrap.app_factory" || true
     silent: true
 
   architecture:test:
@@ -63,6 +63,11 @@ tasks:
     cmds:
       - pytest --durations=0 --profile-svg tests/
 
+  test:profile-markers:
+    desc: Capture performance baselines for schema/pgvector/contract suites
+    cmds:
+      - python scripts/perf/profile_marker_suites.py
+
   test:split:
     desc: Run pytest in split mode for CI matrix builds
     cmds:
@@ -91,7 +96,9 @@ tasks:
   deps:lock:
     desc: Regenerate pip-compile lockfiles for all extras
     cmds:
-      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra base --output-file constraints/base-constraints.txt pyproject.toml
-      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra api --output-file constraints/api-constraints.txt pyproject.toml
-      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra ml --output-file constraints/ml-constraints.txt --pip-args "--index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple" pyproject.toml
-      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra dev --output-file constraints/dev-constraints.txt pyproject.toml
+      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra base --extra api --extra ml \
+          --pip-args "--index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple" \
+          --output-file constraints/prod.txt pyproject.toml
+      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra base --extra api --extra ml --extra dev \
+          --pip-args "--index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple" \
+          --output-file constraints/dev.txt pyproject.toml

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from theo.services.api.app.ingest.orchestrator import IngestOrchestrator, OrchestratorResult, StageExecution
-from theo.services.api.app.ingest.stages import (
+from theo.infrastructure.api.app.ingest.orchestrator import IngestOrchestrator, OrchestratorResult, StageExecution
+from theo.infrastructure.api.app.ingest.stages import (
     DefaultErrorPolicy,
     ErrorDecision,
     ErrorPolicy,

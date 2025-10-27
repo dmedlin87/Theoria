@@ -1,0 +1,48 @@
+{
+  "generated_at": "2025-10-27T01:23:38.452160+00:00",
+  "profiles": {
+    "schema": {
+      "marker": "schema",
+      "command": [
+        "pytest",
+        "--schema",
+        "-m",
+        "schema",
+        "--durations=25",
+        "--durations-min=0.05",
+        "-q"
+      ],
+      "wall_time_seconds": 0.0,
+      "slow_tests": []
+    },
+    "pgvector": {
+      "marker": "pgvector",
+      "command": [
+        "pytest",
+        "--pgvector",
+        "--schema",
+        "-m",
+        "pgvector",
+        "--durations=25",
+        "--durations-min=0.05",
+        "-q"
+      ],
+      "wall_time_seconds": 0.0,
+      "slow_tests": []
+    },
+    "contract": {
+      "marker": "contract",
+      "command": [
+        "pytest",
+        "--contract",
+        "-m",
+        "contract",
+        "--durations=25",
+        "--durations-min=0.05",
+        "-q"
+      ],
+      "wall_time_seconds": 0.0,
+      "slow_tests": []
+    }
+  }
+}

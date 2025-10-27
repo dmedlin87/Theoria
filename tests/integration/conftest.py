@@ -21,7 +21,7 @@ else:
     from theo.adapters.persistence import Base
 
     try:  # pragma: no cover - migrations optional in light environments
-        from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+        from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
     except ModuleNotFoundError:  # pragma: no cover - lightweight test runs
         run_sql_migrations = None  # type: ignore[assignment]
 
@@ -78,8 +78,8 @@ def baseline_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     from theo.application.facades import database as database_module
     from theo.application.facades.settings import get_settings
     from theo.platform.application import resolve_application
-    from theo.services.api.app.db import query_optimizations
-    from theo.services.api.app.routes import documents as documents_route
+    from theo.infrastructure.api.app.db import query_optimizations
+    from theo.infrastructure.api.app.routes import documents as documents_route
 
     monkeypatch.setenv("SETTINGS_SECRET_KEY", "integration-secret")
     monkeypatch.setenv("THEO_API_KEYS", '["pytest-default-key"]')

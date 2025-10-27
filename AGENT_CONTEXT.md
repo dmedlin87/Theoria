@@ -8,12 +8,12 @@ This document distills the essential architecture, conventions, and active surfa
 
 ## Platform Snapshot
 - **Product mission** – Theoria delivers deterministic, verse-anchored theological research workflows with hybrid retrieval, agent assistance, and UI automation. (See the "Why Theoria" and "Core Capabilities" sections in the [README](README.md).)
-- **Primary stacks** – FastAPI workers and background jobs (`theo/services/api`), Next.js app router frontend (`theo/services/web`), PostgreSQL with `pgvector`, and MCP tooling for automations.
+- **Primary stacks** – FastAPI workers and background jobs (`theo/infrastructure/api`), Next.js app router frontend (`theo/services/web`), PostgreSQL with `pgvector`, and MCP tooling for automations.
 - **Operational guardrails** – Scripts under `scripts/` orchestrate dev loops, while `task` targets and `pytest` suites enforce regression safety. Refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for expectations.
 
 ## Architecture Highlights
 - **Hexagonal layering** – Domain logic in `theo/domain` stays pure and framework-free; application facades in `theo/application` orchestrate persistence; adapters integrate external systems; services expose APIs and UI. [`IMPLEMENTATION_CONTEXT.md`](IMPLEMENTATION_CONTEXT.md) contains diagrams and code templates for ports/adapters.
-- **Discovery engines** – Engines share the `dataclass` + `.detect()` contract and are registered in `theo/services/api/app/discoveries/service.py`. Follow the sample patterns in [`IMPLEMENTATION_CONTEXT.md`](IMPLEMENTATION_CONTEXT.md#architecture-patterns) when adding new discovery types.
+- **Discovery engines** – Engines share the `dataclass` + `.detect()` contract and are registered in `theo/infrastructure/api/app/discoveries/service.py`. Follow the sample patterns in [`IMPLEMENTATION_CONTEXT.md`](IMPLEMENTATION_CONTEXT.md#architecture-patterns) when adding new discovery types.
 - **Agent & prompting guardrails** – Safety patterns and operational limits live in [`docs/AGENT_AND_PROMPTING_GUIDE.md`](docs/AGENT_AND_PROMPTING_GUIDE.md) and [`docs/AGENT_CONFINEMENT.md`](docs/AGENT_CONFINEMENT.md); align new reasoning flows with those constraints.
 
 ## Development Workflow

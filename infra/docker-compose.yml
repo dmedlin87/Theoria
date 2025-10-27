@@ -31,7 +31,7 @@ services:
   api:
     build:
       context: ..
-      dockerfile: theo/services/api/Dockerfile
+      dockerfile: theo/infrastructure/api/Dockerfile
     env_file: ../.env
     environment:
       storage_root: /data/storage

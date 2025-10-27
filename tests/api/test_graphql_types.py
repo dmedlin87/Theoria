@@ -5,7 +5,7 @@ from datetime import datetime
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.domain.research.overview import OverviewBullet
 from theo.domain.research.scripture import Verse as DomainVerse
-from theo.services.api.app.graphql import types as graphql_types
+from theo.infrastructure.api.app.graphql import types as graphql_types
 
 
 def test_document_metadata_type_from_domain() -> None:

@@ -13,9 +13,9 @@ Thank you for investing time into Theoria! This guide captures the current devel
    ```bash
    python3.11 -m venv .venv
    source .venv/bin/activate
-   pip install ".[api]" -c constraints/api-constraints.txt
-   pip install ".[ml]" -c constraints/ml-constraints.txt
-   pip install ".[dev]" -c constraints/dev-constraints.txt  # tooling (e.g., mypy) and stub packages
+   pip install ".[api]" -c constraints/prod.txt
+   pip install ".[ml]" -c constraints/prod.txt
+   pip install ".[dev]" -c constraints/dev.txt  # tooling (e.g., mypy) and stub packages
 
 After editing dependency ranges in `pyproject.toml`, regenerate the constraint lockfiles via `python scripts/update_constraints.py` and commit the results. Use `python scripts/update_constraints.py --check` locally or in CI to ensure constraints stay in sync.
    ```
@@ -46,7 +46,7 @@ Testing is being standardised in phases. Until the unified Make targets land, yo
 
 - **Celery worker retry/idempotency tests**
   ```bash
-  pytest -q theo/services/api/tests/workers
+  pytest -q theo/infrastructure/api/tests/workers
   ```
   Tests in `tests/workers/test_tasks.py` use `celery.contrib.pytest` to validate retry backoff windows and ingestion job idempotency. Pass `--use-pgvector` if you need a Postgres + pgvector backend instead of the default in-memory SQLite database.
 
@@ -80,6 +80,7 @@ Once the Makefile façade is introduced the following convenience commands will 
 ## Debugging Utilities & Local Artifacts
 - Reusable maintenance helpers and scratch scripts live in [`scripts/debug/`](scripts/debug/). If you create a new diagnostic script, place it there so others can discover and rerun it.
 - Store ad-hoc transcripts or large local investigation logs under `docs/process/` when they are worth sharing, or `.debug/` when they should stay out of version control. Avoid committing machine-specific transcripts, temporary exports (for example `test_results*.txt`), or other local debugging output at the repository root.
+- Do not recreate the legacy `.tmp_contract_debug/` workspace (or similarly named folders). It was an ad-hoc scratch area that polluted commits; use `.debug/` or `docs/process/` instead so temporary assets stay local.
 
 ## Pull Request Expectations
 - Reference relevant sections of the Test Map when adding or updating tests.

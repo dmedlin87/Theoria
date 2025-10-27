@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.application.facades.database import Base
 from theo.adapters.persistence.models import Document, IngestionJob, Passage, ChatSession
-from theo.services.api.app.workers import tasks
+from theo.infrastructure.api.app.workers import tasks
 
 # Performance optimization fixtures
 @pytest.fixture(scope="session")
@@ -76,11 +76,11 @@ def mock_expensive_operations(monkeypatch):
     )
     
     monkeypatch.setattr(
-        "theo.services.api.app.ingest.pipeline.run_pipeline_for_url",
+        "theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_url",
         Mock(return_value=mock_doc)
     )
     monkeypatch.setattr(
-        "theo.services.api.app.ingest.pipeline.run_pipeline_for_file",
+        "theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_file",
         Mock(return_value=mock_doc)
     )
     
@@ -91,19 +91,19 @@ def mock_expensive_operations(monkeypatch):
     mock_snapshot.generated_at = datetime.now(UTC)
     
     monkeypatch.setattr(
-        "theo.services.api.app.analytics.topic_map.TopicMapBuilder.build",
+        "theo.infrastructure.api.app.analytics.topic_map.TopicMapBuilder.build",
         Mock(return_value=mock_snapshot)
     )
     
     # Mock vector operations
     monkeypatch.setattr(
-        "theo.services.api.app.workers.tasks._format_vector",
+        "theo.infrastructure.api.app.workers.tasks._format_vector",
         Mock(return_value=[0.1] * 10)
     )
     
     # Mock enrichment
     monkeypatch.setattr(
-        "theo.services.api.app.enrich.MetadataEnricher.enrich_document",
+        "theo.infrastructure.api.app.enrich.MetadataEnricher.enrich_document",
         Mock(return_value=True)
     )
     
@@ -165,7 +165,7 @@ class TestWorkerPerformance:
     
     def test_process_url_fast(self, optimized_session):
         """Fast URL processing test."""
-        with patch('theo.services.api.app.workers.tasks.get_engine') as mock_engine:
+        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_engine:
             mock_engine.return_value = optimized_session.bind
             
             # This should complete in <100ms instead of several seconds
@@ -183,7 +183,7 @@ class TestWorkerPerformance:
         job = create_test_job(optimized_session, "url_ingest")
         optimized_session.commit()
         
-        with patch('theo.services.api.app.workers.tasks.get_engine') as mock_engine:
+        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_engine:
             mock_engine.return_value = optimized_session.bind
             
             tasks.process_url(
@@ -222,8 +222,8 @@ class TestWorkerPerformance:
         optimized_session.add(chat_session)
         optimized_session.commit()
         
-        with patch('theo.services.api.app.workers.tasks.get_engine') as mock_engine, \
-             patch('theo.services.api.app.workers.tasks.hybrid_search') as mock_search:
+        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_engine, \
+             patch('theo.infrastructure.api.app.workers.tasks.hybrid_search') as mock_search:
             
             mock_engine.return_value = optimized_session.bind
             mock_search.return_value = [Mock(
@@ -252,8 +252,8 @@ class TestWorkerPerformance:
             def begin(self):
                 return MockConnection()
         
-        with patch('theo.services.api.app.workers.tasks.get_engine') as mock_get_engine, \
-             patch('theo.services.api.app.workers.tasks._evaluate_hnsw_recall') as mock_eval:
+        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_get_engine, \
+             patch('theo.infrastructure.api.app.workers.tasks._evaluate_hnsw_recall') as mock_eval:
             
             mock_get_engine.return_value = MockEngine()
             mock_eval.return_value = {"sample_size": 5, "avg_recall": 0.95}

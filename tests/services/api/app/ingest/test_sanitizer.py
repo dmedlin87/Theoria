@@ -1,4 +1,4 @@
-from theo.services.api.app.ingest import sanitizer
+from theo.infrastructure.api.app.ingest import sanitizer
 
 
 DANGEROUS_SNIPPET = (
