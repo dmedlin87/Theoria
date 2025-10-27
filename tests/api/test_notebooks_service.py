@@ -1,4 +1,4 @@
-from theo.services.api.app.notebooks.service import (
+from theo.infrastructure.api.app.notebooks.service import (
     _ensure_team_membership,
     _principal_teams,
 )

@@ -32,15 +32,15 @@ if "neo4j" not in sys.modules:
     neo4j_module.Driver = _StubDriver  # type: ignore[attr-defined]
     sys.modules["neo4j"] = neo4j_module
 
-from theo.services.api.app.bootstrap.middleware import (
+from theo.infrastructure.api.app.bootstrap.middleware import (
     configure_cors,
     get_security_dependencies,
     install_error_reporting,
     register_trace_handlers,
 )
-from theo.services.api.app.debug import ErrorReportingMiddleware
-from theo.services.api.app.errors import TheoError
-from theo.services.api.app.ingest.exceptions import UnsupportedSourceError
+from theo.infrastructure.api.app.debug import ErrorReportingMiddleware
+from theo.infrastructure.api.app.errors import TheoError
+from theo.infrastructure.api.app.ingest.exceptions import UnsupportedSourceError
 
 
 def test_configure_cors_adds_middleware():

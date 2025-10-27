@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from theo.services.cli import rag_eval as rag_eval_module
+from theo.application.services.cli import rag_eval as rag_eval_module
 
 
 class DummyDataset:

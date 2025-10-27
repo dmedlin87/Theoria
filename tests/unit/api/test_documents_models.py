@@ -7,7 +7,7 @@ import types
 import pytest
 from pydantic import ValidationError
 
-from theo.services.api.app.models import documents
+from theo.infrastructure.api.app.models import documents
 
 
 @pytest.fixture

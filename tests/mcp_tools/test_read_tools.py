@@ -7,8 +7,8 @@ from jsonschema import validate
 
 from mcp_server import schemas
 from mcp_server.tools import read
-from theo.services.api.app.models.search import HybridSearchResult
-from theo.services.api.app.models.verses import (
+from theo.infrastructure.api.app.models.search import HybridSearchResult
+from theo.infrastructure.api.app.models.verses import (
     VerseTimelineBucket,
     VerseTimelineResponse,
 )

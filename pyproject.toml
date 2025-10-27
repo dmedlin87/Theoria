@@ -120,8 +120,8 @@ combine_as_imports = true
 [tool.mypy]
 python_version = "3.11"
 files = [
-    "theo/services/api/app",
-    "theo/services/api/tests",
+    "theo/infrastructure/api/app",
+    "theo/infrastructure/api/tests",
     "tests/export",
 ]
 ignore_missing_imports = true

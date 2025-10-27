@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from theo.services.api.app.analytics.agent_evaluation import (
+from theo.infrastructure.api.app.analytics.agent_evaluation import (
     evaluate_agent_trails,
 )
 from theo.application.facades.database import Base

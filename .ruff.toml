@@ -1,14 +1,14 @@
 line-length = 88
 target-version = "py311"
-src = ["theo/services/api/app"]
+src = ["theo/infrastructure/api/app"]
 exclude = [
     "docs",
     "tests",
     "typings",
     "scripts",
-    "theo/services/cli",
-    "theo/services/geo",
-    "theo/services/api/tests",
+    "theo/application/services/cli",
+    "theo/application/services/geo",
+    "theo/infrastructure/api/tests",
 ]
 
 [lint]
@@ -34,10 +34,10 @@ ignore = [
 
 [lint.per-file-ignores]
 "tests/**" = ["S101", "S106", "E501"]
-"theo/services/api/tests/**" = ["S101", "S106", "E501"]
-"theo/services/cli/tests/**" = ["S101", "S106", "E501"]
+"theo/infrastructure/api/tests/**" = ["S101", "S106", "E501"]
+"theo/application/services/cli/tests/**" = ["S101", "S106", "E501"]
 "typings/**" = ["I001"]
-"theo/services/geo/seed_openbible_geo.py" = ["S603", "S607", "E501", "I001"]
+"theo/application/services/geo/seed_openbible_geo.py" = ["S603", "S607", "E501", "I001"]
 
 [lint.isort]
 known-first-party = ["theo"]

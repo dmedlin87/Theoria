@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from theo.services.api.app.case_builder import sync_case_objects_for_document
+from theo.infrastructure.api.app.case_builder import sync_case_objects_for_document
 from theo.application.facades import settings as settings_module
 from theo.application.facades.database import Base
 from theo.adapters.persistence.models import (
@@ -18,10 +18,10 @@ from theo.adapters.persistence.models import (
     Passage,
     PassageVerse,
 )
-from theo.services.api.app.ingest.chunking import Chunk
-from theo.services.api.app.ingest.osis import expand_osis_reference
-from theo.services.api.app.ingest.persistence import persist_text_document, persist_transcript_document
-from theo.services.api.app.ingest.stages import IngestContext, Instrumentation
+from theo.infrastructure.api.app.ingest.chunking import Chunk
+from theo.infrastructure.api.app.ingest.osis import expand_osis_reference
+from theo.infrastructure.api.app.ingest.persistence import persist_text_document, persist_transcript_document
+from theo.infrastructure.api.app.ingest.stages import IngestContext, Instrumentation
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +64,7 @@ def stub_event_bus(monkeypatch: pytest.MonkeyPatch) -> None:
         "theo.platform.events.event_bus.publish", lambda *_args, **_kwargs: None
     )
     monkeypatch.setattr(
-        "theo.services.api.app.ingest.persistence.emit_document_persisted_event",
+        "theo.infrastructure.api.app.ingest.persistence.emit_document_persisted_event",
         lambda *_args, **_kwargs: None,
     )
 
@@ -161,7 +161,7 @@ def test_sync_case_objects_notifies_updates(
         notified_payloads.append(list(object_ids))
 
     monkeypatch.setattr(
-        "theo.services.api.app.case_builder.ingest._notify_new_objects",
+        "theo.infrastructure.api.app.case_builder.ingest._notify_new_objects",
         _fake_notify,
     )
 
@@ -238,7 +238,7 @@ def test_persist_text_document_invokes_case_builder_sync(
         return []
 
     monkeypatch.setattr(
-        "theo.services.api.app.case_builder.ingest.sync_case_objects_for_document",
+        "theo.infrastructure.api.app.case_builder.ingest.sync_case_objects_for_document",
         _fake_sync,
     )
 
@@ -280,7 +280,7 @@ def test_persist_text_document_does_not_call_case_builder_when_disabled(
         raise AssertionError("case builder sync should not run")
 
     monkeypatch.setattr(
-        "theo.services.api.app.case_builder.ingest.sync_case_objects_for_document",
+        "theo.infrastructure.api.app.case_builder.ingest.sync_case_objects_for_document",
         _fail_sync,
     )
 

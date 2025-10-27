@@ -46,7 +46,7 @@ Testing is being standardised in phases. Until the unified Make targets land, yo
 
 - **Celery worker retry/idempotency tests**
   ```bash
-  pytest -q theo/services/api/tests/workers
+  pytest -q theo/infrastructure/api/tests/workers
   ```
   Tests in `tests/workers/test_tasks.py` use `celery.contrib.pytest` to validate retry backoff windows and ingestion job idempotency. Pass `--use-pgvector` if you need a Postgres + pgvector backend instead of the default in-memory SQLite database.
 

@@ -76,7 +76,7 @@ def _run_sql_migrations(engine: Engine, migrations_dir: Path) -> None:
 
 
 def _seed_reference_data(engine: Engine) -> None:
-    from theo.services.api.app.db.seeds import seed_reference_data
+    from theo.infrastructure.api.app.db.seeds import seed_reference_data
 
     with Session(bind=engine) as session:
         seed_reference_data(session)
@@ -92,7 +92,7 @@ def _reset_schema(engine: Engine) -> None:
 
 
 def _run_smoke_test(api_key: str, osis_reference: str) -> None:
-    from theo.services.api.app.bootstrap import create_app
+    from theo.infrastructure.api.app.bootstrap import create_app
 
     logging.info("Running smoke test against /research/contradictions")
     with TestClient(create_app()) as client:

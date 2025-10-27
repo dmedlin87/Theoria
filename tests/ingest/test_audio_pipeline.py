@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from theo.application.facades.database import Base
-from theo.services.api.app.ingest.pipeline import run_pipeline_for_audio
-from theo.services.api.app.ingest.stages.fetchers import AudioSourceFetcher
-from theo.services.api.app.ingest.stages.parsers import AudioTranscriptionParser
-from theo.services.api.app.ingest.stages.persisters import AudioDocumentPersister
+from theo.infrastructure.api.app.ingest.pipeline import run_pipeline_for_audio
+from theo.infrastructure.api.app.ingest.stages.fetchers import AudioSourceFetcher
+from theo.infrastructure.api.app.ingest.stages.parsers import AudioTranscriptionParser
+from theo.infrastructure.api.app.ingest.stages.persisters import AudioDocumentPersister
 
 @pytest.fixture
 def sample_audio_path(tmp_path):
@@ -69,7 +69,7 @@ def test_audio_pipeline_full(mock_persist, mock_parse, mock_fetch, sample_audio_
     mock_parse.assert_called_once()
     mock_persist.assert_called_once()
 
-@patch("theo.services.api.app.ingest.stages.parsers.WhisperModel", autospec=True)
+@patch("theo.infrastructure.api.app.ingest.stages.parsers.WhisperModel", autospec=True)
 def test_transcription_quality(mock_whisper, sample_audio_path):
     """Test transcription quality with different audio qualities."""
     # Setup mock Whisper model
@@ -86,7 +86,7 @@ def test_transcription_quality(mock_whisper, sample_audio_path):
     segments = parser._transcribe_audio(sample_audio_path, MagicMock())
     assert "Muffled speech" in segments[0]["text"]
 
-@patch("theo.services.api.app.ingest.stages.parsers.VerseDetector", autospec=True)
+@patch("theo.infrastructure.api.app.ingest.stages.parsers.VerseDetector", autospec=True)
 def test_verse_detection(mock_detector, sample_audio_path):
     """Test verse detection in transcribed text."""
     # Setup mock detector

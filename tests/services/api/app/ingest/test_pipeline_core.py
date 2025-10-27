@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from theo.services.api.app.ingest.exceptions import UnsupportedSourceError
-from theo.services.api.app.ingest.orchestrator import OrchestratorResult, StageExecution
-from theo.services.api.app.ingest.pipeline import (
+from theo.infrastructure.api.app.ingest.exceptions import UnsupportedSourceError
+from theo.infrastructure.api.app.ingest.orchestrator import OrchestratorResult, StageExecution
+from theo.infrastructure.api.app.ingest.pipeline import (
     PipelineDependencies,
     _ensure_success,
     _file_title_default,
@@ -53,7 +53,7 @@ class _RecordingDependencies:
 
 
 def test_pipeline_dependencies_prefers_explicit_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     monkeypatch.setattr(pipeline, "get_settings", lambda: (_ for _ in ()).throw(AssertionError))
     monkeypatch.setattr(
@@ -83,7 +83,7 @@ def test_pipeline_dependencies_prefers_explicit_dependencies(monkeypatch: pytest
 
 
 def test_pipeline_dependencies_falls_back_to_null_graph_projector(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     sentinel_settings = _SentinelSettings()
     sentinel_embedding = _SentinelEmbedding()
@@ -223,7 +223,7 @@ def _fake_instrument_workflow(*_, **__):
 
 
 def test_url_document_persister_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     text_instances: list[_FakeTextDocumentPersister] = []
     transcript_instances: list[_FakeTranscriptDocumentPersister] = []
@@ -291,7 +291,7 @@ def _track_instance(cls, storage, *, session):
 
 
 def test_orchestrate_uses_dependencies_and_records_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     captured: dict[str, object] = {}
 
@@ -326,7 +326,7 @@ def test_orchestrate_uses_dependencies_and_records_workflow(monkeypatch: pytest.
 
 
 def test_orchestrate_instantiates_dependencies_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     created: list[_RecordingDependencies] = []
 
@@ -364,7 +364,7 @@ def test_orchestrate_instantiates_dependencies_when_missing(monkeypatch: pytest.
 
 
 def test_run_pipeline_for_file_wires_expected_stages(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     session = object()
     path = Path("/tmp/source.md")
@@ -419,7 +419,7 @@ def test_run_pipeline_for_file_wires_expected_stages(monkeypatch: pytest.MonkeyP
 
 
 def test_run_pipeline_for_transcript_wires_expected_stages(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     session = object()
     transcript_path = Path("/tmp/audio.vtt")
@@ -470,7 +470,7 @@ def test_run_pipeline_for_transcript_wires_expected_stages(monkeypatch: pytest.M
 
 
 def test_import_osis_commentary_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     session = object()
     path = Path("/tmp/commentary.xml")
@@ -530,7 +530,7 @@ def test_import_osis_commentary_returns_result(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_import_osis_commentary_raises_when_missing_result(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     @contextmanager
     def fake_instrument_workflow(*_, **__):
@@ -553,7 +553,7 @@ def test_import_osis_commentary_raises_when_missing_result(monkeypatch: pytest.M
 
 
 def test_import_osis_commentary_reraises_failure_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.services.api.app.ingest import pipeline
+    from theo.infrastructure.api.app.ingest import pipeline
 
     error = RuntimeError("boom")
     failure = StageExecution(

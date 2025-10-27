@@ -49,7 +49,7 @@ jobs:
           pip install ".[api]" -c constraints/prod.txt -c constraints-ci.txt
           pip install ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
           pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
-          # Make the local package importable so `python -m theo.services.cli.rag_eval` works
+          # Make the local package importable so `python -m theo.application.services.cli.rag_eval` works
           pip install -e .
 
       - name: Determine affected modules

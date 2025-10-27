@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from theo.services.api.app.analytics import watchlists
+from theo.infrastructure.api.app.analytics import watchlists
 from theo.adapters.persistence.models import WatchlistEvent
 
 

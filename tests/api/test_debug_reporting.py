@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.debug import (  # noqa: E402
+from theo.infrastructure.api.app.debug import (  # noqa: E402
     ErrorReportingMiddleware,
     build_debug_report,
     emit_debug_report,
@@ -114,7 +114,7 @@ def test_error_reporting_middleware_emits_report(
 def test_debug_report_includes_trace_id(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     trace_id = "1234567890abcdef1234567890abcdef"
     monkeypatch.setattr(
-        "theo.services.api.app.debug.reporting.get_current_trace_id", lambda: trace_id
+        "theo.infrastructure.api.app.debug.reporting.get_current_trace_id", lambda: trace_id
     )
 
     request = _make_request(b"{}")

@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.application.facades.database import Base
-from theo.services.api.app.db.feedback import record_feedback_event
+from theo.infrastructure.api.app.db.feedback import record_feedback_event
 from theo.adapters.persistence.models import FeedbackEvent, FeedbackEventAction
 
 

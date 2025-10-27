@@ -24,10 +24,10 @@ from theo.application.facades.database import (  # noqa: E402
     get_session,
 )
 from theo.adapters.persistence.models import UserWatchlist  # noqa: E402
-from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.adapters.security import require_principal  # noqa: E402
-from theo.services.api.app.routes.ai import watchlists as watchlists_module  # noqa: E402
-from theo.services.api.app.routes.ai.watchlists import (  # noqa: E402
+from theo.infrastructure.api.app.main import app  # noqa: E402
+from theo.infrastructure.api.app.adapters.security import require_principal  # noqa: E402
+from theo.infrastructure.api.app.routes.ai import watchlists as watchlists_module  # noqa: E402
+from theo.infrastructure.api.app.routes.ai.watchlists import (  # noqa: E402
     WatchlistNotFoundError,
 )
 

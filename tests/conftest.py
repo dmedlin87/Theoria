@@ -367,7 +367,7 @@ def _configure_celery_for_tests() -> Generator[None, None, None]:
     os.environ.setdefault("THEORIA_TESTING", "1")
 
     try:
-        from theo.services.api.app.workers import tasks as worker_tasks
+        from theo.infrastructure.api.app.workers import tasks as worker_tasks
     except Exception:  # pragma: no cover - Celery optional in some test subsets
         yield
         return
@@ -595,7 +595,7 @@ def pgvector_migrated_database_url(
 
     _ensure_cli_opt_in(request, option="schema", marker="schema")
 
-    from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
 
     engine = create_engine(pgvector_database_url, future=True)
     try:
@@ -607,7 +607,7 @@ def pgvector_migrated_database_url(
 
 def _initialise_shared_database(db_path: Path) -> str:
     from theo.application.facades.database import Base
-    from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
 
     url = f"sqlite:///{db_path}"
     engine = create_engine(url, future=True)
@@ -625,8 +625,10 @@ def _load_model_from_registry(model_name: str) -> Any:
 
     candidate_modules = [
         f"theo.ml.models.{model_name}",
-        f"theo.services.ml.{model_name}",
-        f"theo.services.ml.models.{model_name}",
+        f"theo.infrastructure.ml.{model_name}",
+        f"theo.infrastructure.ml.models.{model_name}",
+        f"theo.infrastructure.api.app.ml.{model_name}",
+        f"theo.infrastructure.api.app.ml.models.{model_name}",
     ]
 
     for module_path in candidate_modules:
@@ -641,7 +643,7 @@ def _load_model_from_registry(model_name: str) -> Any:
 
 def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     """Create a SQLite database URL with migrations applied."""
-    from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
     from theo.application.facades.database import Base
 
     database_dir = tmp_path_factory.mktemp("sqlite", numbered=True)

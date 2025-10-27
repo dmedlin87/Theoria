@@ -16,12 +16,12 @@ from theo.application.facades.database import (  # noqa: E402
     get_engine,
 )
 from theo.adapters.persistence.models import Document, Passage  # noqa: E402
-from theo.services.api.app.ingest.tei_pipeline import (  # noqa: E402
+from theo.infrastructure.api.app.ingest.tei_pipeline import (  # noqa: E402
     HTRResult,
     ingest_pilot_corpus,
 )
-from theo.services.api.app.models.search import HybridSearchRequest  # noqa: E402
-from theo.services.api.app.retriever.hybrid import hybrid_search  # noqa: E402
+from theo.infrastructure.api.app.models.search import HybridSearchRequest  # noqa: E402
+from theo.infrastructure.api.app.retriever.hybrid import hybrid_search  # noqa: E402
 
 
 def _prepare_database(tmp_path: Path) -> None:

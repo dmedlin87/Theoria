@@ -11,7 +11,7 @@ def test_repro_missing_defusedxml_dependency(monkeypatch):
         if name.startswith("defusedxml"):
             monkeypatch.delitem(sys.modules, name, raising=False)
 
-    module_name = "theo.services.api.app.ingest.parsers"
+    module_name = "theo.infrastructure.api.app.ingest.parsers"
     monkeypatch.delitem(sys.modules, module_name, raising=False)
 
     parsers = importlib.import_module(module_name)

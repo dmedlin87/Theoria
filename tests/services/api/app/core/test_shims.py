@@ -9,31 +9,31 @@ import pytest
 
 SHIM_DEFINITIONS = [
     {
-        "shim": "theo.services.api.app.core.database",
+        "shim": "theo.infrastructure.api.app.core.database",
         "facade": "theo.application.facades.database",
         "exports": ["Base", "configure_engine", "get_engine", "get_session"],
         "callables": ["configure_engine", "get_engine", "get_session"],
     },
     {
-        "shim": "theo.services.api.app.core.runtime",
+        "shim": "theo.infrastructure.api.app.core.runtime",
         "facade": "theo.application.facades.runtime",
         "exports": ["allow_insecure_startup"],
         "callables": ["allow_insecure_startup"],
     },
     {
-        "shim": "theo.services.api.app.core.secret_migration",
+        "shim": "theo.infrastructure.api.app.core.secret_migration",
         "facade": "theo.application.facades.secret_migration",
         "exports": ["migrate_secret_settings"],
         "callables": ["migrate_secret_settings"],
     },
     {
-        "shim": "theo.services.api.app.core.settings",
+        "shim": "theo.infrastructure.api.app.core.settings",
         "facade": "theo.application.facades.settings",
         "exports": ["Settings", "get_settings", "get_settings_cipher"],
         "callables": ["get_settings", "get_settings_cipher"],
     },
     {
-        "shim": "theo.services.api.app.core.settings_store",
+        "shim": "theo.infrastructure.api.app.core.settings_store",
         "facade": "theo.application.facades.settings_store",
         "exports": [
             "SETTINGS_NAMESPACE",
@@ -45,7 +45,7 @@ SHIM_DEFINITIONS = [
         "callables": ["load_setting", "require_setting", "save_setting"],
     },
     {
-        "shim": "theo.services.api.app.core.version",
+        "shim": "theo.infrastructure.api.app.core.version",
         "facade": "theo.application.facades.version",
         "exports": ["get_git_sha"],
         "callables": ["get_git_sha"],

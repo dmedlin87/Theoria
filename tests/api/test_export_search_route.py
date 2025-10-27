@@ -4,9 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from theo.application.facades.database import get_session
-from theo.services.api.app.main import app
-from theo.services.api.app.routes import export as export_route
-from theo.services.api.app.models.search import HybridSearchRequest
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.routes import export as export_route
+from theo.infrastructure.api.app.models.search import HybridSearchRequest
 
 
 def _override_session():

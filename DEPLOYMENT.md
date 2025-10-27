@@ -4,7 +4,7 @@
 
 1. Run CI pipelines (`ci.yml`, `security-codeql.yml`, `security-scorecard.yml`).
 2. Generate CycloneDX SBOM artifacts for Python and Node dependencies.
-3. Build container images using reproducible Dockerfiles (see `theo/services/api/Dockerfile`).
+3. Build container images using reproducible Dockerfiles (see `theo/infrastructure/api/Dockerfile`).
 4. Sign images and provenance metadata before publishing to registries.
 
 ## Provenance & Signing (SLSA Targets)
@@ -19,7 +19,7 @@
 ### Automated signing workflow
 
 - The `Release Containers` GitHub Actions workflow (`.github/workflows/deployment-sign.yml`) builds the API container from
-  `theo/services/api/Dockerfile`, pushes it to GHCR, and publishes the digest that downstream deployments must consume.
+  `theo/infrastructure/api/Dockerfile`, pushes it to GHCR, and publishes the digest that downstream deployments must consume.
 - The job uses GitHub OIDC for **keyless** Sigstore signing (`cosign sign --keyless`) and records the signature in the
   transparency log. Any tampering or re-build without the workflow identity is rejected during verification.
 - `anchore/sbom-action` generates the image SBOM and the workflow constructs a `build-attestation.json` predicate that bundles

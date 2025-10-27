@@ -1,0 +1,260 @@
+"""Document retrieval helpers."""
+
+from __future__ import annotations
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
+
+from theo.domain.mappers import PassageMapper
+from theo.infrastructure.api.app.persistence_models import (
+    Document,
+    DocumentAnnotation,
+    Passage,
+)
+
+from ..case_builder import sync_annotation_case_object
+from ..db.query_optimizations import query_with_monitoring
+from ..models.base import Passage as PassageSchema
+from ..models.documents import (
+    DocumentAnnotationCreate,
+    DocumentAnnotationResponse,
+    DocumentDetailResponse,
+    DocumentListResponse,
+    DocumentPassagesResponse,
+    DocumentSummary,
+    DocumentUpdateRequest,
+)
+from .annotations import annotation_to_schema, prepare_annotation_body
+
+
+_PASSAGE_MAPPER = PassageMapper()
+
+
+def _passage_to_schema(passage: Passage) -> PassageSchema:
+    verse = _PASSAGE_MAPPER.to_domain(passage)
+    text_value = verse.text.normalized or verse.text.raw or passage.text
+    raw_text_value = verse.text.raw or passage.raw_text
+    meta = dict(passage.meta or {})
+    if _PASSAGE_MAPPER.has_biblical_payload(passage.meta):
+        meta[_PASSAGE_MAPPER.META_KEY] = _PASSAGE_MAPPER.to_meta_payload(verse)
+
+    return PassageSchema(
+        id=passage.id,
+        document_id=passage.document_id,
+        text=text_value,
+        raw_text=raw_text_value,
+        osis_ref=verse.reference.osis_id or passage.osis_ref,
+        start_char=passage.start_char,
+        end_char=passage.end_char,
+        page_no=passage.page_no,
+        t_start=passage.t_start,
+        t_end=passage.t_end,
+        score=None,
+        meta=meta or None,
+    )
+
+@query_with_monitoring("documents.list")
+def list_documents(
+    session: Session, *, limit: int = 20, offset: int = 0
+) -> DocumentListResponse:
+    """Return a paginated set of document summaries."""
+
+    query = session.query(Document).order_by(Document.created_at.desc())
+    total = session.query(func.count(Document.id)).scalar() or 0
+    rows = query.offset(offset).limit(limit).all()
+
+    items = [
+        DocumentSummary(
+            id=row.id,
+            title=row.title,
+            source_type=row.source_type,
+            collection=row.collection,
+            authors=row.authors,
+            doi=row.doi,
+            venue=row.venue,
+            year=row.year,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            provenance_score=row.provenance_score,
+        )
+        for row in rows
+    ]
+
+    return DocumentListResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@query_with_monitoring("documents.detail")
+def get_document(session: Session, document_id: str) -> DocumentDetailResponse:
+    """Fetch a document and its passages from the database."""
+
+    stmt = (
+        select(Document)
+        .options(
+            selectinload(Document.passages)
+            .order_by(Passage.page_no.asc(), Passage.start_char.asc()),
+            selectinload(Document.annotations).order_by(
+                DocumentAnnotation.created_at.asc()
+            ),
+        )
+        .where(Document.id == document_id)
+    )
+    document = session.scalars(stmt).first()
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    passages = list(document.passages)
+    annotations = list(document.annotations)
+
+    passage_schemas = [_passage_to_schema(passage) for passage in passages]
+
+    return DocumentDetailResponse(
+        id=document.id,
+        title=document.title,
+        source_type=document.source_type,
+        collection=document.collection,
+        authors=document.authors,
+        doi=document.doi,
+        venue=document.venue,
+        year=document.year,
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+        source_url=document.source_url,
+        channel=document.channel,
+        video_id=document.video_id,
+        duration_seconds=document.duration_seconds,
+        storage_path=document.storage_path,
+        abstract=document.abstract,
+        topics=document.topics,
+        enrichment_version=document.enrichment_version,
+        provenance_score=document.provenance_score,
+        meta=document.bib_json,
+        passages=passage_schemas,
+        annotations=[annotation_to_schema(annotation) for annotation in annotations],
+    )
+
+
+def get_document_passages(
+    session: Session,
+    document_id: str,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+) -> DocumentPassagesResponse:
+    """Return paginated passages for a document."""
+
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    passage_query = (
+        session.query(Passage)
+        .filter(Passage.document_id == document.id)
+        .order_by(Passage.page_no.asc(), Passage.start_char.asc())
+    )
+    total = (
+        session.query(func.count(Passage.id))
+        .filter(Passage.document_id == document.id)
+        .scalar()
+        or 0
+    )
+    passages = passage_query.offset(offset).limit(limit).all()
+
+    return DocumentPassagesResponse(
+        document_id=document.id,
+        passages=[_passage_to_schema(p) for p in passages],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def get_latest_digest_document(session: Session) -> DocumentDetailResponse:
+    """Return the most recently generated topic digest document."""
+
+    digest = (
+        session.query(Document)
+        .filter(Document.source_type == "digest")
+        .order_by(Document.created_at.desc())
+        .first()
+    )
+    if digest is None:
+        raise KeyError("No topic digest document available")
+    return get_document(session, digest.id)
+
+
+def update_document(
+    session: Session,
+    document_id: str,
+    payload: DocumentUpdateRequest,
+) -> DocumentDetailResponse:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    if payload.title is not None:
+        document.title = payload.title or None
+    if payload.collection is not None:
+        document.collection = payload.collection or None
+    if payload.authors is not None:
+        document.authors = payload.authors or None
+    if payload.source_type is not None:
+        document.source_type = payload.source_type or None
+    if payload.abstract is not None:
+        document.abstract = payload.abstract or None
+    if payload.metadata is not None:
+        document.bib_json = payload.metadata
+
+    session.add(document)
+    session.commit()
+    session.refresh(document)
+    return get_document(session, document_id)
+
+
+def list_annotations(
+    session: Session, document_id: str
+) -> list[DocumentAnnotationResponse]:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    annotations = (
+        session.query(DocumentAnnotation)
+        .filter(DocumentAnnotation.document_id == document_id)
+        .order_by(DocumentAnnotation.created_at.asc())
+        .all()
+    )
+    return [annotation_to_schema(annotation) for annotation in annotations]
+
+
+def create_annotation(
+    session: Session,
+    document_id: str,
+    payload: DocumentAnnotationCreate,
+) -> DocumentAnnotationResponse:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    body = prepare_annotation_body(payload)
+    annotation = DocumentAnnotation(document_id=document_id, body=body)
+    session.add(annotation)
+    session.flush()
+    sync_annotation_case_object(session, document=document, annotation=annotation)
+    session.commit()
+    session.refresh(annotation)
+    return annotation_to_schema(annotation)
+
+
+def delete_annotation(session: Session, document_id: str, annotation_id: str) -> None:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise KeyError(f"Document {document_id} not found")
+
+    annotation = session.get(DocumentAnnotation, annotation_id)
+    if annotation is None or annotation.document_id != document_id:
+        raise KeyError(
+            f"Annotation {annotation_id} not found for document {document_id}"
+        )
+
+    session.delete(annotation)
+    session.commit()

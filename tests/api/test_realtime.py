@@ -8,9 +8,9 @@ from starlette.websockets import WebSocket
 
 from theo.application.facades import settings as settings_module
 from theo.application.facades.database import get_session
-from theo.services.api.app.adapters.security import configure_principal_resolver
-from theo.services.api.app.routes import realtime
-from theo.services.api.app.routes.realtime import NotebookEventBroker
+from theo.infrastructure.api.app.adapters.security import configure_principal_resolver
+from theo.infrastructure.api.app.routes import realtime
+from theo.infrastructure.api.app.routes.realtime import NotebookEventBroker
 
 
 pytestmark = pytest.mark.anyio

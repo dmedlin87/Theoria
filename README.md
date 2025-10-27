@@ -135,7 +135,7 @@ The production constraint set also pins a CPU-only PyTorch wheel by embedding th
 
 5. **Launch API**
    ```bash
-   uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+   uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
    ```
    Visit the interactive docs at <http://localhost:8000/docs>.
 
@@ -170,7 +170,7 @@ The production constraint set also pins a CPU-only PyTorch wheel by embedding th
   Documents & Media     Verse-normalized store      Research & authoring
 ```
 
-- **API & Workers**: `theo/services/api` (FastAPI, background jobs, pgvector).
+- **API & Workers**: `theo/infrastructure/api` (FastAPI, background jobs, pgvector).
 - **Web Experience**: `theo/services/web` (Next.js, Radix UI toolkit, theme system).
 - **Docs & Playbooks**: `docs/` (architecture, workflows, policies).
 - **Automation Scripts**: `scripts/` (dev orchestration, reseeding, evaluation).

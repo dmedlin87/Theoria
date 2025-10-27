@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from theo.services.api.app.ai.rag.guardrail_helpers import derive_snippet, format_anchor
+from theo.infrastructure.api.app.ai.rag.guardrail_helpers import derive_snippet, format_anchor
 
 
 def test_format_anchor_prefers_page_numbers() -> None:

@@ -6,9 +6,9 @@ from collections import deque
 
 import pytest
 
-from theo.services.api.app.ai.rag import workflow
-from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
-from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchResult
+from theo.infrastructure.api.app.ai.rag import workflow
+from theo.infrastructure.api.app.ai.rag.models import RAGAnswer, RAGCitation
+from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchResult
 
 
 class _DummySpan:

@@ -40,7 +40,7 @@ if "pydantic" not in sys.modules:
 
     sys.modules["pydantic"] = pydantic_stub
 
-embeddings_stub = types.ModuleType("theo.services.api.app.ingest.embeddings")
+embeddings_stub = types.ModuleType("theo.infrastructure.api.app.ingest.embeddings")
 
 def _stub_clear_cache() -> None:
     return None
@@ -52,11 +52,11 @@ def _stub_get_service() -> Any:
 
 embeddings_stub.clear_embedding_cache = _stub_clear_cache
 embeddings_stub.get_embedding_service = _stub_get_service
-sys.modules["theo.services.api.app.ingest.embeddings"] = embeddings_stub
+sys.modules["theo.infrastructure.api.app.ingest.embeddings"] = embeddings_stub
 
-sanitizer_stub = types.ModuleType("theo.services.api.app.ingest.sanitizer")
+sanitizer_stub = types.ModuleType("theo.infrastructure.api.app.ingest.sanitizer")
 sanitizer_stub.sanitize_passage_text = lambda text: text
-sys.modules["theo.services.api.app.ingest.sanitizer"] = sanitizer_stub
+sys.modules["theo.infrastructure.api.app.ingest.sanitizer"] = sanitizer_stub
 
 pytest.importorskip("sqlalchemy")
 from sqlalchemy.exc import SQLAlchemyError

@@ -23,7 +23,7 @@ from theo.adapters.persistence.models import (  # noqa: E402
     FeedbackEvent,
     FeedbackEventAction,
 )
-from theo.services.api.app.main import app  # noqa: E402
+from theo.infrastructure.api.app.main import app  # noqa: E402
 
 
 @pytest.fixture()
