@@ -15,7 +15,7 @@ This quick start compiles the essential steps pulled from the historical agent h
 1. Create a Python 3.12 virtual environment and install extras following the Quick Start in the README.
 2. From `theo/services/web`, run `npm install` to prepare the Next.js workspace.
 3. Export API keys or enable anonymous development mode as described in the README Quick Start.
-4. Launch the API (`uvicorn theo.services.api.app.main:app --reload`) and Web UI (`npm run dev`) or use `./start-theoria.ps1` for automation.
+4. Launch the API (`uvicorn theo.infrastructure.api.app.main:app --reload`) and Web UI (`npm run dev`) or use `./start-theoria.ps1` for automation.
 
 > ℹ️ **Need HTTPS or Compose?** The launcher profiles in `START_HERE.md` cover HTTPS dev certs, alternate ports, and Docker Compose fallbacks.
 

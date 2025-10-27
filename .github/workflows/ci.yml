@@ -419,7 +419,7 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./lighthouse.db
         run: |
-          uvicorn theo.services.api.app.main:app --host 127.0.0.1 --port 8000 &
+          uvicorn theo.infrastructure.api.app.main:app --host 127.0.0.1 --port 8000 &
           sleep 5
           curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:8000/health || echo "Backend health check failed but continuing"
 

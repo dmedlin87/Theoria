@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.sql.elements import BinaryExpression
 
-from theo.services.api.app.models.documents import DocumentAnnotationResponse
-from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchRequest
-from theo.services.api.app.retriever import hybrid
+from theo.infrastructure.api.app.models.documents import DocumentAnnotationResponse
+from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchRequest
+from theo.infrastructure.api.app.retriever import hybrid
 
 
 class _FakeResult:

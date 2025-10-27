@@ -11,8 +11,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.export.formatters import render_bundle  # noqa: E402
-from theo.services.api.app.models.export import ExportManifest  # noqa: E402
+from theo.infrastructure.api.app.export.formatters import render_bundle  # noqa: E402
+from theo.infrastructure.api.app.models.export import ExportManifest  # noqa: E402
 
 
 GOLDEN_DIR = Path(__file__).with_name("golden")

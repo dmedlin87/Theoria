@@ -1,4 +1,4 @@
-"""Tests for the ``theo.services.api.app.ingest`` package initialisation."""
+"""Tests for the ``theo.infrastructure.api.app.ingest`` package initialisation."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import types
 
 import pytest
 
-import theo.services.api.app.ingest as ingest
+import theo.infrastructure.api.app.ingest as ingest
 
 
 def test_ingest_package_exports_are_loaded_lazily(monkeypatch: pytest.MonkeyPatch) -> None:

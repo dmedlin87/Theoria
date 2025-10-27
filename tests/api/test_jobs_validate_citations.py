@@ -13,8 +13,8 @@ from theo.application.facades.database import (  # noqa: E402
     configure_engine,
     get_engine,
 )
-from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.workers import tasks  # noqa: E402
+from theo.infrastructure.api.app.main import app  # noqa: E402
+from theo.infrastructure.api.app.workers import tasks  # noqa: E402
 
 
 def test_validate_citations_job_endpoint_enqueues(monkeypatch, tmp_path) -> None:

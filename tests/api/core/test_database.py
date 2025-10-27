@@ -6,7 +6,7 @@ from theo.application.facades import database as facades_database
 from tests.api.core import import_legacy_module
 
 
-MODULE_NAME = "theo.services.api.app.core.database"
+MODULE_NAME = "theo.infrastructure.api.app.core.database"
 EXPECTED_EXPORTS = ["Base", "configure_engine", "get_engine", "get_session"]
 
 

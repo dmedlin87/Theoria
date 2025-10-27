@@ -11,7 +11,7 @@ import pytest
 def reload_ai_module():
     """Reload the ai package to ensure tests see latest exports."""
 
-    ai_module = importlib.import_module("theo.services.api.app.ai")
+    ai_module = importlib.import_module("theo.infrastructure.api.app.ai")
     return importlib.reload(ai_module)
 
 
@@ -63,6 +63,6 @@ def test_ai_package_exposes_legacy_submodules(module_name: str) -> None:
     assert isinstance(exported, types.ModuleType), (
         "Expected %s to remain importable as a module from ai package" % module_name
     )
-    assert exported.__name__.startswith("theo.services.api.app.ai."), (
+    assert exported.__name__.startswith("theo.infrastructure.api.app.ai."), (
         "Module %s should report fully qualified name under ai package" % module_name
     )

@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from theo.application.facades.database import get_session
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.platform.application import resolve_application
-from theo.services.api.app.main import app
-from theo.services.api.app.retriever import documents as documents_retriever
-from theo.services.api.app.routes import documents as documents_route
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.retriever import documents as documents_retriever
+from theo.infrastructure.api.app.routes import documents as documents_route
 
 from tests.integration._db import configure_temporary_engine
 

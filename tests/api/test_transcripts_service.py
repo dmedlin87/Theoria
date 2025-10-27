@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from theo.adapters.persistence.models import Document, TranscriptSegment, Video
 from theo.adapters.persistence.transcript_repository import SQLAlchemyTranscriptRepository
 from theo.application.dtos import TranscriptSegmentDTO, TranscriptVideoDTO
-from theo.services.api.app.ingest.osis import expand_osis_reference
-from theo.services.api.app.transcripts.service import (
+from theo.infrastructure.api.app.ingest.osis import expand_osis_reference
+from theo.infrastructure.api.app.transcripts.service import (
     build_source_ref,
     canonical_primary_osis,
     search_transcript_segments,

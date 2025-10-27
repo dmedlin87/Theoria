@@ -85,7 +85,7 @@ class XyzDiscoveryEngine:
 **Integration into DiscoveryService:**
 
 ```python
-# theo/services/api/app/discoveries/service.py
+# theo/infrastructure/api/app/discoveries/service.py
 
 def refresh_user_discoveries(self, user_id: str) -> list[Discovery]:
     documents = self._load_document_embeddings(user_id)
@@ -325,7 +325,7 @@ def test_discovery_refresh_end_to_end(session, user_id):
 ### Models
 
 ```python
-# theo/services/api/app/db/models.py
+# theo/infrastructure/api/app/db/models.py
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, JSON
 from sqlalchemy.dialects.postgresql import JSONB
@@ -376,7 +376,7 @@ session.commit()
 ### FastAPI Routes
 
 ```python
-# theo/services/api/app/routes/xyz.py
+# theo/infrastructure/api/app/routes/xyz.py
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -420,7 +420,7 @@ def create_xyz(
 ### Pydantic Models
 
 ```python
-# theo/services/api/app/models/xyz.py
+# theo/infrastructure/api/app/models/xyz.py
 
 from pydantic import BaseModel, Field
 
@@ -597,10 +597,10 @@ pip install ".[dev]" -c constraints/dev.txt
 docker-compose up -d postgres
 
 # Run migrations (ensures idx_passages_embedding_null, idx_documents_updated_at, idx_passages_document_id)
-python -m theo.services.api.app.db.run_sql_migrations
+python -m theo.infrastructure.api.app.db.run_sql_migrations
 
 # Start API
-cd theo/services/api
+cd theo/infrastructure/api
 uvicorn app.main:app --reload
 
 # Start frontend (separate terminal)
@@ -683,7 +683,7 @@ console.log('State:', state);
 ### Code Examples
 - `theo/domain/discoveries/engine.py` - Pattern detection (reference)
 - `theo/domain/discoveries/contradiction_engine.py` - Contradiction detection (reference)
-- `theo/services/api/app/discoveries/service.py` - Service integration (reference)
+- `theo/infrastructure/api/app/discoveries/service.py` - Service integration (reference)
 
 ### External Resources
 - FastAPI docs: https://fastapi.tiangolo.com

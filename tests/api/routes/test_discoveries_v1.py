@@ -17,8 +17,8 @@ from fastapi.testclient import TestClient
 from theo.application.dtos import DiscoveryDTO, DiscoveryListFilters
 from theo.application.repositories import DiscoveryRepository
 from theo.domain.errors import NotFoundError
-from theo.services.api.app.main import app
-from theo.services.api.app.routes import discoveries_v1
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.routes import discoveries_v1
 
 
 @pytest.fixture

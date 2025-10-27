@@ -6,13 +6,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from theo.services.api.app.ai.reasoning import hypotheses as hypotheses_module
-from theo.services.api.app.ai.reasoning.hypotheses import (
+from theo.infrastructure.api.app.ai.reasoning import hypotheses as hypotheses_module
+from theo.infrastructure.api.app.ai.reasoning.hypotheses import (
     Hypothesis,
     HypothesisGenerator,
     test_hypothesis as run_hypothesis_test,
 )
-from theo.services.api.app.models.search import HybridSearchResult
+from theo.infrastructure.api.app.models.search import HybridSearchResult
 
 
 class TestHypothesisExtraction:

@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.application.facades import database as database_module
 from theo.application.facades.database import configure_engine, get_engine, get_session
 from theo.adapters.persistence.models import Document
-from theo.services.api.app.main import app
+from theo.infrastructure.api.app.main import app
 
 
 @pytest.fixture(scope="module")
@@ -122,7 +122,7 @@ def test_export_to_zotero_success(client: TestClient):
         "errors": [],
     }
 
-    with patch("theo.services.api.app.routes.export.export_to_zotero") as mock_export:
+    with patch("theo.infrastructure.api.app.routes.export.export_to_zotero") as mock_export:
         mock_export.return_value = mock_result
 
         response = client.post(
@@ -214,7 +214,7 @@ def test_export_to_zotero_group_library(client: TestClient):
         "errors": [],
     }
 
-    with patch("theo.services.api.app.routes.export.export_to_zotero") as mock_export:
+    with patch("theo.infrastructure.api.app.routes.export.export_to_zotero") as mock_export:
         mock_export.return_value = mock_result
 
         response = client.post(
@@ -241,7 +241,7 @@ def test_export_to_zotero_with_failures(client: TestClient):
         "errors": ["Item 1 failed validation"],
     }
 
-    with patch("theo.services.api.app.routes.export.export_to_zotero") as mock_export:
+    with patch("theo.infrastructure.api.app.routes.export.export_to_zotero") as mock_export:
         mock_export.return_value = mock_result
 
         response = client.post(
@@ -263,9 +263,9 @@ def test_export_to_zotero_with_failures(client: TestClient):
 
 def test_export_to_zotero_api_error(client: TestClient):
     """Test Zotero export when API call fails."""
-    from theo.services.api.app.export.zotero import ZoteroExportError
+    from theo.infrastructure.api.app.export.zotero import ZoteroExportError
 
-    with patch("theo.services.api.app.routes.export.export_to_zotero") as mock_export:
+    with patch("theo.infrastructure.api.app.routes.export.export_to_zotero") as mock_export:
         mock_export.side_effect = ZoteroExportError("Invalid API key")
 
         response = client.post(
@@ -284,7 +284,7 @@ def test_export_to_zotero_api_error(client: TestClient):
 
 def test_export_to_zotero_request_validation():
     """Test Zotero export request validation."""
-    from theo.services.api.app.models.export import ZoteroExportRequest
+    from theo.infrastructure.api.app.models.export import ZoteroExportRequest
     from pydantic import ValidationError
 
     # Valid request
@@ -322,7 +322,7 @@ def test_export_to_zotero_both_user_and_group(client: TestClient):
         "errors": [],
     }
 
-    with patch("theo.services.api.app.routes.export.export_to_zotero") as mock_export:
+    with patch("theo.infrastructure.api.app.routes.export.export_to_zotero") as mock_export:
         mock_export.return_value = mock_result
 
         # Should succeed - endpoint accepts either one
@@ -341,7 +341,7 @@ def test_export_to_zotero_both_user_and_group(client: TestClient):
 
 def test_export_to_zotero_response_model():
     """Test Zotero export response model."""
-    from theo.services.api.app.models.export import ZoteroExportResponse
+    from theo.infrastructure.api.app.models.export import ZoteroExportResponse
 
     response = ZoteroExportResponse(
         success=True,
@@ -374,7 +374,7 @@ def test_export_to_zotero_extracts_citation_sources(client: TestClient):
         "errors": [],
     }
 
-    with patch("theo.services.api.app.routes.export.export_to_zotero") as mock_export:
+    with patch("theo.infrastructure.api.app.routes.export.export_to_zotero") as mock_export:
         mock_export.return_value = mock_result
 
         response = client.post(

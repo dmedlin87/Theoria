@@ -1,5 +1,5 @@
-from theo.services.api.app.models.search import HybridSearchFilters
-from theo.services.api.app.routes.ai.workflows.utils import has_filters
+from theo.infrastructure.api.app.models.search import HybridSearchFilters
+from theo.infrastructure.api.app.routes.ai.workflows.utils import has_filters
 
 
 def test_has_filters_returns_false_for_empty_filters() -> None:

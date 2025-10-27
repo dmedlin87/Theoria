@@ -6,7 +6,7 @@ from theo.application.facades import runtime as facades_runtime
 from tests.api.core import import_legacy_module
 
 
-MODULE_NAME = "theo.services.api.app.core.runtime"
+MODULE_NAME = "theo.infrastructure.api.app.core.runtime"
 EXPECTED_EXPORTS = ["allow_insecure_startup"]
 
 

@@ -30,7 +30,7 @@ from theo.adapters.persistence.models import (  # noqa: E402
 )
 
 try:  # noqa: E402 - optional dependency handling
-    from theo.services.api.app.ai.rag import RAGCitation
+    from theo.infrastructure.api.app.ai.rag import RAGCitation
 except ModuleNotFoundError:
     @dataclass(slots=True)
     class RAGCitation:
@@ -44,7 +44,7 @@ except ModuleNotFoundError:
         source_url: str = ""
 
 try:  # noqa: E402
-    from theo.services.api.app.models.ai import ChatMemoryEntry
+    from theo.infrastructure.api.app.models.ai import ChatMemoryEntry
 except ModuleNotFoundError:
     @dataclass(slots=True)
     class ChatMemoryEntry:
@@ -70,7 +70,7 @@ except ModuleNotFoundError:
             }
 
 try:  # noqa: E402
-    from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchResult
+    from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchResult
 except ModuleNotFoundError:
     @dataclass(slots=True)
     class HybridSearchFilters:
@@ -107,7 +107,7 @@ except ModuleNotFoundError:
             if self.meta is None:
                 self.meta = {}
 
-from theo.services.api.app.workers import tasks  # noqa: E402
+from theo.infrastructure.api.app.workers import tasks  # noqa: E402
 
 
 def _task(obj: Any) -> Task:
@@ -130,22 +130,22 @@ class TestWorkerTasksOptimized:
         )
         
         monkeypatch.setattr(
-            "theo.services.api.app.ingest.pipeline.run_pipeline_for_url",
+            "theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_url",
             MagicMock(return_value=mock_document)
         )
         monkeypatch.setattr(
-            "theo.services.api.app.ingest.pipeline.run_pipeline_for_file", 
+            "theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_file", 
             MagicMock(return_value=mock_document)
         )
         
         # Mock enrichment operations
         monkeypatch.setattr(
-            "theo.services.api.app.enrich.MetadataEnricher.enrich_document",
+            "theo.infrastructure.api.app.enrich.MetadataEnricher.enrich_document",
             MagicMock(return_value=True)
         )
         
         # Mock deliverable building
-        from theo.services.api.app.models.export import DeliverablePackage, DeliverableManifest, DeliverableAsset
+        from theo.infrastructure.api.app.models.export import DeliverablePackage, DeliverableManifest, DeliverableAsset
         mock_manifest = DeliverableManifest(
             export_id="test-export",
             schema_version="1",
@@ -165,17 +165,17 @@ class TestWorkerTasksOptimized:
         )
         
         monkeypatch.setattr(
-            "theo.services.api.app.ai.rag.deliverables.generate_sermon_prep_outline",
+            "theo.infrastructure.api.app.ai.rag.deliverables.generate_sermon_prep_outline",
             MagicMock(return_value={})
         )
         monkeypatch.setattr(
-            "theo.services.api.app.ai.rag.exports.build_sermon_deliverable",
+            "theo.infrastructure.api.app.ai.rag.exports.build_sermon_deliverable",
             MagicMock(return_value=mock_package)
         )
         
     def test_process_url_basic_functionality(self, worker_engine):
         """Test URL processing with minimal database operations."""
-        with patch('theo.services.api.app.ingest.pipeline.run_pipeline_for_url') as mock_pipeline:
+        with patch('theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_url') as mock_pipeline:
             mock_doc = Document(
                 id="url-test",
                 title="URL Test Doc", 
@@ -203,7 +203,7 @@ class TestWorkerTasksOptimized:
             session.commit()
             job_id = job.id
         
-        with patch('theo.services.api.app.ingest.pipeline.run_pipeline_for_url') as mock_pipeline:
+        with patch('theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_url') as mock_pipeline:
             mock_doc = Document(id="job-test", title="Job Test")
             mock_pipeline.return_value = mock_doc
             
@@ -252,7 +252,7 @@ class TestWorkerTasksOptimized:
                 page_no=1
             )]
             
-        monkeypatch.setattr("theo.services.api.app.workers.tasks.hybrid_search", mock_search)
+        monkeypatch.setattr("theo.infrastructure.api.app.workers.tasks.hybrid_search", mock_search)
         
         # Run validation
         result = _task(tasks.validate_citations).run(limit=1)

@@ -65,7 +65,7 @@ def test_services_no_direct_orm_imports():
         "theo.adapters.persistence.models",
     ]
 
-    for path in _iter_python_files("theo/services/api/app"):
+    for path in _iter_python_files("theo/infrastructure/api/app"):
         # Skip database and adapter-specific modules (handle any path separators)
         if "db" in path.parts or "compat" in path.parts:
             continue

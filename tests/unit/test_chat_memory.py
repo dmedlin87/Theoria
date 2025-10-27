@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-from theo.services.api.app.ai.memory_metadata import extract_memory_metadata
-from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
-from theo.services.api.app.models.ai import ChatMemoryEntry, IntentTagPayload
-from theo.services.api.app.routes.ai.workflows.chat import (
+from theo.infrastructure.api.app.ai.memory_metadata import extract_memory_metadata
+from theo.infrastructure.api.app.ai.rag.models import RAGAnswer, RAGCitation
+from theo.infrastructure.api.app.models.ai import ChatMemoryEntry, IntentTagPayload
+from theo.infrastructure.api.app.routes.ai.workflows.chat import (
     _load_memory_entries,
     _prepare_memory_context,
 )

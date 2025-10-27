@@ -18,10 +18,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from theo.application.facades.database import get_session
 from theo.application.facades.settings import get_settings
-from theo.services.api.app.main import app
-from theo.services.api.app.routes import ai as ai_module
-from theo.services.api.app.routes import documents as documents_module
-from theo.services.api.app.routes import ingest as ingest_module
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.routes import ai as ai_module
+from theo.infrastructure.api.app.routes import documents as documents_module
+from theo.infrastructure.api.app.routes import ingest as ingest_module
 
 
 pytestmark = pytest.mark.no_auth_override
@@ -117,11 +117,11 @@ def _client_context(monkeypatch):
     app.dependency_overrides[get_session] = _override_session
     try:
         monkeypatch.setattr(
-            "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
+            "theo.infrastructure.api.app.bootstrap.lifecycle.run_sql_migrations",
             lambda *args, **kwargs: [],
         )
         monkeypatch.setattr(
-            "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
+            "theo.infrastructure.api.app.bootstrap.lifecycle.seed_reference_data",
             lambda *args, **kwargs: None,
         )
 

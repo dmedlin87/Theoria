@@ -16,10 +16,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.ai.trails import TrailService, TrailStepDigest
+from theo.infrastructure.api.app.ai.trails import TrailService, TrailStepDigest
 from theo.application.facades.database import Base
 from theo.adapters.persistence.models import AgentTrail, ChatSession
-from theo.services.api.app.models.ai import ChatGoalState, ChatMemoryEntry
+from theo.infrastructure.api.app.models.ai import ChatGoalState, ChatMemoryEntry
 from tests.utils.query_profiler import before_cursor_execute, after_cursor_execute, print_query_profile
 
 query_data = {"queries": [], "total_time": 0}
@@ -130,7 +130,7 @@ def test_trail_digest_persists_chat_memory(
     service = TrailService(session)
     recorded_tasks: list[tuple[str, dict[str, str]]] = []
     monkeypatch.setattr(
-        "theo.services.api.app.ai.trails_memory_bridge.celery",
+        "theo.infrastructure.api.app.ai.trails_memory_bridge.celery",
         SimpleNamespace(
             send_task=lambda name, kwargs=None, args=None: recorded_tasks.append(
                 (name, kwargs or {})
@@ -188,7 +188,7 @@ def test_trail_digest_updates_goal_progress(
     service = TrailService(session)
     recorded_tasks: list[tuple[str, dict[str, str]]] = []
     monkeypatch.setattr(
-        "theo.services.api.app.ai.trails_memory_bridge.celery",
+        "theo.infrastructure.api.app.ai.trails_memory_bridge.celery",
         SimpleNamespace(
             send_task=lambda name, kwargs=None, args=None: recorded_tasks.append(
                 (name, kwargs or {})
@@ -292,7 +292,7 @@ def test_trail_digest_deduplicates_entries(
     service = TrailService(session)
     recorded_tasks: list[tuple[str, dict[str, str]]] = []
     monkeypatch.setattr(
-        "theo.services.api.app.ai.trails_memory_bridge.celery",
+        "theo.infrastructure.api.app.ai.trails_memory_bridge.celery",
         SimpleNamespace(
             send_task=lambda name, kwargs=None, args=None: recorded_tasks.append(
                 (name, kwargs or {})

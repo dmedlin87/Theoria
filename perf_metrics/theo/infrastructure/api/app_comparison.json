@@ -1,0 +1,38 @@
+{
+  "baseline": {
+    "answer_relevance": 0.9,
+    "context_precision": 0.88,
+    "context_recall": 0.9,
+    "faithfulness": 0.92,
+    "groundedness": 0.9
+  },
+  "current": {
+    "answer_relevance": 0.009950724164912134,
+    "context_precision": 0.9999999999555556,
+    "context_recall": 1.0,
+    "faithfulness": 1.0,
+    "groundedness": 0.7465718080160485
+  },
+  "failing_rows": [
+    "dev-001",
+    "dev-002",
+    "trace-20240101-1"
+  ],
+  "module": "theo/infrastructure/api/app",
+  "regressions": [
+    {
+      "baseline": 0.9,
+      "current": 0.7465718080160485,
+      "metric": "groundedness",
+      "tolerance": 0.02
+    },
+    {
+      "baseline": 0.9,
+      "current": 0.009950724164912134,
+      "metric": "answer_relevance",
+      "tolerance": 0.02
+    }
+  ],
+  "source_file": "app_after.json",
+  "tolerance": 0.02
+}

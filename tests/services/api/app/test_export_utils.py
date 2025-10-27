@@ -13,8 +13,17 @@ from sqlalchemy.orm import Session, sessionmaker
 from theo.adapters.persistence import Base
 from theo.adapters.persistence.models import Document, Passage
 
-_MODULE_PATH = Path(__file__).resolve().parents[4] / "theo" / "services" / "api" / "app" / "routes" / "export" / "utils.py"
-_EXPORT_PACKAGE = "theo.services.api.app.routes.export"
+_MODULE_PATH = (
+    Path(__file__).resolve().parents[4]
+    / "theo"
+    / "infrastructure"
+    / "api"
+    / "app"
+    / "routes"
+    / "export"
+    / "utils.py"
+)
+_EXPORT_PACKAGE = "theo.infrastructure.api.app.routes.export"
 if _EXPORT_PACKAGE not in sys.modules:
     export_module = types.ModuleType(_EXPORT_PACKAGE)
     export_module.__path__ = [str(_MODULE_PATH.parent)]  # type: ignore[attr-defined]

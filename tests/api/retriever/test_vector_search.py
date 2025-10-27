@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from theo.services.api.app.models.documents import DocumentAnnotationResponse
-from theo.services.api.app.models.search import HybridSearchRequest
-from theo.services.api.app.retriever import hybrid
+from theo.infrastructure.api.app.models.documents import DocumentAnnotationResponse
+from theo.infrastructure.api.app.models.search import HybridSearchRequest
+from theo.infrastructure.api.app.retriever import hybrid
 
 from tests.api.retriever.conftest import DummyDocument, DummyPassage
 

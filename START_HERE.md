@@ -295,7 +295,7 @@ If the smart launcher doesn't work, you can start services manually:
 cd C:\Users\dmedl\Projects\TheoEngine
 $Env:THEO_AUTH_ALLOW_ANONYMOUS="1"
 $Env:THEO_ALLOW_INSECURE_STARTUP="1"
-python -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 > The launchers set these overrides automatically for the `dev` profile. Export

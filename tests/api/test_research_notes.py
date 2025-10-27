@@ -16,7 +16,7 @@ from theo.application.facades.research import (
     get_research_service,
 )
 from theo.adapters.persistence.models import NoteEvidence, ResearchNote
-from theo.services.api.app.mcp.tools import handle_note_write
+from theo.infrastructure.api.app.mcp.tools import handle_note_write
 
 
 @pytest.fixture()

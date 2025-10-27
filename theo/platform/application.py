@@ -256,11 +256,11 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
     registry.register("reasoner_factory", _build_reasoner_factory)
 
     def _build_embedding_rebuild_service() -> EmbeddingRebuildService:
-        from theo.services.api.app.ingest.embeddings import (
+        from theo.infrastructure.api.app.ingest.embeddings import (
             clear_embedding_cache,
             get_embedding_service,
         )
-        from theo.services.api.app.ingest.sanitizer import sanitize_passage_text
+        from theo.infrastructure.api.app.ingest.sanitizer import sanitize_passage_text
 
         embedding_service = get_embedding_service()
 

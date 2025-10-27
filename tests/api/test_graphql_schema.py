@@ -9,7 +9,7 @@ from theo.application.services import ApplicationContainer
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.domain.research.overview import OverviewBullet, ReliabilityOverview
 from theo.domain.research.scripture import Verse
-from theo.services.api.app.main import app
+from theo.infrastructure.api.app.main import app
 
 
 @dataclass(slots=True)
@@ -97,7 +97,7 @@ def graphql_app_setup(monkeypatch: pytest.MonkeyPatch):
     )
 
     monkeypatch.setattr(
-        "theo.services.api.app.graphql.context.resolve_application",
+        "theo.infrastructure.api.app.graphql.context.resolve_application",
         lambda: (container, None),
     )
 

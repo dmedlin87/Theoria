@@ -39,7 +39,7 @@ def _stub_pythonbible(monkeypatch: pytest.MonkeyPatch):
     """Replace heavy pythonbible lookups with a lightweight stub during worker tests."""
 
     try:
-        from theo.services.api.app.ingest import osis as ingest_osis
+        from theo.infrastructure.api.app.ingest import osis as ingest_osis
     except ModuleNotFoundError:  # pragma: no cover - dependency not installed
         yield
         return
@@ -70,14 +70,14 @@ from theo.adapters.persistence.models import (  # noqa: E402
     Passage,
 )
 
-from theo.services.api.app.models.export import (  # noqa: E402
+from theo.infrastructure.api.app.models.export import (  # noqa: E402
     DeliverableAsset,
     DeliverableManifest,
     DeliverablePackage,
 )
 
 try:  # noqa: E402 - optional dependency fallback for lightweight profiling
-    from theo.services.api.app.ai.rag import RAGCitation
+    from theo.infrastructure.api.app.ai.rag import RAGCitation
 except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean environments
     @dataclass(slots=True)
     class RAGCitation:
@@ -86,7 +86,7 @@ except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean envi
         anchor: str
 
 try:  # noqa: E402 - optional dependency fallback for lightweight profiling
-    from theo.services.api.app.models.ai import ChatMemoryEntry
+    from theo.infrastructure.api.app.models.ai import ChatMemoryEntry
 except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean environments
     @dataclass(slots=True)
     class ChatMemoryEntry:
@@ -99,7 +99,7 @@ except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean envi
             return cls(**payload)
 
 try:  # noqa: E402 - optional dependency fallback for lightweight profiling
-    from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchResult
+    from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchResult
 except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean environments
     @dataclass(slots=True)
     class HybridSearchFilters:
@@ -122,7 +122,7 @@ except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean envi
         passage_id: str
         distance: float
         title: str | None = None
-from theo.services.api.app.workers import tasks  # noqa: E402
+from theo.infrastructure.api.app.workers import tasks  # noqa: E402
 
 
 def _task(obj: Any) -> Task:
@@ -477,7 +477,7 @@ def test_enrich_document_missing_document_marks_job_failed(worker_engine, caplog
         session.commit()
         job_id = job.id
 
-    caplog.set_level("WARNING", logger="theo.services.api.app.workers.tasks")
+    caplog.set_level("WARNING", logger="theo.infrastructure.api.app.workers.tasks")
 
     _task(tasks.enrich_document).run(document_id="missing", job_id=job_id)
 

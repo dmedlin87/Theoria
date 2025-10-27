@@ -1,4 +1,4 @@
-"""Unit tests for helper utilities in ``theo.services.api.app.db.seeds``."""
+"""Unit tests for helper utilities in ``theo.infrastructure.api.app.db.seeds``."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, create_engine
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.db import seeds
+from theo.infrastructure.api.app.db import seeds
 from theo.adapters.persistence import sqlite as sqlite_utils
 
 

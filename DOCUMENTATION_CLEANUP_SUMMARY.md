@@ -97,7 +97,7 @@ Each archive directory includes a README explaining its contents and retention p
 - mcp_server/CODE_QUALITY_REPORT.md
 - mcp_server/IMPROVEMENTS.md
 - mcp_server/SUMMARY.md
-- theo/services/api/app/ai/IMPROVEMENTS.md
+- theo/infrastructure/api/app/ai/IMPROVEMENTS.md
 - scripts/CODE_QUALITY_REPORT.md
 
 **Total Archived:** 70+ files and directories

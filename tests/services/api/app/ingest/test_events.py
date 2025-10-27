@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from theo.services.api.app.ingest import events
+from theo.infrastructure.api.app.ingest import events
 
 
 class _StubPassage(SimpleNamespace):
@@ -61,7 +61,7 @@ def test_dispatch_neighborhood_event_uses_delay(monkeypatch: pytest.MonkeyPatch)
         def delay(self, payload: dict[str, object]) -> None:  # noqa: D401 - stub
             called["payload"] = payload
 
-    module_name = "theo.services.api.app.workers.tasks"
+    module_name = "theo.infrastructure.api.app.workers.tasks"
     monkeypatch.setitem(sys.modules, module_name, SimpleNamespace(update_neighborhood_analytics=_Task()))
 
     events._dispatch_neighborhood_event({"document_id": "d-1"})
@@ -75,7 +75,7 @@ def test_dispatch_neighborhood_event_calls_function_when_delay_missing(monkeypat
     def _call(payload: dict[str, object]) -> None:
         payloads.append(payload)
 
-    module_name = "theo.services.api.app.workers.tasks"
+    module_name = "theo.infrastructure.api.app.workers.tasks"
     monkeypatch.setitem(sys.modules, module_name, SimpleNamespace(update_neighborhood_analytics=_call))
 
     events._dispatch_neighborhood_event({"k": 1})
@@ -88,7 +88,7 @@ def test_dispatch_neighborhood_event_logs_exceptions(monkeypatch: pytest.MonkeyP
         def delay(self, payload: dict[str, object]) -> None:  # noqa: D401 - stub
             raise RuntimeError("boom")
 
-    module_name = "theo.services.api.app.workers.tasks"
+    module_name = "theo.infrastructure.api.app.workers.tasks"
     monkeypatch.setitem(sys.modules, module_name, SimpleNamespace(update_neighborhood_analytics=_FailingTask()))
 
     with caplog.at_level("ERROR", logger=events.LOGGER.name):

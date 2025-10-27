@@ -11,10 +11,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.application.facades.database import get_session  # noqa: E402
-from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.ingest import parsers as ingest_parsers  # noqa: E402
-from theo.services.api.app.ingest.pipeline import _parse_text_file  # noqa: E402
-from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
+from theo.infrastructure.api.app.main import app  # noqa: E402
+from theo.infrastructure.api.app.ingest import parsers as ingest_parsers  # noqa: E402
+from theo.infrastructure.api.app.ingest.pipeline import _parse_text_file  # noqa: E402
+from theo.infrastructure.api.app.routes import ingest as ingest_module  # noqa: E402
 
 
 @pytest.fixture()
@@ -169,7 +169,7 @@ def test_ingest_markdown_with_windows_1252_bytes(
 def test_ingest_file_pipeline_exposes_private_parse_text_helper(
     tmp_path: Path, monkeypatch, api_client
 ) -> None:
-    from theo.services.api.app.ingest import pipeline as ingest_pipeline
+    from theo.infrastructure.api.app.ingest import pipeline as ingest_pipeline
 
     captured: dict[str, object] = {}
 
@@ -205,7 +205,7 @@ def test_ingest_file_pipeline_exposes_private_parse_text_helper(
 
 
 def test_ingest_pipeline_alias_is_kept() -> None:
-    from theo.services.api.app.ingest import pipeline as ingest_pipeline
+    from theo.infrastructure.api.app.ingest import pipeline as ingest_pipeline
 
     assert ingest_pipeline._parse_text_file is ingest_pipeline.parse_text_file
 
