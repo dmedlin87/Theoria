@@ -227,16 +227,23 @@ class TheologicalTermTracker:
                 has_singular_verb = False
                 
                 for tag in verse.morphology:
-                    # Check for אלהים (plural form)
-                    if tag.lemma == "אלהים" and tag.number == "plural":
+                    lemma = getattr(tag, "lemma", None)
+                    number = getattr(tag, "number", None)
+                    person = getattr(tag, "person", None)
+                    raw_pos = getattr(tag, "pos", None)
+                    pos_value = raw_pos.value if isinstance(raw_pos, POS) else raw_pos
+
+                    # Check for ????? (plural form)
+                    if lemma == "?????" and number == "plural":
                         has_elohim = True
-                    
+
                     # Check for singular verb
-                    if (tag.pos == POS.VERB and 
-                        tag.number == "singular" and 
-                        tag.person == 3):
+                    if (
+                        pos_value == POS.VERB.value
+                        and number == "singular"
+                        and person == 3
+                    ):
                         has_singular_verb = True
-                
                 if has_elohim and has_singular_verb:
                     results.append(verse)
                     

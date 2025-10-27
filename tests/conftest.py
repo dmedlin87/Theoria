@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import gc
 import importlib
-import importlib.machinery as importlib_machinery
 import inspect
 import os
 import sys
@@ -12,7 +11,6 @@ import warnings
 from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-import types
 from unittest.mock import AsyncMock, patch
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
@@ -55,107 +53,6 @@ def _require_application_factory() -> None:
         reason = _APPLICATION_FACTORY_IMPORT_ERROR or ModuleNotFoundError("pythonbible")
         pytest.skip(f"application factory unavailable: {reason}")
 
-
-try:
-    import fastapi as _fastapi  # type: ignore  # noqa: F401
-except ModuleNotFoundError:
-    fastapi_stub = types.ModuleType("fastapi")
-    fastapi_stub.status = types.SimpleNamespace()
-    sys.modules.setdefault("fastapi", fastapi_stub)
-
-
-if "pydantic" not in sys.modules:
-    class _BaseModel:
-        def __init__(self, **kwargs: Any) -> None:
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-
-        def model_dump(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
-            return dict(self.__dict__)
-
-    def Field(default: Any = None, **_kwargs: Any) -> Any:  # pragma: no cover
-        return default
-
-    class ValidationError(Exception):  # pragma: no cover - simple stub
-        pass
-
-    pydantic_stub = types.ModuleType("pydantic")
-    pydantic_stub.BaseModel = _BaseModel
-    pydantic_stub.Field = Field
-    pydantic_stub.ValidationError = ValidationError
-    pydantic_stub.ConfigDict = dict
-    sys.modules["pydantic"] = pydantic_stub
-
-
-if "sqlalchemy" not in sys.modules:
-    try:
-        import importlib
-
-        importlib.import_module("sqlalchemy")
-    except ModuleNotFoundError:
-        sqlalchemy_stub = types.ModuleType("sqlalchemy")
-
-        class _FuncProxy:
-            def __getattr__(self, name: str) -> Any:  # pragma: no cover - stub
-                raise NotImplementedError(f"sqlalchemy.func placeholder accessed for '{name}'")
-
-        def _raise(*_args: object, **_kwargs: object) -> None:  # pragma: no cover
-            raise NotImplementedError("sqlalchemy placeholder accessed")
-
-        sqlalchemy_stub.__path__ = []
-        sqlalchemy_stub.__spec__ = importlib_machinery.ModuleSpec(
-            "sqlalchemy", loader=None, is_package=True
-        )
-        sqlalchemy_stub.func = _FuncProxy()
-        sqlalchemy_stub.select = _raise
-        sqlalchemy_stub.create_engine = _raise
-        sqlalchemy_stub.text = lambda statement: statement
-
-        exc_module = types.ModuleType("sqlalchemy.exc")
-
-        class SQLAlchemyError(Exception):  # pragma: no cover - stub
-            pass
-
-        exc_module.SQLAlchemyError = SQLAlchemyError
-
-        orm_module = types.ModuleType("sqlalchemy.orm")
-
-        class Session:  # pragma: no cover - stub
-            def __init__(self, *_args: object, **_kwargs: object) -> None:
-                raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
-
-        orm_module.Session = Session
-
-        engine_module = types.ModuleType("sqlalchemy.engine")
-
-        class Engine:  # pragma: no cover - stub
-            pass
-
-        engine_module.Engine = Engine
-
-        sql_module = types.ModuleType("sqlalchemy.sql")
-        sql_module.__path__ = []
-        sql_module.__spec__ = importlib_machinery.ModuleSpec(
-            "sqlalchemy.sql", loader=None, is_package=True
-        )
-        elements_module = types.ModuleType("sqlalchemy.sql.elements")
-        elements_module.__spec__ = importlib_machinery.ModuleSpec(
-            "sqlalchemy.sql.elements", loader=None, is_package=True
-        )
-
-        class ClauseElement:  # pragma: no cover - stub
-            pass
-
-        elements_module.ClauseElement = ClauseElement
-        sql_module.elements = elements_module
-
-        sys.modules["sqlalchemy"] = sqlalchemy_stub
-        sys.modules["sqlalchemy.exc"] = exc_module
-        sys.modules["sqlalchemy.orm"] = orm_module
-        sys.modules["sqlalchemy.engine"] = engine_module
-        sys.modules["sqlalchemy.sql"] = sql_module
-        sys.modules["sqlalchemy.sql.elements"] = elements_module
-
 if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE"}:
     try:
         import pydantic  # type: ignore  # noqa: F401
@@ -180,7 +77,20 @@ except ModuleNotFoundError:  # pragma: no cover - executed when plugin is missin
 try:  # pragma: no cover - psutil optional for lightweight environments
     import psutil
 except ModuleNotFoundError:  # pragma: no cover - allows running without psutil
-    psutil = None
+    psutil = None  # type: ignore[assignment]
+    _PSUTIL_PROCESS = None
+else:  # pragma: no cover - process lookup can fail in sandboxes
+    try:
+        _PSUTIL_PROCESS = psutil.Process()
+    except Exception:
+        _PSUTIL_PROCESS = None
+
+_ENABLE_MEMCHECK = os.getenv("THEORIA_MEMCHECK", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 
 def _register_randomly_plugin(pluginmanager: pytest.PluginManager) -> bool:
@@ -291,6 +201,14 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "asyncio: mark a test function as running with an asyncio event loop.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "allow_sleep: opt out of the session-wide sleep patches for a test.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "memcheck: enable the manage_memory fixture for targeted leak hunts.",
     )
 
     if config.getoption("pgvector") and not config.getoption("schema"):
@@ -489,6 +407,9 @@ def pytest_collection_modifyitems(
     has_xdist = config.pluginmanager.hasplugin("xdist")
 
     for item in items:
+        if not _ENABLE_MEMCHECK and item.get_closest_marker("memcheck"):
+            item.add_marker(pytest.mark.usefixtures("manage_memory"))
+
         fixture_names = set(item.fixturenames)
 
         for marker_name, fixtures in _FIXTURE_MARKER_REQUIREMENTS.items():
@@ -780,11 +701,11 @@ def _set_database_url_env(
             os.environ["DATABASE_URL"] = previous
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=_ENABLE_MEMCHECK)
 def manage_memory() -> Generator[None, None, None]:
     """Collect garbage eagerly and warn about potential leaks."""
 
-    process = psutil.Process() if psutil is not None else None
+    process = _PSUTIL_PROCESS
     before = process.memory_info().rss if process is not None else 0
 
     yield
@@ -803,16 +724,49 @@ def manage_memory() -> Generator[None, None, None]:
         )
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _mock_sleep_session() -> dict[str, Any]:
+    """Patch sleep functions once per session to minimise fixture churn."""
+
+    async_sleep_mock = AsyncMock()
+    time_patcher = patch("time.sleep", return_value=None)
+    asyncio_patcher = patch("asyncio.sleep", new=async_sleep_mock)
+
+    time_patcher.start()
+    asyncio_patcher.start()
+    try:
+        yield {
+            "time": time_patcher,
+            "asyncio": asyncio_patcher,
+            "async_mock": async_sleep_mock,
+        }
+    finally:
+        asyncio_patcher.stop()
+        time_patcher.stop()
+
+
 @pytest.fixture(autouse=True)
-def mock_sleep(request):
+def mock_sleep(request, _mock_sleep_session: dict[str, Any]) -> Iterator[None]:
+    patchers = _mock_sleep_session
+    async_mock: AsyncMock = patchers["async_mock"]
+
     if "allow_sleep" in request.keywords:
-        # Don't mock sleep for tests marked with @pytest.mark.allow_sleep
-        yield
+        time_patcher = patchers["time"]
+        asyncio_patcher = patchers["asyncio"]
+        asyncio_patcher.stop()
+        time_patcher.stop()
+        try:
+            yield
+        finally:
+            time_patcher.start()
+            asyncio_patcher.start()
+            async_mock.reset_mock()
         return
 
-    with patch("time.sleep", return_value=None):
-        with patch("asyncio.sleep", new=AsyncMock()):
-            yield
+    try:
+        yield
+    finally:
+        async_mock.reset_mock()
 
 
 class TestResourcePool:
