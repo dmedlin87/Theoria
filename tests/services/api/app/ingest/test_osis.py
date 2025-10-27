@@ -5,7 +5,7 @@ from textwrap import dedent
 import pytest
 from pythonbible import Book, NormalizedReference
 
-from theo.services.api.app.ingest import osis
+from theo.infrastructure.api.app.ingest import osis
 
 
 def _make_reference(book: Book, start: int, end: int | None = None) -> NormalizedReference:

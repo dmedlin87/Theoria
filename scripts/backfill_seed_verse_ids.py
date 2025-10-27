@@ -33,7 +33,7 @@ def _ensure_models_loaded() -> None:
 
 
 def _verse_range(reference: str) -> tuple[int, int] | None:
-    from theo.services.api.app.ingest.osis import expand_osis_reference
+    from theo.infrastructure.api.app.ingest.osis import expand_osis_reference
 
     verse_ids = expand_osis_reference(reference)
     if not verse_ids:

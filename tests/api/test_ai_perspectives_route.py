@@ -3,12 +3,12 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 import pytest
 
-from theo.services.api.app.ai.reasoning.perspectives import (
+from theo.infrastructure.api.app.ai.reasoning.perspectives import (
     PerspectiveCitation,
     PerspectiveSynthesis,
     PerspectiveView,
 )
-from theo.services.api.app.main import app
+from theo.infrastructure.api.app.main import app
 
 
 def test_perspectives_route_serialises_views(
@@ -50,7 +50,7 @@ def test_perspectives_route_serialises_views(
         return stub_synthesis
 
     monkeypatch.setattr(
-        "theo.services.api.app.routes.ai.workflows.perspectives.synthesize_perspectives",
+        "theo.infrastructure.api.app.routes.ai.workflows.perspectives.synthesize_perspectives",
         _fake_synthesise,
     )
 

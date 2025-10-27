@@ -7,19 +7,19 @@ from typing import Iterator, Literal
 import pytest
 from fastapi.testclient import TestClient
 
-from theo.services.api.app.main import app
+from theo.infrastructure.api.app.main import app
 from theo.application.facades.database import get_session
-from theo.services.api.app.models.export import (
+from theo.infrastructure.api.app.models.export import (
     DeliverableAsset,
     DeliverableManifest,
     DeliverablePackage,
     serialise_asset_content,
 )
-from theo.services.api.app.models.ai import SermonPrepRequest
-from theo.services.api.app.routes.ai.workflows import exports as exports_module
-from theo.services.api.app.routes.ai.workflows import guardrails as guardrails_module
-from theo.services.api.app.ai.rag.guardrails import GuardrailError
-from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
+from theo.infrastructure.api.app.models.ai import SermonPrepRequest
+from theo.infrastructure.api.app.routes.ai.workflows import exports as exports_module
+from theo.infrastructure.api.app.routes.ai.workflows import guardrails as guardrails_module
+from theo.infrastructure.api.app.ai.rag.guardrails import GuardrailError
+from theo.infrastructure.api.app.ai.rag.models import RAGAnswer, RAGCitation
 
 
 class _DummyAuditLogger:

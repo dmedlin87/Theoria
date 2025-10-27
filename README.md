@@ -81,9 +81,9 @@ GPU acceleration is optional. When available, configure the ML extras (see [`doc
    git clone https://github.com/dmedlin87/theoria.git
    cd theoria
    python -m venv .venv && source .venv/bin/activate
-   pip install ".[api]" -c constraints/api-constraints.txt
-   pip install ".[ml]" -c constraints/ml-constraints.txt
-   pip install ".[dev]" -c constraints/dev-constraints.txt
+   pip install ".[api]" -c constraints/prod.txt
+   pip install ".[ml]" -c constraints/prod.txt
+   pip install ".[dev]" -c constraints/dev.txt
 
 Regenerate these lockfiles after changing dependency ranges with:
 
@@ -93,7 +93,7 @@ python scripts/update_constraints.py
 
 To ensure the repository constraints are up to date during CI or reviews, run the script with `--check` to validate without rewriting the files.
 
-The ML constraint set also pins a CPU-only PyTorch wheel by embedding the appropriate `--index-url`/`--extra-index-url` directives so builds avoid GPU-only Triton conflicts.
+The production constraint set also pins a CPU-only PyTorch wheel by embedding the appropriate `--index-url`/`--extra-index-url` directives so builds avoid GPU-only Triton conflicts.
    ```
 
 2. **Provision frontend tooling**
@@ -109,9 +109,16 @@ The ML constraint set also pins a CPU-only PyTorch wheel by embedding the approp
    export THEO_API_KEYS='["local-dev-key"]'
 
    # or temporarily allow unauthenticated requests (development only)
+   export THEO_ALLOW_INSECURE_STARTUP=1
    export THEO_AUTH_ALLOW_ANONYMOUS=1
    ```
    Additional authentication strategies (OIDC, session-based, API tokens) are documented in [`docs/authentication.md`](docs/authentication.md).
+
+   > **Production / staging:** Always configure API keys or JWT credentials. The
+   > API exits during startup if anonymous access remains enabled when the
+   > runtime environment is anything other than development/testing. Set
+   > `THEO_LOCAL_INSECURE_OVERRIDES=0` when you want local scripts to exercise
+   > the same production guards.
 
 ### Phase 2: Launch Services
 
@@ -128,7 +135,7 @@ The ML constraint set also pins a CPU-only PyTorch wheel by embedding the approp
 
 5. **Launch API**
    ```bash
-   uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+   uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
    ```
    Visit the interactive docs at <http://localhost:8000/docs>.
 
@@ -163,7 +170,7 @@ The ML constraint set also pins a CPU-only PyTorch wheel by embedding the approp
   Documents & Media     Verse-normalized store      Research & authoring
 ```
 
-- **API & Workers**: `theo/services/api` (FastAPI, background jobs, pgvector).
+- **API & Workers**: `theo/infrastructure/api` (FastAPI, background jobs, pgvector).
 - **Web Experience**: `theo/services/web` (Next.js, Radix UI toolkit, theme system).
 - **Docs & Playbooks**: `docs/` (architecture, workflows, policies).
 - **Automation Scripts**: `scripts/` (dev orchestration, reseeding, evaluation).
@@ -185,7 +192,7 @@ Install the orchestration tooling with `brew install go-task/tap/go-task`, `scoo
 
 ### Dependency management
 - Python extras live in `pyproject.toml` (`base`, `api`, `ml`, `dev`) with corresponding lockfiles under `constraints/`.
-- Install extras with `pip install .[api] -c constraints/api-constraints.txt` plus `[ml]`/`[dev]` when ML features or tooling are required.
+- Install extras with `pip install .[api] -c constraints/prod.txt` plus `[ml]`/`[dev]` when ML features or tooling are required.
 - Run `task deps:lock` after editing dependency definitions to regenerate the pinned constraints via `pip-compile`.
 
 ### Testing & quality gates
@@ -224,7 +231,7 @@ For staging and production scenarios—including container images, Fly.io, and b
 - **PostgreSQL connection errors**: Ensure port 5432 is available or override `DATABASE_URL` to target your preferred instance.
 - **Node.js version conflicts**: Verify `node --version` returns 20.x or higher; use `nvm use` from `theo/services/web/.nvmrc` if installed.
 - **Missing Task runner**: Either install go-task (see above) or run the equivalent shell commands provided alongside each task.
-- **ML model downloads failing**: Confirm internet access and disk space, then rerun `pip install .[ml] -c constraints/ml-constraints.txt` or use the offline cache instructions in [`docs/ML_SETUP.md`](docs/ML_SETUP.md).
+- **ML model downloads failing**: Confirm internet access and disk space, then rerun `pip install .[ml] -c constraints/prod.txt` or use the offline cache instructions in [`docs/ML_SETUP.md`](docs/ML_SETUP.md).
 
 ---
 

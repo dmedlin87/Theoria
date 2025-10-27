@@ -21,11 +21,11 @@ if str(PROJECT_ROOT) not in sys.path:
 from theo.application.facades import database as database_module  # noqa: E402
 from theo.application.facades.database import configure_engine, get_session  # noqa: E402
 from theo.application.facades.settings import Settings  # noqa: E402
-from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.routes import ingest as ingest_module  # noqa: E402
-from theo.services.api.app.infra import ingestion_service as ingestion_service_module  # noqa: E402
-from theo.services.api.app.ingest import pipeline as pipeline_module  # noqa: E402
-from theo.services.api.app.ingest import network as network_module  # noqa: E402
+from theo.infrastructure.api.app.main import app  # noqa: E402
+from theo.infrastructure.api.app.routes import ingest as ingest_module  # noqa: E402
+from theo.infrastructure.api.app.infra import ingestion_service as ingestion_service_module  # noqa: E402
+from theo.infrastructure.api.app.ingest import pipeline as pipeline_module  # noqa: E402
+from theo.infrastructure.api.app.ingest import network as network_module  # noqa: E402
 
 PAYLOAD_TOO_LARGE = getattr(status, "HTTP_413_CONTENT_TOO_LARGE", None)
 if PAYLOAD_TOO_LARGE is None:  # pragma: no cover - compatibility path
@@ -295,7 +295,7 @@ def test_ingest_url_rejects_disallowed_scheme(
 def test_ingest_url_blocks_private_targets(
     monkeypatch: pytest.MonkeyPatch, api_client: TestClient, blocked_url: str
 ) -> None:
-    from theo.services.api.app.ingest import pipeline as pipeline_module
+    from theo.infrastructure.api.app.ingest import pipeline as pipeline_module
 
     def unexpected_fetch(*args, **kwargs):  # noqa: ANN001
         raise AssertionError("Disallowed URLs must not be fetched")

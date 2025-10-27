@@ -9,7 +9,7 @@ def test_configure_deliverable_hooks_updates_module_exports() -> None:
     """Registering hooks should swap the chat module's compatibility exports."""
 
     chat_module = importlib.reload(
-        importlib.import_module("theo.services.api.app.ai.rag.chat")
+        importlib.import_module("theo.infrastructure.api.app.ai.rag.chat")
     )
 
     def _outline_hook(*_args, **_kwargs):  # pragma: no cover - trivial lambda
@@ -59,4 +59,4 @@ def test_configure_deliverable_hooks_updates_module_exports() -> None:
     assert chat_module.build_transcript_package is _build_transcript_package
 
     # Reload the workflow shim to restore the production hooks for other tests.
-    importlib.reload(importlib.import_module("theo.services.api.app.ai.rag.workflow"))
+    importlib.reload(importlib.import_module("theo.infrastructure.api.app.ai.rag.workflow"))

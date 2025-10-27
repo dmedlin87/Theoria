@@ -8,6 +8,7 @@ import importlib
 import inspect
 import os
 import sys
+import types
 import warnings
 from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
@@ -20,6 +21,63 @@ if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
     from tests.fixtures import RegressionDataFactory
 
 import pytest
+
+try:  # pragma: no cover - optional dependency
+    import pydantic  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - lightweight CI environments
+    pydantic = types.ModuleType("pydantic")  # type: ignore[assignment]
+    sys.modules["pydantic"] = pydantic
+
+if not hasattr(pydantic, "BaseModel"):
+    class _BaseModel:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    pydantic.BaseModel = _BaseModel  # type: ignore[attr-defined]
+
+
+def _identity_decorator(*_args: object, **_kwargs: object):  # pragma: no cover - helper
+    def _decorator(func: Any) -> Any:
+        return func
+
+    return _decorator
+
+
+if not hasattr(pydantic, "Field"):
+    def _field(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    pydantic.Field = _field  # type: ignore[attr-defined]
+
+if not hasattr(pydantic, "field_validator"):
+    pydantic.field_validator = _identity_decorator  # type: ignore[attr-defined]
+
+if not hasattr(pydantic, "model_validator"):
+    pydantic.model_validator = _identity_decorator  # type: ignore[attr-defined]
+
+if not hasattr(pydantic, "AliasChoices"):
+    class _AliasChoices:
+        def __init__(self, *_choices: object) -> None:
+            self.choices = _choices
+
+    pydantic.AliasChoices = _AliasChoices  # type: ignore[attr-defined]
+
+if not hasattr(pydantic, "model_serializer"):
+    pydantic.model_serializer = _identity_decorator  # type: ignore[attr-defined]
+
+if "pydantic_settings" not in sys.modules:  # pragma: no cover - lightweight CI environments
+    pydantic_settings = types.ModuleType("pydantic_settings")
+
+    class _BaseSettings:
+        model_config: dict[str, object] = {}
+
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    pydantic_settings.BaseSettings = _BaseSettings  # type: ignore[attr-defined]
+    pydantic_settings.SettingsConfigDict = dict  # type: ignore[attr-defined]
+
+    sys.modules["pydantic_settings"] = pydantic_settings
 
 try:  # pragma: no cover - optional dependency for integration fixtures
     from sqlalchemy import create_engine, text
@@ -313,7 +371,7 @@ def _configure_celery_for_tests() -> Generator[None, None, None]:
     os.environ.setdefault("THEORIA_TESTING", "1")
 
     try:
-        from theo.services.api.app.workers import tasks as worker_tasks
+        from theo.infrastructure.api.app.workers import tasks as worker_tasks
     except Exception:  # pragma: no cover - Celery optional in some test subsets
         yield
         return
@@ -541,7 +599,7 @@ def pgvector_migrated_database_url(
 
     _ensure_cli_opt_in(request, option="schema", marker="schema")
 
-    from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
 
     engine = create_engine(pgvector_database_url, future=True)
     try:
@@ -553,7 +611,7 @@ def pgvector_migrated_database_url(
 
 def _initialise_shared_database(db_path: Path) -> str:
     from theo.application.facades.database import Base
-    from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
 
     url = f"sqlite:///{db_path}"
     engine = create_engine(url, future=True)
@@ -571,8 +629,10 @@ def _load_model_from_registry(model_name: str) -> Any:
 
     candidate_modules = [
         f"theo.ml.models.{model_name}",
-        f"theo.services.ml.{model_name}",
-        f"theo.services.ml.models.{model_name}",
+        f"theo.infrastructure.ml.{model_name}",
+        f"theo.infrastructure.ml.models.{model_name}",
+        f"theo.infrastructure.api.app.ml.{model_name}",
+        f"theo.infrastructure.api.app.ml.models.{model_name}",
     ]
 
     for module_path in candidate_modules:
@@ -587,7 +647,7 @@ def _load_model_from_registry(model_name: str) -> Any:
 
 def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     """Create a SQLite database URL with migrations applied."""
-    from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
     from theo.application.facades.database import Base
 
     database_dir = tmp_path_factory.mktemp("sqlite", numbered=True)

@@ -25,6 +25,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy import select
 
 from theo.application.facades.settings import get_settings
 
@@ -262,6 +264,9 @@ class NotebookCollaborator(Base):
     )
 
 
+_PREFETCHED_EMBEDDING_ATTR = "_prefetched_embedding"
+
+
 class Passage(Base):
     """Chunked content extracted from a document."""
 
@@ -300,9 +305,6 @@ class Passage(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    embedding: Mapped[list[float] | None] = mapped_column(
-        VectorType(get_settings().embedding_dim), nullable=True
-    )
     lexeme: Mapped[str | None] = mapped_column(TSVectorType(), nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     tei_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -320,6 +322,45 @@ class Passage(Base):
         uselist=False,
     )
 
+    embedding_record: Mapped["PassageEmbedding | None"] = relationship(
+        "PassageEmbedding",
+        back_populates="passage",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+    @hybrid_property
+    def embedding(self) -> list[float] | None:
+        if hasattr(self, _PREFETCHED_EMBEDDING_ATTR):
+            override = getattr(self, _PREFETCHED_EMBEDDING_ATTR)
+            return list(override) if isinstance(override, list) else override
+        if self.embedding_record is None:
+            return None
+        return self.embedding_record.embedding
+
+    @embedding.setter
+    def embedding(self, value: list[float] | None) -> None:
+        if value is None:
+            if self.embedding_record is not None:
+                self.embedding_record = None
+            if hasattr(self, _PREFETCHED_EMBEDDING_ATTR):
+                delattr(self, _PREFETCHED_EMBEDDING_ATTR)
+            return
+        vector = [float(component) for component in value]
+        if self.embedding_record is None:
+            self.embedding_record = PassageEmbedding(embedding=vector)
+        else:
+            self.embedding_record.embedding = vector
+        setattr(self, _PREFETCHED_EMBEDDING_ATTR, list(vector))
+
+    @embedding.expression
+    def embedding(cls):  # type: ignore[no-untyped-def]
+        return (
+            select(PassageEmbedding.embedding)
+            .where(PassageEmbedding.passage_id == cls.id)
+            .scalar_subquery()
+        )
+
 
 class PassageVerse(Base):
     """Association table connecting passages to verse identifiers."""
@@ -335,6 +376,34 @@ class PassageVerse(Base):
     verse_id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     passage: Mapped["Passage"] = relationship("Passage", back_populates="verses")
+
+
+class PassageEmbedding(Base):
+    """Vector representation for a passage stored separately for performance."""
+
+    __tablename__ = "passage_embeddings"
+
+    passage_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("passages.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    embedding: Mapped[list[float]] = mapped_column(
+        VectorType(get_settings().embedding_dim), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    passage: Mapped[Passage] = relationship("Passage", back_populates="embedding_record")
 
 
 class AppSetting(Base):

@@ -209,11 +209,19 @@ Theoria/
 database_url=sqlite:///./theo.db
 storage_root=./storage
 redis_url=redis://localhost:6379/0
-THEO_AUTH_ALLOW_ANONYMOUS=1
+# Override THEO_AUTH_ALLOW_ANONYMOUS=1 in your shell when testing without API keys.
+THEO_AUTH_ALLOW_ANONYMOUS=0
+# Set THEO_ALLOW_INSECURE_STARTUP=1 in your shell only when running without credentials locally.
+THEO_ALLOW_INSECURE_STARTUP=0
 embedding_model=BAAI/bge-m3
 embedding_dim=1024
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
+
+During local development the runners export `THEO_ALLOW_INSECURE_STARTUP=1` and
+`THEO_AUTH_ALLOW_ANONYMOUS=1` on your behalf so the API can start without
+credentials. Set `THEO_LOCAL_INSECURE_OVERRIDES=0` before running a script to
+opt out and exercise the production startup paths.
 
 ### `.env.local` (Auto-generated)
 

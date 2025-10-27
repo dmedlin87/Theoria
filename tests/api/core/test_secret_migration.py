@@ -6,7 +6,7 @@ from theo.application.facades import secret_migration as facades_secret_migratio
 from tests.api.core import import_legacy_module
 
 
-MODULE_NAME = "theo.services.api.app.core.secret_migration"
+MODULE_NAME = "theo.infrastructure.api.app.core.secret_migration"
 EXPECTED_EXPORTS = ["migrate_secret_settings"]
 
 

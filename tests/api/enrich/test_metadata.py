@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 from theo.adapters.persistence.models import Document
-from theo.services.api.app.enrich.metadata import (
+from theo.infrastructure.api.app.enrich.metadata import (
     MetadataEnricher,
     _dedupe_preserve_order,
     _extract_doi_from_url,

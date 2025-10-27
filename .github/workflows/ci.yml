@@ -49,10 +49,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
-            constraints/base-constraints.txt
-            constraints/api-constraints.txt
-            constraints/ml-constraints.txt
-            constraints/dev-constraints.txt
+            constraints/prod.txt
+            constraints/dev.txt
             constraints-ci.txt
 
       - name: Preinstall CPU-only PyTorch
@@ -62,9 +60,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e . -c constraints/api-constraints.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
@@ -142,7 +140,7 @@ jobs:
 
       - name: Upload pytest coverage report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: pytest-coverage
           path: coverage.xml
@@ -161,9 +159,8 @@ jobs:
             --sv 1.5 \
             --of json \
             -o sbom-python.json \
-            constraints/api-constraints.txt \
-            constraints/ml-constraints.txt \
-            constraints/dev-constraints.txt \
+            constraints/prod.txt \
+            constraints/dev.txt \
             constraints-ci.txt
 
       - name: Generate Node SBOM
@@ -171,7 +168,7 @@ jobs:
         run: npx --yes @cyclonedx/cyclonedx-npm@1.12.0 --output-format json --output-file ../../sbom-node.json
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: cyclonedx-sboms
           path: |
@@ -181,7 +178,7 @@ jobs:
 
       - name: Upload Vitest coverage report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: vitest-coverage
           path: theo/services/web/coverage
@@ -189,7 +186,7 @@ jobs:
 
       - name: Upload Playwright artifacts
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: playwright-artifacts
           path: |
@@ -219,10 +216,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
-            constraints/base-constraints.txt
-            constraints/api-constraints.txt
-            constraints/ml-constraints.txt
-            constraints/dev-constraints.txt
+            constraints/prod.txt
+            constraints/dev.txt
             constraints-ci.txt
 
       - name: Preinstall CPU-only PyTorch
@@ -232,9 +227,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e . -c constraints/api-constraints.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Run ${{ matrix.suite }} pytest suite with profiling
         env:
@@ -297,7 +292,7 @@ jobs:
 
       - name: Upload accessibility artifacts
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: axe-playwright-artifacts
           path: |
@@ -367,7 +362,7 @@ jobs:
 
       - name: Upload Percy artifacts
         if: steps.verify-token.outputs.skip != 'true' && always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: percy-visual-artifacts
           path: |
@@ -394,10 +389,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
-            constraints/base-constraints.txt
-            constraints/api-constraints.txt
-            constraints/ml-constraints.txt
-            constraints/dev-constraints.txt
+            constraints/prod.txt
+            constraints/dev.txt
             constraints-ci.txt
 
       - name: Preinstall CPU-only PyTorch
@@ -407,9 +400,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e . -c constraints/api-constraints.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
@@ -426,7 +419,7 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./lighthouse.db
         run: |
-          uvicorn theo.services.api.app.main:app --host 127.0.0.1 --port 8000 &
+          uvicorn theo.infrastructure.api.app.main:app --host 127.0.0.1 --port 8000 &
           sleep 5
           curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:8000/health || echo "Backend health check failed but continuing"
 
@@ -442,7 +435,7 @@ jobs:
 
       - name: Upload Lighthouse artifacts
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: lighthouse-smoke
           path: |

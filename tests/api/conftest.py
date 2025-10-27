@@ -189,11 +189,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.main import app
-from theo.services.api.app.db import run_sql_migrations as migrations_module
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.db import run_sql_migrations as migrations_module
 from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, configure_engine, get_engine
-from theo.services.api.app.adapters.security import require_principal
+from theo.infrastructure.api.app.adapters.security import require_principal
 
 @pytest.fixture(autouse=True)
 def _bypass_authentication(request: pytest.FixtureRequest):
@@ -245,7 +245,7 @@ def _disable_migrations(
         _noop_run_sql_migrations,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
+        "theo.infrastructure.api.app.bootstrap.lifecycle.run_sql_migrations",
         _noop_run_sql_migrations,
     )
 
@@ -258,7 +258,7 @@ def _skip_heavy_startup() -> None:
     """Disable expensive FastAPI lifespan setup steps for API tests."""
 
     from sqlalchemy import text as _sql_text
-    from theo.services.api.app.db import seeds as _seeds_module
+    from theo.infrastructure.api.app.db import seeds as _seeds_module
 
     original_seed_reference_data = _seeds_module.seed_reference_data
 
@@ -301,17 +301,17 @@ def _skip_heavy_startup() -> None:
             original_seed_reference_data(session)
 
     monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
+        "theo.infrastructure.api.app.bootstrap.lifecycle.seed_reference_data",
         _maybe_seed_reference_data,
         raising=False,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.lifecycle.start_discovery_scheduler",
+        "theo.infrastructure.api.app.bootstrap.lifecycle.start_discovery_scheduler",
         lambda: None,
         raising=False,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.lifecycle.stop_discovery_scheduler",
+        "theo.infrastructure.api.app.bootstrap.lifecycle.stop_discovery_scheduler",
         lambda: None,
         raising=False,
     )
@@ -325,7 +325,7 @@ def _skip_heavy_startup() -> None:
 @pytest.fixture(scope="session")
 def _api_engine_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Materialise a migrated SQLite database once per test session."""
-    from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
 
     template_dir = tmp_path_factory.mktemp("api-engine-template")
     template_path = template_dir / "api.sqlite"

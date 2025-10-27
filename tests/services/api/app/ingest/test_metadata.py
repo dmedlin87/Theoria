@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from hypothesis import given, strategies as st
 
-from theo.services.api.app.ingest.metadata import (
+from theo.infrastructure.api.app.ingest.metadata import (
     HTMLMetadataParser,
     HTMLTextExtractor,
     _normalise_guardrail_collection,

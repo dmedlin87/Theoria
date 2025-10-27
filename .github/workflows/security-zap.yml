@@ -53,7 +53,7 @@ jobs:
       - name: Run ZAP baseline scan
         if: steps.verify-secret.outputs.skip != 'true'
         id: zap
-        uses: zaproxy/action-baseline@7c4deb10e6261301961c86d65d54a516394f9aed # v0.14.0
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: ${{ steps.verify-secret.outputs.url }}
           cmd_options: '-J zap-baseline-report.json -r zap-baseline-report.html -w zap-baseline-warn.md'
@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload ZAP artifacts
         if: steps.verify-secret.outputs.skip != 'true' && always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: zap-baseline-artifacts
           path: |

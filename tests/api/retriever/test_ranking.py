@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from theo.services.api.app.models.search import HybridSearchResult
-from theo.services.api.app.retriever import hybrid
+from theo.infrastructure.api.app.models.search import HybridSearchResult
+from theo.infrastructure.api.app.retriever import hybrid
 
 
 def _result(result_id: str, document_id: str, score: float) -> HybridSearchResult:

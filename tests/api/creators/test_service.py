@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from theo.services.api.app.creators.service import (
+from theo.infrastructure.api.app.creators.service import (
     _average_confidence,
     _collect_quotes,
     _normalise_topic,

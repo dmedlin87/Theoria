@@ -30,8 +30,8 @@ if "neo4j" not in sys.modules:
     neo4j_module.Driver = _StubDriver  # type: ignore[attr-defined]
     sys.modules["neo4j"] = neo4j_module
 
-from theo.services.api.app.bootstrap import app_factory
-from theo.services.api.app.bootstrap.lifecycle import lifespan as bootstrap_lifespan
+from theo.infrastructure.api.app.bootstrap import app_factory
+from theo.infrastructure.api.app.bootstrap.lifecycle import lifespan as bootstrap_lifespan
 
 
 class DummySettings:

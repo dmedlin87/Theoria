@@ -19,12 +19,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from theo.services.api.app.db.run_sql_migrations import (
+from theo.infrastructure.api.app.db.run_sql_migrations import (
     _SQLITE_PERSPECTIVE_MIGRATION,
     _split_sql_statements,
     run_sql_migrations,
 )
-from theo.services.api.app.db.seeds import seed_reference_data
+from theo.infrastructure.api.app.db.seeds import seed_reference_data
 
 
 class _Base(DeclarativeBase):
@@ -112,8 +112,8 @@ class GeoPlace(_Base):
 def _patch_models(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure migrations and seeds use lightweight test models."""
 
-    from theo.services.api.app.db import run_sql_migrations as migrations_module
-    from theo.services.api.app.db import seeds as seeds_module
+    from theo.infrastructure.api.app.db import run_sql_migrations as migrations_module
+    from theo.infrastructure.api.app.db import seeds as seeds_module
 
     monkeypatch.setattr(migrations_module, "AppSetting", AppSetting)
     monkeypatch.setattr(seeds_module, "HarmonySeed", HarmonySeed)
@@ -344,7 +344,7 @@ def test_seed_reference_data_tolerates_missing_perspective_column(
             """
         )
 
-    from theo.services.api.app.db import seeds as seeds_module
+    from theo.infrastructure.api.app.db import seeds as seeds_module
 
     monkeypatch.setattr(seeds_module, "seed_openbible_geo", lambda session: None)
 

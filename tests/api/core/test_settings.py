@@ -6,7 +6,7 @@ from theo.application.facades import settings as facades_settings
 from tests.api.core import import_legacy_module
 
 
-MODULE_NAME = "theo.services.api.app.core.settings"
+MODULE_NAME = "theo.infrastructure.api.app.core.settings"
 EXPECTED_EXPORTS = ["Settings", "get_settings", "get_settings_cipher"]
 
 

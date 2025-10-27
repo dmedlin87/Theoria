@@ -6,7 +6,7 @@ from theo.application.facades import settings_store as facades_settings_store
 from tests.api.core import import_legacy_module
 
 
-MODULE_NAME = "theo.services.api.app.core.settings_store"
+MODULE_NAME = "theo.infrastructure.api.app.core.settings_store"
 EXPECTED_EXPORTS = [
     "SETTINGS_NAMESPACE",
     "SettingNotFoundError",

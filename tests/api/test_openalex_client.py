@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from theo.services.api.app.analytics.openalex import OpenAlexClient
+from theo.infrastructure.api.app.analytics.openalex import OpenAlexClient
 
 
 @pytest.mark.parametrize(
@@ -152,7 +152,7 @@ def test_fetch_authorships_retries_after_rate_limit(monkeypatch: pytest.MonkeyPa
 
     sleep_calls: list[float] = []
     monkeypatch.setattr(
-        "theo.services.api.app.analytics.openalex.time.sleep",
+        "theo.infrastructure.api.app.analytics.openalex.time.sleep",
         lambda seconds: sleep_calls.append(seconds),
     )
 

@@ -12,14 +12,17 @@ from theo.application.observability import trace_repository_call
 from theo.application.repositories.transcript_repository import TranscriptRepository
 from theo.domain.research.osis import expand_osis_reference
 
+from .base_repository import BaseRepository
 from .models import TranscriptSegment, Video
 
 
-class SQLAlchemyTranscriptRepository(TranscriptRepository):
+class SQLAlchemyTranscriptRepository(
+    BaseRepository[TranscriptSegment], TranscriptRepository
+):
     """Retrieve transcript segments using a SQLAlchemy session."""
 
     def __init__(self, session: Session):
-        self._session = session
+        super().__init__(session)
 
     def search_segments(
         self,
@@ -42,7 +45,7 @@ class SQLAlchemyTranscriptRepository(TranscriptRepository):
                 return []
 
             query = (
-                self._session.query(TranscriptSegment)
+                self.session.query(TranscriptSegment)
                 .options(joinedload(TranscriptSegment.video))
                 .outerjoin(Video, TranscriptSegment.video_id == Video.id)
             )
@@ -56,7 +59,7 @@ class SQLAlchemyTranscriptRepository(TranscriptRepository):
                     )
                 )
 
-            bind = self._session.get_bind()
+            bind = self.session.get_bind()
             dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
             trace.set_attribute("dialect", dialect_name or "unknown")
 

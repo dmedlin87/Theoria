@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
 from theo.application.facades.database import Base, configure_engine, get_engine
-from theo.services.api.app.workers import tasks
+from theo.infrastructure.api.app.workers import tasks
 
 
 @pytest.fixture(scope="session")
@@ -74,13 +74,13 @@ def mock_heavy_operations(monkeypatch):
     mock_snapshot.edges = []
     mock_snapshot.generated_at = None
     monkeypatch.setattr(
-        "theo.services.api.app.analytics.topic_map.TopicMapBuilder.build",
+        "theo.infrastructure.api.app.analytics.topic_map.TopicMapBuilder.build",
         MagicMock(return_value=mock_snapshot)
     )
     
     # Mock vector operations
     monkeypatch.setattr(
-        "theo.services.api.app.workers.tasks._format_vector", 
+        "theo.infrastructure.api.app.workers.tasks._format_vector", 
         lambda x: [0.1] * 10
     )
     

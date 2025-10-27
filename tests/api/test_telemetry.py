@@ -5,13 +5,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from theo.application.facades import telemetry as telemetry_facade
-from theo.services.api.app.adapters.telemetry import ApiTelemetryProvider
+from theo.infrastructure.api.app.adapters.telemetry import ApiTelemetryProvider
 
 
 @pytest.fixture(autouse=True)
 def disable_prometheus(monkeypatch):
-    monkeypatch.setattr("theo.services.api.app.adapters.telemetry.Counter", None)
-    monkeypatch.setattr("theo.services.api.app.adapters.telemetry.Histogram", None)
+    monkeypatch.setattr("theo.infrastructure.api.app.adapters.telemetry.Counter", None)
+    monkeypatch.setattr("theo.infrastructure.api.app.adapters.telemetry.Histogram", None)
 
 
 @pytest.mark.parametrize(

@@ -19,11 +19,11 @@ from theo.application.facades.database import (  # noqa: E402
     get_settings,
 )
 from theo.adapters.persistence.models import CaseObject, Document  # noqa: E402
-from theo.services.api.app.ingest import pipeline  # noqa: E402
-from theo.services.api.app.models.documents import (  # noqa: E402
+from theo.infrastructure.api.app.ingest import pipeline  # noqa: E402
+from theo.infrastructure.api.app.models.documents import (  # noqa: E402
     DocumentAnnotationCreate,
 )
-from theo.services.api.app.retriever import documents as documents_api  # noqa: E402
+from theo.infrastructure.api.app.retriever import documents as documents_api  # noqa: E402
 
 
 def _prepare_database(tmp_path: Path):
@@ -40,7 +40,7 @@ def test_create_annotation_persists_case_object(tmp_path, monkeypatch) -> None:
 
     # Skip asynchronous worker dispatches that require external services.
     monkeypatch.setattr(
-        "theo.services.api.app.ingest.events._dispatch_neighborhood_event",
+        "theo.infrastructure.api.app.ingest.events._dispatch_neighborhood_event",
         lambda payload: None,
     )
     monkeypatch.setattr(

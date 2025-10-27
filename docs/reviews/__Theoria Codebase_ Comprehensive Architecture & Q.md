@@ -345,11 +345,10 @@ class PassageMapper:
 **8. Dependency Isolation**
 
 ```toml
-# Create constraint files per profile
+# Maintain aggregated constraint files
 constraints/
-├── api-constraints.txt
-├── ml-constraints.txt  
-└── dev-constraints.txt
+├── prod.txt
+└── dev.txt
 ```
 
 **9. Enhanced Instrumentation**

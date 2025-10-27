@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from theo.services.api.app.models.ai import (
+from theo.infrastructure.api.app.models.ai import (
     CHAT_SESSION_TOTAL_CHAR_BUDGET,
     MAX_CHAT_MESSAGE_CONTENT_LENGTH,
 )

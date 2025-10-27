@@ -9,15 +9,17 @@ multipart uploads for binary content.
 - **Content type:** `application/json` unless noted otherwise
 - **Authentication:** required. Supply either an API key (`THEO_API_KEYS`) or
   a JWT bearer token (`THEO_AUTH_JWT_*`). For isolated local testing you may
-  opt into anonymous requests by setting `THEO_AUTH_ALLOW_ANONYMOUS=1` before
-  launching the service.
+  opt into anonymous requests by setting `THEO_ALLOW_INSECURE_STARTUP=1` and
+  `THEO_AUTH_ALLOW_ANONYMOUS=1` before launching the service.
 - **Error format:** errors follow FastAPI's default structure:
 
 The API validates these authentication settings during startup. If neither
 `THEO_API_KEYS` nor JWT settings are provided and anonymous access remains
 disabled, the process exits with a configuration error. Enable
-`THEO_AUTH_ALLOW_ANONYMOUS=1` only for ephemeral local testing—production
-deployments must configure real credentials.
+`THEO_ALLOW_INSECURE_STARTUP=1` and `THEO_AUTH_ALLOW_ANONYMOUS=1` only for
+ephemeral local testing—production deployments must configure real credentials.
+When the runtime environment resolves to anything other than development or
+test, the API fails fast if anonymous access remains enabled.
 
 ```json
 {

@@ -29,10 +29,10 @@ from theo.adapters.persistence.models import (
     Passage,
     PassageVerse,
 )
-from theo.services.api.app.db.seeds import CONTRADICTION_NAMESPACE
-from theo.services.api.app.ingest.osis import expand_osis_reference
-from theo.services.api.app.main import app
-from theo.services.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _build_csl_entry
+from theo.infrastructure.api.app.db.seeds import CONTRADICTION_NAMESPACE
+from theo.infrastructure.api.app.ingest.osis import expand_osis_reference
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.routes.ai.workflows.exports import _CSL_TYPE_MAP, _build_csl_entry
 
 
 CONTRADICTIONS_PATH = PROJECT_ROOT / "data" / "seeds" / "contradictions.json"
@@ -452,8 +452,8 @@ def test_sqlite_migration_backfills_contradiction_perspective(
 
     from theo.application.facades import database as database_module
     from theo.application.facades import settings as settings_module
-    from theo.services.api.app.db import run_sql_migrations as migrations_module
-    from theo.services.api.app.db import seeds as seeds_module
+    from theo.infrastructure.api.app.db import run_sql_migrations as migrations_module
+    from theo.infrastructure.api.app.db import seeds as seeds_module
 
     migrations_dir = tmp_path / "migrations"
     migrations_dir.mkdir()

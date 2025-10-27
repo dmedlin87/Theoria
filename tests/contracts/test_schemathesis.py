@@ -27,13 +27,13 @@ from schemathesis.schemas import BaseSchema
 
 from theo.adapters.persistence import models as persistence_models  # noqa: E402
 
-from theo.services.api.app.analytics.topics import (  # noqa: E402
+from theo.infrastructure.api.app.analytics.topics import (  # noqa: E402
     TopicCluster,
     TopicDigest,
 )
-from theo.services.api.app.ai.rag import RAGAnswer  # noqa: E402
-from theo.services.api.app.ai.trails import TrailReplayResult  # noqa: E402
-from theo.services.api.app.models.ai import (  # noqa: E402
+from theo.infrastructure.api.app.ai.rag import RAGAnswer  # noqa: E402
+from theo.infrastructure.api.app.ai.trails import TrailReplayResult  # noqa: E402
+from theo.infrastructure.api.app.models.ai import (  # noqa: E402
     ChatGoalState,
     ChatMemoryEntry,
     ChatSessionMessage,
@@ -43,27 +43,27 @@ from theo.services.api.app.models.ai import (  # noqa: E402
     CitationExportResponse,
     ExportDeliverableResponse,
 )
-from theo.services.api.app.models.trails import (  # noqa: E402
+from theo.infrastructure.api.app.models.trails import (  # noqa: E402
     TrailReplayDiff,
     TrailReplayResponse,
 )
-from theo.services.api.app.models.watchlists import (  # noqa: E402
+from theo.infrastructure.api.app.models.watchlists import (  # noqa: E402
     WatchlistResponse,
     WatchlistRunResponse,
 )
-from theo.services.api.app.models.research import (  # noqa: E402
+from theo.infrastructure.api.app.models.research import (  # noqa: E402
     ResearchNote,
     ResearchNotesResponse,
 )
-from theo.services.api.app.models.search import (  # noqa: E402
+from theo.infrastructure.api.app.models.search import (  # noqa: E402
     HybridSearchResponse,
     HybridSearchResult,
 )
-from theo.services.api.app.models.verses import (  # noqa: E402
+from theo.infrastructure.api.app.models.verses import (  # noqa: E402
     VerseTimelineBucket,
     VerseTimelineResponse,
 )
-from theo.services.api.app.models.documents import (  # noqa: E402
+from theo.infrastructure.api.app.models.documents import (  # noqa: E402
     DocumentListResponse,
     DocumentSummary,
 )
@@ -81,7 +81,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 pytest.importorskip("theo.adapters.persistence.models")
 
-from theo.services.api.app.ai.registry import (  # noqa: E402
+from theo.infrastructure.api.app.ai.registry import (  # noqa: E402
     LLMModel,
     LLMRegistry,
     save_llm_registry,
@@ -92,8 +92,8 @@ from theo.application.facades.database import (  # noqa: E402
     get_engine,
     get_session,
 )
-from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.adapters.security import require_principal  # noqa: E402
+from theo.infrastructure.api.app.main import app  # noqa: E402
+from theo.infrastructure.api.app.adapters.security import require_principal  # noqa: E402
 
 CONFIG_PATH = PROJECT_ROOT / "contracts" / "schemathesis.toml"
 with CONFIG_PATH.open("rb") as config_file:
@@ -247,28 +247,28 @@ def _optimise_lifespan():
         return None
 
     patcher.setattr(
-        "theo.services.api.app.db.run_sql_migrations.run_sql_migrations",
+        "theo.infrastructure.api.app.db.run_sql_migrations.run_sql_migrations",
         _noop_migrations,
     )
     patcher.setattr(
-        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
+        "theo.infrastructure.api.app.bootstrap.lifecycle.run_sql_migrations",
         _noop_migrations,
     )
     patcher.setattr(
-        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
+        "theo.infrastructure.api.app.bootstrap.lifecycle.seed_reference_data",
         _noop_seed,
     )
     patcher.setattr(
-        "theo.services.api.app.db.seeds.seed_reference_data",
+        "theo.infrastructure.api.app.db.seeds.seed_reference_data",
         _noop_seed,
     )
     patcher.setattr(
-        "theo.services.api.app.workers.discovery_scheduler.start_discovery_scheduler",
+        "theo.infrastructure.api.app.workers.discovery_scheduler.start_discovery_scheduler",
         lambda: None,
         raising=False,
     )
     patcher.setattr(
-        "theo.services.api.app.workers.discovery_scheduler.stop_discovery_scheduler",
+        "theo.infrastructure.api.app.workers.discovery_scheduler.stop_discovery_scheduler",
         lambda: None,
         raising=False,
     )
@@ -402,11 +402,11 @@ def _stub_external_services(contract_context: ContractTestContext):
         )
 
     patcher.setattr(
-        "theo.services.api.app.routes.ai.workflows.chat.run_guarded_chat",
+        "theo.infrastructure.api.app.routes.ai.workflows.chat.run_guarded_chat",
         _fake_run_guarded_chat,
     )
     patcher.setattr(
-        "theo.services.api.app.routes.ai.workflows.chat.ensure_completion_safe",
+        "theo.infrastructure.api.app.routes.ai.workflows.chat.ensure_completion_safe",
         lambda *_args, **_kwargs: None,
     )
 
@@ -481,7 +481,7 @@ def _stub_external_services(contract_context: ContractTestContext):
         return manifest, records, csl_entries
 
     patcher.setattr(
-        "theo.services.api.app.routes.ai.workflows.exports.build_citation_export",
+        "theo.infrastructure.api.app.routes.ai.workflows.exports.build_citation_export",
         _fake_build_citation_export,
     )
 
@@ -514,7 +514,7 @@ def _stub_external_services(contract_context: ContractTestContext):
         return _StubPackage()
 
     patcher.setattr(
-        "theo.services.api.app.routes.ai.workflows.exports.build_sermon_deliverable",
+        "theo.infrastructure.api.app.routes.ai.workflows.exports.build_sermon_deliverable",
         _fake_build_sermon_deliverable,
     )
 
@@ -530,7 +530,7 @@ def _stub_external_services(contract_context: ContractTestContext):
         return response()
 
     patcher.setattr(
-        "theo.services.api.app.routes.ai.workflows.exports.generate_sermon_prep_outline",
+        "theo.infrastructure.api.app.routes.ai.workflows.exports.generate_sermon_prep_outline",
         _fake_generate_sermon_prep_outline,
     )
 
@@ -542,7 +542,7 @@ def _stub_external_services(contract_context: ContractTestContext):
         return _StubAuditLogger()
 
     patcher.setattr(
-        "theo.services.api.app.ai.audit_logging.AuditLogWriter.from_session",
+        "theo.infrastructure.api.app.ai.audit_logging.AuditLogWriter.from_session",
         classmethod(_fake_audit_from_session),
     )
 
@@ -567,7 +567,7 @@ def _stub_external_services(contract_context: ContractTestContext):
             return self._digest
 
     patcher.setattr(
-        "theo.services.api.app.routes.ai.digest.DigestService",
+        "theo.infrastructure.api.app.routes.ai.digest.DigestService",
         _StubDigestService,
     )
 
@@ -590,12 +590,12 @@ def _stub_external_services(contract_context: ContractTestContext):
             )
 
     patcher.setattr(
-        "theo.services.api.app.routes.ai.watchlists._service",
+        "theo.infrastructure.api.app.routes.ai.watchlists._service",
         lambda _session: _StubWatchlistsService(_session),
     )
 
     patcher.setattr(
-        "theo.services.api.app.routes.analytics.record_feedback_from_payload",
+        "theo.infrastructure.api.app.routes.analytics.record_feedback_from_payload",
         lambda _session, _payload: None,
     )
 
@@ -616,7 +616,7 @@ def _stub_external_services(contract_context: ContractTestContext):
         return DocumentListResponse(items=[summary], total=1, limit=limit, offset=offset)
 
     patcher.setattr(
-        "theo.services.api.app.routes.documents.list_documents",
+        "theo.infrastructure.api.app.routes.documents.list_documents",
         _fake_list_documents,
     )
 
@@ -639,7 +639,7 @@ def _stub_external_services(contract_context: ContractTestContext):
             ]
 
     patcher.setattr(
-        "theo.services.api.app.routes.research.get_research_service",
+        "theo.infrastructure.api.app.routes.research.get_research_service",
         lambda _session=None: _StubResearchService(),
     )
 
@@ -671,7 +671,7 @@ def _stub_external_services(contract_context: ContractTestContext):
             return ([result], None)
 
     patcher.setattr(
-        "theo.services.api.app.routes.search.get_retrieval_service",
+        "theo.infrastructure.api.app.routes.search.get_retrieval_service",
         lambda *_args, **_kwargs: _StubRetrievalService(),
     )
 
@@ -698,7 +698,7 @@ def _stub_external_services(contract_context: ContractTestContext):
         )
 
     patcher.setattr(
-        "theo.services.api.app.routes.verses.get_verse_timeline",
+        "theo.infrastructure.api.app.routes.verses.get_verse_timeline",
         _fake_get_verse_timeline,
     )
 
@@ -711,11 +711,11 @@ def _stub_external_services(contract_context: ContractTestContext):
         provider_store[key] = value
 
     patcher.setattr(
-        "theo.services.api.app.routes.ai.workflows.settings.load_setting",
+        "theo.infrastructure.api.app.routes.ai.workflows.settings.load_setting",
         _fake_load_setting,
     )
     patcher.setattr(
-        "theo.services.api.app.routes.ai.workflows.settings.save_setting",
+        "theo.infrastructure.api.app.routes.ai.workflows.settings.save_setting",
         _fake_save_setting,
     )
 
@@ -734,7 +734,7 @@ def _stub_external_services(contract_context: ContractTestContext):
         )
 
     patcher.setattr(
-        "theo.services.api.app.ai.trails.TrailService.replay_trail",
+        "theo.infrastructure.api.app.ai.trails.TrailService.replay_trail",
         _fake_replay_trail,
         raising=False,
     )

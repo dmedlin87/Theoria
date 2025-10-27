@@ -5,8 +5,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import configure_engine, get_engine
-from theo.services.api.app.db import seeds as seeds_module
-from theo.services.api.app.db.seeds import seed_contradiction_claims
+from theo.infrastructure.api.app.db import seeds as seeds_module
+from theo.infrastructure.api.app.db.seeds import seed_contradiction_claims
 
 path = Path('temp_seed.db')
 if path.exists():

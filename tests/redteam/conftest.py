@@ -104,28 +104,28 @@ def _speed_up_redteam_startup() -> Generator[None, None, None]:
         return None
 
     monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.lifecycle.run_sql_migrations",
+        "theo.infrastructure.api.app.bootstrap.lifecycle.run_sql_migrations",
         _noop_run_sql_migrations,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.db.run_sql_migrations.run_sql_migrations",
+        "theo.infrastructure.api.app.db.run_sql_migrations.run_sql_migrations",
         _noop_run_sql_migrations,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.bootstrap.lifecycle.seed_reference_data",
+        "theo.infrastructure.api.app.bootstrap.lifecycle.seed_reference_data",
         _noop,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.db.seeds.seed_reference_data",
+        "theo.infrastructure.api.app.db.seeds.seed_reference_data",
         _noop,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.workers.discovery_scheduler.start_discovery_scheduler",
+        "theo.infrastructure.api.app.workers.discovery_scheduler.start_discovery_scheduler",
         _noop,
         raising=False,
     )
     monkeypatch.setattr(
-        "theo.services.api.app.workers.discovery_scheduler.stop_discovery_scheduler",
+        "theo.infrastructure.api.app.workers.discovery_scheduler.stop_discovery_scheduler",
         _noop,
         raising=False,
     )

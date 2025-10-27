@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 from theo.adapters.persistence import Base, dispose_sqlite_engine
-from theo.services.api.app.db.run_sql_migrations import run_sql_migrations
+from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
 
 pytestmark = pytest.mark.schema
 

@@ -6,7 +6,7 @@ from theo.application.facades import version as facades_version
 from tests.api.core import import_legacy_module
 
 
-MODULE_NAME = "theo.services.api.app.core.version"
+MODULE_NAME = "theo.infrastructure.api.app.core.version"
 EXPECTED_EXPORTS = ["get_git_sha"]
 
 

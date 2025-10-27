@@ -14,7 +14,7 @@ from theo.adapters.research import (
 )
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.platform.application import resolve_application as platform_resolve_application
-from theo.services.bootstrap import resolve_application
+from theo.application.services.bootstrap import resolve_application
 
 
 @pytest.fixture

@@ -32,7 +32,7 @@ Include the following:
 
 | OWASP ASVS Control | Implementation | Evidence |
 | --- | --- | --- |
-| V2 Authentication | API key/JWT enforcement in `theo/services/api/app/security.py`; anonymous access disabled by default | `tests/api/test_security.py`, CodeQL auth checks |
+| V2 Authentication | API key/JWT enforcement in `theo/infrastructure/api/app/security.py`; anonymous access disabled by default | `tests/api/test_security.py`, CodeQL auth checks |
 | V3 Session Management | Stateless API tokens; no session identifiers stored server-side | API integration tests |
 | V4 Access Control | Principal propagation & policy checks in routes/services | Pytest authorization suite |
 | V5 Validation/Sanitization | Pydantic models, schema validation on inbound payloads | FastAPI validation, `pytest` request fixtures |

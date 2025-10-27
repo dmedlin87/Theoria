@@ -107,7 +107,7 @@ Faker = _resolve_faker()
 from theo.domain.research.osis import format_osis, osis_to_readable
 
 try:  # pragma: no cover - exercised in lightweight environments
-    from theo.services.api.app.ai.rag.models import RAGAnswer, RAGCitation
+    from theo.infrastructure.api.app.ai.rag.models import RAGAnswer, RAGCitation
 except Exception:  # pragma: no cover - allows running without pydantic
     @dataclass(frozen=True)
     class RAGCitation:  # type: ignore[override]

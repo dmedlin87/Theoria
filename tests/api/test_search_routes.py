@@ -8,10 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from theo.application.facades.settings import get_settings
-from theo.services.api.app.main import app
-from theo.services.api.app.models.search import HybridSearchResult
-from theo.services.api.app.routes import search as search_route
-from theo.services.api.app.infra import retrieval_service as retrieval_service_module
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.models.search import HybridSearchResult
+from theo.infrastructure.api.app.routes import search as search_route
+from theo.infrastructure.api.app.infra import retrieval_service as retrieval_service_module
 
 
 class _WeightedModel:

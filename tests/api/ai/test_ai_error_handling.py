@@ -6,10 +6,10 @@ from contextlib import contextmanager
 
 import pytest
 
-from theo.services.api.app.ai.rag import workflow
-from theo.services.api.app.ai.rag.guardrail_helpers import GuardrailError
-from theo.services.api.app.ai.rag.models import RAGAnswer
-from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchResult
+from theo.infrastructure.api.app.ai.rag import workflow
+from theo.infrastructure.api.app.ai.rag.guardrail_helpers import GuardrailError
+from theo.infrastructure.api.app.ai.rag.models import RAGAnswer
+from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchResult
 
 
 def _result(*, identifier: str, osis: str | None) -> HybridSearchResult:

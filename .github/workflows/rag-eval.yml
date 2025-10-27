@@ -35,10 +35,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
-            constraints/base-constraints.txt
-            constraints/api-constraints.txt
-            constraints/ml-constraints.txt
-            constraints/dev-constraints.txt
+            constraints/prod.txt
+            constraints/dev.txt
             constraints-ci.txt
 
       - name: Preinstall CPU-only PyTorch
@@ -48,10 +46,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install ".[api]" -c constraints/api-constraints.txt -c constraints-ci.txt
-          pip install ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
-          pip install ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
-          # Make the local package importable so `python -m theo.services.cli.rag_eval` works
+          pip install ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          # Make the local package importable so `python -m theo.application.services.cli.rag_eval` works
           pip install -e .
 
       - name: Determine affected modules
@@ -68,7 +66,7 @@ jobs:
           python scripts/perf/collect_rag_eval_metrics.py --modules ${RAG_MODULES}
 
       - name: Upload rag_eval artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
         with:
           name: rag-eval-metrics
           path: perf_metrics/

@@ -13,10 +13,10 @@ from theo.adapters.persistence.models import (
     ContradictionSeed,
     HarmonySeed,
 )
-from theo.services.api.app.db.verse_graph import load_seed_relationships
-from theo.services.api.app.ingest.osis import expand_osis_reference
-from theo.services.api.app.research.commentaries import search_commentaries
-from theo.services.api.app.research.contradictions import search_contradictions
+from theo.infrastructure.api.app.db.verse_graph import load_seed_relationships
+from theo.infrastructure.api.app.ingest.osis import expand_osis_reference
+from theo.infrastructure.api.app.research.commentaries import search_commentaries
+from theo.infrastructure.api.app.research.contradictions import search_contradictions
 
 
 def _range(osis: str) -> tuple[int | None, int | None]:

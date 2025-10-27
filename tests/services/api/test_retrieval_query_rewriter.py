@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import Settings
 from theo.application.search import QueryRewriter
-from theo.services.api.app.models.search import HybridSearchRequest, HybridSearchResult
-from theo.services.api.app.infra.retrieval_service import RetrievalService
+from theo.infrastructure.api.app.models.search import HybridSearchRequest, HybridSearchResult
+from theo.infrastructure.api.app.infra.retrieval_service import RetrievalService
 
 
 def _build_result(meta: dict[str, object] | None = None) -> HybridSearchResult:

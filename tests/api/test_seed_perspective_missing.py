@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
-from theo.services.api.app.db.seeds import (
+from theo.infrastructure.api.app.db.seeds import (
     seed_contradiction_claims,
     seed_harmony_claims,
     seed_commentary_excerpts,

@@ -18,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from theo.application.facades.database import Base
-from theo.services.api.app.db import seeds
+from theo.infrastructure.api.app.db import seeds
 from theo.adapters.persistence.models import (
     CommentaryExcerptSeed,
     ContradictionSeed,
@@ -410,14 +410,14 @@ def test_api_boots_contradiction_seeding_without_migrations(
     database_module._engine = None  # type: ignore[attr-defined]
     database_module._SessionLocal = None  # type: ignore[attr-defined]
 
-    module_name = "theo.services.api.app.bootstrap.app_factory"
+    module_name = "theo.infrastructure.api.app.bootstrap.app_factory"
     if module_name in sys.modules:
         importlib.reload(sys.modules[module_name])
     else:
         importlib.import_module(module_name)
     app_factory_module = sys.modules[module_name]
 
-    from theo.services.api.app.db import run_sql_migrations as migrations_module
+    from theo.infrastructure.api.app.db import run_sql_migrations as migrations_module
 
     monkeypatch.setattr(
         migrations_module,
@@ -440,7 +440,7 @@ def test_api_boots_contradiction_seeding_without_migrations(
         json.dumps(minimal_payload), encoding="utf-8"
     )
 
-    from theo.services.api.app.db import seeds as seeds_module
+    from theo.infrastructure.api.app.db import seeds as seeds_module
 
     monkeypatch.setattr(seeds_module, "SEED_ROOT", seed_dir)
     monkeypatch.setattr(seeds_module, "seed_harmony_claims", lambda session: None)

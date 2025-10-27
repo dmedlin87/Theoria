@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from theo.services.api.app.routes import export as export_routes
+from theo.infrastructure.api.app.routes import export as export_routes
 
 
 def test_normalise_formats_translates_aliases() -> None:

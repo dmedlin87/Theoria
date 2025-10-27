@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from theo.application.facades.database import Base
 from theo.adapters.persistence.models import GeoModernLocation
-from theo.services.api.app.research.geo import lookup_geo_places
+from theo.infrastructure.api.app.research.geo import lookup_geo_places
 
 
 class DummyResult:
