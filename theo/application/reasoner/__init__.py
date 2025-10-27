@@ -120,6 +120,16 @@ def _score_labels(
     return sorted(scored, key=lambda item: item.score, reverse=True)
 
 
+def _normalise_reasoner_meta(meta: Mapping[str, object] | None) -> dict[str, object]:
+    """Return a comparable snapshot of reasoner metadata without volatile fields."""
+
+    if not isinstance(meta, Mapping):
+        return {}
+    comparable = dict(meta)
+    comparable.pop("updated_at", None)
+    return comparable
+
+
 _MODELS = importlib.import_module("theo.adapters.persistence.models")
 CaseObject = _MODELS.CaseObject
 Session = SessionProtocol
@@ -280,7 +290,12 @@ class NeighborhoodReasoner:
             "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         }
 
-        if existing_meta.get("reasoner") == reasoner_meta and not inferred_tags:
+        existing_reasoner_meta = existing_meta.get("reasoner")
+        if (
+            not inferred_tags
+            and _normalise_reasoner_meta(existing_reasoner_meta)
+            == _normalise_reasoner_meta(reasoner_meta)
+        ):
             return False
 
         merged_meta = dict(existing_meta)
