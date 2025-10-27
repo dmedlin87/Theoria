@@ -24,6 +24,7 @@ from .models import (
     Discovery,
     Document,
     Passage,
+    _PREFETCHED_EMBEDDING_ATTR,
 )
 
 
@@ -104,8 +105,12 @@ def document_summary_to_dto(model: Document) -> DocumentSummaryDTO:
     )
 
 
-def passage_to_dto(model: Passage) -> PassageDTO:
+def passage_to_dto(
+    model: Passage, *, embedding: Sequence[float] | None = None
+) -> PassageDTO:
     """Convert ORM Passage to application DTO."""
+    if embedding is None:
+        embedding = model.embedding
     return PassageDTO(
         id=model.id,
         document_id=model.document_id,
@@ -115,7 +120,7 @@ def passage_to_dto(model: Passage) -> PassageDTO:
         end_char=model.end_char,
         osis_ref=model.osis_ref,
         osis_verse_ids=model.osis_verse_ids,
-        embedding=model.embedding,
+        embedding=embedding,
     )
 
 
@@ -127,9 +132,15 @@ def document_to_dto(model: Document, passages: Sequence[Passage] | None = None) 
 
     passage_dtos = []
     if passages is not None:
-        passage_dtos = [passage_to_dto(p) for p in passages]
+        passage_dtos = [
+            passage_to_dto(p, embedding=getattr(p, _PREFETCHED_EMBEDDING_ATTR, None))
+            for p in passages
+        ]
     elif hasattr(model, 'passages') and model.passages:
-        passage_dtos = [passage_to_dto(p) for p in model.passages]
+        passage_dtos = [
+            passage_to_dto(p, embedding=getattr(p, _PREFETCHED_EMBEDDING_ATTR, None))
+            for p in model.passages
+        ]
 
     return DocumentDTO(
         id=model.id,
