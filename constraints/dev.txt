@@ -1144,9 +1144,9 @@ huggingface-hub==0.36.0 \
     #   tokenizers
     #   transformers
 
-hypothesis==6.124.6 \
-    --hash=sha256:8e466b76c5f474ba07e5283308d7785fbac4bb48fb8ffbd1f5c26e534f07cd7c \
-    --hash=sha256:d245a4c17a18a44a957f026b896630d756cc413762c7739d1097cd76b0e75fa2
+hypothesis==6.142.4 \
+    --hash=sha256:25eecc73fadecd8b491aed822204cfe4be9c98ff5c1e8e038d181136ffc54b5b \
+    --hash=sha256:b3e71a84708994aa910ea47f1483ad892a7c390839959d689b2a2b07ebfd160e
     # via theoria (pyproject.toml)
 
 idna==3.11 \
