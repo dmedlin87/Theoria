@@ -9,8 +9,11 @@ services:
       - "${THEORIA_API_PORT:-8000}:8000"
     environment:
       PYTHONPATH: /app
-      THEO_AUTH_ALLOW_ANONYMOUS: "1"
-      THEO_ALLOW_INSECURE_STARTUP: "1"
+      # Anonymous access is disabled by default; set THEO_AUTH_ALLOW_ANONYMOUS=1
+      # in your shell only when iterating locally.
+      THEO_AUTH_ALLOW_ANONYMOUS: "${THEO_AUTH_ALLOW_ANONYMOUS:-0}"
+      # Insecure startup must be explicitly enabled for local development.
+      THEO_ALLOW_INSECURE_STARTUP: "${THEO_ALLOW_INSECURE_STARTUP:-0}"
       THEORIA_ENVIRONMENT: "development"
       THEORIA_PROFILE: "${THEORIA_PROFILE:-dev}"
       THEORIA_API_PORT: "${THEORIA_API_PORT:-8000}"

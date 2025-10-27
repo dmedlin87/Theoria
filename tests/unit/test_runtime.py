@@ -91,3 +91,19 @@ def test_resolve_environment_defaults_to_production(monkeypatch: pytest.MonkeyPa
         monkeypatch.delenv(name, raising=False)
 
     assert runtime._resolve_environment() == "production"
+
+
+def test_current_runtime_environment_exposes_resolved_label(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Expose the same label used by allow_insecure_startup for diagnostics."""
+
+    for name in [
+        "THEORIA_ENVIRONMENT",
+        "THEO_ENVIRONMENT",
+        "ENVIRONMENT",
+        "THEORIA_PROFILE",
+    ]:
+        monkeypatch.delenv(name, raising=False)
+
+    monkeypatch.setenv("THEO_ENVIRONMENT", "Staging")
+
+    assert runtime.current_runtime_environment() == "staging"

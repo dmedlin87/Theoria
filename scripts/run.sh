@@ -124,7 +124,10 @@ setup_env_files() {
 database_url=sqlite:///./theo.db
 storage_root=./storage
 redis_url=redis://localhost:6379/0
-THEO_AUTH_ALLOW_ANONYMOUS=1
+# Override THEO_AUTH_ALLOW_ANONYMOUS=1 in your shell when testing without API keys.
+THEO_AUTH_ALLOW_ANONYMOUS=0
+# Set THEO_ALLOW_INSECURE_STARTUP=1 in your shell only when running without credentials locally.
+THEO_ALLOW_INSECURE_STARTUP=0
 embedding_model=BAAI/bge-m3
 embedding_dim=1024
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:$PORT
@@ -141,6 +144,23 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:$PORT
 API_BASE_URL=http://127.0.0.1:$PORT
 EOF
         print_success "Created web/.env.local"
+    fi
+}
+
+enable_local_insecure_overrides() {
+    if [ "${THEO_LOCAL_INSECURE_OVERRIDES:-1}" != "1" ]; then
+        print_step "Skipping local insecure overrides (THEO_LOCAL_INSECURE_OVERRIDES=0)"
+        return
+    fi
+
+    if [ "${THEO_ALLOW_INSECURE_STARTUP:-}" != "1" ]; then
+        export THEO_ALLOW_INSECURE_STARTUP=1
+        print_warn "Enabling THEO_ALLOW_INSECURE_STARTUP=1 for local development"
+    fi
+
+    if [ "${THEO_AUTH_ALLOW_ANONYMOUS:-}" != "1" ]; then
+        export THEO_AUTH_ALLOW_ANONYMOUS=1
+        print_warn "Enabling THEO_AUTH_ALLOW_ANONYMOUS=1 for local development"
     fi
 }
 
@@ -194,11 +214,12 @@ check_prerequisites() {
 
 start_api() {
     print_header "Starting API Service"
-    
+
     stop_port "$PORT"
-    
+
     setup_python_env
-    
+    enable_local_insecure_overrides
+
     print_step "Starting FastAPI server on port $PORT..."
     
     cd "$PROJECT_ROOT"

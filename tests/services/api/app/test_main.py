@@ -18,6 +18,7 @@ def test_enforce_authentication_requires_credentials(monkeypatch):
     )
     monkeypatch.setattr(main_module, "get_settings", lambda: settings)
     monkeypatch.setattr(main_module, "allow_insecure_startup", lambda: False)
+    monkeypatch.setattr(main_module, "current_runtime_environment", lambda: "development")
 
     with pytest.raises(RuntimeError):
         main_module._enforce_authentication_requirements()
@@ -31,6 +32,7 @@ def test_enforce_authentication_allows_insecure_override(monkeypatch):
     )
     monkeypatch.setattr(main_module, "get_settings", lambda: settings)
     monkeypatch.setattr(main_module, "allow_insecure_startup", lambda: True)
+    monkeypatch.setattr(main_module, "current_runtime_environment", lambda: "development")
 
     main_module._enforce_authentication_requirements()
 
@@ -43,6 +45,21 @@ def test_enforce_authentication_blocks_anonymous_without_insecure(monkeypatch):
     )
     monkeypatch.setattr(main_module, "get_settings", lambda: settings)
     monkeypatch.setattr(main_module, "allow_insecure_startup", lambda: False)
+    monkeypatch.setattr(main_module, "current_runtime_environment", lambda: "development")
+
+    with pytest.raises(RuntimeError):
+        main_module._enforce_authentication_requirements()
+
+
+def test_enforce_authentication_blocks_anonymous_outside_local(monkeypatch):
+    settings = SimpleNamespace(
+        api_keys=[],
+        auth_allow_anonymous=True,
+        has_auth_jwt_credentials=lambda: False,
+    )
+    monkeypatch.setattr(main_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(main_module, "allow_insecure_startup", lambda: True)
+    monkeypatch.setattr(main_module, "current_runtime_environment", lambda: "production")
 
     with pytest.raises(RuntimeError):
         main_module._enforce_authentication_requirements()

@@ -109,9 +109,16 @@ The ML constraint set also pins a CPU-only PyTorch wheel by embedding the approp
    export THEO_API_KEYS='["local-dev-key"]'
 
    # or temporarily allow unauthenticated requests (development only)
+   export THEO_ALLOW_INSECURE_STARTUP=1
    export THEO_AUTH_ALLOW_ANONYMOUS=1
    ```
    Additional authentication strategies (OIDC, session-based, API tokens) are documented in [`docs/authentication.md`](docs/authentication.md).
+
+   > **Production / staging:** Always configure API keys or JWT credentials. The
+   > API exits during startup if anonymous access remains enabled when the
+   > runtime environment is anything other than development/testing. Set
+   > `THEO_LOCAL_INSECURE_OVERRIDES=0` when you want local scripts to exercise
+   > the same production guards.
 
 ### Phase 2: Launch Services
 

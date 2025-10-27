@@ -8,7 +8,10 @@ from fastapi import FastAPI
 from theo.application.facades.resilience import set_resilience_policy_factory
 from theo.application.facades.research import set_application_resolver
 from theo.application.facades.secret_migration import set_llm_registry_saver
-from theo.application.facades.runtime import allow_insecure_startup
+from theo.application.facades.runtime import (
+    allow_insecure_startup,
+    current_runtime_environment,
+)
 from theo.application.facades.settings import Settings, get_settings, get_settings_secret
 from theo.application.facades.telemetry import set_telemetry_provider
 
@@ -62,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     enforce_authentication_requirements(
         resolved_settings,
         allow_insecure_startup=allow_insecure_startup,
+        get_environment_label=current_runtime_environment,
         logger=logger,
     )
     enforce_secret_requirements(

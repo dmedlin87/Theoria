@@ -12,7 +12,10 @@ from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from starlette.responses import Response
 
-from theo.application.facades.runtime import allow_insecure_startup
+from theo.application.facades.runtime import (
+    allow_insecure_startup,
+    current_runtime_environment,
+)
 from theo.application.facades.settings import get_settings, get_settings_secret
 
 from .bootstrap import ROUTER_REGISTRATIONS, create_app
@@ -113,6 +116,7 @@ def _enforce_authentication_requirements() -> None:
     _enforce_authentication_requirements_impl(
         settings,
         allow_insecure_startup=allow_insecure_startup,
+        get_environment_label=current_runtime_environment,
         logger=logger,
     )
 

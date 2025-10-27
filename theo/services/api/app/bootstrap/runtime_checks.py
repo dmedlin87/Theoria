@@ -12,6 +12,11 @@ class _AllowInsecureStartup(Protocol):
         ...
 
 
+class _GetEnvironmentLabel(Protocol):
+    def __call__(self) -> str:  # pragma: no cover - protocol definition
+        ...
+
+
 class _ConsoleTracer(Protocol):
     def __call__(self) -> None:  # pragma: no cover - protocol definition
         ...
@@ -46,6 +51,7 @@ def enforce_authentication_requirements(
     settings: object,
     *,
     allow_insecure_startup: _AllowInsecureStartup,
+    get_environment_label: _GetEnvironmentLabel,
     logger: logging.Logger,
 ) -> None:
     """Validate the authentication configuration prior to boot."""
@@ -54,6 +60,17 @@ def enforce_authentication_requirements(
     auth_allow_anonymous = getattr(settings, "auth_allow_anonymous", False)
     api_keys = getattr(settings, "api_keys", [])
     has_jwt = getattr(settings, "has_auth_jwt_credentials", lambda: False)
+    environment = (get_environment_label() or "").strip().lower() or "production"
+    allows_anonymous = environment in {"development", "dev", "local", "test", "testing"}
+
+    if auth_allow_anonymous and not allows_anonymous:
+        message = (
+            "THEO_AUTH_ALLOW_ANONYMOUS is disabled for the current environment "
+            f"({environment}). Remove the override or switch to a development "
+            "profile before starting the service."
+        )
+        logger.critical(message)
+        raise RuntimeError(message)
 
     if auth_allow_anonymous and not insecure_ok:
         message = (
