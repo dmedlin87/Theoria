@@ -685,13 +685,19 @@ def db_transaction(integration_engine: Engine) -> Generator[Any, None, None]:
 
 
 @pytest.fixture(scope="function")
-def integration_session(db_transaction: Any) -> Generator[Session, None, None]:
+def integration_session(request: pytest.FixtureRequest) -> Generator[Session, None, None]:
     """Return a SQLAlchemy ``Session`` bound to an isolated transaction."""
 
     if sessionmaker is None:  # pragma: no cover - lightweight envs without SQLAlchemy
         pytest.skip("sqlalchemy not installed")
 
-    connection = cast("Connection", _SCHEMA_CONNECTION.get(None) or db_transaction)
+    connection = _SCHEMA_CONNECTION.get(None)
+    if connection is None:
+        db_transaction = request.getfixturevalue("db_transaction")
+        connection = cast("Connection", db_transaction)
+    else:
+        connection = cast("Connection", connection)
+
     SessionFactory = sessionmaker(bind=connection, future=True)  # type: ignore[arg-type]
     session = SessionFactory()
     try:
