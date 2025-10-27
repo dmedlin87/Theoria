@@ -9,15 +9,18 @@ from theo.application.dtos import ChatSessionDTO
 from theo.application.observability import trace_repository_call
 from theo.application.repositories import ChatSessionRepository
 
+from .base_repository import BaseRepository
 from .mappers import chat_session_to_dto
 from .models import ChatSession
 
 
-class SQLAlchemyChatSessionRepository(ChatSessionRepository):
+class SQLAlchemyChatSessionRepository(
+    BaseRepository[ChatSession], ChatSessionRepository
+):
     """Chat session repository backed by a SQLAlchemy session."""
 
     def __init__(self, session: Session):
-        self.session = session
+        super().__init__(session)
 
     def list_recent(self, limit: int) -> list[ChatSessionDTO]:
         if limit < 1:
@@ -33,7 +36,7 @@ class SQLAlchemyChatSessionRepository(ChatSessionRepository):
                 .order_by(ChatSession.updated_at.desc())
                 .limit(limit)
             )
-            results = self.session.scalars(stmt).all()
+            results = self.scalars(stmt).all()
             trace.record_result_count(len(results))
             return [chat_session_to_dto(model) for model in results]
 

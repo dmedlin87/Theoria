@@ -15,14 +15,17 @@ from theo.application.repositories.embedding_repository import (
     PassageForEmbedding,
 )
 
+from .base_repository import BaseRepository
 from .models import Document, Passage
 
 
-class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
+class SQLAlchemyPassageEmbeddingRepository(
+    BaseRepository[Passage], PassageEmbeddingRepository
+):
     """Repository coordinating passage reads and embedding updates."""
 
     def __init__(self, session: Session) -> None:
-        self._session = session
+        super().__init__(session)
 
     def count_candidates(
         self,
@@ -39,13 +42,13 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
             stmt = stmt.join(Document)
         for criterion in filters:
             stmt = stmt.where(criterion)
-        return int(self._session.execute(stmt).scalar_one())
+        return int(self.execute(stmt).scalar_one())
 
     def existing_ids(self, ids: Sequence[str]) -> set[str]:
         if not ids:
             return set()
         stmt = select(Passage.id).where(Passage.id.in_(ids))
-        return set(self._session.execute(stmt).scalars())
+        return set(self.execute(stmt).scalars())
 
     def iter_candidates(
         self,
@@ -68,7 +71,7 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
         for criterion in filters:
             stmt = stmt.where(criterion)
 
-        stream = self._session.execute(stmt).scalars()
+        stream = self.execute(stmt).scalars()
         for record in stream:
             yield PassageForEmbedding(
                 id=record.id,
@@ -85,7 +88,7 @@ class SQLAlchemyPassageEmbeddingRepository(PassageEmbeddingRepository):
         payload = [
             {"id": update.id, "embedding": list(update.embedding)} for update in updates
         ]
-        self._session.bulk_update_mappings(Passage, payload)
+        self.session.bulk_update_mappings(Passage, payload)
 
     def _build_filters(
         self,
