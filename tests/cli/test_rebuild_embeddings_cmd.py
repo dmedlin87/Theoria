@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 import types
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import Any, Iterable, List
 
@@ -17,14 +19,6 @@ try:  # pragma: no cover - optional dependency in lightweight test runs
 except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
     class SQLAlchemyError(Exception):
         """Fallback SQLAlchemyError when the real dependency is unavailable."""
-
-
-@pytest.fixture
-def cli_module(
-    stub_sqlalchemy: types.ModuleType, stub_pythonbible: types.ModuleType
-) -> Iterator[types.ModuleType]:
-    """Import :mod:`theo.cli` with stubbed heavy dependencies."""
-
 from theo.application.embeddings import (
     EmbeddingRebuildError,
     EmbeddingRebuildOptions,
@@ -34,10 +28,6 @@ from theo.application.embeddings import (
     EmbeddingRebuildStart,
     EmbeddingRebuildState,
 )
-try:  # pragma: no cover - optional dependency in lightweight test runs
-    from sqlalchemy.exc import SQLAlchemyError
-except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
-
 if "fastapi" not in sys.modules:
     fastapi_stub = types.ModuleType("fastapi")
     fastapi_stub.status = types.SimpleNamespace()
@@ -47,8 +37,6 @@ def _install_sqlalchemy_stub() -> None:
     if "sqlalchemy" in sys.modules:
         return
     try:  # Prefer the real package when available.
-        import importlib
-
         importlib.import_module("sqlalchemy")
         return
     except ModuleNotFoundError:
@@ -79,98 +67,6 @@ def _install_sqlalchemy_stub() -> None:
 
     orm_module = types.ModuleType("sqlalchemy.orm")
 
-    module_name = "theo.cli"
-    original = sys.modules.pop(module_name, None)
-    try:
-        module = importlib.import_module(module_name)
-    except ModuleNotFoundError as exc:
-        if original is not None:
-            sys.modules[module_name] = original
-        pytest.skip(f"theo.cli unavailable: {exc}")
-    try:
-        yield module
-    finally:
-        sys.modules.pop(module_name, None)
-        if original is not None:
-            sys.modules[module_name] = original
-
-
-@pytest.fixture
-def rebuild_embeddings_cmd(cli_module: types.ModuleType):
-    return cli_module.rebuild_embeddings_cmd
-
-
-@pytest.fixture
-def cli(cli_module: types.ModuleType):
-    return cli_module.cli
-
-
-@dataclass
-class FakePassageRow:
-    id: str
-    text: str
-    embedding: list[float] | None
-    document_updated_at: datetime | None = None
-
-
-class FakeCriterion:
-    def __init__(self, op: str, getter, value: Any) -> None:
-        self.op = op
-        self.getter = getter
-        self.value = value
-
-
-
-@pytest.fixture
-def rebuild_embeddings_cmd(cli_module: types.ModuleType):
-    return cli_module.rebuild_embeddings_cmd
-
-
-
-
-@pytest.fixture
-def cli_module(
-    stub_sqlalchemy: types.ModuleType, stub_pythonbible: types.ModuleType
-) -> Iterator[types.ModuleType]:
-    """Import :mod:`theo.cli` with stubbed heavy dependencies."""
-
-    module_name = "theo.cli"
-    original = sys.modules.pop(module_name, None)
-    try:
-        module = importlib.import_module(module_name)
-    except ModuleNotFoundError as exc:
-        if original is not None:
-            sys.modules[module_name] = original
-        pytest.skip(f"theo.cli unavailable: {exc}")
-    try:
-        yield module
-    finally:
-        sys.modules.pop(module_name, None)
-        if original is not None:
-            sys.modules[module_name] = original
-
-
-@pytest.fixture
-def rebuild_embeddings_cmd(cli_module: types.ModuleType):
-    return cli_module.rebuild_embeddings_cmd
-
-
-@pytest.fixture
-def cli(cli_module: types.ModuleType):
-    return cli_module.cli
-    sql_module = types.ModuleType("sqlalchemy.sql")
-    sql_module.__path__ = []  # type: ignore[attr-defined]
-    sql_module.__package__ = "sqlalchemy"
-    sql_spec = ModuleSpec("sqlalchemy.sql", loader=None, is_package=True)
-    sql_spec.submodule_search_locations = []  # type: ignore[assignment]
-    sql_module.__spec__ = sql_spec  # type: ignore[attr-defined]
-    elements_module = types.ModuleType("sqlalchemy.sql.elements")
-    elements_module.__package__ = "sqlalchemy.sql"
-    elements_spec = ModuleSpec("sqlalchemy.sql.elements", loader=None, is_package=False)
-    elements_spec.submodule_search_locations = []  # type: ignore[assignment]
-    elements_module.__spec__ = elements_spec  # type: ignore[attr-defined]
-
-    class ClauseElement:  # pragma: no cover - placeholder type
     class Session:  # pragma: no cover - placeholder
         def __init__(self, *_args: object, **_kwargs: object) -> None:
             raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
@@ -184,14 +80,39 @@ def cli(cli_module: types.ModuleType):
 
     engine_module.Engine = Engine
 
+    sql_module = types.ModuleType("sqlalchemy.sql")
+    sql_module.__package__ = "sqlalchemy"
+    sql_module.__path__ = []  # type: ignore[attr-defined]
+    sql_spec = ModuleSpec("sqlalchemy.sql", loader=None, is_package=True)
+    sql_spec.submodule_search_locations = []  # type: ignore[assignment]
+    sql_module.__spec__ = sql_spec  # type: ignore[attr-defined]
+
+    elements_module = types.ModuleType("sqlalchemy.sql.elements")
+    elements_module.__package__ = "sqlalchemy.sql"
+    elements_spec = ModuleSpec(
+        "sqlalchemy.sql.elements",
+        loader=None,
+        is_package=False,
+    )
+    elements_spec.submodule_search_locations = []  # type: ignore[assignment]
+    elements_module.__spec__ = elements_spec  # type: ignore[attr-defined]
+
+    class ClauseElement:  # pragma: no cover - placeholder type
+        pass
+
+    elements_module.ClauseElement = ClauseElement
+
     sqlalchemy_stub.exc = exc_module
     sqlalchemy_stub.orm = orm_module
     sqlalchemy_stub.engine = engine_module
+    sqlalchemy_stub.sql = sql_module
 
     sys.modules["sqlalchemy"] = sqlalchemy_stub
     sys.modules["sqlalchemy.exc"] = exc_module
     sys.modules["sqlalchemy.orm"] = orm_module
     sys.modules["sqlalchemy.engine"] = engine_module
+    sys.modules["sqlalchemy.sql"] = sql_module
+    sys.modules["sqlalchemy.sql.elements"] = elements_module
 
 
 def _install_pythonbible_stub() -> None:

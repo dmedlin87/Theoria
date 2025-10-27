@@ -162,6 +162,7 @@ markers = [
     "db: database-hitting tests",
     "network: tests that would reach network if not mocked",
     "perf: benchmark-style performance checks",
+    "performance: benchmark-style performance checks",
     "flaky: known-intermittent tests",
     "xdist_group: marker for grouping tests by xdist",
 ]
