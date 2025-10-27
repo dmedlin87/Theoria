@@ -158,3 +158,66 @@ def test_reasoner_end_to_end_with_sql_adapter() -> None:
         session.close()
         session.bind.dispose()  # type: ignore[arg-type]
 
+
+def test_reasoner_skips_rewrites_when_inferences_unchanged() -> None:
+    session = _build_session()
+    try:
+        document = Document(id="doc-1", title="Focus", topics=["Ecclesiology"])
+        case_object = CaseObject(id="co-1", document_id=document.id, meta={})
+        session.add_all([document, case_object])
+        session.commit()
+
+        neighborhood = GraphNeighborhood(
+            focus_ids=[case_object.id],
+            nodes={
+                "co-1": GraphNode(
+                    id="co-1",
+                    document_id=document.id,
+                    topics=["Ecclesiology"],
+                    topic_domains=["Doctrine"],
+                    doctrine="Orthodox",
+                    is_focus=True,
+                )
+            },
+            edges=[],
+        )
+
+        reasoner = NeighborhoodReasoner(
+            graph_adapter_factory=lambda _session: _StaticAdapter(neighborhood),
+            doctrine_threshold=1.1,
+            topic_threshold=1.1,
+            domain_threshold=1.1,
+        )
+        event = DocumentPersistedEvent(
+            document_id=document.id,
+            passage_ids=["passage-1"],
+            passage_count=1,
+            topics=["Ecclesiology"],
+            topic_domains=["Doctrine"],
+            theological_tradition="Orthodox",
+            source_type="txt",
+        )
+
+        first_report = reasoner.handle_document_persisted(session, event)
+        session.commit()
+
+        assert first_report.updated_case_objects == [case_object.id]
+        refreshed = session.get(CaseObject, case_object.id)
+        assert refreshed is not None
+        initial_reasoner_meta = (refreshed.meta or {}).get("reasoner")
+        assert isinstance(initial_reasoner_meta, dict)
+        initial_updated_at = initial_reasoner_meta.get("updated_at")
+
+        second_report = reasoner.handle_document_persisted(session, event)
+        session.commit()
+
+        assert second_report.updated_case_objects == []
+        rerefreshed = session.get(CaseObject, case_object.id)
+        assert rerefreshed is not None
+        new_reasoner_meta = (rerefreshed.meta or {}).get("reasoner")
+        assert isinstance(new_reasoner_meta, dict)
+        assert new_reasoner_meta.get("updated_at") == initial_updated_at
+    finally:
+        session.close()
+        session.bind.dispose()  # type: ignore[arg-type]
+
