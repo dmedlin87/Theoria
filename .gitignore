@@ -64,6 +64,8 @@ temp_*.py
 temp_*.xml
 temp_*.db
 temp_*/
+.tmp_contract_debug/
+.tmp_contract_debug*/
 test_results*.txt
 
 # OS-specific
