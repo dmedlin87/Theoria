@@ -63,6 +63,11 @@ tasks:
     cmds:
       - pytest --durations=0 --profile-svg tests/
 
+  test:profile-markers:
+    desc: Capture performance baselines for schema/pgvector/contract suites
+    cmds:
+      - python scripts/perf/profile_marker_suites.py
+
   test:split:
     desc: Run pytest in split mode for CI matrix builds
     cmds:
