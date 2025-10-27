@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from contextvars import ContextVar
 import gc
 import importlib
 import inspect
@@ -10,7 +11,7 @@ import sys
 import warnings
 from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
@@ -22,11 +23,12 @@ import pytest
 
 try:  # pragma: no cover - optional dependency for integration fixtures
     from sqlalchemy import create_engine, text
-    from sqlalchemy.engine import Engine
+    from sqlalchemy.engine import Connection, Engine
     from sqlalchemy.orm import Session, sessionmaker
 except ModuleNotFoundError:  # pragma: no cover - allows running lightweight suites
     create_engine = None  # type: ignore[assignment]
     text = None  # type: ignore[assignment]
+    Connection = object  # type: ignore[assignment]
     Engine = object  # type: ignore[assignment]
     Session = object  # type: ignore[assignment]
     sessionmaker = None  # type: ignore[assignment]
@@ -94,6 +96,8 @@ _ENABLE_MEMCHECK = os.getenv("THEORIA_MEMCHECK", "").strip().lower() in {
     "yes",
     "on",
 }
+
+_SCHEMA_CONNECTION: ContextVar[Connection | None] = ContextVar("_SCHEMA_CONNECTION")
 
 
 def _register_randomly_plugin(pluginmanager: pytest.PluginManager) -> bool:
@@ -681,14 +685,13 @@ def db_transaction(integration_engine: Engine) -> Generator[Any, None, None]:
 
 
 @pytest.fixture(scope="function")
-def integration_session(integration_engine: Engine) -> Generator[Session, None, None]:
+def integration_session(db_transaction: Any) -> Generator[Session, None, None]:
     """Return a SQLAlchemy ``Session`` bound to an isolated transaction."""
 
     if sessionmaker is None:  # pragma: no cover - lightweight envs without SQLAlchemy
         pytest.skip("sqlalchemy not installed")
 
-    connection = integration_engine.connect()
-    transaction = connection.begin()
+    connection = cast("Connection", _SCHEMA_CONNECTION.get(None) or db_transaction)
     SessionFactory = sessionmaker(bind=connection, future=True)  # type: ignore[arg-type]
     session = SessionFactory()
     try:
@@ -696,15 +699,18 @@ def integration_session(integration_engine: Engine) -> Generator[Session, None, 
         session.flush()
     finally:
         session.close()
-        transaction.rollback()
-        connection.close()
 
 
 @pytest.fixture(scope="function")
-def schema_isolation(db_transaction: Any) -> Iterator[None]:
+def schema_isolation(db_transaction: Any) -> Iterator[Any]:
     """Ensure ``@pytest.mark.schema`` tests automatically roll back state."""
 
-    yield
+    connection = cast("Connection", db_transaction)
+    token = _SCHEMA_CONNECTION.set(connection)
+    try:
+        yield connection
+    finally:
+        _SCHEMA_CONNECTION.reset(token)
 
 
 @pytest.fixture(scope="session", autouse=True)

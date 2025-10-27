@@ -94,24 +94,34 @@ def _parse_slowest(lines: Iterable[str]) -> list[SlowTestRecord]:
 def _run_profile(marker: str) -> MarkerProfile:
     command = _build_command(marker)
     start = time.perf_counter()
-    process = subprocess.run(
+    process = subprocess.Popen(
         command,
         cwd=REPO_ROOT,
-        check=False,
         text=True,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
     )
+
+    output_lines: list[str] = []
+    assert process.stdout is not None  # for type checkers; stdout is PIPE
+    try:
+        for line in process.stdout:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            output_lines.append(line.rstrip("\n"))
+    finally:
+        process.stdout.close()
+
+    returncode = process.wait()
     end = time.perf_counter()
 
-    if process.returncode != 0:
-        sys.stderr.write(process.stdout)
-        sys.stderr.write(process.stderr)
+    if returncode != 0:
         raise SystemExit(
-            f"pytest exited with status {process.returncode} while profiling marker '{marker}'"
+            f"pytest exited with status {returncode} while profiling marker '{marker}'"
         )
 
-    combined_output = (process.stdout or "").splitlines() + (process.stderr or "").splitlines()
-    slow_tests = _parse_slowest(combined_output)
+    slow_tests = _parse_slowest(output_lines)
     return MarkerProfile(marker, command, end - start, slow_tests)
 
 
