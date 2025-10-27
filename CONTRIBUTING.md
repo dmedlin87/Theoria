@@ -80,6 +80,7 @@ Once the Makefile façade is introduced the following convenience commands will 
 ## Debugging Utilities & Local Artifacts
 - Reusable maintenance helpers and scratch scripts live in [`scripts/debug/`](scripts/debug/). If you create a new diagnostic script, place it there so others can discover and rerun it.
 - Store ad-hoc transcripts or large local investigation logs under `docs/process/` when they are worth sharing, or `.debug/` when they should stay out of version control. Avoid committing machine-specific transcripts, temporary exports (for example `test_results*.txt`), or other local debugging output at the repository root.
+- Do not recreate the legacy `.tmp_contract_debug/` workspace (or similarly named folders). It was an ad-hoc scratch area that polluted commits; use `.debug/` or `docs/process/` instead so temporary assets stay local.
 
 ## Pull Request Expectations
 - Reference relevant sections of the Test Map when adding or updating tests.
