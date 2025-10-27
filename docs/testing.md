@@ -63,7 +63,7 @@ regression-focused portions of the Python test suite.
 * **Scope** – `tests/ranking/test_reranker_scripts.py` shells out to `scripts/train_reranker.py` and `scripts/eval_reranker.py`
   to ensure the CLI tooling trains and reports metrics end-to-end. 【F:tests/ranking/test_reranker_scripts.py†L1-L52】
 * **Dependencies** – Installs succeed without scikit-learn thanks to bundled stubs, but installing the ML extra unlocks
-  histogram gradient boosting (`pip install ".[ml]" -c constraints/ml-constraints.txt`).
+  histogram gradient boosting (`pip install ".[ml]" -c constraints/prod.txt`).
 
 ## Database-backed integration fixtures
 
@@ -111,5 +111,5 @@ Export these values (or suitable overrides) before running CLI tools or manual s
 | Red-team regressions | `pytest tests/redteam/test_ai_redteam.py` |
 | Watchlist performance | `pytest tests/api/test_watchlist_performance.py` |
 | Slow transformers | `pip install "transformers[torch]" && pytest -m slow -k contradiction_engine` |
-| Ranking CLI slow path | `pip install ".[ml]" -c constraints/ml-constraints.txt && pytest -m slow -k reranker_scripts` |
+| Ranking CLI slow path | `pip install ".[ml]" -c constraints/prod.txt && pytest -m slow -k reranker_scripts` |
 | Postgres-backed slow suite | `docker info && pytest --schema --pgvector -m "slow"` |

@@ -35,10 +35,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
-            constraints/base-constraints.txt
-            constraints/api-constraints.txt
-            constraints/ml-constraints.txt
-            constraints/dev-constraints.txt
+            constraints/prod.txt
+            constraints/dev.txt
             constraints-ci.txt
 
       - name: Preinstall CPU-only PyTorch
@@ -48,9 +46,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install ".[api]" -c constraints/api-constraints.txt -c constraints-ci.txt
-          pip install ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
-          pip install ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
+          pip install ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
           # Make the local package importable so `python -m theo.services.cli.rag_eval` works
           pip install -e .
 
