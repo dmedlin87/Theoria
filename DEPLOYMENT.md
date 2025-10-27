@@ -67,6 +67,8 @@
 ## Environment Hardening
 
 - **Secrets:** Provision via cloud secret manager and inject at runtime; do not bake into images.
+- **Authentication:** Provision API keys or JWT credentials for every non-local profile. The runtime fails fast when
+  `THEO_AUTH_ALLOW_ANONYMOUS=1` is detected outside development/testing, preventing accidental public deployments.
 - **Runtime Policies:** Enable read-only filesystem, non-root users, network policies restricting egress to approved providers.
 - **Observability:** Export OpenTelemetry traces + Prometheus metrics for deployment verification.
 

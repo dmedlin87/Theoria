@@ -853,8 +853,41 @@ function Start-TheoriaApi {
     }
 
     $apiEnv = New-ServiceEnvironment
-    $apiEnv['THEO_AUTH_ALLOW_ANONYMOUS'] = '1'
-    $apiEnv['THEO_ALLOW_INSECURE_STARTUP'] = '1'
+
+    $truthy = @('1', 'true', 'yes')
+    $localOverrideFlag = [System.Environment]::GetEnvironmentVariable('THEO_LOCAL_INSECURE_OVERRIDES')
+    $enableLocalInsecure = $script:ProfileName -in @('dev', 'local')
+
+    if ($localOverrideFlag -eq '0') {
+        $enableLocalInsecure = $false
+        Write-TheoriaLog "Skipping insecure overrides (THEO_LOCAL_INSECURE_OVERRIDES=0)" -Level Info
+    }
+
+    if ($enableLocalInsecure) {
+        $existingInsecure = if ($apiEnv.ContainsKey('THEO_ALLOW_INSECURE_STARTUP')) { $apiEnv['THEO_ALLOW_INSECURE_STARTUP'] } else { $null }
+        $existingInsecureText = if ($existingInsecure) { $existingInsecure.ToString().ToLowerInvariant() } else { '' }
+        if (-not $truthy.Contains($existingInsecureText)) {
+            $apiEnv['THEO_ALLOW_INSECURE_STARTUP'] = '1'
+            Write-TheoriaLog "Enabling THEO_ALLOW_INSECURE_STARTUP=1 for local development" -Level Warning
+        }
+        $existingAnonymous = if ($apiEnv.ContainsKey('THEO_AUTH_ALLOW_ANONYMOUS')) { $apiEnv['THEO_AUTH_ALLOW_ANONYMOUS'] } else { $null }
+        $existingAnonymousText = if ($existingAnonymous) { $existingAnonymous.ToString().ToLowerInvariant() } else { '' }
+        if (-not $truthy.Contains($existingAnonymousText)) {
+            $apiEnv['THEO_AUTH_ALLOW_ANONYMOUS'] = '1'
+            Write-TheoriaLog "Enabling THEO_AUTH_ALLOW_ANONYMOUS=1 for local development" -Level Warning
+        }
+    } else {
+        foreach ($key in @('THEO_ALLOW_INSECURE_STARTUP', 'THEO_AUTH_ALLOW_ANONYMOUS')) {
+            if ($apiEnv.ContainsKey($key)) {
+                $currentValue = $apiEnv[$key]
+                $currentText = if ($currentValue) { $currentValue.ToString().ToLowerInvariant() } else { '' }
+                if ($truthy.Contains($currentText)) {
+                    $apiEnv[$key] = '0'
+                    Write-TheoriaLog "Clearing $key for non-local profile" -Level Info
+                }
+            }
+        }
+    }
     $apiEnv['PYTHONUNBUFFERED'] = '1'
     if (-not $apiEnv.ContainsKey('THEO_FORCE_EMBEDDING_FALLBACK')) {
         $fallbackSetting = [System.Environment]::GetEnvironmentVariable('THEO_FORCE_EMBEDDING_FALLBACK')

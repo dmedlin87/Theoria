@@ -272,7 +272,10 @@ function Initialize-EnvironmentFiles {
 database_url=sqlite:///./theo.db
 storage_root=./storage
 redis_url=redis://localhost:6379/0
-THEO_AUTH_ALLOW_ANONYMOUS=1
+# Override THEO_AUTH_ALLOW_ANONYMOUS=1 in your shell when testing without API keys.
+THEO_AUTH_ALLOW_ANONYMOUS=0
+# Set THEO_ALLOW_INSECURE_STARTUP=1 in your shell only when running without credentials locally.
+THEO_ALLOW_INSECURE_STARTUP=0
 embedding_model=BAAI/bge-m3
 embedding_dim=1024
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:$Port
@@ -295,6 +298,36 @@ API_BASE_URL=http://127.0.0.1:$Port
         Write-Success "Created web/.env.local"
     } else {
         Write-Success "Web environment file exists"
+    }
+}
+
+function Enable-LocalInsecureOverrides {
+    $shouldEnable = $true
+    if ($env:THEO_LOCAL_INSECURE_OVERRIDES -eq '0') {
+        Write-Step "Skipping local insecure overrides (THEO_LOCAL_INSECURE_OVERRIDES=0)"
+        $shouldEnable = $false
+    }
+
+    if (-not $shouldEnable) { return }
+
+    $truthy = @('1', 'true', 'yes')
+
+    $currentInsecure = ''
+    if (-not [string]::IsNullOrWhiteSpace($env:THEO_ALLOW_INSECURE_STARTUP)) {
+        $currentInsecure = $env:THEO_ALLOW_INSECURE_STARTUP.ToLowerInvariant()
+    }
+    if (-not $truthy.Contains($currentInsecure)) {
+        $env:THEO_ALLOW_INSECURE_STARTUP = '1'
+        Write-Warn "Enabling THEO_ALLOW_INSECURE_STARTUP=1 for local development"
+    }
+
+    $currentAnonymous = ''
+    if (-not [string]::IsNullOrWhiteSpace($env:THEO_AUTH_ALLOW_ANONYMOUS)) {
+        $currentAnonymous = $env:THEO_AUTH_ALLOW_ANONYMOUS.ToLowerInvariant()
+    }
+    if (-not $truthy.Contains($currentAnonymous)) {
+        $env:THEO_AUTH_ALLOW_ANONYMOUS = '1'
+        Write-Warn "Enabling THEO_AUTH_ALLOW_ANONYMOUS=1 for local development"
     }
 }
 
@@ -360,19 +393,21 @@ function Test-Prerequisites {
 
 function Start-ApiService {
     Write-Header "Starting API Service"
-    
+
     # Stop any existing service on API port
     if (Test-PortInUse $Port) {
         Stop-ServiceOnPort $Port
     }
-    
+
     Write-Step "Initializing Python environment..."
     $python = Initialize-VirtualEnvironment
-    
+
     if (-not $SkipChecks) {
         Install-PythonDependencies $python
     }
-    
+
+    Enable-LocalInsecureOverrides
+
     Write-Step "Starting FastAPI server on port $Port..."
     
     $uvicornArgs = @(
