@@ -1,7 +1,7 @@
 import pytest
 
 from theo.application.search import QueryRewriter
-from theo.services.api.app.models.search import HybridSearchRequest
+from theo.infrastructure.api.app.models.search import HybridSearchRequest
 
 
 def test_query_rewriter_adds_osis_hint() -> None:

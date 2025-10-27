@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from theo.services.api.app.models.search import HybridSearchFilters
-from theo.services.api.app.retriever import hybrid
+from theo.infrastructure.api.app.models.search import HybridSearchFilters
+from theo.infrastructure.api.app.retriever import hybrid
 
 from tests.api.retriever.conftest import DummyDocument, DummyPassage
 

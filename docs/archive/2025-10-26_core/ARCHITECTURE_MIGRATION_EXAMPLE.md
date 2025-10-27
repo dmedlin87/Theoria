@@ -326,7 +326,7 @@ def list_documents_with_passages(session, user_id):
 
 ```python
 # NEW: Optimized + monitored
-from theo.services.api.app.db.query_optimizations import (
+from theo.infrastructure.api.app.db.query_optimizations import (
     query_with_monitoring,
     with_eager_loading,
 )

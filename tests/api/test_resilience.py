@@ -5,7 +5,7 @@ import pytest
 
 from theo.application.facades import resilience as resilience_facade
 from theo.application.resilience import ResilienceError, ResilienceSettings
-from theo.services.api.app.adapters import resilience as resilience_adapter
+from theo.infrastructure.api.app.adapters import resilience as resilience_adapter
 
 
 @pytest.fixture(autouse=True)

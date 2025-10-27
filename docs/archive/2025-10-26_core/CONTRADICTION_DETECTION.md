@@ -66,7 +66,7 @@ Contradictions are automatically detected:
 ### Manual Trigger
 
 ```python
-from theo.services.api.app.discoveries import DiscoveryService
+from theo.infrastructure.api.app.discoveries import DiscoveryService
 from theo.application.facades.database import get_session
 from theo.adapters.persistence.discovery_repository import SQLAlchemyDiscoveryRepository
 from theo.adapters.persistence.document_repository import SQLAlchemyDocumentRepository

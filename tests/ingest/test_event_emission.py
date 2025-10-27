@@ -12,7 +12,7 @@ from theo.application.facades.database import (
 )
 from theo.platform.events import event_bus
 from theo.platform.events.types import DocumentIngestedEvent
-from theo.services.api.app.ingest import pipeline
+from theo.infrastructure.api.app.ingest import pipeline
 
 
 def _prepare_database(tmp_path: Path) -> None:

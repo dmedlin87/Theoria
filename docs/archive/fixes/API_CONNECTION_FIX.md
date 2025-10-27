@@ -32,7 +32,7 @@ This creates a `.env` file with the necessary configuration:
 ### 2. Started the API Server
 
 ```powershell
-python -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 The API server is now running and listening on port 8000.
@@ -78,7 +78,7 @@ Added proper try-catch blocks to these files for better debugging:
 
 - **Status**: ✅ Running (just started)
 - **Location**: `theo/services/api`
-- **Command**: `uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000`
+- **Command**: `uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000`
 
 ## Common Issues
 
@@ -107,7 +107,7 @@ For future development, start both services:
 
 ```powershell
 # Terminal 1 - API
-python -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
 
 # Terminal 2 - Web
 cd theo\services\web

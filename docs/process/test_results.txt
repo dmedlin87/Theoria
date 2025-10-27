@@ -2621,7 +2621,7 @@ theo\services\api\app\ai\router.py:209: in execute_generation
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 theo\services\api\app\ai\ledger.py:438: in wait_for_inflight
     raise GenerationError(
-E   theo.services.api.app.ai.clients.GenerationError: Deduplicated generation completed without a result
+E   theo.infrastructure.api.app.ai.clients.GenerationError: Deduplicated generation completed without a result
 _________________ test_ingest_url_times_out_on_slow_response __________________
 tests\api\test_ingest.py:330: in test_ingest_url_times_out_on_slow_response
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -2629,7 +2629,7 @@ E   assert 500 == 400
 E    +  where 500 = <Response [500 Internal Server Error]>.status_code
 E    +  and   400 = status.HTTP_400_BAD_REQUEST
 ----------------------------- Captured log setup ------------------------------
-WARNING  theo.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
+WARNING  theo.application.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
 ------------------------------ Captured log call ------------------------------
 ERROR    theo.api.errors:reporting.py:189 api.debug_report
 _________________ test_ingest_url_rejects_oversized_response __________________
@@ -2639,7 +2639,7 @@ E   assert 500 == 400
 E    +  where 500 = <Response [500 Internal Server Error]>.status_code
 E    +  and   400 = status.HTTP_400_BAD_REQUEST
 ----------------------------- Captured log setup ------------------------------
-WARNING  theo.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
+WARNING  theo.application.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
 ------------------------------ Captured log call ------------------------------
 ERROR    theo.api.errors:reporting.py:189 api.debug_report
 ____________________ test_ingest_url_detects_redirect_loop ____________________
@@ -2649,7 +2649,7 @@ E   assert 500 == 400
 E    +  where 500 = <Response [500 Internal Server Error]>.status_code
 E    +  and   400 = status.HTTP_400_BAD_REQUEST
 ----------------------------- Captured log setup ------------------------------
-WARNING  theo.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
+WARNING  theo.application.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
 ------------------------------ Captured log call ------------------------------
 ERROR    theo.api.errors:reporting.py:189 api.debug_report
 ________________ test_ingest_markdown_with_windows_1252_bytes _________________
@@ -2848,7 +2848,7 @@ ________________ test_ingest_markdown_with_windows_1252_bytes _________________
     |   File "C:\Users\dmedl\Projects\Theoria\tests\api\test_ingest_uploads.py", line 135, in fake_pipeline
     |     body, _ = ingest_pipeline._parse_text_file(path)
     |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    | AttributeError: module 'theo.services.api.app.ingest.pipeline' has no attribute '_parse_text_file'. Did you mean: 'parse_text_file'?
+    | AttributeError: module 'theo.infrastructure.api.app.ingest.pipeline' has no attribute '_parse_text_file'. Did you mean: 'parse_text_file'?
     +------------------------------------
 
 During handling of the above exception, another exception occurred:
@@ -2975,7 +2975,7 @@ Traceback (most recent call last):
   File "C:\Users\dmedl\Projects\Theoria\tests\api\test_ingest_uploads.py", line 135, in fake_pipeline
     body, _ = ingest_pipeline._parse_text_file(path)
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AttributeError: module 'theo.services.api.app.ingest.pipeline' has no attribute '_parse_text_file'. Did you mean: 'parse_text_file'?
+AttributeError: module 'theo.infrastructure.api.app.ingest.pipeline' has no attribute '_parse_text_file'. Did you mean: 'parse_text_file'?
 
 During handling of the above exception, another exception occurred:
 tests\api\test_ingest_uploads.py:151: in test_ingest_markdown_with_windows_1252_bytes
@@ -3092,9 +3092,9 @@ theo\services\api\app\routes\ingest.py:122: in ingest_file
 tests\api\test_ingest_uploads.py:135: in fake_pipeline
     body, _ = ingest_pipeline._parse_text_file(path)
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E   AttributeError: module 'theo.services.api.app.ingest.pipeline' has no attribute '_parse_text_file'. Did you mean: 'parse_text_file'?
+E   AttributeError: module 'theo.infrastructure.api.app.ingest.pipeline' has no attribute '_parse_text_file'. Did you mean: 'parse_text_file'?
 ----------------------------- Captured log setup ------------------------------
-WARNING  theo.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
+WARNING  theo.application.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
 ------------------------------ Captured log call ------------------------------
 ERROR    theo.api.errors:reporting.py:189 api.debug_report
 ============================== warnings summary ===============================

@@ -4,8 +4,8 @@
 
 import json
 
-from theo.services.api.app.ai.rag import RAGAnswer, RAGCitation, ReasoningTrace
-from theo.services.api.app.routes.ai.workflows.chat import (
+from theo.infrastructure.api.app.ai.rag import RAGAnswer, RAGCitation, ReasoningTrace
+from theo.infrastructure.api.app.routes.ai.workflows.chat import (
     _create_mock_reasoning_timeline,
 )
 
@@ -89,7 +89,7 @@ def test_timeline_integration():
     print("🎯 Timeline integration test PASSED!")
     print()
     print("Next steps:")
-    print("  1. Start API server: uvicorn theo.services.api.app.main:app --reload")
+    print("  1. Start API server: uvicorn theo.infrastructure.api.app.main:app --reload")
     print("  2. Send chat request to /chat endpoint")
     print("  3. Verify reasoning_trace in response")
     print("  4. Frontend will automatically display it using existing ReasoningTrace component")

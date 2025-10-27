@@ -1,6 +1,6 @@
 import pytest
 
-from theo.services.api.app import tracing
+from theo.infrastructure.api.app import tracing
 
 
 class FakeContext:

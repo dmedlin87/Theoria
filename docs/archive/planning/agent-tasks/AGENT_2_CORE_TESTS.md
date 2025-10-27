@@ -97,7 +97,7 @@ Look at these files for patterns:
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from theo.services.api.app.core import [module]
+from theo.infrastructure.api.app.core import [module]
 
 
 class Test[Module]:
@@ -139,10 +139,10 @@ def test_integration_scenario():
 python -m pytest tests/api/core/ -v
 
 # Test with coverage
-python -m pytest tests/api/core/ --cov=theo.services.api.app.core --cov-report=term-missing
+python -m pytest tests/api/core/ --cov=theo.infrastructure.api.app.core --cov-report=term-missing
 
 # Verify 80%+ coverage
-python -m pytest tests/api/core/ --cov=theo.services.api.app.core --cov-fail-under=80
+python -m pytest tests/api/core/ --cov=theo.infrastructure.api.app.core --cov-fail-under=80
 ```
 
 ## Success Criteria

@@ -2,9 +2,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from theo.services.api.app.ai.rag import retrieval
-from theo.services.api.app.ai.rag.models import RAGCitation
-from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchResult
+from theo.infrastructure.api.app.ai.rag import retrieval
+from theo.infrastructure.api.app.ai.rag.models import RAGCitation
+from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchResult
 
 
 def test_passage_retriever_falls_back_to_guardrail(monkeypatch: pytest.MonkeyPatch) -> None:

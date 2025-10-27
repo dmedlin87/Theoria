@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from theo.adapters.persistence import models
 from theo.application.facades.database import get_session
-from theo.services.api.app.main import app
+from theo.infrastructure.api.app.main import app
 
 
 def _override_session_factory(engine):

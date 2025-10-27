@@ -18,7 +18,7 @@
 - Split truly optional ML packages into a dedicated extra so API-only deployments do not need to resolve heavyweight scientific wheels.
 
 ## Architectural Guardrails
-- Expand `importlinter.ini` with explicit boundaries between `theo.domain`, `theo.application`, and `theo.services.api` feature folders to prevent accidental cross-layer imports.
+- Expand `importlinter.ini` with explicit boundaries between `theo.domain`, `theo.application`, and `theo.infrastructure.api` feature folders to prevent accidental cross-layer imports.
 - Introduce an internal ADR describing how modules inside `theo/services/api/app` should be grouped (core, interfaces, infrastructure, feature slices) and migrate modules incrementally to the agreed structure.
 - Track N+1 query remediation by adding SQLAlchemy profiler hooks to the ingest and ranking pipelines while bulk update helpers are introduced.
 

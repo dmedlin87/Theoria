@@ -31,7 +31,7 @@ Legacy and lightweight environments (such as SQLite-backed tests) should run
 the existing SQL migration runner, which now enforces the same indexes:
 
 ```bash
-python -m theo.services.api.app.db.run_sql_migrations
+python -m theo.infrastructure.api.app.db.run_sql_migrations
 ```
 
 The runner detects the database dialect and applies either PostgreSQL

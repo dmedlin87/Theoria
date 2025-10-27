@@ -13,7 +13,7 @@ except ModuleNotFoundError:  # pragma: no cover - gracefully skip when SQLAlchem
 except ImportError:  # pragma: no cover - minimal stubs without pool support
     pytest.skip("sqlalchemy pool utilities unavailable", allow_module_level=True)
 
-from theo.services.api.app.models.documents import (
+from theo.infrastructure.api.app.models.documents import (
     DocumentAnnotationCreate,
     DocumentAnnotationResponse,
     DocumentDetailResponse,
@@ -21,13 +21,13 @@ from theo.services.api.app.models.documents import (
     DocumentPassagesResponse,
     DocumentUpdateRequest,
 )
-from theo.services.api.app.persistence_models import (
+from theo.infrastructure.api.app.persistence_models import (
     Base,
     Document,
     DocumentAnnotation,
     Passage,
 )
-from theo.services.api.app.retriever import documents
+from theo.infrastructure.api.app.retriever import documents
 
 
 @pytest.fixture(scope="module")

@@ -110,7 +110,7 @@ Document the affected route, suspected cause, and mitigation plan in the issue. 
 ## Workflow checklist
 
 - [ ] Review Lighthouse output on your PR and note any metric changes in the summary.
-- [ ] Run `python -m theo.services.cli.rag_eval` and include before/after retrieval metrics when the change touches the reranker or intent tagger.
+- [ ] Run `python -m theo.infrastructure.cli.rag_eval` and include before/after retrieval metrics when the change touches the reranker or intent tagger.
 - [ ] Cross-check the observability dashboard after deployment to ensure field metrics track the expected direction.
 - [ ] Log any discrepancies with hypotheses (cache warm-up, CDN purge timing, feature flags) in the release notes.
 - [ ] Coordinate with DevOps for load tests when performance work ships alongside infrastructure changes.

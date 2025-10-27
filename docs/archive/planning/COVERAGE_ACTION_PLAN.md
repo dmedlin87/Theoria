@@ -255,7 +255,7 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from theo.services.api.app.[module] import [function_or_class]
+from theo.infrastructure.api.app.[module] import [function_or_class]
 
 class Test[FunctionOrClass]:
     """Test suite for [FunctionOrClass]."""
@@ -296,7 +296,7 @@ class Test[FunctionOrClass]:
 import pytest
 from fastapi.testclient import TestClient
 
-from theo.services.api.app.main import app
+from theo.infrastructure.api.app.main import app
 
 @pytest.fixture
 def client():

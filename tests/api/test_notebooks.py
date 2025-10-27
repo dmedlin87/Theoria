@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from fastapi import Request
 from theo.application.facades.database import get_session
 from theo.adapters.persistence.models import Document, Notebook
-from theo.services.api.app.main import app
-from theo.services.api.app.adapters.security import require_principal
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.adapters.security import require_principal
 
 
 @pytest.fixture()

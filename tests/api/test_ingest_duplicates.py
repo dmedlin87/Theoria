@@ -23,9 +23,9 @@ from theo.application.facades.database import (  # noqa: E402
     get_session,
 )
 from theo.application.facades.settings import get_settings  # noqa: E402
-from theo.services.api.app.ingest import pipeline  # noqa: E402
-from theo.services.api.app.ingest import events as ingest_events  # noqa: E402
-from theo.services.api.app.main import app  # noqa: E402
+from theo.infrastructure.api.app.ingest import pipeline  # noqa: E402
+from theo.infrastructure.api.app.ingest import events as ingest_events  # noqa: E402
+from theo.infrastructure.api.app.main import app  # noqa: E402
 
 
 @pytest.fixture(scope="module")

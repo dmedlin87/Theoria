@@ -84,7 +84,7 @@ Create: `tests/mcp_tools/test_api_mcp_integration.py`
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 
-from theo.services.api.app.mcp import tools
+from theo.infrastructure.api.app.mcp import tools
 
 
 class TestMCPToolRegistration:
@@ -172,7 +172,7 @@ def mcp_tools_instance():
 @pytest.fixture
 def mock_api():
     """Mock API responses."""
-    with patch('theo.services.api.app.mcp.tools.some_api_call') as mock:
+    with patch('theo.infrastructure.api.app.mcp.tools.some_api_call') as mock:
         yield mock
 ```
 
@@ -183,12 +183,12 @@ python -m pytest tests/mcp_tools/test_api_mcp_integration.py -v
 
 # Test with coverage for MCP package
 python -m pytest tests/mcp_tools/test_api_mcp_integration.py \
-  --cov=theo.services.api.app.mcp \
+  --cov=theo.infrastructure.api.app.mcp \
   --cov-report=term-missing
 
 # Verify 80%+ coverage
 python -m pytest tests/mcp_tools/test_api_mcp_integration.py \
-  --cov=theo.services.api.app.mcp \
+  --cov=theo.infrastructure.api.app.mcp \
   --cov-fail-under=80
 
 # Run all MCP tests together

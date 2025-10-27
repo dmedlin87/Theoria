@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from theo.services.api.app.ingest.chunking import chunk_text, chunk_transcript
-from theo.services.api.app.ingest.parsers import TranscriptSegment
+from theo.infrastructure.api.app.ingest.chunking import chunk_text, chunk_transcript
+from theo.infrastructure.api.app.ingest.parsers import TranscriptSegment
 
 
 def test_chunk_text_respects_token_budgets_and_indexes() -> None:

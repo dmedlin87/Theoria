@@ -13,18 +13,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.services.api.app.export import formatters
-from theo.services.api.app.models.base import Passage
-from theo.services.api.app.models.documents import DocumentDetailResponse
-from theo.services.api.app.models.export import (
+from theo.infrastructure.api.app.export import formatters
+from theo.infrastructure.api.app.models.base import Passage
+from theo.infrastructure.api.app.models.documents import DocumentDetailResponse
+from theo.infrastructure.api.app.models.export import (
     DocumentExportFilters,
     DocumentExportResponse,
     ExportedDocumentSummary,
     SearchExportResponse,
     SearchExportRow,
 )
-from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchRequest
-from theo.services.cli import export_data as cli  # noqa: E402
+from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchRequest
+from theo.infrastructure.cli import export_data as cli  # noqa: E402
 
 
 @contextmanager

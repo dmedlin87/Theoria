@@ -101,7 +101,7 @@ def test_list_discoveries():
 ```python
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from theo.services.api.app.db.query_optimizations import query_with_monitoring
+from theo.infrastructure.api.app.db.query_optimizations import query_with_monitoring
 
 @query_with_monitoring("document.list_with_passages")
 def list_documents_optimized(session, user_id):
@@ -169,7 +169,7 @@ class SQLAlchemyMyRepository(MyRepository):
 v1 = version_manager.register_version("1.0", is_default=True)
 
 # Your route file
-from theo.services.api.app.versioning import get_version_manager
+from theo.infrastructure.api.app.versioning import get_version_manager
 
 v1 = get_version_manager().get_version("1.0")
 v1.include_router(router, prefix="/my-feature", tags=["my-feature"])

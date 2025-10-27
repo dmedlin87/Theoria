@@ -136,7 +136,7 @@
 ## 🎯 Next Steps
 
 ### Immediate (Today):
-1. Start API server: `uvicorn theo.services.api.app.main:app --reload`
+1. Start API server: `uvicorn theo.infrastructure.api.app.main:app --reload`
 2. Send test chat request
 3. Verify reasoning_trace appears in response
 4. Check frontend auto-displays it

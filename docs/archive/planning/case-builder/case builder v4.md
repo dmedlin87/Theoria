@@ -3,9 +3,9 @@
 > Schema reference: See [`docs/case_builder.schema.json`](docs/case_builder.schema.json) for the authoritative payload contract alongside sample fixtures such as [`sample_convergence.json`](fixtures/case_builder/sample_convergence.json) and [`sample_bundle.ndjson`](fixtures/case_builder/sample_bundle.ndjson) for end-to-end examples.
 
 ## Phase 0 – Domain model & ingestion scaffolding (Weeks 0-1)
-- Introduce SQLAlchemy models and migrations for the case-builder tables—`CaseObject`, `CaseSource`, `CaseEdge`, `CaseInsight`, and `CaseUserAction`—mirroring the blueprint’s storage contract while reusing existing vector/JSON column helpers in `theo.services.api.app.db.models`.
+- Introduce SQLAlchemy models and migrations for the case-builder tables—`CaseObject`, `CaseSource`, `CaseEdge`, `CaseInsight`, and `CaseUserAction`—mirroring the blueprint’s storage contract while reusing existing vector/JSON column helpers in `theo.infrastructure.api.app.db.models`.
 - Extend the ingestion pipeline so every newly normalized document/passage/annotation also yields a persisted `CaseObject` with OSIS ranges, modality, and embeddings, wiring this into the existing parser/persistence flow in `ingest.pipeline`.
-- Emit Postgres `NOTIFY` events on case-object upserts and register a Celery task stub (e.g., `on_case_object_upsert`) inside `theo.services.api.app.workers.tasks` to enqueue downstream scoring work, matching the worker skeleton from the blueprint.
+- Emit Postgres `NOTIFY` events on case-object upserts and register a Celery task stub (e.g., `on_case_object_upsert`) inside `theo.infrastructure.api.app.workers.tasks` to enqueue downstream scoring work, matching the worker skeleton from the blueprint.
 - Add configuration flags (API + web) for staged rollout via `Settings` so the feature can be toggled per environment before exposing new routers/UI.
 - Seed migration smoke tests and model validation checks to guarantee the new schema, embeddings, and signals ingest correctly from day one.
 

@@ -25,14 +25,14 @@ export THEO_ENABLE_CONSOLE_TRACES=1
 ```
 
 When this flag is set the application calls
-`theo.services.api.app.telemetry.configure_console_tracer`, wiring the
+`theo.infrastructure.api.app.telemetry.configure_console_tracer`, wiring the
 OpenTelemetry SDK with a console exporter. Spans for each workflow will be
 printed to stdout.
 
 ## 3. Launch the API locally
 
 ```bash
-uvicorn theo.services.api.app.main:app --reload --log-level info
+uvicorn theo.infrastructure.api.app.main:app --reload --log-level info
 ```
 
 The server now exposes:

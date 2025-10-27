@@ -203,7 +203,7 @@ Duration:     5.14s
 python -m pytest --cov=theo --cov=mcp_server --cov-report=term-missing --cov-report=html --cov-report=xml
 
 # Run specific package tests
-python -m pytest tests/api/test_ingest.py --cov=theo.services.api.app.ingest
+python -m pytest tests/api/test_ingest.py --cov=theo.infrastructure.api.app.ingest
 
 # Generate coverage report
 python analyze_coverage.py

@@ -344,7 +344,7 @@ def test_http_client_pool_cleanup():
 
 ```bash
 # Run a worker for 24 hours with monitoring
-celery -A theo.services.api.app.workers worker --loglevel=info &
+celery -A theo.infrastructure.api.app.workers worker --loglevel=info &
 CELERY_PID=$!
 
 # Monitor memory over time

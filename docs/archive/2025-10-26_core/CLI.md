@@ -2,7 +2,7 @@
 
 # Bulk ingestion CLI
 
-The `theo.services.cli.ingest_folder` command walks a folder (or a single file) and
+The `theo.infrastructure.cli.ingest_folder` command walks a folder (or a single file) and
 submits every supported asset to the Theo ingestion pipeline. It is intended for
 local bulk imports and supports synchronous API execution or background worker
 queuing. Configure API credentials before invoking the CLI; see the
@@ -24,10 +24,10 @@ Any other file types are ignored.
 ## Usage
 
 ```bash
-python -m theo.services.cli.ingest_folder PATH [OPTIONS]
+python -m theo.infrastructure.cli.ingest_folder PATH [OPTIONS]
 ```
 
-Run `python -m theo.services.cli.ingest_folder --help` to review the available
+Run `python -m theo.infrastructure.cli.ingest_folder --help` to review the available
 flags and descriptions directly from the command line.
 
 Key options:
@@ -63,13 +63,13 @@ against the configured policy.
 Dry-run a directory to inspect what would be ingested:
 
 ```bash
-python -m theo.services.cli.ingest_folder ./import --dry-run
+python -m theo.infrastructure.cli.ingest_folder ./import --dry-run
 ```
 
 Ingest a folder in batches of five documents, overriding the collection and author metadata:
 
 ```bash
-python -m theo.services.cli.ingest_folder ./sermons \
+python -m theo.infrastructure.cli.ingest_folder ./sermons \
   --batch-size 5 \
   --meta collection=sermons \
   --meta 'authors=["Theo Church"]'
@@ -78,7 +78,7 @@ python -m theo.services.cli.ingest_folder ./sermons \
 Queue files for background processing instead of running the API synchronously:
 
 ```bash
-python -m theo.services.cli.ingest_folder ./archive --mode worker
+python -m theo.infrastructure.cli.ingest_folder ./archive --mode worker
 ```
 
 ## Code quality checks
@@ -86,7 +86,7 @@ python -m theo.services.cli.ingest_folder ./archive --mode worker
 Run Theo's linting and test bundle from the command line using the aggregated helper:
 
 ```bash
-python -m theo.services.cli.code_quality
+python -m theo.infrastructure.cli.code_quality
 ```
 
 By default the command lints the `mcp_server` package with `ruff` and runs the MCP-focused pytest suite. Add `--include-mypy` to
@@ -96,7 +96,7 @@ and `--mypy-arg` flags.
 
 ## Export utilities
 
-Bulk exports are available via `theo.services.cli.export_data`.
+Bulk exports are available via `theo.infrastructure.cli.export_data`.
 
 ### Citation exports
 
@@ -112,7 +112,7 @@ Use the `rag_eval` command to benchmark reranker candidates or intent-aware prom
 changes against the curated evaluation suites:
 
 ```bash
-python -m theo.services.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
+python -m theo.infrastructure.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
   --trace-path data/eval/production_traces.jsonl \
   --output data/eval/reranker_candidate.json
 ```
@@ -126,7 +126,7 @@ change meets the tolerances configured in `data/eval/baseline.json`.
 Run a hybrid search and save the results to an NDJSON file:
 
 ```bash
-python -m theo.services.cli.export_data search \
+python -m theo.infrastructure.cli.export_data search \
   --query "forgiveness" \
   --collection sermons \
   --format ndjson \
@@ -139,7 +139,7 @@ Fetch all documents in the `sermons` collection, including passages, and write
 them to JSON:
 
 ```bash
-python -m theo.services.cli.export_data documents \
+python -m theo.infrastructure.cli.export_data documents \
   --collection sermons \
   --output sermons.json
 ```
@@ -150,14 +150,14 @@ number of returned documents.
 Run metadata enrichment immediately after ingest:
 
 ```bash
-python -m theo.services.cli.ingest_folder ./sermons \
+python -m theo.infrastructure.cli.ingest_folder ./sermons \
   --post-batch tags
 ```
 
 Request additional post-processing steps (summaries plus metadata enrichment and bibliography refresh):
 
 ```bash
-python -m theo.services.cli.ingest_folder ./sermons \
+python -m theo.infrastructure.cli.ingest_folder ./sermons \
   --post-batch summaries,tags,biblio
 ```
 

@@ -44,7 +44,7 @@ tests/api/ai/
 
 ## Run Tests
 ```bash
-python -m pytest tests/api/ai/ --cov=theo.services.api.app.ai --cov-report=term-missing
+python -m pytest tests/api/ai/ --cov=theo.infrastructure.api.app.ai --cov-report=term-missing
 ```
 
 ## No Conflicts

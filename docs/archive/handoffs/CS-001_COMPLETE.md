@@ -133,7 +133,7 @@ python test_chat_timeline.py
 **Step 1: Start Backend**
 ```bash
 cd c:\Users\dmedl\Projects\Theoria
-uvicorn theo.services.api.app.main:app --reload --port 8000
+uvicorn theo.infrastructure.api.app.main:app --reload --port 8000
 ```
 
 **Step 2: Send Test Request**

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from theo.application.facades import database as database_module
-from theo.services.api.app.db import seeds as seeds_module
+from theo.infrastructure.api.app.db import seeds as seeds_module
 
 
 def test_seed_contradictions_backfills_perspective(

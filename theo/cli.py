@@ -35,12 +35,12 @@ from theo.checkpoints import (
     load_embedding_rebuild_checkpoint,
     save_embedding_rebuild_checkpoint,
 )
-from theo.services.api.app.ingest.embeddings import (
+from theo.infrastructure.api.app.ingest.embeddings import (
     clear_embedding_cache,
     get_embedding_service,
 )
-from theo.services.bootstrap import resolve_application
-from theo.services.embeddings import (
+from theo.application.services.bootstrap import resolve_application
+from theo.domain.services.embeddings import (
     EmbeddingRebuildConfig,
     EmbeddingRebuildInstrumentation,
 )
@@ -153,7 +153,7 @@ def _ensure_cli_telemetry() -> None:
         get_telemetry_provider()
     except RuntimeError:
         try:
-            from theo.services.api.app.adapters.telemetry import (
+            from theo.infrastructure.api.app.adapters.telemetry import (
                 ApiTelemetryProvider,
             )
         except ModuleNotFoundError:  # pragma: no cover - optional dependency missing
@@ -238,11 +238,11 @@ def rebuild_embeddings_cmd(
 
     _ensure_cli_telemetry()
 
-    from theo.services.api.app.ingest.embeddings import (
+    from theo.infrastructure.api.app.ingest.embeddings import (
         clear_embedding_cache,
         get_embedding_service,
     )
-    from theo.services.api.app.ingest.sanitizer import sanitize_passage_text
+    from theo.infrastructure.api.app.ingest.sanitizer import sanitize_passage_text
 
     try:
         _, registry = resolve_application()

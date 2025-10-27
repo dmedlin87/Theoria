@@ -41,7 +41,7 @@ This guide turns the high-level MCP integration plan into a concrete runbook for
 2. Run the ingestion CLI from the repository root (it connects directly to the
    configured database when operating in the default `api` mode):
    ```bash
-   python -m theo.services.cli.ingest_folder /path/to/corpus \
+   python -m theo.infrastructure.cli.ingest_folder /path/to/corpus \
      --batch-size 5 \
      --meta collection=seed_corpus
    ```

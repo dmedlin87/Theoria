@@ -36,8 +36,8 @@ Theoria demonstrates **solid architectural foundations** with clean layered desi
 ```python
 # theo/cli.py - BAD: Direct imports bypass application layer
 from theo.adapters.persistence.models import Document, Passage
-from theo.services.api.app.ingest.embeddings import get_embedding_service
-from theo.services.api.app.ingest.sanitizer import sanitize_passage_text
+from theo.infrastructure.api.app.ingest.embeddings import get_embedding_service
+from theo.infrastructure.api.app.ingest.sanitizer import sanitize_passage_text
 ```
 
 - CLI reaches deep into service internals and persistence models
@@ -254,7 +254,7 @@ transformers=">=4.30,<5"  # Range (better flexibility)
 ```python
 # Current BAD approach:
 from theo.adapters.persistence.models import Document, Passage
-from theo.services.api.app.ingest.embeddings import get_embedding_service
+from theo.infrastructure.api.app.ingest.embeddings import get_embedding_service
 
 # Better approach:
 class EmbeddingRebuildService:
@@ -322,7 +322,7 @@ class EmbeddingRebuildCheckpoint:
 @pytest.fixture
 def mock_embedding_service(monkeypatch):
     mock = Mock()
-    monkeypatch.setattr("theo.services.embeddings.get_service", lambda: mock)
+    monkeypatch.setattr("theo.domain.services.embeddings.get_service", lambda: mock)
     return mock
 ```
 

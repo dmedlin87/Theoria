@@ -4,7 +4,7 @@
 
 from datetime import UTC, datetime
 
-from theo.services.api.app.models.reasoning import (
+from theo.infrastructure.api.app.models.reasoning import (
     ReasoningStep,
     ReasoningStepStatus,
     ReasoningStepType,

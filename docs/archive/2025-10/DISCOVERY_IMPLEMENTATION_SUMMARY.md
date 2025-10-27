@@ -107,7 +107,7 @@ Or manually:
 # Terminal 1 - API
 cd C:\Users\dmedl\Projects\Theoria
 $Env:THEO_AUTH_ALLOW_ANONYMOUS="1"
-uvicorn theo.services.api.app.main:app --reload
+uvicorn theo.infrastructure.api.app.main:app --reload
 
 # Terminal 2 - Web
 cd theo\services\web

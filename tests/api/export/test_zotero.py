@@ -5,14 +5,14 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from theo.services.api.app.export.zotero import (
+from theo.infrastructure.api.app.export.zotero import (
     ZoteroExportError,
     export_to_zotero,
     verify_zotero_credentials,
     _build_zotero_item,
     _map_csl_to_zotero_type,
 )
-from theo.services.api.app.export.citations import CitationSource
+from theo.infrastructure.api.app.export.citations import CitationSource
 
 
 @pytest.fixture
@@ -186,7 +186,7 @@ async def test_export_to_zotero_success(sample_source, sample_csl_entry):
         "failed": {},
     }
 
-    with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
+    with patch("theo.infrastructure.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=mock_response
         )
@@ -214,7 +214,7 @@ async def test_export_to_zotero_partial_failure(sample_source, sample_csl_entry)
         "failed": {"1": "Invalid item format"},
     }
 
-    with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
+    with patch("theo.infrastructure.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=mock_response
         )
@@ -274,7 +274,7 @@ async def test_export_to_zotero_forbidden(sample_source, sample_csl_entry):
     mock_response.status_code = 403
     mock_response.text = "Forbidden"
 
-    with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
+    with patch("theo.infrastructure.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=mock_response
         )
@@ -295,7 +295,7 @@ async def test_export_to_zotero_not_found(sample_source, sample_csl_entry):
     mock_response.status_code = 404
     mock_response.text = "Not Found"
 
-    with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
+    with patch("theo.infrastructure.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             return_value=mock_response
         )
@@ -314,7 +314,7 @@ async def test_export_to_zotero_timeout(sample_source, sample_csl_entry):
     """Test Zotero export with timeout."""
     import httpx
 
-    with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
+    with patch("theo.infrastructure.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
             side_effect=httpx.TimeoutException("Timeout")
         )
@@ -338,7 +338,7 @@ async def test_export_to_zotero_group_library(sample_source, sample_csl_entry):
         "failed": {},
     }
 
-    with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
+    with patch("theo.infrastructure.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_post = AsyncMock(return_value=mock_response)
         mock_client.return_value.__aenter__.return_value.post = mock_post
 
@@ -361,7 +361,7 @@ async def test_verify_zotero_credentials_valid():
     mock_response = AsyncMock()
     mock_response.status_code = 200
 
-    with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
+    with patch("theo.infrastructure.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.get = AsyncMock(
             return_value=mock_response
         )
@@ -380,7 +380,7 @@ async def test_verify_zotero_credentials_invalid():
     mock_response = AsyncMock()
     mock_response.status_code = 403
 
-    with patch("theo.services.api.app.export.zotero.httpx.AsyncClient") as mock_client:
+    with patch("theo.infrastructure.api.app.export.zotero.httpx.AsyncClient") as mock_client:
         mock_client.return_value.__aenter__.return_value.get = AsyncMock(
             return_value=mock_response
         )

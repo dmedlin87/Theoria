@@ -16,8 +16,8 @@ from theo.application.facades.database import (  # noqa: E402  (import after pat
     configure_engine,
     get_engine,
 )
-from theo.services.api.app.main import app  # noqa: E402
-from theo.services.api.app.routes import jobs as jobs_module  # noqa: E402
+from theo.infrastructure.api.app.main import app  # noqa: E402
+from theo.infrastructure.api.app.routes import jobs as jobs_module  # noqa: E402
 
 
 def test_repro_enqueue_job_runtime_error(monkeypatch, tmp_path) -> None:

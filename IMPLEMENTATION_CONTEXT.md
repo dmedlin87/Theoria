@@ -597,7 +597,7 @@ pip install ".[dev]" -c constraints/dev-constraints.txt
 docker-compose up -d postgres
 
 # Run migrations (ensures idx_passages_embedding_null, idx_documents_updated_at, idx_passages_document_id)
-python -m theo.services.api.app.db.run_sql_migrations
+python -m theo.infrastructure.api.app.db.run_sql_migrations
 
 # Start API
 cd theo/services/api

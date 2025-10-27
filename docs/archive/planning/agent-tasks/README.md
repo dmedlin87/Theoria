@@ -139,19 +139,19 @@ No overlapping directories = no merge conflicts!
 cd theo/services/web && npm run test:vitest
 
 # Agent 2
-pytest tests/api/core/ --cov=theo.services.api.app.core --cov-report=term-missing
+pytest tests/api/core/ --cov=theo.infrastructure.api.app.core --cov-report=term-missing
 
 # Agent 3
-pytest tests/mcp_tools/test_api_mcp_integration.py --cov=theo.services.api.app.mcp
+pytest tests/mcp_tools/test_api_mcp_integration.py --cov=theo.infrastructure.api.app.mcp
 
 # Agent 4
-pytest tests/ingest/ --cov=theo.services.api.app.ingest --cov-report=term-missing
+pytest tests/ingest/ --cov=theo.infrastructure.api.app.ingest --cov-report=term-missing
 
 # Agent 5
-pytest tests/api/retriever/ --cov=theo.services.api.app.retriever --cov-report=term-missing
+pytest tests/api/retriever/ --cov=theo.infrastructure.api.app.retriever --cov-report=term-missing
 
 # Agent 6
-pytest tests/api/ai/ --cov=theo.services.api.app.ai --cov-report=term-missing
+pytest tests/api/ai/ --cov=theo.infrastructure.api.app.ai --cov-report=term-missing
 ```
 
 ### Check Overall Progress

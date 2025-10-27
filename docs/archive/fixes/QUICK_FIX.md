@@ -32,7 +32,7 @@ cd C:\Users\dmedl\Projects\TheoEngine
 ```powershell
 $Env:THEO_AUTH_ALLOW_ANONYMOUS="1"
 $Env:THEO_ALLOW_INSECURE_STARTUP="1"
-python -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 You should see output like:
@@ -123,7 +123,7 @@ Always run BOTH servers during development:
 **Terminal 1 (API):**
 
 ```powershell
-$Env:THEO_AUTH_ALLOW_ANONYMOUS="1"; $Env:THEO_ALLOW_INSECURE_STARTUP="1"; python -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+$Env:THEO_AUTH_ALLOW_ANONYMOUS="1"; $Env:THEO_ALLOW_INSECURE_STARTUP="1"; python -m uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 **Terminal 2 (Web):**

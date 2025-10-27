@@ -27,7 +27,7 @@
 - **Suggested actions:** Move the assertions to the public `parse_text_file` helper or expose a supported testing hook to keep the contract stable.
 
 ## Heavy optional dependencies imported during test collection
-- Importing `theo.services.api.app.main` during test discovery pulls in the full ingestion stack, which imports `FlagEmbedding`, `transformers`, and ultimately `torch`. Even a targeted test run spends significant time loading GPU inference modules before the first assertion executes.【F:tests/api/conftest.py†L18-L25】【a2291f†L1-L116】
+- Importing `theo.infrastructure.api.app.main` during test discovery pulls in the full ingestion stack, which imports `FlagEmbedding`, `transformers`, and ultimately `torch`. Even a targeted test run spends significant time loading GPU inference modules before the first assertion executes.【F:tests/api/conftest.py†L18-L25】【a2291f†L1-L116】
 - **Impact:** Local feedback loops slow to a crawl, and environments without torch fail before tests can start.
 - **Suggested actions:** Gate heavyweight imports behind runtime flags (similar to `_skip_heavy_startup`) or lazy-load optional ML dependencies only when specific tests require them.
 

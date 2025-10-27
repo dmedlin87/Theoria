@@ -10,15 +10,15 @@ from sqlalchemy.orm import sessionmaker
 
 from theo.adapters.persistence.models import AuditLog
 from theo.application.facades.database import get_session
-from theo.services.api.app.ai.audit_logging import (
+from theo.infrastructure.api.app.ai.audit_logging import (
     AuditLogWriter,
     fetch_recent_audit_logs,
     purge_audit_logs,
 )
-from theo.services.api.app.ai.rag import GuardrailError, RAGAnswer, RAGCitation
-from theo.services.api.app.main import app
-from theo.services.api.app.routes.ai.workflows import chat as chat_module
-from theo.services.api.app.models import AuditClaimCard, AuditLogMetadata
+from theo.infrastructure.api.app.ai.rag import GuardrailError, RAGAnswer, RAGCitation
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.routes.ai.workflows import chat as chat_module
+from theo.infrastructure.api.app.models import AuditClaimCard, AuditLogMetadata
 
 
 class DummyRecorder:

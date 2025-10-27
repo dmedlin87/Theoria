@@ -87,7 +87,7 @@ Theoria uses a **multi-layered agent architecture** that combines RAG (Retrieval
 
 **Example:**
 ```python
-from theo.services.api.app.ai.rag.prompts import PromptContext, scrub_adversarial_language
+from theo.infrastructure.api.app.ai.rag.prompts import PromptContext, scrub_adversarial_language
 
 # Build a safe prompt
 context = PromptContext(
@@ -199,7 +199,7 @@ You are a neutral academic surveying the field:
 
 **Usage:**
 ```python
-from theo.services.api.app.ai.reasoning.chain_of_thought import build_cot_prompt
+from theo.infrastructure.api.app.ai.reasoning.chain_of_thought import build_cot_prompt
 
 prompt = build_cot_prompt(
     question="Did the early church believe Jesus was divine?",
@@ -244,7 +244,7 @@ prompt = build_cot_prompt(
 
 **Usage:**
 ```python
-from theo.services.api.app.ai.reasoning.fallacies import detect_fallacies
+from theo.infrastructure.api.app.ai.reasoning.fallacies import detect_fallacies
 
 text = "Ehrman is biased, so his argument about Jesus's divinity is wrong."
 warnings = detect_fallacies(text)
@@ -280,7 +280,7 @@ class Hypothesis:
 
 **Example:**
 ```python
-from theo.services.api.app.ai.reasoning.hypotheses import generate_hypotheses
+from theo.infrastructure.api.app.ai.reasoning.hypotheses import generate_hypotheses
 
 hypotheses = generate_hypotheses(
     question="Did the early church believe Jesus was divine?",
@@ -770,20 +770,20 @@ pytest tests/api/ai/test_guardrails.py -v
 ### Import Paths
 ```python
 # RAG
-from theo.services.api.app.ai.rag.prompts import PromptContext, scrub_adversarial_language
-from theo.services.api.app.ai.rag.guardrails import validate_answer
-from theo.services.api.app.ai.rag.workflow import GuardedAnswerPipeline
+from theo.infrastructure.api.app.ai.rag.prompts import PromptContext, scrub_adversarial_language
+from theo.infrastructure.api.app.ai.rag.guardrails import validate_answer
+from theo.infrastructure.api.app.ai.rag.workflow import GuardedAnswerPipeline
 
 # Reasoning
-from theo.services.api.app.ai.reasoning.chain_of_thought import build_cot_prompt
-from theo.services.api.app.ai.reasoning.fallacies import detect_fallacies
-from theo.services.api.app.ai.reasoning.hypotheses import generate_hypotheses
-from theo.services.api.app.ai.reasoning.insights import detect_insights
-from theo.services.api.app.ai.reasoning.metacognition import critique_reasoning
-from theo.services.api.app.ai.reasoning.perspectives import synthesize_perspectives
+from theo.infrastructure.api.app.ai.reasoning.chain_of_thought import build_cot_prompt
+from theo.infrastructure.api.app.ai.reasoning.fallacies import detect_fallacies
+from theo.infrastructure.api.app.ai.reasoning.hypotheses import generate_hypotheses
+from theo.infrastructure.api.app.ai.reasoning.insights import detect_insights
+from theo.infrastructure.api.app.ai.reasoning.metacognition import critique_reasoning
+from theo.infrastructure.api.app.ai.reasoning.perspectives import synthesize_perspectives
 
 # Trails
-from theo.services.api.app.ai.trails import create_trail, log_step
+from theo.infrastructure.api.app.ai.trails import create_trail, log_step
 ```
 
 ### API Endpoints

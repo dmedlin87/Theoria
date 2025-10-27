@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from theo.services.api.app.models.search import HybridSearchFilters, HybridSearchRequest
-from theo.services.api.app.retriever import hybrid
+from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchRequest
+from theo.infrastructure.api.app.retriever import hybrid
 
 
 class _DummyDialect:

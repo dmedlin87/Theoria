@@ -7,9 +7,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from theo.adapters.persistence.models import Base, CommentaryExcerptSeed
-from theo.services.api.app.ingest.osis import ResolvedCommentaryAnchor
-import theo.services.api.app.ingest.persistence as persistence
-from theo.services.api.app.ingest.persistence import (
+from theo.infrastructure.api.app.ingest.osis import ResolvedCommentaryAnchor
+import theo.infrastructure.api.app.ingest.persistence as persistence
+from theo.infrastructure.api.app.ingest.persistence import (
     IngestContext,
     _dedupe_preserve_order,
     _project_document_if_possible,

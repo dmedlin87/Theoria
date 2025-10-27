@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from sqlalchemy.sql.elements import ClauseElement
 
-from theo.services.api.app.ingest.embeddings import lexical_representation
+from theo.infrastructure.api.app.ingest.embeddings import lexical_representation
 
 
 def _session_with_dialect(name: str) -> SimpleNamespace:

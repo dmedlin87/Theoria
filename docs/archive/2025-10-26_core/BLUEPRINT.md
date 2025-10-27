@@ -574,7 +574,7 @@ Sermon/lesson prep and Q&A transcripts now surface export pipelines.
 
 ## 20) CLI Batch Intelligence
 
-Extend `theo.services.cli.ingest_folder` with a `--post-batch` flag to trigger enrichers immediately after ingest:
+Extend `theo.infrastructure.cli.ingest_folder` with a `--post-batch` flag to trigger enrichers immediately after ingest:
 
 - `summaries` – calls `/ai/chat` with the “Corpus Maintenance” prompt to create `ai_summary` documents stored alongside originals.
 - `tags` – hits the metadata enrichment endpoint to refresh topics/subjects.

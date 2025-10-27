@@ -33,7 +33,7 @@
 ## Evaluation & Benchmarks
 - Use the existing RAG evaluation CLI to capture before/after metrics:
   ```bash
-  python -m theo.services.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
+  python -m theo.infrastructure.cli.rag_eval --dev-path data/eval/rag_dev.jsonl \
     --trace-path data/eval/production_traces.jsonl \
     --output data/eval/reranker_candidate.json
   ```

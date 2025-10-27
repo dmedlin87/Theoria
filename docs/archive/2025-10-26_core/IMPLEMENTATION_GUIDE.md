@@ -61,13 +61,13 @@ pip install pytest pytest-cov
 pytest tests/api/ai/test_reasoning_modules.py -v
 
 # Check coverage
-pytest tests/api/ai/test_reasoning_modules.py --cov=theo.services.api.app.ai.reasoning --cov-report=html
+pytest tests/api/ai/test_reasoning_modules.py --cov=theo.infrastructure.api.app.ai.reasoning --cov-report=html
 ```
 
 ### Step 3: Test Fallacy Detection
 
 ```python
-from theo.services.api.app.ai.reasoning.fallacies import detect_fallacies
+from theo.infrastructure.api.app.ai.reasoning.fallacies import detect_fallacies
 
 # Example 1: Ad hominem
 text = "Ehrman is biased, so his argument about Jesus's divinity is wrong."
@@ -90,8 +90,8 @@ assert len(high_severity) == 0
 ### Step 4: Test Chain-of-Thought Prompting
 
 ```python
-from theo.services.api.app.ai.reasoning.chain_of_thought import build_cot_prompt
-from theo.services.api.app.ai.rag.models import RAGCitation
+from theo.infrastructure.api.app.ai.reasoning.chain_of_thought import build_cot_prompt
+from theo.infrastructure.api.app.ai.rag.models import RAGCitation
 
 # Create citations
 citations = [
@@ -475,8 +475,8 @@ class AutonomousExplorer:
 def test_end_to_end_enhanced_reasoning(session):
     """Test full reasoning pipeline."""
     
-    from theo.services.api.app.ai.rag.workflow_enhanced import ReasoningPipeline
-    from theo.services.api.app.search.hybrid import search_passages
+    from theo.infrastructure.api.app.ai.rag.workflow_enhanced import ReasoningPipeline
+    from theo.infrastructure.api.app.search.hybrid import search_passages
     
     # 1. Search for passages
     results = search_passages(session, query="Did Jesus claim to be divine?")
@@ -506,7 +506,7 @@ def test_end_to_end_enhanced_reasoning(session):
 ### Example 1: Basic Fallacy Check
 
 ```python
-from theo.services.api.app.ai.reasoning.fallacies import detect_fallacies
+from theo.infrastructure.api.app.ai.reasoning.fallacies import detect_fallacies
 
 answer = """
 The early church clearly believed Jesus was divine. 
@@ -553,7 +553,7 @@ for step in cot.steps:
 ### Example 3: Self-Critique
 
 ```python
-from theo.services.api.app.ai.reasoning.metacognition import critique_reasoning
+from theo.infrastructure.api.app.ai.reasoning.metacognition import critique_reasoning
 
 critique = critique_reasoning(
     reasoning_trace=chain_of_thought.raw_thinking,

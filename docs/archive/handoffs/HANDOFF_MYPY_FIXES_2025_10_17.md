@@ -120,7 +120,7 @@ __all__ = [
     "classify_osis_matches",
 ]
 ```
-- Fixed: `Module "theo.services.api.app.ingest.osis" does not explicitly export attribute "expand_osis_reference"`
+- Fixed: `Module "theo.infrastructure.api.app.ingest.osis" does not explicitly export attribute "expand_osis_reference"`
 
 **`theo/services/api/app/routes/export.py`:**
 ```python
@@ -301,15 +301,15 @@ Found 1678 errors in 69 files (checked 39 source files)
 ### MyPy Configuration
 The project uses **strict typing** for specific modules defined in `mypy.ini`:
 ```ini
-[mypy-theo.services.api.app.*]
+[mypy-theo.infrastructure.api.app.*]
 disallow_untyped_defs = True
 disallow_incomplete_defs = True
 
-[mypy-theo.services.api.app.routes.*]
+[mypy-theo.infrastructure.api.app.routes.*]
 disallow_untyped_defs = True
 disallow_incomplete_defs = True
 
-[mypy-theo.services.api.app.models.*]
+[mypy-theo.infrastructure.api.app.models.*]
 disallow_untyped_defs = True
 disallow_incomplete_defs = True
 ```

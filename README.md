@@ -128,7 +128,7 @@ The ML constraint set also pins a CPU-only PyTorch wheel by embedding the approp
 
 5. **Launch API**
    ```bash
-   uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+   uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
    ```
    Visit the interactive docs at <http://localhost:8000/docs>.
 

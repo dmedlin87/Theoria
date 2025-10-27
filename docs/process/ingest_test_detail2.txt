@@ -58,7 +58,7 @@ E        +  and   400 = status.HTTP_400_BAD_REQUEST
 
 tests\api\test_ingest.py:332: AssertionError
 ----------------------------- Captured log setup ------------------------------
-WARNING  theo.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
+WARNING  theo.application.services.geo.seed_openbible_geo:seed_openbible_geo.py:236 OpenBible geo dataset not available at C:\Users\dmedl\Projects\Theoria\theo\data\providers\openbible-geo\data
 ------------------------------ Captured log call ------------------------------
 ERROR    theo.api.errors:reporting.py:189 api.debug_report
 ============================== warnings summary ===============================

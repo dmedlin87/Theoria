@@ -1,7 +1,7 @@
 """Compatibility facades exposing application-layer entry points.
 
 These modules provide forward-looking import paths for adapters while the
-legacy implementation continues to live under ``theo.services``. Once the
+legacy implementation continues to live under ``theo.infrastructure``. Once the
 migration completes, adapters can depend exclusively on the application
 package without touching service-specific modules.
 """

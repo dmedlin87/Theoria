@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import pytest
 
-from theo.services.api.app.ingest.embeddings import EmbeddingService
+from theo.infrastructure.api.app.ingest.embeddings import EmbeddingService
 
 
 def _stubbed_encode_factory(

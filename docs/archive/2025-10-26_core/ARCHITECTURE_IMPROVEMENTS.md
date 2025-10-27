@@ -125,7 +125,7 @@ def refresh_discoveries(repo: DiscoveryRepository, user_id: str):
 URL-based API versioning infrastructure:
 
 ```python
-from theo.services.api.app.versioning import get_version_manager
+from theo.infrastructure.api.app.versioning import get_version_manager
 
 # Register versions
 manager = get_version_manager()
@@ -258,7 +258,7 @@ def create_app():
 Query optimization helpers with monitoring:
 
 ```python
-from theo.services.api.app.db.query_optimizations import (
+from theo.infrastructure.api.app.db.query_optimizations import (
     with_eager_loading,
     query_with_monitoring,
 )
@@ -292,7 +292,7 @@ docs = session.query(Document).options(*options).all()
 
 **2. Batch Loading**
 ```python
-from theo.services.api.app.db.query_optimizations import batch_load
+from theo.infrastructure.api.app.db.query_optimizations import batch_load
 
 # Load 1000 documents in batches of 100
 docs = batch_load(session, Document, document_ids, batch_size=100)

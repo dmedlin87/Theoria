@@ -13,7 +13,7 @@ def refresh_cli_module(monkeypatch: pytest.MonkeyPatch):
     """Import the refresh_hnsw CLI module with bootstrap patched out."""
 
     monkeypatch.setattr(
-        "theo.services.bootstrap.resolve_application", lambda: None
+        "theo.application.services.bootstrap.resolve_application", lambda: None
     )
     celery_module = ModuleType("celery")
     celery_app_module = ModuleType("celery.app")
@@ -24,16 +24,16 @@ def refresh_cli_module(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setitem(sys.modules, "celery", celery_module)
     monkeypatch.setitem(sys.modules, "celery.app", celery_app_module)
     monkeypatch.setitem(sys.modules, "celery.app.task", celery_task_module)
-    fake_tasks_module = ModuleType("theo.services.api.app.workers.tasks")
+    fake_tasks_module = ModuleType("theo.infrastructure.api.app.workers.tasks")
     fake_tasks_module.refresh_hnsw = SimpleNamespace(
         delay=lambda *args, **kwargs: SimpleNamespace(id=None),
         run=lambda *args, **kwargs: {},
     )
     monkeypatch.setitem(
-        sys.modules, "theo.services.api.app.workers.tasks", fake_tasks_module
+        sys.modules, "theo.infrastructure.api.app.workers.tasks", fake_tasks_module
     )
-    monkeypatch.delitem(sys.modules, "theo.services.cli.refresh_hnsw", raising=False)
-    module = importlib.import_module("theo.services.cli.refresh_hnsw")
+    monkeypatch.delitem(sys.modules, "theo.infrastructure.cli.refresh_hnsw", raising=False)
+    module = importlib.import_module("theo.infrastructure.cli.refresh_hnsw")
     return module
 
 

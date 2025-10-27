@@ -4,17 +4,18 @@ The Theo codebase follows a layered architecture that keeps the domain model
 isolated from infrastructure concerns. The enforced dependency direction is:
 
 ```
-theo.domain  →  theo.application  →  theo.services
+theo.domain  →  theo.application  →  theo.infrastructure
 ```
 
 * **Domain (`theo.domain`)** contains core business concepts. It must not depend
-  on the application or service layers.
+  on the application or infrastructure layers.
 * **Application (`theo.application`)** coordinates domain workflows and exposes
-  facades for services. It may import the domain layer (and vetted adapters),
-  but it must not reach into service runtimes or framework code such as
-  FastAPI.
-* **Services (`theo.services`)** provide delivery mechanisms (API, CLI, UI) and
-  may depend on both the application and domain layers.
+  facades for downstream adapters. It may import the domain layer (and vetted
+  adapter abstractions), but it must not reach into infrastructure runtimes or
+  framework code such as FastAPI.
+* **Infrastructure (`theo.infrastructure`)** provides delivery mechanisms (API,
+  CLI orchestration, web UI) and may depend on both the application and domain
+  layers.
 
 ## Enforced rules
 
@@ -22,7 +23,7 @@ The dependency graph is verified in two complementary ways:
 
 1. **Architecture tests** (`tests/architecture/test_module_boundaries.py`)
    assert that application modules never import
-   `theo.services.api.app.*`, the telemetry/resilience/security adapters, or
+   `theo.infrastructure.api.app.*`, the telemetry/resilience/security adapters, or
    `fastapi`. Existing tests also prevent domain modules from depending on
    services and ensure other adapter constraints.
 2. **Import Linter** (`importlinter.ini`) encodes the layered contract so that

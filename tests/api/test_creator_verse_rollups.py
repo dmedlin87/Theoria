@@ -20,9 +20,9 @@ from theo.adapters.persistence.models import (
     TranscriptSegmentVerse,
     Video,
 )
-from theo.services.api.app.ingest.osis import expand_osis_reference
-from theo.services.api.app.ingest.persistence import refresh_creator_verse_rollups
-from theo.services.api.app.ingest.stages import IngestContext, Instrumentation
+from theo.infrastructure.api.app.ingest.osis import expand_osis_reference
+from theo.infrastructure.api.app.ingest.persistence import refresh_creator_verse_rollups
+from theo.infrastructure.api.app.ingest.stages import IngestContext, Instrumentation
 
 
 class _DummyEmbeddingService:

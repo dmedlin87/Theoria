@@ -4,8 +4,8 @@
 A repository-wide test sweep was executed with `pytest`. Collection failed due to four distinct issues, preventing the suite from running to completion. Additional targeted imports reproduced the underlying problems. Each failure is documented below with reproduction guidance and suspected root causes.
 
 ## 1. Circular import in RAG workflow exports
-- **Symptom:** Importing `theo.services.api.app.ai.rag` fails during API test collection with `ImportError: cannot import name 'build_sermon_deliverable' from partially initialized module`.
-- **Reproduction:** `pytest` or `python -c "import theo.services.api.app.ai.rag"` while the API app loads workers.
+- **Symptom:** Importing `theo.infrastructure.api.app.ai.rag` fails during API test collection with `ImportError: cannot import name 'build_sermon_deliverable' from partially initialized module`.
+- **Reproduction:** `pytest` or `python -c "import theo.infrastructure.api.app.ai.rag"` while the API app loads workers.
 - **Cause:** `IngestionService` depends on the CLI ingest module, which in turn imports Celery workers. The worker module re-imports the RAG package, creating a cycle before `build_sermon_deliverable` is defined.
 - **Relevant files:**
   - `theo/services/api/app/infra/ingestion_service.py` imports the CLI ingest entry point. 【F:theo/services/api/app/infra/ingestion_service.py†L1-L60】
@@ -21,8 +21,8 @@ A repository-wide test sweep was executed with `pytest`. Collection failed due t
 - **Captured error:** `ImportError: cannot import name 'experimental' from 'schemathesis'`. 【4271a6†L35-L47】
 
 ## 3. Circular bootstrap dependency in CLI helpers
-- **Symptom:** Importing `theo.services.cli.code_quality` or running the CLI tests triggers `ImportError: cannot import name 'resolve_application' ... (circular import)`.
-- **Reproduction:** `python -c "import importlib; importlib.import_module('theo.services.cli.tests.test_code_quality')"`.
+- **Symptom:** Importing `theo.infrastructure.cli.code_quality` or running the CLI tests triggers `ImportError: cannot import name 'resolve_application' ... (circular import)`.
+- **Reproduction:** `python -c "import importlib; importlib.import_module('theo.infrastructure.cli.tests.test_code_quality')"`.
 - **Cause:** `code_quality.py` imports `resolve_application`, which imports `theo.application.facades`. The facades package re-imports `resolve_application` via its `research` facade, causing a bootstrap-time cycle.
 - **Relevant files:**
   - `theo/services/cli/code_quality.py` imports `resolve_application`. 【F:theo/services/cli/code_quality.py†L1-L80】

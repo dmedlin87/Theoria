@@ -9,11 +9,11 @@ from fastapi.testclient import TestClient
 
 from datetime import UTC, datetime
 
-from theo.services.api.app.ai.rag import RAGAnswer
+from theo.infrastructure.api.app.ai.rag import RAGAnswer
 from theo.application.facades.database import get_session
-from theo.services.api.app.intent.tagger import IntentTag
-from theo.services.api.app.main import app
-from theo.services.api.app.routes.ai.workflows import chat as chat_module
+from theo.infrastructure.api.app.intent.tagger import IntentTag
+from theo.infrastructure.api.app.main import app
+from theo.infrastructure.api.app.routes.ai.workflows import chat as chat_module
 
 
 class DummySession:

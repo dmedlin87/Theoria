@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from theo.services.api.app.ai.rag.guardrails import guardrail_metadata
+from theo.infrastructure.api.app.ai.rag.guardrails import guardrail_metadata
 
 
 @pytest.fixture

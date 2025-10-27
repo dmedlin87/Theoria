@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from theo.services.cli import code_quality as code_quality_module
+from theo.infrastructure.cli import code_quality as code_quality_module
 
 
 @pytest.fixture()

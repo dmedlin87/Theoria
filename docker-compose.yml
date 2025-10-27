@@ -16,7 +16,7 @@ services:
       THEORIA_API_PORT: "${THEORIA_API_PORT:-8000}"
     volumes:
       - .:/app
-    command: ["uvicorn", "theo.services.api.app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "theo.infrastructure.api.app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
 
   web:
     image: node:20-alpine

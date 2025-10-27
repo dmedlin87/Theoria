@@ -9,9 +9,9 @@ from typing import Any, Iterable
 
 import pytest
 
-from theo.services.api.app.mcp import tools
-from theo.services.api.app.mcp.tools import MCPToolError
-from theo.services.api.app.models.research import ResearchNote as ResearchNoteSchema
+from theo.infrastructure.api.app.mcp import tools
+from theo.infrastructure.api.app.mcp.tools import MCPToolError
+from theo.infrastructure.api.app.models.research import ResearchNote as ResearchNoteSchema
 
 
 _FAKE_TIMESTAMP = datetime(2024, 1, 1, tzinfo=timezone.utc)

@@ -4,7 +4,7 @@ from types import ModuleType
 
 import pytest
 
-from theo.services.api.app.utils import imports
+from theo.infrastructure.api.app.utils import imports
 
 
 class SentinelError(RuntimeError):

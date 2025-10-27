@@ -40,7 +40,7 @@ This behavior lets you reuse the same environment variable across local developm
 ## Verifying your setup
 
 1. Configure credentials via environment variables or secrets manager.
-2. Start the API (`uvicorn theo.services.api.app.main:app --reload`).
+2. Start the API (`uvicorn theo.infrastructure.api.app.main:app --reload`).
 3. Issue a test request:
 
    ```bash

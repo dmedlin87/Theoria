@@ -29,7 +29,7 @@ tests/api/retriever/
 
 ## Run Tests
 ```bash
-python -m pytest tests/api/retriever/ --cov=theo.services.api.app.retriever --cov-report=term-missing
+python -m pytest tests/api/retriever/ --cov=theo.infrastructure.api.app.retriever --cov-report=term-missing
 ```
 
 ## No Conflicts

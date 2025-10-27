@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from theo.services.api.app.ai.rag.refusals import (
+from theo.infrastructure.api.app.ai.rag.refusals import (
     REFUSAL_MESSAGE,
     REFUSAL_MODEL_NAME,
     _REFUSAL_FALLBACK_ANCHOR,
@@ -15,7 +15,7 @@ from theo.services.api.app.ai.rag.refusals import (
     _REFUSAL_FALLBACK_TITLE,
     build_guardrail_refusal,
 )
-from theo.services.api.app.persistence_models import Document, Passage
+from theo.infrastructure.api.app.persistence_models import Document, Passage
 
 
 @dataclass(slots=True)

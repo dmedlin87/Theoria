@@ -17,12 +17,12 @@ from theo.application.facades.research import (
     ResearchNoteEvidenceDraft,
     get_research_service,
 )
-from theo.services.api.app.models.jobs import HNSWRefreshJobRequest
-from theo.services.api.app.research.evidence_cards import (
+from theo.infrastructure.api.app.models.jobs import HNSWRefreshJobRequest
+from theo.infrastructure.api.app.research.evidence_cards import (
     create_evidence_card,
     preview_evidence_card,
 )
-from theo.services.api.app.routes.jobs import enqueue_refresh_hnsw_job
+from theo.infrastructure.api.app.routes.jobs import enqueue_refresh_hnsw_job
 
 from .. import schemas
 from ..security import WriteSecurityError, get_write_security_policy

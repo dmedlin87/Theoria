@@ -336,7 +336,7 @@ Then open <http://localhost:3000> in your browser. Everything else is handled au
 
 ```powershell
 # Terminal 1
-python -m uvicorn theo.services.api.app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn theo.infrastructure.api.app.main:app --reload --host 127.0.0.1 --port 8000
 
 # Terminal 2  
 cd theo\services\web

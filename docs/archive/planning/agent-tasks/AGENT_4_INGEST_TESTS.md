@@ -45,7 +45,7 @@ You need to add tests for:
 ```bash
 # See exactly what's not covered
 python -m pytest tests/ingest/ \
-  --cov=theo.services.api.app.ingest \
+  --cov=theo.infrastructure.api.app.ingest \
   --cov-report=html
 
 # Open: htmlcov/index.html
@@ -131,7 +131,7 @@ class TestIngestErrorRecovery:
         """Test recovering from partial ingestion."""
         pass
     
-    @patch('theo.services.api.app.ingest.stage.StageX.process')
+    @patch('theo.infrastructure.api.app.ingest.stage.StageX.process')
     def test_stage_failure_handling(self, mock_process):
         """Test handling of stage failures."""
         mock_process.side_effect = Exception("Stage failed")
@@ -241,7 +241,7 @@ python -m pytest tests/ingest/ -v
 
 # Run with coverage
 python -m pytest tests/ingest/ \
-  --cov=theo.services.api.app.ingest \
+  --cov=theo.infrastructure.api.app.ingest \
   --cov-report=term-missing \
   --cov-report=html
 

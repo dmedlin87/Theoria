@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 from starlette.responses import Response
 
-from theo.services.api.app import main as main_module
+from theo.infrastructure.api.app import main as main_module
 
 
 def test_enforce_authentication_requires_credentials(monkeypatch):
@@ -190,7 +190,7 @@ def test_register_health_routes_return_service_data(monkeypatch):
             return FakeReport()
 
     monkeypatch.setattr(
-        "theo.services.api.app.infra.health.get_health_service",
+        "theo.infrastructure.api.app.infra.health.get_health_service",
         lambda: FakeService(),
     )
 
