@@ -1,15 +1,10 @@
 """Expose the real :mod:`webvtt` package when available.
 
-The lightweight parser bundled with the repository keeps worker tests running in
-minimal environments.  When the third-party dependency is installed we defer to
-it so production code receives the full implementation.
-
-Minimal WebVTT parser used for worker tests.
-
-The real :mod:`webvtt` dependency pulls in a number of optional packages.  The
-worker suites only rely on a tiny subset of its functionality (parsing timestamps
-and yielding caption entries), so we provide a lightweight pure-Python
-implementation that covers the project fixtures.
+Worker tests rely on a lightweight parser bundled with the repository so they
+can run in environments without the optional dependency.  When the genuine
+third-party package is installed we defer to it so production code retains the
+full implementation.  Only if the dependency is missing do we fall back to the
+minimal shim below, which covers just the features exercised by the fixtures.
 """
 
 from __future__ import annotations

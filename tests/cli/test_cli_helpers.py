@@ -155,7 +155,7 @@ def test_read_checkpoint_raises_on_invalid_json(tmp_path: Path) -> None:
     assert _read_checkpoint(invalid_path) is None
 
     with pytest.raises(json.JSONDecodeError):
-        _read_checkpoint(invalid_path)
+        _read_checkpoint(invalid_path, raise_on_error=True)
 
 
 def test_read_checkpoint_handles_non_mapping_payload(tmp_path: Path) -> None:

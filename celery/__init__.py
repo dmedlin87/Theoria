@@ -1,16 +1,10 @@
 """Expose the real :mod:`celery` package when available.
 
-The repository ships a minimal Celery stand-in so the worker test suite can run
-in environments without the heavy third-party dependency.  When the genuine
-package is installed we should defer to it to avoid shadowing production
-behaviour.  Only if the real dependency is unavailable do we provide the local
-fallback implementation.
-
-This module provides a minimal subset of the public Celery API sufficient for
-unit tests that exercise Theoria's worker task wiring.  The real Celery
-dependency is quite heavy and not required for these isolated suites, so the
-project ships a tiny shim that mimics the handful of behaviours relied upon by
-the tests (task registration, eager execution helpers, and logging).
+The repository ships a small Celery shim so worker-related tests can execute in
+lightweight environments.  Whenever the genuine dependency is present we defer
+to it to match production behaviour.  Only when the package is missing do we
+provide the stub below, which implements the narrow surface area exercised by
+the test suite.
 """
 
 from __future__ import annotations

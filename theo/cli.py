@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypeVar
 
 import click
 from sqlalchemy import func, select
@@ -24,9 +26,12 @@ from theo.application.telemetry import (
     EMBEDDING_REBUILD_BATCH_LATENCY_METRIC,
     EMBEDDING_REBUILD_COMMIT_LATENCY_METRIC,
     EMBEDDING_REBUILD_PROGRESS_METRIC,
+)
 from theo.adapters.persistence.models import Document, Passage
 from theo.checkpoints import (
     EmbeddingRebuildCheckpoint,
+    CheckpointValidationError,
+    deserialize_embedding_rebuild_checkpoint,
     load_embedding_rebuild_checkpoint,
     save_embedding_rebuild_checkpoint,
 )
@@ -34,7 +39,6 @@ from theo.services.api.app.ingest.embeddings import (
     clear_embedding_cache,
     get_embedding_service,
 )
-from theo.adapters.persistence.models import Document, Passage
 from theo.services.bootstrap import resolve_application
 from theo.services.embeddings import (
     EmbeddingRebuildConfig,
@@ -48,6 +52,25 @@ _LOGGER = logging.getLogger(__name__)
 @click.group()
 def cli() -> None:
     """Theo CLI entry point."""
+
+
+_BatchItem = TypeVar("_BatchItem")
+
+
+def _batched(iterable: Iterable[_BatchItem], size: int) -> Iterator[list[_BatchItem]]:
+    """Yield successive batches from *iterable* of at most *size* items."""
+
+    if size <= 0:
+        raise ValueError("size must be positive")
+
+    batch: list[_BatchItem] = []
+    for item in iterable:
+        batch.append(item)
+        if len(batch) == size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
 
 
 def _normalise_timestamp(value: datetime | None) -> datetime | None:
@@ -72,15 +95,28 @@ def _load_ids(path: Path) -> list[str]:
     return deduped
 
 
-def _read_checkpoint(path: Path) -> dict[str, object]:
+def _read_checkpoint(
+    path: Path, *, raise_on_error: bool = False
+) -> EmbeddingRebuildCheckpoint | None:
     try:
         raw = path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        return {}
-    data = json.loads(raw)
-    if not isinstance(data, dict):
-        return {}
-    return data
+        return None
+
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        if raise_on_error:
+            raise
+        return None
+
+    if not isinstance(payload, Mapping):
+        return None
+
+    try:
+        return deserialize_embedding_rebuild_checkpoint(payload)
+    except CheckpointValidationError:
+        return None
 
 
 def _write_checkpoint(
@@ -241,7 +277,9 @@ def rebuild_embeddings_cmd(
     if checkpoint_file is not None:
         if resume:
             try:
-                checkpoint_state = _read_checkpoint(checkpoint_file)
+                checkpoint_state = _read_checkpoint(
+                    checkpoint_file, raise_on_error=True
+                )
             except json.JSONDecodeError as exc:
                 _LOGGER.error(
                     "Failed to decode checkpoint file during resume",
@@ -254,18 +292,18 @@ def rebuild_embeddings_cmd(
                 raise click.ClickException(
                     f"Checkpoint file {checkpoint_file} contains invalid JSON"
                 ) from exc
-            skip_count = int(checkpoint_state.get("processed", 0)) if checkpoint_state else 0
+            skip_count = checkpoint_state.processed if checkpoint_state else 0
             if skip_count:
                 click.echo(
                     f"Resuming from checkpoint at {checkpoint_file} "
-                    f"(already processed {processed} passage(s))."
+                    f"(already processed {skip_count} passage(s))."
                 )
         else:
             try:
                 checkpoint_file.unlink()
             except FileNotFoundError:
                 pass
-    processed = int(checkpoint_state.get("processed", 0)) if checkpoint_state else 0
+    processed = checkpoint_state.processed if checkpoint_state else 0
 
     metadata = {
         "fast": fast,
@@ -355,16 +393,8 @@ def rebuild_embeddings_cmd(
         set_span_attribute(span, "embedding_rebuild.mode", telemetry_mode)
         set_span_attribute(span, "embedding_rebuild.processed", processed)
         if skip_count:
-            set_span_attribute(
-                span, "embedding_rebuild.resume.skip_count", skip_count
+            set_span_attribute(span, "embedding_rebuild.resume.skip_count", skip_count)
         processed = min(processed, total)
-
-        if ids:
-            expected_ids = set(
-                session.execute(
-                    select(Passage.id).where(Passage.id.in_(ids))
-                ).scalars()
-            )
 
         log_workflow_event(
             "embedding_rebuild.initialising",
@@ -373,10 +403,9 @@ def rebuild_embeddings_cmd(
             resume=resume,
             skip_count=skip_count,
             ids_count=len(ids) if ids else None,
-            changed_since=
-                normalized_changed_since.isoformat()
-                if normalized_changed_since
-                else None,
+            changed_since=normalized_changed_since.isoformat()
+            if normalized_changed_since
+            else None,
         )
 
         with Session(engine) as session:

@@ -164,7 +164,8 @@ def command_check(project_root: Path) -> Dict[str, Any]:
     runtimes.append(detect_docker_compose())
     result = {
         "generated_at": datetime.now(UTC).isoformat(),
-        "project_root": str(project_root),
+        # Use POSIX style to keep launcher output consistent across platforms.
+        "project_root": project_root.as_posix(),
         "runtimes": runtimes,
     }
     return result
@@ -191,7 +192,7 @@ def check_prereqs(args: argparse.Namespace) -> None:
 def ensure_crypto_available() -> None:
     if x509 is None or rsa is None:
         raise RuntimeError(
-            "The 'cryptography' package is required to generate certificates. Install dependencies with 'pip install .[dev] -c constraints/dev.txt'."
+            "The 'cryptography' package is required to generate certificates. Install dependencies with 'pip install .[dev] -c constraints/dev-constraints.txt'."
         )
 
 

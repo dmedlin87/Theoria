@@ -8,7 +8,7 @@ import warnings
 from dataclasses import dataclass
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
@@ -421,6 +421,66 @@ def _build_settings_stub_module() -> types.ModuleType:
     settings_module.get_settings_cipher = lambda: None
 
     return settings_module
+
+
+def _build_pydantic_stub_module() -> types.ModuleType:
+    module = types.ModuleType("pydantic")
+
+    class BaseModel:  # pragma: no cover - lightweight substitute
+        def __init__(self, **kwargs: Any) -> None:
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+        def model_dump(self, *_args: object, **_kwargs: object) -> dict[str, Any]:
+            return dict(self.__dict__)
+
+        def model_dump_json(self, *_args: object, **_kwargs: object) -> str:
+            return repr(self.model_dump())
+
+        @classmethod
+        def model_validate(cls, data: dict[str, Any]) -> "BaseModel":
+            return cls(**data)
+
+    def Field(default: Any = None, **_kwargs: Any) -> Any:  # pragma: no cover - placeholder
+        return default
+
+    class ValidationError(Exception):  # pragma: no cover - placeholder
+        pass
+
+    def create_model(name: str, **fields: Any) -> type:
+        return type(name, (BaseModel,), fields)
+
+    module.BaseModel = BaseModel
+    module.Field = Field
+    module.ValidationError = ValidationError
+    module.ConfigDict = dict
+    module.create_model = create_model
+    module.RootModel = BaseModel
+
+    return module
+
+
+def _install_optional_dependency_stubs() -> None:
+    """Install stub modules for optional dependencies that are missing."""
+
+    optional_modules: dict[str, Callable[[], dict[str, types.ModuleType]]] = {
+        "sqlalchemy": _build_sqlalchemy_stub_modules,
+        "pythonbible": lambda: {"pythonbible": _build_pythonbible_stub_module()},
+        "httpx": lambda: {"httpx": _build_httpx_stub_module()},
+        "cachetools": lambda: {"cachetools": _build_cachetools_stub_module()},
+        "pydantic": lambda: {"pydantic": _build_pydantic_stub_module()},
+    }
+
+    for module_name, builder in optional_modules.items():
+        if module_name in sys.modules:
+            continue
+        if importlib.util.find_spec(module_name) is not None:
+            continue
+        for name, module in builder().items():
+            sys.modules.setdefault(name, module)
+
+
+_install_optional_dependency_stubs()
 
 
 @contextmanager

@@ -856,6 +856,55 @@ function Start-TheoriaApi {
     $apiEnv['THEO_AUTH_ALLOW_ANONYMOUS'] = '1'
     $apiEnv['THEO_ALLOW_INSECURE_STARTUP'] = '1'
     $apiEnv['PYTHONUNBUFFERED'] = '1'
+    if (-not $apiEnv.ContainsKey('THEO_FORCE_EMBEDDING_FALLBACK')) {
+        $fallbackSetting = [System.Environment]::GetEnvironmentVariable('THEO_FORCE_EMBEDDING_FALLBACK')
+        if (-not [string]::IsNullOrWhiteSpace($fallbackSetting)) {
+            $apiEnv['THEO_FORCE_EMBEDDING_FALLBACK'] = $fallbackSetting
+        } elseif ($script:ProfileName -eq 'dev') {
+            # Default to deterministic embeddings so health probes don't block on model downloads in dev.
+            $apiEnv['THEO_FORCE_EMBEDDING_FALLBACK'] = '1'
+        }
+    }
+    if (-not $apiEnv.ContainsKey('redis_url')) {
+        $redisUrlCandidate = $null
+        $existingRedis = [System.Environment]::GetEnvironmentVariable('redis_url')
+        if (-not [string]::IsNullOrWhiteSpace($existingRedis)) {
+            $redisUrlCandidate = $existingRedis
+        } else {
+            $envFile = Join-Path $script:ProjectRoot ".env"
+            if (Test-Path $envFile) {
+                foreach ($line in Get-Content -Path $envFile) {
+                    if ($line -match '^\s*#') { continue }
+                    if ($line -match '^\s*redis_url\s*=\s*(.*)$') {
+                        $redisUrlCandidate = $Matches[1].Trim()
+                        break
+                    }
+                }
+            }
+        }
+
+        $shouldDisableRedis = $false
+        if ([string]::IsNullOrWhiteSpace($redisUrlCandidate)) {
+            $shouldDisableRedis = $true
+        } else {
+            try {
+                $redisUri = [System.Uri]$redisUrlCandidate
+                $redisPort = if ($redisUri.IsDefaultPort) { 6379 } else { $redisUri.Port }
+                $redisHost = $redisUri.Host.ToLowerInvariant()
+                $isLocalAlias = $redisUri.IsLoopback -or $redisHost -eq 'redis'
+                if ($isLocalAlias -and (Test-PortAvailable -Port $redisPort)) {
+                    $shouldDisableRedis = $true
+                }
+            } catch {
+                $shouldDisableRedis = $true
+            }
+        }
+
+        if ($shouldDisableRedis) {
+            $apiEnv['redis_url'] = ''
+            Write-TheoriaLog "Redis broker not detected locally; skipping Redis-dependent health probes" -Level Warning
+        }
+    }
 
     $httpsEnabled = $script:HttpsEnabled
     if ($httpsEnabled) {
