@@ -89,9 +89,9 @@ setup_python_env() {
     if [ -f "$PROJECT_ROOT/pyproject.toml" ]; then
         print_step "Installing Python dependencies (api/dev/ml extras)..."
         pip install -q --upgrade pip
-        pip install -q ".[api]" -c "$PROJECT_ROOT/constraints/api-constraints.txt"
-        pip install -q ".[ml]" -c "$PROJECT_ROOT/constraints/ml-constraints.txt"
-        pip install -q ".[dev]" -c "$PROJECT_ROOT/constraints/dev-constraints.txt"
+        pip install -q ".[api]" -c "$PROJECT_ROOT/constraints/prod.txt"
+        pip install -q ".[ml]" -c "$PROJECT_ROOT/constraints/prod.txt"
+        pip install -q ".[dev]" -c "$PROJECT_ROOT/constraints/dev.txt"
         print_success "Python dependencies installed"
     fi
 }

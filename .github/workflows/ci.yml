@@ -49,10 +49,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
-            constraints/base-constraints.txt
-            constraints/api-constraints.txt
-            constraints/ml-constraints.txt
-            constraints/dev-constraints.txt
+            constraints/prod.txt
+            constraints/dev.txt
             constraints-ci.txt
 
       - name: Preinstall CPU-only PyTorch
@@ -62,9 +60,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e . -c constraints/api-constraints.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
@@ -161,9 +159,8 @@ jobs:
             --sv 1.5 \
             --of json \
             -o sbom-python.json \
-            constraints/api-constraints.txt \
-            constraints/ml-constraints.txt \
-            constraints/dev-constraints.txt \
+            constraints/prod.txt \
+            constraints/dev.txt \
             constraints-ci.txt
 
       - name: Generate Node SBOM
@@ -219,10 +216,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
-            constraints/base-constraints.txt
-            constraints/api-constraints.txt
-            constraints/ml-constraints.txt
-            constraints/dev-constraints.txt
+            constraints/prod.txt
+            constraints/dev.txt
             constraints-ci.txt
 
       - name: Preinstall CPU-only PyTorch
@@ -232,9 +227,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e . -c constraints/api-constraints.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Run ${{ matrix.suite }} pytest suite
         run: |
@@ -392,10 +387,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
-            constraints/base-constraints.txt
-            constraints/api-constraints.txt
-            constraints/ml-constraints.txt
-            constraints/dev-constraints.txt
+            constraints/prod.txt
+            constraints/dev.txt
             constraints-ci.txt
 
       - name: Preinstall CPU-only PyTorch
@@ -405,9 +398,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e . -c constraints/api-constraints.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/ml-constraints.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev-constraints.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
