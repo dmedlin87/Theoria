@@ -199,7 +199,8 @@ def test_get_by_id_eager_loads_passages(in_memory_session: Session) -> None:
         assert len(dto.passages) == 1
 
     select_statements = [stmt for stmt in statements if stmt.lstrip().upper().startswith("SELECT")]
-    assert len(select_statements) <= 2
+    # One additional query loads cached embeddings from the dedicated table.
+    assert len(select_statements) <= 3
 
 
 def test_list_created_since_uses_selectinload(in_memory_session: Session) -> None:
@@ -230,4 +231,5 @@ def test_list_created_since_uses_selectinload(in_memory_session: Session) -> Non
         assert len(results[0].passages) == 2
 
     select_statements = [stmt for stmt in statements if stmt.lstrip().upper().startswith("SELECT")]
-    assert len(select_statements) <= 2
+    # Expect an extra select for the passage_embeddings lookup performed in bulk.
+    assert len(select_statements) <= 3

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 import numpy as np
 from sqlalchemy import select
@@ -13,17 +13,32 @@ from theo.application.dtos import DocumentDTO, DocumentSummaryDTO
 from theo.application.observability import trace_repository_call
 from theo.application.repositories.document_repository import DocumentRepository
 from theo.domain.discoveries import DocumentEmbedding
+from theo.application.facades.settings import get_settings
+from theo.application.embeddings.store import PassageEmbeddingService
 
 from .base_repository import BaseRepository
 from .mappers import document_summary_to_dto, document_to_dto
-from .models import Document
+from .models import Document, Passage, _PREFETCHED_EMBEDDING_ATTR
+from .passage_embedding_store import SQLAlchemyPassageEmbeddingStore
 
 
 class SQLAlchemyDocumentRepository(BaseRepository[Document], DocumentRepository):
     """Document repository using SQLAlchemy sessions."""
 
-    def __init__(self, session: Session):
-        super().__init__(session)
+    def __init__(
+        self,
+        session: Session,
+        *,
+        embedding_service: PassageEmbeddingService | None = None,
+    ) -> None:
+        self.session = session
+        if embedding_service is None:
+            settings = get_settings()
+            store = SQLAlchemyPassageEmbeddingStore(session)
+            embedding_service = PassageEmbeddingService(
+                store, cache_max_size=settings.embedding_cache_size
+            )
+        self._embedding_service = embedding_service
 
     def list_with_embeddings(self, user_id: str) -> list[DocumentEmbedding]:
         """Return documents belonging to *user_id* with averaged embeddings."""
@@ -42,14 +57,18 @@ class SQLAlchemyDocumentRepository(BaseRepository[Document], DocumentRepository)
 
             trace.set_attribute("documents_fetched", len(documents))
 
+            all_passages = [
+                passage for document in documents for passage in document.passages
+            ]
+            embedding_map = self._prefetch_embeddings(all_passages)
+
             results: list[DocumentEmbedding] = []
             for document in documents:
-                vectors = [
-                    passage.embedding
-                    for passage in document.passages
-                    if isinstance(passage.embedding, Sequence)
-                    and len(passage.embedding) > 0
-                ]
+                vectors: list[Sequence[float]] = []
+                for passage in document.passages:
+                    embedding = self._resolve_embedding(passage, embedding_map)
+                    if isinstance(embedding, Sequence) and len(embedding) > 0:
+                        vectors.append(embedding)
                 if not vectors:
                     continue
 
@@ -94,6 +113,8 @@ class SQLAlchemyDocumentRepository(BaseRepository[Document], DocumentRepository)
                 trace.record_result_count(0)
                 return None
 
+            self._prefetch_embeddings(document.passages)
+
             trace.record_result_count(1)
             return document_to_dto(document)
 
@@ -132,7 +153,9 @@ class SQLAlchemyDocumentRepository(BaseRepository[Document], DocumentRepository)
             )
             if limit is not None:
                 stmt = stmt.limit(limit)
-            documents = self.scalars(stmt).all()
+            documents = self.session.scalars(stmt).all()
+            for document in documents:
+                self._prefetch_embeddings(document.passages)
             trace.record_result_count(len(documents))
             return [document_to_dto(doc) for doc in documents]
 
@@ -179,6 +202,39 @@ class SQLAlchemyDocumentRepository(BaseRepository[Document], DocumentRepository)
                                 topics.append(value)
                                 break
         return topics
+
+    def _prefetch_embeddings(
+        self, passages: Iterable[Passage]
+    ) -> Mapping[str, Sequence[float] | None]:
+        collected: list[Passage] = list(passages)
+        unique_ids: list[str] = []
+        seen: set[str] = set()
+        for passage in collected:
+            identifier = getattr(passage, "id", None)
+            if isinstance(identifier, str) and identifier not in seen:
+                unique_ids.append(identifier)
+                seen.add(identifier)
+        if not unique_ids:
+            return {}
+        mapping = self._embedding_service.get_many(unique_ids)
+        for passage in collected:
+            identifier = getattr(passage, "id", None)
+            if isinstance(identifier, str):
+                setattr(passage, _PREFETCHED_EMBEDDING_ATTR, mapping.get(identifier))
+        return mapping
+
+    @staticmethod
+    def _resolve_embedding(
+        passage: Passage, embedding_map: Mapping[str, Sequence[float] | None]
+    ) -> Sequence[float] | None:
+        identifier = getattr(passage, "id", None)
+        if isinstance(identifier, str):
+            if hasattr(passage, _PREFETCHED_EMBEDDING_ATTR):
+                return getattr(passage, _PREFETCHED_EMBEDDING_ATTR)
+            value = embedding_map.get(identifier)
+            setattr(passage, _PREFETCHED_EMBEDDING_ATTR, value)
+            return value
+        return passage.embedding
 
 
 __all__ = ["SQLAlchemyDocumentRepository"]
