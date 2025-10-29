@@ -225,4 +225,6 @@ class DocumentUpdateRequest(APIModel):
     metadata: dict[str, Any] | None = Field(default=None, alias="meta")
 
 
-DocumentDetailResponse.model_rebuild()
+_rebuild_model = getattr(DocumentDetailResponse, "model_rebuild", None)
+if callable(_rebuild_model):  # pragma: no branch - executed during import
+    _rebuild_model()
