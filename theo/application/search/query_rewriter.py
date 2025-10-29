@@ -113,15 +113,25 @@ class QueryRewriter:
     def _collect_synonyms(self, query: str | None) -> list[str]:
         if not query:
             return []
-        lowered = query.lower()
+        lowered = query.casefold()
         expansions: list[str] = []
+        added: set[str] = set()
         for token, synonyms in self._synonym_index.items():
             # Use word-boundary regex to match token as a whole word
             pattern = re.compile(r"\b{}\b".format(re.escape(token)), re.IGNORECASE)
             if pattern.search(query):
                 for synonym in synonyms:
-                    if synonym and not re.search(r"\b{}\b".format(re.escape(synonym)), lowered):
-                        expansions.append(synonym)
+                    if not synonym:
+                        continue
+                    normalized = synonym.casefold()
+                    if normalized in added:
+                        continue
+                    if re.search(
+                        r"\b{}\b".format(re.escape(normalized)), lowered
+                    ):
+                        continue
+                    expansions.append(synonym)
+                    added.add(normalized)
         return expansions
 
     def _build_osis_hints(self, osis_value: str | None) -> list[str]:
