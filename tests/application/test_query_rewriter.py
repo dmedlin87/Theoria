@@ -1,4 +1,15 @@
+import sys
+import types
+
 import pytest
+
+if "fastapi" not in sys.modules:
+    fastapi_module = types.ModuleType("fastapi")
+    status_module = types.ModuleType("fastapi.status")
+    setattr(status_module, "HTTP_422_UNPROCESSABLE_ENTITY", 422)
+    sys.modules["fastapi.status"] = status_module
+    fastapi_module.status = status_module  # type: ignore[attr-defined]
+    sys.modules["fastapi"] = fastapi_module
 
 from theo.application.search import QueryRewriter
 from theo.infrastructure.api.app.models.search import HybridSearchRequest
@@ -49,3 +60,15 @@ def test_query_rewriter_invalid_osis_and_no_changes(monkeypatch: pytest.MonkeyPa
     assert result.request.query == "love"
     assert result.metadata["rewrite_applied"] is False
     assert "osis_hints" not in result.metadata
+
+
+def test_query_rewriter_skips_case_insensitive_synonyms() -> None:
+    rewriter = QueryRewriter(
+        synonym_index={"hope": ("Faith", "FAITH")}
+    )
+    request = HybridSearchRequest(query="Hope and faith in action")
+
+    result = rewriter.rewrite(request)
+
+    assert result.metadata.get("synonym_expansions", []) == []
+    assert result.request.query == "Hope and faith in action"
