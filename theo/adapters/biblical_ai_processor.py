@@ -3,7 +3,7 @@
 import json
 import re
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from theo.domain.biblical_texts import (
     AIAnalysis,
@@ -17,10 +17,38 @@ from theo.domain.biblical_texts import (
 )
 
 
+def _validate_chat_completions_client(ai_client: Any) -> None:
+    """Ensure the provided AI client exposes chat.completions.create."""
+
+    if ai_client is None:
+        raise ValueError(
+            "ai_client must provide chat.completions.create; received None"
+        )
+
+    chat = getattr(ai_client, "chat", None)
+    if chat is None:
+        raise ValueError(
+            "ai_client must provide chat.completions.create; missing 'chat' attribute"
+        )
+
+    completions = getattr(chat, "completions", None)
+    if completions is None:
+        raise ValueError(
+            "ai_client must provide chat.completions.create; missing 'chat.completions'"
+        )
+
+    create = getattr(completions, "create", None)
+    if create is None or not callable(create):
+        raise ValueError(
+            "ai_client must provide chat.completions.create callable"
+        )
+
+
 class BiblicalAIProcessor:
     """AI processor for biblical text analysis using OpenAI/Anthropic APIs."""
     
     def __init__(self, ai_client, model_name: str = "gpt-4"):
+        _validate_chat_completions_client(ai_client)
         self.ai_client = ai_client
         self.model_name = model_name
     
@@ -239,8 +267,9 @@ Provide JSON with: themes, theological_keywords, cross_references, textual_varia
 
 class CrossLanguageComparator:
     """AI-powered cross-language comparison for Hebrew/Greek texts."""
-    
+
     def __init__(self, ai_client, model_name: str = "gpt-4"):
+        _validate_chat_completions_client(ai_client)
         self.ai_client = ai_client
         self.model_name = model_name
     
@@ -273,8 +302,9 @@ Provide JSON analysis.
 
 class TheologicalDebateAnalyzer:
     """AI analyzer for theological debate contexts."""
-    
+
     def __init__(self, ai_client, model_name: str = "gpt-4"):
+        _validate_chat_completions_client(ai_client)
         self.ai_client = ai_client
         self.model_name = model_name
     
