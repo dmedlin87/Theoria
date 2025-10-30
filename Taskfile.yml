@@ -33,6 +33,26 @@ tasks:
       - task: architecture:test
       - task: architecture:imports
 
+  ec:ingest:
+    desc: Run the Engine CLI folder ingestion helper
+    cmds:
+      - python -m theo.application.services.cli.ingest_folder{{if .CLI_ARGS}} {{.CLI_ARGS}}{{else}} --help{{end}}
+
+  ec:code-quality:
+    desc: Run the Engine CLI aggregated code quality checks
+    cmds:
+      - python -m theo.application.services.cli.code_quality{{if .CLI_ARGS}} {{.CLI_ARGS}}{{else}} --help{{end}}
+
+  ec:rag-eval:
+    desc: Run the Engine CLI retrieval evaluation suite
+    cmds:
+      - python -m theo.application.services.cli.rag_eval{{if .CLI_ARGS}} {{.CLI_ARGS}}{{else}} --help{{end}}
+
+  ec:export:
+    desc: Run the Engine CLI export data helper
+    cmds:
+      - python -m theo.application.services.cli.export_data{{if .CLI_ARGS}} {{.CLI_ARGS}}{{else}} --help{{end}}
+
   test:fast:
     desc: Run the fast pytest suite without contract, GPU, or pgvector tests
     cmds:
