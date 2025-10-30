@@ -1,0 +1,41 @@
+{
+  "schema_version": "2025-02-14",
+  "topics": [
+    {
+      "id": "watch.trinity-emergence",
+      "label": "Trinity Emergent Themes",
+      "description": "Track convergence of passages, patristic sources, and modern scholarship reinforcing Trinitarian doctrine.",
+      "osis_ranges": ["John.1.1-1.18", "Matt.28.18-28.20", "2Cor.13.14"],
+      "tags": ["doctrine.trinity", "history.ecumenical-councils"],
+      "signals": {
+        "convergence_threshold": 0.78,
+        "diversity_min_sources": 3,
+        "stability_window_days": 14
+      }
+    },
+    {
+      "id": "watch.christology-councils",
+      "label": "Christology Council Proceedings",
+      "description": "Monitor historical documents and secondary literature linked to Chalcedonian Christology claims.",
+      "osis_ranges": ["Col.1.15-1.20", "Heb.1.1-1.14"],
+      "tags": ["history.ecumenical-councils", "apologetics.classic-arguments"],
+      "signals": {
+        "convergence_threshold": 0.72,
+        "diversity_min_sources": 4,
+        "stability_window_days": 21
+      }
+    },
+    {
+      "id": "watch.textual-variants",
+      "label": "High Impact Textual Variants",
+      "description": "Surface manuscript or translation variants that materially affect doctrinal arguments or modern apologetics.",
+      "osis_ranges": ["1John.5.7-5.8", "Mark.16.9-16.20"],
+      "tags": ["textual.critical-notes", "apologetics.classic-arguments"],
+      "signals": {
+        "convergence_threshold": 0.75,
+        "diversity_min_sources": 2,
+        "stability_window_days": 10
+      }
+    }
+  ]
+}
