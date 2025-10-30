@@ -180,7 +180,9 @@ def gather_changed_files(
     if staged:
         args.append("--staged")
 
-    args.extend(["--name-only", "--diff-filter=ACMR"])
+    # Include deletions in the diff filter so that removing a guarded file still
+    # triggers watchlist enforcement.
+    args.extend(["--name-only", "--diff-filter=ACDMR"])
 
     if not staged:
         if include_worktree:
