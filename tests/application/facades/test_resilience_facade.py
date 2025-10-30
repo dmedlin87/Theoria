@@ -82,6 +82,7 @@ def test_resilient_operation_with_default_policy() -> None:
     assert result == "ok"
     assert metadata.policy["name"] == "noop"
     assert metadata.attempts == 1
+    assert metadata.duration > 0.0
 
 
 @pytest.mark.asyncio
@@ -100,3 +101,19 @@ async def test_resilient_async_operation_uses_policy() -> None:
     assert result == "async-ok"
     assert metadata.policy["name"] == "custom"
     assert policy.calls[-1] == ("async", "sync")
+
+
+@pytest.mark.asyncio
+async def test_resilient_async_operation_with_default_policy_records_duration() -> None:
+    async def runner() -> str:
+        await asyncio.sleep(0)
+        return "async-ok"
+
+    result, metadata = await resilience_facade.resilient_async_operation(
+        runner, key="async-default", classification="transient"
+    )
+
+    assert result == "async-ok"
+    assert metadata.policy["name"] == "noop"
+    assert metadata.attempts == 1
+    assert metadata.duration > 0.0
