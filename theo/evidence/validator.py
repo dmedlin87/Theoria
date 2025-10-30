@@ -30,7 +30,14 @@ class EvidenceValidator:
         for path in paths:
             collection = self.validate_file(path)
             merged.extend(collection.records)
-        return EvidenceCollection(records=merged)
+
+        # Deduplicate by SID to ensure deterministic downstream operations.
+        unique: dict[str, EvidenceRecord] = {}
+        for record in merged:
+            if record.sid not in unique:
+                unique[record.sid] = record
+
+        return EvidenceCollection(records=tuple(unique.values()))
 
     def validate_all(self, directory: Path | str) -> EvidenceCollection:
         """Validate every JSON/JSONL file in ``directory``."""

@@ -38,7 +38,7 @@ class EvidencePromoter:
             target_path.parent.mkdir(parents=True, exist_ok=True)
         dump_records(target_path, collection.records)
         if sqlite_path:
-            self.indexer.build_sqlite(sources, sqlite_path=sqlite_path)
+            self.indexer.build_sqlite(sources, sqlite_path=sqlite_path, collection=collection)
         return collection
 
 
