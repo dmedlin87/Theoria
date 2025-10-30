@@ -33,6 +33,26 @@ tasks:
       - task: architecture:test
       - task: architecture:imports
 
+  ec:validate:
+    desc: Validate evidence payloads via the Evidence CLI
+    cmds:
+      - poetry run theoria-ec validate {{.CLI_ARGS}}
+
+  ec:index:
+    desc: Build a SQLite index from evidence payloads via the Evidence CLI
+    cmds:
+      - poetry run theoria-ec index {{.CLI_ARGS}}
+
+  ec:promote:
+    desc: Promote curated evidence artifacts via the Evidence CLI
+    cmds:
+      - poetry run theoria-ec promote {{.CLI_ARGS}}
+
+  ec:dossier:
+    desc: Generate evidence dossiers via the Evidence CLI
+    cmds:
+      - poetry run theoria-ec dossier {{.CLI_ARGS}}
+
   security:sid-check:
     desc: Validate Security Incident Document coverage against the watchlist
     cmds:
