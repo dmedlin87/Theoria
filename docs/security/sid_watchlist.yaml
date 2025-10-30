@@ -1,0 +1,21 @@
+# Security Incident Document watchlist configuration.
+#
+# Each entry defines the files that should trigger a SID review.
+# When a pattern matches a changed file, at least one of the referenced
+# `required_sids` or `sid_paths` must be updated in the same change.
+#
+# Example entry:
+#
+# entries:
+#   - name: Authentication guardrails
+#     description: Ensure the authentication SID stays current.
+#     patterns:
+#       - "theo/infrastructure/api/app/security.py"
+#       - "theo/infrastructure/api/app/routes/auth/**"
+#     required_sids:
+#       - SID-XXXX
+#     sid_paths:
+#       - "docs/security/sids/authentication.md"
+#
+# Leave the list empty if there are no enforced watchlist rules yet.
+entries: []
