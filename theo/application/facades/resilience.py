@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Awaitable, Callable, Optional, TypeVar
 
 from ..resilience import ResilienceError, ResilienceMetadata, ResiliencePolicy, ResilienceSettings
@@ -31,13 +32,15 @@ class _NoOpResiliencePolicy:
         key: str,
         classification: str,
     ) -> tuple[T, ResilienceMetadata]:
+        start_time = time.perf_counter()
         result = operation()
+        duration = time.perf_counter() - start_time
         metadata = ResilienceMetadata(
             attempts=1,
             category=key,
             circuit_open=False,
             last_exception=None,
-            duration=0.0,
+            duration=max(duration, 0.0),
             classification=classification,
             policy={"name": "noop"},
         )
@@ -50,13 +53,15 @@ class _NoOpResiliencePolicy:
         key: str,
         classification: str,
     ) -> tuple[T, ResilienceMetadata]:
+        start_time = time.perf_counter()
         result = await operation()
+        duration = time.perf_counter() - start_time
         metadata = ResilienceMetadata(
             attempts=1,
             category=key,
             circuit_open=False,
             last_exception=None,
-            duration=0.0,
+            duration=max(duration, 0.0),
             classification=classification,
             policy={"name": "noop"},
         )
