@@ -1,0 +1,15 @@
+extends: default
+
+ignore: |
+  .windsurf/workflows/rebuild_corpus.yaml
+
+rules:
+  comments: disable
+  document-start: disable
+  empty-lines: disable
+  truthy: disable
+  new-line-at-end-of-file: disable
+  trailing-spaces: disable
+  line-length:
+    max: 200
+    allow-non-breakable-words: true
