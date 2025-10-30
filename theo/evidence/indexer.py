@@ -23,10 +23,12 @@ class EvidenceIndexer:
         sources: Iterable[Path | str],
         *,
         sqlite_path: Path | str,
+        collection: EvidenceCollection | None = None,
     ) -> EvidenceCollection:
         """Validate ``sources`` and persist them into a SQLite index."""
 
-        collection = self.validator.validate_many(sources)
+        if collection is None:
+            collection = self.validator.validate_many(sources)
         database_path = Path(sqlite_path)
         if not database_path.parent.exists():
             database_path.parent.mkdir(parents=True, exist_ok=True)
@@ -42,6 +44,8 @@ class EvidenceIndexer:
                 continue
             seen_sids.add(record.sid)
             deduped.append(record)
+
+        ordered = sorted(deduped, key=lambda record: (record.normalized_osis, record.sid))
         with sqlite3.connect(path) as connection:
             cursor = connection.cursor()
             cursor.execute(
@@ -59,7 +63,7 @@ class EvidenceIndexer:
                 """
             )
             cursor.execute("DELETE FROM evidence")
-            for record in deduped:
+            for record in ordered:
                 cursor.execute(
                     """
                     INSERT INTO evidence (sid, title, summary, osis, normalized_osis, tags, citation, metadata)
@@ -121,6 +125,7 @@ class EvidenceIndexer:
                 "metadata": json.loads(row[7]),
             }
             results.append(EvidenceRecord.model_validate(raw))
+        results.sort(key=lambda record: (record.normalized_osis, record.sid))
         return results
 
 
