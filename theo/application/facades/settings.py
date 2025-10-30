@@ -635,11 +635,28 @@ def get_settings() -> Settings:
 
     settings = Settings()
     project_root = None
-    if settings.fixtures_root is not None:
-        root = settings.fixtures_root
-        if not root.is_absolute():
-            project_root = Path(__file__).resolve().parents[3]
-            settings.fixtures_root = (project_root / root).resolve()
+    root_candidate = settings.fixtures_root
+    root_path: Path | None
+    if root_candidate is None:
+        root_path = None
+    elif isinstance(root_candidate, Path):
+        root_path = root_candidate
+    else:
+        try:
+            root_path = Path(root_candidate)  # type: ignore[arg-type]
+        except TypeError:  # pragma: no cover - defensive guard for bad stubs
+            LOGGER.debug(
+                "Ignoring unsupported fixtures_root value from settings: %r",
+                root_candidate,
+            )
+            root_path = None
+
+    if root_path is not None:
+        project_root = Path(__file__).resolve().parents[3]
+        if not root_path.is_absolute():
+            settings.fixtures_root = (project_root / root_path).resolve()
+        else:
+            settings.fixtures_root = root_path.resolve()
     else:
         project_root = Path(__file__).resolve().parents[3]
         candidate = project_root / "fixtures"
