@@ -35,6 +35,13 @@ class EvidenceIndexer:
 
     def _write_sqlite(self, path: Path, records: Iterable[EvidenceRecord]) -> None:
         serialized = list(records)
+        deduped: list[EvidenceRecord] = []
+        seen_sids: set[str] = set()
+        for record in serialized:
+            if record.sid in seen_sids:
+                continue
+            seen_sids.add(record.sid)
+            deduped.append(record)
         with sqlite3.connect(path) as connection:
             cursor = connection.cursor()
             cursor.execute(
@@ -52,7 +59,7 @@ class EvidenceIndexer:
                 """
             )
             cursor.execute("DELETE FROM evidence")
-            for record in serialized:
+            for record in deduped:
                 cursor.execute(
                     """
                     INSERT INTO evidence (sid, title, summary, osis, normalized_osis, tags, citation, metadata)
