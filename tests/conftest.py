@@ -66,18 +66,20 @@ if not hasattr(pydantic, "model_serializer"):
     pydantic.model_serializer = _identity_decorator  # type: ignore[attr-defined]
 
 if "pydantic_settings" not in sys.modules:  # pragma: no cover - lightweight CI environments
-    pydantic_settings = types.ModuleType("pydantic_settings")
+    spec = importlib.util.find_spec("pydantic_settings")
+    if spec is None:
+        pydantic_settings = types.ModuleType("pydantic_settings")
 
-    class _BaseSettings:
-        model_config: dict[str, object] = {}
+        class _BaseSettings:
+            model_config: dict[str, object] = {}
 
-        def __init__(self, **_kwargs: object) -> None:
-            pass
+            def __init__(self, **_kwargs: object) -> None:
+                pass
 
-    pydantic_settings.BaseSettings = _BaseSettings  # type: ignore[attr-defined]
-    pydantic_settings.SettingsConfigDict = dict  # type: ignore[attr-defined]
+        pydantic_settings.BaseSettings = _BaseSettings  # type: ignore[attr-defined]
+        pydantic_settings.SettingsConfigDict = dict  # type: ignore[attr-defined]
 
-    sys.modules["pydantic_settings"] = pydantic_settings
+        sys.modules["pydantic_settings"] = pydantic_settings
 
 try:  # pragma: no cover - optional dependency for integration fixtures
     from sqlalchemy import create_engine, text
