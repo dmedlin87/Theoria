@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from collections.abc import Iterable, Mapping
 from typing import Any, ClassVar
 
@@ -77,8 +79,31 @@ class EvidenceRecord(BaseModel):
         if not normalized:
             msg = "Unable to normalize OSIS references"
             raise ValueError(msg)
-        sid = self.sid or hash_sid((self.title, *normalized))
+        sid = self.sid or hash_sid(self._signature_parts(normalized))
         return self.model_copy(update={"normalized_osis": normalized, "sid": sid})
+
+    def _signature_parts(self, normalized: tuple[str, ...]) -> tuple[str, ...]:
+        """Derive stable signature components for SID generation."""
+
+        citation = ""
+        if self.citation:
+            payload = self.citation.model_dump(mode="json", exclude_none=True)
+            citation = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+        metadata = json.dumps(
+            _normalize_metadata(self.metadata),
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        parts = (
+            self.title,
+            "|".join(normalized),
+            "|".join(self.osis),
+            self.summary or "",
+            citation,
+            "|".join(self.tags),
+            metadata,
+        )
+        return parts
 
 
 class EvidenceCollection(BaseModel):
@@ -112,3 +137,26 @@ class EvidenceCollection(BaseModel):
 
 
 __all__ = ["EvidenceCitation", "EvidenceRecord", "EvidenceCollection"]
+
+
+def _normalize_metadata(value: Any) -> Any:
+    """Recursively coerce metadata to deterministic JSON-serializable forms."""
+
+    if isinstance(value, Mapping):
+        return {
+            str(key): _normalize_metadata(val)
+            for key, val in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_normalize_metadata(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return sorted((_normalize_metadata(item) for item in value), key=_stable_repr)
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return _stable_repr(value)
+
+
+def _stable_repr(value: Any) -> str:
+    """Generate a deterministic string representation for ``value``."""
+
+    return repr(value)
