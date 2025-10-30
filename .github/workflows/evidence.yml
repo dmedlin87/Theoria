@@ -1,0 +1,237 @@
+name: Evidence dataset verification
+
+on:
+  push:
+    paths:
+      - 'data/seeds/**'
+      - 'scripts/test_biblical_analysis.py'
+      - 'theo/infrastructure/api/app/db/seeds.py'
+      - '.github/workflows/evidence.yml'
+  pull_request:
+    paths:
+      - 'data/seeds/**'
+      - 'scripts/test_biblical_analysis.py'
+      - 'theo/infrastructure/api/app/db/seeds.py'
+      - '.github/workflows/evidence.yml'
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            pyproject.toml
+            constraints/prod.txt
+            constraints/dev.txt
+            constraints-ci.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade 'pip<25'
+          pip install ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+          pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install -e .
+
+      - name: Run evidence CLI commands
+        run: |
+          set -e
+          mkdir -p evidence_artifacts
+          python scripts/test_biblical_analysis.py | tee evidence_artifacts/biblical-analysis.txt
+          python -m theo.application.services.cli.code_quality --skip-ruff --skip-pytest | tee evidence_artifacts/code-quality.txt
+
+      - name: Run SID stability check
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import sys
+          from collections import defaultdict
+          from pathlib import Path
+          from typing import Dict, List
+          from uuid import uuid5
+
+          from theo.infrastructure.api.app.db import seeds
+
+          OUTPUT_DIR = Path("evidence_artifacts")
+          OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+          def _contradiction_rows() -> List[Dict[str, str]]:
+              paths = [
+                  seeds.SEED_ROOT / "contradictions.json",
+                  seeds.SEED_ROOT / "contradictions_additional.json",
+                  seeds.SEED_ROOT / "contradictions_catalog.yaml",
+              ]
+              rows: List[Dict[str, str]] = []
+              for entry in seeds._iter_seed_entries(*paths):
+                  osis_a = entry.get("osis_a")
+                  osis_b = entry.get("osis_b")
+                  if not osis_a or not osis_b:
+                      continue
+                  source = str(entry.get("source") or "community")
+                  perspective = (entry.get("perspective") or "skeptical").strip().lower()
+                  sid = str(
+                      uuid5(
+                          seeds.CONTRADICTION_NAMESPACE,
+                          "|".join(
+                              [
+                                  str(osis_a).lower(),
+                                  str(osis_b).lower(),
+                                  source.lower(),
+                                  perspective,
+                              ]
+                          ),
+                      )
+                  )
+                  rows.append(
+                      {
+                          "sid": sid,
+                          "osis_a": str(osis_a),
+                          "osis_b": str(osis_b),
+                          "source": source,
+                          "perspective": perspective,
+                      }
+                  )
+              rows.sort(key=lambda item: item["sid"])
+              return rows
+
+          def _harmony_rows() -> List[Dict[str, str]]:
+              paths = [
+                  seeds.SEED_ROOT / "harmonies.yaml",
+                  seeds.SEED_ROOT / "harmonies.json",
+                  seeds.SEED_ROOT / "harmonies_additional.yaml",
+              ]
+              rows: List[Dict[str, str]] = []
+              for entry in seeds._iter_seed_entries(*paths):
+                  osis_a = entry.get("osis_a")
+                  osis_b = entry.get("osis_b")
+                  summary = entry.get("summary")
+                  if not osis_a or not osis_b or not summary:
+                      continue
+                  source = str(entry.get("source") or "community")
+                  perspective = (entry.get("perspective") or "apologetic").strip().lower()
+                  sid = str(
+                      uuid5(
+                          seeds.HARMONY_NAMESPACE,
+                          "|".join(
+                              [
+                                  str(osis_a).lower(),
+                                  str(osis_b).lower(),
+                                  source.lower(),
+                                  perspective,
+                              ]
+                          ),
+                      )
+                  )
+                  rows.append(
+                      {
+                          "sid": sid,
+                          "osis_a": str(osis_a),
+                          "osis_b": str(osis_b),
+                          "source": source,
+                          "perspective": perspective,
+                      }
+                  )
+              rows.sort(key=lambda item: item["sid"])
+              return rows
+
+          def _commentary_rows() -> List[Dict[str, str]]:
+              paths = [
+                  seeds.SEED_ROOT / "commentaries.yaml",
+                  seeds.SEED_ROOT / "commentaries.json",
+                  seeds.SEED_ROOT / "commentaries_additional.yaml",
+              ]
+              rows: List[Dict[str, str]] = []
+              for entry in seeds._iter_seed_entries(*paths):
+                  osis = entry.get("osis")
+                  excerpt = entry.get("excerpt")
+                  if not osis or not excerpt:
+                      continue
+                  source = str(entry.get("source") or "community")
+                  perspective = (entry.get("perspective") or "neutral").strip().lower()
+                  snippet = str(excerpt)
+                  sid = str(
+                      uuid5(
+                          seeds.COMMENTARY_NAMESPACE,
+                          "|".join(
+                              [
+                                  str(osis).lower(),
+                                  source.lower(),
+                                  perspective,
+                                  snippet[:64].lower(),
+                              ]
+                          ),
+                      )
+                  )
+                  rows.append(
+                      {
+                          "sid": sid,
+                          "osis": str(osis),
+                          "source": source,
+                          "perspective": perspective,
+                          "title": (entry.get("title") or ""),
+                          "excerpt_preview": snippet[:80],
+                      }
+                  )
+              rows.sort(key=lambda item: item["sid"])
+              return rows
+
+          def _ensure_unique(dataset: str, rows: List[Dict[str, str]]) -> None:
+              index: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+              for row in rows:
+                  index[row["sid"]].append(row)
+              duplicates = {sid: items for sid, items in index.items() if len(items) > 1}
+              if duplicates:
+                  print(f"Duplicate SIDs detected in {dataset} dataset:", file=sys.stderr)
+                  for sid, items in duplicates.items():
+                      print(f"  {sid}", file=sys.stderr)
+                      for item in items:
+                          print(f"    {item}", file=sys.stderr)
+                  raise SystemExit(1)
+
+          manifest = {
+              "contradictions": _contradiction_rows(),
+              "harmonies": _harmony_rows(),
+              "commentaries": _commentary_rows(),
+          }
+
+          for dataset, rows in manifest.items():
+              _ensure_unique(dataset, rows)
+
+          counts = {dataset: len(rows) for dataset, rows in manifest.items()}
+          summary_lines = [
+              "Seed SID counts:",
+              *[f"  - {name}: {count}" for name, count in sorted(counts.items())],
+          ]
+          summary_text = "\n".join(summary_lines)
+
+          manifest_path = OUTPUT_DIR / "sid-manifest.json"
+          manifest_path.write_text(
+              json.dumps({"counts": counts, "datasets": manifest}, indent=2, ensure_ascii=False)
+              + "\n",
+              encoding="utf-8",
+          )
+          (OUTPUT_DIR / "sid-summary.txt").write_text(summary_text + "\n", encoding="utf-8")
+
+          print(summary_text)
+          PY
+
+      - name: Upload evidence artifacts
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
+        with:
+          name: evidence-artifacts
+          path: evidence_artifacts/
+          if-no-files-found: error
