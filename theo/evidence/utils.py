@@ -34,7 +34,11 @@ def load_records(path: Path) -> tuple["EvidenceRecord", ...]:
                 continue
             raw.append(json.loads(line))
     else:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        if not text.strip():
+            raw = []
+        else:
+            raw = json.loads(text)
         if isinstance(raw, dict):
             raw = raw.get("records") or raw.get("data") or []
         if not isinstance(raw, list):
