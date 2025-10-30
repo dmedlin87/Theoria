@@ -1,0 +1,43 @@
+{
+  "schema_version": "2025-02-14",
+  "sources": [
+    {
+      "id": "scripture.esv",
+      "title": "The Holy Bible, English Standard Version",
+      "type": "Scripture",
+      "publisher": "Crossway",
+      "publication_year": 2016,
+      "languages": ["en"],
+      "tags": ["doctrine.trinity"]
+    },
+    {
+      "id": "patristic.nicene-creed",
+      "title": "The Nicene-Constantinopolitan Creed",
+      "type": "Creedal Document",
+      "publisher": "Council of Constantinople",
+      "publication_year": 381,
+      "languages": ["la", "grc", "en"],
+      "tags": ["history.ecumenical-councils"]
+    },
+    {
+      "id": "monograph.hurtado-lord-jesus-christ",
+      "title": "Lord Jesus Christ: Devotion to Jesus in Earliest Christianity",
+      "author": "Larry W. Hurtado",
+      "type": "Scholarly Monograph",
+      "publisher": "Eerdmans",
+      "publication_year": 2003,
+      "languages": ["en"],
+      "tags": ["doctrine.trinity", "history.ecumenical-councils"]
+    },
+    {
+      "id": "journal.wallace-greek-grammar-beyond-basics",
+      "title": "Greek Grammar Beyond the Basics",
+      "author": "Daniel B. Wallace",
+      "type": "Reference Work",
+      "publisher": "Zondervan",
+      "publication_year": 1996,
+      "languages": ["en"],
+      "tags": ["linguistics.semantic-range", "textual.critical-notes"]
+    }
+  ]
+}
