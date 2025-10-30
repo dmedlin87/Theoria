@@ -15,7 +15,9 @@ on:
       - '.github/workflows/evidence.yml'
   workflow_dispatch:
 
-permissions: read-all
+permissions:
+  contents: read
+  actions: write
 
 jobs:
   evidence:
@@ -47,7 +49,7 @@ jobs:
 
       - name: Run evidence CLI commands
         run: |
-          set -e
+          set -eo pipefail
           mkdir -p evidence_artifacts
           python scripts/test_biblical_analysis.py | tee evidence_artifacts/biblical-analysis.txt
           python -m theo.application.services.cli.code_quality --skip-ruff --skip-pytest | tee evidence_artifacts/code-quality.txt
