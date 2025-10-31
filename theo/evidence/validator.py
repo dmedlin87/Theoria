@@ -19,6 +19,9 @@ class EvidenceValidator:
         """Validate a single evidence file and return the normalized collection."""
 
         resolved = self._resolve(path)
+        if resolved.is_dir():
+            msg = f"Expected an evidence file but received directory: {resolved}"
+            raise IsADirectoryError(msg)
         records = load_records(resolved)
         collection = EvidenceCollection(records=records)
         return collection
@@ -28,8 +31,11 @@ class EvidenceValidator:
 
         merged: list[EvidenceRecord] = []
         for path in paths:
-            collection = self.validate_file(path)
-            merged.extend(collection.records)
+            resolved = self._resolve(path)
+            targets = self._discover(resolved) if resolved.is_dir() else (resolved,)
+            for target in targets:
+                collection = self.validate_file(target)
+                merged.extend(collection.records)
 
         # Deduplicate by SID to ensure deterministic downstream operations.
         unique: dict[str, EvidenceRecord] = {}
@@ -40,17 +46,13 @@ class EvidenceValidator:
         return EvidenceCollection(records=tuple(unique.values()))
 
     def validate_all(self, directory: Path | str) -> EvidenceCollection:
-        """Validate every JSON/JSONL file in ``directory``."""
+        """Validate every JSON/JSONL/Markdown file in ``directory``."""
 
         resolved = self._resolve(directory)
-        files = sorted(
-            (
-                path
-                for path in resolved.iterdir()
-                if path.suffix.lower() in {".json", ".jsonl"}
-            ),
-            key=lambda item: item.name,
-        )
+        if not resolved.is_dir():
+            msg = f"Expected a directory of evidence resources: {resolved}"
+            raise NotADirectoryError(msg)
+        files = self._discover(resolved)
         return self.validate_many(files)
 
     def _resolve(self, path: Path | str) -> Path:
@@ -61,6 +63,18 @@ class EvidenceValidator:
             msg = f"Evidence resource not found: {candidate}"
             raise FileNotFoundError(msg)
         return candidate
+
+    def _discover(self, directory: Path) -> tuple[Path, ...]:
+        files = sorted(
+            (
+                path
+                for path in directory.iterdir()
+                if path.is_file()
+                and path.suffix.lower() in {".json", ".jsonl", ".md"}
+            ),
+            key=lambda item: item.name,
+        )
+        return tuple(files)
 
 
 def validate(path: Path | str, *, base_path: Path | str | None = None) -> EvidenceCollection:
