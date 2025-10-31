@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Refresh extras constraint lockfiles.
-
 Usage:
     python scripts/update_constraints.py          # rewrite constraint files
     python scripts/update_constraints.py --check  # verify files are up to date
 """
 from __future__ import annotations
-
 import argparse
 import subprocess
 import sys
@@ -47,27 +45,29 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
     ]
     for extra in extras:
         cmd.append(f"--extra={extra}")
+
     cmd.extend([
         "--output-file",
         str(relative_output),
         "pyproject.toml",
     ])
+
     if "ml" in extras:
         cmd.extend(["--index-url", CPU_TORCH_INDEX])
         cmd.extend(["--extra-index-url", DEFAULT_PYPI_INDEX])
+        # Add index strategy to allow searching across multiple indexes
+        cmd.extend(["--index-strategy", "unsafe-best-match"])
+
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     return destination
 
-
 def check_constraints() -> bool:
-    # Ensure compatibility before running
-    ensure_pip_tools_compatibility()
-    
     ok = True
     for name, config in TARGETS.items():
         destination = config["destination"]
         extras = config["extras"]
         original_bytes = destination.read_bytes() if destination.exists() else None
+
         try:
             run_uv_compile(extras, destination)
         except subprocess.CalledProcessError:
@@ -96,13 +96,10 @@ def check_constraints() -> bool:
             destination.unlink(missing_ok=True)
         else:
             destination.write_bytes(original_bytes)
+
     return ok
 
-
 def update_constraints() -> None:
-    # Ensure compatibility before running
-    ensure_pip_tools_compatibility()
-    
     CONSTRAINTS_DIR.mkdir(exist_ok=True)
     for name, config in TARGETS.items():
         destination = config["destination"]
@@ -128,7 +125,6 @@ def main(argv: list[str] | None = None) -> int:
 
     update_constraints()
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

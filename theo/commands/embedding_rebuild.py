@@ -43,6 +43,7 @@ from theo.checkpoints import (
     CheckpointValidationError,
     EmbeddingRebuildCheckpoint,
     deserialize_embedding_rebuild_checkpoint,
+    load_embedding_rebuild_checkpoint,
     save_embedding_rebuild_checkpoint,
 )
 from theo.infrastructure.api.app.ingest.embeddings import (
@@ -100,30 +101,6 @@ def _load_ids(path: Path) -> list[str]:
         seen.add(item)
         deduped.append(item)
     return deduped
-
-
-def _read_checkpoint(
-    path: Path, *, raise_on_error: bool = False
-) -> EmbeddingRebuildCheckpoint | None:
-    try:
-        raw = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return None
-
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        if raise_on_error:
-            raise
-        return None
-
-    if not isinstance(payload, Mapping):
-        return None
-
-    try:
-        return deserialize_embedding_rebuild_checkpoint(payload)
-    except CheckpointValidationError:
-        return None
 
 
 def _write_checkpoint(
@@ -296,6 +273,11 @@ def _commit_with_retry(
     default=False,
     help="Resume from an existing checkpoint file instead of starting from scratch.",
 )
+@click.option(
+    "--strict-checkpoint/--lenient-checkpoint",
+    default=False,
+    help="Fail on invalid checkpoint content instead of treating as missing (strict mode).",
+)
 def rebuild_embeddings_cmd(
     fast: bool,
     no_cache: bool,
@@ -304,6 +286,7 @@ def rebuild_embeddings_cmd(
     checkpoint_file: Path | None,
     metrics_file: Path | None,
     resume: bool,
+    strict_checkpoint: bool,
 ) -> None:
     """Rebuild vector store from normalized artifacts."""
 
@@ -353,20 +336,24 @@ def rebuild_embeddings_cmd(
     if checkpoint_file is not None:
         if resume:
             try:
-                checkpoint_state = _read_checkpoint(
-                    checkpoint_file, raise_on_error=True
+                checkpoint_state = load_embedding_rebuild_checkpoint(
+                    checkpoint_file, strict=strict_checkpoint
                 )
-            except json.JSONDecodeError as exc:
+                if checkpoint_state is None and strict_checkpoint:
+                    raise click.ClickException(
+                        f"Checkpoint file {checkpoint_file} is missing but strict mode was enabled"
+                    )
+            except CheckpointValidationError as exc:
                 _LOGGER.error(
-                    "Failed to decode checkpoint file during resume",
+                    "Failed to load checkpoint file during resume",
                     extra={
-                        "event": "cli.rebuild_embeddings.checkpoint_decode_error",
+                        "event": "cli.rebuild_embeddings.checkpoint_validation_error",
                         "checkpoint_file": str(checkpoint_file),
                     },
                     exc_info=exc,
                 )
                 raise click.ClickException(
-                    f"Checkpoint file {checkpoint_file} contains invalid JSON"
+                    f"Checkpoint file {checkpoint_file} is invalid: {exc}"
                 ) from exc
             skip_count = checkpoint_state.processed if checkpoint_state else 0
             if skip_count:
