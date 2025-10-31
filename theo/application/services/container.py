@@ -60,7 +60,12 @@ class ApplicationContainer:
     def bind_list(self) -> Callable[[int], list[Document]]:
         """Return a query adapter for listing documents."""
 
-        def _runner(limit: int = 20) -> list[Document]:
+        def _runner(limit: int = 20, *, requested_limit: int | None = None) -> list[Document]:
+            """Delegate to :meth:`list_documents` while preserving keyword names."""
+
+            if requested_limit is not None:
+                limit = requested_limit
+
             return self.list_documents(limit=limit)
 
         return _runner

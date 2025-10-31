@@ -60,6 +60,9 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
 
 
 def check_constraints() -> bool:
+    # Ensure compatibility before running
+    ensure_pip_tools_compatibility()
+    
     ok = True
     for name, config in TARGETS.items():
         destination = config["destination"]
@@ -97,6 +100,9 @@ def check_constraints() -> bool:
 
 
 def update_constraints() -> None:
+    # Ensure compatibility before running
+    ensure_pip_tools_compatibility()
+    
     CONSTRAINTS_DIR.mkdir(exist_ok=True)
     for name, config in TARGETS.items():
         destination = config["destination"]
