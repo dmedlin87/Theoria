@@ -233,13 +233,13 @@ class TheologicalTermTracker:
                     raw_pos = getattr(tag, "pos", None)
                     pos_value = raw_pos.value if isinstance(raw_pos, POS) else raw_pos
 
-                    # Check for ????? (plural form)
-                    if lemma == "?????" and number == "plural":
+                    # Check for אלהים (plural form)
+                    if lemma == "אלהים" and number == "plural":
                         has_elohim = True
 
-                    # Check for singular verb
+                    # Check for singular verb with null-safety
                     if (
-                        pos_value == POS.VERB.value
+                        pos_value and pos_value == POS.VERB.value
                         and number == "singular"
                         and person == 3
                     ):
