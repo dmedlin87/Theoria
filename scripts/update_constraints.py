@@ -14,6 +14,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONSTRAINTS_DIR = REPO_ROOT / "constraints"
+GUARDRAILS_CONSTRAINT = CONSTRAINTS_DIR / "guardrails.txt"
 
 TARGETS = {
     "prod": {
@@ -50,6 +51,14 @@ def run_pip_compile(extras: tuple[str, ...], destination: Path) -> Path:
     ]
     for extra in extras:
         cmd.append(f"--extra={extra}")
+    try:
+        relative_guardrails = GUARDRAILS_CONSTRAINT.relative_to(REPO_ROOT)
+    except ValueError:
+        relative_guardrails = GUARDRAILS_CONSTRAINT
+    cmd.extend([
+        "--constraint",
+        str(relative_guardrails),
+    ])
     cmd.extend([
         "--output-file",
         str(relative_output),
