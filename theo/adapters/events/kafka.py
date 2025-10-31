@@ -82,6 +82,7 @@ class KafkaEventPublisher(EventPublisher):
                 current_time = time.time()
                 time_since_flush = current_time - self._last_flush
 
+                
                 should_flush = (
                     self._message_count >= self._batch_size or
                     time_since_flush >= self._flush_interval
