@@ -31,6 +31,45 @@ DEFAULT_PYPI_INDEX = "https://pypi.org/simple"
 TORCH_PIP_ARGS = f"--index-url {CPU_TORCH_INDEX} --extra-index-url {DEFAULT_PYPI_INDEX}"
 
 
+def ensure_pip_tools_compatibility() -> None:
+    """Ensure pip and pip-tools versions are compatible."""
+    try:
+        # Check current pip version
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "--version"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        pip_version = result.stdout.strip()
+        print(f"Using {pip_version}")
+        
+        # Check pip-tools version
+        result = subprocess.run(
+            [sys.executable, "-m", "piptools", "--version"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        piptools_version = result.stdout.strip()
+        print(f"Using pip-tools {piptools_version}")
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Could not verify pip-tools compatibility: {e}", file=sys.stderr)
+        print("Attempting to install compatible versions...", file=sys.stderr)
+        
+        try:
+            # Install compatible versions
+            subprocess.run([
+                sys.executable, "-m", "pip", "install", "--upgrade",
+                "pip<24.1", "pip-tools>=7.4.1,<7.5"
+            ], check=True)
+            print("Successfully installed compatible pip and pip-tools versions")
+        except subprocess.CalledProcessError as install_error:
+            print(f"Failed to install compatible versions: {install_error}", file=sys.stderr)
+            raise
+
+
 def run_pip_compile(extras: tuple[str, ...], destination: Path) -> Path:
     """Run pip-compile for a combination of extras and return the generated file path."""
     try:
@@ -57,11 +96,28 @@ def run_pip_compile(extras: tuple[str, ...], destination: Path) -> Path:
     ])
     if "ml" in extras:
         cmd.extend(["--pip-args", TORCH_PIP_ARGS])
-    subprocess.run(cmd, check=True, cwd=REPO_ROOT)
+    
+    try:
+        subprocess.run(cmd, check=True, cwd=REPO_ROOT)
+    except subprocess.CalledProcessError as e:
+        print(f"\nError running pip-compile for extras {extras}:", file=sys.stderr)
+        print(f"Command: {' '.join(cmd)}", file=sys.stderr)
+        print(f"Exit code: {e.returncode}", file=sys.stderr)
+        
+        # Check if this is the known compatibility issue
+        if "use_pep517" in str(e) or "AttributeError" in str(e):
+            print("\nThis appears to be a pip-tools compatibility issue.", file=sys.stderr)
+            print("Try running: pip install --upgrade 'pip<24.1' 'pip-tools>=7.4.1,<7.5'", file=sys.stderr)
+        
+        raise
+    
     return destination
 
 
 def check_constraints() -> bool:
+    # Ensure compatibility before running
+    ensure_pip_tools_compatibility()
+    
     ok = True
     for name, config in TARGETS.items():
         destination = config["destination"]
@@ -99,6 +155,9 @@ def check_constraints() -> bool:
 
 
 def update_constraints() -> None:
+    # Ensure compatibility before running
+    ensure_pip_tools_compatibility()
+    
     CONSTRAINTS_DIR.mkdir(exist_ok=True)
     for name, config in TARGETS.items():
         destination = config["destination"]
