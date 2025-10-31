@@ -77,14 +77,13 @@ pytest.importorskip("sqlalchemy")
 from sqlalchemy.exc import SQLAlchemyError
 
 from theo.application.embeddings import EmbeddingRebuildResult
-from theo.checkpoints import CURRENT_EMBEDDING_CHECKPOINT_VERSION
+from theo.checkpoints import CURRENT_EMBEDDING_CHECKPOINT_VERSION, CheckpointValidationError
 from theo.commands import embedding_rebuild
 from theo.commands.embedding_rebuild import (
     _batched,
     _commit_with_retry,
     _load_ids,
     _normalise_timestamp,
-    _read_checkpoint,
     _write_checkpoint,
     rebuild_embeddings_cmd,
 )
@@ -144,11 +143,9 @@ def test_load_ids_strips_and_deduplicates(tmp_path: Path) -> None:
     assert _load_ids(ids_file) == ["a", "A", "b", "B"]
 
 
-def test_read_checkpoint_handles_missing(tmp_path: Path) -> None:
-    assert _read_checkpoint(tmp_path / "missing.json") is None
-
-
 def test_write_and_read_checkpoint_roundtrip(tmp_path: Path) -> None:
+    from theo.checkpoints import load_embedding_rebuild_checkpoint
+    
     checkpoint_path = tmp_path / "checkpoint.json"
     checkpoint = _write_checkpoint(
         checkpoint_path,
@@ -160,7 +157,7 @@ def test_write_and_read_checkpoint_roundtrip(tmp_path: Path) -> None:
     payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
     assert payload["version"] == CURRENT_EMBEDDING_CHECKPOINT_VERSION
     assert checkpoint.processed == 3
-    loaded = _read_checkpoint(checkpoint_path)
+    loaded = load_embedding_rebuild_checkpoint(checkpoint_path)
     assert loaded == checkpoint
 
 
@@ -313,9 +310,10 @@ def test_rebuild_embeddings_handles_service_failure(monkeypatch: pytest.MonkeyPa
     assert "boom" in result.output
 
 
-def test_rebuild_embeddings_invalid_checkpoint_resume(
+def test_rebuild_embeddings_invalid_checkpoint_resume_lenient_mode(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Test that invalid checkpoint in lenient mode (default) continues without error."""
     checkpoint = tmp_path / "checkpoint.json"
     checkpoint.write_text("not-json", encoding="utf-8")
 
@@ -339,5 +337,82 @@ def test_rebuild_embeddings_invalid_checkpoint_resume(
         rebuild_embeddings_cmd,
         ["--checkpoint-file", str(checkpoint), "--resume"],
     )
+    # In lenient mode (default), invalid checkpoint should be treated as missing
+    assert result.exit_code == 0
+    assert service.received_options is not None
+    assert service.received_options.skip_count == 0  # No checkpoint loaded
+
+
+def test_rebuild_embeddings_invalid_checkpoint_resume_strict_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Test that invalid checkpoint in strict mode fails with proper error."""
+    checkpoint = tmp_path / "checkpoint.json"
+    # Create an invalid checkpoint with swapped created_at/updated_at
+    invalid_checkpoint = {
+        "version": CURRENT_EMBEDDING_CHECKPOINT_VERSION,
+        "processed": 5,
+        "total": 10,
+        "last_id": "p5",
+        "metadata": {},
+        "created_at": "2024-01-01T12:00:00Z",
+        "updated_at": "2024-01-01T11:00:00Z",  # Earlier than created_at - invalid!
+    }
+    checkpoint.write_text(json.dumps(invalid_checkpoint), encoding="utf-8")
+
+    service = _RecordingService(
+        EmbeddingRebuildResult(processed=0, total=0, duration=0.1, missing_ids=[], metadata={})
+    )
+    registry = _StubRegistry(service, engine=object())
+    monkeypatch.setattr(
+        embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
+    )
+    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", lambda: _StubEmbeddingService())
+    monkeypatch.setattr(
+        embedding_rebuild.EmbeddingRebuildConfig,
+        "for_mode",
+        classmethod(lambda cls, fast: _StubConfig(batch_size=8)),
+    )
+    embedding_rebuild._TELEMETRY_READY = True
+
+    runner = CliRunner()
+    result = runner.invoke(
+        rebuild_embeddings_cmd,
+        ["--checkpoint-file", str(checkpoint), "--resume", "--strict-checkpoint"],
+    )
+    # In strict mode, should fail with validation error
     assert result.exit_code == 1
-    assert "contains invalid JSON" in result.output
+    assert "is invalid" in result.output
+    assert "updated_at cannot be earlier than created_at" in result.output
+
+
+def test_rebuild_embeddings_missing_checkpoint_strict_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Test that missing checkpoint in strict mode fails with proper error."""
+    checkpoint = tmp_path / "missing_checkpoint.json"
+    # Don't create the file
+
+    service = _RecordingService(
+        EmbeddingRebuildResult(processed=0, total=0, duration=0.1, missing_ids=[], metadata={})
+    )
+    registry = _StubRegistry(service, engine=object())
+    monkeypatch.setattr(
+        embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
+    )
+    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", lambda: _StubEmbeddingService())
+    monkeypatch.setattr(
+        embedding_rebuild.EmbeddingRebuildConfig,
+        "for_mode",
+        classmethod(lambda cls, fast: _StubConfig(batch_size=8)),
+    )
+    embedding_rebuild._TELEMETRY_READY = True
+
+    runner = CliRunner()
+    result = runner.invoke(
+        rebuild_embeddings_cmd,
+        ["--checkpoint-file", str(checkpoint), "--resume", "--strict-checkpoint"],
+    )
+    # In strict mode with missing file, should fail
+    assert result.exit_code == 1
+    assert "is missing but strict mode was enabled" in result.output
