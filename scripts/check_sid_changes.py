@@ -95,6 +95,10 @@ def determine_base_revision(user_base: str | None, head: str) -> str | None:
         if ref_exists(candidate):
             return candidate
 
+    for candidate in ("origin/main", "origin/master", "main", "master"):
+        if ref_exists(candidate):
+            return candidate
+
     try:
         parent = run_git_command(["rev-parse", f"{head}^"]).strip()
     except EvidenceCardCheckError:
