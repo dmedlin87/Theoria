@@ -83,13 +83,21 @@ class KafkaEventPublisher(EventPublisher):
                 self._message_count += 1
                 current_time = time.time()
                 time_since_flush = current_time - self._last_flush
-                
+
                 should_flush = (
                     self._message_count >= self._batch_size or
                     time_since_flush >= self._flush_interval
                 )
-                
-                if should_flush and self._flush_timeout is not None:
+
+                if should_flush:
+                    timeout = self._flush_timeout if self._flush_timeout is not None else 30.0
+                    self._producer.flush(timeout)
+                    self._message_count = 0
+                    self._last_flush = current_time
+                elif self._flush_timeout is not None:
+                    # Preserve legacy synchronous semantics for single publishes so callers
+                    # relying on flush_timeout continue to have their messages delivered
+                    # immediately, even when batching would otherwise defer the flush.
                     self._producer.flush(self._flush_timeout)
                     self._message_count = 0
                     self._last_flush = current_time
