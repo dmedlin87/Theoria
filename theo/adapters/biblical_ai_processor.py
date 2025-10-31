@@ -44,6 +44,28 @@ def _validate_chat_completions_client(ai_client: Any) -> None:
         )
 
 
+def _safe_json_loads(content: str, max_size: int = 1024 * 1024) -> Any:
+    """Safely parse JSON with size limits to prevent DoS attacks.
+    
+    Args:
+        content: JSON string to parse
+        max_size: Maximum allowed size in bytes (default: 1MB)
+        
+    Returns:
+        Parsed JSON object, or None if parsing fails
+        
+    Raises:
+        ValueError: If content exceeds size limit
+    """
+    if len(content) > max_size:
+        raise ValueError(f"JSON content too large: {len(content)} bytes (max: {max_size})")
+    
+    try:
+        return json.loads(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 class BiblicalAIProcessor:
     """AI processor for biblical text analysis using OpenAI/Anthropic APIs."""
     
@@ -64,15 +86,13 @@ class BiblicalAIProcessor:
         # Step 3: AI semantic analysis
         semantic_analysis = self._analyze_semantics(text_content, morphology, reference)
         
-        # Step 4: Create AI metadata
+        # Step 4: Create AI metadata (using dynamic confidence based on results)
+        confidence_scores = self._calculate_confidence_scores(morphology, semantic_analysis)
+        
         ai_analysis = AIAnalysis(
             generated_at=datetime.utcnow(),
             model_version=self.model_name,
-            confidence_scores={
-                "morphology": 0.92,
-                "semantics": 0.88,
-                "theological_significance": 0.85
-            }
+            confidence_scores=confidence_scores
         )
         
         return BiblicalVerse(
@@ -83,6 +103,37 @@ class BiblicalAIProcessor:
             semantic_analysis=semantic_analysis,
             ai_analysis=ai_analysis
         )
+    
+    def _calculate_confidence_scores(self, morphology: List[MorphologicalTag], 
+                                   semantic_analysis: SemanticAnalysis) -> Dict[str, float]:
+        """Calculate realistic confidence scores based on analysis results."""
+        
+        # Base confidence on actual content quality
+        morphology_confidence = 0.75  # Conservative baseline
+        if morphology:
+            # Higher confidence if we have detailed morphological data
+            has_detailed_tags = sum(1 for tag in morphology 
+                                  if tag.lemma and tag.root and tag.gloss)
+            morphology_confidence = min(0.95, 0.60 + (has_detailed_tags / len(morphology)) * 0.35)
+        
+        semantics_confidence = 0.70  # Conservative baseline
+        if semantic_analysis.themes or semantic_analysis.theological_keywords:
+            # Higher confidence if we found theological content
+            theme_count = len(semantic_analysis.themes)
+            keyword_count = len(semantic_analysis.theological_keywords)
+            content_richness = min(1.0, (theme_count + keyword_count) / 10)
+            semantics_confidence = 0.60 + content_richness * 0.30
+        
+        theological_confidence = 0.65  # Most conservative
+        if semantic_analysis.cross_references or semantic_analysis.textual_variants:
+            # Boost confidence if we have cross-references or variants
+            theological_confidence = min(0.85, theological_confidence + 0.15)
+            
+        return {
+            "morphology": round(morphology_confidence, 2),
+            "semantics": round(semantics_confidence, 2),
+            "theological_significance": round(theological_confidence, 2)
+        }
     
     def _normalize_hebrew_text(self, raw_text: str) -> TextContent:
         """Normalize Hebrew text and generate transliteration."""
@@ -106,7 +157,7 @@ class BiblicalAIProcessor:
         return re.sub(diacritics_pattern, '', text)
     
     def _generate_transliteration(self, hebrew_text: str) -> str:
-        """Generate transliteration using AI."""
+        """Generate transliteration using AI with proper error handling."""
         
         prompt = f"""
 Transliterate this Hebrew text into Latin characters following academic standards:
@@ -116,13 +167,16 @@ Hebrew: {hebrew_text}
 Provide only the transliteration, no explanations.
 """
         
-        response = self.ai_client.chat.completions.create(
-            model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
-        )
-        
-        return response.choices[0].message.content.strip()
+        try:
+            response = self.ai_client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1
+            )
+            return response.choices[0].message.content.strip()
+        except Exception:
+            # Fallback to basic transliteration if AI fails
+            return "[transliteration unavailable]"
     
     def _analyze_hebrew_morphology(self, hebrew_text: str) -> List[MorphologicalTag]:
         """Perform AI-powered morphological analysis of Hebrew text."""
@@ -138,16 +192,20 @@ Hebrew: {hebrew_text}
 Respond in JSON array format.
 """
         
-        response = self.ai_client.chat.completions.create(
-            model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
-        )
-        
         try:
-            morphology_data = json.loads(response.choices[0].message.content)
-        except json.JSONDecodeError:
-            return []
+            response = self.ai_client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1
+            )
+            
+            # Use safe JSON parsing with size limits
+            morphology_data = _safe_json_loads(
+                response.choices[0].message.content,
+                max_size=512 * 1024  # 512KB limit for morphology data
+            )
+        except Exception:
+            return []  # Return empty list on any error
 
         if not isinstance(morphology_data, list):
             return []
@@ -218,21 +276,20 @@ Morphology: {morphology_summary}
 Provide JSON with: themes, theological_keywords, cross_references, textual_variants, translation_notes
 """
         
-        response = self.ai_client.chat.completions.create(
-            model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2
-        )
-        
         try:
-            raw_semantic_data = json.loads(response.choices[0].message.content)
-        except json.JSONDecodeError:
-            return SemanticAnalysis(
-                themes=[],
-                theological_keywords=[],
-                cross_references=[],
-                textual_variants=[]
+            response = self.ai_client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2
             )
+            
+            # Use safe JSON parsing with size limits
+            raw_semantic_data = _safe_json_loads(
+                response.choices[0].message.content,
+                max_size=256 * 1024  # 256KB limit for semantic data
+            )
+        except Exception:
+            raw_semantic_data = None
 
         if not isinstance(raw_semantic_data, dict):
             return SemanticAnalysis(
@@ -255,14 +312,26 @@ Provide JSON with: themes, theological_keywords, cross_references, textual_varia
         """Return a list of strings, discarding malformed AI payloads."""
         if not isinstance(candidate, list):
             return []
-        return [str(item) for item in candidate if isinstance(item, str)]
+        # Limit list size and string length to prevent abuse
+        safe_list = []
+        for item in candidate[:50]:  # Max 50 items
+            if isinstance(item, str) and len(item) <= 500:  # Max 500 chars per item
+                safe_list.append(item)
+        return safe_list
 
     @staticmethod
     def _safe_dict(candidate: Optional[Dict]) -> Dict:
-        """Ensure translation notes are a dictionary."""
+        """Ensure translation notes are a safe dictionary."""
         if not isinstance(candidate, dict):
             return {}
-        return candidate
+        
+        # Limit dictionary size and key/value lengths
+        safe_dict = {}
+        for key, value in list(candidate.items())[:20]:  # Max 20 entries
+            if isinstance(key, str) and len(key) <= 100:  # Max 100 chars for keys
+                if isinstance(value, str) and len(value) <= 1000:  # Max 1000 chars for values
+                    safe_dict[key] = value
+        return safe_dict
 
 
 class CrossLanguageComparator:
@@ -288,16 +357,21 @@ Analyze translation differences, theological implications, semantic shifts.
 Provide JSON analysis.
 """
         
-        response = self.ai_client.chat.completions.create(
-            model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2
-        )
-        
         try:
-            return json.loads(response.choices[0].message.content)
-        except json.JSONDecodeError:
-            return {"error": "Failed to parse AI response"}
+            response = self.ai_client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2
+            )
+            
+            # Use safe JSON parsing with size limits
+            result = _safe_json_loads(
+                response.choices[0].message.content,
+                max_size=128 * 1024  # 128KB limit for comparison data
+            )
+            return result if isinstance(result, dict) else {"error": "Failed to parse AI response"}
+        except Exception as exc:
+            return {"error": f"Analysis failed: {str(exc)}"}
 
 
 class TheologicalDebateAnalyzer:
@@ -326,13 +400,18 @@ historical interpretation, modern consensus, counter-arguments.
 Provide comprehensive JSON analysis.
 """
         
-        response = self.ai_client.chat.completions.create(
-            model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
-        )
-        
         try:
-            return json.loads(response.choices[0].message.content)
-        except json.JSONDecodeError:
-            return {"error": "Failed to parse AI response"}
+            response = self.ai_client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1
+            )
+            
+            # Use safe JSON parsing with size limits
+            result = _safe_json_loads(
+                response.choices[0].message.content,
+                max_size=256 * 1024  # 256KB limit for theological analysis
+            )
+            return result if isinstance(result, dict) else {"error": "Failed to parse AI response"}
+        except Exception as exc:
+            return {"error": f"Analysis failed: {str(exc)}"}
