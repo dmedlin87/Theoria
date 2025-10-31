@@ -52,6 +52,7 @@ class KafkaEventPublisher(EventPublisher):
         
         # State for batching
         self._message_count = 0
+        self._sync_flush_count = 0
         self._last_flush = time.time()
         self._lock = threading.Lock()
         self._closed = False
@@ -81,27 +82,39 @@ class KafkaEventPublisher(EventPublisher):
             # Intelligent flushing logic
             with self._lock:
                 self._message_count += 1
+                pending_messages = self._message_count - self._sync_flush_count
                 current_time = time.time()
                 time_since_flush = current_time - self._last_flush
 
                 should_flush = (
-                    self._message_count >= self._batch_size or
-                    time_since_flush >= self._flush_interval
+                    (
+                        self._message_count >= self._batch_size and
+                        pending_messages > 0
+                    )
+                    or (
+                        pending_messages > 0 and
+                        time_since_flush >= self._flush_interval
+                    )
                 )
 
                 if should_flush:
                     timeout = self._flush_timeout if self._flush_timeout is not None else 30.0
                     self._producer.flush(timeout)
                     self._message_count = 0
+                    self._sync_flush_count = 0
                     self._last_flush = current_time
-                elif self._flush_timeout is not None:
+                elif (
+                    self._flush_timeout is not None
+                    and pending_messages == 1
+                    and self._sync_flush_count == 0
+                ):
                     # Preserve legacy synchronous semantics for single publishes so callers
                     # relying on flush_timeout continue to have their messages delivered
                     # immediately, even when batching would otherwise defer the flush.
                     self._producer.flush(self._flush_timeout)
-                    self._message_count = 0
+                    self._sync_flush_count = self._message_count
                     self._last_flush = current_time
-                    
+
         except Exception as exc:  # pragma: no cover - logging for observability
             LOGGER.exception("Failed to publish Kafka event")
             raise
@@ -116,6 +129,7 @@ class KafkaEventPublisher(EventPublisher):
             self._producer.flush(timeout)
             with self._lock:
                 self._message_count = 0
+                self._sync_flush_count = 0
                 self._last_flush = time.time()
         except Exception as exc:
             LOGGER.warning("Failed to flush Kafka producer: %s", exc)

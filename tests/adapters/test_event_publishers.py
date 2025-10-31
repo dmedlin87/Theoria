@@ -72,6 +72,61 @@ def test_kafka_event_publisher_uses_factory() -> None:
     assert producer.flushes == [sink.flush_timeout_seconds]
 
 
+def test_kafka_event_publisher_batches_with_flush_timeout() -> None:
+    sink = KafkaEventSink(
+        topic="batched",
+        bootstrap_servers="kafka:9092",
+        producer_config={},
+        flush_timeout_seconds=0.5,
+    )
+
+    class _Producer:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+            self.polls: list[float] = []
+            self.flushes: list[float] = []
+
+        def produce(self, *, topic: str, value: bytes, key=None, headers=None) -> None:
+            self.calls.append(
+                {
+                    "topic": topic,
+                    "value": value,
+                    "key": key,
+                    "headers": headers,
+                }
+            )
+
+        def poll(self, timeout: float) -> None:
+            self.polls.append(timeout)
+
+        def flush(self, timeout: float) -> int:
+            self.flushes.append(timeout)
+            return 0
+
+    producer = _Producer()
+
+    def factory(options: dict[str, object]) -> _Producer:
+        return producer
+
+    publisher = KafkaEventPublisher(
+        sink,
+        producer_factory=factory,
+        batch_size=3,
+        flush_interval_seconds=60.0,
+    )
+
+    event = DomainEvent(type="batched", payload={"id": "1"})
+
+    publisher.publish(event)
+    assert producer.flushes == [sink.flush_timeout_seconds]
+
+    publisher.publish(event)
+    assert producer.flushes == [sink.flush_timeout_seconds]
+
+    publisher.publish(event)
+    assert producer.flushes == [sink.flush_timeout_seconds, sink.flush_timeout_seconds]
+
+
 def test_redis_stream_event_publisher_appends_messages() -> None:
     sink = RedisStreamEventSink(stream="events", redis_url="redis://redis:6379/0", maxlen=100)
 
