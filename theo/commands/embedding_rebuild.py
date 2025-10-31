@@ -187,9 +187,19 @@ def _execute_with_retry(
             return session.execute(stmt)
         except SQLAlchemyError as exc:
             _LOGGER.warning(
-                "Database query failed on attempt %d/%d: %s", 
+                "Database query failed on attempt %d/%d: %s",
                 attempt, max_attempts, exc
             )
+            try:
+                session.rollback()
+            except SQLAlchemyError as rollback_exc:  # pragma: no cover - defensive
+                _LOGGER.error(
+                    "Failed to rollback session after query error: %s",
+                    rollback_exc,
+                )
+                raise click.ClickException(
+                    "Database session rollback failed after query error"
+                ) from rollback_exc
             if attempt == max_attempts:
                 raise click.ClickException(
                     f"Database query failed after {max_attempts} attempt(s): {exc}"
