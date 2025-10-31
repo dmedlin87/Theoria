@@ -66,6 +66,8 @@ def _render_graphviz(graph: dict[str, object]) -> str:
                 lines.append(f'  "{osis}" -> "{sid}";')
     lines.append("}")
     return "\n".join(lines) + "\n"
+
+
 CARDS_DIRECTORY = Path("evidence/cards")
 REGISTRY_DIRECTORY = Path("evidence/registry")
 DEFAULT_SQLITE_PATH = REGISTRY_DIRECTORY / "evidence.index.sqlite"
@@ -162,13 +164,6 @@ def promote_command(
 
 @cli.command("dossier")
 @click.argument("paths", nargs=-1, type=click.Path(path_type=Path))
-@click.option("--graph", "render_graph", is_flag=True, help="Emit a JSON graph of OSIS to evidence")
-@click.option("--out", "output_path", type=click.Path(path_type=Path), help="Write the dossier to a file")
-@click.option("--base-path", type=click.Path(path_type=Path), default=Path.cwd())
-def dossier_command(
-    paths: tuple[Path, ...],
-    render_graph: bool,
-    output_path: Path | None,
 @click.option("--out", "out_path", type=click.Path(path_type=Path))
 @click.option("--tags", "tags", multiple=True, help="Filter dossier records by tag")
 @click.option(
@@ -198,33 +193,6 @@ def dossier_command(
 
     validator = EvidenceValidator(base_path=base_path)
     dossier = EvidenceDossier(validator)
-    if render_graph:
-        graph = dossier.build_graph(paths)
-        if output_path:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            if output_path.suffix.lower() == ".dot":
-                output_path.write_text(_render_graphviz(graph), encoding="utf-8")
-            else:
-                output_path.write_text(
-                    json.dumps(graph, indent=2, ensure_ascii=False) + "\n",
-                    encoding="utf-8",
-                )
-        else:
-            click.echo(json.dumps(graph, indent=2))
-    else:
-        collection = validator.validate_many(paths)
-        payload = [record.model_dump(mode="json") for record in collection.records]
-        if output_path:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            if output_path.suffix.lower() in {".md", ".markdown"}:
-                output_path.write_text(_render_markdown(payload), encoding="utf-8")
-            else:
-                output_path.write_text(
-                    json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-                    encoding="utf-8",
-                )
-        else:
-            click.echo(json.dumps(payload, indent=2))
     targets = paths if paths else (CARDS_DIRECTORY,)
 
     tag_filters = _coerce_tags(tags)

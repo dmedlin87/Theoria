@@ -218,17 +218,74 @@ def _parse_key_excerpts(block: str) -> list[dict[str, str]]:
         if not line.startswith("-"):
             continue
         content = line[1:].strip()
-        if "—" in content:
-            reference, snippet = content.split("—", 1)
-        elif "-" in content:
-            reference, snippet = content.split("-", 1)
+        separator_match = None
+        for candidate in re.finditer(r"\s[-–—]\s", content):
+            left = content[: candidate.start()].rstrip()
+            right = content[candidate.end() :].lstrip()
+            if _looks_like_range_boundary(left, right):
+                continue
+            separator_match = candidate
+            break
+        if separator_match:
+            reference = content[: separator_match.start()].strip()
+            snippet = content[separator_match.end() :].strip()
         else:
             reference, snippet = content, ""
+            for separator in ("—", "–"):
+                if separator in content:
+                    reference, snippet = content.split(separator, 1)
+                    reference = reference.strip()
+                    snippet = snippet.strip()
+                    break
+            if not snippet:
+                hyphen_index = content.rfind(" - ")
+                if hyphen_index != -1:
+                    candidate_reference = content[:hyphen_index].rstrip()
+                    candidate_snippet = content[hyphen_index + 3 :].lstrip()
+                    if candidate_snippet and not _RANGE_ONLY_SEGMENT.fullmatch(candidate_snippet):
+                        reference, snippet = candidate_reference, candidate_snippet
         excerpts.append({
             "reference": reference.strip(),
             "snippet": snippet.strip(),
         })
     return excerpts
+
+
+def _looks_like_range_boundary(left: str, right: str) -> bool:
+    """Return ``True`` when a spaced dash likely separates a verse range."""
+
+    if not left or not right:
+        return False
+
+    if not _RANGE_LEFT_SUFFIX.search(left):
+        return False
+
+    return bool(_RANGE_RIGHT_PREFIX.match(right))
+
+
+_RANGE_LEFT_SUFFIX = re.compile(r"(?:\d+[:\.]?\d*[a-z]?|\d+[a-z]?)\s*$", re.IGNORECASE)
+
+
+_RANGE_RIGHT_PREFIX = re.compile(
+    r"""
+    ^
+    (?:
+        (?:[1-3]\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+
+    )?
+    \d+(?::\d+)?[a-z]?
+    """,
+    re.VERBOSE,
+)
+
+
+_RANGE_ONLY_SEGMENT = re.compile(
+    r"""
+    \d+(?::\d+)?[a-z]?
+    (?:\s*[-–—]\s*\d+(?::\d+)?[a-z]?)*
+    \s*
+    """,
+    re.VERBOSE,
+)
 
 
 def _parse_source_table(block: str) -> list[dict[str, str]]:
