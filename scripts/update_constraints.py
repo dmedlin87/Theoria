@@ -58,13 +58,8 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
         cmd.extend(["--index-strategy", "unsafe-best-match"])
         cmd.extend(["--index-url", CPU_TORCH_INDEX])
         cmd.extend(["--extra-index-url", DEFAULT_PYPI_INDEX])
-        # Add index strategy to allow searching across multiple indexes
-        cmd.extend(["--index-strategy", "unsafe-best-match"])
-
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     return destination
-        # Add index strategy to allow searching across multiple indexes
-        cmd.extend(["--index-strategy", "unsafe-best-match"])
 
 def check_constraints() -> bool:
     ok = True
