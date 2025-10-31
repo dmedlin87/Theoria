@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable
+import statistics
 
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, joinedload
@@ -22,6 +23,28 @@ class ToolUsageMetric:
     trail_count: int
     tokens_in: int
     tokens_out: int
+
+
+@dataclass(frozen=True)
+class LatencyPercentileMetric:
+    """Percentile buckets for tool execution latency analysis."""
+    
+    tool: str
+    p50: float
+    p75: float
+    p90: float
+    p95: float
+    p99: float
+
+
+@dataclass(frozen=True)
+class TokenEfficiencyMetric:
+    """Token efficiency metrics per tool."""
+    
+    tool: str
+    tokens_in_per_step: float
+    tokens_out_per_step: float
+    efficiency_ratio: float  # tokens_out / tokens_in
 
 
 @dataclass(frozen=True)
@@ -44,6 +67,8 @@ class AgentEvaluationReport:
     average_llm_tokens_in: float
     average_llm_tokens_out: float
     tool_usage: list[ToolUsageMetric]
+    latency_percentiles: list[LatencyPercentileMetric]
+    token_efficiency: list[TokenEfficiencyMetric]
 
 
 def _build_trail_query(
@@ -200,6 +225,77 @@ def _compute_tool_metrics(
     }
 
 
+def _compute_latency_percentiles(
+    trails: list[AgentTrail],
+) -> list[LatencyPercentileMetric]:
+    """Calculate percentile buckets for tool execution latency."""
+    tool_latencies: defaultdict[str, list[float]] = defaultdict(list)
+    
+    for trail in trails:
+        for step in trail.steps:
+            if step.created_at and step.completed_at:
+                latency_ms = (step.completed_at - step.created_at).total_seconds() * 1000
+                tool_latencies[step.tool].append(latency_ms)
+    
+    percentiles = []
+    for tool, latencies in sorted(tool_latencies.items()):
+        if len(latencies) < 2:  # Need at least 2 samples for meaningful percentiles
+            continue
+            
+        sorted_latencies = sorted(latencies)
+        
+        # Safe percentile calculations with fallbacks for small datasets
+        p50 = statistics.quantiles(sorted_latencies, n=2)[0] if len(sorted_latencies) >= 2 else 0.0
+        p75 = statistics.quantiles(sorted_latencies, n=4)[2] if len(sorted_latencies) >= 4 else p50
+        p90 = statistics.quantiles(sorted_latencies, n=10)[8] if len(sorted_latencies) >= 10 else p75
+        p95 = statistics.quantiles(sorted_latencies, n=20)[18] if len(sorted_latencies) >= 20 else p90
+        p99 = statistics.quantiles(sorted_latencies, n=100)[98] if len(sorted_latencies) >= 100 else p95
+        
+        percentiles.append(LatencyPercentileMetric(
+            tool=tool,
+            p50=p50,
+            p75=p75,
+            p90=p90,
+            p95=p95,
+            p99=p99,
+        ))
+    
+    return percentiles
+
+
+def _compute_token_efficiency(
+    trails: list[AgentTrail],
+) -> list[TokenEfficiencyMetric]:
+    """Calculate token efficiency metrics per tool."""
+    tool_stats: defaultdict[str, dict] = defaultdict(lambda: {"steps": 0, "tokens_in": 0, "tokens_out": 0})
+    
+    for trail in trails:
+        for step in trail.steps:
+            tool_stats[step.tool]["steps"] += 1
+            if step.tokens_in is not None:
+                tool_stats[step.tool]["tokens_in"] += step.tokens_in
+            if step.tokens_out is not None:
+                tool_stats[step.tool]["tokens_out"] += step.tokens_out
+    
+    efficiency_metrics = []
+    for tool, stats in sorted(tool_stats.items()):
+        if stats["steps"] == 0:
+            continue
+            
+        tokens_in_per_step = stats["tokens_in"] / stats["steps"]
+        tokens_out_per_step = stats["tokens_out"] / stats["steps"]
+        efficiency_ratio = tokens_out_per_step / tokens_in_per_step if tokens_in_per_step > 0 else 0.0
+        
+        efficiency_metrics.append(TokenEfficiencyMetric(
+            tool=tool,
+            tokens_in_per_step=tokens_in_per_step,
+            tokens_out_per_step=tokens_out_per_step,
+            efficiency_ratio=efficiency_ratio,
+        ))
+    
+    return efficiency_metrics
+
+
 def _empty_report() -> AgentEvaluationReport:
     """Return a report with zeroed metrics."""
 
@@ -220,6 +316,8 @@ def _empty_report() -> AgentEvaluationReport:
         average_llm_tokens_in=0.0,
         average_llm_tokens_out=0.0,
         tool_usage=[],
+        latency_percentiles=[],
+        token_efficiency=[],
     )
 
 
@@ -243,11 +341,15 @@ def evaluate_agent_trails(
     completion_metrics = _compute_completion_metrics(trails)
     retrieval_metrics = _compute_retrieval_metrics(trails)
     tool_metrics = _compute_tool_metrics(trails)
+    latency_metrics = _compute_latency_percentiles(trails)
+    efficiency_metrics = _compute_token_efficiency(trails)
 
     return AgentEvaluationReport(
         **completion_metrics,
         **retrieval_metrics,
         **tool_metrics,
+        latency_percentiles=latency_metrics,
+        token_efficiency=efficiency_metrics,
     )
 
 

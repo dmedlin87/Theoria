@@ -122,10 +122,18 @@ def apply_guardrail_profile(
 ) -> tuple[list[HybridSearchResult], dict[str, str] | None]:
     ordered = list(results)
     if not filters:
+        LOGGER.debug(
+            "guardrail profile bypassed - no filters provided",
+            extra={
+                "total_results": len(ordered),
+                "filters_applied": False,
+            },
+        )
         return ordered, None
 
     tradition_filter = _normalise_profile_value(filters.theological_tradition)
     domain_filter = _normalise_profile_value(filters.topic_domain)
+    
     if not tradition_filter and not domain_filter:
         payload = {
             key: value
@@ -135,13 +143,46 @@ def apply_guardrail_profile(
             }.items()
             if value
         }
+        LOGGER.debug(
+            "guardrail profile bypassed - no valid filter values",
+            extra={
+                "total_results": len(ordered),
+                "filters_applied": False,
+                "raw_tradition_filter": filters.theological_tradition,
+                "raw_domain_filter": filters.topic_domain,
+            },
+        )
         return ordered, payload or None
+
+    # Enhanced telemetry: log filtering start state
+    LOGGER.info(
+        "guardrail profile filtering started",
+        extra={
+            "total_results": len(ordered),
+            "filters_applied": True,
+            "tradition_filter": tradition_filter,
+            "domain_filter": domain_filter,
+            "passage_ids_sample": [result.id for result in ordered[:3]],
+            "total_passage_count": len(ordered),
+        },
+    )
 
     matched: list[HybridSearchResult] = []
     remainder: list[HybridSearchResult] = []
+    missing_metadata_count = 0
+    tradition_mismatch_count = 0
+    domain_mismatch_count = 0
+    
     for result in ordered:
         meta = getattr(result, "meta", None)
         meta_mapping: Mapping[str, Any] | None = meta if isinstance(meta, Mapping) else None
+        
+        # Track missing metadata
+        if not meta_mapping:
+            missing_metadata_count += 1
+            remainder.append(result)
+            continue
+            
         meta_tradition = (
             _normalise_profile_value(str(meta_mapping.get("theological_tradition")))
             if meta_mapping and meta_mapping.get("theological_tradition") is not None
@@ -152,22 +193,60 @@ def apply_guardrail_profile(
         matches_tradition = True
         if tradition_filter:
             matches_tradition = meta_tradition == tradition_filter
+            if not matches_tradition:
+                tradition_mismatch_count += 1
 
         matches_domain = True
         if domain_filter:
             matches_domain = domain_filter in domains
+            if not matches_domain:
+                domain_mismatch_count += 1
 
         if matches_tradition and matches_domain:
             matched.append(result)
         else:
             remainder.append(result)
 
+    # Enhanced telemetry: log filtering results
+    match_percentage = (len(matched) / len(ordered) * 100) if ordered else 0
+    LOGGER.info(
+        "guardrail profile filtering completed",
+        extra={
+            "total_results": len(ordered),
+            "matched_count": len(matched),
+            "remainder_count": len(remainder),
+            "match_percentage": round(match_percentage, 1),
+            "missing_metadata_count": missing_metadata_count,
+            "tradition_mismatch_count": tradition_mismatch_count,
+            "domain_mismatch_count": domain_mismatch_count,
+            "tradition_filter": tradition_filter,
+            "domain_filter": domain_filter,
+        },
+    )
+    
+    # Debug-level detailed passage tracking
+    LOGGER.debug(
+        "guardrail profile filtering detailed results",
+        extra={
+            "matched_passage_ids": [result.id for result in matched],
+            "remainder_passage_ids": [result.id for result in remainder],
+        },
+    )
+
     if not matched:
         LOGGER.warning(
-            "guardrail profile rejected retrieved passages",
+            "guardrail profile rejected retrieved passages - no matches found",
             extra={
+                "total_results": len(ordered),
+                "matched_count": 0,
+                "match_percentage": 0.0,
+                "missing_metadata_count": missing_metadata_count,
+                "tradition_mismatch_count": tradition_mismatch_count,
+                "domain_mismatch_count": domain_mismatch_count,
                 "theological_tradition": filters.theological_tradition,
                 "topic_domain": filters.topic_domain,
+                "passage_ids_sample": [result.id for result in ordered[:3]],
+                "total_passage_count": len(ordered),
             },
         )
         raise GuardrailError(
@@ -177,6 +256,16 @@ def apply_guardrail_profile(
                 "code": "guardrail_profile_no_match",
                 "guardrail": "retrieval",
                 "suggested_action": "search",
+                "total_results": len(ordered),
+                "matched_count": 0,
+                "match_percentage": 0.0,
+                "missing_metadata_count": missing_metadata_count,
+                "tradition_mismatch_count": tradition_mismatch_count,
+                "domain_mismatch_count": domain_mismatch_count,
+                "theological_tradition": filters.theological_tradition,
+                "topic_domain": filters.topic_domain,
+                "passage_ids_sample": [result.id for result in ordered[:3]],
+                "total_passage_count": len(ordered),
             },
         )
 
@@ -188,6 +277,21 @@ def apply_guardrail_profile(
         }.items()
         if value
     }
+    
+    # Enhanced telemetry: log successful filtering
+    LOGGER.info(
+        "guardrail profile filtering successful",
+        extra={
+            "total_results": len(ordered),
+            "matched_count": len(matched),
+            "remainder_count": len(remainder),
+            "match_percentage": round(match_percentage, 1),
+            "tradition_filter": tradition_filter,
+            "domain_filter": domain_filter,
+            "payload": payload,
+        },
+    )
+    
     return matched + remainder, payload or None
 
 
@@ -376,52 +480,85 @@ def build_retrieval_digest(results: Sequence[HybridSearchResult]) -> str:
     return digest.hexdigest()
 
 
+def _normalise_citation_value(value: str) -> str:
+    """Normalize citation values for robust comparison."""
+    if not value:
+        return ""
+    # Remove surrounding punctuation but preserve internal structure
+    normalized = re.sub(r"^[^\w\d.]+|[^\w\d.]+$", "", value.strip())
+    # Normalize multiple spaces to single space, but preserve dots in OSIS refs
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.lower()
+
+
 def validate_model_completion(
     completion: str,
     citations: Sequence[RAGCitation],
 ) -> dict[str, Any]:
+    """Validate model completion and return structured decision reasons."""
+    
     if not completion or not completion.strip():
-        raise GuardrailError(
-            "Model completion was empty",
-            metadata={
-                "code": "generation_empty_completion",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
+        return {
+            "status": "failed",
+            "decision_reason": "empty_completion",
+            "decision_message": "Model completion was empty",
+            "suggested_action": "search",
+            "cited_indices": [],
+            "citation_count": 0,
+            "sources": [],
+        }
+
+    # Check for extra text before Sources line
+    sources_marker_match = re.search(r"sources:\s*$", completion, re.IGNORECASE | re.MULTILINE)
+    if not sources_marker_match:
+        return {
+            "status": "failed",
+            "decision_reason": "missing_sources_line",
+            "decision_message": "Model completion missing 'Sources:' line",
+            "suggested_action": "search",
+            "cited_indices": [],
+            "citation_count": 0,
+            "sources": [],
+        }
+
+    # Verify Sources line is near the end (allow trailing whitespace/newlines)
+    sources_line_index = sources_marker_match.start()
+    content_after_sources = completion[sources_line_index + len(sources_marker_match.group(0)):].strip()
+    if content_after_sources and not re.match(r"^\s*(?:\[\d+\]|Here are|Sources:)", content_after_sources, re.IGNORECASE):
+        return {
+            "status": "failed",
+            "decision_reason": "extra_content_after_sources",
+            "decision_message": "Extra content found after 'Sources:' line before citations",
+            "suggested_action": "search",
+            "cited_indices": [],
+            "citation_count": 0,
+            "sources": [],
+        }
 
     marker_index = completion.lower().rfind("sources:")
-    if marker_index == -1:
-        raise GuardrailError(
-            "Model completion missing 'Sources:' line",
-            metadata={
-                "code": "generation_missing_sources_line",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
-
-    sources_text = completion[marker_index + len("Sources:") :].strip()
+    sources_text = completion[marker_index + len("Sources:"):].strip()
     if not sources_text:
-        raise GuardrailError(
-            "Model completion missing citations after 'Sources:'",
-            metadata={
-                "code": "generation_missing_citations",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
+        return {
+            "status": "failed",
+            "decision_reason": "missing_citations",
+            "decision_message": "Model completion missing citations after 'Sources:'",
+            "suggested_action": "search",
+            "cited_indices": [],
+            "citation_count": 0,
+            "sources": [],
+        }
 
     entries = [entry.strip() for entry in re.split(r";|\n", sources_text) if entry.strip()]
     if not entries:
-        raise GuardrailError(
-            "Model completion missing citations after 'Sources:'",
-            metadata={
-                "code": "generation_missing_citations",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
-        )
+        return {
+            "status": "failed",
+            "decision_reason": "missing_citations",
+            "decision_message": "Model completion missing citations after 'Sources:'",
+            "suggested_action": "search",
+            "cited_indices": [],
+            "citation_count": 0,
+            "sources": [],
+        }
 
     expected = {citation.index: citation for citation in citations}
     mismatches: list[str] = []
@@ -437,8 +574,18 @@ def validate_model_completion(
         index = int(entry_match.group("index"))
         osis = entry_match.group("osis").strip()
         anchor = entry_match.group("anchor").strip()
+        
+        # Normalize values for comparison
+        normalized_osis = _normalise_citation_value(osis)
+        normalized_anchor = _normalise_citation_value(anchor)
+        
         parsed_entries.append({"index": index, "osis": osis, "anchor": anchor})
         cited_indices.append(index)
+
+        # Check for duplicate indices
+        if cited_indices.count(index) > 1:
+            mismatches.append(f"duplicate citation index {index}")
+            continue
 
         citation = expected.get(index)
         if citation is None:
@@ -446,42 +593,90 @@ def validate_model_completion(
                 f"citation index {index} not present in retrieved passages"
             )
             continue
-        if osis != citation.osis:
+            
+        # Compare normalized values
+        expected_osis = _normalise_citation_value(citation.osis)
+        expected_anchor = _normalise_citation_value(citation.anchor)
+        
+        if normalized_osis != expected_osis:
             mismatches.append(
-                f"citation [{index}] OSIS mismatch (expected {citation.osis}, got {osis})"
+                f"citation [{index}] OSIS mismatch (expected '{citation.osis}', got '{osis}')"
             )
-        if anchor != citation.anchor:
+        if normalized_anchor != expected_anchor:
             mismatches.append(
-                f"citation [{index}] anchor mismatch (expected {citation.anchor}, got {anchor})"
+                f"citation [{index}] anchor mismatch (expected '{citation.anchor}', got '{anchor}')"
             )
 
     if not cited_indices:
-        raise GuardrailError(
-            "Model completion did not include any recognised citations",
-            metadata={
-                "code": "generation_unrecognised_citations",
-                "guardrail": "generation",
-                "suggested_action": "search",
-            },
+        return {
+            "status": "failed",
+            "decision_reason": "unrecognised_citations",
+            "decision_message": "Model completion did not include any recognised citations",
+            "suggested_action": "search",
+            "cited_indices": [],
+            "citation_count": 0,
+            "sources": [],
+        }
+
+    # Check minimum coverage - require at least 1 citation or 50% of available (max 3)
+    min_required = min(max(1, len(citations) // 2), 3)
+    unique_cited = len(set(cited_indices))
+    if unique_cited < min_required:
+        mismatches.append(
+            f"insufficient citation coverage (cited {unique_cited}, required at least {min_required})"
         )
 
     if mismatches:
-        raise GuardrailError(
-            "Model citations failed guardrails: " + "; ".join(mismatches),
-            metadata={
-                "code": "generation_citation_mismatch",
-                "guardrail": "generation",
-                "suggested_action": "search",
-                "reason": "; ".join(mismatches),
+        return {
+            "status": "failed",
+            "decision_reason": "citation_mismatch",
+            "decision_message": "Model citations failed guardrails: " + "; ".join(mismatches),
+            "suggested_action": "search",
+            "cited_indices": sorted(set(cited_indices)),
+            "citation_count": len(parsed_entries),
+            "sources": parsed_entries,
+            "validation_details": {
+                "mismatches": mismatches,
+                "unique_cited": unique_cited,
+                "min_required": min_required,
+                "total_available": len(citations),
             },
-        )
+        }
 
     return {
         "status": "passed",
+        "decision_reason": "validation_successful",
+        "decision_message": "All guardrails passed successfully",
+        "suggested_action": None,
         "cited_indices": sorted(set(cited_indices)),
         "citation_count": len(parsed_entries),
         "sources": parsed_entries,
+        "validation_details": {
+            "unique_cited": unique_cited,
+            "min_required": min_required,
+            "total_available": len(citations),
+        },
     }
+
+
+def validate_model_completion_strict(
+    completion: str,
+    citations: Sequence[RAGCitation],
+) -> dict[str, Any]:
+    """Validate model completion and raise GuardrailError on failure for backward compatibility."""
+    result = validate_model_completion(completion, citations)
+    if result["status"] == "failed":
+        raise GuardrailError(
+            result["decision_message"],
+            metadata={
+                "code": f"generation_{result['decision_reason']}",
+                "guardrail": "generation",
+                "suggested_action": result["suggested_action"],
+                "reason": result["decision_message"],
+                "validation_details": result.get("validation_details"),
+            },
+        )
+    return result
 
 
 def ensure_completion_safe(completion: str | None) -> None:

@@ -21,7 +21,7 @@ from .guardrails import (
     ensure_completion_safe as _guardrails_ensure_completion_safe,
     load_guardrail_reference as _guardrails_load_guardrail_reference,
     load_passages_for_osis as _guardrails_load_passages_for_osis,
-    validate_model_completion as _guardrails_validate_model_completion,
+    validate_model_completion_strict as _guardrails_validate_model_completion_strict,
 )
 from .prompts import (
     sanitise_json_structure as _prompts_sanitize_json_structure,

@@ -31,6 +31,17 @@ class ToolResponseBase(BaseModel):
     )
 
 
+class ToolErrorEnvelope(BaseModel):
+    """Structured error response for deterministic client handling."""
+
+    status: Literal["error"] = Field(default="error", description="Error status indicator.")
+    error_code: str = Field(..., description="Machine-readable error code for client handling.")
+    error_message: str = Field(..., description="Human-readable error description.")
+    hint: str | None = Field(default=None, description="Optional hint for error resolution.")
+    request_id: str = Field(..., description="Echo of the originating request identifier.")
+    run_id: str = Field(..., description="Server generated identifier for the tool execution.")
+
+
 class SearchLibraryRequest(ToolRequestBase):
     """Search the Theo library for passages or documents."""
 

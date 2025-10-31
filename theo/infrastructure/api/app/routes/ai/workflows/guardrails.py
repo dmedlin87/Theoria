@@ -202,6 +202,24 @@ def guardrail_http_exception(
     detail_text = f"Guardrail refusal: {summary}"
     advisory_payload = advisory.model_dump(mode="json")
     advisory_payload.update({"type": "guardrail_refusal", "message": summary})
+    
+    # Extract validation details if available for richer error reporting
+    raw_metadata = getattr(exc, "metadata", None)
+    validation_details = None
+    if isinstance(raw_metadata, Mapping) and "validation_details" in raw_metadata:
+        validation_details = raw_metadata["validation_details"]
+        # Add specific guidance to advisory based on validation failure
+        if validation_details and "mismatches" in validation_details:
+            mismatches = validation_details["mismatches"]
+            if any("duplicate" in m.lower() for m in mismatches):
+                advisory_payload["specific_guidance"] = "Remove duplicate citation indices and ensure each source is cited only once."
+            elif any("coverage" in m.lower() for m in mismatches):
+                unique_cited = validation_details.get("unique_cited", 0)
+                min_required = validation_details.get("min_required", 2)
+                advisory_payload["specific_guidance"] = f"Cite at least {min_required} different sources (currently {unique_cited}). Include more references from the provided passages."
+            elif any("mismatch" in m.lower() for m in mismatches):
+                advisory_payload["specific_guidance"] = "Ensure citation format matches exactly: [index] OSIS (anchor). Check OSIS references and anchor text for accuracy."
+    
     detail_payload = {
         "type": advisory_payload.get("type"),
         "message": detail_text,
@@ -209,6 +227,11 @@ def guardrail_http_exception(
         "metadata": advisory_payload.get("metadata"),
         "suggestions": advisory_payload.get("suggestions") or [],
     }
+    
+    # Include validation details in response for debugging
+    if validation_details:
+        detail_payload["validation_details"] = validation_details
+    
     filters_payload = (
         failure_metadata.filters.model_dump(exclude_none=True)
         if failure_metadata.filters
@@ -224,7 +247,6 @@ def guardrail_http_exception(
         error_data["filters"] = filters_payload
     if failure_metadata.reason:
         error_data["reason"] = failure_metadata.reason
-    raw_metadata = getattr(exc, "metadata", None)
     if isinstance(raw_metadata, Mapping):
         error_data["metadata"] = dict(raw_metadata)
 

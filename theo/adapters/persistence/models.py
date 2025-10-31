@@ -1229,6 +1229,7 @@ class AgentStep(Base):
     input_payload: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
     output_payload: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
     output_digest: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_hash: Mapped[str | None] = mapped_column(String(16), nullable=True)
     tokens_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
