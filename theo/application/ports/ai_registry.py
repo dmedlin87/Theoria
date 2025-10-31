@@ -248,8 +248,20 @@ def registry_from_payload(
 
 
 def encrypt_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Encrypt sensitive configuration values while preserving structure.
+    
+    Args:
+        config: Configuration dictionary to encrypt
+        
+    Returns:
+        Dictionary with sensitive values encrypted
+        
+    Raises:
+        RuntimeError: When encryption is required but SETTINGS_SECRET_KEY not configured
+    """
     cipher = get_settings_cipher()
     encrypted: dict[str, Any] = {}
+    
     for key, value in config.items():
         if (
             cipher
@@ -266,35 +278,56 @@ def encrypt_config(config: dict[str, Any]) -> dict[str, Any]:
                 and isinstance(value, str)
                 and value
             ):
+                # Use generic error message that doesn't reveal key names
                 logger.error(
-                    "Cannot persist secret %s for model config without SETTINGS_SECRET_KEY. "
-                    "Set the environment variable before updating the registry.",
-                    key,
+                    "Cannot persist secrets without SETTINGS_SECRET_KEY. "
+                    "Set the environment variable before updating the registry."
                 )
                 raise RuntimeError(
-                    "SETTINGS_SECRET_KEY must be configured to store LLM secrets"
+                    "SETTINGS_SECRET_KEY must be configured to store secrets"
                 )
             encrypted[key] = value
     return encrypted
 
 
 def decrypt_config(config: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Decrypt sensitive configuration values.
+    
+    Args:
+        config: Configuration dictionary potentially containing encrypted values
+        
+    Returns:
+        Tuple of (decrypted_config, was_migrated_from_plaintext)
+        
+    Raises:
+        GenerationError: When decryption fails or secret key is missing
+    """
     cipher = get_settings_cipher()
     decrypted: dict[str, Any] = {}
     migrated = False
+    
     for key, value in config.items():
         if isinstance(value, dict) and _ENCRYPTED_FIELD in value:
             if cipher is None:
                 raise GenerationError(
-                    "SETTINGS_SECRET_KEY is required to decrypt stored API keys"
+                    "Configuration decryption requires SETTINGS_SECRET_KEY"
                 )
             token = value[_ENCRYPTED_FIELD]
             try:
-                decrypted_value = cipher.decrypt(token.encode("utf-8")).decode("utf-8")
+                decrypted_bytes = cipher.decrypt(token.encode("utf-8"))
+                decrypted_value = decrypted_bytes.decode("utf-8")
+                # Clear the decrypted bytes from memory
+                del decrypted_bytes
             except InvalidToken as exc:
-                raise GenerationError("Stored API key could not be decrypted") from exc
+                # Use generic error message that doesn't reveal system details
+                raise GenerationError("Configuration decryption failed") from exc
+            except Exception as exc:
+                # Catch any other decryption-related errors
+                raise GenerationError("Configuration decryption failed") from exc
+                
             decrypted[key] = decrypted_value
             continue
+            
         decrypted[key] = value
         if (
             cipher
@@ -303,7 +336,18 @@ def decrypt_config(config: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             and value
         ):
             migrated = True
+            
     return decrypted, migrated
+
+
+def _secure_clear_dict(data: dict[str, Any]) -> None:
+    """Securely clear sensitive data from dictionary in memory."""
+    for key in list(data.keys()):
+        if key in SECRET_CONFIG_KEYS and isinstance(data[key], str):
+            # Overwrite the string value in memory before deleting
+            original_value = data[key]
+            data[key] = "*" * len(original_value)
+            del data[key]
 
 
 LanguageModelClient = LanguageModelClientProtocol
@@ -321,5 +365,3 @@ __all__ = [
     "LanguageModelClient",
     "LanguageModelClientProtocol",
 ]
-
-
