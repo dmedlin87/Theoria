@@ -1,0 +1,6 @@
+# Guardrail version ranges to align with pyproject optional constraints.
+# These constraints are consumed alongside hashed lockfiles to avoid
+# introducing unhashed entries that break --require-hashes installs.
+click>=8.1,<9
+pydantic>=2.5,<3
+PyYAML>=6.0.1,<7

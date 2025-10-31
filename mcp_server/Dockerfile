@@ -20,8 +20,8 @@ COPY . /app
 ENV PYTHONPATH=/app
 
 RUN pip install --upgrade pip \
-    && pip install ".[api]" -c constraints/prod.txt \
-    && pip install ".[ml]" -c constraints/prod.txt
+    && pip install ".[api]" -c constraints/guardrails.txt -c constraints/prod.txt \
+    && pip install ".[ml]" -c constraints/guardrails.txt -c constraints/prod.txt
 
 ENV MCP_TOOLS_ENABLED=1 \
     MCP_HOST=0.0.0.0 \

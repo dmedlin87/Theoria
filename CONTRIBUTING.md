@@ -13,9 +13,9 @@ Thank you for investing time into Theoria! This guide captures the current devel
    ```bash
    python3.11 -m venv .venv
    source .venv/bin/activate
-   pip install ".[api]" -c constraints/prod.txt
-   pip install ".[ml]" -c constraints/prod.txt
-   pip install ".[dev]" -c constraints/dev.txt  # tooling (e.g., mypy) and stub packages
+   pip install ".[api]" -c constraints/guardrails.txt -c constraints/prod.txt
+   pip install ".[ml]" -c constraints/guardrails.txt -c constraints/prod.txt
+   pip install ".[dev]" -c constraints/guardrails.txt -c constraints/dev.txt  # tooling (e.g., mypy) and stub packages
 
 After editing dependency ranges in `pyproject.toml`, regenerate the constraint lockfiles via `python scripts/update_constraints.py` and commit the results. Use `python scripts/update_constraints.py --check` locally or in CI to ensure constraints stay in sync.
    ```

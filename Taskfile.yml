@@ -127,7 +127,7 @@ tasks:
     cmds:
       - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra base --extra api --extra ml \
           --pip-args "--index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple" \
-          --output-file constraints/prod.txt pyproject.toml
+          --constraint constraints/guardrails.txt --output-file constraints/prod.txt pyproject.toml
       - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra base --extra api --extra ml --extra dev \
           --pip-args "--index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple" \
-          --output-file constraints/dev.txt pyproject.toml
+          --constraint constraints/guardrails.txt --output-file constraints/dev.txt pyproject.toml
