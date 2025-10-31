@@ -81,9 +81,9 @@ GPU acceleration is optional. When available, configure the ML extras (see [`doc
    git clone https://github.com/dmedlin87/theoria.git
    cd theoria
    python -m venv .venv && source .venv/bin/activate
-   pip install ".[api]" -c constraints/prod.txt
-   pip install ".[ml]" -c constraints/prod.txt
-   pip install ".[dev]" -c constraints/dev.txt
+   pip install ".[api]" -c constraints/guardrails.txt -c constraints/prod.txt
+   pip install ".[ml]" -c constraints/guardrails.txt -c constraints/prod.txt
+   pip install ".[dev]" -c constraints/guardrails.txt -c constraints/dev.txt
 
 Regenerate these lockfiles after changing dependency ranges with:
 
@@ -192,7 +192,7 @@ Install the orchestration tooling with `brew install go-task/tap/go-task`, `scoo
 
 ### Dependency management
 - Python extras live in `pyproject.toml` (`base`, `api`, `ml`, `dev`) with corresponding lockfiles under `constraints/`.
-- Install extras with `pip install .[api] -c constraints/prod.txt` plus `[ml]`/`[dev]` when ML features or tooling are required.
+- Install extras with `pip install .[api] -c constraints/guardrails.txt -c constraints/prod.txt` plus `[ml]`/`[dev]` when ML features or tooling are required.
 - Run `task deps:lock` after editing dependency definitions to regenerate the pinned constraints via `pip-compile`.
 
 ### Testing & quality gates
@@ -231,7 +231,7 @@ For staging and production scenarios—including container images, Fly.io, and b
 - **PostgreSQL connection errors**: Ensure port 5432 is available or override `DATABASE_URL` to target your preferred instance.
 - **Node.js version conflicts**: Verify `node --version` returns 20.x or higher; use `nvm use` from `theo/services/web/.nvmrc` if installed.
 - **Missing Task runner**: Either install go-task (see above) or run the equivalent shell commands provided alongside each task.
-- **ML model downloads failing**: Confirm internet access and disk space, then rerun `pip install .[ml] -c constraints/prod.txt` or use the offline cache instructions in [`docs/ML_SETUP.md`](docs/ML_SETUP.md).
+- **ML model downloads failing**: Confirm internet access and disk space, then rerun `pip install .[ml] -c constraints/guardrails.txt -c constraints/prod.txt` or use the offline cache instructions in [`docs/ML_SETUP.md`](docs/ML_SETUP.md).
 
 ---
 

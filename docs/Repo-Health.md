@@ -30,7 +30,7 @@
 ## Dependency Risk & Update Plan
 
 ### Python
-- Core runtime published via extras in `pyproject.toml` (install with `pip install .[api] -c constraints/prod.txt` plus `[ml]`/`[dev]` as needed).
+- Core runtime published via extras in `pyproject.toml` (install with `pip install .[api] -c constraints/guardrails.txt -c constraints/prod.txt` plus `[ml]`/`[dev]` as needed).
 - **Grouped Releases:**
   - **Monthly functional upgrades:** Framework stack (FastAPI, SQLAlchemy, Celery).
   - **Bi-weekly security sweeps:** Cryptography, JWT, HTTP clients.
