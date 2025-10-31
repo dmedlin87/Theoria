@@ -220,12 +220,10 @@ def _parse_key_excerpts(block: str) -> list[dict[str, str]]:
             snippet = content[separator_match.end() :].strip()
         else:
             reference, snippet = content, ""
-            for separator in ("—", "–"):
-                if separator in content:
-                    reference, snippet = content.split(separator, 1)
-                    reference = reference.strip()
-                    snippet = snippet.strip()
-                    break
+            if "—" in content:
+                reference, snippet = content.split("—", 1)
+                reference = reference.strip()
+                snippet = snippet.strip()
         excerpts.append({
             "reference": reference.strip(),
             "snippet": snippet.strip(),
