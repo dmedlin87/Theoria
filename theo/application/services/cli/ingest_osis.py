@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from theo.application.facades.database import Base, configure_engine
 from theo.application.services.bootstrap import resolve_application
 
-from ..api.app.ingest.pipeline import PipelineDependencies, import_osis_commentary
+from theo.infrastructure.api.app.ingest.pipeline import PipelineDependencies, import_osis_commentary
 
 
 APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()

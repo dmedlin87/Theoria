@@ -20,9 +20,9 @@ except ImportError:  # pragma: no cover - allows stubbing in tests
 from packaging.version import InvalidVersion, Version
 from sqlalchemy.orm import Session
 
-from ..api.app.ai import rag as rag_service
-from ..api.app.models.search import HybridSearchFilters, HybridSearchRequest
-from ..api.app.retriever.hybrid import hybrid_search
+from theo.infrastructure.api.app.ai import rag as rag_service
+from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchRequest
+from theo.infrastructure.api.app.retriever.hybrid import hybrid_search
 from theo.application.services.bootstrap import resolve_application
 
 
