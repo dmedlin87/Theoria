@@ -46,7 +46,11 @@ def load_records(path: Path) -> tuple["EvidenceRecord", ...]:
     elif suffix == ".md":
         raw = _load_markdown_records(path)
     else:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        if not text.strip():
+            raw = []
+        else:
+            raw = json.loads(text)
         if isinstance(raw, dict):
             raw = raw.get("records") or raw.get("data") or []
         if not isinstance(raw, list):
