@@ -233,6 +233,13 @@ def _parse_key_excerpts(block: str) -> list[dict[str, str]]:
                     reference = reference.strip()
                     snippet = snippet.strip()
                     break
+            if not snippet:
+                hyphen_index = content.rfind(" - ")
+                if hyphen_index != -1:
+                    candidate_reference = content[:hyphen_index].rstrip()
+                    candidate_snippet = content[hyphen_index + 3 :].lstrip()
+                    if candidate_snippet and not _RANGE_ONLY_SEGMENT.fullmatch(candidate_snippet):
+                        reference, snippet = candidate_reference, candidate_snippet
         excerpts.append({
             "reference": reference.strip(),
             "snippet": snippet.strip(),
@@ -262,6 +269,16 @@ _RANGE_RIGHT_PREFIX = re.compile(
         (?:[1-3]\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+
     )?
     \d+(?::\d+)?[a-z]?
+    """,
+    re.VERBOSE,
+)
+
+
+_RANGE_ONLY_SEGMENT = re.compile(
+    r"""
+    \d+(?::\d+)?[a-z]?
+    (?:\s*[-–—]\s*\d+(?::\d+)?[a-z]?)*
+    \s*
     """,
     re.VERBOSE,
 )
