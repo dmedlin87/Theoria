@@ -60,10 +60,11 @@ class ApplicationContainer:
     def bind_list(self) -> Callable[[int], list[Document]]:
         """Return a query adapter for listing documents."""
 
-        def _runner(limit: int = 20) -> list[Document]:
+        def _list_runner(limit: int = 20) -> list[Document]:
+            """Delegate to list_documents with the specified limit."""
             return self.list_documents(limit=limit)
 
-        return _runner
+        return _list_runner
 
     def get_research_service(self, session: SessionProtocol) -> ResearchService:
         """Return a research service bound to the provided session."""
