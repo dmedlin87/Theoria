@@ -343,6 +343,7 @@ def rebuild_embeddings_cmd(
     if ids_file is not None:
         ids = _load_ids(ids_file)
         if not ids:
+            # Convert this to a proper error for automation/CI contexts
             raise click.ClickException("No passage IDs were found in the provided file.")
 
     checkpoint_state: EmbeddingRebuildCheckpoint | None = None
@@ -400,6 +401,12 @@ def rebuild_embeddings_cmd(
                 f"{len(start.missing_ids)} passage ID(s) were not found and will be skipped."
             )
         if start.total == 0:
+            # This should also be an error in automation contexts
+            # when specific criteria were given but no work was found
+            if ids_file or normalized_changed_since:
+                raise click.ClickException(
+                    "No passages matched the specified criteria for embedding updates."
+                )
             click.echo("No passages require embedding updates.")
         else:
             click.echo(
@@ -444,11 +451,18 @@ def rebuild_embeddings_cmd(
         raise click.ClickException(str(exc)) from exc
 
     if result.total == 0:
+        # Check if this was due to invalid input that should be an error
+        if ids_file or normalized_changed_since:
+            raise click.ClickException(
+                "No passages matched the specified criteria for embedding updates."
+            )
         return
 
     if checkpoint_file is not None and checkpoint_written:
         click.echo(f"Checkpoint written to {checkpoint_file}")
 
+    # Continue with the rest of the original implementation...
+    # (The rest remains the same as the original file)
     where_clause = Passage.embedding.is_(None) if fast else None
 
     workflow_name = "embedding_rebuild"
