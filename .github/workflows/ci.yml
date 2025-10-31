@@ -22,10 +22,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install compatible pip and pip-tools
+      - name: Install UV for dependency compilation
         run: |
-          python -m pip install --upgrade 'pip<24.1'
-          pip install 'pip-tools>=7.4.1,<7.5'
+          python -m pip install --upgrade pip
+          pip install uv
 
       - name: Ensure constraint lockfiles are current
         run: python scripts/update_constraints.py --check
