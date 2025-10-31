@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
@@ -18,6 +19,9 @@ from theo.application.repositories.embedding_repository import (
     PassageEmbeddingRepository,
     PassageForEmbedding,
 )
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class EmbeddingBackendProtocol(Protocol):
@@ -241,10 +245,13 @@ class EmbeddingRebuildService:
                 missing_ids=missing_ids,
                 metadata=metadata,
             )
+        except Exception:
+            # Ensure any uncommitted transactions are rolled back before re-raising
+            self._safe_rollback(session)
+            raise
         finally:
-            close = getattr(session, "close", None)
-            if callable(close):
-                close()
+            # Always ensure clean session closure with transaction cleanup
+            self._safe_session_close(session)
 
     def _commit_with_retry(self, session: SessionProtocol) -> None:
         for attempt in range(1, self._commit_attempts + 1):
@@ -253,7 +260,13 @@ class EmbeddingRebuildService:
             except SQLAlchemyError as exc:  # pragma: no cover - defensive retry path
                 rollback = getattr(session, "rollback", None)
                 if callable(rollback):
-                    rollback()
+                    try:
+                        rollback()
+                    except Exception as rollback_exc:
+                        _LOGGER.warning(
+                            "Rollback failed during commit retry (attempt %d): %s",
+                            attempt, rollback_exc
+                        )
                 if attempt == self._commit_attempts:
                     raise EmbeddingRebuildError(
                         f"Database commit failed after {attempt} attempt(s): {exc}"
@@ -261,6 +274,32 @@ class EmbeddingRebuildService:
                 time.sleep(self._commit_backoff * attempt)
             else:
                 return
+
+    def _safe_rollback(self, session: SessionProtocol) -> None:
+        """Safely attempt to rollback any pending transaction."""
+        rollback = getattr(session, "rollback", None)
+        if callable(rollback):
+            try:
+                rollback()
+                _LOGGER.debug("Successfully rolled back pending transaction")
+            except Exception as exc:
+                _LOGGER.warning(
+                    "Failed to rollback pending transaction during exception handling: %s",
+                    exc
+                )
+
+    def _safe_session_close(self, session: SessionProtocol) -> None:
+        """Safely close session with transaction cleanup."""
+        # First ensure no pending transactions
+        self._safe_rollback(session)
+        
+        # Then close the session
+        close = getattr(session, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception as exc:
+                _LOGGER.warning("Failed to close session cleanly: %s", exc)
 
 
 def _batched(iterator: Iterable[PassageForEmbedding], size: int) -> Iterable[list[PassageForEmbedding]]:
