@@ -74,7 +74,7 @@ ml = [
     "scipy>=1.10,<2",
     "sentencepiece>=0.2.0,<0.3",
     "threadpoolctl>=3.1,<4",
-    "torch==2.4.0+cpu",
+    "torch>=2.5.0",
     "transformers>=4.30,<5",
 ]
 dev = [
@@ -106,6 +106,21 @@ include-package-data = true
 where = ["."]
 include = ["theo*", "mcp_server*"]
 exclude = ["tests*", "fixtures*", "data*", "infra*", "metrics*", "ranking*", "contracts*", "dashboard*"]
+
+# Configure uv to use unsafe-best-match strategy for PyTorch dependencies
+[tool.uv]
+index-strategy = "unsafe-best-match"
+
+# Define PyTorch CPU index for ML dependencies
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu" },
+]
 
 [tool.black]
 line-length = 88

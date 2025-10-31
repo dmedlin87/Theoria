@@ -57,6 +57,8 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
         cmd.extend(["--extra-index-url", DEFAULT_PYPI_INDEX])
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     return destination
+        # Add index strategy to allow searching across multiple indexes
+        cmd.extend(["--index-strategy", "unsafe-best-match"])
 
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     return destination
