@@ -107,6 +107,21 @@ where = ["."]
 include = ["theo*", "mcp_server*"]
 exclude = ["tests*", "fixtures*", "data*", "infra*", "metrics*", "ranking*", "contracts*", "dashboard*"]
 
+# Configure uv to use unsafe-best-match strategy for PyTorch dependencies
+[tool.uv]
+index-strategy = "unsafe-best-match"
+
+# Define PyTorch CPU index for ML dependencies
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu" },
+]
+
 [tool.black]
 line-length = 88
 target-version = ["py311"]
