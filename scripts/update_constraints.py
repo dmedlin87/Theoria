@@ -28,6 +28,7 @@ CPU_TORCH_INDEX = "https://download.pytorch.org/whl/cpu"
 DEFAULT_PYPI_INDEX = "https://pypi.org/simple"
 TORCH_PIP_ARGS = f"--index-url {CPU_TORCH_INDEX} --extra-index-url {DEFAULT_PYPI_INDEX}"
 
+
 def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
     """Run uv pip compile for a combination of extras and return the generated file path."""
     try:
@@ -54,6 +55,8 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
     if "ml" in extras:
         cmd.extend(["--index-url", CPU_TORCH_INDEX])
         cmd.extend(["--extra-index-url", DEFAULT_PYPI_INDEX])
+    subprocess.run(cmd, check=True, cwd=REPO_ROOT)
+    return destination
         # Add index strategy to allow searching across multiple indexes
         cmd.extend(["--index-strategy", "unsafe-best-match"])
 
@@ -108,6 +111,7 @@ def update_constraints() -> None:
             f"'{name}' -> {destination.relative_to(REPO_ROOT)} (extras: {', '.join(config['extras'])})"
         )
         run_uv_compile(config["extras"], destination)
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Refresh dependency constraint lockfiles.")
