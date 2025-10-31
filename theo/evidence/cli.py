@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 import re
 from pathlib import Path
 
@@ -13,6 +14,58 @@ from .indexer import EvidenceIndexer
 from .promoter import EvidencePromoter
 from .utils import dump_records_jsonl
 from .validator import EvidenceValidator
+
+
+def _render_markdown(records: Iterable[dict[str, object]]) -> str:
+    """Return a lightweight markdown dossier for ``records``."""
+
+    lines: list[str] = ["# Evidence Dossier", ""]
+    for record in records:
+        title = str(record.get("title") or "Untitled evidence")
+        sid = str(record.get("sid") or "")
+        heading = f"## {title}"
+        if sid:
+            heading += f" ({sid})"
+        lines.append(heading)
+        normalized = record.get("normalized_osis") or record.get("osis") or ()
+        if isinstance(normalized, Iterable) and not isinstance(normalized, (str, bytes)):
+            osis = ", ".join(str(item) for item in normalized)
+        else:
+            osis = str(normalized)
+        lines.append(f"- **Normalized OSIS:** {osis or 'N/A'}")
+        tags = record.get("tags") or ()
+        if isinstance(tags, Iterable) and not isinstance(tags, (str, bytes)):
+            tag_list = ", ".join(str(tag) for tag in tags)
+        else:
+            tag_list = str(tags)
+        lines.append(f"- **Tags:** {tag_list or 'N/A'}")
+        summary = record.get("summary")
+        if summary:
+            lines.extend(["", str(summary)])
+        lines.append("")
+    return "\n".join(lines).strip() + "\n"
+
+
+def _render_graphviz(graph: dict[str, object]) -> str:
+    """Render ``graph`` payload as a Graphviz DOT document."""
+
+    nodes = list(map(str, graph.get("nodes", [])))
+    edges = graph.get("edges", [])
+    records = graph.get("records", [])
+    lines = ["digraph Evidence {", "  rankdir=LR;"]
+    for node in nodes:
+        lines.append(f'  "{node}" [shape=box];')
+    for record in records or []:
+        sid = str(record.get("sid") or "")
+        if sid:
+            lines.append(f'  "{sid}" [shape=ellipse];')
+    for edge in edges or []:
+        osis = str(edge.get("osis") or "")
+        for sid in edge.get("records", []):
+            if osis and sid:
+                lines.append(f'  "{osis}" -> "{sid}";')
+    lines.append("}")
+    return "\n".join(lines) + "\n"
 
 
 CARDS_DIRECTORY = Path("evidence/cards")

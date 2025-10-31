@@ -22,7 +22,7 @@ def bootstrap_application(
     retire = retire_factory()
     get = get_factory()
     list_docs = list_factory()
-    research = research_factory()
+    research = research_factory
 
     return ApplicationContainer(
         ingest_document=ingest,

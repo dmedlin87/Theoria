@@ -305,7 +305,7 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
         retire_factory=_build_retire_callable,
         get_factory=_build_get_callable,
         list_factory=_build_list_callable,
-        research_factory=lambda: registry.resolve("research_service_factory"),
+        research_factory=_build_research_service_factory,
     )
     return container, registry
 

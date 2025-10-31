@@ -1,0 +1,28 @@
+name: Validate Evidence Cards
+
+on:
+  push:
+    paths:
+      - 'evidence/**'
+      - '.github/workflows/validate-evidence-cards.yml'
+  pull_request:
+    paths:
+      - 'evidence/**'
+      - '.github/workflows/validate-evidence-cards.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Validate Evidence Cards
+        run: python evidence/scripts/theoria_cli.py validate
+      - name: Build Markdown mirrors
+        run: python evidence/scripts/build_markdown.py
+      - name: Show generated files
+        run: ls -la evidence/cards_md || true

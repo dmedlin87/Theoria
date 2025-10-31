@@ -7,7 +7,7 @@ from typing import Callable, Protocol
 from theo.application.interfaces import SessionProtocol
 from theo.domain import Document, DocumentId
 
-from .research import ResearchService
+from theo.application.research import ResearchService
 
 
 class _CommandCallable(Protocol):

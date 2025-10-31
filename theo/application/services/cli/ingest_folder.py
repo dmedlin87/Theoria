@@ -16,13 +16,13 @@ from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
 from theo.adapters.persistence.models import Document
-from ..api.app.enrich import MetadataEnricher
-from ..api.app.ingest.pipeline import (
+from theo.infrastructure.api.app.enrich import MetadataEnricher
+from theo.infrastructure.api.app.ingest.pipeline import (
     PipelineDependencies,
     run_pipeline_for_file,
     run_pipeline_for_url,
 )
-from ..api.app.telemetry import log_workflow_event
+from theo.infrastructure.api.app.telemetry import log_workflow_event
 from theo.application.services.bootstrap import resolve_application
 
 
@@ -30,13 +30,13 @@ APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
 
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checking only
-    from ..api.app.workers import tasks as worker_tasks
+    from theo.infrastructure.api.app.workers import tasks as worker_tasks
 
 
 def _get_worker_tasks():
     """Import worker tasks lazily to avoid circular imports during bootstrap."""
 
-    from ..api.app.workers import tasks as worker_tasks
+    from theo.infrastructure.api.app.workers import tasks as worker_tasks
 
     return worker_tasks
 
