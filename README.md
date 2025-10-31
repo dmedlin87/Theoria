@@ -241,6 +241,7 @@ For staging and production scenarios—including container images, Fly.io, and b
 | --- | --- |
 | Architecture | [`docs/architecture.md`](docs/architecture.md), [`docs/architecture_review.md`](docs/architecture_review.md) |
 | API & Agents | [`docs/API.md`](docs/API.md), [`docs/theoria_instruction_prompt.md`](docs/theoria_instruction_prompt.md), [`docs/AGENT_CONFINEMENT.md`](docs/AGENT_CONFINEMENT.md) |
+| User Research | [`docs/research/adjacent_user_needs.md`](docs/research/adjacent_user_needs.md) |
 | Operations | [`docs/codebase_stabilization_plan.md`](docs/codebase_stabilization_plan.md), [`docs/Repo-Health.md`](docs/Repo-Health.md) |
 | Documentation Index | [`docs/document_inventory.md`](docs/document_inventory.md), [`docs/INDEX.md`](docs/INDEX.md) |
 | Testing & Quality | [`docs/testing.md`](docs/testing.md), [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md) |

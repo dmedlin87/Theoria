@@ -1,6 +1,6 @@
 # Documentation Inventory & Freshness Audit
 
-> **Last Updated:** 2025-10-26  
+> **Last Updated:** 2025-10-31
 > **Maintainers:** Documentation working group
 
 This inventory reflects the streamlined documentation set after the October 26 archiving pass. Active references stay lightweight and task-focused; superseded material has been moved to dated archive folders with an explicit banner.
@@ -23,6 +23,7 @@ This inventory reflects the streamlined documentation set after the October 26 a
 - **API & Agents:** [`API.md`](API.md), [`theoria_instruction_prompt.md`](theoria_instruction_prompt.md), [`AGENT_CONFINEMENT.md`](AGENT_CONFINEMENT.md)
 - **Quality:** [`testing.md`](testing.md), [`tests/utils/query_profiler.py`](../tests/utils/query_profiler.py)
 - **Navigation:** [`INDEX.md`](INDEX.md), [`document_inventory.md`](document_inventory.md)
+- **Research & Strategy:** [`research/adjacent_user_needs.md`](research/adjacent_user_needs.md)
 
 ## Archive Layout
 
