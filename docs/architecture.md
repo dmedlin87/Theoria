@@ -22,7 +22,7 @@ The dependency graph is verified in two complementary ways:
 
 1. **Architecture tests** (`tests/architecture/test_module_boundaries.py`)
    assert that application modules never import
-   `theo.services.api.app.*`, the telemetry/resilience/security adapters, or
+   `theo.infrastructure.api.app.*`, the telemetry/resilience/security adapters, or
    `fastapi`. Existing tests also prevent domain modules from depending on
    services and ensure other adapter constraints.
 2. **Import Linter** (`importlinter.ini`) encodes the layered contract so that
