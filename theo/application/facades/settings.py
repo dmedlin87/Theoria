@@ -51,6 +51,14 @@ class KafkaEventSink(_BaseEventSink):
         default=1.0,
         description="Optional timeout (in seconds) for producer flush operations.",
     )
+    batch_size: int = Field(
+        default=1,
+        description="Number of messages to batch before flushing. Set to 1 for per-message flush (original behavior).",
+    )
+    flush_interval_seconds: float = Field(
+        default=5.0,
+        description="Time interval in seconds to force flush even if batch_size not reached.",
+    )
 
 
 class RedisStreamEventSink(_BaseEventSink):
