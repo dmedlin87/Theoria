@@ -50,24 +50,32 @@ class PassageEmbeddingService:
         """Return embeddings for all *passage_ids*, using bulk fetches for misses."""
 
         results: dict[str, Sequence[float] | None] = {}
-        missing: list[str] = []
+        missing_set: set[str] = set()  # Use set to automatically deduplicate
+        
         for identifier in passage_ids:
             if not identifier:
                 continue
             if self._cache is not None and identifier in self._cache:
                 self._cache.move_to_end(identifier)
                 results[identifier] = self._cache[identifier]
-            elif identifier not in missing:
-                missing.append(identifier)
-        if missing:
-            fetched = self._store.get_embeddings(missing)
-            for identifier in missing:
+            else:
+                missing_set.add(identifier)  # Automatically deduplicates
+                
+        if missing_set:
+            # Convert back to list for backend call, preserving deduplication
+            missing_list = list(missing_set)
+            fetched = self._store.get_embeddings(missing_list)
+            
+            # Update results and cache for each missing ID
+            for identifier in missing_list:
                 value = fetched.get(identifier)
                 results[identifier] = value
                 if self._cache is not None:
                     self._cache[identifier] = value
+                    
             if self._cache is not None:
                 self._prune_cache()
+                
         return results
 
     def clear_cache(self) -> None:
