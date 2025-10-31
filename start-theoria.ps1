@@ -956,7 +956,7 @@ function Start-TheoriaApi {
         $arguments = @(
             '-m',
             'uvicorn',
-            'theo.services.api.app.bootstrap.app_factory:create_app',
+            'theo.infrastructure.api.app.bootstrap.app_factory:create_app',
             '--factory',
             '--reload',
             '--host',
