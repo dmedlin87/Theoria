@@ -21,8 +21,6 @@ class KafkaEventPublisher(EventPublisher):
         config: KafkaEventSink,
         *,
         producer_factory: Callable[[dict[str, Any]], Any] | None = None,
-        batch_size: int = 100,
-        flush_interval_seconds: float = 5.0,
     ) -> None:
         if not config.topic:
             raise ValueError("Kafka event sink requires a topic")
@@ -47,8 +45,8 @@ class KafkaEventPublisher(EventPublisher):
         self._flush_timeout = config.flush_timeout_seconds
         
         # Batching configuration
-        self._batch_size = max(1, batch_size)
-        self._flush_interval = max(0.1, flush_interval_seconds)
+        self._batch_size = max(1, config.batch_size)
+        self._flush_interval = max(0.1, config.flush_interval_seconds)
         
         # State for batching
         self._message_count = 0
