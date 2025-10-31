@@ -47,6 +47,7 @@ class KafkaEventPublisher(EventPublisher):
         # Batching configuration
         self._batch_size = max(1, config.batch_size)
         self._flush_interval = max(0.1, config.flush_interval_seconds)
+        self._batching_enabled = self._batch_size > 1
         
         # State for batching
         self._message_count = 0
@@ -93,10 +94,10 @@ class KafkaEventPublisher(EventPublisher):
                     self._producer.flush(timeout)
                     self._message_count = 0
                     self._last_flush = current_time
-                elif self._flush_timeout is not None:
-                    # Preserve legacy synchronous semantics for single publishes so callers
-                    # relying on flush_timeout continue to have their messages delivered
-                    # immediately, even when batching would otherwise defer the flush.
+                elif self._flush_timeout is not None and not self._batching_enabled:
+                    # Preserve legacy synchronous semantics for publishers that have batching
+                    # explicitly disabled (batch size of 1).  In this mode callers expect an
+                    # immediate flush on every publish even when a flush timeout is configured.
                     self._producer.flush(self._flush_timeout)
                     self._message_count = 0
                     self._last_flush = current_time
