@@ -214,12 +214,18 @@ def _parse_key_excerpts(block: str) -> list[dict[str, str]]:
         if not line.startswith("-"):
             continue
         content = line[1:].strip()
-        if "—" in content:
-            reference, snippet = content.split("—", 1)
-        elif "-" in content:
-            reference, snippet = content.split("-", 1)
+        separator_match = re.search(r"\s[-–—]\s", content)
+        if separator_match:
+            reference = content[: separator_match.start()].strip()
+            snippet = content[separator_match.end() :].strip()
         else:
             reference, snippet = content, ""
+            for separator in ("—", "–"):
+                if separator in content:
+                    reference, snippet = content.split(separator, 1)
+                    reference = reference.strip()
+                    snippet = snippet.strip()
+                    break
         excerpts.append({
             "reference": reference.strip(),
             "snippet": snippet.strip(),
