@@ -3,12 +3,7 @@
     Intelligent launcher for Theoria - ensures API and Web services run reliably.
 
 .DESCRIPTION
-    Smart service manager that:
-    - Validates all prerequisites (Python, Node, dependencies)
-    - Starts both API (port 8000) and Web (port 3000) services
-    - Continuously monitors health with auto-recovery
-    - Handles graceful shutdown on Ctrl+C
-    - Provides clear status updates and error diagnostics
+    Smart service manager that validates prerequisites (Python, Node, dependencies), starts both API (port 8000) and Web (port 3000) services, continuously monitors health with auto-recovery, handles graceful shutdown on Ctrl+C, and provides clear status updates with diagnostics.
 
 .PARAMETER ApiPort
     Port for the FastAPI server (default: 8000)
@@ -17,28 +12,28 @@
     Port for the Next.js dev server (default: 3000)
 
 .PARAMETER SkipHealthChecks
-    Disable continuous health monitoring (faster startup, less resilient)
+    Disables continuous health monitoring (faster startup, less resilient)
 
 .PARAMETER Verbose
-    Show detailed logging for troubleshooting
+    Shows detailed logging for troubleshooting
 
 .PARAMETER LogToFile
-    Write logs to file in addition to console (logs/theoria-launcher.log)
+    Writes logs to file in addition to console (logs/theoria-launcher.log)
 
 .PARAMETER ShowMetrics
-    Display real-time service metrics in the console
+    Displays real-time service metrics in the console
 
 .EXAMPLE
     .\start-theoria.ps1
-    Start both services with default ports and health monitoring
+    Demonstrates running both services with default ports and health monitoring.
 
 .EXAMPLE
     .\start-theoria.ps1 -ApiPort 8010 -WebPort 3100
-    Start with custom ports
+    Demonstrates running with custom ports.
 
 .EXAMPLE
     .\start-theoria.ps1 -Verbose
-    Start with detailed logging
+    Demonstrates enabling detailed logging.
 
 .NOTES
     Theoria Engine - Intelligent Service Launcher
