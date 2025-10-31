@@ -60,8 +60,8 @@ class ApplicationContainer:
     def bind_list(self) -> Callable[[int], list[Document]]:
         """Return a query adapter for listing documents."""
 
-        def _runner(limit: int = 20) -> list[Document]:
-            return self.list_documents(limit=limit)
+        def _runner(requested_limit: int = 20) -> list[Document]:
+            return self.list_documents(limit=requested_limit)
 
         return _runner
 
