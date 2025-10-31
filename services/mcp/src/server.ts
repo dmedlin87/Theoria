@@ -31,6 +31,33 @@ async function appendJsonl(lineObj: unknown) {
   await fs.appendFile(CARDS, JSON.stringify(lineObj) + '\n', 'utf8');
 }
 
+async function getFileSizeIfExists(filePath: string): Promise<number | null> {
+  try {
+    const stats = await fs.stat(filePath);
+    return stats.size;
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function rollbackAppend(previousSize: number | null) {
+  if (previousSize === null) {
+    try {
+      await fs.unlink(CARDS);
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+    return;
+  }
+
+  await fs.truncate(CARDS, previousSize);
+}
+
 async function runValidateAndBuild() {
   try {
     await execFileAsync('python', [CLI_SCRIPT, 'validate'], { cwd: REPO });
@@ -144,8 +171,18 @@ const addCardTool: Tool = {
       created_at: now,
       updated_at: now,
     };
-    await appendJsonl(card);
-    await runValidateAndBuild();
+    const previousSize = await getFileSizeIfExists(CARDS);
+    let appended = false;
+    try {
+      await appendJsonl(card);
+      appended = true;
+      await runValidateAndBuild();
+    } catch (error) {
+      if (appended) {
+        await rollbackAppend(previousSize);
+      }
+      throw error;
+    }
     return { content: [{ type: 'text', text: JSON.stringify(card) }] };
   },
 };
