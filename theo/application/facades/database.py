@@ -71,6 +71,28 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _is_sqlite_closed_database_error(exc: ProgrammingError) -> bool:
+    """Return ``True`` if the error indicates SQLite was already closed."""
+
+    # ``ProgrammingError`` from SQLAlchemy wraps the DB-API error in ``orig``.
+    dbapi_exc = getattr(exc, "orig", None)
+
+    if sqlite3 is not None and isinstance(dbapi_exc, sqlite3.ProgrammingError):
+        # Python 3.11 exposes ``sqlite_errorcode`` which is ``SQLITE_MISUSE``
+        # when operations are attempted on a closed connection. Prefer the
+        # error code when available to avoid relying solely on fragile strings.
+        error_code = getattr(dbapi_exc, "sqlite_errorcode", None)
+        if error_code == sqlite3.SQLITE_MISUSE:
+            return True
+
+    error_msg = str(dbapi_exc or exc).lower()
+
+    sqlite_closed_indicators = (
+        "closed database",
+        "database is closed",
+        "cannot operate on a closed database",
+    )
+
+    return any(indicator in error_msg for indicator in sqlite_closed_indicators)
     """Check if ProgrammingError indicates a closed SQLite database.
     
     Uses multiple patterns to detect SQLite database closed errors across
