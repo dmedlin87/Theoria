@@ -3818,4 +3818,9 @@ zlib-state==0.1.10 \
     --hash=sha256:dfecba070cdeeab073573ac721459727d60e0b8ef7b38dac3c965459781b0eeb
     # via ir-datasets
 
+# Guardrail ranges to align with pyproject optional constraints.
+click>=8.1,<9
+pydantic>=2.5,<3
+PyYAML>=6.0.1,<7
+
 # The following packages are considered to be unsafe in a requirements file:

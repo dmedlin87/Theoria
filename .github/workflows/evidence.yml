@@ -1,0 +1,75 @@
+name: Evidence dataset verification
+
+on:
+  push:
+    paths:
+      - 'evidence/**'
+      - 'theo/evidence/**'
+      - 'scripts/check_sid_changes.py'
+      - '.github/workflows/evidence.yml'
+  pull_request:
+    paths:
+      - 'evidence/**'
+      - 'theo/evidence/**'
+      - 'scripts/check_sid_changes.py'
+      - '.github/workflows/evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints/prod.txt
+
+      - name: Install pinned runtime dependencies
+        run: |
+          python -m pip install --upgrade "pip<25"
+          pip install -r constraints/prod.txt
+          pip install . --no-deps
+
+      - name: Validate evidence registry
+        run: |
+          mkdir -p out/dossiers
+          python -m theo.evidence.cli validate --all evidence/registry > evidence/registry/evidence.index.json
+
+      - name: Build evidence SQLite index
+        run: |
+          python -m theo.evidence.cli index --sqlite evidence/registry/evidence.sqlite3 evidence/registry/evidence.index.json
+
+      - name: Generate dossier markdown
+        run: |
+          python -m theo.evidence.cli dossier --out out/dossiers/evidence.md evidence/registry/evidence.index.json
+
+      - name: Render evidence graph
+        run: |
+          python -m theo.evidence.cli dossier --graph --out out/dossiers/evidence.graph.dot evidence/registry/evidence.index.json
+
+      - name: Run SID change guard
+        run: python scripts/check_sid_changes.py
+
+      - name: Upload evidence artifacts
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
+        with:
+          name: evidence-registry
+          path: |
+            evidence/registry/evidence.index.json
+            evidence/registry/evidence.sqlite3
+            out/dossiers/evidence.graph.dot
+            out/dossiers/evidence.md
+          if-no-files-found: error

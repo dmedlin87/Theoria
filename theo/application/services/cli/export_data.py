@@ -14,22 +14,22 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.adapters.persistence.models import Document
-from ..api.app.export.citations import build_citation_export, render_citation_markdown
-from ..api.app.export.formatters import (
+from theo.infrastructure.api.app.export.citations import build_citation_export, render_citation_markdown
+from theo.infrastructure.api.app.export.formatters import (
     build_document_export,
     build_search_export,
     generate_export_id,
     render_bundle,
 )
-from ..api.app.models.export import (
+from theo.infrastructure.api.app.models.export import (
     CitationStyleLiteral,
     DocumentExportFilters,
     ExportManifest,
 )
-from ..api.app.models.search import HybridSearchFilters, HybridSearchRequest
-from ..api.app.retriever.export import export_documents, export_search_results
-from ..api.app.retriever.verses import get_mentions_for_osis
-from ..api.app.models.verses import VerseMentionsFilters
+from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchRequest
+from theo.infrastructure.api.app.retriever.export import export_documents, export_search_results
+from theo.infrastructure.api.app.retriever.verses import get_mentions_for_osis
+from theo.infrastructure.api.app.models.verses import VerseMentionsFilters
 from theo.application.services.bootstrap import resolve_application
 
 

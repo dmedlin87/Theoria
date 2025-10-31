@@ -1,10 +1,14 @@
 """Domain event publishing contracts."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Protocol, Sequence
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class EventPublisher(Protocol):
@@ -59,19 +63,58 @@ class NullEventPublisher(EventPublisher):
 
 @dataclass(slots=True)
 class CompositeEventPublisher(EventPublisher):
-    """Dispatches events to all configured sinks."""
+    """Dispatches events to all configured sinks with configurable error handling.
+    
+    Supports two modes:
+    - fail_fast=True (default): Stop on first failure for consistency
+    - fail_fast=False: Attempt all publishers for best-effort delivery
+    """
 
     publishers: Sequence[EventPublisher]
+    fail_fast: bool = True
 
     def publish(self, event: DomainEvent) -> None:
+        """Publish event to all publishers with configurable error handling.
+        
+        Args:
+            event: Domain event to publish
+            
+        Raises:
+            EventDispatchError: When publishers fail (immediately if fail_fast=True,
+                               after all attempts if fail_fast=False)
+        """
         failures: list[Exception] = []
+        successful_publishers = 0
+        
         for publisher in self.publishers:
             try:
                 publisher.publish(event)
+                successful_publishers += 1
             except Exception as exc:  # pragma: no cover - defensive logging occurs upstream
                 failures.append(exc)
+                _LOGGER.warning(
+                    "Publisher failed for event %s: %s", 
+                    event.type, exc, exc_info=True
+                )
+                
+                if self.fail_fast:
+                    # Stop immediately on first failure to ensure consistency
+                    raise EventDispatchError(event, failures)
+        
+        # If we get here and have failures, we're in best-effort mode
         if failures:
+            _LOGGER.error(
+                "Event %s partially delivered: %d successful, %d failed",
+                event.type, successful_publishers, len(failures)
+            )
             raise EventDispatchError(event, failures)
+        
+        # All publishers succeeded
+        if successful_publishers > 0:
+            _LOGGER.debug(
+                "Event %s successfully delivered to %d publisher(s)",
+                event.type, successful_publishers
+            )
 
 
 def normalise_event_value(value: Any) -> Any:

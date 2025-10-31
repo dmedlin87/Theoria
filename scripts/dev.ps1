@@ -117,7 +117,7 @@ function Resolve-PythonExe {
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
 
-$ApiModule = 'theo.services.api.app.bootstrap.app_factory:create_app'
+$ApiModule = 'theo.infrastructure.api.app.bootstrap.app_factory:create_app'
 $WebDir = Join-Path $RepoRoot 'theo/services/web'
 
 if (-not (Test-Path (Join-Path $RepoRoot 'pyproject.toml'))) {

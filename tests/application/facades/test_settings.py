@@ -71,3 +71,19 @@ def test_get_settings_cipher_uses_insecure_fallback(monkeypatch):
 
     payload = cipher_one.encrypt(b"theoria")
     assert cipher_one.decrypt(payload) == b"theoria"
+
+
+def test_get_settings_handles_non_path_fixture_root(monkeypatch):
+    class DummySettings:
+        def __init__(self) -> None:
+            # Simulate a stubbed BaseSettings implementation that leaves FieldInfo
+            # objects on the instance attributes instead of coercing them.
+            self.fixtures_root = object()
+            self.embedding_dim = 128
+
+    monkeypatch.setattr(settings_module, "Settings", DummySettings)
+
+    settings = settings_module.get_settings()
+
+    expected_root = Path(__file__).resolve().parents[3] / "fixtures"
+    assert settings.fixtures_root == expected_root

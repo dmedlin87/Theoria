@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass
 from time import perf_counter
@@ -16,6 +17,9 @@ from .facades.telemetry import (
 
 REPOSITORY_LATENCY_METRIC = "theo_repository_latency_seconds"
 REPOSITORY_RESULT_METRIC = "theo_repository_results_total"
+
+_LOGGER = logging.getLogger(__name__)
+_telemetry_disable_logged = False  # Prevent spam logging
 
 
 @dataclass(slots=True)
@@ -75,7 +79,24 @@ def trace_repository_call(
             span = stack.enter_context(
                 instrument_workflow(workflow_name, **enriched_attributes)
             )
-        except RuntimeError:
+        except RuntimeError as exc:
+            # Log telemetry failure for debugging and operational awareness
+            global _telemetry_disable_logged
+            if not _telemetry_disable_logged:
+                _LOGGER.warning(
+                    "Repository observability disabled due to telemetry failure: %s. "
+                    "This affects metrics collection and tracing for repository calls. "
+                    "Check telemetry provider configuration and connectivity.",
+                    exc
+                )
+                _telemetry_disable_logged = True
+            else:
+                # Log subsequent failures at debug level to avoid spam
+                _LOGGER.debug(
+                    "Repository telemetry still disabled for %s.%s: %s",
+                    repository, operation, exc
+                )
+                
             span = stack.enter_context(nullcontext(None))
             telemetry_enabled = False
         else:
@@ -117,9 +138,16 @@ def trace_repository_call(
                 )
 
 
+def reset_telemetry_logging() -> None:
+    """Reset telemetry disable logging state for testing purposes."""
+    global _telemetry_disable_logged
+    _telemetry_disable_logged = False
+
+
 __all__ = [
     "REPOSITORY_LATENCY_METRIC",
     "REPOSITORY_RESULT_METRIC",
     "RepositoryCallTrace",
+    "reset_telemetry_logging",
     "trace_repository_call",
 ]

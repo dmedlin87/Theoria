@@ -31,20 +31,17 @@ DEFAULT_PYPI_INDEX = "https://pypi.org/simple"
 TORCH_PIP_ARGS = f"--index-url {CPU_TORCH_INDEX} --extra-index-url {DEFAULT_PYPI_INDEX}"
 
 
-def run_pip_compile(extras: tuple[str, ...], destination: Path) -> Path:
-    """Run pip-compile for a combination of extras and return the generated file path."""
+def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
+    """Run uv pip compile for a combination of extras and return the generated file path."""
     try:
         relative_output = destination.relative_to(REPO_ROOT)
     except ValueError:
         relative_output = destination
 
     cmd = [
-        sys.executable,
-        "-m",
-        "piptools",
+        "uv",
+        "pip",
         "compile",
-        "--resolver=backtracking",
-        "--allow-unsafe",
         "--generate-hashes",
         "--quiet",
     ]
@@ -56,19 +53,23 @@ def run_pip_compile(extras: tuple[str, ...], destination: Path) -> Path:
         "pyproject.toml",
     ])
     if "ml" in extras:
-        cmd.extend(["--pip-args", TORCH_PIP_ARGS])
+        cmd.extend(["--index-url", CPU_TORCH_INDEX])
+        cmd.extend(["--extra-index-url", DEFAULT_PYPI_INDEX])
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     return destination
 
 
 def check_constraints() -> bool:
+    # Ensure compatibility before running
+    ensure_pip_tools_compatibility()
+    
     ok = True
     for name, config in TARGETS.items():
         destination = config["destination"]
         extras = config["extras"]
         original_bytes = destination.read_bytes() if destination.exists() else None
         try:
-            run_pip_compile(extras, destination)
+            run_uv_compile(extras, destination)
         except subprocess.CalledProcessError:
             if original_bytes is None:
                 destination.unlink(missing_ok=True)
@@ -99,6 +100,9 @@ def check_constraints() -> bool:
 
 
 def update_constraints() -> None:
+    # Ensure compatibility before running
+    ensure_pip_tools_compatibility()
+    
     CONSTRAINTS_DIR.mkdir(exist_ok=True)
     for name, config in TARGETS.items():
         destination = config["destination"]
@@ -107,7 +111,7 @@ def update_constraints() -> None:
             "Updating constraints for target "
             f"'{name}' -> {destination.relative_to(REPO_ROOT)} (extras: {', '.join(config['extras'])})"
         )
-        run_pip_compile(config["extras"], destination)
+        run_uv_compile(config["extras"], destination)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover - import for typing only
     from .container import ApplicationContainer as ApplicationContainer
-else:
-    ApplicationContainer = None  # type: ignore[assignment]
 
 __all__ = ["ApplicationContainer", "resolve_application"]
 

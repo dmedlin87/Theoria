@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from pathlib import Path
@@ -66,6 +67,58 @@ __all__ = ["Base", "configure_engine", "get_engine", "get_session"]
 _engine: Engine | None = None
 _SessionLocal: sessionmaker[Session] | None = None
 _engine_url_override: str | None = None
+_LOGGER = logging.getLogger(__name__)
+
+
+def _is_sqlite_closed_database_error(exc: ProgrammingError) -> bool:
+    """Return ``True`` if the error indicates SQLite was already closed."""
+
+    # ``ProgrammingError`` from SQLAlchemy wraps the DB-API error in ``orig``.
+    dbapi_exc = getattr(exc, "orig", None)
+
+    if sqlite3 is not None and isinstance(dbapi_exc, sqlite3.ProgrammingError):
+        # Python 3.11 exposes ``sqlite_errorcode`` which is ``SQLITE_MISUSE``
+        # when operations are attempted on a closed connection. Prefer the
+        # error code when available to avoid relying solely on fragile strings.
+        error_code = getattr(dbapi_exc, "sqlite_errorcode", None)
+        if error_code == sqlite3.SQLITE_MISUSE:
+            return True
+
+    error_msg = str(dbapi_exc or exc).lower()
+
+    sqlite_closed_indicators = (
+        "closed database",
+        "database is closed",
+        "cannot operate on a closed database",
+    )
+
+    return any(indicator in error_msg for indicator in sqlite_closed_indicators)
+    """Check if ProgrammingError indicates a closed SQLite database.
+    
+    Uses multiple patterns to detect SQLite database closed errors across
+    different SQLAlchemy versions and database drivers.
+    """
+    error_msg = str(exc).lower()
+    
+    # Common SQLite "database is closed" error patterns
+    sqlite_closed_indicators = [
+        "closed database",
+        "database is closed", 
+        "cannot operate on a closed database",
+        "database disk image is malformed",  # Sometimes appears with closed DBs
+        "sql logic error",  # Generic SQLite error that can indicate closure
+    ]
+    
+    # Check if any indicator matches
+    for indicator in sqlite_closed_indicators:
+        if indicator in error_msg:
+            return True
+            
+    # Additional check for SQLite-specific error patterns
+    if "sqlite" in error_msg and ("closed" in error_msg or "disconnect" in error_msg):
+        return True
+        
+    return False
 
 
 class _TheoSession(Session):
@@ -77,14 +130,28 @@ class _TheoSession(Session):
             bind = self.get_bind()
         except Exception:
             bind = None
+            
         try:
             super().close()
         except ProgrammingError as exc:
-            if "closed database" not in str(exc).lower():
+            # Use robust error detection instead of fragile string matching
+            if not _is_sqlite_closed_database_error(exc):
+                # Log the unexpected error for debugging but still raise it
+                _LOGGER.warning(
+                    "Unexpected ProgrammingError during session close: %s", 
+                    exc, exc_info=True
+                )
                 raise
+            
+            # This is a known SQLite closed database error - safe to suppress
+            _LOGGER.debug(
+                "Suppressing expected SQLite closed database error during session close: %s", 
+                exc
+            )
             # SQLite disposal helpers may close the underlying connection
-            # before SQLAlchemy attempts its implicit rollback.  Suppress the
+            # before SQLAlchemy attempts its implicit rollback. Suppress the
             # resulting noise so session cleanup remains idempotent.
+            
         if bind is not None:
             dispose_sqlite_engine(bind, dispose_engine=False)
 

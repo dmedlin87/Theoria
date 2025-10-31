@@ -1,2 +1,7 @@
 langchain-openai==0.1.25
 openai==1.109.1
+
+# Guardrail ranges mirrored from constraints/dev.txt and constraints/prod.txt
+click>=8.1,<9
+pydantic>=2.5,<3
+PyYAML>=6.0.1,<7

@@ -1,0 +1,53 @@
+{
+  "schema_version": "2025-02-14",
+  "tags": [
+    {
+      "id": "doctrine.trinity",
+      "label": "Trinity Doctrine",
+      "category": "Doctrine",
+      "description": "Claims and evidence exploring the triune nature of God and relationships within the Godhead.",
+      "preferred_aliases": ["Trinitarian Theology"],
+      "keywords": ["Trinity", "Triune", "Godhead", "Persons"]
+    },
+    {
+      "id": "history.ecumenical-councils",
+      "label": "Ecumenical Councils",
+      "category": "Historical Theology",
+      "description": "Evidence derived from conciliar proceedings, canons, and patristic commentary on doctrinal development.",
+      "preferred_aliases": ["Church Councils"],
+      "keywords": ["Nicaea", "Chalcedon", "Creed", "Synod"]
+    },
+    {
+      "id": "textual.critical-notes",
+      "label": "Textual Critical Notes",
+      "category": "Textual Criticism",
+      "description": "Variant readings, manuscript attestations, and apparatus commentary affecting doctrinal claims.",
+      "preferred_aliases": ["Critical Apparatus"],
+      "keywords": ["Variant", "Manuscript", "Apparatus", "Witness"]
+    },
+    {
+      "id": "linguistics.semantic-range",
+      "label": "Semantic Range",
+      "category": "Linguistics",
+      "description": "Lexical and semantic analysis detailing how key terms operate across corpora and traditions.",
+      "preferred_aliases": ["Lexical Study"],
+      "keywords": ["Lexeme", "Gloss", "Meaning", "Usage"]
+    },
+    {
+      "id": "apologetics.classic-arguments",
+      "label": "Classic Apologetic Arguments",
+      "category": "Apologetics",
+      "description": "Structured philosophical or theological arguments defending Christian doctrine with referenced premises.",
+      "preferred_aliases": ["Classical Apologetics"],
+      "keywords": ["Argument", "Premise", "Inference", "Deduction"]
+    },
+    {
+      "id": "ethics.practical-implications",
+      "label": "Practical Implications",
+      "category": "Ethics",
+      "description": "Applications of doctrinal insights to Christian practice, discipleship, and communal life.",
+      "preferred_aliases": ["Applied Theology"],
+      "keywords": ["Practice", "Discipleship", "Community", "Formation"]
+    }
+  ]
+}

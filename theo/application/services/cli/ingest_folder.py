@@ -16,13 +16,13 @@ from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
 from theo.adapters.persistence.models import Document
-from ..api.app.enrich import MetadataEnricher
-from ..api.app.ingest.pipeline import (
+from theo.infrastructure.api.app.enrich import MetadataEnricher
+from theo.infrastructure.api.app.ingest.pipeline import (
     PipelineDependencies,
     run_pipeline_for_file,
     run_pipeline_for_url,
 )
-from ..api.app.telemetry import log_workflow_event
+from theo.infrastructure.api.app.telemetry import log_workflow_event
 from theo.application.services.bootstrap import resolve_application
 
 
@@ -30,13 +30,13 @@ APPLICATION_CONTAINER, _ADAPTER_REGISTRY = resolve_application()
 
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checking only
-    from ..api.app.workers import tasks as worker_tasks
+    from theo.infrastructure.api.app.workers import tasks as worker_tasks
 
 
 def _get_worker_tasks():
     """Import worker tasks lazily to avoid circular imports during bootstrap."""
 
-    from ..api.app.workers import tasks as worker_tasks
+    from theo.infrastructure.api.app.workers import tasks as worker_tasks
 
     return worker_tasks
 
@@ -332,27 +332,40 @@ def _ingest_batch_via_api(
     engine = get_engine()
     dependency_bundle = dependencies or PipelineDependencies(settings=get_settings())
     document_ids: list[str] = []
+    
     with Session(engine) as session:
-        for item in batch:
-            frontmatter = dict(overrides)
-            if item.is_remote:
-                document = run_pipeline_for_url(
-                    session,
-                    cast(str, item.url),
-                    source_type=item.source_type,
-                    frontmatter=frontmatter,
-                    dependencies=dependency_bundle,
-                )
-            else:
-                document = run_pipeline_for_file(
-                    session,
-                    cast(Path, item.path),
-                    frontmatter,
-                    dependencies=dependency_bundle,
-                )
-            document_ids.append(document.id)
-        if post_batch_steps:
-            _run_post_batch_operations(session, document_ids, post_batch_steps)
+        try:
+            # Process all files in the batch
+            for item in batch:
+                frontmatter = dict(overrides)
+                if item.is_remote:
+                    document = run_pipeline_for_url(
+                        session,
+                        cast(str, item.url),
+                        source_type=item.source_type,
+                        frontmatter=frontmatter,
+                        dependencies=dependency_bundle,
+                    )
+                else:
+                    document = run_pipeline_for_file(
+                        session,
+                        cast(Path, item.path),
+                        frontmatter,
+                        dependencies=dependency_bundle,
+                    )
+                document_ids.append(document.id)
+            
+            # Run post-batch operations if specified
+            if post_batch_steps:
+                _run_post_batch_operations(session, document_ids, post_batch_steps)
+            
+            # Commit all changes if everything succeeded
+            session.commit()
+        except Exception:
+            # Roll back any uncommitted changes on failure
+            session.rollback()
+            raise
+    
     return document_ids
 
 

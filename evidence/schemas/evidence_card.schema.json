@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Theoria Evidence Card",
+  "type": "object",
+  "required": [
+    "id", "title", "claim", "scope", "mode", "stability", "confidence",
+    "sources", "quotes", "arguments_for", "counterpoints", "open_questions",
+    "tags", "provenance", "created_at", "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "claim": { "type": "string" },
+    "scope": { "type": "string" },
+    "mode": { "type": "string", "enum": ["Skeptical", "Neutral", "Apologetic"] },
+    "stability": { "type": "string", "enum": ["Low", "Medium", "High"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "sources": {
+      "type": "object",
+      "required": ["primary", "secondary"],
+      "properties": {
+        "primary": { "type": "array", "items": { "type": "string" } },
+        "secondary": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "quotes": { "type": "array", "items": { "type": "string" } },
+    "arguments_for": { "type": "array", "items": { "type": "string" } },
+    "counterpoints": { "type": "array", "items": { "type": "string" } },
+    "open_questions": { "type": "array", "items": { "type": "string" } },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "provenance": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "type": "string" },
+        "details": { "type": "string" }
+      }
+    },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  }
+}

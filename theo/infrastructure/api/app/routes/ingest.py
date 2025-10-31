@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, AsyncIterator, Iterator
@@ -149,6 +150,27 @@ def _unique_safe_path(tmp_dir: Path, filename: str | None, default: str) -> Path
     return tmp_dir / unique_name
 
 
+def _safe_cleanup_temp_directory(tmp_dir: Path) -> None:
+    """Safely clean up temporary directory with fallback to recursive removal."""
+    try:
+        # First try to remove files individually, then the directory
+        for file_path in tmp_dir.glob("*"):
+            if file_path.is_file():
+                try:
+                    file_path.unlink(missing_ok=True)
+                except OSError:
+                    pass  # Best effort file cleanup
+        
+        # Try simple directory removal first
+        tmp_dir.rmdir()
+    except OSError:
+        # Fallback to recursive removal if rmdir fails
+        try:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        except Exception:
+            pass  # Final fallback - best effort cleanup
+
+
 async def _iter_upload_chunks(
     upload: UploadFile, chunk_size: int = _UPLOAD_CHUNK_SIZE
 ) -> AsyncIterator[bytes]:
@@ -268,11 +290,7 @@ async def ingest_file(
             data={"resilience": exc.metadata.to_dict()},
         ) from exc
     finally:
-        try:
-            tmp_path.unlink(missing_ok=True)
-            tmp_dir.rmdir()
-        except OSError:
-            pass
+        _safe_cleanup_temp_directory(tmp_dir)
 
     schedule_discovery_refresh(background_tasks, user_id)
     return DocumentIngestResponse(document_id=document.id, status="processed")
@@ -426,13 +444,7 @@ async def ingest_transcript(
             data={"resilience": exc.metadata.to_dict()},
         ) from exc
     finally:
-        try:
-            if audio_path:
-                audio_path.unlink(missing_ok=True)
-            transcript_path.unlink(missing_ok=True)
-            tmp_dir.rmdir()
-        except OSError:
-            pass
+        _safe_cleanup_temp_directory(tmp_dir)
 
     schedule_discovery_refresh(background_tasks, user_id)
     return DocumentIngestResponse(document_id=document.id, status="processed")
@@ -504,14 +516,7 @@ async def ingest_audio(
                 frontmatter=enriched_frontmatter,
             )
         finally:
-            try:
-                tmp_path.unlink(missing_ok=True)
-            except FileNotFoundError:
-                pass
-            try:
-                tmp_dir.rmdir()
-            except OSError:
-                pass
+            _safe_cleanup_temp_directory(tmp_dir)
 
         schedule_discovery_refresh(background_tasks, principal_subject)
         return DocumentIngestResponse(document_id=document.id, status="processed")

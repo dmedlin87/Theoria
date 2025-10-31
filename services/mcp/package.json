@@ -1,0 +1,22 @@
+{
+  "name": "theoria-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/src/server.js",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.1.0",
+    "ulid": "^2.3.0",
+    "zod": "^3.23.8",
+    "dotenv": "^16.4.5",
+    "simple-git": "^3.22.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3"
+  }
+}
