@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -227,9 +229,26 @@ def serialize_embedding_rebuild_checkpoint(
     return checkpoint.to_dict()
 
 
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
+
 def load_embedding_rebuild_checkpoint(
-    path: Path,
+    path: Path, *, strict: bool = False
 ) -> EmbeddingRebuildCheckpoint | None:
+    """Load embedding rebuild checkpoint from file.
+    
+    Args:
+        path: Path to the checkpoint file
+        strict: If True, raises exceptions on invalid payloads instead of returning None
+        
+    Returns:
+        The checkpoint object if valid, None if missing or invalid (when strict=False)
+        
+    Raises:
+        CheckpointValidationError: When strict=True and checkpoint is invalid
+    """
     try:
         raw = path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -237,20 +256,64 @@ def load_embedding_rebuild_checkpoint(
 
     try:
         payload = json.loads(raw)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        if strict:
+            raise CheckpointValidationError(f"Invalid JSON in checkpoint {path}: {exc}") from exc
+        _LOGGER.warning("Invalid JSON in checkpoint %s: %s", path, exc)
         return None
+        
     if not isinstance(payload, Mapping):
+        error_msg = f"Invalid payload type in checkpoint {path}: expected mapping, got {type(payload)}"
+        if strict:
+            raise CheckpointValidationError(error_msg)
+        _LOGGER.warning(error_msg)
         return None
 
     try:
         return deserialize_embedding_rebuild_checkpoint(payload)
-    except CheckpointValidationError:
+    except CheckpointValidationError as exc:
+        if strict:
+            raise
+        _LOGGER.warning("Invalid checkpoint %s: %s", path, exc)
         return None
 
 
 def save_embedding_rebuild_checkpoint(
     path: Path, checkpoint: EmbeddingRebuildCheckpoint
 ) -> None:
+    """Atomically save embedding rebuild checkpoint to file.
+    
+    Uses atomic write via temporary file to prevent corruption on crash/interruption.
+    
+    Args:
+        path: Target path for the checkpoint file
+        checkpoint: Checkpoint data to save
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = serialize_embedding_rebuild_checkpoint(checkpoint)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    json_content = json.dumps(payload, indent=2)
+    
+    # Atomic write: write to temporary file, fsync, then rename
+    with tempfile.NamedTemporaryFile(
+        mode='w', 
+        delete=False, 
+        dir=path.parent, 
+        encoding='utf-8',
+        prefix=f".{path.name}.",
+        suffix='.tmp'
+    ) as tmp_file:
+        tmp_file.write(json_content)
+        tmp_file.flush()
+        os.fsync(tmp_file.fileno())
+        tmp_path = Path(tmp_file.name)
+    
+    try:
+        # Atomic rename to final location
+        tmp_path.replace(path)
+    except Exception:
+        # Clean up temporary file on failure
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass  # Best effort cleanup
+        raise
