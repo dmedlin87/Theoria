@@ -37,6 +37,8 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
         relative_output = destination
 
     cmd = [
+        "python",
+        "-m",
         "uv",
         "pip",
         "compile",

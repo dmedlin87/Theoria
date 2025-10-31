@@ -7,8 +7,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from hashlib import sha256
+import json
 from typing import Any
 
+from opentelemetry import trace
 from sqlalchemy.orm import Session
 
 from theo.infrastructure.api.app.persistence_models import (
@@ -21,6 +23,42 @@ from theo.infrastructure.api.app.persistence_models import (
 from ..models.search import HybridSearchFilters
 
 LOGGER = logging.getLogger(__name__)
+_TRACER = trace.get_tracer("theo.trails")
+
+
+def _emit_trail_completion_event(trail: AgentTrail) -> None:
+    """Emit trail completion event to external OpenTelemetry sink."""
+    try:
+        with _TRACER.start_as_current_span("trail.completed") as span:
+            span.set_attribute("trail.id", trail.id)
+            span.set_attribute("trail.workflow", trail.workflow)
+            span.set_attribute("trail.status", trail.status)
+            span.set_attribute("trail.user_id", trail.user_id or "anonymous")
+            span.set_attribute("trail.step_count", len(trail.steps))
+            span.set_attribute("trail.retrieval_count", len(trail.retrieval_snapshots))
+            
+            if trail.started_at:
+                span.set_attribute("trail.started_at", trail.started_at.isoformat())
+            if trail.completed_at:
+                span.set_attribute("trail.completed_at", trail.completed_at.isoformat())
+                if trail.started_at:
+                    duration_ms = (trail.completed_at - trail.started_at).total_seconds() * 1000
+                    span.set_attribute("trail.duration_ms", round(duration_ms, 2))
+            
+            # Add event for external monitoring systems
+            span.add_event(
+                "trail_completion",
+                attributes={
+                    "trail_id": trail.id,
+                    "workflow": trail.workflow,
+                    "status": trail.status,
+                    "step_count": len(trail.steps),
+                    "user_id": trail.user_id or "anonymous",
+                },
+            )
+    except Exception:
+        # Log but don't fail trail completion for telemetry issues
+        LOGGER.debug("Failed to emit trail completion event", exc_info=True)
 
 
 def _dedupe_and_clean(values: Sequence[Any]) -> list[str]:
@@ -33,6 +71,34 @@ def _dedupe_and_clean(values: Sequence[Any]) -> list[str]:
             continue
         ordered.append(text)
     return ordered
+
+
+def _compute_input_hash(input_payload: Any, tool: str, action: str | None = None) -> str:
+    """Compute a deterministic hash for input deduplication, excluding non-deterministic fields."""
+    if input_payload is None:
+        normalized = {}
+    elif hasattr(input_payload, "model_dump"):
+        normalized = input_payload.model_dump(mode="json")
+    elif isinstance(input_payload, Mapping):
+        normalized = dict(input_payload)
+    else:
+        normalized = {"value": str(input_payload)}
+    
+    # Remove non-deterministic fields that would cause false duplicates
+    non_deterministic_keys = {"timestamp", "request_id", "trace_id", "random_seed", "nonce"}
+    for key in non_deterministic_keys:
+        normalized.pop(key, None)
+    
+    # Create canonical representation
+    hash_input = {
+        "tool": tool,
+        "action": action,
+        "input": normalized,
+    }
+    
+    # Sort keys for deterministic ordering
+    canonical = json.dumps(hash_input, sort_keys=True, separators=(",", ":"))
+    return sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
 def _normalize_payload(value: Any) -> Any:
@@ -171,6 +237,9 @@ class TrailRecorder:
         digest: TrailStepDigest | Mapping[str, Any] | None = None,
         significant: bool = False,
     ) -> AgentStep:
+        # Compute input hash for deduplication
+        input_hash = _compute_input_hash(input_payload, tool, action)
+        
         step = AgentStep(
             trail_id=self.trail.id,
             step_index=self._next_step_index,
@@ -180,6 +249,7 @@ class TrailRecorder:
             input_payload=_normalize_payload(input_payload),
             output_payload=_normalize_payload(output_payload),
             output_digest=output_digest,
+            input_hash=input_hash,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             error_message=error_message,
@@ -319,6 +389,10 @@ class TrailRecorder:
         self.trail.updated_at = now
         self._session.add(self.trail)
         self._session.commit()
+        
+        # Emit completion event to external sink
+        _emit_trail_completion_event(self.trail)
+        
         self._finalized = True
         return self.trail
 
@@ -329,6 +403,10 @@ class TrailRecorder:
         self.trail.updated_at = datetime.now(UTC)
         self._session.add(self.trail)
         self._session.commit()
+        
+        # Emit completion event to external sink
+        _emit_trail_completion_event(self.trail)
+        
         self._finalized = True
         self._pending_digests.clear()
         return self.trail

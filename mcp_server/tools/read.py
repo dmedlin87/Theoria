@@ -137,10 +137,28 @@ def _select_search_filters(filters: dict[str, Any] | None) -> HybridSearchFilter
     return HybridSearchFilters(**supported)
 
 
+def _create_error_envelope(
+    error_code: str,
+    error_message: str,
+    request_id: str,
+    run_id: str,
+    hint: str | None = None,
+) -> schemas.ToolErrorEnvelope:
+    """Create a structured error envelope for deterministic client handling."""
+    return schemas.ToolErrorEnvelope(
+        status="error",
+        error_code=error_code,
+        error_message=error_message,
+        hint=hint,
+        request_id=request_id,
+        run_id=run_id,
+    )
+
+
 async def search_library(
     request: schemas.SearchLibraryRequest,
     end_user_id: Annotated[str, Header(alias="X-End-User-Id")],
-) -> schemas.SearchLibraryResponse:
+) -> schemas.SearchLibraryResponse | schemas.ToolErrorEnvelope:
     """Execute hybrid search and project results to the MCP schema."""
 
     # Validate inputs
@@ -153,8 +171,13 @@ async def search_library(
     try:
         policy.enforce_rate_limit("search_library", validated_user_id)
     except WriteSecurityError as exc:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        return _create_error_envelope(
+            "rate_limit_exceeded",
+            "Rate limit exceeded",
+            request.request_id,
+            str(uuid4()),
+            str(exc),
+        )
 
     with _tool_instrumentation("search_library", request, validated_user_id) as (
         run_id,
