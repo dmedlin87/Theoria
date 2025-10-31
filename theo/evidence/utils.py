@@ -214,7 +214,14 @@ def _parse_key_excerpts(block: str) -> list[dict[str, str]]:
         if not line.startswith("-"):
             continue
         content = line[1:].strip()
-        separator_match = re.search(r"\s[-–—]\s", content)
+        separator_match = None
+        for candidate in re.finditer(r"\s[-–—]\s", content):
+            left = content[: candidate.start()].rstrip()
+            right = content[candidate.end() :].lstrip()
+            if _looks_like_range_boundary(left, right):
+                continue
+            separator_match = candidate
+            break
         if separator_match:
             reference = content[: separator_match.start()].strip()
             snippet = content[separator_match.end() :].strip()
@@ -231,6 +238,33 @@ def _parse_key_excerpts(block: str) -> list[dict[str, str]]:
             "snippet": snippet.strip(),
         })
     return excerpts
+
+
+def _looks_like_range_boundary(left: str, right: str) -> bool:
+    """Return ``True`` when a spaced dash likely separates a verse range."""
+
+    if not left or not right:
+        return False
+
+    if not _RANGE_LEFT_SUFFIX.search(left):
+        return False
+
+    return bool(_RANGE_RIGHT_PREFIX.match(right))
+
+
+_RANGE_LEFT_SUFFIX = re.compile(r"(?:\d+[:\.]?\d*[a-z]?|\d+[a-z]?)\s*$", re.IGNORECASE)
+
+
+_RANGE_RIGHT_PREFIX = re.compile(
+    r"""
+    ^
+    (?:
+        (?:[1-3]\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+
+    )?
+    \d+(?::\d+)?[a-z]?
+    """,
+    re.VERBOSE,
+)
 
 
 def _parse_source_table(block: str) -> list[dict[str, str]]:
