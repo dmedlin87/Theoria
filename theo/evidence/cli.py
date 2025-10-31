@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+import re
 from pathlib import Path
 
 import click
@@ -11,6 +12,7 @@ import click
 from .dossier import EvidenceDossier
 from .indexer import EvidenceIndexer
 from .promoter import EvidencePromoter
+from .utils import dump_records_jsonl
 from .validator import EvidenceValidator
 
 
@@ -64,6 +66,10 @@ def _render_graphviz(graph: dict[str, object]) -> str:
                 lines.append(f'  "{osis}" -> "{sid}";')
     lines.append("}")
     return "\n".join(lines) + "\n"
+CARDS_DIRECTORY = Path("evidence/cards")
+REGISTRY_DIRECTORY = Path("evidence/registry")
+DEFAULT_SQLITE_PATH = REGISTRY_DIRECTORY / "evidence.index.sqlite"
+DEFAULT_JSONL_PATH = REGISTRY_DIRECTORY / "evidence.index.jsonl"
 
 
 @click.group()
@@ -79,30 +85,56 @@ def validate_command(paths: tuple[Path, ...], validate_all: bool, base_path: Pat
     """Validate evidence payloads and emit normalized JSON."""
 
     validator = EvidenceValidator(base_path=base_path)
+    default_target: Path | None = None if paths else CARDS_DIRECTORY
     if validate_all:
-        if not paths:
+        directory = paths[0] if paths else default_target
+        if directory is None:
             raise click.BadOptionUsage("--all", "Provide a directory to validate.")
-        collection = validator.validate_all(paths[0])
+        collection = validator.validate_all(directory)
     else:
-        if not paths:
+        targets: tuple[Path, ...] = paths if paths else (default_target,) if default_target else ()
+        if not targets:
             raise click.UsageError("Provide at least one evidence file to validate.")
-        collection = validator.validate_many(paths)
+        collection = validator.validate_many(targets)
     click.echo(json.dumps([record.model_dump(mode="json") for record in collection.records], indent=2))
 
 
 @cli.command("index")
 @click.argument("paths", nargs=-1, type=click.Path(path_type=Path))
-@click.option("--sqlite", "sqlite_path", required=True, type=click.Path(path_type=Path))
+@click.option(
+    "--sqlite",
+    "sqlite_path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_SQLITE_PATH,
+    show_default=True,
+    help="Destination SQLite index path.",
+)
+@click.option(
+    "--jsonl",
+    "jsonl_path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_JSONL_PATH,
+    show_default=True,
+    help="Destination JSONL registry path.",
+)
 @click.option("--base-path", type=click.Path(path_type=Path), default=Path.cwd())
-def index_command(paths: tuple[Path, ...], sqlite_path: Path, base_path: Path) -> None:
+def index_command(
+    paths: tuple[Path, ...],
+    sqlite_path: Path,
+    jsonl_path: Path,
+    base_path: Path,
+) -> None:
     """Build a SQLite index from evidence payloads."""
 
-    if not paths:
-        raise click.UsageError("Provide at least one evidence source file.")
+    targets = paths if paths else (CARDS_DIRECTORY,)
     validator = EvidenceValidator(base_path=base_path)
     indexer = EvidenceIndexer(validator)
-    collection = indexer.build_sqlite(paths, sqlite_path=sqlite_path)
-    click.echo(f"Indexed {len(collection.records)} records into {sqlite_path}")
+    collection = indexer.build_sqlite(targets, sqlite_path=sqlite_path)
+    jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+    dump_records_jsonl(jsonl_path, collection.records)
+    click.echo(
+        f"Indexed {len(collection.records)} records into {sqlite_path} and {jsonl_path}"
+    )
 
 
 @cli.command("promote")
@@ -137,12 +169,33 @@ def dossier_command(
     paths: tuple[Path, ...],
     render_graph: bool,
     output_path: Path | None,
+@click.option("--out", "out_path", type=click.Path(path_type=Path))
+@click.option("--tags", "tags", multiple=True, help="Filter dossier records by tag")
+@click.option(
+    "--mode",
+    type=click.Choice(["records", "summary", "full"], case_sensitive=False),
+    default="records",
+    show_default=True,
+)
+@click.option("--include-contradictions", is_flag=True, help="Include contradiction-tagged records")
+@click.option(
+    "--graph",
+    "graph_format",
+    type=click.Choice(["json", "dot"], case_sensitive=False),
+    help="Generate an evidence graph in the requested format",
+)
+@click.option("--base-path", type=click.Path(path_type=Path), default=Path.cwd())
+def dossier_command(
+    paths: tuple[Path, ...],
+    out_path: Path | None,
+    tags: tuple[str, ...],
+    mode: str,
+    include_contradictions: bool,
+    graph_format: str | None,
     base_path: Path,
 ) -> None:
     """Generate analytical dossiers for evidence collections."""
 
-    if not paths:
-        raise click.UsageError("Provide at least one evidence file.")
     validator = EvidenceValidator(base_path=base_path)
     dossier = EvidenceDossier(validator)
     if render_graph:
@@ -172,6 +225,61 @@ def dossier_command(
                 )
         else:
             click.echo(json.dumps(payload, indent=2))
+    targets = paths if paths else (CARDS_DIRECTORY,)
+
+    tag_filters = _coerce_tags(tags)
+    collection = dossier.collect(
+        targets,
+        tags=tag_filters if tag_filters else None,
+        include_contradictions=include_contradictions,
+    )
+
+    mode_normalized = mode.lower()
+    dossier_path: Path | None
+    graph_path: Path | None
+    dossier_path, graph_path = _resolve_output_paths(out_path, mode_normalized, graph_format)
+
+    if dossier_path:
+        dossier.export_dossier(
+            dossier_path,
+            mode=mode_normalized,
+            tags=tag_filters if tag_filters else None,
+            include_contradictions=include_contradictions,
+            collection=collection,
+        )
+        click.echo(f"Wrote dossier to {dossier_path}")
+    else:
+        dossier_payload = dossier.build_dossier(
+            targets,
+            mode=mode_normalized,
+            tags=tag_filters if tag_filters else None,
+            include_contradictions=include_contradictions,
+            collection=collection,
+        )
+        click.echo(json.dumps(dossier_payload, indent=2))
+
+    if graph_format:
+        if graph_path:
+            dossier.export_graph(
+                graph_path,
+                format=graph_format.lower(),
+                tags=tag_filters if tag_filters else None,
+                include_contradictions=include_contradictions,
+                collection=collection,
+            )
+            click.echo(f"Wrote graph to {graph_path}")
+        else:
+            graph_data = dossier.build_graph(
+                targets,
+                format=graph_format.lower(),
+                tags=tag_filters if tag_filters else None,
+                include_contradictions=include_contradictions,
+                collection=collection,
+            )
+            if isinstance(graph_data, str):
+                click.echo(graph_data)
+            else:
+                click.echo(json.dumps(graph_data, indent=2))
 
 
 @cli.command("query")
@@ -184,6 +292,44 @@ def query_command(sqlite_path: Path, osis: str | None, tag: str | None) -> None:
     indexer = EvidenceIndexer()
     results = indexer.query(sqlite_path, osis=osis, tag=tag)
     click.echo(json.dumps([record.model_dump(mode="json") for record in results], indent=2))
+
+
+def _coerce_tags(values: tuple[str, ...]) -> tuple[str, ...]:
+    tags: set[str] = set()
+    for raw in values:
+        if not raw:
+            continue
+        for item in re.split(r",|\s", raw):
+            item = item.strip()
+            if item:
+                tags.add(item)
+    return tuple(sorted(tags))
+
+
+def _resolve_output_paths(
+    out_path: Path | None, mode: str, graph_format: str | None
+) -> tuple[Path | None, Path | None]:
+    if out_path is None:
+        return None, None
+
+    target = Path(out_path)
+    if target.suffix:
+        dossier_path = target
+        graph_path: Path | None = None
+        if graph_format:
+            suffix = ".dot" if graph_format.lower() == "dot" else ".json"
+            graph_name = f"{dossier_path.stem}.graph{suffix}"
+            graph_path = dossier_path.with_name(graph_name)
+        return dossier_path, graph_path
+
+    dossier_dir = target
+    dossier_dir.mkdir(parents=True, exist_ok=True)
+    dossier_path = dossier_dir / f"dossier.{mode}.json"
+    graph_path = None
+    if graph_format:
+        suffix = "dot" if graph_format.lower() == "dot" else "json"
+        graph_path = dossier_dir / f"graph.{suffix}"
+    return dossier_path, graph_path
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point

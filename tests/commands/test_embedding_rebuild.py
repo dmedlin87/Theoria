@@ -42,6 +42,7 @@ if "pydantic" not in sys.modules:
 
 embeddings_stub = types.ModuleType("theo.infrastructure.api.app.ingest.embeddings")
 
+
 def _stub_clear_cache() -> None:
     return None
 
@@ -50,8 +51,22 @@ def _stub_get_service() -> Any:
     raise RuntimeError("embedding service stub should be patched")
 
 
+def _stub_lexical_representation(*_args: object, **_kwargs: object) -> str:
+    raise RuntimeError("lexical_representation stub should not be used at import time")
+
+
+class _StubEmbeddingService:  # pragma: no cover - placeholder for discovery
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("EmbeddingService stub should not be instantiated")
+
+
 embeddings_stub.clear_embedding_cache = _stub_clear_cache
 embeddings_stub.get_embedding_service = _stub_get_service
+embeddings_stub.lexical_representation = _stub_lexical_representation
+embeddings_stub.EmbeddingService = _StubEmbeddingService
+from theo.application.facades.resilience import ResilienceError as _RealResilienceError
+
+embeddings_stub.ResilienceError = _RealResilienceError
 sys.modules["theo.infrastructure.api.app.ingest.embeddings"] = embeddings_stub
 
 sanitizer_stub = types.ModuleType("theo.infrastructure.api.app.ingest.sanitizer")
