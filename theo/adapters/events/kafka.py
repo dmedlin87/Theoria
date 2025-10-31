@@ -90,8 +90,9 @@ class KafkaEventPublisher(EventPublisher):
                 )
 
                 if should_flush:
-                    timeout = self._flush_timeout if self._flush_timeout is not None else 30.0
-                    self._producer.flush(timeout)
+                    if self._flush_timeout is not None:
+                        timeout = self._flush_timeout
+                        self._producer.flush(timeout)
                     self._message_count = 0
                     self._last_flush = current_time
                 elif self._flush_timeout is not None and not self._batching_enabled:
