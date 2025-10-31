@@ -93,6 +93,32 @@ def _is_sqlite_closed_database_error(exc: ProgrammingError) -> bool:
     )
 
     return any(indicator in error_msg for indicator in sqlite_closed_indicators)
+    """Check if ProgrammingError indicates a closed SQLite database.
+    
+    Uses multiple patterns to detect SQLite database closed errors across
+    different SQLAlchemy versions and database drivers.
+    """
+    error_msg = str(exc).lower()
+    
+    # Common SQLite "database is closed" error patterns
+    sqlite_closed_indicators = [
+        "closed database",
+        "database is closed", 
+        "cannot operate on a closed database",
+        "database disk image is malformed",  # Sometimes appears with closed DBs
+        "sql logic error",  # Generic SQLite error that can indicate closure
+    ]
+    
+    # Check if any indicator matches
+    for indicator in sqlite_closed_indicators:
+        if indicator in error_msg:
+            return True
+            
+    # Additional check for SQLite-specific error patterns
+    if "sqlite" in error_msg and ("closed" in error_msg or "disconnect" in error_msg):
+        return True
+        
+    return False
 
 
 class _TheoSession(Session):

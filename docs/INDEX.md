@@ -23,6 +23,9 @@ This index highlights the current source-of-truth documents for Theoria. Anythin
   - [theoria_instruction_prompt.md](theoria_instruction_prompt.md) — System prompt contract for AI agents interfacing with Theoria.
   - [AGENT_CONFINEMENT.md](AGENT_CONFINEMENT.md) — Guardrails for agent execution and sandboxing.
 
+- **User Research & Strategy**
+  - [research/adjacent_user_needs.md](research/adjacent_user_needs.md) — Adjacent user pain points and opportunity backlog for product planning.
+
 - **Testing & Quality**
   - [testing.md](testing.md) — Current testing posture and coverage heatmap.
   - [testing/TEST_MAP.md](testing/TEST_MAP.md) — Authoritative testing matrix and ownership.
