@@ -229,14 +229,15 @@ export function AppShell({
           }
           fallbackFocus={() => navToggleRef.current ?? document.body}
         >
-          <div
-            id="app-shell-v2-nav-content"
-            className="app-shell-v2__nav-content"
-            data-open={!isMobileNav || isNavOpen}
-            data-ready={navInitialized}
-            aria-hidden={isMobileNav && !isNavOpen}
-            ref={navContentRef}
-          >
+          <div className={styles.globalNavWrapper}>
+            <div
+              id="app-shell-v2-nav-content"
+              className="app-shell-v2__nav-content"
+              data-open={!isMobileNav || isNavOpen}
+              data-ready={navInitialized}
+              aria-hidden={isMobileNav && !isNavOpen}
+              ref={navContentRef}
+            >
             <nav className="app-shell-v2__nav-groups" aria-label="Primary">
               {navSections.map((section) => (
                 <div key={section.label} className="app-shell-v2__nav-group">
@@ -276,6 +277,7 @@ export function AppShell({
               ))}
             </nav>
             <div className="app-shell-v2__mode">{modeSwitcher}</div>
+          </div>
           </div>
         </FocusTrapRegion>
       </aside>
