@@ -36,6 +36,8 @@
 ### Celery Tasks (`workers.tasks`)
 - `validate_citations`, `process_file`, `process_url`, `enrich_document`, `generate_document_summary`, `send_topic_digest_notification`, `generate_topic_digest`, `refresh_hnsw`, `run_watchlist_alert`, `build_deliverable`, `schedule_watchlist_alerts`, `refresh_creator_verse_rollups` plus helpers for cached chat sessions and citation normalisation.
 
+The contributor workflow for starting Postgres fixtures, running targeted suites, and interpreting coverage reports now lives in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#postgres--pgvector-testcontainer-fixture). Cross-check those sections when spinning up a new suite locally.
+
 ## Planned Test Suites
 
 | Suite | Scope | Key Fixtures / Infra | Coverage Goals | Notes & Deferrals |
@@ -65,4 +67,4 @@
 - [ ] Configure Vitest coverage thresholds and component tests for key UI surfaces.
 - [ ] Script Playwright journeys with smoke/full tags and CI trace uploads.
 - [ ] Wire GitHub Actions workflows with coverage gates and artifact uploads.
-- [ ] Document developer flows in `CONTRIBUTING.md` (DB/bootstrap, targeted runs).
+- [x] Document developer flows in `CONTRIBUTING.md` (DB/bootstrap, targeted runs). See [Running Tests](../../CONTRIBUTING.md#targeted-pytest-execution) for the living reference.

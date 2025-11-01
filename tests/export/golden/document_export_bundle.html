@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Theo Export export-fixture</title>
+    <meta name="generator" content="Theo Exporter" />
+    <meta name="theo:schema_version" content="2024-07-01" />
+    <script id="theo-export-manifest" type="application/json">{
+  "export_id": "export-fixture",
+  "schema_version": "2024-07-01",
+  "created_at": "2024-01-01T00:00:00Z",
+  "type": "documents",
+  "filters": {
+    "collection": "theology",
+    "author": null,
+    "source_type": null
+  },
+  "totals": {
+    "documents": 1,
+    "passages": 1,
+    "returned": 1
+  },
+  "app_git_sha": "abc1234",
+  "enrichment_version": 2,
+  "cursor": "doc-1",
+  "next_cursor": null,
+  "mode": null
+}</script>
+    <script id="theo-export-records" type="application/json">[
+  {
+    "kind": "document",
+    "document_id": "doc-1",
+    "title": "Example Document",
+    "collection": "theology",
+    "source_type": "article",
+    "authors": [
+      "Jane Doe",
+      "John Roe"
+    ],
+    "doi": "10.1234/example",
+    "venue": "TheoConf",
+    "year": 2023,
+    "topics": [
+      "grace"
+    ],
+    "primary_topic": "Grace",
+    "enrichment_version": 2,
+    "provenance_score": 82,
+    "abstract": "An example abstract",
+    "source_url": "https://example.com/doc-1",
+    "metadata": {
+      "publisher": "Theo Press",
+      "pages": "10-12"
+    },
+    "passages": [
+      {
+        "id": "passage-1",
+        "document_id": "doc-1",
+        "osis_ref": "John.1.1",
+        "page_no": 1,
+        "t_start": null,
+        "t_end": null,
+        "text": "In the beginning was the Word.",
+        "meta": {
+          "snippet": "In the beginning was the Word."
+        }
+      }
+    ]
+  }
+]</script>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 2rem;
+        line-height: 1.5;
+      }
+      pre {
+        background: #f5f5f5;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        overflow-x: auto;
+      }
+      h1, h2 {
+        color: #1a365d;
+      }
+      .summary {
+        margin-bottom: 2rem;
+      }
+      .summary dt {
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Theo Export export-fixture</h1>
+        <dl class="summary">
+          <dt>Schema version</dt>
+          <dd>2024-07-01</dd>
+          <dt>Created</dt>
+          <dd>2024-01-01T00:00:00+00:00</dd>
+          <dt>Export type</dt>
+          <dd>documents</dd>
+        </dl>
+      </header>
+      <section id="manifest">
+        <h2>Manifest</h2>
+        <pre>{
+  &quot;export_id&quot;: &quot;export-fixture&quot;,
+  &quot;schema_version&quot;: &quot;2024-07-01&quot;,
+  &quot;created_at&quot;: &quot;2024-01-01T00:00:00Z&quot;,
+  &quot;type&quot;: &quot;documents&quot;,
+  &quot;filters&quot;: {
+    &quot;collection&quot;: &quot;theology&quot;,
+    &quot;author&quot;: null,
+    &quot;source_type&quot;: null
+  },
+  &quot;totals&quot;: {
+    &quot;documents&quot;: 1,
+    &quot;passages&quot;: 1,
+    &quot;returned&quot;: 1
+  },
+  &quot;app_git_sha&quot;: &quot;abc1234&quot;,
+  &quot;enrichment_version&quot;: 2,
+  &quot;cursor&quot;: &quot;doc-1&quot;,
+  &quot;next_cursor&quot;: null,
+  &quot;mode&quot;: null
+}</pre>
+      </section>
+      <section id="records">
+        <h2>Records</h2>
+        <pre>[
+  {
+    &quot;kind&quot;: &quot;document&quot;,
+    &quot;document_id&quot;: &quot;doc-1&quot;,
+    &quot;title&quot;: &quot;Example Document&quot;,
+    &quot;collection&quot;: &quot;theology&quot;,
+    &quot;source_type&quot;: &quot;article&quot;,
+    &quot;authors&quot;: [
+      &quot;Jane Doe&quot;,
+      &quot;John Roe&quot;
+    ],
+    &quot;doi&quot;: &quot;10.1234/example&quot;,
+    &quot;venue&quot;: &quot;TheoConf&quot;,
+    &quot;year&quot;: 2023,
+    &quot;topics&quot;: [
+      &quot;grace&quot;
+    ],
+    &quot;primary_topic&quot;: &quot;Grace&quot;,
+    &quot;enrichment_version&quot;: 2,
+    &quot;provenance_score&quot;: 82,
+    &quot;abstract&quot;: &quot;An example abstract&quot;,
+    &quot;source_url&quot;: &quot;https://example.com/doc-1&quot;,
+    &quot;metadata&quot;: {
+      &quot;publisher&quot;: &quot;Theo Press&quot;,
+      &quot;pages&quot;: &quot;10-12&quot;
+    },
+    &quot;passages&quot;: [
+      {
+        &quot;id&quot;: &quot;passage-1&quot;,
+        &quot;document_id&quot;: &quot;doc-1&quot;,
+        &quot;osis_ref&quot;: &quot;John.1.1&quot;,
+        &quot;page_no&quot;: 1,
+        &quot;t_start&quot;: null,
+        &quot;t_end&quot;: null,
+        &quot;text&quot;: &quot;In the beginning was the Word.&quot;,
+        &quot;meta&quot;: {
+          &quot;snippet&quot;: &quot;In the beginning was the Word.&quot;
+        }
+      }
+    ]
+  }
+]</pre>
+      </section>
+    </main>
+  </body>
+</html>

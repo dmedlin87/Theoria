@@ -194,6 +194,7 @@ CASE_OVERRIDES: dict[tuple[str, str], CaseOverride] = {
         },
         expected_status=201,
     ),
+    ("GET", "/ai/digest/watchlists"): CaseOverride(expected_status=200),
     ("GET", "/ai/llm"): CaseOverride(expected_status=200),
     ("POST", "/analytics/feedback"): CaseOverride(
         body=lambda ctx: {
@@ -574,20 +575,63 @@ def _stub_external_services(contract_context: ContractTestContext):
     class _StubWatchlistsService:
         def __init__(self, _session) -> None:
             self._now = now
+            self._store: dict[str, WatchlistResponse] = {
+                "watchlist-contract": self._build_response(
+                    watchlist_id="watchlist-contract",
+                    user_id="contract-test",
+                    name="Weekly Hope",
+                    filters={"osis": [contract_context.osis_ref]},
+                    cadence="weekly",
+                )
+            }
 
-        def create(self, user_id: str, payload) -> WatchlistResponse:
+        def _build_response(
+            self,
+            *,
+            watchlist_id: str,
+            user_id: str,
+            name: str,
+            filters: dict[str, object] | None,
+            cadence: str,
+            delivery_channels: list[str] | None = None,
+            is_active: bool = True,
+        ) -> WatchlistResponse:
             return WatchlistResponse(
-                id="watchlist-contract",
+                id=watchlist_id,
                 user_id=user_id,
-                name=payload.name,
-                filters=payload.filters or {},
-                cadence=payload.cadence or "weekly",
-                delivery_channels=payload.delivery_channels or ["email"],
-                is_active=payload.is_active if payload.is_active is not None else True,
+                name=name,
+                filters=filters or {},
+                cadence=cadence,
+                delivery_channels=delivery_channels or ["email"],
+                is_active=is_active,
                 last_run=None,
                 created_at=self._now,
                 updated_at=self._now,
             )
+
+        def list(self, user_id: str) -> list[WatchlistResponse]:
+            return [
+                watchlist
+                for watchlist in self._store.values()
+                if watchlist.user_id == user_id
+            ]
+
+        def create(self, user_id: str, payload) -> WatchlistResponse:
+            watchlist = self._build_response(
+                watchlist_id="watchlist-contract",
+                user_id=user_id,
+                name=payload.name,
+                filters=payload.filters,
+                cadence=payload.cadence or "weekly",
+                delivery_channels=payload.delivery_channels,
+                is_active=(
+                    payload.is_active
+                    if payload.is_active is not None
+                    else True
+                ),
+            )
+            self._store[watchlist.id] = watchlist
+            return watchlist
 
     patcher.setattr(
         "theo.infrastructure.api.app.routes.ai.watchlists._service",
