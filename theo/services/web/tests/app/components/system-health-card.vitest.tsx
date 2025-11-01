@@ -54,7 +54,14 @@ describe("SystemHealthCard", () => {
 
     render(<SystemHealthCard />);
 
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith("/health/detail", expect.anything()));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+
+    const [request] = fetchSpy.mock.calls[0] ?? [];
+    if (request instanceof Request) {
+      expect(request.url).toContain("/health/detail");
+    } else {
+      expect(request).toContain("/health/detail");
+    }
 
     expect(await screen.findByText(/System health/i)).toBeInTheDocument();
     expect(screen.getByText("Database reachable")).toBeInTheDocument();
