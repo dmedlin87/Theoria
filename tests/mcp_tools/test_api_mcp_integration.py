@@ -1,227 +1,131 @@
-"""Integration tests for MCP API tools."""
+"""Integration tests for the service-level MCP tool registry."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any, Iterable
 
 import pytest
 
-from theo.infrastructure.api.app.mcp import tools
-from theo.infrastructure.api.app.mcp.tools import MCPToolError
-from theo.infrastructure.api.app.models.research import ResearchNote as ResearchNoteSchema
+from theo.services.api.app.mcp import tools
 
 
-_FAKE_TIMESTAMP = datetime(2024, 1, 1, tzinfo=timezone.utc)
+class _FakeServer:
+    """Minimal MCP server stub used to capture registration calls."""
 
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, object, bool]] = []
 
-@dataclass
-class _FakeResult:
-    rows: Iterable[Any]
-
-    def __iter__(self):
-        return iter(self.rows)
-
-
-@dataclass
-class _FakeSession:
-    rows: Iterable[Any]
-
-    def execute(self, _stmt):
-        return _FakeResult(self.rows)
-
-
-class _FakeResearchService:
-    def __init__(self):
-        self.created: list[tuple[Any, bool]] = []
-        self.previewed: list[Any] = []
-
-    def create_note(self, draft, *, commit: bool = True):
-        self.created.append((draft, commit))
-        return ResearchNoteSchema(
-            id="note-created",
-            osis=draft.osis,
-            body=draft.body,
-            title=draft.title,
-            stance=draft.stance,
-            claim_type=draft.claim_type,
-            confidence=None,
-            tags=list(draft.tags or []) or None,
-            evidences=[],
-            created_at=_FAKE_TIMESTAMP,
-            updated_at=_FAKE_TIMESTAMP,
-        )
-
-    def preview_note(self, draft):
-        self.previewed.append(draft)
-        return ResearchNoteSchema(
-            id="note-preview",
-            osis=draft.osis,
-            body=draft.body,
-            title=draft.title,
-            stance=draft.stance,
-            claim_type=draft.claim_type,
-            confidence=None,
-            tags=list(draft.tags or []) or None,
-            evidences=[],
-            created_at=_FAKE_TIMESTAMP,
-            updated_at=_FAKE_TIMESTAMP,
-        )
+    def register_tool(self, name: str, *, handler, requires_commit: bool) -> None:
+        self.calls.append((name, handler, requires_commit))
 
 
 @pytest.fixture
-def fake_service(monkeypatch):
-    service = _FakeResearchService()
-    monkeypatch.setattr(tools, "get_research_service", lambda session: service)
-    return service
+def fresh_registry(monkeypatch):
+    """Reset the MCP registry to its default state for each test."""
+
+    registry = tools._build_default_registry()
+    monkeypatch.setattr(tools, "_registry", registry)
+    return registry
 
 
-def _build_payload(**overrides: Any) -> dict[str, Any]:
+@pytest.fixture
+def fake_session():
+    return SimpleNamespace()
+
+
+def _sample_payload(**overrides):
     payload = {
         "osis": "John.3.16",
         "body": "For God so loved the world",
         "title": "Gospel Insight",
-        "stance": "supportive",
-        "claim_type": "commentary",
-        "tags": ["grace", "love"],
-        "evidences": [
-            {
-                "source_type": "passage",
-                "source_ref": "doc-1",
-                "osis_refs": ["John.3.16"],
-                "citation": "John 3:16",
-                "snippet": "For God so loved the world",
-                "meta": {"translation": "KJV"},
-            }
-        ],
     }
     payload.update(overrides)
     return payload
 
 
-class TestHandleNoteWrite:
-    def test_commits_by_default(self, fake_service):
-        payload = _build_payload()
-        session = SimpleNamespace()
+def test_register_with_server_registers_default_tool(fresh_registry):
+    server = _FakeServer()
 
-        response = tools.handle_note_write(session, payload)
+    tools.register_with_server(server)
 
-        assert response.osis == "John.3.16"
-        assert fake_service.created, "create_note should be invoked"
-        draft, commit_flag = fake_service.created[-1]
-        assert commit_flag is True
-        assert list(draft.tags) == ["grace", "love"]
-        assert len(draft.evidences) == 1
-        evidence = draft.evidences[0]
-        assert list(evidence.osis_refs) == ["John.3.16"]
-        assert evidence.meta == {"translation": "KJV"}
-
-    def test_preview_when_commit_false(self, fake_service):
-        payload = _build_payload(commit=False)
-        session = SimpleNamespace()
-
-        response = tools.handle_note_write(session, payload)
-
-        assert not fake_service.created
-        assert fake_service.previewed, "preview_note should be invoked"
-        preview_draft = fake_service.previewed[-1]
-        assert preview_draft.osis == "John.3.16"
-        assert response.body == payload["body"]
-
-    def test_doc_id_used_when_osis_missing(self, fake_service, monkeypatch):
-        payload = _build_payload(osis="   ", doc_id="doc-77")
-        session = SimpleNamespace()
-
-        orig_resolver = tools._resolve_document_osis
-
-        def fake_resolver(sess, doc_id):
-            assert sess is session
-            if doc_id == "doc-77":
-                return "Gen.1.1"
-            return orig_resolver(sess, doc_id)
-
-        monkeypatch.setattr(tools, "_resolve_document_osis", fake_resolver)
-
-        tools.handle_note_write(session, payload)
-
-        draft, _ = fake_service.created[-1]
-        assert draft.osis == "Gen.1.1"
-
-    def test_missing_osis_raises_error(self, fake_service, monkeypatch):
-        payload = _build_payload(osis="", doc_id=None)
-        session = SimpleNamespace()
-
-        orig_resolver = tools._resolve_document_osis
-
-        def always_none_resolver(sess, doc_id):
-            if isinstance(doc_id, str):
-                return orig_resolver(sess, doc_id)
-            return None
-
-        monkeypatch.setattr(tools, "_resolve_document_osis", always_none_resolver)
-
-        with pytest.raises(MCPToolError) as exc:
-            tools.handle_note_write(session, payload)
-
-        assert "OSIS reference" in str(exc.value)
-
-    def test_invalid_payload_raises_mcp_error(self, fake_service):
-        payload = {"osis": "", "body": None}
-        session = SimpleNamespace()
-
-        with pytest.raises(MCPToolError):
-            tools.handle_note_write(session, payload)
+    assert len(server.calls) == 1
+    name, handler, requires_commit = server.calls[0]
+    assert name == "note_write"
+    assert handler is tools.handle_note_write
+    assert requires_commit is True
 
 
-class TestResolveDocumentOsis:
-    def test_prefers_primary_reference(self, monkeypatch):
-        rows = [
-            SimpleNamespace(osis_ref="Gen.1.1", meta={"osis_primary": "Gen.1.2"}),
-            SimpleNamespace(osis_ref="Gen.1.3", meta={}),
-        ]
-        session = _FakeSession(rows)
-        monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
-        payload = _build_payload(osis=" ", doc_id="doc-1")
-        orig_resolver = tools._resolve_document_osis
+def test_invoke_tool_delegates_to_handler(monkeypatch, fake_session, mcp_security_policies):
+    captured: dict[str, object] = {}
 
-        def patched_resolver(sess, doc_id):
-            assert sess is session
-            return orig_resolver(sess, doc_id)
+    def fake_handle(session, payload):
+        captured["session"] = session
+        captured["payload"] = payload
+        return {"note_id": "note-1"}
 
-        monkeypatch.setattr(tools, "_resolve_document_osis", patched_resolver)
-        result = tools.handle_note_write(session, payload)
-        assert result.osis == "Gen.1.2"
+    monkeypatch.setattr(tools, "handle_note_write", fake_handle)
+    registry = tools._build_default_registry()
+    monkeypatch.setattr(tools, "_registry", registry)
 
-    def test_falls_back_to_first_osis(self, monkeypatch):
-        rows = [
-            SimpleNamespace(osis_ref="Gen.1.4", meta=None),
-            SimpleNamespace(osis_ref="Gen.1.5", meta="not-a-mapping"),
-        ]
-        session = _FakeSession(rows)
-        monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
-        payload = _build_payload(osis=" ", doc_id="doc-2")
-        orig_resolver = tools._resolve_document_osis
+    payload = _sample_payload(commit=True)
+    result = tools.invoke_tool("note_write", fake_session, payload)
 
-        def patched_resolver(sess, doc_id):
-            assert sess is session
-            return orig_resolver(sess, doc_id)
+    assert result == {"note_id": "note-1"}
+    assert captured["session"] is fake_session
+    assert captured["payload"] is payload
 
-        monkeypatch.setattr(tools, "_resolve_document_osis", patched_resolver)
-        result = tools.handle_note_write(session, payload)
-        assert result.osis == "Gen.1.4"
 
-    def test_returns_none_when_no_rows(self, monkeypatch):
-        session = _FakeSession([])
-        monkeypatch.setattr(tools, "get_research_service", lambda s: _FakeResearchService())
-        payload = _build_payload(osis=" ", doc_id="doc-3")
-        orig_resolver = tools._resolve_document_osis
+def test_invoke_tool_propagates_mcp_error(monkeypatch, fake_session, mcp_security_policies):
+    def fake_handle(session, payload):
+        raise tools.MCPToolError("invalid payload")
 
-        def patched_resolver(sess, doc_id):
-            assert sess is session
-            return orig_resolver(sess, doc_id)
+    monkeypatch.setattr(tools, "handle_note_write", fake_handle)
+    registry = tools._build_default_registry()
+    monkeypatch.setattr(tools, "_registry", registry)
 
-        monkeypatch.setattr(tools, "_resolve_document_osis", patched_resolver)
-        with pytest.raises(MCPToolError):
-            tools.handle_note_write(session, payload)
+    with pytest.raises(tools.MCPToolError) as excinfo:
+        tools.invoke_tool("note_write", fake_session, _sample_payload(osis=""))
+    assert "invalid payload" in str(excinfo.value)
+
+
+def test_register_tool_prevents_duplicate_registration(fresh_registry):
+    with pytest.raises(ValueError):
+        tools.register_tool("note_write", lambda *args, **kwargs: None)
+
+
+def test_register_tool_rejects_blank_name(fresh_registry):
+    with pytest.raises(ValueError):
+        tools.register_tool("   ", lambda *args, **kwargs: None)
+
+
+def test_invoke_tool_unknown_tool_raises_key_error(fresh_registry, fake_session):
+    with pytest.raises(KeyError):
+        tools.invoke_tool("nonexistent", fake_session, _sample_payload())
+
+
+def test_register_tool_respects_requires_commit_flag(fresh_registry):
+    preview_result = {"status": "preview"}
+
+    def fake_preview(session, payload):
+        return preview_result
+
+    tools.register_tool("preview_only", fake_preview, requires_commit=False)
+    server = _FakeServer()
+    tools.register_with_server(server)
+
+    preview_entry = next((call for call in server.calls if call[0] == "preview_only"), None)
+    assert preview_entry is not None
+    name, handler, requires_commit = preview_entry
+    assert name == "preview_only"
+    assert handler is fake_preview
+    assert requires_commit is False
+
+
+def test_register_tool_normalizes_name(fresh_registry, fake_session):
+    def fake_preview(session, payload):
+        return {"status": "ok"}
+
+    tools.register_tool("  preview_only  ", fake_preview, requires_commit=False)
+
+    result = tools.invoke_tool("preview_only", fake_session, _sample_payload(commit=False))
+    assert result == {"status": "ok"}
