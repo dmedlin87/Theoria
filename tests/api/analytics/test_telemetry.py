@@ -250,7 +250,7 @@ def test_dashboard_summary_shapes_metrics_and_activity(
     prior_note = ResearchNote(
         id="note-old",
         osis="Gen.1.2",
-        body="Let there be light",
+        body="And the earth was without form, and void; and darkness was upon the face of the deep",
         created_at=fixed_now - timedelta(days=10),
         updated_at=fixed_now - timedelta(days=10),
     )
