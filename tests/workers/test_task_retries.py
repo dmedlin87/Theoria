@@ -25,6 +25,7 @@ def _task(obj: Any) -> Task:
 
 
 @pytest.fixture
+# This fixture intentionally overrides the pytest-celery plugin's celery_app fixture.
 def celery_app():  # type: ignore[override]
     """Run Celery tasks eagerly against the application task registry."""
 
