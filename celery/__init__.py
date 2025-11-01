@@ -10,6 +10,7 @@ the test suite.
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -57,11 +58,18 @@ def _import_real_module(name: str) -> ModuleType | None:
     return module
 
 
-_real_celery = _import_real_module("celery")
+if "pytest" in sys.modules and os.environ.get("THEORIA_ALLOW_REAL_CELERY", "0") not in {"1", "true", "TRUE"}:
+    _real_celery = None
+else:
+    _real_celery = _import_real_module("celery")
 if _real_celery is not None:
     sys.modules[__name__] = _real_celery
     globals().update({key: getattr(_real_celery, key) for key in dir(_real_celery)})
-    __all__ = getattr(_real_celery, "__all__", [key for key in dir(_real_celery) if not key.startswith("_")])
+    __all__ = getattr(
+        _real_celery,
+        "__all__",
+        [key for key in dir(_real_celery) if not key.startswith("_")],
+    )
 else:
     from .app.task import Task
     from .exceptions import Retry
@@ -71,7 +79,9 @@ else:
     class Celery:
         """A drastically simplified stand-in for :class:`celery.Celery`."""
 
-        def __init__(self, main: str, *, broker: str | None = None, backend: str | None = None) -> None:
+        def __init__(
+            self, main: str, *, broker: str | None = None, backend: str | None = None
+        ) -> None:
             self.main = main
             self.broker = broker
             self.backend = backend

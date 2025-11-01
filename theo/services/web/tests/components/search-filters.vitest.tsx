@@ -44,13 +44,27 @@ describe("SearchFilters", () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText(/search query/i), { target: { value: "lexical" } });
-    fireEvent.change(screen.getByLabelText(/osis reference/i), { target: { value: "John.1.1" } });
-    fireEvent.change(screen.getByLabelText(/collection/i), { target: { value: "Sermons" } });
-    fireEvent.change(screen.getByLabelText(/author/i), { target: { value: "Augustine" } });
-    fireEvent.change(screen.getByLabelText(/source type/i), { target: { value: "pdf" } });
-    fireEvent.change(screen.getByLabelText(/theological tradition/i), { target: { value: "baptist" } });
-    fireEvent.change(screen.getByLabelText(/topic domain/i), { target: { value: "christology" } });
+    fireEvent.change(screen.getByLabelText(/search query/i, { selector: "input" }), {
+      target: { value: "lexical" },
+    });
+    fireEvent.change(screen.getByLabelText(/osis reference/i, { selector: "input" }), {
+      target: { value: "John.1.1" },
+    });
+    fireEvent.change(screen.getByLabelText(/collection/i, { selector: "input" }), {
+      target: { value: "Sermons" },
+    });
+    fireEvent.change(screen.getByLabelText(/author/i, { selector: "input" }), {
+      target: { value: "Augustine" },
+    });
+    fireEvent.change(screen.getByLabelText(/source type/i, { selector: "select" }), {
+      target: { value: "pdf" },
+    });
+    fireEvent.change(screen.getByLabelText(/theological tradition/i, { selector: "select" }), {
+      target: { value: "baptist" },
+    });
+    fireEvent.change(screen.getByLabelText(/topic domain/i, { selector: "select" }), {
+      target: { value: "christology" },
+    });
 
     await user.click(screen.getByRole("button", { name: /clear all/i }));
 
