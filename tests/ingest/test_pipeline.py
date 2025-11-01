@@ -27,6 +27,9 @@ from theo.infrastructure.api.app.ingest.parsers import TranscriptSegment  # noqa
 from theo.infrastructure.api.app.ingest.stages import ErrorDecision  # noqa: E402
 from theo.infrastructure.api.app.ingest.stages.fetchers import UrlSourceFetcher  # noqa: E402
 from theo.infrastructure.api.app.ingest.stages.parsers import TranscriptParser  # noqa: E402
+
+
+pytestmark = pytest.mark.pgvector
 def _capture_span_attributes(monkeypatch):
     recorded = []
 

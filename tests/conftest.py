@@ -19,6 +19,7 @@ if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
     from theo.adapters import AdapterRegistry
     from theo.application import ApplicationContainer
     from tests.fixtures import RegressionDataFactory
+    from testcontainers.postgres import PostgresContainer
 
 import pytest
 
@@ -94,7 +95,8 @@ except ModuleNotFoundError:  # pragma: no cover - allows running lightweight sui
     sessionmaker = None  # type: ignore[assignment]
 
 try:  # pragma: no cover - factory depends on optional domain extras
-    from tests.factories.application import isolated_application_container
+from tests.factories.application import isolated_application_container
+from tests.fixtures.pgvector import PGVectorDatabase, PGVectorClone, provision_pgvector_database
 except ModuleNotFoundError as exc:  # pragma: no cover - light environments
     isolated_application_container = None  # type: ignore[assignment]
     _APPLICATION_FACTORY_IMPORT_ERROR = exc
@@ -410,10 +412,14 @@ if str(PROJECT_ROOT) not in sys.path:
 
 _FIXTURE_MARKER_REQUIREMENTS: dict[str, set[str]] = {
     "pgvector": {
+        "ingest_engine",
+        "pgvector_db",
         "pgvector_container",
         "pgvector_database_url",
         "pgvector_engine",
         "pgvector_migrated_database_url",
+        "pipeline_engine",
+        "pipeline_session_factory",
     },
     "schema": {
         "integration_database_url",
@@ -519,74 +525,54 @@ def pytest_collection_modifyitems(
                 item.add_marker(pytest.mark.xdist_group(name=group_name))
 
 
-POSTGRES_IMAGE = os.environ.get("PYTEST_PGVECTOR_IMAGE", "ankane/pgvector:0.5.2")
+POSTGRES_IMAGE = os.environ.get("PYTEST_PGVECTOR_IMAGE", "pgvector/pgvector:pg15")
 
 
 @pytest.fixture(scope="session")
-def pgvector_container(
-    request: pytest.FixtureRequest,
-) -> Generator["PostgresContainer", None, None]:
-    """Launch a pgvector-enabled Postgres container for integration tests."""
+def pgvector_db(request: pytest.FixtureRequest) -> Iterator[PGVectorDatabase]:
+    """Provision a seeded Postgres+pgvector database for heavy integration suites.
+
+    The fixture starts a single Testcontainer for the duration of the test
+    session, applies the project's SQL migrations, and seeds the bundled
+    reference datasets.  Individual tests can call ``clone_database`` on the
+    returned object to create isolated databases that inherit the prepared
+    schema and extensions without incurring the full migration cost again.
+    """
 
     _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
 
     try:
-        from testcontainers.postgres import PostgresContainer
-    except ModuleNotFoundError as exc:  # pragma: no cover - missing optional dep
+        context = provision_pgvector_database(image=POSTGRES_IMAGE)
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
         pytest.skip(f"testcontainers not installed: {exc}")
-
-    container = PostgresContainer(image=POSTGRES_IMAGE)
-    container.with_env("POSTGRES_DB", "theo")
-    container.with_env("POSTGRES_USER", "postgres")
-    container.with_env("POSTGRES_PASSWORD", "postgres")
-
     try:
-        container.start()
+        with context as database:
+            yield database
+    except ModuleNotFoundError as exc:  # pragma: no cover - container provisioning
+        pytest.skip(f"testcontainers not installed: {exc}")
     except Exception as exc:  # pragma: no cover - surfaced when Docker unavailable
         pytest.skip(f"Unable to start Postgres Testcontainer: {exc}")
 
-    try:
-        yield container
-    finally:
-        with contextlib.suppress(Exception):
-            container.stop()
 
+@pytest.fixture(scope="session")
+def pgvector_container(pgvector_db: PGVectorDatabase) -> PostgresContainer:
+    """Return the underlying Testcontainer for backwards-compatible fixtures."""
 
-def _normalise_database_url(url: str) -> str:
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return url
+    return pgvector_db.container
 
 
 @pytest.fixture(scope="session")
-def pgvector_database_url(
-    request: pytest.FixtureRequest, pgvector_container
-) -> Generator[str, None, None]:
-    """Yield a SQLAlchemy-friendly database URL for the running container."""
+def pgvector_database_url(pgvector_db: PGVectorDatabase) -> str:
+    """Expose the SQLAlchemy URL for the seeded pgvector template database."""
 
-    _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
-
-    raw_url = pgvector_container.get_connection_url()
-    url = _normalise_database_url(raw_url)
-    engine = create_engine(url, future=True)
-    try:
-        with engine.begin() as connection:
-            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            connection.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
-        yield url
-    finally:
-        engine.dispose()
+    return pgvector_db.url
 
 
 @pytest.fixture(scope="session")
-def pgvector_engine(
-    request: pytest.FixtureRequest, pgvector_database_url: str
-) -> Generator[Engine, None, None]:
-    """Provide a SQLAlchemy engine connected to the pgvector container."""
+def pgvector_engine(pgvector_db: PGVectorDatabase) -> Iterator[Engine]:
+    """Yield an engine connected to the seeded pgvector template database."""
 
-    _ensure_cli_opt_in(request, option="pgvector", marker="pgvector")
-
-    engine = create_engine(pgvector_database_url, future=True)
+    engine = pgvector_db.create_engine()
     try:
         yield engine
     finally:
@@ -594,21 +580,10 @@ def pgvector_engine(
 
 
 @pytest.fixture(scope="session")
-def pgvector_migrated_database_url(
-    request: pytest.FixtureRequest, pgvector_database_url: str
-) -> Generator[str, None, None]:
-    """Apply SQL migrations to the pgvector database and return the connection URL."""
+def pgvector_migrated_database_url(pgvector_db: PGVectorDatabase) -> str:
+    """Return the URL of the migrated pgvector database (for legacy callers)."""
 
-    _ensure_cli_opt_in(request, option="schema", marker="schema")
-
-    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
-
-    engine = create_engine(pgvector_database_url, future=True)
-    try:
-        run_sql_migrations(engine)
-        yield pgvector_database_url
-    finally:
-        engine.dispose()
+    return pgvector_db.url
 
 
 def _initialise_shared_database(db_path: Path) -> str:
