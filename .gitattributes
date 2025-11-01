@@ -1,0 +1,3 @@
+# Ensure constraint lockfiles always use LF line endings
+# to maintain consistency across platforms (Windows/Linux CI)
+constraints/*.txt text eol=lf
