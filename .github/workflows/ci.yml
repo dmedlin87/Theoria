@@ -119,6 +119,10 @@ jobs:
         working-directory: theo/services/web
         run: npm run test:vitest
 
+      - name: Verify Vitest coverage thresholds
+        working-directory: theo/services/web
+        run: node scripts/ci/verify-vitest-coverage.mjs
+
       - name: Show Vitest output tree
         if: always()
         run: |
@@ -136,7 +140,14 @@ jobs:
           ls -la theo/services/web/playwright-artifacts || true
 
       - name: Run pytest suite (fast)
-        run: pytest -m "not (slow or gpu or contract)" --cov=theo --cov=tests --cov-report=xml --cov-report=term --cov-fail-under=80
+        run: |
+          pytest -m "not (slow or gpu or contract)" \
+            --cov=theo \
+            --cov=tests \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:coverage-html \
+            --cov-report=term \
+            --cov-fail-under=80
 
       - name: Show pytest coverage presence
         if: always()
@@ -148,6 +159,14 @@ jobs:
         with:
           name: pytest-coverage
           path: coverage.xml
+          if-no-files-found: warn
+
+      - name: Upload pytest HTML coverage report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
+        with:
+          name: pytest-coverage-html
+          path: coverage-html
           if-no-files-found: warn
 
       - name: Enforce critical coverage thresholds
