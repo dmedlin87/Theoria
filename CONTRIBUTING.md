@@ -103,7 +103,7 @@ Keep the following workflow in mind:
 - Trigger Playwright against a tag or specific spec: `npm run test:e2e -- --grep @smoke` or `npm run test:e2e -- tests/e2e/chat.spec.ts`.
 - Regenerate the MCP contract fixtures after API changes with `task test:contract`.
 
-### Coverage artefacts and dashboards
+### Coverage artifacts and dashboards
 
 - **Python (pytest-cov)** – `python -m pytest --cov=theo --cov=mcp_server --cov-report=xml --cov-report=html` writes `coverage.xml` plus an `htmlcov/` dashboard. Summarise or compare runs with `python analyze_coverage.py`.
 - **JSON comparisons** – Produce machine-readable diffs with `coverage json -o coverage.json` and inspect deltas via `jq` or downstream tooling; regenerate `coverage.xml` afterwards so `python analyze_coverage.py` can summarise the run.
