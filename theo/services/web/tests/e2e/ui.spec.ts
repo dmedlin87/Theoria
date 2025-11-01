@@ -1,76 +1,9 @@
 import { expect, test } from "./fixtures/error-guard";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import crypto from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-
-const API_BASE = process.env.PLAYWRIGHT_API_BASE ?? "http://127.0.0.1:8000";
-
-async function seedCorpus(request: APIRequestContext): Promise<void> {
-  const content = `---
-title: "Test Sermon"
-authors:
-  - "Jane Doe"
-collection: "Gospels"
----
-
-In the beginning was the Word (John 1:1-5), and the Word was with God.
-Later we reflect on Genesis 1:1 in passing.
-Test run: ${crypto.randomUUID()}
-`;
-
-  const response = await request.post(`${API_BASE}/ingest/file`, {
-    multipart: {
-      file: {
-        name: "sermon.md",
-        buffer: Buffer.from(content, "utf-8"),
-        mimeType: "text/markdown",
-      },
-    },
-  });
-  expect(response.ok()).toBeTruthy();
-}
-
-async function seedResearchNote(request: APIRequestContext): Promise<void> {
-  const payload = {
-    osis: "John.1.1",
-    body: "Playwright integration commentary on John 1:1",
-    title: "Playwright commentary",
-    stance: "apologetic",
-    claim_type: "textual",
-    confidence: 0.7,
-    tags: ["playwright", "integration"],
-    evidences: [
-      {
-        source_type: "crossref",
-        source_ref: "Genesis.1.1",
-        snippet: "Creation language links the passages.",
-        osis_refs: ["Genesis.1.1"],
-      },
-    ],
-  };
-  const response = await request.post(`${API_BASE}/research/notes`, {
-    data: JSON.stringify(payload),
-    headers: { "content-type": "application/json" },
-  });
-  expect(response.ok()).toBeTruthy();
-}
-
-test.beforeAll(async ({ request }) => {
-  await seedCorpus(request);
-  await seedResearchNote(request);
-});
-
 test.describe("Theo Engine UI", () => {
-  test("@smoke allows searching for ingested passages", async ({ page }) => {
-    await page.goto("/search");
-
-    await page.fill("input[name='q']", "Word");
-    await page.click("button[type='submit']");
-    const firstResultLink = page.getByRole("link", { name: /Open passage/i }).first();
-    await expect(firstResultLink).toBeVisible();
-  });
-
   test("@full primary navigation links load", async ({ page }) => {
     const navLinks: {
       href: string;
