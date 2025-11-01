@@ -112,10 +112,16 @@ def test_chunk_transcript_respects_overlaps_and_temporal_window(
     assert chunks[0].t_start == pytest.approx(segments[0].start)
     assert chunks[-1].t_end == pytest.approx(segments[-1].end)
 
+    separator = " "
+    expected_start_char = 0
     for idx, chunk in enumerate(chunks):
-        assert chunk.start_char == (0 if idx == 0 else chunks[idx - 1].end_char + 1)
+        assert chunk.start_char == expected_start_char
         assert chunk.end_char - chunk.start_char == len(chunk.text)
         assert chunk.t_start is not None and chunk.t_end is not None
+        # Update expected_start_char for next chunk
+        expected_start_char += len(chunk.text)
+        if idx < len(chunks) - 1:
+            expected_start_char += len(separator)
         assert chunk.t_start <= chunk.t_end
         assert chunk.t_end - chunk.t_start <= 25.0 + 1e-6
 
