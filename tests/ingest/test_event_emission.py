@@ -1,13 +1,8 @@
 from __future__ import annotations
-
-from pathlib import Path
-
+import pytest
 from sqlalchemy.orm import Session
 
 from theo.application.facades.database import (
-    Base,
-    configure_engine,
-    get_engine,
     get_settings,
 )
 from theo.platform.events import event_bus
@@ -15,17 +10,11 @@ from theo.platform.events.types import DocumentIngestedEvent
 from theo.infrastructure.api.app.ingest import pipeline
 
 
-def _prepare_database(tmp_path: Path) -> None:
-    db_path = tmp_path / "event-bus.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+pytestmark = pytest.mark.pgvector
 
 
-def test_file_pipeline_emits_document_event(tmp_path) -> None:
-    _prepare_database(tmp_path)
-    engine = get_engine()
+def test_file_pipeline_emits_document_event(tmp_path, ingest_engine) -> None:
+    engine = ingest_engine
 
     settings = get_settings()
     original_storage = settings.storage_root

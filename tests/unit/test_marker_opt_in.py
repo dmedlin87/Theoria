@@ -35,8 +35,8 @@ def _seed_project_conftest(pytester: pytest.Pytester) -> None:
                 """
                 import pytest
 
-                def test_missing_marker(pgvector_container):
-                    assert pgvector_container is not None
+                def test_missing_marker(pgvector_db):
+                    assert pgvector_db is not None
                 """
             ),
             ("-rs",),
@@ -48,8 +48,8 @@ def _seed_project_conftest(pytester: pytest.Pytester) -> None:
                 import pytest
 
                 @pytest.mark.pgvector
-                def test_pgvector_skipped(pgvector_container):
-                    assert pgvector_container is not None
+                def test_pgvector_skipped(pgvector_db):
+                    assert pgvector_db is not None
                 """
             ),
             ("-rs",),
@@ -74,8 +74,9 @@ def test_pgvector_fixture_runs_with_cli(pytester: pytest.Pytester) -> None:
     pytester.makeconftest(
         textwrap.dedent(
             """
+            import contextlib
             import sys
-            import types
+            from types import SimpleNamespace
             from pathlib import Path
 
             PROJECT_ROOT = Path(r"{PROJECT_ROOT}")
@@ -84,28 +85,28 @@ def test_pgvector_fixture_runs_with_cli(pytester: pytest.Pytester) -> None:
 
             from tests.conftest import *  # noqa: F401,F403
 
-            class _DummyContainer:
-                def __init__(self, *_, **__):
-                    self._stopped = False
+            import tests.fixtures.pgvector as pgvector_module
 
-                def with_env(self, *_args, **_kwargs):
-                    return self
+            @contextlib.contextmanager
+            def _fake_pgvector_database(*_, **__):
+                clone = SimpleNamespace(
+                    name="clone",
+                    url="postgresql+psycopg://postgres:postgres@localhost:5432/clone",
+                )
 
-                def start(self):
-                    return None
+                def _create_engine(**_kwargs):
+                    return SimpleNamespace(dispose=lambda: None)
 
-                def stop(self):
-                    self._stopped = True
+                database = SimpleNamespace(
+                    container=SimpleNamespace(stop=lambda: None),
+                    url="postgresql+psycopg://postgres:postgres@localhost:5432/theo",
+                    create_engine=_create_engine,
+                    clone_database=lambda *args, **kwargs: clone,
+                    drop_clone=lambda *args, **kwargs: None,
+                )
+                yield database
 
-                def get_connection_url(self):
-                    return "postgresql://postgres:postgres@localhost:5432/theo"
-
-            testcontainers = types.ModuleType("testcontainers")
-            postgres_module = types.ModuleType("testcontainers.postgres")
-            postgres_module.PostgresContainer = _DummyContainer
-
-            sys.modules.setdefault("testcontainers", testcontainers)
-            sys.modules.setdefault("testcontainers.postgres", postgres_module)
+            pgvector_module.provision_pgvector_database = _fake_pgvector_database
             """
         )
     )
@@ -115,8 +116,8 @@ def test_pgvector_fixture_runs_with_cli(pytester: pytest.Pytester) -> None:
             import pytest
 
             @pytest.mark.pgvector
-            def test_pgvector_fixture(pgvector_container):
-                assert pgvector_container is not None
+            def test_pgvector_fixture(pgvector_db):
+                assert pgvector_db is not None
             """
         )
     )
