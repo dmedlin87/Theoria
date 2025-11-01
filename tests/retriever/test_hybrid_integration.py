@@ -23,7 +23,23 @@ class _FakeResult:
 
 
 class _FakeSession:
+    """
+    A fake SQLAlchemy session for testing.
+
+    Args:
+        executions: A list of row sets. Each row set will be returned sequentially
+            for each query execution via the `execute` method.
+        dialect_name: The name of the database dialect being simulated (e.g., "postgresql").
+            Determines the value of `self.bind.dialect.name`.
+    """
     def __init__(self, executions, *, dialect_name: str | None = "postgresql"):
+        """
+        Initialize the fake session.
+
+        Args:
+            executions: List of row sets to be returned for each query execution.
+            dialect_name: Name of the database dialect to simulate.
+        """
         self._executions = list(executions)
         if dialect_name is None:
             self.bind = None
