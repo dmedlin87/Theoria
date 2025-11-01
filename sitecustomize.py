@@ -18,6 +18,33 @@ _FASTAPI_MODULE = "fastapi"
 _FASTAPI_STATUS_MODULE = "fastapi.status"
 
 
+def _install_fastapi_stub() -> None:
+    """Install a minimal FastAPI status stub when the dependency is missing."""
+
+    if _FASTAPI_STATUS_MODULE in sys.modules:
+        return
+
+    fastapi_module = types.ModuleType(_FASTAPI_MODULE)
+    status_module = types.ModuleType(_FASTAPI_STATUS_MODULE)
+    setattr(status_module, "HTTP_422_UNPROCESSABLE_ENTITY", 422)
+    sys.modules[_FASTAPI_STATUS_MODULE] = status_module
+    fastapi_module.status = status_module  # type: ignore[attr-defined]
+    sys.modules[_FASTAPI_MODULE] = fastapi_module
+
+
+def _ensure_fastapi_modules_loaded() -> None:
+    """Guarantee FastAPI status shim is available before project imports."""
+
+    try:
+        importlib.import_module(_FASTAPI_MODULE)
+        importlib.import_module(_FASTAPI_STATUS_MODULE)
+    except (ModuleNotFoundError, ImportError):
+        _install_fastapi_stub()
+
+
+_ensure_fastapi_modules_loaded()
+
+
 def _should_install_workers_stub() -> bool:
     """Check if workers stub should be installed."""
     return (
@@ -39,7 +66,7 @@ def _install_workers_stub() -> None:
             task_store_eager_result=False,
         )
     )
-    stub_module = types.ModuleType(_WORKERS_TASKS_MODULE)
+    stub_module = types.ModuleType("theo.infrastructure.api.app.workers.tasks")
     stub_module.celery = celery_stub
     sys.modules[stub_module.__name__] = stub_module
     setattr(workers_pkg, "tasks", stub_module)
@@ -110,36 +137,4 @@ if _WORKERS_TASKS_MODULE not in sys.modules:  # pragma: no cover - import-time w
 try:
     importlib.import_module("theo.infrastructure.api.app.workers.tasks")
 except Exception:  # pragma: no cover - executed only when optional deps missing
-    workers_pkg = importlib.import_module("theo.infrastructure.api.app.workers")
-    celery_stub = types.SimpleNamespace(
-        conf=types.SimpleNamespace(
-            task_always_eager=False,
-            task_ignore_result=False,
-            task_store_eager_result=False,
-        )
-    )
-    stub_module = types.ModuleType("theo.infrastructure.api.app.workers.tasks")
-    stub_module.celery = celery_stub
-    sys.modules[stub_module.__name__] = stub_module
-    setattr(workers_pkg, "tasks", stub_module)
-
-
-def _install_fastapi_stub() -> None:
-    """Install a minimal FastAPI status stub when the dependency is missing."""
-
-    if _FASTAPI_STATUS_MODULE in sys.modules:
-        return
-
-    fastapi_module = types.ModuleType(_FASTAPI_MODULE)
-    status_module = types.ModuleType(_FASTAPI_STATUS_MODULE)
-    setattr(status_module, "HTTP_422_UNPROCESSABLE_ENTITY", 422)
-    sys.modules[_FASTAPI_STATUS_MODULE] = status_module
-    fastapi_module.status = status_module  # type: ignore[attr-defined]
-    sys.modules[_FASTAPI_MODULE] = fastapi_module
-
-
-try:  # pragma: no cover - executed during interpreter bootstrap
-    importlib.import_module(_FASTAPI_MODULE)
-    importlib.import_module(_FASTAPI_STATUS_MODULE)
-except (ModuleNotFoundError, ImportError):
-    _install_fastapi_stub()
+    _install_workers_stub()
