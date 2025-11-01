@@ -63,7 +63,6 @@ async function main() {
       console.error(` - ${formatDeficit(deficit)}`);
     }
     process.exit(1);
-    return;
   }
 
   console.log("Vitest coverage thresholds satisfied.");
