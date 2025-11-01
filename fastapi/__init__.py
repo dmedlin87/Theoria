@@ -61,4 +61,3 @@ class FastAPI:
 # Re-export commonly used submodules for compatibility.
 status = status
 responses = responses
-params = params
