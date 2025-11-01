@@ -32,6 +32,7 @@ class MemorySession:
         self.commits = 0
 
     def get(self, _model: Any, key: str) -> MemoryAppSetting | None:  # noqa: D401
+        """Return the setting record for the given key, or None if not found."""
         return self.storage.get(key)
 
     def add(self, record: MemoryAppSetting) -> None:
