@@ -1,4 +1,4 @@
-langchain-openai==0.1.25
+langchain-openai==1.0.1
 openai==1.109.1
 
 # Guardrail ranges mirrored from constraints/dev.txt and constraints/prod.txt

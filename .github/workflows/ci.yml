@@ -60,13 +60,13 @@ jobs:
 
       - name: Preinstall CPU-only PyTorch
         run: |
-          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.0
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.9.0+cpu
 
       - name: Install Python dependencies
         run: |
-          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints-ci.txt -c constraints/prod.txt
+          pip install -e ".[ml]" -c constraints-ci.txt -c constraints/prod.txt
+          pip install -e ".[dev]" -c constraints-ci.txt -c constraints/dev.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
@@ -231,13 +231,13 @@ jobs:
 
       - name: Preinstall CPU-only PyTorch
         run: |
-          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.0
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.9.0+cpu
 
       - name: Install Python dependencies
         run: |
-          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints-ci.txt -c constraints/prod.txt
+          pip install -e ".[ml]" -c constraints-ci.txt -c constraints/prod.txt
+          pip install -e ".[dev]" -c constraints-ci.txt -c constraints/dev.txt
 
       - name: Run ${{ matrix.suite }} pytest suite with profiling
         env:
@@ -408,13 +408,13 @@ jobs:
 
       - name: Preinstall CPU-only PyTorch
         run: |
-          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.0
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.9.0+cpu
 
       - name: Install Python dependencies
         run: |
-          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install -e ".[api]" -c constraints-ci.txt -c constraints/prod.txt
+          pip install -e ".[ml]" -c constraints-ci.txt -c constraints/prod.txt
+          pip install -e ".[dev]" -c constraints-ci.txt -c constraints/dev.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
