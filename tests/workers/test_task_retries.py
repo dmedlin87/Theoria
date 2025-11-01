@@ -1,4 +1,4 @@
-"""Regression tests for Celery task retry and idempotency behaviour."""
+"""Regression tests for Celery task retry and idempotency behavior."""
 
 from __future__ import annotations
 
