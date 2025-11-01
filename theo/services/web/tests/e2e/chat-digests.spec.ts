@@ -28,8 +28,8 @@ const STREAMING_BODY =
     },
   });
 
-test.describe("Chat workspace", () => {
-  test("@smoke shows a loading state before the response resolves", async ({ page }) => {
+test.describe("Chat digest workflow", () => {
+  test("@smoke shows interim digest loading state before the response resolves", async ({ page }) => {
     await page.route("**/ai/workflows/chat", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 600));
       await route.fulfill({
@@ -51,7 +51,7 @@ test.describe("Chat workspace", () => {
     await expect(page.getByText("Patience rewarded.")).toBeVisible();
   });
 
-  test("@full streams chat answers with citations", async ({ page }) => {
+  test("@full streams chat answers with digest-friendly citations", async ({ page }) => {
     await page.route("**/ai/workflows/chat", async (route) => {
       await route.fulfill({
         status: 200,
@@ -69,7 +69,7 @@ test.describe("Chat workspace", () => {
     await expect(page.getByRole("link", { name: "Search references" })).toBeVisible();
   });
 
-  test("@full renders guardrail violations", async ({ page }) => {
+  test("@full renders guardrail violations with suggested recovery digests", async ({ page }) => {
     await page.route("**/ai/workflows/chat", async (route) => {
       await route.fulfill({
         status: 409,
