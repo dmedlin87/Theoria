@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 const API_BASE = process.env.PLAYWRIGHT_API_BASE ?? "http://127.0.0.1:8000";
 
 export async function seedCorpus(request: APIRequestContext): Promise<void> {
-  const content = `---\ntitle: "Test Sermon"\nauthors:\n  - "Jane Doe"\ncollection: "Gospels"\n---\n\nIn the beginning was the Word (John 1:1-5), and the Word was with God.\nLater we reflect on Genesis 1:1 in passing.\nTest run: ${crypto.randomUUID()}\n`;
+  const content = `---
 
   const response = await request.post(`${API_BASE}/ingest/file`, {
     multipart: {
