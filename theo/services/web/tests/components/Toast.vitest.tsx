@@ -60,6 +60,10 @@ describe("ToastProvider", () => {
 
     expect(toastStatus).toBeDefined();
     expect(toastStatus).toHaveAttribute("aria-live", "polite");
+    const liveRegion = toastDescription.parentElement?.querySelector('[role="status"]') as HTMLElement | null;
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion).toHaveAttribute("role", "status");
+    expect(liveRegion).toHaveAttribute("aria-live", "polite");
   });
 
   it("allows toasts to be dismissed manually", async () => {
