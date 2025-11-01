@@ -123,7 +123,7 @@ describe("ToastProvider", () => {
     const toastRoot = toastDescription.closest("[data-state]");
 
     expect(toastRoot).not.toBeNull();
-    expect(toastRoot).toHaveClass(toastVariants.error);
+    expect(toastRoot?.className).toContain(toastVariants.error);
     expect(toastRoot).toHaveClass("slide-up", "shake");
   });
 });
