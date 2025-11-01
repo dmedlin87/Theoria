@@ -64,9 +64,10 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install --no-deps -e ".[api,ml,dev]"
+          pip install -c constraints/prod.txt -c constraints-ci.txt ".[api]"
+          pip install -c constraints/prod.txt -c constraints-ci.txt ".[ml]"
+          pip install -c constraints/dev.txt -c constraints-ci.txt ".[dev]"
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
@@ -235,9 +236,10 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install --no-deps -e ".[api,ml,dev]"
+          pip install -c constraints/prod.txt -c constraints-ci.txt ".[api]"
+          pip install -c constraints/prod.txt -c constraints-ci.txt ".[ml]"
+          pip install -c constraints/dev.txt -c constraints-ci.txt ".[dev]"
 
       - name: Run ${{ matrix.suite }} pytest suite with profiling
         env:
@@ -412,9 +414,10 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -e ".[api]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install -e ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+          pip install --no-deps -e ".[api,ml,dev]"
+          pip install -c constraints/prod.txt -c constraints-ci.txt ".[api]"
+          pip install -c constraints/prod.txt -c constraints-ci.txt ".[ml]"
+          pip install -c constraints/dev.txt -c constraints-ci.txt ".[dev]"
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
