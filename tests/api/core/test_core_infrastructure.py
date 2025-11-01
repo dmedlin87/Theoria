@@ -361,7 +361,7 @@ def test_version_get_git_sha_invokes_git_binary(monkeypatch: pytest.MonkeyPatch)
     facade_version.get_git_sha.cache_clear()
     legacy_version.get_git_sha.cache_clear()
 
-    monkeypatch.setattr(facade_version.shutil, "which", lambda _: "/usr/bin/git")
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/git")
 
     def fake_run(*_args: Any, **_kwargs: Any) -> types.SimpleNamespace:
         return types.SimpleNamespace(stdout="deadbeef\n")
