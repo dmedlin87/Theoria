@@ -50,7 +50,7 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
 
     cmd.extend([
         "--output-file",
-        str(relative_output),
+        relative_output.as_posix(),
         "pyproject.toml",
     ])
 
