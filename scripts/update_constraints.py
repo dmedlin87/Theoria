@@ -56,9 +56,16 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
 
     if "ml" in extras:
         # Add index strategy to allow searching across multiple indexes
-        cmd.extend(["--index-strategy", "unsafe-best-match"])
-        cmd.extend(["--index-url", CPU_TORCH_INDEX])
-        cmd.extend(["--extra-index-url", DEFAULT_PYPI_INDEX])
+        cmd.extend(
+            [
+                "--index-strategy",
+                "unsafe-best-match",
+                "--index-url",
+                CPU_TORCH_INDEX,
+                "--extra-index-url",
+                DEFAULT_PYPI_INDEX,
+            ]
+        )
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     return destination
 
