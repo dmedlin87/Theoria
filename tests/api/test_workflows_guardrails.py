@@ -1,7 +1,7 @@
-import pytest
-
 import json
 from unittest.mock import MagicMock
+
+import pytest
 
 from theo.infrastructure.api.app.ai.rag.guardrails import GuardrailError
 from theo.infrastructure.api.app.ai.rag.models import RAGAnswer
@@ -90,4 +90,87 @@ def test_guardrail_http_exception_embeds_error_payload(
     assert payload["detail"]["type"] == "guardrail_refusal"
     assert payload["error"]["data"]["guardrail"] == "retrieval"
     assert payload["error"]["data"]["filters"]["collection"] == "Alpha"
+
+
+@pytest.mark.parametrize("action", ["retry", "none"])
+def test_guardrail_advisory_supports_retry_and_cancellation(action: str) -> None:
+    error = GuardrailError(
+        "Blocked",
+        metadata={"guardrail": "generation", "suggested_action": action},
+    )
+    metadata = build_guardrail_metadata(error, None)
+
+    advisory = guardrail_advisory(
+        "Please adjust your request",
+        question="Should we try again?",
+        osis=None,
+        filters=None,
+        metadata=metadata,
+    )
+
+    assert advisory.metadata is not None
+    assert advisory.metadata.suggested_action == action
+    assert advisory.suggestions, "Search follow-up should be available"
+    assert advisory.suggestions[0].action == "search"
+
+
+def test_guardrail_http_exception_marks_safe_refusals(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = MagicMock()
+    fake_answer = RAGAnswer(summary="Refused", citations=[])
+
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.routes.ai.workflows.guardrails.build_guardrail_refusal",
+        lambda _session, reason=None: fake_answer,
+    )
+
+    error = GuardrailError(
+        "Request cancelled",
+        metadata={
+            "guardrail": "generation",
+            "suggested_action": "retry",
+            "reason": "User cancelled",
+        },
+    )
+    setattr(error, "safe_refusal", True)
+
+    response = guardrail_http_exception(
+        error,
+        session=session,
+        question="Should I continue?",
+        osis=None,
+        filters=None,
+    )
+
+    payload = json.loads(response.body)
+    assert payload["error"]["data"]["safe_refusal"] is True
+    assert payload["error"]["data"]["reason"] == "User cancelled"
+    assert payload["guardrail_advisory"]["metadata"]["suggested_action"] == "retry"
+
+
+def test_guardrail_http_exception_handles_invalid_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = MagicMock()
+    fake_answer = RAGAnswer(summary="Refused", citations=[])
+
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.routes.ai.workflows.guardrails.build_guardrail_refusal",
+        lambda _session, reason=None: fake_answer,
+    )
+
+    error = GuardrailError("Invalid payload", metadata="not-a-mapping")
+
+    response = guardrail_http_exception(
+        error,
+        session=session,
+        question="What happened?",
+        osis=None,
+        filters=None,
+    )
+
+    payload = json.loads(response.body)
+    assert payload["error"]["data"]["guardrail"] == "unknown"
+    assert payload["guardrail_advisory"]["metadata"]["suggested_action"] == "search"
 
