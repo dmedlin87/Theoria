@@ -6,25 +6,29 @@ from typing import Callable, Generator
 
 import pytest
 from sqlalchemy import create_engine
+from typing import Callable, Iterator
+
+import pytest
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from theo.application.facades.database import Base, configure_engine, get_engine
+from tests.fixtures.pgvector import PGVectorDatabase, PGVectorClone
 
 
 @pytest.fixture(scope="module")
-def pipeline_engine(tmp_path_factory: pytest.TempPathFactory):
-    """Provision a shared SQLite database for pipeline ingestion tests."""
+def pipeline_engine(pgvector_db: PGVectorDatabase) -> Iterator[Engine]:
+    """Provision a shared Postgres-backed engine for pipeline ingestion tests."""
 
-    db_dir = tmp_path_factory.mktemp("pipeline-db")
-    db_path = Path(db_dir) / "pipeline.db"
-    configure_engine(f"sqlite:///{db_path}")
+    clone: PGVectorClone = pgvector_db.clone_database("ingest_pipeline")
+    configure_engine(clone.url)
     engine = get_engine()
     Base.metadata.create_all(engine)
     try:
         yield engine
     finally:
         engine.dispose()
+        pgvector_db.drop_clone(clone)
 
 
 @pytest.fixture
@@ -60,6 +64,14 @@ def pgvector_pipeline_engine(
 
     engine = create_engine(pgvector_database_url, future=True)
     run_sql_migrations(engine)
+@pytest.fixture()
+def ingest_engine(pgvector_db: PGVectorDatabase) -> Iterator[Engine]:
+    """Yield an isolated Postgres engine cloned from the seeded pgvector template."""
+
+    clone: PGVectorClone = pgvector_db.clone_database("ingest_case")
+    configure_engine(clone.url)
+    engine = get_engine()
+    Base.metadata.create_all(engine)
     try:
         yield engine
     finally:
@@ -89,6 +101,7 @@ def pgvector_pipeline_session_factory(
             session.close()
         transaction.rollback()
         connection.close()
+        pgvector_db.drop_clone(clone)
 
 
 @pytest.fixture(autouse=True)

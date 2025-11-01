@@ -172,6 +172,7 @@ markers = [
     "slow: long-running tests that require opt-in",
     "enable_migrations: allow database migrations to execute in tests",
     "pgvector: tests that require the pgvector/Postgres testcontainer",
+    "celery: tests exercising Celery worker integrations and retry semantics",
     "schema: tests that require database schema migrations",
     "contract: contract-level compatibility suites",
     "gpu: tests that require GPU runtimes or CUDA dependencies",

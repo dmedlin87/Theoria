@@ -10,11 +10,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from theo.application.facades.database import (  # noqa: E402
-    Base,
-    configure_engine,
-    get_engine,
-)
 from theo.adapters.persistence.models import Document, Passage  # noqa: E402
 from theo.infrastructure.api.app.ingest.tei_pipeline import (  # noqa: E402
     HTRResult,
@@ -24,14 +19,7 @@ from theo.infrastructure.api.app.models.search import HybridSearchRequest  # noq
 from theo.infrastructure.api.app.retriever.hybrid import hybrid_search  # noqa: E402
 
 
-def _prepare_database(tmp_path: Path) -> None:
-    db_path = tmp_path / "tei_pipeline.db"
-    configure_engine(f"sqlite:///{db_path}")
-    engine = get_engine()
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
-
-
+pytestmark = pytest.mark.pgvector
 class DummyHTRClient:
     """Fixture-friendly OCR client returning deterministic output."""
 
@@ -43,9 +31,8 @@ class DummyHTRClient:
         yield HTRResult(text=text, confidence=self.confidence, page_no=1)
 
 
-def test_ingest_pilot_corpus_emits_tei_metadata(tmp_path) -> None:
-    _prepare_database(tmp_path)
-    engine = get_engine()
+def test_ingest_pilot_corpus_emits_tei_metadata(tmp_path, ingest_engine) -> None:
+    engine = ingest_engine
 
     corpus_dir = tmp_path / "corpus"
     corpus_dir.mkdir()
