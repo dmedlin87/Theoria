@@ -139,6 +139,7 @@ def _install_fastapi_stub() -> None:
 
 
 try:  # pragma: no cover - executed during interpreter bootstrap
+    importlib.import_module(_FASTAPI_MODULE)
     importlib.import_module(_FASTAPI_STATUS_MODULE)
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     _install_fastapi_stub()
