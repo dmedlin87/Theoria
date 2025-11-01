@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Generator
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from theo.application.facades.database import Base, configure_engine, get_engine
@@ -32,6 +34,47 @@ def pipeline_session_factory(pipeline_engine) -> Callable[[], Session]:
     connection = pipeline_engine.connect()
     transaction = connection.begin()
     factory = sessionmaker(bind=connection)
+    sessions: list[Session] = []
+
+    def _factory() -> Session:
+        session = factory()
+        sessions.append(session)
+        return session
+
+    try:
+        yield _factory
+    finally:
+        for session in sessions:
+            session.close()
+        transaction.rollback()
+        connection.close()
+
+
+@pytest.fixture(scope="module")
+def pgvector_pipeline_engine(
+    pgvector_database_url: str,
+) -> Generator[Engine, None, None]:
+    """Provision a Postgres+pgvector engine with migrations applied."""
+
+    from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
+
+    engine = create_engine(pgvector_database_url, future=True)
+    run_sql_migrations(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def pgvector_pipeline_session_factory(
+    pgvector_pipeline_engine,
+) -> Callable[[], Session]:
+    """Yield sessions bound to an isolated Postgres transaction."""
+
+    connection = pgvector_pipeline_engine.connect()
+    transaction = connection.begin()
+    factory = sessionmaker(bind=connection, future=True)
     sessions: list[Session] = []
 
     def _factory() -> Session:
