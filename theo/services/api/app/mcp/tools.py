@@ -85,7 +85,7 @@ class _ToolRegistry:
         return self._registrations[normalized]
 
     def items(self) -> Iterable[ToolRegistration]:
-        """Iterate over the registered tools."""
+        """Return the registered tools."""
 
         return tuple(self._registrations.values())
 
