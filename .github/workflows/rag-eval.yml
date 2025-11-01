@@ -1,73 +1,73 @@
 name: RAG Evaluation
 
 on:
-  pull_request:
-    paths:
-      - 'theo/**'
-      - 'data/eval/**'
-      - 'scripts/perf/**'
-  push:
-    branches:
-      - main
-      - develop
-    paths:
-      - 'theo/**'
-      - 'data/eval/**'
-      - 'scripts/perf/**'
+    pull_request:
+        paths:
+            - "theo/**"
+            - "data/eval/**"
+            - "scripts/perf/**"
+    push:
+        branches:
+            - main
+            - develop
+        paths:
+            - "theo/**"
+            - "data/eval/**"
+            - "scripts/perf/**"
 
 # Global permissions set to read-all for OSSF Scorecard compliance
 permissions: read-all
 
 jobs:
-  rag-eval:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-        with:
-          fetch-depth: 0
+    rag-eval:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+              with:
+                  fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: |
-            pyproject.toml
-            constraints/prod.txt
-            constraints/dev.txt
-            constraints-ci.txt
+            - name: Set up Python
+              uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6
+              with:
+                  python-version: "3.11"
+                  cache: "pip"
+                  cache-dependency-path: |
+                      pyproject.toml
+                      constraints/prod.txt
+                      constraints/dev.txt
+                      constraints-ci.txt
 
-      - name: Preinstall CPU-only PyTorch
-        run: |
-          python -m pip install --upgrade pip
-          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.0
+            - name: Preinstall CPU-only PyTorch
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.0
 
-      - name: Install dependencies
-        run: |
-          pip install ".[api]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
-          pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
-          # Make the local package importable so `python -m theo.application.services.cli.rag_eval` works
-          pip install -e .
+            - name: Install dependencies
+              run: |
+                  pip install ".[api]" -c constraints/prod.txt -c constraints-ci.txt
+                  pip install ".[ml]" -c constraints/prod.txt -c constraints-ci.txt
+                  pip install ".[dev]" -c constraints/dev.txt -c constraints-ci.txt
+                  # Make the local package importable so `python -m theo.application.services.cli.rag_eval` works
+                  pip install -e .
 
-      - name: Determine affected modules
-        id: modules
-        run: |
-          MODULES="$(python scripts/perf/detect_rag_modules.py)"
-          echo "modules=$MODULES" >> "$GITHUB_OUTPUT"
-          echo "Detected modules: $MODULES"
+            - name: Determine affected modules
+              id: modules
+              run: |
+                  MODULES="$(python scripts/perf/detect_rag_modules.py)"
+                  echo "modules=$MODULES" >> "$GITHUB_OUTPUT"
+                  echo "Detected modules: $MODULES"
 
-      - name: Run rag_eval comparisons
-        env:
-          RAG_MODULES: ${{ steps.modules.outputs.modules }}
-        run: |
-          python scripts/perf/collect_rag_eval_metrics.py --modules ${RAG_MODULES}
+            - name: Run rag_eval comparisons
+              env:
+                  RAG_MODULES: ${{ steps.modules.outputs.modules }}
+              run: |
+                  python scripts/perf/collect_rag_eval_metrics.py --modules ${RAG_MODULES}
 
-      - name: Upload rag_eval artifacts
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
-        with:
-          name: rag-eval-metrics
-          path: perf_metrics/
-          if-no-files-found: error
+            - name: Upload rag_eval artifacts
+              uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
+              with:
+                  name: rag-eval-metrics
+                  path: perf_metrics/
+                  if-no-files-found: error
