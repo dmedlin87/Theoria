@@ -105,16 +105,15 @@ class _StubTrailService:
 
 
 class _StubAuditWriter:
-    calls: list[dict[str, Any]] = []
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
 
     @classmethod
     def from_session(cls, _session: object) -> "_StubAuditWriter":
         return cls()
 
     def log(self, **kwargs: Any) -> None:  # noqa: D401 - logger protocol stub
-        type(self).calls.append(kwargs)
-
-
+        self.calls.append(kwargs)
 class _StubLoopController:
     def __init__(self) -> None:
         self.initialised: list[dict[str, Any]] = []
