@@ -34,6 +34,10 @@ name = "ai-digest"
   method = "POST"
   path = "/ai/digest/watchlists"
 
+  [[suites.endpoints]]
+  method = "GET"
+  path = "/ai/digest/watchlists"
+
 [[suites]]
 name = "ai-llm"
 
