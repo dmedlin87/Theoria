@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from types import SimpleNamespace
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 from unittest.mock import MagicMock
+
+if TYPE_CHECKING:
+    from tests.fixtures import RegressionDataFactory
 
 import pytest
 
@@ -86,7 +89,7 @@ def telemetry_provider(monkeypatch: pytest.MonkeyPatch) -> _StubTelemetryProvide
 
 
 def test_guarded_pipeline_compose_builds_prompt_and_records_metrics(
-    monkeypatch: pytest.MonkeyPatch, regression_factory, telemetry_provider: _StubTelemetryProvider
+    monkeypatch: pytest.MonkeyPatch, regression_factory: RegressionDataFactory, telemetry_provider: _StubTelemetryProvider
 ) -> None:
     citations = regression_factory.rag_citations(2)
     results = [_result_from_citation(citation, rank=i + 1) for i, citation in enumerate(citations)]
@@ -233,7 +236,7 @@ def test_guarded_pipeline_compose_builds_prompt_and_records_metrics(
 
 
 def test_guarded_pipeline_uses_cached_answer_for_performance(
-    monkeypatch: pytest.MonkeyPatch, regression_factory, telemetry_provider: _StubTelemetryProvider
+    monkeypatch: pytest.MonkeyPatch, regression_factory: RegressionDataFactory, telemetry_provider: _StubTelemetryProvider
 ) -> None:
     citations = regression_factory.rag_citations(1)
     cached_answer = regression_factory.rag_answer(citations=citations, model_name="cached-model")
@@ -289,7 +292,7 @@ def test_guarded_pipeline_uses_cached_answer_for_performance(
 
 
 def test_guarded_pipeline_raises_guardrail_error_without_citations(
-    monkeypatch: pytest.MonkeyPatch, regression_factory
+    monkeypatch: pytest.MonkeyPatch, regression_factory: RegressionDataFactory
 ) -> None:
     citations = regression_factory.rag_citations(1)
     results = [_result_from_citation(citations[0])]
@@ -308,7 +311,7 @@ def test_guarded_pipeline_raises_guardrail_error_without_citations(
 
 
 def test_guarded_pipeline_raises_generation_error_when_all_models_fail(
-    monkeypatch: pytest.MonkeyPatch, regression_factory
+    monkeypatch: pytest.MonkeyPatch, regression_factory: RegressionDataFactory
 ) -> None:
     citations = regression_factory.rag_citations(1)
     results = [_result_from_citation(citations[0])]
@@ -343,7 +346,7 @@ def test_guarded_pipeline_raises_generation_error_when_all_models_fail(
 
 
 def test_run_guarded_chat_returns_refusal_on_safe_guardrail_error(
-    monkeypatch: pytest.MonkeyPatch, regression_factory, telemetry_provider: _StubTelemetryProvider
+    monkeypatch: pytest.MonkeyPatch, regression_factory: RegressionDataFactory, telemetry_provider: _StubTelemetryProvider
 ) -> None:
     results = [_result_from_citation(regression_factory.rag_citation())]
     question = regression_factory.question()
