@@ -28,7 +28,6 @@ CPU_TORCH_INDEX = "https://download.pytorch.org/whl/cpu"
 DEFAULT_PYPI_INDEX = "https://pypi.org/simple"
 
 
-
 def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
     """Run uv pip compile for a combination of extras and return the generated file path."""
     try:
@@ -56,6 +55,9 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
 
     if "ml" in extras:
         # Add index strategy to allow searching across multiple indexes
+        cmd.extend(["--index-strategy", "unsafe-best-match"])
+        cmd.extend(["--index-url", CPU_TORCH_INDEX])
+        cmd.extend(["--extra-index-url", DEFAULT_PYPI_INDEX])
         cmd.extend(
             [
                 "--index-strategy",
