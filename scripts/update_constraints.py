@@ -41,7 +41,6 @@ def run_uv_compile(extras: tuple[str, ...], destination: Path) -> Path:
         "uv",
         "pip",
         "compile",
-        "--generate-hashes",
         "--quiet",
     ]
     for extra in extras:
