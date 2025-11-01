@@ -123,11 +123,11 @@ tasks:
       - pip install -e ".[dev]"
 
   deps:lock:
-    desc: Regenerate pip-compile lockfiles for all extras
+    desc: Regenerate uv constraint lockfiles for all extras
     cmds:
-      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra base --extra api --extra ml \
-          --pip-args "--index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple" \
-          --output-file constraints/prod.txt pyproject.toml
-      - pip-compile --resolver=backtracking --allow-unsafe --generate-hashes --extra base --extra api --extra ml --extra dev \
-          --pip-args "--index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple" \
-          --output-file constraints/dev.txt pyproject.toml
+      - python scripts/update_constraints.py
+
+  deps:check:
+    desc: Verify constraint lockfiles are current
+    cmds:
+      - python scripts/update_constraints.py --check

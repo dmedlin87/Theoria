@@ -30,6 +30,7 @@
 ## Dependency Risk & Update Plan
 
 ### Python
+
 - Core runtime published via extras in `pyproject.toml` (install with `pip install .[api] -c constraints/prod.txt` plus `[ml]`/`[dev]` as needed).
 - **Grouped Releases:**
   - **Monthly functional upgrades:** Framework stack (FastAPI, SQLAlchemy, Celery).
@@ -38,11 +39,13 @@
 - **Breaking-Change Windows:** Align ORM & FastAPI upgrades with dedicated staging branches and smoke tests.
 
 ### Node / Web
+
 - Lockfile ensures deterministic installs.
 - Dependabot groups `next`/`react`/`typescript` and linting packages separately to control rollout velocity.
 - Introduce Playwright smoke tests before promoting Next.js major versions.
 
 ### Supply-Chain Controls
+
 - SBOM generation (Python + Node) on each CI run.
 - Dependabot configuration for both ecosystems with weekly cadence and security-only immediate patches.
 - Plan to adopt Sigstore provenance for container builds as part of the SLSA roadmap (see `DEPLOYMENT.md`).

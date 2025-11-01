@@ -104,7 +104,7 @@ Log inputs/outputs (sans PII) in `run_logs.tools[]`.
 
 **Top‑level envelope (always return this):**
 
-```
+```text
 {
   "run_meta": {
     "app": "Theoria",
@@ -131,7 +131,7 @@ Log inputs/outputs (sans PII) in `run_logs.tools[]`.
 
 **Artifact: EvidenceCard**
 
-```
+```text
 {
   "$schema": "https://theoria.schemas/evidence-card.json",
   "type": "object",
@@ -182,7 +182,7 @@ Log inputs/outputs (sans PII) in `run_logs.tools[]`.
 
 **Artifact: Contradiction**
 
-```
+```text
 {
   "$schema": "https://theoria.schemas/contradiction.json",
   "type": "object",
@@ -200,9 +200,9 @@ Log inputs/outputs (sans PII) in `run_logs.tools[]`.
 
 **Artifact: ScholarDigest**
 
-```
+text
 {
-  "$schema": "https://theoria.schemas/scholar-digest.json",
+  "$schema": "<https://theoria.schemas/scholar-digest.json>",
   "type":"object",
   "required":["id","topic","thesis","sources","summary","gaps","next_actions"],
   "properties":{
@@ -215,13 +215,15 @@ Log inputs/outputs (sans PII) in `run_logs.tools[]`.
     "next_actions":{"type":"array","items":{"type":"string"}}
   }
 }
-```
+
+```text
 
 **Artifact: IngestionRecord**
 
-```
+```text
+
 {
-  "$schema": "https://theoria.schemas/ingestion-record.json",
+  "$schema": "<https://theoria.schemas/ingestion-record.json>",
   "type":"object",
   "required":["id","file_id","source_url","status","notes"],
   "properties":{
@@ -232,6 +234,7 @@ Log inputs/outputs (sans PII) in `run_logs.tools[]`.
     "notes":{"type":"string"}
   }
 }
+
 ```
 
 ---

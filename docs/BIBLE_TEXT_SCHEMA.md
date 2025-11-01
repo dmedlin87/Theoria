@@ -1,6 +1,7 @@
 # Biblical Text Schema Design
 
 ## Overview
+
 Design for storing multi-layer biblical texts with AI-enhanced morphological and semantic analysis.
 Supports Hebrew Bible (Masoretic), Septuagint (LXX), and cross-translation research.
 
@@ -8,7 +9,7 @@ Supports Hebrew Bible (Masoretic), Septuagint (LXX), and cross-translation resea
 
 ### 1. Base Text Storage
 
-```
+```text
 data/bibles/
 ├── hebrew-wlc/              # Westminster Leningrad Codex
 │   ├── manifest.yaml
@@ -16,7 +17,7 @@ data/bibles/
 │   ├── exodus.jsonl
 │   └── ...
 ├── greek-lxx-rahlfs/        # Septuagint (Rahlfs edition)
-│   ├── manifest.yaml  
+│   ├── manifest.yaml
 │   ├── genesis.jsonl
 │   └── ...
 ├── greek-na28/              # Nestle-Aland 28th (NT)
@@ -46,11 +47,11 @@ data/bibles/
   },
   "morphology": [
     {
-      "word": "בְּרֵאשִׁית", 
+      "word": "בְּרֵאשִׁית",
       "lemma": "ראשית",
       "root": "ראש",
       "pos": "noun",
-      "gender": "feminine", 
+      "gender": "feminine",
       "number": "singular",
       "state": "construct",
       "prefix": "ב",
@@ -58,7 +59,7 @@ data/bibles/
     },
     {
       "word": "בָּרָא",
-      "lemma": "ברא", 
+      "lemma": "ברא",
       "root": "ברא",
       "pos": "verb",
       "stem": "qal",
@@ -71,7 +72,7 @@ data/bibles/
     {
       "word": "אֱלֹהִים",
       "lemma": "אלהים",
-      "root": "אלה", 
+      "root": "אלה",
       "pos": "noun",
       "gender": "masculine",
       "number": "plural",
@@ -130,7 +131,7 @@ books:
     name: "Genesis"
     hebrew_name: "בראשית"
     chapters: 50
-  - id: "exo" 
+  - id: "exo"
     name: "Exodus"
     hebrew_name: "שמות"
     chapters: 40
@@ -140,43 +141,46 @@ books:
 ## AI Processing Pipeline
 
 ### Phase 1: Text Import & Normalization
+
 ```python
 class BibleTextProcessor:
     def import_hebrew_text(self, source_file):
         """Import and normalize Hebrew text"""
-        
+
     def generate_transliteration(self, hebrew_text):
         """AI-generated transliteration"""
-        
+
     def extract_morphology(self, hebrew_text):
         """AI morphological analysis using GPT-4/Claude"""
 ```
 
-### Phase 2: Cross-Language Analysis  
+### Phase 2: Cross-Language Analysis
+
 ```python
 class CrossTranslationAnalyzer:
     def compare_hebrew_lxx(self, hebrew_verse, lxx_verse):
         """Semantic comparison Hebrew -> Greek"""
-        
+
     def track_theological_terms(self, term, languages=['hebrew', 'greek', 'latin']):
         """Track key terms across translations"""
-        
+
     def identify_translation_shifts(self, source_verse, target_verse):
         """AI-detected semantic/theological shifts"""
 ```
 
 ### Phase 3: Research Queries
+
 ```python
 class TheologicalResearch:
     def search_divine_names(self, name_pattern):
         """Search יהוה, אלהים, etc. with grammatical context"""
-        
+
     def analyze_plural_singulars(self):
         """Find אלהים with singular verbs (trinity debates)"""
-        
+
     def compare_messianic_prophecies(self, reference):
         """Compare Hebrew vs LXX in key passages"""
-        
+
     def track_textual_variants(self, passage):
         """Manuscript comparison for critical passages"""
 ```
@@ -184,21 +188,25 @@ class TheologicalResearch:
 ## Implementation Plan
 
 ### Week 1: Foundation
+
 - [ ] Create base schema and manifest structure
 - [ ] Import WLC Genesis as proof of concept
 - [ ] Basic morphological parsing with AI
 
 ### Week 2: Cross-Language Support
+
 - [ ] Add LXX Genesis with alignment to Hebrew
 - [ ] Implement semantic comparison framework
 - [ ] Build theological term tracking
 
 ### Week 3: Research Features
+
 - [ ] Advanced search capabilities
 - [ ] Cross-reference generation
 - [ ] Textual criticism support
 
 ### Week 4: AI Enhancement
+
 - [ ] Automated analysis pipeline
 - [ ] Confidence scoring
 - [ ] Research hypothesis testing

@@ -15,11 +15,13 @@
 ## Before & After
 
 ### Before (Old Pattern)
+
 ```python
 # Paste old code here
 ```
 
 ### After (New Pattern)
+
 ```python
 # Paste new code here
 ```
@@ -33,8 +35,8 @@
 
 ## Performance Impact
 
-- Query time: Before ___ ms → After ___ ms
-- Memory usage: Before ___ MB → After ___ MB
+- Query time: Before ___ms → After___ ms
+- Memory usage: Before ___MB → After___ MB
 - N+1 queries eliminated: ☐ Yes ☐ No ☐ N/A
 
 ## Backward Compatibility
