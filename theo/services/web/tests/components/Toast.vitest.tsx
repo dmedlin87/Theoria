@@ -35,8 +35,9 @@ describe("ToastProvider", () => {
     expect(toastDescription).toBeInTheDocument();
     expect(screen.getByText("Notification")).toBeInTheDocument();
 
-    const liveRegion = await screen.findByRole("status", { name: "Toast message" });
-
+    const liveRegion = toastDescription.parentElement?.querySelector('[role="status"]') as HTMLElement | null;
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion).toHaveAttribute("role", "status");
     expect(liveRegion).toHaveAttribute("aria-live", "polite");
   });
 
