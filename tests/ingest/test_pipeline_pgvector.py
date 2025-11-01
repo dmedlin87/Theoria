@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from theo.application.facades.settings import get_settings
 from theo.infrastructure.api.app.ingest import pipeline
 from theo.infrastructure.api.app.ingest.exceptions import UnsupportedSourceError
-from theo.infrastructure.api.app.ingest.stages import ErrorDecision, ErrorPolicy
+from theo.infrastructure.api.app.ingest.stages import ErrorDecision, ErrorPolicy, IngestContext
 from theo.infrastructure.api.app.persistence_models import Document, Passage
 from theo.infrastructure.api.app.ingest import persistence as ingest_persistence
 
@@ -245,7 +245,7 @@ class _RetryingPolicy(ErrorPolicy):
         stage: str,
         error: Exception,
         attempt: int,
-        context: Any,
+        context: IngestContext,
     ) -> ErrorDecision:
         if stage == "text_document_persister" and attempt == 1:
             self.decisions.append((stage, attempt))
