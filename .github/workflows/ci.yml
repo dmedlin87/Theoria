@@ -129,6 +129,10 @@ jobs:
           ls -la theo/services/web || true
           ls -la theo/services/web/coverage || true
 
+      - name: Run Playwright smoke suite
+        working-directory: theo/services/web
+        run: npm run test:e2e:smoke
+
       - name: Run Playwright E2E suite
         working-directory: theo/services/web
         run: npm run test:e2e:full
