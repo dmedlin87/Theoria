@@ -110,8 +110,16 @@ describe("ConnectionStatusIndicator", () => {
     const { rerender } = render(<ConnectionStatusIndicator />);
 
     await waitFor(() => {
-      expect(addToastMock).not.toHaveBeenCalled();
+      expect(addToastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "success",
+          title: "API connection restored",
+          message: "All systems nominal",
+        }),
+      );
     });
+
+    addToastMock.mockClear();
 
     mockUseApiHealth.mockReturnValueOnce(
       createSnapshot({ status: "degraded", message: "Latency elevated" }),
