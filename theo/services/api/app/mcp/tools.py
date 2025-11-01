@@ -121,7 +121,7 @@ def register_tool(
 def iter_registered_tools() -> Iterable[ToolRegistration]:
     """Yield all registered tool definitions."""
 
-    return _registry.items()
+    yield from _registry.items()
 
 
 def invoke_tool(name: str, session: Session, payload: Mapping[str, Any]) -> Any:
