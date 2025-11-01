@@ -98,13 +98,14 @@ def test_process_url_retry_uses_exponential_backoff(
         assert job.status == "failed"
         assert job.error == str(failure)
 
-    task.request.retries = 1
+    # Simulate a retry by passing the retries count via options, as Celery would do.
 
     with pytest.raises(CeleryRetry) as second_exc:
         task.apply(
             args=("doc-123", "https://example.invalid/resource"),
             kwargs={"job_id": job_id},
             throw=True,
+            options={"retries": 1},
         )
 
     assert attempts == 2
