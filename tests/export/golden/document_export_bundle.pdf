@@ -1,0 +1,182 @@
+%PDF-1.4
+%
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2205 >>
+stream
+BT
+/F1 11 Tf
+14 TL
+72 760 Td
+(Theo Export export-fixture) Tj
+T*
+(Schema Version: 2024-07-01) Tj
+T*
+(Created: 2024-01-01T00:00:00+00:00) Tj
+T*
+(Export Type: documents) Tj
+T*
+() Tj
+T*
+(Manifest:) Tj
+T*
+({) Tj
+T*
+(  "export_id": "export-fixture",) Tj
+T*
+(  "schema_version": "2024-07-01",) Tj
+T*
+(  "created_at": "2024-01-01T00:00:00Z",) Tj
+T*
+(  "type": "documents",) Tj
+T*
+(  "filters": {) Tj
+T*
+(    "collection": "theology",) Tj
+T*
+(    "author": null,) Tj
+T*
+(    "source_type": null) Tj
+T*
+(  },) Tj
+T*
+(  "totals": {) Tj
+T*
+(    "documents": 1,) Tj
+T*
+(    "passages": 1,) Tj
+T*
+(    "returned": 1) Tj
+T*
+(  },) Tj
+T*
+(  "app_git_sha": "abc1234",) Tj
+T*
+(  "enrichment_version": 2,) Tj
+T*
+(  "cursor": "doc-1",) Tj
+T*
+(  "next_cursor": null,) Tj
+T*
+(  "mode": null) Tj
+T*
+(}) Tj
+T*
+() Tj
+T*
+(Records:) Tj
+T*
+([) Tj
+T*
+(  {) Tj
+T*
+(    "kind": "document",) Tj
+T*
+(    "document_id": "doc-1",) Tj
+T*
+(    "title": "Example Document",) Tj
+T*
+(    "collection": "theology",) Tj
+T*
+(    "source_type": "article",) Tj
+T*
+(    "authors": [) Tj
+T*
+(      "Jane Doe",) Tj
+T*
+(      "John Roe") Tj
+T*
+(    ],) Tj
+T*
+(    "doi": "10.1234/example",) Tj
+T*
+(    "venue": "TheoConf",) Tj
+T*
+(    "year": 2023,) Tj
+T*
+(    "topics": [) Tj
+T*
+(      "grace") Tj
+T*
+(    ],) Tj
+T*
+(    "primary_topic": "Grace",) Tj
+T*
+(    "enrichment_version": 2,) Tj
+T*
+(    "provenance_score": 82,) Tj
+T*
+(    "abstract": "An example abstract",) Tj
+T*
+(    "source_url": "https://example.com/doc-1",) Tj
+T*
+(    "metadata": {) Tj
+T*
+(      "publisher": "Theo Press",) Tj
+T*
+(      "pages": "10-12") Tj
+T*
+(    },) Tj
+T*
+(    "passages": [) Tj
+T*
+(      {) Tj
+T*
+(        "id": "passage-1",) Tj
+T*
+(        "document_id": "doc-1",) Tj
+T*
+(        "osis_ref": "John.1.1",) Tj
+T*
+(        "page_no": 1,) Tj
+T*
+(        "t_start": null,) Tj
+T*
+(        "t_end": null,) Tj
+T*
+(        "text": "In the beginning was the Word.",) Tj
+T*
+(        "meta": {) Tj
+T*
+(          "snippet": "In the beginning was the Word.") Tj
+T*
+(        }) Tj
+T*
+(      }) Tj
+T*
+(    ]) Tj
+T*
+(  }) Tj
+T*
+(]) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Producer (Theo Exporter) /Creator (Theo Exporter) /Title (Theo Export export-fixture) /Subject (Schema 2024-07-01) /CreationDate (D:20240101000000+0000 )>>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000067 00000 n 
+0000000127 00000 n 
+0000000256 00000 n 
+0000002519 00000 n 
+0000002592 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+startxref
+2770
+%%EOF
