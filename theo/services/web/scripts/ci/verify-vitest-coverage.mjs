@@ -54,7 +54,6 @@ async function main() {
   if (!totals) {
     console.error("Vitest coverage summary is missing total metrics.");
     process.exit(1);
-    return;
   }
 
   const deficits = validateTotals(totals);
