@@ -106,7 +106,7 @@ describe("ToastProvider", () => {
     const toastRoot = toastDescription.closest("[data-state]");
 
     expect(toastRoot).not.toBeNull();
-    expect(toastRoot).toHaveClass(toastVariants.success);
+    expect(toastRoot?.className).toContain(toastVariants.success);
     expect(toastRoot).toHaveClass("slide-up", "bounce");
   });
 
