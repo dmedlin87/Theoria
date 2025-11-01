@@ -99,7 +99,7 @@ Keep the following workflow in mind:
 
 - Run a single component test: `npm run test:vitest -- --run tests/app/onboarding/onboarding-wizard.test.tsx`.
 - Filter by test name: `npm run test:vitest -- --testNamePattern="Wizard completes"`.
-- Collect coverage without executing tests a second time: `npm run test:vitest -- --coverage=false` reuses cached V8 coverage data.
+- To run Vitest tests without collecting coverage, use: `npm run test:vitest -- --coverage=false`.
 - Trigger Playwright against a tag or specific spec: `npm run test:e2e -- --grep @smoke` or `npm run test:e2e -- tests/e2e/chat.spec.ts`.
 - Regenerate the MCP contract fixtures after API changes with `task test:contract`.
 
