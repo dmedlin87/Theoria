@@ -34,7 +34,6 @@ pytestmark = pytest.mark.pgvector
 def engine(pgvector_db: PGVectorDatabase):
     clone: PGVectorClone = pgvector_db.clone_database("retriever_docs")
     engine = pgvector_db.create_engine(database=clone.name)
-    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     try:
         yield engine
