@@ -242,7 +242,7 @@ def test_passage_sync_deduplicates_and_notifies(
 
     def _record_notifications(
         session: Session,
-        case_object_ids: Sequence[str | None],
+        case_object_ids: Iterator[str],
         *,
         document_id: str | None = None,
     ) -> None:
