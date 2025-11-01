@@ -20,8 +20,12 @@ if "fastapi" not in sys.modules:
 if "pypdf" not in sys.modules:
     pypdf_module = types.ModuleType("pypdf")
     errors_module = types.ModuleType("pypdf.errors")
-    errors_module.FileNotDecryptedError = RuntimeError  # type: ignore[attr-defined]
-    errors_module.PdfReadError = RuntimeError  # type: ignore[attr-defined]
+    class FileNotDecryptedError(RuntimeError):
+        pass
+    class PdfReadError(RuntimeError):
+        pass
+    errors_module.FileNotDecryptedError = FileNotDecryptedError  # type: ignore[attr-defined]
+    errors_module.PdfReadError = PdfReadError  # type: ignore[attr-defined]
     class DummyPdfReader:
         pass
     pypdf_module.PdfReader = DummyPdfReader  # type: ignore[attr-defined]
