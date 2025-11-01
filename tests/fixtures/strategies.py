@@ -22,7 +22,9 @@ if "pypdf" not in sys.modules:
     errors_module = types.ModuleType("pypdf.errors")
     errors_module.FileNotDecryptedError = RuntimeError  # type: ignore[attr-defined]
     errors_module.PdfReadError = RuntimeError  # type: ignore[attr-defined]
-    pypdf_module.PdfReader = object  # type: ignore[attr-defined]
+    class DummyPdfReader:
+        pass
+    pypdf_module.PdfReader = DummyPdfReader  # type: ignore[attr-defined]
     pypdf_module.errors = errors_module  # type: ignore[attr-defined]
     sys.modules["pypdf"] = pypdf_module
     sys.modules["pypdf.errors"] = errors_module
