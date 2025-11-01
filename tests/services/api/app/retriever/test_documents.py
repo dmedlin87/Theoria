@@ -5,13 +5,9 @@ from datetime import UTC, datetime
 import pytest
 
 try:  # pragma: no cover - optional dependency for lightweight environments
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import Session, sessionmaker
-    from sqlalchemy.pool import StaticPool
 except ModuleNotFoundError:  # pragma: no cover - gracefully skip when SQLAlchemy missing
     pytest.skip("sqlalchemy not installed", allow_module_level=True)
-except ImportError:  # pragma: no cover - minimal stubs without pool support
-    pytest.skip("sqlalchemy pool utilities unavailable", allow_module_level=True)
 
 from theo.infrastructure.api.app.models.documents import (
     DocumentAnnotationCreate,
@@ -28,22 +24,23 @@ from theo.infrastructure.api.app.persistence_models import (
     Passage,
 )
 from theo.infrastructure.api.app.retriever import documents
+from tests.fixtures.pgvector import PGVectorDatabase, PGVectorClone
+
+
+pytestmark = pytest.mark.pgvector
 
 
 @pytest.fixture(scope="module")
-def engine():
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        future=True,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+def engine(pgvector_db: PGVectorDatabase):
+    clone: PGVectorClone = pgvector_db.clone_database("retriever_docs")
+    engine = pgvector_db.create_engine(database=clone.name)
     Base.metadata.create_all(engine)
     try:
         yield engine
     finally:
         Base.metadata.drop_all(engine)
         engine.dispose()
+        pgvector_db.drop_clone(clone)
 
 
 @pytest.fixture
