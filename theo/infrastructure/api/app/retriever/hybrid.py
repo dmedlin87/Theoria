@@ -419,7 +419,13 @@ def _passes_author_filter(document: Document, author: str | None) -> bool:
         return True
     if not document.authors:
         return False
-    return author in document.authors
+    target_author = _normalise_filter_value(author)
+    if target_author is None:
+        return True
+    for doc_author in document.authors:
+        if _normalise_filter_value(doc_author) == target_author:
+            return True
+    return False
 
 
 def _normalise_filter_value(value: str | None) -> str | None:

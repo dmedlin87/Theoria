@@ -195,14 +195,14 @@ def _bulk_update_with_retry(
             return  # Success
         except SQLAlchemyError as exc:
             _LOGGER.warning(
-                "Bulk update failed on attempt %d/%d: %s", 
+                "Bulk update failed on attempt %d/%d: %s",
                 attempt, max_attempts, exc
             )
             try:
                 session.rollback()
             except Exception as rollback_exc:
                 _LOGGER.error("Failed to rollback after bulk update error: %s", rollback_exc)
-                
+
             if attempt == max_attempts:
                 raise click.ClickException(
                     f"Bulk update failed after {max_attempts} attempt(s): {exc}"
@@ -220,14 +220,14 @@ def _commit_with_retry(
             session.commit()
         except SQLAlchemyError as exc:  # pragma: no cover - defensive retry path
             _LOGGER.warning(
-                "Database commit failed on attempt %d/%d: %s", 
+                "Database commit failed on attempt %d/%d: %s",
                 attempt, max_attempts, exc
             )
             try:
                 session.rollback()
             except Exception as rollback_exc:
                 _LOGGER.error("Failed to rollback after commit error: %s", rollback_exc)
-                
+
             if attempt == max_attempts:
                 raise click.ClickException(
                     f"Database commit failed after {max_attempts} attempt(s): {exc}"
@@ -503,7 +503,7 @@ def rebuild_embeddings_cmd(
                     count_stmt = count_stmt.join(Document)
                 for criterion in filters:
                     count_stmt = count_stmt.where(criterion)
-                
+
                 # Use retry logic for count query
                 count_result = _execute_with_retry(session, count_stmt)
                 total = count_result.scalar_one()
@@ -561,7 +561,7 @@ def rebuild_embeddings_cmd(
                 # Use retry logic for streaming query
                 stream_result = _execute_with_retry(session, stmt)
                 stream = stream_result.scalars()
-                
+
                 if skip_count:
                     stream = itertools.islice(stream, skip_count, None)
                     processed = min(skip_count, total)
@@ -682,10 +682,10 @@ def rebuild_embeddings_cmd(
                             processed=processed,
                             last_id=last_id,
                         )
-                        
+
             except SQLAlchemyError as exc:
                 _LOGGER.error(
-                    "Database error during embedding rebuild: %s", 
+                    "Database error during embedding rebuild: %s",
                     exc, exc_info=True
                 )
                 raise click.ClickException(
@@ -693,7 +693,7 @@ def rebuild_embeddings_cmd(
                 ) from exc
             except Exception as exc:
                 _LOGGER.error(
-                    "Unexpected error during embedding rebuild: %s", 
+                    "Unexpected error during embedding rebuild: %s",
                     exc, exc_info=True
                 )
                 raise
@@ -703,7 +703,7 @@ def rebuild_embeddings_cmd(
                     session.rollback()
                 except Exception:
                     pass  # Best effort cleanup
-                    
+
         if checkpoint_file is not None:
             click.echo(f"Checkpoint written to {checkpoint_file}")
             log_workflow_event(
