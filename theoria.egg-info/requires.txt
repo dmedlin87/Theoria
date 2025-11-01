@@ -11,6 +11,7 @@ httpx<0.29,>=0.28.1
 neo4j<6,>=5.20
 opentelemetry-api<2,>=1.25.0
 opentelemetry-sdk<2,>=1.25.0
+packaging<25,>=23.2
 prometheus-client<1,>=0.20
 pydantic<3,>=2.5
 pydantic-settings<3,>=2.1
