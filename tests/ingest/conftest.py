@@ -74,7 +74,7 @@ def pgvector_pipeline_session_factory(
 
     connection = pgvector_pipeline_engine.connect()
     transaction = connection.begin()
-    factory = sessionmaker(bind=connection, future=True)
+    factory = sessionmaker(bind=connection)
     sessions: list[Session] = []
 
     def _factory() -> Session:
