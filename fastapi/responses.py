@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Iterable
+import json
 
 
 class Response:
@@ -10,6 +11,35 @@ class Response:
         self.content = content
         self.status_code = status_code
         self.media_type = media_type
+        self.headers: dict[str, str] = {}
+        if media_type:
+            self.headers["content-type"] = media_type
+
+    @property
+    def text(self) -> str:
+        if isinstance(self.content, bytes):
+            try:
+                return self.content.decode("utf-8")
+            except Exception:
+                return str(self.content)
+        if isinstance(self.content, (dict, list)) and self.media_type == "application/json":
+            try:
+                return json.dumps(self.content)
+            except Exception:
+                return str(self.content)
+        return "" if self.content is None else str(self.content)
+
+    def json(self) -> Any:
+        if isinstance(self.content, (dict, list)):
+            return self.content
+        if isinstance(self.content, (bytes, str)):
+            try:
+                payload = self.content.decode("utf-8") if isinstance(self.content, bytes) else self.content
+                return json.loads(payload)
+            except Exception:
+                # Fall back to raw content if not valid JSON
+                return self.content
+        return self.content
 
 
 class JSONResponse(Response):

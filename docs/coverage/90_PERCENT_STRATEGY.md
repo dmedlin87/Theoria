@@ -1,8 +1,8 @@
 # 90% Coverage Strategy for Theoria
 
-**Status:** Active Strategy  
-**Date:** November 1, 2025  
-**Target:** 90% coverage for critical packages, 85% overall  
+**Status:** Active Strategy
+**Date:** November 1, 2025
+**Target:** 90% coverage for critical packages, 85% overall
 
 ## Executive Summary
 
@@ -47,14 +47,16 @@ Packages requiring 90% coverage based on system impact:
 
 ### Phase 1: Foundation (Weeks 1-3) - Reach 35% Overall
 
-**Build on existing COVERAGE_ACTION_PLAN.md**
+### Build on existing COVERAGE_ACTION_PLAN.md
 
 #### Week 0: Frontend Test Fixes (Pre-requisite)
-**BLOCKING - All other work depends on this**
+
+### BLOCKING - All other work depends on this
 
 - [ ] **URGENT:** Fix 2 failing frontend test suites blocking coverage measurement
 - [ ] Enable frontend coverage reporting and baseline
 - [ ] Generate initial coverage.baseline.xml for PR enforcement:
+
   ```bash
   pytest --cov=theo --cov-report=xml && cp coverage.xml coverage.baseline.xml
   ```
@@ -87,7 +89,7 @@ Packages requiring 90% coverage based on system impact:
 
 ### Phase 2: Critical Path Coverage (Weeks 4-8) - Reach 80% Overall
 
-**Execute existing COVERAGE_ACTION_PLAN.md with 90% critical targets**
+### Execute existing COVERAGE_ACTION_PLAN.md with 90% critical targets
 
 #### Week 4-5: Document Processing Foundation
 
@@ -152,24 +154,24 @@ Packages requiring 90% coverage based on system impact:
 
 ### 0% → 60%: Foundation Testing
 
-**Focus: Basic functionality and happy paths**
+### Focus: Basic functionality and happy paths
 
 ```python
 # Template for foundation tests
 class TestCoreFunctionality:
     def test_basic_workflow(self):
         """Test primary use case works"""
-        
+
     def test_error_handling(self):
         """Test appropriate exceptions raised"""
-        
+
     def test_configuration_defaults(self):
         """Test default configurations"""
 ```
 
 ### 60% → 80%: Comprehensive Testing
 
-**Focus: Edge cases, integration, error scenarios**
+### Focus: Edge cases, integration, error scenarios
 
 ```python
 # Template for comprehensive tests
@@ -177,27 +179,27 @@ class TestComprehensiveCoverage:
     @pytest.mark.parametrize("scenario", ["case1", "case2", "edge"])
     def test_multiple_scenarios(self, scenario):
         """Test various input scenarios"""
-        
+
     def test_integration_dependencies(self):
         """Test with real dependencies"""
-        
+
     def test_performance_bounds(self):
         """Test performance constraints"""
 ```
 
 ### 80% → 90%: Excellence Testing
 
-**Focus: Branch coverage, mutation testing, security**
+### Focus: Branch coverage, mutation testing, security
 
 ```python
 # Template for excellence tests
 class TestExcellenceCoverage:
     def test_all_branch_paths(self):
         """Test every conditional branch"""
-        
+
     def test_security_boundaries(self):
         """Test security constraints"""
-        
+
     def test_resource_exhaustion(self):
         """Test system limits and recovery"""
 ```
@@ -224,17 +226,17 @@ class TestExcellenceCoverage:
 class TestDatabaseExcellence:
     def test_connection_lifecycle_all_branches(self):
         """Test every connection state transition"""
-        
+
     def test_transaction_commit_rollback_scenarios(self):
         """Test all transaction outcomes"""
-        
+
     def test_pool_exhaustion_recovery(self):
         """Test connection pool limits"""
 
 class TestSettingsExcellence:
     def test_all_environment_combinations(self):
         """Test every environment variable combination"""
-        
+
     def test_validation_error_messages(self):
         """Test specific validation failures"""
 ```
@@ -261,7 +263,7 @@ class TestSettingsExcellence:
   run: |
     python scripts/security/verify_critical_coverage.py
     # Enforces 90% for critical packages
-    
+
 - name: Overall Coverage Check
   run: |
     python -m pytest --cov=theo --cov-fail-under=80
@@ -423,6 +425,6 @@ STRETCH_THRESHOLD = 0.85  # Stretch goal
 
 ---
 
-**Status Review:** Weekly during Phase 1-2, biweekly during Phase 3-4  
-**Strategy Owner:** Engineering Team Lead  
+**Status Review:** Weekly during Phase 1-2, biweekly during Phase 3-4
+**Strategy Owner:** Engineering Team Lead
 **Last Updated:** November 1, 2025

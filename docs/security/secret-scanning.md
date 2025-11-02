@@ -16,10 +16,12 @@
 
 1. Install Trufflehog locally (`pip install trufflehog`) and ensure the repository has a remote named `origin` (needed by legacy CLI).
 2. Run the filesystem scan from the repo root:
+
    ```bash
    python scripts/security/run_trufflehog.py  # or manually:
    trufflehog --json --regex --entropy=False --repo_path . file://.
    ```
+
 3. The JSON findings are persisted to [`docs/security/trufflehog-baseline.json`](trufflehog-baseline.json). Eight findings were recorded on 2025-01-13; all map to sample Postgres/Redis connection strings used in local development templates and infrastructure manifests.
 4. Treat the baseline as the allow-list. Confirm any new match is not in that file before updating the baseline.
 

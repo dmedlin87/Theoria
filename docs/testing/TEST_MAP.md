@@ -3,6 +3,7 @@
 ## Inventory Overview
 
 ### Backend Python Services (`theo/services/api/app`)
+
 - **Core settings & infrastructure**: `core.settings`, `core.settings_store`, `core.database`, `core.secret_migration`, `tracing`, `telemetry`.
 - **Database access**: SQLAlchemy models in `db.models`, utility types in `db.types`, migration runner `db.run_sql_migrations`, seed utilities `db.seeds`, feedback persistence `db.feedback`.
 - **Ingestion pipeline**: Parsers & normalizers in `ingest.parsers`, `ingest.osis`, `ingest.metadata`, chunking logic `ingest.chunking`, pipeline orchestration `ingest.pipeline`, persistence `ingest.persistence`, sanitization and network fetchers.
@@ -16,12 +17,15 @@
 - **Ranking**: Feature engineering `ranking.features`, metrics `ranking.metrics`, re-ranker orchestrator `ranking.re_ranker`.
 
 ### CLI Utilities (`theo/services/cli`)
+
 - Ingestion helpers, redaction scripts, pgvector maintenance (`refresh_hnsw.py`).
 
 ### Geo Services (`theo/services/geo`)
+
 - Geo dataset loaders and GIS helpers (used by research modules).
 
 ### Frontend (`theo/services/web`)
+
 - **Next.js App Router** with routes: `app/search`, `app/research`, `app/chat`, `app/upload`, verse detail `app/verse/[osis]`, document view `app/doc/[id]`, admin dashboards `app/admin/*`, copilot area `app/copilot/*`.
 - **Route handlers**: API route handlers under `app/api/(search|analytics|ingest)`.
 - **Shared components**: `app/components` and `app/copilot/components`.
@@ -29,11 +33,13 @@
 - **Utilities**: Query helpers in `app/lib`, typed client in `app/lib/generated/api.ts`.
 
 ### Search Infrastructure
+
 - Hybrid pgvector search in `retriever.hybrid` with ANN/HNSW and lexical blend.
 - Ranking heuristics in `ranking.features` and `metrics`.
 - CLI + Celery integration for refreshing vector indexes and evaluating recall.
 
 ### Celery Tasks (`workers.tasks`)
+
 - `validate_citations`, `process_file`, `process_url`, `enrich_document`, `generate_document_summary`, `send_topic_digest_notification`, `generate_topic_digest`, `refresh_hnsw`, `run_watchlist_alert`, `build_deliverable`, `schedule_watchlist_alerts`, `refresh_creator_verse_rollups` plus helpers for cached chat sessions and citation normalisation.
 
 The contributor workflow for starting Postgres fixtures, running targeted suites, and interpreting coverage reports now lives in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#postgres--pgvector-testcontainer-fixture). Cross-check those sections when spinning up a new suite locally.
@@ -53,14 +59,20 @@ The contributor workflow for starting Postgres fixtures, running targeted suites
 | `make test:changed` | Run Vitest on changed files using `--changed` filter, fallback to full run when no git context | N/A | N/A | Implementation tied to Nx caching deferred |
 
 ### Known Gaps / Deferrals
-- No automated load/perf benchmarking in CI (documented in ROADMAP).<br>- Geo services integration tests require large shapefiles; plan to stub via contract tests instead.<br>- Third-party API contract tests (OpenAlex, external sermon sources) to be covered via recorded cassettes in separate initiative.<br>- Accessibility snapshot tooling (axe) to be introduced after initial Playwright smoke coverage is stable.
+
+- No automated load/perf benchmarking in CI (documented in ROADMAP).  
+- Geo services integration tests require large shapefiles; plan to stub via contract tests instead.  
+- Third-party API contract tests (OpenAlex, external sermon sources) to be covered via recorded cassettes in separate initiative.  
+- Accessibility snapshot tooling (axe) to be introduced after initial Playwright smoke coverage is stable.
 
 ### Regression Data Factories
+
 - `tests/fixtures/regression_factory.py` synthesises documents, passages, and OSIS references using `Faker` and `pythonbible`.
 - Tests can request the `regression_factory` fixture (seeded to `2025`) to build deterministic RAG prompts, guardrail payloads, and other regression datasets.
 - Re-create golden/performance artefacts by instantiating `RegressionDataFactory` with the default seed; randomness is seeded so repeated runs produce identical output.
 
 ## Next Steps Checklist
+
 - [ ] Stand up reusable Postgres + pgvector Testcontainer fixtures.
 - [ ] Add Hypothesis-based property suites for OSIS parser and chunking heuristics.
 - [ ] Implement Celery retry/idempotency tests with celery.contrib.pytest fixtures.

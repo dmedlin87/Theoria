@@ -95,8 +95,12 @@ except ModuleNotFoundError:  # pragma: no cover - allows running lightweight sui
     sessionmaker = None  # type: ignore[assignment]
 
 try:  # pragma: no cover - factory depends on optional domain extras
-from tests.factories.application import isolated_application_container
-from tests.fixtures.pgvector import PGVectorDatabase, PGVectorClone, provision_pgvector_database
+    from tests.factories.application import isolated_application_container
+    from tests.fixtures.pgvector import (
+        PGVectorDatabase,
+        PGVectorClone,
+        provision_pgvector_database,
+    )
 except ModuleNotFoundError as exc:  # pragma: no cover - light environments
     isolated_application_container = None  # type: ignore[assignment]
     _APPLICATION_FACTORY_IMPORT_ERROR = exc
