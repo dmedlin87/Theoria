@@ -26,7 +26,7 @@ def _install_fastapi_stub() -> None:
 
     fastapi_module = types.ModuleType(_FASTAPI_MODULE)
     status_module = types.ModuleType(_FASTAPI_STATUS_MODULE)
-    setattr(status_module, "HTTP_422_UNPROCESSABLE_ENTITY", 422)
+    setattr(status_module, "HTTP_422_UNPROCESSABLE_CONTENT", 422)
     sys.modules[_FASTAPI_STATUS_MODULE] = status_module
     fastapi_module.status = status_module  # type: ignore[attr-defined]
     sys.modules[_FASTAPI_MODULE] = fastapi_module

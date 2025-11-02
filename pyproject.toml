@@ -166,10 +166,6 @@ norecursedirs = [
     ".*",
     "__pycache__",
 ]
-env = [
-    "THEORIA_ALLOW_REAL_FASTAPI=1",
-    "THEORIA_ALLOW_REAL_CELERY=1",
-]
 markers = [
     "redteam: OWASP LLM red-team regression suite",
     "no_auth_override: disable authentication override fixture for security assertions",

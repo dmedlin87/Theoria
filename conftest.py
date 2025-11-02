@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import os
+
+# Force use of real FastAPI and Celery packages during testing
+# This prevents import errors when shims don't expose all required submodules
+os.environ["THEORIA_ALLOW_REAL_FASTAPI"] = "1"
+os.environ["THEORIA_ALLOW_REAL_CELERY"] = "1"
+
 import importlib
 import importlib.util
 import sys

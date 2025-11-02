@@ -58,8 +58,10 @@ def _import_real_module(name: str) -> ModuleType | None:
     return module
 
 
-# Always try to use real package when available, fall back to stub otherwise
-_real_fastapi = _import_real_module("fastapi")
+if "pytest" in sys.modules and os.environ.get("THEORIA_ALLOW_REAL_FASTAPI", "0") not in {"1", "true", "TRUE"}:
+    _real_fastapi = None
+else:
+    _real_fastapi = _import_real_module("fastapi")
 
 if _real_fastapi is not None:
     sys.modules[__name__] = _real_fastapi

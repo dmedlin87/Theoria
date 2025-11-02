@@ -9,12 +9,12 @@ try:  # pragma: no cover - defensive import for environments without Starlette
 except ImportError:  # pragma: no cover - fallback if Starlette is absent
     starlette_status = fastapi_status  # type: ignore[assignment]
 
-# FastAPI 0.115 (Starlette >=0.40) renamed HTTP_422_UNPROCESSABLE_CONTENT to
-# HTTP_422_UNPROCESSABLE_ENTITY. Maintain the previous attribute for the rest of
+# FastAPI 0.115 (Starlette >=0.40) renamed HTTP_422_UNPROCESSABLE_ENTITY to
+# HTTP_422_UNPROCESSABLE_CONTENT. Maintain the previous attribute for the rest of
 # the codebase and historical clients until we can migrate fully.
 _unprocessable = getattr(
     fastapi_status,
-    "HTTP_422_UNPROCESSABLE_ENTITY",
+    "HTTP_422_UNPROCESSABLE_CONTENT",
     422,  # pragma: no cover - ultra defensive default
 )
 
