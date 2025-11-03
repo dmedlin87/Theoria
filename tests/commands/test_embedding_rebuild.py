@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import types
+import importlib.machinery as importlib_machinery
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -39,6 +40,88 @@ if "pydantic" not in sys.modules:
     pydantic_stub.AliasChoices = type("AliasChoices", (), {})
 
     sys.modules["pydantic"] = pydantic_stub
+
+if "sqlalchemy" not in sys.modules:
+    sqlalchemy_stub = types.ModuleType("sqlalchemy")
+    sqlalchemy_stub.__path__ = []  # pragma: no cover - mark as package
+    sqlalchemy_spec = importlib_machinery.ModuleSpec("sqlalchemy", loader=None)
+    sqlalchemy_spec.submodule_search_locations = []
+    sqlalchemy_stub.__spec__ = sqlalchemy_spec
+
+    class _FuncProxy:
+        def __getattr__(self, name: str) -> Any:  # pragma: no cover - defensive
+            raise NotImplementedError(f"sqlalchemy.func placeholder accessed for '{name}'")
+
+    def _raise(*_args: object, **_kwargs: object) -> None:  # pragma: no cover
+        raise NotImplementedError("sqlalchemy placeholder accessed")
+
+    sqlalchemy_stub.func = _FuncProxy()
+    sqlalchemy_stub.select = _raise
+    sqlalchemy_stub.create_engine = _raise
+    sqlalchemy_stub.text = lambda statement: statement
+
+    exc_module = types.ModuleType("sqlalchemy.exc")
+
+    class SQLAlchemyError(Exception):
+        pass
+
+    exc_module.SQLAlchemyError = SQLAlchemyError
+
+    orm_module = types.ModuleType("sqlalchemy.orm")
+
+    class Session:  # pragma: no cover - placeholder
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            raise NotImplementedError("sqlalchemy.orm.Session placeholder accessed")
+
+    orm_module.Session = Session
+
+    engine_module = types.ModuleType("sqlalchemy.engine")
+
+    class Engine:  # pragma: no cover - placeholder
+        pass
+
+    engine_module.Engine = Engine
+
+    ext_module = types.ModuleType("sqlalchemy.ext")
+    ext_module.__path__ = []  # pragma: no cover - mark as package
+    ext_spec = importlib_machinery.ModuleSpec("sqlalchemy.ext", loader=None)
+    ext_spec.submodule_search_locations = []
+    ext_module.__spec__ = ext_spec
+    hybrid_module = types.ModuleType("sqlalchemy.ext.hybrid")
+
+    def hybrid_property(func: Any | None = None, **_kwargs: object):  # pragma: no cover - stub
+        if func is None:
+            return hybrid_property
+        return func
+
+    hybrid_module.hybrid_property = hybrid_property
+    ext_module.hybrid = hybrid_module
+
+    sql_module = types.ModuleType("sqlalchemy.sql")
+    sql_module.__path__ = []  # pragma: no cover - mark as package
+    sql_spec = importlib_machinery.ModuleSpec("sqlalchemy.sql", loader=None)
+    sql_spec.submodule_search_locations = []
+    sql_module.__spec__ = sql_spec
+    elements_module = types.ModuleType("sqlalchemy.sql.elements")
+    elements_spec = importlib_machinery.ModuleSpec("sqlalchemy.sql.elements", loader=None)
+    elements_spec.submodule_search_locations = []
+    elements_module.__spec__ = elements_spec
+
+    class ClauseElement:  # pragma: no cover - placeholder
+        pass
+
+    elements_module.ClauseElement = ClauseElement
+    sql_module.elements = elements_module
+    sqlalchemy_stub.sql = sql_module
+
+    sys.modules["sqlalchemy"] = sqlalchemy_stub
+    sys.modules["sqlalchemy.exc"] = exc_module
+    sys.modules["sqlalchemy.orm"] = orm_module
+    sys.modules["sqlalchemy.engine"] = engine_module
+    sys.modules["sqlalchemy.ext"] = ext_module
+    sys.modules["sqlalchemy.ext.hybrid"] = hybrid_module
+    sys.modules["sqlalchemy.sql"] = sql_module
+    sys.modules["sqlalchemy.sql.elements"] = elements_module
 
 embeddings_stub = types.ModuleType("theo.infrastructure.api.app.ingest.embeddings")
 
@@ -77,7 +160,7 @@ pytest.importorskip("sqlalchemy")
 from sqlalchemy.exc import SQLAlchemyError
 
 from theo.application.embeddings import EmbeddingRebuildResult
-from theo.checkpoints import CURRENT_EMBEDDING_CHECKPOINT_VERSION, CheckpointValidationError
+from theo.application.embeddings.checkpoint_store import load_checkpoint
 from theo.commands import embedding_rebuild
 from theo.commands.embedding_rebuild import (
     _batched,
@@ -144,8 +227,6 @@ def test_load_ids_strips_and_deduplicates(tmp_path: Path) -> None:
 
 
 def test_write_and_read_checkpoint_roundtrip(tmp_path: Path) -> None:
-    from theo.checkpoints import load_embedding_rebuild_checkpoint
-    
     checkpoint_path = tmp_path / "checkpoint.json"
     checkpoint = _write_checkpoint(
         checkpoint_path,
@@ -155,9 +236,14 @@ def test_write_and_read_checkpoint_roundtrip(tmp_path: Path) -> None:
         metadata={"mode": "fast"},
     )
     payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-    assert payload["version"] == CURRENT_EMBEDDING_CHECKPOINT_VERSION
+    assert payload["processed"] == 3
+    assert payload["total"] == 10
+    assert payload["last_id"] == "p3"
+    assert payload["metadata"] == {"mode": "fast"}
+    assert "created_at" in payload
+    assert "updated_at" in payload
     assert checkpoint.processed == 3
-    loaded = load_embedding_rebuild_checkpoint(checkpoint_path)
+    loaded = load_checkpoint(checkpoint_path)
     assert loaded == checkpoint
 
 
@@ -350,7 +436,6 @@ def test_rebuild_embeddings_invalid_checkpoint_resume_strict_mode(
     checkpoint = tmp_path / "checkpoint.json"
     # Create an invalid checkpoint with swapped created_at/updated_at
     invalid_checkpoint = {
-        "version": CURRENT_EMBEDDING_CHECKPOINT_VERSION,
         "processed": 5,
         "total": 10,
         "last_id": "p5",
