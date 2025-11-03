@@ -245,11 +245,11 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
     registry.register("engine", get_engine)
     registry.register(
         "research_notes_repository_factory",
-        lambda: SqlAlchemyResearchNoteRepositoryFactory(),
+        SqlAlchemyResearchNoteRepositoryFactory,
     )
     registry.register(
         "hypotheses_repository_factory",
-        lambda: SqlAlchemyHypothesisRepositoryFactory(),
+        SqlAlchemyHypothesisRepositoryFactory,
     )
 
     def _build_research_service_factory() -> Callable[[Session], ResearchService]:
