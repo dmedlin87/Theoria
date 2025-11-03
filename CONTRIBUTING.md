@@ -95,17 +95,16 @@ Keep the following workflow in mind:
 - Let the wrapper script discover optional plugins automatically: `python run_tests.py` adds timeouts, xdist parallelism, and coverage flags whenever the plugins are installed.
 - Profiling helpers such as `python scripts/perf/profile_marker_suites.py` capture baseline timings for heavy suites before you land optimisations.
 
-### Targeted Vitest, Playwright, and MCP runs
+### Targeted Vitest and Playwright runs
 
 - Run a single component test: `npm run test:vitest -- --run tests/app/onboarding/onboarding-wizard.test.tsx`.
 - Filter by test name: `npm run test:vitest -- --testNamePattern="Wizard completes"`.
 - To run Vitest tests without collecting coverage, use: `npm run test:vitest -- --coverage=false`.
 - Trigger Playwright against a tag or specific spec: `npm run test:e2e -- --grep @smoke` or `npm run test:e2e -- tests/e2e/chat.spec.ts`.
-- Regenerate the MCP contract fixtures after API changes with `task test:contract`.
 
 ### Coverage artifacts and dashboards
 
-- **Python (pytest-cov)** – `python -m pytest --cov=theo --cov=mcp_server --cov-report=xml --cov-report=html` writes `coverage.xml` plus an `htmlcov/` dashboard. Summarise or compare runs with `python analyze_coverage.py`.
+- **Python (pytest-cov)** – `python -m pytest --cov=theo --cov-report=xml --cov-report=html` writes `coverage.xml` plus an `htmlcov/` dashboard. Summarise or compare runs with `python analyze_coverage.py`.
 - **JSON comparisons** – Produce machine-readable diffs with `coverage json -o coverage.json` and inspect deltas via `jq` or downstream tooling; regenerate `coverage.xml` afterwards so `python analyze_coverage.py` can summarise the run.
 - **Frontend (Vitest)** – `npm run test:vitest` emits V8 coverage in `theo/services/web/coverage/`; open `theo/services/web/coverage/index.html` to review the per-file breakdown.
 - **Playwright** – Every E2E run writes `playwright-report/` with HTML, HAR, and trace archives. Add `--trace on` during investigations so GitHub Actions uploads the bundle automatically.

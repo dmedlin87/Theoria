@@ -169,31 +169,6 @@ def test_register_metrics_endpoint_skips_when_not_available(monkeypatch):
     assert response.status_code == 404
 
 
-def test_mount_mcp_registers_route_when_enabled(monkeypatch):
-    package = ModuleType("mcp_server")
-    server_module = ModuleType("mcp_server.server")
-    server_module.app = FastAPI()
-    monkeypatch.setitem(sys.modules, "mcp_server", package)
-    monkeypatch.setitem(sys.modules, "mcp_server.server", server_module)
-
-    settings = SimpleNamespace(mcp_tools_enabled=True)
-    app = FastAPI()
-
-    main_module._mount_mcp(app, settings)
-
-    assert any(getattr(route, "path", None) == "/mcp" for route in app.routes)
-
-
-def test_mount_mcp_skips_when_disabled(monkeypatch):
-    monkeypatch.delenv("THEO_ENABLE_CONSOLE_TRACES", raising=False)
-    settings = SimpleNamespace(mcp_tools_enabled=False)
-    app = FastAPI()
-
-    main_module._mount_mcp(app, settings)
-
-    assert all(getattr(route, "path", None) != "/mcp" for route in app.routes)
-
-
 def test_register_health_routes_return_service_data(monkeypatch):
     class FakeReport:
         def to_summary(self):

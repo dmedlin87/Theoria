@@ -38,7 +38,6 @@ class DummySettings:
     auth_allow_anonymous = False
     api_keys = ["dummy"]
     cors_allowed_origins = ["https://example.test"]
-    mcp_tools_enabled = True
 
     def has_auth_jwt_credentials(self) -> bool:
         return False
@@ -88,17 +87,11 @@ def test_create_app_uses_provided_settings(monkeypatch):
     monkeypatch.setattr(app_factory, "get_version_manager", lambda: DummyVersionManager())
     monkeypatch.setattr(app_factory, "register_metrics_endpoint", lambda app: calls.setdefault("metrics", True))
 
-    def fake_mount_mcp(app: FastAPI, *, enabled: bool):
-        calls["mcp_enabled"] = enabled
-
-    monkeypatch.setattr(app_factory, "mount_mcp", fake_mount_mcp)
-
     app = app_factory.create_app(settings=DummySettings())
 
     assert isinstance(app, FastAPI)
     assert calls["cors"] == tuple(DummySettings.cors_allowed_origins)
     assert calls["included_dependencies"] is sentinel_dependencies
-    assert calls["mcp_enabled"] is True
     assert calls["version_registered"][0] == ("1.0",)
     assert calls["version_registered"][1] == {"is_default": True}
     assert calls["security_dependencies"] is True
@@ -113,7 +106,6 @@ def test_create_app_configures_lifespan(monkeypatch):
         auth_allow_anonymous=False,
         api_keys=["dummy"],
         cors_allowed_origins=[],
-        mcp_tools_enabled=False,
         has_auth_jwt_credentials=lambda: False,
     ))
 
@@ -126,7 +118,6 @@ def test_create_app_configures_lifespan(monkeypatch):
     monkeypatch.setattr(app_factory, "include_router_registrations", lambda app, *, security_dependencies: None)
     monkeypatch.setattr(app_factory, "get_version_manager", lambda: SimpleNamespace(register_version=lambda *args, **kwargs: None))
     monkeypatch.setattr(app_factory, "register_metrics_endpoint", lambda app: None)
-    monkeypatch.setattr(app_factory, "mount_mcp", lambda app, *, enabled: None)
 
     app = app_factory.create_app()
 

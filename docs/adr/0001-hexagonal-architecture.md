@@ -18,4 +18,4 @@ The existing codebase couples FastAPI controllers, Celery workers, and persisten
 
 - Short-term increase in indirection while compatibility facades coexist with legacy modules.
 - Enables testing domain logic without FastAPI or database dependencies.
-- Simplifies addition of new delivery mechanisms (e.g., GraphQL, MCP) without touching core logic.
+- Simplifies addition of new delivery mechanisms (e.g., GraphQL, CLI clients) without touching core logic.

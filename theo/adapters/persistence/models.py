@@ -657,7 +657,7 @@ class Hypothesis(Base):
 
 
 class EvidenceCard(Base):
-    """Evidence card records authored via MCP."""
+    """Evidence card records authored via automation clients."""
 
     __tablename__ = "evidence_cards"
 

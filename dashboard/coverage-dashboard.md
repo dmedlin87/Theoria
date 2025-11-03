@@ -52,7 +52,6 @@ Coverage: Not Generated
 | Package | Coverage | Trend | Priority |
 |---------|----------|-------|----------|
 | 🔴 `services.api.app.core` | 0.0% | ▬ | 🚨 CRITICAL |
-| 🔴 `services.api.app.mcp` | 0.0% | ▬ | 🚨 CRITICAL |
 | 🔴 `services.api.app.retriever.tests` | 0.0% | ▬ | ⚠️ LOW |
 | 🔴 `services.api.tests` | 0.0% | ▬ | ⚠️ LOW |
 | 🔴 `services.api.tests.workers` | 0.0% | ▬ | ⚠️ LOW |
@@ -98,12 +97,6 @@ Coverage: Not Generated
 <td>🔴 Not Started</td>
 </tr>
 <tr>
-<td>MCP Integration</td>
-<td>0%</td>
-<td>80%</td>
-<td>🔴 Not Started</td>
-</tr>
-<tr>
 <td>Overall Coverage</td>
 <td>28.3%</td>
 <td>35%</td>
@@ -130,7 +123,7 @@ Package Categories by Coverage Level:
 40-59% ██   (6)  facades, routes.ai, services, db, app, ingest.stages
 20-39% █    (10) workers, rag, creators, cli, workflows, ai, intent, ranking, debug, research
 10-19% █    (9)  case_builder, transcripts, retriever, geo, notebooks, export, ingest, enrich, analytics
-0-9%   █    (5)  core, mcp, retriever.tests, api.tests (2x)
+0-9%   █    (4)  core, retriever.tests, api.tests (2x)
 
 Legend: █ = 5 packages
 ```
@@ -143,10 +136,9 @@ Legend: █ = 5 packages
 These packages have **NO TESTS** and represent **critical risk areas**:
 
 1. **`core/`** (7 files) - Database, settings, runtime
-2. **`mcp/`** (2 files) - MCP server integration
-3. **`retriever.tests/`** (2 files) - Old test files?
-4. **`api.tests/`** (23 files) - Old test files?
-5. **`api.tests.workers/`** (2 files) - Old test files?
+2. **`retriever.tests/`** (2 files) - Old test files?
+3. **`api.tests/`** (23 files) - Old test files?
+4. **`api.tests.workers/`** (2 files) - Old test files?
 
 ### Under 20% Coverage (9 packages, 41 files)
 Critical business logic with minimal testing:
@@ -175,7 +167,6 @@ By Category:
 - Ingest:        68 tests (7 files)
 - AI/RAG:        77 tests (4 files)
 - Architecture:   7 tests (1 file)
-- MCP Tools:     34 tests (3 files)
 - Export:        17 tests (3 files)
 - Database:      ~20 tests (3 files)
 - Research:      ~15 tests (6 files)
@@ -223,7 +214,7 @@ By Category:
 ### Run Tests
 ```bash
 # Backend with coverage
-python -m pytest --cov=theo --cov=mcp_server \
+python -m pytest --cov=theo \
   --cov-report=term-missing --cov-report=html
 
 # Frontend (fix tests first!)
@@ -255,7 +246,6 @@ start theo/services/web/playwright-report/index.html
 ### Phase 1: Foundation (Weeks 1-2)
 - [ ] Fix frontend test failures
 - [ ] Add core infrastructure tests
-- [ ] Add MCP integration tests
 - [ ] Setup automated coverage tracking
 - **Target:** 35% overall coverage
 

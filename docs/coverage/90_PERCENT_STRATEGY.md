@@ -12,7 +12,7 @@ This strategy expands upon ADR 0003's baseline requirements:
 - **90% critical package coverage** (expanded enforcement)
 - **85% overall coverage** (stretch goal)
 
-Current state: **28.3% overall** with critical gaps in core infrastructure (0%), MCP (0%), and key business logic.
+Current state: **28.3% overall** with critical gaps in core infrastructure (0%) and key business logic.
 
 **Timeline assumes 50% team capacity** (2 developers half-time, parallel to feature development).
 
@@ -68,7 +68,6 @@ Packages requiring 90% coverage based on system impact:
   - Settings loading and validation
   - Runtime environment detection
   - Secret migration logic
-- [ ] MCP server tests: `theo.services.api.app.mcp` (0% → 80%)
 - [ ] Enable basic coverage reporting
 
 #### Week 2: Zero-Coverage Elimination

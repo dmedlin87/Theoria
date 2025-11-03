@@ -32,23 +32,23 @@ def test_code_quality_runs_selected_checks(monkeypatch: pytest.MonkeyPatch, runn
         code_quality_module.code_quality,
         [
             "--ruff-path",
-            "mcp_server",
+            "theo",
             "--pytest-path",
-            "tests/mcp_tools",
+            "tests/unit",
             "--include-mypy",
             "--mypy-path",
-            "mcp_server",
+            "theo",
         ],
     )
 
     assert result.exit_code == 0
     assert calls == [
-        ["ruff", "check", "mcp_server"],
-        ["pytest", "tests/mcp_tools", "-q"],
-        ["mypy", "mcp_server"],
+        ["ruff", "check", "theo"],
+        ["pytest", "tests/unit", "-q"],
+        ["mypy", "theo"],
     ]
     assert "Summary:" in result.output
-    assert "✅ ruff (mcp_server)" in result.output
+    assert "✅ ruff (theo)" in result.output
 
 
 def test_code_quality_reports_required_failures(monkeypatch: pytest.MonkeyPatch, runner: CliRunner) -> None:

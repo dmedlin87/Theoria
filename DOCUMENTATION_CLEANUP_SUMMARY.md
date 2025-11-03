@@ -93,7 +93,7 @@ Each archive directory includes a README explaining its contents and retention p
 - docs/case_builder_buddy_summary.md
 - docs/theo_engine_case_builder_buddy_convergence_triggers_blueprint.md
 
-**MCP & Script Improvement Reports (5 files):**
+**Retired MCP & Script Improvement Reports (5 files removed):**
 - mcp_server/CODE_QUALITY_REPORT.md
 - mcp_server/IMPROVEMENTS.md
 - mcp_server/SUMMARY.md

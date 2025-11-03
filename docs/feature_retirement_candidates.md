@@ -37,22 +37,15 @@ required to safely remove them.
   from ingest, drop the Neo4j dependency, and prune the dormant tests/docs. This
   reduces ingest branching and simplifies dependency management.
 
-## Standalone MCP FastAPI server
+## Retired: standalone MCP FastAPI server
 
-* **Status:** Exists as a separate FastAPI application under
-  [`mcp_server/`](../mcp_server/) even though the primary API already exposes the
-  underlying functionality. Runtime exposure is gated by the
-  `mcp_tools_enabled` flag, which defaults to `False`.
-* **Surface area:** Duplicate configuration, middleware, schema registration,
-  metrics, and tool handlers. The codebase also carries a parallel test suite
-  and documentation explaining how to run this server.
-* **Maintenance drag:** The duplicate surface multiplies security review,
-  dependency updates, and contract testing, while few (if any) deployments turn
-  it on.
-* **Retirement plan:** Remove the `mcp_server/` package, the CLI/task entries
-  that spawn it, the associated tests, and the optional FastAPI/OpenTelemetry
-  extras from dependency manifests. Document that the REST and CLI interfaces
-  are the supported integration surfaces.
+* **Status:** Removed in favour of the unified REST API and CLI tooling. The
+  `mcp_server/` package, dedicated tests, and helper CLIs have been deleted.
+* **Surface area:** Integrations should target the documented REST endpoints or
+  automation scripts under `scripts/` for equivalent coverage.
+* **Maintenance win:** Eliminates duplicate configuration, middleware, schema
+  registration, and observability pipelines while consolidating integration
+  testing on the canonical surfaces.
 
 ## Additional exploration
 

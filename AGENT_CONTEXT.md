@@ -8,7 +8,7 @@ This document distills the essential architecture, conventions, and active surfa
 
 ## Platform Snapshot
 - **Product mission** – Theoria delivers deterministic, verse-anchored theological research workflows with hybrid retrieval, agent assistance, and UI automation. (See the "Why Theoria" and "Core Capabilities" sections in the [README](README.md).)
-- **Primary stacks** – FastAPI workers and background jobs (`theo/infrastructure/api`), Next.js app router frontend (`theo/services/web`), PostgreSQL with `pgvector`, and MCP tooling for automations.
+- **Primary stacks** – FastAPI workers and background jobs (`theo/infrastructure/api`), Next.js app router frontend (`theo/services/web`), PostgreSQL with `pgvector`, and CLI automation tooling.
 - **Operational guardrails** – Scripts under `scripts/` orchestrate dev loops, while `task` targets and `pytest` suites enforce regression safety. Refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for expectations.
 
 ## Architecture Highlights

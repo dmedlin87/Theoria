@@ -49,7 +49,6 @@ __all__ = [
     "register_health_routes",
     "include_router_registrations",
     "register_metrics_endpoint",
-    "mount_mcp",
     "get_router_registrations",
     "ROUTER_REGISTRATIONS",
 ]
@@ -103,22 +102,6 @@ def register_metrics_endpoint(app: FastAPI) -> None:
     def metrics_endpoint() -> PlainTextResponse:
         payload = metrics_generator()
         return PlainTextResponse(payload, media_type=CONTENT_TYPE_LATEST)
-
-
-def mount_mcp(app: FastAPI, *, enabled: bool) -> None:
-    """Mount the MCP server when requested."""
-
-    if not enabled:
-        return
-    try:
-        from mcp_server.server import app as mcp_app
-    except ImportError as exc:  # pragma: no cover - defensive guard
-        logger.warning(
-            "MCP tools enabled but server package import failed: %s", exc
-        )
-        return
-    app.mount("/mcp", mcp_app)
-    logger.info("Mounted MCP server at /mcp")
 
 
 def get_router_registrations() -> tuple[RouterRegistration, ...]:

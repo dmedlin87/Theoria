@@ -1,4 +1,4 @@
-"""Tests for research note creation, preview, and MCP tooling."""
+"""Tests for research note creation, preview, and CLI tooling."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from theo.application.facades.research import (
     get_research_service,
 )
 from theo.adapters.persistence.models import NoteEvidence, ResearchNote
-from theo.infrastructure.api.app.mcp.tools import handle_note_write
 
 
 @pytest.fixture()
@@ -118,18 +117,3 @@ def test_create_research_note_commit_persists(session: Session) -> None:
     assert stored.evidences[0].source_ref == "Example Commentary"
 
 
-def test_handle_note_write_commit_flag_controls_persistence(session: Session) -> None:
-    dry_run = handle_note_write(session, {**_note_payload(), "commit": False})
-
-    assert dry_run.osis == "John.1.1"
-    assert session.query(ResearchNote).count() == 0
-    assert session.query(NoteEvidence).count() == 0
-
-    committed = handle_note_write(session, _note_payload())
-
-    assert session.query(ResearchNote).count() == 1
-    assert session.query(NoteEvidence).count() == 1
-
-    stored = session.get(ResearchNote, committed.id)
-    assert stored is not None
-    assert stored.body == committed.body
