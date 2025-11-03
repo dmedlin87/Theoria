@@ -159,16 +159,6 @@ theo/domain/research/variants.py
 theo/domain/services/__init__.py
 theo/domain/services/embeddings/__init__.py
 theo/domain/services/embeddings/config.py
-theo/evidence/__init__.py
-theo/evidence/citations.py
-theo/evidence/cli.py
-theo/evidence/dossier.py
-theo/evidence/indexer.py
-theo/evidence/models.py
-theo/evidence/normalization.py
-theo/evidence/promoter.py
-theo/evidence/utils.py
-theo/evidence/validator.py
 theo/infrastructure/__init__.py
 theo/infrastructure/api/__init__.py
 theo/infrastructure/api/app/__init__.py

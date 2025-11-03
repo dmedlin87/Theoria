@@ -34,24 +34,24 @@ tasks:
       - task: architecture:imports
 
   ec:validate:
-    desc: Validate evidence payloads via the Evidence CLI
+    desc: Validate evidence payloads with the lightweight evidence tool
     cmds:
-      - poetry run python -m theo.evidence.cli validate {{.CLI_ARGS}}
+      - python scripts/evidence_tool.py validate {{.CLI_ARGS}}
 
   ec:index:
-    desc: Build a SQLite index from evidence payloads via the Evidence CLI
+    desc: Build a JSONL index from evidence payloads with the lightweight tool
     cmds:
-      - poetry run python -m theo.evidence.cli index {{.CLI_ARGS}}
+      - python scripts/evidence_tool.py index {{.CLI_ARGS}}
 
   ec:promote:
-    desc: Promote curated evidence artifacts via the Evidence CLI
+    desc: Promote curated evidence artifacts with the lightweight tool
     cmds:
-      - poetry run python -m theo.evidence.cli promote {{.CLI_ARGS}}
+      - python scripts/evidence_tool.py promote {{.CLI_ARGS}}
 
   ec:dossier:
-    desc: Generate evidence dossiers via the Evidence CLI
+    desc: Generate evidence dossiers with the lightweight tool
     cmds:
-      - poetry run python -m theo.evidence.cli dossier {{.CLI_ARGS}}
+      - python scripts/evidence_tool.py dossier {{.CLI_ARGS}}
 
   security:sid-check:
     desc: Validate Security Incident Document coverage against the watchlist
