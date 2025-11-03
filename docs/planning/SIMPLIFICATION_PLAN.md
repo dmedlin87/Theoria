@@ -38,10 +38,11 @@ mcp_server/
 - Remove MCP-related environment variables from `.env.example`
 - Clean up any import references in main application
 
-### 2. Evidence System (MEDIUM PRIORITY)
-**Path:** `theo/evidence/`  
-**Complexity:** 10 specialized modules, complex citation/validation workflows  
+### 2. Evidence System (COMPLETED)
+**Path:** `theo/evidence/`
+**Complexity:** 10 specialized modules, complex citation/validation workflows
 **Rationale:** Specialized system that may be over-engineered for current research needs.
+**Outcome:** Package removed in favour of `scripts/evidence_tool.py`, a lightweight helper for JSON/JSONL datasets.
 
 **Files to Remove:**
 ```
@@ -105,16 +106,16 @@ theo/platform/
 
 ### Phase 2: Evidence System Evaluation & Removal (Week 1-2)
 **PR 2: Audit Evidence System Usage**
-- [ ] Search codebase for evidence system imports
-- [ ] Document current usage patterns
-- [ ] Identify API endpoints using evidence features
-- [ ] Plan migration path for essential functionality
+- [x] Search codebase for evidence system imports
+- [x] Document current usage patterns
+- [x] Identify API endpoints using evidence features
+- [x] Plan migration path for essential functionality
 
-**PR 3: Remove Evidence System** (if audit shows limited usage)
-- [ ] Delete `theo/evidence/` directory
-- [ ] Remove evidence-related routes/endpoints
-- [ ] Update documentation
-- [ ] Migrate essential citation functionality to simpler approach
+**PR 3: Remove Evidence System**
+- [x] Delete `theo/evidence/` directory
+- [x] Remove evidence-related routes/endpoints
+- [x] Update documentation
+- [x] Migrate essential citation functionality to simpler approach
 
 ### Phase 3: Checkpoint System Simplification (Week 2)
 **PR 4: Simplify Checkpoints**
