@@ -187,26 +187,6 @@ class Settings(BaseSettings):
         default="case_object_upsert",
         description="Postgres NOTIFY channel used for case object upsert events",
     )
-    graph_projection_enabled: bool = Field(
-        default=False,
-        description="Enable projecting documents and relationships into a graph store",
-    )
-    graph_neo4j_uri: str | None = Field(
-        default=None,
-        description="Bolt URI for the Neo4j instance used for graph projection",
-    )
-    graph_neo4j_username: str | None = Field(
-        default=None,
-        description="Username for the Neo4j graph projection adapter",
-    )
-    graph_neo4j_password: str | None = Field(
-        default=None,
-        description="Password for the Neo4j graph projection adapter",
-    )
-    graph_neo4j_database: str | None = Field(
-        default=None,
-        description="Optional Neo4j database name for graph projection",
-    )
     topic_digest_ttl_seconds: int = Field(
         default=3600,
         description="Time-to-live in seconds before regenerating cached topic digests",

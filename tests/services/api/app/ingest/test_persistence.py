@@ -12,7 +12,6 @@ import theo.infrastructure.api.app.ingest.persistence as persistence
 from theo.infrastructure.api.app.ingest.persistence import (
     IngestContext,
     _dedupe_preserve_order,
-    _project_document_if_possible,
     persist_commentary_entries,
     refresh_creator_verse_rollups,
 )
@@ -65,65 +64,6 @@ def test_dedupe_preserve_order_strips_and_omits_empty_values() -> None:
     assert _dedupe_preserve_order(values) == ["Alpha", "Beta", "beta"]
 
 
-def test_project_document_if_possible_projects_and_dedupes(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: list[object] = []
-
-    class _Recorder:
-        def project_document(self, projection):
-            captured.append(projection)
-
-    context = IngestContext(
-        settings=SimpleNamespace(),
-        embedding_service=SimpleNamespace(),
-        instrumentation=SimpleNamespace(),
-        graph_projector=_Recorder(),
-    )
-
-    document = SimpleNamespace(
-        id="doc-1",
-        title="Example",
-        source_type="sermon",
-        topic_domains=["  Doctrine  ", "Doctrine"],
-        theological_tradition="Reformed",
-    )
-
-    _project_document_if_possible(
-        context,
-        document,
-        verses=[" John.1.1 ", "John.1.1", None],
-        concepts=[" grace ", "grace"],
-    )
-
-    assert len(captured) == 1
-    projection = captured[0]
-    assert projection.document_id == "doc-1"
-    assert projection.verses == ("John.1.1",)
-    assert projection.concepts == ("grace",)
-    assert projection.topic_domains == ("Doctrine",)
-
-
-def test_project_document_if_possible_no_projector_is_noop() -> None:
-    context = IngestContext(
-        settings=SimpleNamespace(),
-        embedding_service=SimpleNamespace(),
-        instrumentation=SimpleNamespace(),
-        graph_projector=None,
-    )
-
-    _project_document_if_possible(
-        context,
-        SimpleNamespace(
-            id="doc-1",
-            title="Example",
-            source_type="sermon",
-            topic_domains=None,
-            theological_tradition=None,
-        ),
-        verses=["John.1.1"],
-        concepts=["grace"],
-    )
-
-
 def test_refresh_creator_verse_rollups_sync_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[list[str]] = []
 
@@ -140,7 +80,6 @@ def test_refresh_creator_verse_rollups_sync_fallback(monkeypatch: pytest.MonkeyP
         settings=SimpleNamespace(creator_verse_rollups_async_refresh=False),
         embedding_service=SimpleNamespace(),
         instrumentation=SimpleNamespace(),
-        graph_projector=None,
     )
 
     segments = [SimpleNamespace(osis_refs=["Gen.1.1", "Gen.1.1"])]
@@ -167,7 +106,6 @@ def test_refresh_creator_verse_rollups_skips_when_no_refs(monkeypatch: pytest.Mo
         settings=SimpleNamespace(creator_verse_rollups_async_refresh=False),
         embedding_service=SimpleNamespace(),
         instrumentation=SimpleNamespace(),
-        graph_projector=None,
     )
 
     refresh_creator_verse_rollups("session", [SimpleNamespace(osis_refs=None)], context=context)

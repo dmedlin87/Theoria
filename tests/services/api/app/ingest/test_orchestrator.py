@@ -77,7 +77,6 @@ def _make_context(*, policy=None):
         embedding_service=_FakeEmbeddingService(),
         instrumentation=Instrumentation(),
         error_policy=policy or DefaultErrorPolicy(),
-        graph_projector=None,
     )
 
 

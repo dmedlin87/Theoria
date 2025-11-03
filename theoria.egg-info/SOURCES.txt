@@ -25,7 +25,6 @@ theo/adapters/events/__init__.py
 theo/adapters/events/kafka.py
 theo/adapters/events/redis.py
 theo/adapters/graph/__init__.py
-theo/adapters/graph/neo4j.py
 theo/adapters/persistence/__init__.py
 theo/adapters/persistence/base_repository.py
 theo/adapters/persistence/chat_repository.py

@@ -24,18 +24,13 @@ required to safely remove them.
 
 ## Neo4j graph projection integration
 
-* **Status:** Hidden behind the `graph_projection_enabled` flag (default
-  `False`) and disabled whenever no Neo4j credentials are configured.
-* **Surface area:** Neo4j adapter under
-  [`theo/adapters/graph/neo4j.py`](../theo/adapters/graph/neo4j.py), a graph
-  facade, ingest-time projection hooks, and dependency pins for the Neo4j
-  driver.
-* **Maintenance drag:** We maintain optional dependency management, resilience
-  handling, and projection tests for a pathway that falls back to a no-op in all
-  default environments.
-* **Retirement plan:** Delete the adapter and facade, rip the projection hooks
-  from ingest, drop the Neo4j dependency, and prune the dormant tests/docs. This
-  reduces ingest branching and simplifies dependency management.
+* **Status:** Retired. The adapter, ingest hooks, and dependency pins were
+  removed once we confirmed no deployments supplied Neo4j credentials.
+* **Surface area:** Formerly covered the Neo4j adapter,
+  `theo.application.facades.graph`, ingestion-time projection hooks, and
+  optional dependency manifests.
+* **Outcome:** Ingest pipelines now run without graph projection branches and
+  the dependency set no longer includes the Neo4j Python driver.
 
 ## Standalone MCP FastAPI server
 

@@ -300,8 +300,6 @@ mypy-extensions==1.1.0
     #   typing-inspect
 narwhals==2.9.0
     # via plotly
-neo4j==5.28.2
-    # via theoria (pyproject.toml)
 nest-asyncio==1.6.0
     # via ragas
 networkx==3.5
@@ -493,7 +491,6 @@ pythonbible==0.13.1
     # via theoria (pyproject.toml)
 pytz==2025.2
     # via
-    #   neo4j
     #   pandas
 pywin32==311
     # via docker

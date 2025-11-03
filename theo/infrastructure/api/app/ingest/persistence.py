@@ -15,8 +15,6 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
-from theo.application.graph import GraphDocumentProjection
 from theo.platform.events import event_bus
 from theo.platform.events.types import DocumentIngestedEvent
 from theo.infrastructure.api.app.persistence_models import (
@@ -84,37 +82,6 @@ def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
     return ordered
 
 
-def _project_document_if_possible(
-    context: IngestContext,
-    document: Document,
-    *,
-    verses: Iterable[str],
-    concepts: Iterable[str],
-) -> None:
-    projector = getattr(context, "graph_projector", None)
-    if projector is None:
-        return
-
-    verse_list = tuple(_dedupe_preserve_order(verses))
-    concept_list = tuple(_dedupe_preserve_order(concepts))
-    topic_domains = tuple(_dedupe_preserve_order(document.topic_domains or ()))
-
-    try:
-        projection = GraphDocumentProjection(
-            document_id=document.id,
-            title=document.title,
-            source_type=document.source_type,
-            verses=verse_list,
-            concepts=concept_list,
-            topic_domains=topic_domains,
-            theological_tradition=document.theological_tradition,
-        )
-        projector.project_document(projection)
-    except Exception:  # pragma: no cover - defensive guard
-        logger.exception(
-            "Graph projection failed",
-            extra={"document_id": document.id},
-        )
 COMMENTARY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/commentaries")
 
 
@@ -726,12 +693,6 @@ def persist_text_document(
             case_object_ids.add(str(identifier))
 
     topics = collect_topics(document, frontmatter)
-    _project_document_if_possible(
-        context,
-        document,
-        verses=collected_verse_refs,
-        concepts=topics,
-    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):
@@ -1192,12 +1153,6 @@ def persist_transcript_document(
             case_object_ids.add(str(identifier))
 
     topics = collect_topics(document, frontmatter)
-    _project_document_if_possible(
-        context,
-        document,
-        verses=collected_verse_refs,
-        concepts=topics,
-    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):
