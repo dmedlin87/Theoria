@@ -30,6 +30,7 @@ This index highlights the current source-of-truth documents for Theoria. Anythin
   - [testing.md](testing.md) — Current testing posture and coverage heatmap.
   - [testing/TEST_MAP.md](testing/TEST_MAP.md) — Authoritative testing matrix and ownership.
   - [coverage/90_PERCENT_STRATEGY.md](coverage/90_PERCENT_STRATEGY.md) — Active strategy to achieve 90% coverage for critical packages.
+  - [coverage/COVERAGE_SNAPSHOT_2025-10-31.md](coverage/COVERAGE_SNAPSHOT_2025-10-31.md) — Latest quantitative snapshot of line coverage and priority gaps.
   - [tests/utils/query_profiler.py](../tests/utils/query_profiler.py) — Profiling helper referenced in QA tasks.
 
 - **Documentation Utilities**
