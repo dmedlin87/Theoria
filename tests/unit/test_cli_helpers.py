@@ -101,7 +101,6 @@ import click
 import json
 import time
 import pytest
-import theo.commands.embedding_rebuild as cli
 
 pytest.importorskip(
     "sqlalchemy",
