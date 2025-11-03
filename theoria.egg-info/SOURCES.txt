@@ -1,18 +1,5 @@
 README.md
 pyproject.toml
-mcp_server/__init__.py
-mcp_server/__main__.py
-mcp_server/config.py
-mcp_server/errors.py
-mcp_server/metrics.py
-mcp_server/middleware.py
-mcp_server/schemas.py
-mcp_server/security.py
-mcp_server/server.py
-mcp_server/validators.py
-mcp_server/tools/__init__.py
-mcp_server/tools/read.py
-mcp_server/tools/write.py
 tests/test_constraints_sync.py
 tests/test_redos_fix.py
 theo/__init__.py
@@ -309,8 +296,6 @@ theo/infrastructure/api/app/ingest/stages/parsers.py
 theo/infrastructure/api/app/ingest/stages/persisters.py
 theo/infrastructure/api/app/intent/__init__.py
 theo/infrastructure/api/app/intent/tagger.py
-theo/infrastructure/api/app/mcp/__init__.py
-theo/infrastructure/api/app/mcp/tools.py
 theo/infrastructure/api/app/models/__init__.py
 theo/infrastructure/api/app/models/ai.py
 theo/infrastructure/api/app/models/analytics.py

@@ -104,7 +104,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["theo*", "mcp_server*"]
+include = ["theo*"]
 exclude = ["tests*", "fixtures*", "data*", "infra*", "metrics*", "ranking*", "contracts*", "dashboard*"]
 
 # Configure uv to use unsafe-best-match strategy for PyTorch dependencies
