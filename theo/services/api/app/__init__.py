@@ -1,1 +1,1 @@
-"""Application layer utilities exposed for MCP integrations."""
+"""Application layer utilities for the Theo API service."""

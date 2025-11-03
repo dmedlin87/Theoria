@@ -42,7 +42,7 @@ Theoria unifies your theological research library—papers, notes, transcripts, 
 | Ingestion | Local files, URLs, YouTube, bulk CLI pipelines with citation preservation |
 | Workflows | Sermon prep, comparative analysis, topic monitoring, export tooling (Markdown/NDJSON/CSV) |
 | Experience | Modern Next.js UI, command palette (⌘K/CTRL+K), dark mode, WCAG 2.1 AA accessibility |
-| Integrations | Model Context Protocol (MCP) server, API + CLI automation hooks |
+| Integrations | REST API + CLI automation hooks for automation and orchestration |
 
 Additional feature deep-dives live in [`docs/archive/`](docs/archive/). The public roadmap and current areas of focus are tracked in [`NEXT_STEPS.md`](NEXT_STEPS.md).
 
@@ -161,10 +161,10 @@ The production constraint set also pins a CPU-only PyTorch wheel by embedding th
 ## Architecture Overview
 
 ```
-┌──────────────┐      ┌───────────────────────┐      ┌────────────────┐
-│ Ingestion    │──►──│ Retrieval Services     │──►──│ UI & MCP Tools │
-│ (CLI & API)  │      │ (FastAPI + Workers)    │      │ (Next.js, MCP) │
-└──────────────┘      └───────────────────────┘      └────────────────┘
+┌──────────────┐      ┌───────────────────────┐      ┌─────────────────────┐
+│ Ingestion    │──►──│ Retrieval Services     │──►──│ UI & Integrations   │
+│ (CLI & API)  │      │ (FastAPI + Workers)    │      │ (Next.js, REST/CLI) │
+└──────────────┘      └───────────────────────┘      └─────────────────────┘
         ▲                       │                         │
         │                       ▼                         ▼
   Documents & Media     Verse-normalized store      Research & authoring
@@ -174,7 +174,7 @@ The production constraint set also pins a CPU-only PyTorch wheel by embedding th
 - **Web Experience**: `theo/services/web` (Next.js, Radix UI toolkit, theme system).
 - **Docs & Playbooks**: `docs/` (architecture, workflows, policies).
 - **Automation Scripts**: `scripts/` (dev orchestration, reseeding, evaluation).
-- **Quality Gates**: `tests/` (unit, integration, ranking, MCP, UI smoke suites).
+- **Quality Gates**: `tests/` (unit, integration, ranking, UI smoke suites).
 
 For detailed architecture patterns, see the [System Blueprint](docs/BLUEPRINT.md) covering service boundaries, data flow, and scaling considerations. The [Architecture Overview](README_ARCHITECTURE_UPDATES.md) file captures ongoing platform investments at a glance, and additional ADRs live under [`docs/adr/`](docs/adr/).
 
@@ -186,7 +186,7 @@ For detailed architecture patterns, see the [System Blueprint](docs/BLUEPRINT.md
 - **PowerShell**: `./scripts/dev.ps1`
 - **Bash**: `./scripts/run.sh`
 
-Both scripts boot the API and Next.js app, wiring ports and environment variables automatically. Pass `-IncludeMcp` or `-McpPort` to enable the MCP server alongside the stack.
+Both scripts boot the API and Next.js app, wiring ports and environment variables automatically. REST and CLI integrations are supported through the primary API stack—see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) for examples and recommended workflows.
 
 Install the orchestration tooling with `brew install go-task/tap/go-task`, `scoop install task`, or download binaries from the [go-task releases](https://github.com/go-task/task/releases). All commands listed in this README include raw equivalents when Task is optional.
 
@@ -216,7 +216,6 @@ docker compose up --build -d
 ```
 - Web: <http://localhost:3000>
 - API: <http://localhost:8000/docs>
-- MCP: `docker compose up mcp`
 
 Stop with `docker compose down`.
 

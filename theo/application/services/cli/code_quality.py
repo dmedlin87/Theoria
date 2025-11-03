@@ -36,9 +36,9 @@ class CheckOutcome:
     def succeeded(self) -> bool:
         return self.returncode == 0 and self.error is None
 
-DEFAULT_RUFF_PATHS: tuple[Path, ...] = (Path("mcp_server"),)
-DEFAULT_PYTEST_PATHS: tuple[Path, ...] = (Path("tests/mcp_tools"),)
-DEFAULT_MYPY_PATHS: tuple[Path, ...] = (Path("mcp_server"),)
+DEFAULT_RUFF_PATHS: tuple[Path, ...] = (Path("theo"),)
+DEFAULT_PYTEST_PATHS: tuple[Path, ...] = (Path("tests"),)
+DEFAULT_MYPY_PATHS: tuple[Path, ...] = (Path("theo"),)
 
 _ALLOWED_EXECUTABLES: frozenset[str] = frozenset({"ruff", "pytest", "mypy"})
 

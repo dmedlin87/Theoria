@@ -34,7 +34,6 @@ from .routes import (
     ROUTER_REGISTRATIONS,
     get_router_registrations,
     include_router_registrations,
-    mount_mcp,
     register_health_routes,
     register_metrics_endpoint,
 )
@@ -110,6 +109,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     logger.info("Registered API version 1.0 as default")
 
     register_metrics_endpoint(app)
-    mount_mcp(app, enabled=resolved_settings.mcp_tools_enabled)
 
     return app

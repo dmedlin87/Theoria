@@ -17,20 +17,12 @@ required to safely remove them.
 
 ## Standalone MCP FastAPI server
 
-* **Status:** Exists as a separate FastAPI application under
-  [`mcp_server/`](../mcp_server/) even though the primary API already exposes the
-  underlying functionality. Runtime exposure is gated by the
-  `mcp_tools_enabled` flag, which defaults to `False`.
-* **Surface area:** Duplicate configuration, middleware, schema registration,
-  metrics, and tool handlers. The codebase also carries a parallel test suite
-  and documentation explaining how to run this server.
-* **Maintenance drag:** The duplicate surface multiplies security review,
-  dependency updates, and contract testing, while few (if any) deployments turn
-  it on.
-* **Retirement plan:** Remove the `mcp_server/` package, the CLI/task entries
-  that spawn it, the associated tests, and the optional FastAPI/OpenTelemetry
-  extras from dependency manifests. Document that the REST and CLI interfaces
-  are the supported integration surfaces.
+* **Status:** Retired. The dedicated `mcp_server/` package, launch scripts, and
+  supporting tests were removed in favour of the primary REST and CLI
+  integrations documented in [`docs/INTEGRATIONS.md`](INTEGRATIONS.md).
+* **Surface area:** The repository no longer carries duplicate configuration,
+  schema registration, or tool handlers for MCP. Consumers should call the REST
+  API or reuse the CLI utilities instead.
 
 ## Additional exploration
 
