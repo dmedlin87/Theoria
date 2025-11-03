@@ -35,7 +35,6 @@
 | Level | Count | Packages |
 |-------|-------|----------|
 | 🔴 0% | 5 | core, mcp, retriever.tests, api.tests (2x) |
-| 🔴 1-20% | 9 | case_builder, transcripts, retriever, geo, notebooks, export, ingest, enrich, analytics |
 | 🟡 21-40% | 10 | workers, ai.rag, creators, cli, routes.ai.workflows, ai, intent, ranking, debug, research |
 | 🟢 41-60% | 6 | routes, services, db, app, ingest.stages, routes.ai, facades |
 | ✅ 61-100% | 11 | models, adapters, domain, application, platform, etc. |
@@ -51,7 +50,6 @@
 | 5 | `services.api.app.ai` | 25.5% | VERY HIGH | ⚠️ |
 | 6 | `services.api.app.mcp` | 0.0% | HIGH | 🚨 |
 | 7 | `services.api.app.routes` | 33.4% | HIGH | ⚠️ |
-| 8 | `services.api.app.case_builder` | 10.7% | HIGH | 🚨 |
 
 ## Files Generated
 
@@ -120,7 +118,7 @@ npm run test:e2e
 
 ### Opportunities
 - 📈 Quick wins: Core tests (small files, high impact)
-- 📈 Existing fixtures: case_builder, citations, markdown
+- 📈 Existing fixtures: citations, markdown
 - 📈 Contract testing: Schemathesis configured but underutilized
 - 📈 Test templates: Strong existing patterns to follow
 

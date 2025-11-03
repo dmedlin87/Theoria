@@ -82,8 +82,6 @@ theo/application/ports/__init__.py
 theo/application/ports/ai_registry.py
 theo/application/ports/events.py
 theo/application/ports/secrets.py
-theo/application/reasoner/__init__.py
-theo/application/reasoner/events.py
 theo/application/repositories/__init__.py
 theo/application/repositories/chat_repository.py
 theo/application/repositories/discovery_repository.py
@@ -242,9 +240,6 @@ theo/infrastructure/api/app/bootstrap/lifecycle.py
 theo/infrastructure/api/app/bootstrap/middleware.py
 theo/infrastructure/api/app/bootstrap/routes.py
 theo/infrastructure/api/app/bootstrap/runtime_checks.py
-theo/infrastructure/api/app/case_builder/__init__.py
-theo/infrastructure/api/app/case_builder/ingest.py
-theo/infrastructure/api/app/case_builder/sync.py
 theo/infrastructure/api/app/compat/__init__.py
 theo/infrastructure/api/app/core/__init__.py
 theo/infrastructure/api/app/core/database.py
