@@ -259,22 +259,14 @@ def test_list_annotations_returns_sorted_entries(session: Session):
     assert isinstance(annotations[0], DocumentAnnotationResponse)
 
 
-def test_create_annotation_persists_structured_body(monkeypatch, session: Session):
+def test_create_annotation_persists_structured_body(session: Session):
     document = _add_document(session, id="doc-create")
     payload = DocumentAnnotationCreate(type="note", text="  Example  ", passage_ids=["p-1", "p-1"])
-
-    recorded: dict[str, tuple] = {}
-
-    def _record_case_sync(session: Session, *, document: Document, annotation: DocumentAnnotation):
-        recorded["called"] = (document.id, annotation.id)
-
-    monkeypatch.setattr(documents, "sync_annotation_case_object", _record_case_sync)
 
     response = documents.create_annotation(session, document.id, payload)
 
     assert response.body == "Example"
     assert response.passage_ids == ["p-1"]
-    assert recorded["called"][0] == document.id
     stored = session.get(DocumentAnnotation, response.id)
     assert stored.body.startswith("{")
 

@@ -160,23 +160,6 @@ class CommentaryExcerptSeed:
     created_at: datetime
 
 
-class CaseObjectType:
-    PASSAGE: str
-    ANNOTATION: str
-    CLAIM: str
-
-
-class CaseSource:
-    id: str
-    created_at: datetime
-
-
-class CaseObject:
-    id: str
-    object_type: str
-    created_at: datetime
-
-
 __all__ = [
     "Document",
     "Passage",
@@ -193,7 +176,4 @@ __all__ = [
     "ContradictionSeed",
     "HarmonySeed",
     "CommentaryExcerptSeed",
-    "CaseObjectType",
-    "CaseSource",
-    "CaseObject",
 ]

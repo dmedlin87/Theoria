@@ -53,7 +53,6 @@ Once the runtime core is stable, expand to the heavier business logic packages.
 - `theo/services/api/app/ai`
 - `theo/services/api/app/analytics`
 - `theo/services/api/app/retriever`
-- `theo/services/api/app/case_builder`
 - `theo/services/api/app/workers`
 
 Deliverables:

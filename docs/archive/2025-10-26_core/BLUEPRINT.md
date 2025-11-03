@@ -103,7 +103,6 @@ polling. Two primary payloads are available:
 
 * `DocumentIngestedEvent` – fired after a document is fully persisted (passages, storage artefacts, case objects). The default
   handlers log structured analytics entries and ensure the embedding backend is initialised for subsequent workloads.
-* `CaseObjectsUpsertedEvent` – dispatched whenever Case Builder rows change. The API layer forwards these notifications to
   background workers (using Celery when available) so scoring, analytics, and other asynchronous jobs can run deterministically.
 
 Handlers register once during API startup (`theo/services/api/app/events.py`). Custom services can subscribe to the same events to

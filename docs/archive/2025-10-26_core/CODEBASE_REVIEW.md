@@ -35,7 +35,7 @@ and architectural plans are organized under `docs/`.
 - **Configuration** – `theo/application/facades/settings.py` defines a
   Pydantic-powered settings object that loads environment variables, covers
   database and Redis connections, embedding models, rerankers, authentication
-  policies, and feature flags for Case Builder and topic digests. Shared LLM
+  policies, and feature flags for topic digests. Shared LLM
   registry primitives (secret handling, bootstrap defaults) now live in
   `theo/application/ports/ai_registry.py`.
 - **API Composition** – `theo/services/api/app/main.py` builds the FastAPI app,
@@ -114,7 +114,7 @@ and architectural plans are organized under `docs/`.
 - **Front-End Tests** – The Next.js app runs ESLint, TypeScript, Jest, Vitest,
   and Playwright via npm scripts. Percy snapshots and Lighthouse smoke tests
   enforce visual and performance regressions.
-- **Data Contracts** – JSON Schema specs in `docs/case_builder.schema.json` and
+- **Data Contracts** – JSON Schema specs maintained alongside ingest and analytics modules
   contract tests under `tests/contracts` ensure API compatibility with case
   builder clients and MCP integrations.
 

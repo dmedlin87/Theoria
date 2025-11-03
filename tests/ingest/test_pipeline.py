@@ -15,8 +15,6 @@ from theo.application.facades.database import (  # noqa: E402  (import after pat
     get_settings,
 )
 from theo.adapters.persistence.models import (  # noqa: E402
-    CaseObject,
-    CaseSource,
     Document,
     Passage,
 )
@@ -152,65 +150,6 @@ def test_run_pipeline_for_file_records_span_metrics(
         _assert_ingest_metrics(recorded, document_id, "n/a")
     finally:
         settings.storage_root = original_storage
-
-
-def test_run_pipeline_creates_case_builder_objects(
-    tmp_path, pipeline_session_factory
-) -> None:
-    """Case Builder objects mirror ingested passages when enabled."""
-
-    settings = get_settings()
-    original_storage = settings.storage_root
-    original_flag = settings.case_builder_enabled
-    settings.storage_root = tmp_path / "storage"
-    settings.case_builder_enabled = True
-
-    try:
-        dependencies = pipeline.PipelineDependencies(settings=settings)
-        markdown = (
-            "---\ntitle: Case Doc\n---\n\nVerse driven content."
-            "\n\nAnother passage with OSIS John.1.1"
-        )
-        doc_path = tmp_path / "case_doc.md"
-        doc_path.write_text(markdown, encoding="utf-8")
-
-        session = pipeline_session_factory()
-        try:
-            document = pipeline.run_pipeline_for_file(
-                session,
-                doc_path,
-                dependencies=dependencies,
-            )
-            document_id = document.id
-            session.flush()
-            session.expire_all()
-
-            source = (
-                session.query(CaseSource)
-                .filter(CaseSource.document_id == document_id)
-                .one_or_none()
-            )
-            objects = (
-                session.query(CaseObject)
-                .filter(CaseObject.document_id == document_id)
-                .order_by(CaseObject.id.asc())
-                .all()
-            )
-            passage_ids = {
-                passage.id
-                for passage in session.query(Passage).filter_by(document_id=document_id)
-            }
-        finally:
-            session.close()
-
-        assert source is not None
-        assert objects, "Expected case objects to be persisted"
-        assert {obj.passage_id for obj in objects} == passage_ids
-        assert all(obj.object_type == "passage" for obj in objects)
-        assert any(obj.embedding for obj in objects)
-    finally:
-        settings.storage_root = original_storage
-        settings.case_builder_enabled = original_flag
 
 
 def test_run_pipeline_for_url_ingests_html(

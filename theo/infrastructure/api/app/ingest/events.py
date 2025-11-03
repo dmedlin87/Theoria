@@ -2,12 +2,36 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
-import sys
 from typing import Any, Iterable, Sequence
 
-from theo.application.reasoner.events import DocumentPersistedEvent
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentPersistedEvent:
+    """Structured payload summarising a persisted document."""
+
+    document_id: str
+    passage_ids: list[str]
+    passage_count: int
+    topics: list[str]
+    topic_domains: list[str]
+    theological_tradition: str | None
+    source_type: str | None
+    metadata: dict[str, object]
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "document_id": self.document_id,
+            "passage_ids": list(self.passage_ids),
+            "passage_count": self.passage_count,
+            "topics": list(self.topics),
+            "topic_domains": list(self.topic_domains),
+            "theological_tradition": self.theological_tradition,
+            "source_type": self.source_type,
+            "metadata": dict(self.metadata),
+        }
 
 LOGGER = logging.getLogger("theo.ingest.events")
 
@@ -60,35 +84,8 @@ def emit_document_persisted_event(
     payload = event.to_payload()
     LOGGER.info("ingest.document_persisted", extra=payload)
 
-    _dispatch_neighborhood_event(payload)
     return event
 
 
-def _dispatch_neighborhood_event(payload: dict[str, Any]) -> None:
-    module_name = "theo.infrastructure.api.app.workers.tasks"
-
-    worker_tasks = sys.modules.get(module_name)
-    if worker_tasks is None:
-        try:
-            worker_tasks = importlib.import_module(module_name)
-        except ImportError:  # pragma: no cover - worker import optional in tests
-            LOGGER.debug("Workers unavailable; skipping neighborhood analytics dispatch")
-            return
-
-    task = getattr(worker_tasks, "update_neighborhood_analytics", None)
-    if task is None:
-        LOGGER.debug("Neighborhood analytics task not registered")
-        return
-
-    try:
-        maybe_delay = getattr(task, "delay", None)
-        if callable(maybe_delay):
-            maybe_delay(payload)
-        else:  # pragma: no cover - synchronous execution fallback
-            task(payload)
-    except Exception:
-        LOGGER.exception("Failed to dispatch neighborhood analytics task")
-
-
-__all__ = ["emit_document_persisted_event"]
+__all__ = ["DocumentPersistedEvent", "emit_document_persisted_event"]
 
