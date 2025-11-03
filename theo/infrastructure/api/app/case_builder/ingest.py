@@ -9,8 +9,7 @@ from typing import Any, Sequence
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import Settings, get_settings
-from theo.platform.events import event_bus
-from theo.platform.events.types import CaseObjectsUpsertedEvent
+from ..events import notify_case_objects_upserted
 from theo.infrastructure.api.app.persistence_models import (
     CaseObject,
     CaseObjectType,
@@ -142,9 +141,7 @@ def _notify_new_objects(
 ) -> None:
     if not object_ids:
         return
-    event_bus.publish(
-        CaseObjectsUpsertedEvent.from_ids(object_ids, document_id=document_id)
-    )
+    notify_case_objects_upserted(object_ids, document_id=document_id)
 
 
 try:

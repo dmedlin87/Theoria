@@ -1,40 +1,62 @@
-"""Application event handlers wiring ingestion to downstream processes."""
+"""Service-level event helpers for API infrastructure."""
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Sequence
+from typing import Mapping
 
-from theo.platform.events import event_bus
-from theo.platform.events.types import CaseObjectsUpsertedEvent, DocumentIngestedEvent
+from theo.application.facades.telemetry import log_workflow_event
 
 from .ingest.embeddings import get_embedding_service
-from theo.application.facades.telemetry import log_workflow_event
 
 logger = logging.getLogger(__name__)
 
 
-def _handle_document_ingested_embeddings(event: DocumentIngestedEvent) -> None:
-    """Prime embedding infrastructure after successful ingestion."""
+def _normalise_ids(values: Iterable[str]) -> tuple[str, ...]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = str(value).strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        ordered.append(cleaned)
+    return tuple(ordered)
+
+
+def notify_document_ingested(
+    *,
+    document_id: str,
+    workflow: str,
+    passage_ids: Sequence[str] | None = None,
+    case_object_ids: Sequence[str] | None = None,
+    metadata: Mapping[str, object] | None = None,
+) -> None:
+    """Perform synchronous side-effects after a document has been stored."""
 
     try:
         get_embedding_service()
     except Exception:  # pragma: no cover - defensive warmup
         logger.debug("embedding service warmup failed", exc_info=True)
 
-
-def _handle_document_ingested_analytics(event: DocumentIngestedEvent) -> None:
-    """Record analytics breadcrumbs for ingestion workflows."""
-
     log_workflow_event(
         "ingest.document.persisted",
-        workflow=event.workflow,
-        document_id=event.document_id,
-        passage_count=len(event.passage_ids),
-        case_object_count=len(event.case_object_ids),
+        workflow=workflow,
+        document_id=document_id,
+        passage_count=len(tuple(passage_ids or ())),
+        case_object_count=len(tuple(case_object_ids or ())),
+        metadata=dict(metadata) if metadata else None,
     )
 
 
-def _handle_case_object_upserts(event: CaseObjectsUpsertedEvent) -> None:
+def notify_case_objects_upserted(
+    ids: Sequence[str], *, document_id: str | None = None
+) -> None:
     """Dispatch case object updates to the worker queue when available."""
+
+    ordered = _normalise_ids(ids)
+    if not ordered:
+        return
 
     try:
         from .workers import tasks as worker_tasks
@@ -47,21 +69,36 @@ def _handle_case_object_upserts(event: CaseObjectsUpsertedEvent) -> None:
         logger.debug("case object upsert handler missing")
         return
 
-    for case_object_id in event.case_object_ids:
-        if not case_object_id:
-            continue
+    for case_object_id in ordered:
         try:
             maybe_delay = getattr(handler, "delay", None)
             if callable(maybe_delay):
-                maybe_delay(case_object_id)
+                maybe_delay(case_object_id, document_id=document_id)
             else:
-                handler(case_object_id)
+                handler(case_object_id, document_id=document_id)
+        except TypeError:
+            # Maintain backwards compatibility with handlers that only accept
+            # the identifier argument.
+            try:
+                maybe_delay = getattr(handler, "delay", None)
+                if callable(maybe_delay):
+                    maybe_delay(case_object_id)
+                else:
+                    handler(case_object_id)
+            except Exception:  # pragma: no cover - defensive logging
+                logger.exception(
+                    "case object handler failed",
+                    extra={"case_object_id": case_object_id},
+                )
         except Exception:  # pragma: no cover - defensive logging
             logger.exception(
-                "case object handler failed", extra={"case_object_id": case_object_id}
+                "case object handler failed",
+                extra={"case_object_id": case_object_id},
             )
 
 
-event_bus.subscribe(DocumentIngestedEvent, _handle_document_ingested_embeddings)
-event_bus.subscribe(DocumentIngestedEvent, _handle_document_ingested_analytics)
-event_bus.subscribe(CaseObjectsUpsertedEvent, _handle_case_object_upserts)
+__all__ = [
+    "notify_case_objects_upserted",
+    "notify_document_ingested",
+]
+

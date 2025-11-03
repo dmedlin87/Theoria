@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from theo.adapters import AdapterRegistry
 
 from theo.domain import Document, DocumentId, DocumentMetadata
-from theo.platform import application as application_module
+from theo.application.services import bootstrap as application_module
 
 
 class DummyResearchService:

@@ -44,8 +44,8 @@ def test_create_annotation_persists_case_object(tmp_path, monkeypatch) -> None:
         lambda payload: None,
     )
     monkeypatch.setattr(
-        "theo.platform.events.event_bus.publish",
-        lambda *args, **kwargs: [],
+        "theo.infrastructure.api.app.events.notify_case_objects_upserted",
+        lambda *args, **kwargs: None,
     )
 
     engine = _prepare_database(tmp_path)

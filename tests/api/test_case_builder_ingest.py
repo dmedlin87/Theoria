@@ -61,7 +61,12 @@ def sqlite_session(sqlite_engine) -> Iterator[Session]:
 @pytest.fixture(autouse=True)
 def stub_event_bus(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "theo.platform.events.event_bus.publish", lambda *_args, **_kwargs: None
+        "theo.infrastructure.api.app.events.notify_document_ingested",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.events.notify_case_objects_upserted",
+        lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
         "theo.infrastructure.api.app.ingest.persistence.emit_document_persisted_event",
