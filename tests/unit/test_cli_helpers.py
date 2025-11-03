@@ -18,9 +18,9 @@ if "sqlalchemy" not in sys.modules:
     sqlalchemy_stub = types.ModuleType("sqlalchemy")
 
     sqlalchemy_stub.__path__ = []  # pragma: no cover - mark as package
-    sqlalchemy_stub.__spec__ = importlib_machinery.ModuleSpec(
-        "sqlalchemy", loader=None, is_package=True
-    )
+    sqlalchemy_spec = importlib_machinery.ModuleSpec("sqlalchemy", loader=None)
+    sqlalchemy_spec.submodule_search_locations = []
+    sqlalchemy_stub.__spec__ = sqlalchemy_spec
 
     class _FuncProxy:
         def __getattr__(self, name: str) -> Any:  # pragma: no cover - defensive
@@ -56,15 +56,30 @@ if "sqlalchemy" not in sys.modules:
 
     engine_module.Engine = Engine
 
+    ext_module = types.ModuleType("sqlalchemy.ext")
+    ext_module.__path__ = []  # pragma: no cover - mark as package
+    ext_spec = importlib_machinery.ModuleSpec("sqlalchemy.ext", loader=None)
+    ext_spec.submodule_search_locations = []
+    ext_module.__spec__ = ext_spec
+    hybrid_module = types.ModuleType("sqlalchemy.ext.hybrid")
+
+    def hybrid_property(func: Any | None = None, **_kwargs: object):  # pragma: no cover - stub
+        if func is None:
+            return hybrid_property
+        return func
+
+    hybrid_module.hybrid_property = hybrid_property
+    ext_module.hybrid = hybrid_module
+
     sql_module = types.ModuleType("sqlalchemy.sql")
     sql_module.__path__ = []  # pragma: no cover - mark as package
-    sql_module.__spec__ = importlib_machinery.ModuleSpec(
-        "sqlalchemy.sql", loader=None, is_package=True
-    )
+    sql_spec = importlib_machinery.ModuleSpec("sqlalchemy.sql", loader=None)
+    sql_spec.submodule_search_locations = []
+    sql_module.__spec__ = sql_spec
     elements_module = types.ModuleType("sqlalchemy.sql.elements")
-    elements_module.__spec__ = importlib_machinery.ModuleSpec(
-        "sqlalchemy.sql.elements", loader=None, is_package=True
-    )
+    elements_spec = importlib_machinery.ModuleSpec("sqlalchemy.sql.elements", loader=None)
+    elements_spec.submodule_search_locations = []
+    elements_module.__spec__ = elements_spec
 
     class ClauseElement:  # pragma: no cover - placeholder
         pass
@@ -77,6 +92,8 @@ if "sqlalchemy" not in sys.modules:
     sys.modules["sqlalchemy.exc"] = exc_module
     sys.modules["sqlalchemy.orm"] = orm_module
     sys.modules["sqlalchemy.engine"] = engine_module
+    sys.modules["sqlalchemy.ext"] = ext_module
+    sys.modules["sqlalchemy.ext.hybrid"] = hybrid_module
     sys.modules["sqlalchemy.sql"] = sql_module
     sys.modules["sqlalchemy.sql.elements"] = elements_module
 
@@ -84,6 +101,7 @@ import click
 import json
 import time
 import pytest
+import theo.commands.embedding_rebuild as cli
 
 pytest.importorskip(
     "sqlalchemy",
@@ -92,11 +110,12 @@ pytest.importorskip(
 from sqlalchemy.exc import SQLAlchemyError
 
 from theo.commands.embedding_rebuild import _load_ids, _commit_with_retry
-from theo.checkpoints import (
-    load_embedding_rebuild_checkpoint as _read_checkpoint,
-    save_embedding_rebuild_checkpoint as _write_checkpoint,
+from theo.application.embeddings.checkpoint_store import (
+    CheckpointError,
+    EmbeddingCheckpoint,
+    load_checkpoint,
+    save_checkpoint,
 )
-from theo.checkpoints import CURRENT_EMBEDDING_CHECKPOINT_VERSION
 
 
 class FakeSession:
@@ -131,60 +150,57 @@ def test_load_ids_deduplicates_and_strips(tmp_path: Path) -> None:
 def test_read_checkpoint_handles_missing_file(tmp_path: Path) -> None:
     missing = tmp_path / "missing.json"
 
-    assert _read_checkpoint(missing) is None
+    assert load_checkpoint(missing) is None
 
 
 def test_read_checkpoint_raises_on_invalid_json(tmp_path: Path) -> None:
     checkpoint = tmp_path / "checkpoint.json"
     checkpoint.write_text("not json", encoding="utf-8")
 
-    with pytest.raises(json.JSONDecodeError):
-        _read_checkpoint(checkpoint)
+    assert load_checkpoint(checkpoint) is None
+    with pytest.raises(CheckpointError):
+        load_checkpoint(checkpoint, strict=True)
 
 
 def test_read_checkpoint_handles_non_mapping_payload(tmp_path: Path) -> None:
     checkpoint = tmp_path / "checkpoint.json"
     checkpoint.write_text("[]", encoding="utf-8")
 
-    assert _read_checkpoint(checkpoint) is None
+    assert load_checkpoint(checkpoint) is None
 
 
-@pytest.mark.skip(reason="API refactored, tests need update")
 def test_read_checkpoint_returns_checkpoint(tmp_path: Path) -> None:
     checkpoint = tmp_path / "checkpoint.json"
-    _write_checkpoint(
-        checkpoint,
+    state = EmbeddingCheckpoint.build(
         processed=3,
         total=5,
         last_id="p3",
         metadata={"resume": True},
     )
+    save_checkpoint(checkpoint, state)
 
-    result = _read_checkpoint(checkpoint)
-    assert result is not None
-    assert result.processed == 3
-    assert result.total == 5
-    assert result.last_id == "p3"
-    assert result.metadata == {"resume": True}
+    result = load_checkpoint(checkpoint)
+    assert isinstance(result, EmbeddingCheckpoint)
+    assert result == state
 
 
 def test_write_checkpoint_creates_expected_payload(tmp_path: Path) -> None:
     checkpoint = tmp_path / "nested" / "checkpoint.json"
-    checkpoint_state = _write_checkpoint(
-        checkpoint,
+    state = EmbeddingCheckpoint.build(
         processed=5,
         total=12,
         last_id="passage-42",
         metadata={"fast": True},
     )
-    assert checkpoint_state.version == CURRENT_EMBEDDING_CHECKPOINT_VERSION
+    save_checkpoint(checkpoint, state)
 
     data = json.loads(checkpoint.read_text(encoding="utf-8"))
-    assert data["version"] == CURRENT_EMBEDDING_CHECKPOINT_VERSION
     assert data["processed"] == 5
     assert data["total"] == 12
     assert data["last_id"] == "passage-42"
     assert data["metadata"] == {"fast": True}
+    assert data["created_at"] == state.created_at.isoformat()
+    assert data["updated_at"] == state.updated_at.isoformat()
     parsed_created_at = datetime.fromisoformat(data["created_at"])
     parsed_updated_at = datetime.fromisoformat(data["updated_at"])
     assert parsed_created_at.tzinfo is not None
@@ -192,19 +208,23 @@ def test_write_checkpoint_creates_expected_payload(tmp_path: Path) -> None:
     assert parsed_created_at <= parsed_updated_at
 
 
-def test_read_checkpoint_migrates_v1_payload(tmp_path: Path) -> None:
+def test_read_checkpoint_requires_timestamps(tmp_path: Path) -> None:
     checkpoint = tmp_path / "checkpoint.json"
     checkpoint.write_text(
-        json.dumps({"processed": 2, "total": 3, "last_id": "p2"}),
+        json.dumps(
+            {
+                "processed": 2,
+                "total": 3,
+                "last_id": "p2",
+                "metadata": {},
+            }
+        ),
         encoding="utf-8",
     )
 
-    result = _read_checkpoint(checkpoint)
-
-    assert result is not None
-    assert result.processed == 2
-    assert result.total == 3
-    assert result.last_id == "p2"
+    assert load_checkpoint(checkpoint) is None
+    with pytest.raises(CheckpointError):
+        load_checkpoint(checkpoint, strict=True)
 
 
 def test_write_checkpoint_preserves_created_timestamp(tmp_path: Path) -> None:
@@ -235,7 +255,6 @@ def test_read_checkpoint_rejects_invalid_counts(tmp_path: Path) -> None:
     checkpoint.write_text(
         json.dumps(
             {
-                "version": CURRENT_EMBEDDING_CHECKPOINT_VERSION,
                 "processed": 5,
                 "total": 3,
                 "last_id": "p5",
@@ -247,7 +266,9 @@ def test_read_checkpoint_rejects_invalid_counts(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _read_checkpoint(checkpoint) is None
+    assert load_checkpoint(checkpoint) is None
+    with pytest.raises(CheckpointError):
+        load_checkpoint(checkpoint, strict=True)
 
 
 def test_normalise_timestamp_with_naive_datetime() -> None:

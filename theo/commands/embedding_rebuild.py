@@ -39,12 +39,11 @@ from theo.application.telemetry import (
     EMBEDDING_REBUILD_PROGRESS_METRIC,
 )
 from theo.adapters.persistence.models import Document, Passage
-from theo.checkpoints import (
-    CheckpointValidationError,
-    EmbeddingRebuildCheckpoint,
-    deserialize_embedding_rebuild_checkpoint,
-    load_embedding_rebuild_checkpoint,
-    save_embedding_rebuild_checkpoint,
+from theo.application.embeddings.checkpoint_store import (
+    CheckpointError,
+    EmbeddingCheckpoint,
+    load_checkpoint,
+    save_checkpoint,
 )
 from theo.infrastructure.api.app.ingest.embeddings import (
     clear_embedding_cache,
@@ -110,16 +109,16 @@ def _write_checkpoint(
     total: int,
     last_id: str | None,
     metadata: dict[str, object],
-    previous: EmbeddingRebuildCheckpoint | None = None,
-) -> EmbeddingRebuildCheckpoint:
-    checkpoint = EmbeddingRebuildCheckpoint.build(
+    previous: EmbeddingCheckpoint | None = None,
+) -> EmbeddingCheckpoint:
+    checkpoint = EmbeddingCheckpoint.build(
         processed=processed,
         total=total,
         last_id=last_id,
         metadata=metadata,
         previous=previous,
     )
-    save_embedding_rebuild_checkpoint(path, checkpoint)
+    save_checkpoint(path, checkpoint)
     return checkpoint
 
 
@@ -329,21 +328,21 @@ def rebuild_embeddings_cmd(
             # Convert this to a proper error for automation/CI contexts
             raise click.ClickException("No passage IDs were found in the provided file.")
 
-    checkpoint_state: EmbeddingRebuildCheckpoint | None = None
+    checkpoint_state: EmbeddingCheckpoint | None = None
     skip_count = 0
     last_processed_id: str | None = None
 
     if checkpoint_file is not None:
         if resume:
             try:
-                checkpoint_state = load_embedding_rebuild_checkpoint(
+                checkpoint_state = load_checkpoint(
                     checkpoint_file, strict=strict_checkpoint
                 )
                 if checkpoint_state is None and strict_checkpoint:
                     raise click.ClickException(
                         f"Checkpoint file {checkpoint_file} is missing but strict mode was enabled"
                     )
-            except CheckpointValidationError as exc:
+            except CheckpointError as exc:
                 _LOGGER.error(
                     "Failed to load checkpoint file during resume",
                     extra={

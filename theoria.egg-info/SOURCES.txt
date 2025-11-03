@@ -16,7 +16,7 @@ mcp_server/tools/write.py
 tests/test_constraints_sync.py
 tests/test_redos_fix.py
 theo/__init__.py
-theo/checkpoints.py
+theo/application/embeddings/checkpoint_store.py
 theo/cli.py
 theo/adapters/__init__.py
 theo/adapters/biblical_ai_processor.py
