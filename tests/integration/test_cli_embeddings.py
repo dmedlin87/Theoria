@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import get_settings
 from theo.cli import rebuild_embeddings_cmd
-from theo.platform.application import resolve_application
+from theo.application.services.bootstrap import resolve_application
 from theo.infrastructure.api.app.persistence_models import Document as DocumentRecord
 from theo.infrastructure.api.app.persistence_models import Passage
 from theo.adapters.persistence import dispose_sqlite_engine

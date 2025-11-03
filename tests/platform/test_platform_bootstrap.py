@@ -1,7 +1,7 @@
 from unittest.mock import Mock, call
 
 from theo.adapters import AdapterRegistry
-from theo.platform import bootstrap_application
+from theo.application.services.bootstrap import bootstrap_application
 
 
 def test_bootstrap_application_invokes_factories_once():

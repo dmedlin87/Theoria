@@ -5,15 +5,14 @@ from sqlalchemy.orm import Session
 from theo.application.facades.database import (
     get_settings,
 )
-from theo.platform.events import event_bus
-from theo.platform.events.types import DocumentIngestedEvent
+from theo.infrastructure.api.app import events as events_module
 from theo.infrastructure.api.app.ingest import pipeline
 
 
 pytestmark = pytest.mark.pgvector
 
 
-def test_file_pipeline_emits_document_event(tmp_path, ingest_engine) -> None:
+def test_file_pipeline_emits_document_event(tmp_path, ingest_engine, monkeypatch) -> None:
     engine = ingest_engine
 
     settings = get_settings()
@@ -22,12 +21,12 @@ def test_file_pipeline_emits_document_event(tmp_path, ingest_engine) -> None:
     settings.storage_root = tmp_path / "storage"
     settings.case_builder_enabled = True
 
-    captured: list[DocumentIngestedEvent] = []
+    captured: list[dict[str, object]] = []
 
-    def _capture(event: DocumentIngestedEvent) -> None:
-        captured.append(event)
+    def _capture(**payload: object) -> None:
+        captured.append(payload)
 
-    event_bus.subscribe(DocumentIngestedEvent, _capture)
+    monkeypatch.setattr(events_module, "notify_document_ingested", _capture)
 
     try:
         dependencies = pipeline.PipelineDependencies(settings=settings)
@@ -42,12 +41,11 @@ def test_file_pipeline_emits_document_event(tmp_path, ingest_engine) -> None:
             )
             document_id = document.id
 
-        assert captured, "expected a document ingestion event"
+        assert captured, "expected a document ingestion notification"
         event = captured[-1]
-        assert event.document_id == str(document_id)
-        assert event.workflow == "text"
-        assert len(event.passage_ids) >= 1
+        assert event["document_id"] == str(document_id)
+        assert event["workflow"] == "text"
+        assert len(tuple(event.get("passage_ids", ()))) >= 1
     finally:
-        event_bus.unsubscribe(DocumentIngestedEvent, _capture)
         settings.storage_root = original_storage
         settings.case_builder_enabled = original_case_builder

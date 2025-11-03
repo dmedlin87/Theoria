@@ -457,11 +457,6 @@ theo/infrastructure/api/tests/workers/__init__.py
 theo/infrastructure/api/tests/workers/test_discovery_scheduler.py
 theo/infrastructure/api/tests/workers/test_discovery_tasks.py
 theo/infrastructure/api/tests/workers/test_tasks_properties.py
-theo/platform/__init__.py
-theo/platform/application.py
-theo/platform/bootstrap.py
-theo/platform/events/__init__.py
-theo/platform/events/types.py
 theo/services/__init__.py
 theo/services/api/app/db/migrations/20250501_passage_embeddings_table.py
 theo/services/web/node_modules/flatted/python/flatted.py

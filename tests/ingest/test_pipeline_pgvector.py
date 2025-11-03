@@ -34,14 +34,11 @@ def _capture_span_attributes(monkeypatch: pytest.MonkeyPatch):
 
 
 def _record_persistence_events(monkeypatch: pytest.MonkeyPatch):
-    published: list[Any] = []
+    notified: list[dict[str, Any]] = []
     emitted: list[dict[str, Any]] = []
 
-    original_publish = ingest_persistence.event_bus.publish
-
-    def _publish(event: Any, *args, **kwargs):  # noqa: ANN001
-        published.append(event)
-        return original_publish(event, *args, **kwargs)
+    def _notify_document_ingested(**payload: Any) -> None:  # noqa: ANN401
+        notified.append(payload)
 
     def _emit_document_persisted_event(*, document, passages, **kwargs):  # noqa: ANN001
         payload = {
@@ -52,11 +49,15 @@ def _record_persistence_events(monkeypatch: pytest.MonkeyPatch):
         emitted.append(payload)
         return SimpleNamespace(**payload)
 
-    monkeypatch.setattr(ingest_persistence.event_bus, "publish", _publish)
+    monkeypatch.setattr(
+        ingest_persistence,
+        "notify_document_ingested",
+        _notify_document_ingested,
+    )
     monkeypatch.setattr(
         ingest_persistence, "emit_document_persisted_event", _emit_document_persisted_event
     )
-    return published, emitted
+    return notified, emitted
 
 
 def _build_dependencies(settings) -> pipeline.PipelineDependencies:
@@ -82,7 +83,7 @@ def test_pgvector_malformed_pdf_rejected(
     settings.storage_root = tmp_path / "storage"
 
     recorded = _capture_span_attributes(monkeypatch)
-    published, emitted = _record_persistence_events(monkeypatch)
+    notified, emitted = _record_persistence_events(monkeypatch)
 
     broken_pdf = tmp_path / "malformed.pdf"
     broken_pdf.write_bytes(b"%PDF-1.4\n%broken payload")
@@ -100,7 +101,7 @@ def test_pgvector_malformed_pdf_rejected(
         session.close()
         settings.storage_root = original_storage
 
-    assert published == []
+    assert notified == []
     assert emitted == []
 
     source_types = [value for _, key, value in recorded if key == "ingest.source_type"]
@@ -118,7 +119,7 @@ def test_pgvector_large_file_records_chunk_metrics(
     settings.storage_root = tmp_path / "storage"
 
     recorded = _capture_span_attributes(monkeypatch)
-    published, emitted = _record_persistence_events(monkeypatch)
+    notified, emitted = _record_persistence_events(monkeypatch)
 
     paragraphs = []
     token_block = " ".join(f"token{i}" for i in range(300))
@@ -156,7 +157,7 @@ def test_pgvector_large_file_records_chunk_metrics(
     assert ingest_metrics["ingest.batch_size"] == 32
     assert ingest_metrics["ingest.document_id"] == document.id
 
-    assert published and published[0].workflow == "text"
+    assert notified and notified[0]["workflow"] == "text"
     assert emitted and emitted[0]["passage_count"] == passage_count
 
 
@@ -171,7 +172,7 @@ def test_pgvector_concurrent_ingestion_isolated(
     settings.storage_root = tmp_path / "storage"
 
     recorded = _capture_span_attributes(monkeypatch)
-    published, emitted = _record_persistence_events(monkeypatch)
+    notified, emitted = _record_persistence_events(monkeypatch)
 
     session_factory = sessionmaker(bind=pgvector_pipeline_engine, future=True)
 
@@ -231,7 +232,7 @@ def test_pgvector_concurrent_ingestion_isolated(
     }
     assert doc_ids <= seen_ids
 
-    assert len(published) >= 2
+    assert len(notified) >= 2
     assert len(emitted) >= 2
 
 
@@ -264,7 +265,7 @@ def test_pgvector_pipeline_recovers_from_transient_persist_failure(
     settings.storage_root = tmp_path / "storage"
 
     recorded = _capture_span_attributes(monkeypatch)
-    published, emitted = _record_persistence_events(monkeypatch)
+    notified, emitted = _record_persistence_events(monkeypatch)
 
     attempts = {"count": 0}
     original_persist = pipeline.TextDocumentPersister.persist
@@ -314,6 +315,6 @@ def test_pgvector_pipeline_recovers_from_transient_persist_failure(
     assert ingest_metrics["ingest.chunk_count"] >= 1
     assert ingest_metrics["ingest.cache_status"] == "n/a"
 
-    assert published and published[0].workflow == "text"
+    assert notified and notified[0]["workflow"] == "text"
     assert emitted and emitted[0]["document_id"] == document.id
 

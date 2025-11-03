@@ -10,8 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from theo.application.facades.settings import get_settings
-from theo.platform.events import event_bus
-from theo.platform.events.types import CaseObjectsUpsertedEvent
+from ..events import notify_case_objects_upserted
 from theo.infrastructure.api.app.persistence_models import (
     CaseObject,
     CaseSource,
@@ -232,9 +231,7 @@ def emit_case_object_notifications(
     # ``session`` is retained in the signature for compatibility with existing
     # call sites that expect to provide a database handle.  The event bus
     # dispatch is independent of the underlying engine.
-    event_bus.publish(
-        CaseObjectsUpsertedEvent.from_ids(ids, document_id=document_id)
-    )
+    notify_case_objects_upserted(ids, document_id=document_id)
 
 
 def sync_passages_case_objects(

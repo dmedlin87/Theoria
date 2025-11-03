@@ -17,8 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from theo.application.graph import GraphDocumentProjection
-from theo.platform.events import event_bus
-from theo.platform.events.types import DocumentIngestedEvent
+from ..events import notify_document_ingested
 from theo.infrastructure.api.app.persistence_models import (
     CommentaryExcerptSeed,
     Creator,
@@ -921,14 +920,12 @@ def persist_text_document(
             metadata["collection"] = document.collection
         if document.storage_path:
             metadata["storage_path"] = document.storage_path
-        event_bus.publish(
-            DocumentIngestedEvent.from_components(
-                document_id=str(document.id),
-                workflow="text",
-                passage_ids=[str(passage.id) for passage in passages],
-                case_object_ids=sorted(case_object_ids),
-                metadata=metadata or None,
-            )
+        notify_document_ingested(
+            document_id=str(document.id),
+            workflow="text",
+            passage_ids=[str(passage.id) for passage in passages],
+            case_object_ids=sorted(case_object_ids),
+            metadata=metadata or None,
         )
         emit_document_persisted_event(
             document=document,
@@ -1388,14 +1385,12 @@ def persist_transcript_document(
             metadata["collection"] = document.collection
         if document.storage_path:
             metadata["storage_path"] = document.storage_path
-        event_bus.publish(
-            DocumentIngestedEvent.from_components(
-                document_id=str(document.id),
-                workflow="transcript",
-                passage_ids=[str(passage.id) for passage in passages],
-                case_object_ids=sorted(case_object_ids),
-                metadata=metadata or None,
-            )
+        notify_document_ingested(
+            document_id=str(document.id),
+            workflow="transcript",
+            passage_ids=[str(passage.id) for passage in passages],
+            case_object_ids=sorted(case_object_ids),
+            metadata=metadata or None,
         )
         emit_document_persisted_event(
             document=document,

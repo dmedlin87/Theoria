@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # pragma: no cover - import for typing only
     from .container import ApplicationContainer as ApplicationContainer
 
-__all__ = ["ApplicationContainer", "resolve_application"]
+__all__ = ["ApplicationContainer", "bootstrap_application", "resolve_application"]
 
 
 def __getattr__(name: str):
@@ -16,9 +16,10 @@ def __getattr__(name: str):
         value = getattr(module, "ApplicationContainer")
         globals()[name] = value
         return value
-    if name == "resolve_application":
-        from .bootstrap import resolve_application as _resolve_application
+    if name in {"bootstrap_application", "resolve_application"}:
+        from . import bootstrap as bootstrap_module
 
-        globals()[name] = _resolve_application
-        return _resolve_application
+        value = getattr(bootstrap_module, name)
+        globals()[name] = value
+        return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

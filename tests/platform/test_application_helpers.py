@@ -1,4 +1,4 @@
-"""Tests for helper functions in ``theo.platform.application``."""
+"""Tests for helper functions in ``theo.application.services.bootstrap``."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 from theo.adapters import AdapterRegistry
 from theo.adapters.persistence import models
 from theo.domain import Document, DocumentId, DocumentMetadata
-from theo.platform import application as application_module
+from theo.application.services import bootstrap as application_module
 
 
 @pytest.fixture
