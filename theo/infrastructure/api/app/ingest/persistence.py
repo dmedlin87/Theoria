@@ -15,8 +15,6 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
-from theo.application.graph import GraphDocumentProjection
 from theo.platform.events import event_bus
 from theo.platform.events.types import DocumentIngestedEvent
 from theo.infrastructure.api.app.persistence_models import (
@@ -33,7 +31,6 @@ from theo.infrastructure.api.app.persistence_models import (
     Video,
 )
 
-from ..case_builder import sync_passages_case_objects
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from .embeddings import lexical_representation
 from .events import emit_document_persisted_event
@@ -84,37 +81,6 @@ def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
     return ordered
 
 
-def _project_document_if_possible(
-    context: IngestContext,
-    document: Document,
-    *,
-    verses: Iterable[str],
-    concepts: Iterable[str],
-) -> None:
-    projector = getattr(context, "graph_projector", None)
-    if projector is None:
-        return
-
-    verse_list = tuple(_dedupe_preserve_order(verses))
-    concept_list = tuple(_dedupe_preserve_order(concepts))
-    topic_domains = tuple(_dedupe_preserve_order(document.topic_domains or ()))
-
-    try:
-        projection = GraphDocumentProjection(
-            document_id=document.id,
-            title=document.title,
-            source_type=document.source_type,
-            verses=verse_list,
-            concepts=concept_list,
-            topic_domains=topic_domains,
-            theological_tradition=document.theological_tradition,
-        )
-        projector.project_document(projection)
-    except Exception:  # pragma: no cover - defensive guard
-        logger.exception(
-            "Graph projection failed",
-            extra={"document_id": document.id},
-        )
 COMMENTARY_NAMESPACE = uuid5(NAMESPACE_URL, "theo-engine/commentaries")
 
 
@@ -603,7 +569,6 @@ def persist_text_document(
     ) or sanitize_passage_text(text_content)
 
     passages: list[Passage] = []
-    case_object_ids: set[str] = set()
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     collected_verse_refs: list[str] = []
@@ -696,42 +661,7 @@ def persist_text_document(
 
     session.flush()
 
-    if getattr(settings, "case_builder_enabled", False):
-        try:
-            from ..case_builder import ingest as case_builder_ingest
-
-            created_objects = case_builder_ingest.sync_case_objects_for_document(
-                session,
-                document=document,
-                passages=passages,
-                settings=settings,
-            )
-            for obj in created_objects:
-                identifier = getattr(obj, "id", None)
-                if identifier:
-                    case_object_ids.add(str(identifier))
-        except Exception:  # pragma: no cover - defensive logging
-            logger.exception(
-                "Case Builder sync failed during text ingestion",
-                extra={"document_id": document.id},
-            )
-    passage_case_object_ids = sync_passages_case_objects(
-        session,
-        document=document,
-        passages=passages,
-        frontmatter=frontmatter,
-    )
-    for identifier in passage_case_object_ids:
-        if identifier:
-            case_object_ids.add(str(identifier))
-
     topics = collect_topics(document, frontmatter)
-    _project_document_if_possible(
-        context,
-        document,
-        verses=collected_verse_refs,
-        concepts=topics,
-    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):
@@ -926,7 +856,6 @@ def persist_text_document(
                 document_id=str(document.id),
                 workflow="text",
                 passage_ids=[str(passage.id) for passage in passages],
-                case_object_ids=sorted(case_object_ids),
                 metadata=metadata or None,
             )
         )
@@ -1069,7 +998,6 @@ def persist_transcript_document(
     )
 
     passages: list[Passage] = []
-    case_object_ids: set[str] = set()
     segments: list[TranscriptSegment] = []
     segment_verse_ids: dict[TranscriptSegment, list[int]] = {}
     collected_verse_refs: list[str] = []
@@ -1162,42 +1090,7 @@ def persist_transcript_document(
 
     session.flush()
 
-    if getattr(settings, "case_builder_enabled", False):
-        try:
-            from ..case_builder import ingest as case_builder_ingest
-
-            created_objects = case_builder_ingest.sync_case_objects_for_document(
-                session,
-                document=document,
-                passages=passages,
-                settings=settings,
-            )
-            for obj in created_objects:
-                identifier = getattr(obj, "id", None)
-                if identifier:
-                    case_object_ids.add(str(identifier))
-        except Exception:  # pragma: no cover - defensive logging
-            logger.exception(
-                "Case Builder sync failed during transcript ingestion",
-                extra={"document_id": document.id},
-            )
-    passage_case_object_ids = sync_passages_case_objects(
-        session,
-        document=document,
-        passages=passages,
-        frontmatter=frontmatter,
-    )
-    for identifier in passage_case_object_ids:
-        if identifier:
-            case_object_ids.add(str(identifier))
-
     topics = collect_topics(document, frontmatter)
-    _project_document_if_possible(
-        context,
-        document,
-        verses=collected_verse_refs,
-        concepts=topics,
-    )
     stance_overrides_raw = frontmatter.get("creator_stances") or {}
     stance_overrides: dict[str, str] = {}
     if isinstance(stance_overrides_raw, dict):
@@ -1393,7 +1286,6 @@ def persist_transcript_document(
                 document_id=str(document.id),
                 workflow="transcript",
                 passage_ids=[str(passage.id) for passage in passages],
-                case_object_ids=sorted(case_object_ids),
                 metadata=metadata or None,
             )
         )

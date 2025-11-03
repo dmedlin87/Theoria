@@ -12,7 +12,6 @@ from theo.infrastructure.api.app.persistence_models import (
     Passage,
 )
 
-from ..case_builder import sync_annotation_case_object
 from ..db.query_optimizations import query_with_monitoring
 from ..models.base import Passage as PassageSchema
 from ..models.documents import (
@@ -239,7 +238,6 @@ def create_annotation(
     annotation = DocumentAnnotation(document_id=document_id, body=body)
     session.add(annotation)
     session.flush()
-    sync_annotation_case_object(session, document=document, annotation=annotation)
     session.commit()
     session.refresh(annotation)
     return annotation_to_schema(annotation)

@@ -105,20 +105,7 @@
 
 ---
 
-### 6. Case Builder (10.7% → 70%)
-**Impact:** High - Research feature  
-**Effort:** Low (1 day)
-
-**Low-coverage files in `theo/services/api/app/case_builder/` (3 files):**
-- Case construction
-- Evidence gathering
-- Citation management
-
-**Fixtures available:** `fixtures/case_builder/` (3 files)
-
----
-
-### 7. AI/RAG Systems (23.4% → 70%)
+### 6. AI/RAG Systems (23.4% → 70%)
 **Impact:** Very High - Core AI functionality  
 **Effort:** High (4-6 days)
 
@@ -216,7 +203,6 @@
 |------|--------|------------|
 | 1 | 35% | Frontend fixes + Core infrastructure |
 | 2 | 40% | Ingest + Retriever |
-| 3 | 45% | Case Builder + AI/RAG basics |
 | 4 | 50% | AI/RAG integration + API routes |
 | 5 | 60% | Workflow + Export |
 | 6 | 70% | Analytics + Edge cases |

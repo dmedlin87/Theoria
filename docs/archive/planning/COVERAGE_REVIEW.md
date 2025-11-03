@@ -38,7 +38,6 @@ Branch Coverage:  Not tracked
 
 | Package | Coverage | Files | Priority |
 |---------|----------|-------|----------|
-| `services.api.app.case_builder` | 10.7% | 3 | High |
 | `services.api.app.transcripts` | 11.8% | 2 | High |
 | `services.api.app.retriever` | 12.8% | 8 | High |
 | `services.geo` | 14.1% | 2 | Medium |
@@ -124,7 +123,6 @@ Duration:     5.14s
 3. **Boost Critical Low-Coverage Areas**
    - `services.api.app.ingest` (16.2% → 60%+): 13 files, critical path
    - `services.api.app.retriever` (12.8% → 60%+): 8 files, search functionality
-   - `services.api.app.case_builder` (10.7% → 60%+): 3 files
 
 4. **AI/RAG Coverage**
    - `services.api.app.ai.rag` (23.4% → 70%+): Core AI functionality

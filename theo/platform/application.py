@@ -22,7 +22,6 @@ from theo.application.embeddings import EmbeddingRebuildService
 from theo.application import ApplicationContainer
 from theo.application.facades.database import get_engine
 from theo.application.facades.settings import get_settings
-from theo.application.reasoner import NeighborhoodReasoner
 from theo.application.research import ResearchService
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.platform.bootstrap import bootstrap_application
@@ -246,14 +245,6 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
         return _factory
 
     registry.register("research_service_factory", _build_research_service_factory)
-
-    def _build_reasoner_factory() -> Callable[[Session], NeighborhoodReasoner]:
-        def _factory(session: Session) -> NeighborhoodReasoner:
-            return NeighborhoodReasoner()
-
-        return _factory
-
-    registry.register("reasoner_factory", _build_reasoner_factory)
 
     def _build_embedding_rebuild_service() -> EmbeddingRebuildService:
         from theo.infrastructure.api.app.ingest.embeddings import (

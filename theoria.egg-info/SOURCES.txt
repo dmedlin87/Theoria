@@ -25,7 +25,6 @@ theo/adapters/events/__init__.py
 theo/adapters/events/kafka.py
 theo/adapters/events/redis.py
 theo/adapters/graph/__init__.py
-theo/adapters/graph/neo4j.py
 theo/adapters/persistence/__init__.py
 theo/adapters/persistence/base_repository.py
 theo/adapters/persistence/chat_repository.py
@@ -82,8 +81,6 @@ theo/application/ports/__init__.py
 theo/application/ports/ai_registry.py
 theo/application/ports/events.py
 theo/application/ports/secrets.py
-theo/application/reasoner/__init__.py
-theo/application/reasoner/events.py
 theo/application/repositories/__init__.py
 theo/application/repositories/chat_repository.py
 theo/application/repositories/discovery_repository.py
@@ -159,16 +156,6 @@ theo/domain/research/variants.py
 theo/domain/services/__init__.py
 theo/domain/services/embeddings/__init__.py
 theo/domain/services/embeddings/config.py
-theo/evidence/__init__.py
-theo/evidence/citations.py
-theo/evidence/cli.py
-theo/evidence/dossier.py
-theo/evidence/indexer.py
-theo/evidence/models.py
-theo/evidence/normalization.py
-theo/evidence/promoter.py
-theo/evidence/utils.py
-theo/evidence/validator.py
 theo/infrastructure/__init__.py
 theo/infrastructure/api/__init__.py
 theo/infrastructure/api/app/__init__.py
@@ -252,9 +239,6 @@ theo/infrastructure/api/app/bootstrap/lifecycle.py
 theo/infrastructure/api/app/bootstrap/middleware.py
 theo/infrastructure/api/app/bootstrap/routes.py
 theo/infrastructure/api/app/bootstrap/runtime_checks.py
-theo/infrastructure/api/app/case_builder/__init__.py
-theo/infrastructure/api/app/case_builder/ingest.py
-theo/infrastructure/api/app/case_builder/sync.py
 theo/infrastructure/api/app/compat/__init__.py
 theo/infrastructure/api/app/core/__init__.py
 theo/infrastructure/api/app/core/database.py

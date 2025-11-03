@@ -88,13 +88,6 @@ Each archive directory includes a README explaining its contents and retention p
 - IMPLEMENTATION_SUMMARY.md
 - QUICK_START.md
 
-**Case Builder Versions (5 files):**
-- case builder v4.md
-- docs/case builder v2.md
-- docs/case-builder-v1.md
-- docs/case_builder_buddy_summary.md
-- docs/theo_engine_case_builder_buddy_convergence_triggers_blueprint.md
-
 **MCP & Script Improvement Reports (5 files):**
 - mcp_server/CODE_QUALITY_REPORT.md
 - mcp_server/IMPROVEMENTS.md
@@ -133,12 +126,6 @@ Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
 - docs/adr/0001-mcp-tools-and-apps-sdk.md
 
 ### 4. ✅ Consolidated Documentation
-
-**Case Builder:**
-- Created `docs/CASE_BUILDER.md` as consolidated reference
-- Documents v4 as current specification
-- Links to archived versions (v1-v3) and related fixtures
-- Provides implementation roadmap and integration points
 
 **Documentation Index:**
 - Created `docs/INDEX.md` with comprehensive navigation

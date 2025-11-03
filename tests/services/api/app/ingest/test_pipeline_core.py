@@ -68,7 +68,6 @@ def test_pipeline_dependencies_prefers_explicit_dependencies(monkeypatch: pytest
         settings=_SentinelSettings(),
         embedding_service=_SentinelEmbedding(),
         error_policy=_SentinelErrorPolicy(),
-        graph_projector=object(),
     )
 
     context = dependencies.build_context(span=span)
@@ -76,34 +75,9 @@ def test_pipeline_dependencies_prefers_explicit_dependencies(monkeypatch: pytest
     assert context.settings is dependencies.settings
     assert context.embedding_service is dependencies.embedding_service
     assert context.error_policy is dependencies.error_policy
-    assert context.graph_projector is dependencies.graph_projector
 
     context.instrumentation.set("foo", "bar")
     assert span["attributes"] == [("foo", "bar")]
-
-
-def test_pipeline_dependencies_falls_back_to_null_graph_projector(monkeypatch: pytest.MonkeyPatch) -> None:
-    from theo.infrastructure.api.app.ingest import pipeline
-
-    sentinel_settings = _SentinelSettings()
-    sentinel_embedding = _SentinelEmbedding()
-
-    monkeypatch.setattr(pipeline, "get_settings", lambda: sentinel_settings)
-    monkeypatch.setattr(pipeline, "get_embedding_service", lambda: sentinel_embedding)
-
-    def failing_graph_projector():
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(pipeline, "get_graph_projector", failing_graph_projector)
-
-    dependencies = PipelineDependencies()
-    context = dependencies.build_context(span=None)
-
-    assert context.settings is sentinel_settings
-    assert context.embedding_service is sentinel_embedding
-    assert isinstance(context.graph_projector, pipeline.NullGraphProjector)
-
-
 def test_ensure_success_returns_document_on_success() -> None:
     document = object()
     result = OrchestratorResult(
@@ -254,7 +228,6 @@ def test_url_document_persister_dispatch(monkeypatch: pytest.MonkeyPatch) -> Non
         settings=_SentinelSettings(),
         embedding_service=_SentinelEmbedding(),
         error_policy=_SentinelErrorPolicy(),
-        graph_projector=object(),
     )
 
     result = run_pipeline_for_url(
