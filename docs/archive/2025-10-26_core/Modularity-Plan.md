@@ -34,7 +34,7 @@
 | `theo.adapters.interfaces.api` | FastAPI routes/controllers | HTTP requests | Calls application services | Sole entry for REST.
 | `theo.adapters.interfaces.cli` | CLI commands / scripts | CLI invocations | Application service interfaces | No direct DB access.
 | `theo.adapters.interfaces.web` | Next.js proxy + UI integration | HTTP/GraphQL boundary | REST/WS API only | Lives in separate package; interacts via HTTP clients.
-| `theo.platform` | Cross-cutting infrastructure (telemetry, security policies, settings) | Application bootstrap | Logging, tracing sinks | Provides adapters with shared utilities.
+| `theo.application.services` | Cross-cutting infrastructure (telemetry, security policies, settings) | Application bootstrap | Logging, tracing sinks | Provides adapters with shared utilities.
 
 ## Ports & Contracts
 
@@ -48,13 +48,13 @@
 - `theo.application.ports.notifications` – Webhooks, email, Slack connectors.
 - `theo.application.ports.search` – Embeddings + lexical search integration.
 - `theo.application.ports.ai` – LLM completion/streaming interfaces.
-- `theo.platform.telemetry` – Metrics/tracing collectors.
+- `theo.application.facades.telemetry` – Metrics/tracing collectors.
 
 ## Public APIs Per Module
 
 - `theo.domain` exports immutable data classes, aggregates, and domain services through `__all__` definitions. No module may import from `theo.adapters.*`.
 - `theo.application` exposes orchestrator classes (`IngestDocumentService`, `ResearchWorkflowService`) via dedicated `facade` modules that depend solely on ports.
-- `theo.adapters.*` modules implement the respective port interfaces and are registered via dependency injection container (`theo.platform.bootstrap`).
+- `theo.adapters.*` modules implement the respective port interfaces and are registered via dependency injection container (`theo.application.services.bootstrap`).
 - `theo.adapters.interfaces.*` provide boundary controllers; they **MUST** invoke application facades only.
 
 ### Forbidden Couplings
@@ -74,7 +74,7 @@
 ## Migration Plan
 
 ### Phase 1 – Foundations (Current)
-- Introduce module scaffolding (`theo/domain`, `theo/application`, `theo/adapters`, `theo/platform`).
+- Introduce module scaffolding (`theo/domain`, `theo/application`, `theo/adapters`).
 - Provide compatibility facades that wrap existing services and expose planned interfaces.
 - Add architecture tests & CI guardrails.
 
@@ -89,7 +89,7 @@
 - Ensure CLI uses application services via dependency-injected container (no direct DB usage).
 
 ### Phase 4 – Eventing & Extensibility
-- Publish domain events through `theo.platform.events` to allow new adapters (e.g., auditing, analytics) without touching core.
+- Invoke synchronous ingestion hooks (via `theo.infrastructure.api.app.ingest.persistence`) to allow new adapters (e.g., auditing, analytics) without touching core.
 - Document extension points and register entrypoints for plugin discovery.
 
 ## Diagram Legend
@@ -97,7 +97,7 @@
 - **Inbound Ports:** Interfaces consumed by driving adapters (API/CLI/Web).
 - **Outbound Ports:** Interfaces implemented by driven adapters (DB, LLM, notifications).
 - **Facades:** `theo.application.facades` unify domain operations for adapters.
-- **Events:** Domain events emitted via `theo.platform.events` for asynchronous reactions.
+- **Events:** Ingestion completions trigger synchronous telemetry/warm-up hooks exposed from `theo.infrastructure.api.app.ingest.persistence`.
 
 ## Next Steps Checklist
 

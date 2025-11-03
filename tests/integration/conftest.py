@@ -77,7 +77,7 @@ def baseline_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
     from theo.application.facades import database as database_module
     from theo.application.facades.settings import get_settings
-    from theo.platform.application import resolve_application
+    from theo.application.services.bootstrap import resolve_application
     from theo.infrastructure.api.app.db import query_optimizations
     from theo.infrastructure.api.app.routes import documents as documents_route
 

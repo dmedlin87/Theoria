@@ -1,31 +1,34 @@
-from __future__ import annotations
 import pytest
 from sqlalchemy.orm import Session
 
-from theo.application.facades.database import (
-    get_settings,
-)
-from theo.platform.events import event_bus
-from theo.platform.events.types import DocumentIngestedEvent
+from theo.application.facades.database import get_settings
 from theo.infrastructure.api.app.ingest import pipeline
+from theo.infrastructure.api.app.ingest import persistence as ingest_persistence
 
 
 pytestmark = pytest.mark.pgvector
 
 
-def test_file_pipeline_emits_document_event(tmp_path, ingest_engine) -> None:
+def test_file_pipeline_records_ingestion(tmp_path, ingest_engine, monkeypatch) -> None:
     engine = ingest_engine
 
     settings = get_settings()
     original_storage = settings.storage_root
     settings.storage_root = tmp_path / "storage"
 
-    captured: list[DocumentIngestedEvent] = []
+    warm_calls: list[bool] = []
+    recorded: list[dict[str, object]] = []
 
-    def _capture(event: DocumentIngestedEvent) -> None:
-        captured.append(event)
+    monkeypatch.setattr(ingest_persistence, "_warm_embedding_service", lambda: warm_calls.append(True))
 
-    event_bus.subscribe(DocumentIngestedEvent, _capture)
+    def _record_document_ingested(**kwargs):
+        recorded.append(kwargs)
+
+    monkeypatch.setattr(
+        ingest_persistence,
+        "_record_document_ingested",
+        _record_document_ingested,
+    )
 
     try:
         dependencies = pipeline.PipelineDependencies(settings=settings)
@@ -38,13 +41,15 @@ def test_file_pipeline_emits_document_event(tmp_path, ingest_engine) -> None:
                 doc_path,
                 dependencies=dependencies,
             )
-            document_id = document.id
 
-        assert captured, "expected a document ingestion event"
-        event = captured[-1]
-        assert event.document_id == str(document_id)
-        assert event.workflow == "text"
-        assert len(event.passage_ids) >= 1
+        assert warm_calls, "expected embedding warmup to run"
+        assert recorded, "expected ingestion telemetry to be recorded"
+
+        payload = recorded[-1]
+        assert payload["workflow"] == "text"
+        assert payload["document_id"] == str(document.id)
+        passage_ids = payload["passage_ids"]
+        assert isinstance(passage_ids, list)
+        assert passage_ids, "expected at least one passage id"
     finally:
-        event_bus.unsubscribe(DocumentIngestedEvent, _capture)
         settings.storage_root = original_storage

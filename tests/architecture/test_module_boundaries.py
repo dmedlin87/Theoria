@@ -90,7 +90,6 @@ def test_application_depends_only_on_domain_and_platform() -> None:
     allowed_prefixes = (
         "theo.application",
         "theo.domain",
-        "theo.platform",
         "theo.adapters",
     )
     forbidden_prefixes = ("theo.infrastructure",)

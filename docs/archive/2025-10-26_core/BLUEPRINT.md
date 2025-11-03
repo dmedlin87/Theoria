@@ -96,17 +96,12 @@ Bibliography (optional): CSL-JSON for metadata backfill
 
 If present, a small frontmatter JSON/YAML block improves provenance/dedupe (see §10).
 
-### Ingestion Event Bus
+### Ingestion Notifications
 
-Theo's ingestion pipeline emits structured events via `theo.platform.events.event_bus` so downstream systems can react without
-polling. Two primary payloads are available:
-
-* `DocumentIngestedEvent` – fired after a document is fully persisted (passages, storage artefacts, case objects). The default
-  handlers log structured analytics entries and ensure the embedding backend is initialised for subsequent workloads.
-  background workers (using Celery when available) so scoring, analytics, and other asynchronous jobs can run deterministically.
-
-Handlers register once during API startup (`theo/services/api/app/events.py`). Custom services can subscribe to the same events to
-enqueue bespoke processing or observability hooks without modifying the ingestion code paths.
+Theo's ingestion pipeline now calls synchronous hooks inside `theo.infrastructure.api.app.ingest.persistence` once a document is
+committed. These hooks warm the embedding service and log telemetry via
+`theo.application.facades.telemetry.log_workflow_event`, removing the need for an event bus and ensuring deployments without
+background workers still capture analytics deterministically.
 
 ## 4) Infrastructure
 

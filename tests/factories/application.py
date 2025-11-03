@@ -8,7 +8,7 @@ from typing import Callable, Tuple, TypeVar, overload
 
 from theo.adapters import AdapterRegistry
 from theo.application import ApplicationContainer
-from theo.platform.application import resolve_application as _resolve_application
+from theo.application.services.bootstrap import resolve_application as _resolve_application
 
 FactoryValue = TypeVar("FactoryValue")
 FactoryOverride = Callable[[], FactoryValue] | FactoryValue
