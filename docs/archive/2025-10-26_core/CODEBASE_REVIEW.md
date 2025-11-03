@@ -27,7 +27,7 @@ and architectural plans are organized under `docs/`.
   - `geo` manages optional geographic enrichment data.
 - **Adapters** – Integration code for embeddings, storage, and third-party
   services is collected in `theo/adapters`, with implementation-specific wiring
-  abstracted behind the application container (`theo/platform/application.py`,
+  abstracted behind the application container (`theo/application/services/bootstrap.py`,
   re-exported for services via `theo/services/bootstrap.py`).
 
 ## Backend Services

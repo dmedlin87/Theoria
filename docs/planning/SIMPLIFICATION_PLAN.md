@@ -79,19 +79,9 @@ theo/checkpoints.py
 - Replace with simpler state persistence (JSON files, database records)
 - Remove version migration complexity
 
-### 4. Platform Event System (LOW PRIORITY)
-**Path:** `theo/platform/`  
-**Complexity:** Event-driven architecture abstraction  
-**Rationale:** May be over-engineering; evaluate if simpler patterns suffice.
-
-**Files to Evaluate:**
-```
-theo/platform/
-├── __init__.py
-├── application.py (11K+ lines)
-├── bootstrap.py
-└── events/ (directory)
-```
+### 4. Platform Event System (COMPLETE)
+**Path:** previously `theo/platform/`
+**Outcome:** Replaced with `theo.application.services.bootstrap` and synchronous ingestion hooks, eliminating the custom event bus layer.
 
 ## Implementation Plan
 
@@ -125,11 +115,11 @@ theo/platform/
 - [ ] Delete `theo/checkpoints.py`
 - [ ] Update embedding rebuild processes
 
-### Phase 4: Platform Events Evaluation (Future)
-**Future Consideration:**
-- Evaluate `theo/platform/` directory usage
-- Determine if event system provides value
-- Consider removal if simple function calls suffice
+### Phase 4: Platform Events Evaluation (Complete)
+**Outcome:**
+- `theo/platform/` removed with bootstrap logic consolidated under `theo/application/services/bootstrap.py`.
+- Ingestion notifications now call synchronous helpers instead of publishing to an event bus.
+- Future enhancements should document additional telemetry consumers if new hooks are introduced.
 
 ## Risk Mitigation
 

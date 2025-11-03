@@ -12,7 +12,6 @@ from theo.adapters.research import (
     SqlAlchemyResearchNoteRepository,
 )
 from theo.domain import Document, DocumentId, DocumentMetadata
-from theo.platform.application import resolve_application as platform_resolve_application
 from theo.application.services.bootstrap import resolve_application
 
 
@@ -91,10 +90,6 @@ def test_resolve_application_results_are_cached(
 
         assert first_container is second_container
         assert first_registry is second_registry
-
-
-def test_service_wrapper_exposes_platform_bootstrap():
-    assert resolve_application is platform_resolve_application
 
 
 def test_research_service_factory_binds_sqlalchemy_repositories(

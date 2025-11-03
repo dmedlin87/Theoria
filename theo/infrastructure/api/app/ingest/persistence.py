@@ -15,8 +15,8 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from theo.platform.events import event_bus
-from theo.platform.events.types import DocumentIngestedEvent
+
+from theo.application.facades.telemetry import log_workflow_event
 from theo.infrastructure.api.app.persistence_models import (
     CommentaryExcerptSeed,
     Creator,
@@ -32,7 +32,7 @@ from theo.infrastructure.api.app.persistence_models import (
 )
 
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
-from .embeddings import lexical_representation
+from .embeddings import get_embedding_service, lexical_representation
 from .events import emit_document_persisted_event
 from .exceptions import UnsupportedSourceError
 from .metadata import (
@@ -63,6 +63,41 @@ logger = logging.getLogger(__name__)
 
 
 from .stages import IngestContext
+
+
+def _warm_embedding_service() -> None:
+    """Attempt to prime the embedding service so subsequent calls are fast."""
+
+    try:
+        get_embedding_service()
+    except Exception:  # pragma: no cover - defensive warmup
+        logger.debug("embedding service warmup failed", exc_info=True)
+
+
+def _record_document_ingested(
+    *, workflow: str, document_id: str, passage_ids: Sequence[str]
+) -> None:
+    """Log a telemetry breadcrumb for a persisted document."""
+
+    log_workflow_event(
+        "ingest.document.persisted",
+        workflow=workflow,
+        document_id=document_id,
+        passage_count=len(passage_ids),
+    )
+
+
+def _notify_document_ingested(
+    *, workflow: str, document_id: str, passage_ids: Sequence[str]
+) -> None:
+    """Bridge ingestion completion events to synchronous orchestrations."""
+
+    _warm_embedding_service()
+    _record_document_ingested(
+        workflow=workflow,
+        document_id=document_id,
+        passage_ids=passage_ids,
+    )
 
 
 def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
@@ -842,22 +877,11 @@ def persist_text_document(
         session.add(document)
         session.commit()
 
-        metadata: dict[str, object] = {}
-        if document.source_type:
-            metadata["source_type"] = document.source_type
-        if document.source_url:
-            metadata["source_url"] = document.source_url
-        if document.collection:
-            metadata["collection"] = document.collection
-        if document.storage_path:
-            metadata["storage_path"] = document.storage_path
-        event_bus.publish(
-            DocumentIngestedEvent.from_components(
-                document_id=str(document.id),
-                workflow="text",
-                passage_ids=[str(passage.id) for passage in passages],
-                metadata=metadata or None,
-            )
+        passage_ids = [str(passage.id) for passage in passages]
+        _notify_document_ingested(
+            workflow="text",
+            document_id=str(document.id),
+            passage_ids=passage_ids,
         )
         emit_document_persisted_event(
             document=document,
@@ -1272,22 +1296,11 @@ def persist_transcript_document(
         session.add(document)
         session.commit()
 
-        metadata: dict[str, object] = {}
-        if document.source_type:
-            metadata["source_type"] = document.source_type
-        if document.source_url:
-            metadata["source_url"] = document.source_url
-        if document.collection:
-            metadata["collection"] = document.collection
-        if document.storage_path:
-            metadata["storage_path"] = document.storage_path
-        event_bus.publish(
-            DocumentIngestedEvent.from_components(
-                document_id=str(document.id),
-                workflow="transcript",
-                passage_ids=[str(passage.id) for passage in passages],
-                metadata=metadata or None,
-            )
+        passage_ids = [str(passage.id) for passage in passages]
+        _notify_document_ingested(
+            workflow="transcript",
+            document_id=str(document.id),
+            passage_ids=passage_ids,
         )
         emit_document_persisted_event(
             document=document,
