@@ -49,7 +49,6 @@ Theoria/
 └── docs/
     ├── INDEX.md                # Master index (START HERE)
     ├── DOCUMENTATION_GUIDE.md  # This file
-    ├── CASE_BUILDER.md         # Case Builder spec
     │
     ├── [Feature Docs]
     │   ├── DISCOVERY_FEATURE.md

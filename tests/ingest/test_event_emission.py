@@ -18,9 +18,7 @@ def test_file_pipeline_emits_document_event(tmp_path, ingest_engine) -> None:
 
     settings = get_settings()
     original_storage = settings.storage_root
-    original_case_builder = settings.case_builder_enabled
     settings.storage_root = tmp_path / "storage"
-    settings.case_builder_enabled = True
 
     captured: list[DocumentIngestedEvent] = []
 
@@ -50,4 +48,3 @@ def test_file_pipeline_emits_document_event(tmp_path, ingest_engine) -> None:
     finally:
         event_bus.unsubscribe(DocumentIngestedEvent, _capture)
         settings.storage_root = original_storage
-        settings.case_builder_enabled = original_case_builder

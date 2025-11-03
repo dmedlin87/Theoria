@@ -26,7 +26,6 @@ from theo.adapters.persistence.ingestion_job_repository import (
 )
 from theo.adapters.persistence.types import VectorType
 from theo.application.dtos import ChatSessionDTO
-from theo.application.reasoner.events import DocumentPersistedEvent
 from theo.infrastructure.api.app.persistence_models import Document, Passage
 from theo.application.services.bootstrap import resolve_application
 
@@ -132,15 +131,6 @@ celery.conf.beat_schedule.setdefault(
 )
 
 
-@celery.task(name="tasks.on_case_object_upsert")
-def on_case_object_upsert(case_object_id: str) -> None:
-    """Entry point for Case Builder object scoring."""
-
-    logger.debug(
-        "Received Case Builder object upsert", extra={"case_object_id": case_object_id}
-    )
-
-
 _CITATION_VALIDATION_TOP_K = 8
 _DEFAULT_CITATION_SESSION_LIMIT = 25
 
@@ -196,51 +186,6 @@ def _compose_cached_completion(
         f"[{citation.index}] {citation.osis} ({citation.anchor})" for citation in citations
     )
     return f"{base_text}\n\nSources: {sources}"
-
-
-@celery.task(name="tasks.on_case_object_upsert")
-def on_case_object_upsert(case_object_id: str) -> None:
-    """Placeholder worker triggered when new case objects land."""
-
-    if not case_object_id:
-        logger.debug("Received empty case object notification")
-        return
-
-    logger.info(
-        "Enqueued case object upsert", extra={"case_object_id": case_object_id}
-    )
-
-
-@celery.task(name="tasks.update_neighborhood_analytics")
-def update_neighborhood_analytics(event_payload: dict[str, Any]) -> None:
-    """Refresh doctrine/topic analytics after ingestion persists a document."""
-
-    try:
-        event = DocumentPersistedEvent.from_payload(event_payload)
-    except Exception:
-        logger.exception("Invalid neighborhood analytics payload", extra={"payload": event_payload})
-        return
-
-    logger.info(
-        "Updating neighborhood analytics",
-        extra={"document_id": event.document_id, "passages": event.passage_count},
-    )
-
-    reasoner_factory = _ADAPTER_REGISTRY.resolve("reasoner_factory")
-    engine = get_engine()
-
-    with Session(engine) as session:
-        reasoner = reasoner_factory(session)
-        result = reasoner.handle_document_persisted(session, event)
-        session.commit()
-
-    logger.info(
-        "Neighborhood analytics refreshed",
-        extra={
-            "document_id": event.document_id,
-            "updated_case_objects": result.updated_case_objects,
-        },
-    )
 
 
 @celery.task(name="tasks.validate_citations")
