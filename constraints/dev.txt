@@ -149,7 +149,7 @@ graphql-core==3.2.6
     # via strawberry-graphql
 greenlet==3.2.4
     # via sqlalchemy
-grimp==3.12
+grimp==3.13
     # via import-linter
 h11==0.16.0
     # via
