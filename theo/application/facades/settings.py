@@ -175,25 +175,17 @@ class Settings(BaseSettings):
         default=5,
         description="Maximum redirect hops allowed when fetching web documents",
     )
-    graph_projection_enabled: bool = Field(
+    case_builder_enabled: bool = Field(
         default=False,
-        description="Enable projecting documents and relationships into a graph store",
+        description="Enable ingestion and APIs for the Case Builder feature",
     )
-    graph_neo4j_uri: str | None = Field(
-        default=None,
-        description="Bolt URI for the Neo4j instance used for graph projection",
+    case_builder_web_enabled: bool = Field(
+        default=False,
+        description="Expose Case Builder UI affordances in the web client",
     )
-    graph_neo4j_username: str | None = Field(
-        default=None,
-        description="Username for the Neo4j graph projection adapter",
-    )
-    graph_neo4j_password: str | None = Field(
-        default=None,
-        description="Password for the Neo4j graph projection adapter",
-    )
-    graph_neo4j_database: str | None = Field(
-        default=None,
-        description="Optional Neo4j database name for graph projection",
+    case_builder_notify_channel: str = Field(
+        default="case_object_upsert",
+        description="Postgres NOTIFY channel used for case object upsert events",
     )
     topic_digest_ttl_seconds: int = Field(
         default=3600,

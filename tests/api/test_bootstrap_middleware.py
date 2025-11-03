@@ -22,16 +22,6 @@ if "FlagEmbedding" not in sys.modules:
     flag_module.FlagModel = _StubFlagModel  # type: ignore[attr-defined]
     sys.modules["FlagEmbedding"] = flag_module
 
-if "neo4j" not in sys.modules:
-    neo4j_module = ModuleType("neo4j")
-
-    class _StubDriver:  # pragma: no cover - simple test double
-        pass
-
-    neo4j_module.GraphDatabase = object()
-    neo4j_module.Driver = _StubDriver  # type: ignore[attr-defined]
-    sys.modules["neo4j"] = neo4j_module
-
 from theo.infrastructure.api.app.bootstrap.middleware import (
     configure_cors,
     get_security_dependencies,
