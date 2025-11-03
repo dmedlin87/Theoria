@@ -562,7 +562,7 @@ scikit-learn==1.7.2
     #   pynndescent
     #   sentence-transformers
     #   umap-learn
-scipy==1.16.2
+scipy==1.16.3
     # via
     #   theoria (pyproject.toml)
     #   hdbscan
