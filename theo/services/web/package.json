@@ -60,7 +60,7 @@
     "@typescript-eslint/parser": "^8.13.0",
     "@vitest/coverage-v8": "4.0.3",
     "msw": "^2.6.8",
-    "eslint": "^9.38.0",
+    "eslint": "^9.39.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsx-a11y": "^6.9.0",
     "eslint-plugin-promise": "^7.1.0",
