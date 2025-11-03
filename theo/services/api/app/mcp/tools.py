@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Mapping, MutableMapping
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Mapping, MutableMapping
 
-from sqlalchemy.orm import Session
+if TYPE_CHECKING:  # pragma: no cover - import used for type checking only
+    from sqlalchemy.orm import Session
+else:  # pragma: no cover - lightweight fallback when SQLAlchemy is absent
+    class Session:  # type: ignore[too-few-public-methods]
+        """Minimal placeholder for :class:`sqlalchemy.orm.Session`."""
+
+        pass
 
 try:  # pragma: no cover - guarded for environments missing infrastructure deps
     from theo.infrastructure.api.app.mcp.tools import (

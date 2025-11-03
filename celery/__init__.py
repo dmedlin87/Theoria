@@ -75,6 +75,7 @@ else:
     from .exceptions import Retry
 
     __all__ = ["Celery", "Retry"]
+    __path__ = [str(Path(__file__).resolve().parent)]
 
     class Celery:
         """A drastically simplified stand-in for :class:`celery.Celery`."""
