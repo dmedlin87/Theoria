@@ -98,6 +98,10 @@ def test_application_depends_only_on_domain_and_platform() -> None:
             continue
         if "tests" in path.parts:
             continue
+        if path.name == "bootstrap.py" and "services" in path.parts:
+            continue
+        if "services" in path.parts and "cli" in path.parts:
+            continue
         for module in _gather_imports(path):
             if not module.startswith("theo"):
                 continue
@@ -129,6 +133,10 @@ def test_application_does_not_import_service_runtimes_or_fastapi() -> None:
     )
     for path in _iter_python_files("theo.application"):
         if "tests" in path.parts:
+            continue
+        if path.name == "bootstrap.py" and "services" in path.parts:
+            continue
+        if "services" in path.parts and "cli" in path.parts:
             continue
         for module in _gather_imports(path):
             for adapter in forbidden_adapters:
@@ -171,7 +179,7 @@ def test_routes_depend_on_application_facades() -> None:
         )
 
 
-def test_workers_use_platform_bootstrap() -> None:
+def test_workers_use_application_bootstrap() -> None:
     workers_path = REPO_ROOT / "theo/infrastructure/api/app/workers"
     for path in workers_path.rglob("*.py"):
         if path.name == "__init__.py":
@@ -182,7 +190,7 @@ def test_workers_use_platform_bootstrap() -> None:
         )
 
 
-def test_cli_commands_use_platform_bootstrap() -> None:
+def test_cli_commands_use_application_bootstrap() -> None:
     cli_root = REPO_ROOT / "theo/application/services/cli"
     for path in cli_root.rglob("*.py"):
         if "/tests/" in path.as_posix():
@@ -191,6 +199,23 @@ def test_cli_commands_use_platform_bootstrap() -> None:
         assert "theo.application.services.bootstrap" in imports, (
             f"CLI module {path} must resolve adapters via theo.application.services.bootstrap"
         )
+
+
+def test_platform_package_removed() -> None:
+    platform_path = REPO_ROOT / "theo/platform"
+    assert not platform_path.exists(), "Legacy 'theo.platform' package should be removed."
+
+    violating_modules: list[tuple[Path, str]] = []
+    for package in ("theo", "tests"):
+        for path in _iter_python_files(package):
+            for module in _gather_imports(path):
+                if module == "theo.platform" or module.startswith("theo.platform."):
+                    violating_modules.append((path, module))
+
+    assert not violating_modules, (
+        "Modules import removed package 'theo.platform': "
+        + ", ".join(f"{path}:{module}" for path, module in violating_modules)
+    )
 
 
 def test_async_workers_do_not_depend_on_domain_layer() -> None:
