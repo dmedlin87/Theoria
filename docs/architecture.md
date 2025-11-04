@@ -29,6 +29,21 @@ The dependency graph is verified in two complementary ways:
    no package can import “up” the stack. Any attempt to import from services to
    application (or from application to domain) will fail the lint step.
 
+## Platform event bus retirement
+
+The legacy `theo.platform` package (bootstrap helpers and an event bus facade)
+has been fully removed in favour of direct orchestration through
+`theo.application.services.bootstrap`. The bootstrap module now wires adapters
+and services synchronously without the indirection of the former platform
+events layer.【F:theo/application/services/bootstrap.py†L215-L303】 Architecture
+tests enforce that the package stays deleted and that no module attempts to
+import the retired namespace.【F:tests/architecture/test_module_boundaries.py†L182-L218】
+
+Developers should resolve adapters or repositories by calling
+`theo.application.services.bootstrap.resolve_application()` or the relevant
+facade. Event publishers live under `theo.adapters.events` and are resolved via
+`theo.application.facades.events`, matching the simplified interaction model.【F:theo/application/facades/events.py†L1-L64】
+
 ## Running the checks locally
 
 Use the Taskfile helpers to execute the architecture guardrails:

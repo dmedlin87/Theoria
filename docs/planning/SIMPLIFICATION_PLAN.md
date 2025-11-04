@@ -120,6 +120,8 @@ theo/checkpoints.py
 - `theo/platform/` removed with bootstrap logic consolidated under `theo/application/services/bootstrap.py`.
 - Ingestion notifications now call synchronous helpers instead of publishing to an event bus.
 - Future enhancements should document additional telemetry consumers if new hooks are introduced.
+- Architecture guardrails ensure the legacy namespace stays deleted and cannot
+  be re-imported accidentally.【F:tests/architecture/test_module_boundaries.py†L182-L218】
 
 ## Risk Mitigation
 
