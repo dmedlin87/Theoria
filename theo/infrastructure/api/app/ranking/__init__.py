@@ -29,3 +29,8 @@ def __getattr__(name: str) -> Any:
         module = import_module(".re_ranker", __name__)
         return getattr(module, name)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
+def __dir__() -> list[str]:
+    """Expose re-exported symbols when using ``dir()`` for introspection."""
+    return sorted(__all__ + list(globals().keys()))
