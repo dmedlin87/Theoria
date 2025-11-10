@@ -451,7 +451,7 @@ pyproject-hooks==1.2.0
     #   pip-tools
 pysbd==0.3.4
     # via ragas
-pytest==8.4.2
+pytest==9.0.0
     # via
     #   theoria (pyproject.toml)
     #   pytest-cov
