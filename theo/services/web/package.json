@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.0",
-    "@eslint/js": "^9.39.0",
+    "@eslint/js": "^9.39.1",
     "@lhci/cli": "0.15.1",
     "@next/bundle-analyzer": "15.5.4",
     "@percy/cli": "^1.31.4",
