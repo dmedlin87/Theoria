@@ -25,7 +25,7 @@ __all__ = [
 def __getattr__(name: str) -> Any:
     """Lazily expose heavy reranker helpers on demand."""
 
-    if name in {"Reranker", "load_reranker"}:
+    if name in __all__:
         module = import_module(".re_ranker", __name__)
         return getattr(module, name)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
