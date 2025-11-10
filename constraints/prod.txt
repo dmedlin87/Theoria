@@ -175,7 +175,7 @@ jsonpointer==3.0.0
     # via jsonpatch
 kombu==5.5.4
     # via celery
-langchain==1.0.3
+langchain==1.0.5
     # via ragas
 langchain-classic==1.0.0
     # via langchain-community
