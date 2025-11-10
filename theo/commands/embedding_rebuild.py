@@ -436,6 +436,25 @@ def rebuild_embeddings_cmd(
     except EmbeddingRebuildError as exc:
         raise click.ClickException(str(exc)) from exc
 
+    if metrics_file is not None:
+        throughput = (
+            result.processed / result.duration if result.duration > 0 else None
+        )
+        metrics_payload: dict[str, object] = {
+            "processed_passages": result.processed,
+            "total_passages": result.total,
+            "duration_seconds": result.duration,
+            "throughput_passages_per_second": throughput,
+            "missing_passage_ids": list(result.missing_ids),
+            "metadata": dict(result.metadata),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        metrics_file.parent.mkdir(parents=True, exist_ok=True)
+        metrics_file.write_text(
+            json.dumps(metrics_payload, indent=2), encoding="utf-8"
+        )
+        click.echo(f"Metrics written to {metrics_file}")
+
     if result.total == 0:
         # Check if this was due to invalid input that should be an error
         if ids_file or normalized_changed_since:
