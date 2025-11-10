@@ -1,8 +1,15 @@
 """Ranking utilities for hybrid search results."""
 
+from __future__ import annotations
+
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
 from .features import FEATURE_NAMES, extract_features
 from .metrics import dcg, mrr, ndcg
-from .re_ranker import Reranker, load_reranker
+
+if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
+    from .re_ranker import Reranker, load_reranker
 
 __all__ = [
     "FEATURE_NAMES",
@@ -13,3 +20,17 @@ __all__ = [
     "Reranker",
     "load_reranker",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily expose heavy reranker helpers on demand."""
+
+    if name in __all__:
+        module = import_module(".re_ranker", __name__)
+        return getattr(module, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
+def __dir__() -> list[str]:
+    """Expose re-exported symbols when using ``dir()`` for introspection."""
+    return sorted(__all__ + list(globals().keys()))
