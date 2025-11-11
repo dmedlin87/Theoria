@@ -58,10 +58,7 @@ def worker_session(worker_engine) -> Session:
 @pytest.fixture(autouse=True)
 def mock_heavy_operations(monkeypatch):
     """Mock expensive operations to speed up tests."""
-    # Mock file I/O operations  
-    monkeypatch.setattr("pathlib.Path.mkdir", MagicMock())
-    monkeypatch.setattr("pathlib.Path.write_text", MagicMock())
-    monkeypatch.setattr("pathlib.Path.write_bytes", MagicMock())
+    # Avoid patching pathlib.Path globally to keep pytest tmp_path working
     
     # Mock HTTP requests
     mock_response = MagicMock()

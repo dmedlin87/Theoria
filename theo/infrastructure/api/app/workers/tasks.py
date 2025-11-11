@@ -1,3 +1,36 @@
+def generate_sermon_prep_outline(
+    session,
+    *,
+    topic,
+    osis=None,
+    filters=None,
+    model_name=None,
+    recorder=None,
+    outline_template=None,
+    key_points_limit=4,
+):
+    return rag_deliverables.generate_sermon_prep_outline(
+        session,
+        topic=topic,
+        osis=osis,
+        filters=filters,
+        model_name=model_name,
+        recorder=recorder,
+        outline_template=outline_template,
+        key_points_limit=key_points_limit,
+    )
+
+
+def build_sermon_deliverable(response, *, formats, filters):
+    return rag_exports.build_sermon_deliverable(
+        response, formats=formats, filters=filters
+    )
+
+
+def build_transcript_deliverable(session, document_id, *, formats):
+    return rag_exports.build_transcript_deliverable(
+        session, document_id, formats=formats
+    )
 """Celery tasks for asynchronous ingestion."""
 
 from __future__ import annotations
@@ -30,11 +63,8 @@ from theo.application.reasoner.events import DocumentPersistedEvent
 from theo.infrastructure.api.app.persistence_models import Document, Passage
 from theo.application.services.bootstrap import resolve_application
 
-from ..ai.rag.deliverables import generate_sermon_prep_outline
-from ..ai.rag.exports import (
-    build_sermon_deliverable,
-    build_transcript_deliverable,
-)
+from ..ai.rag import deliverables as rag_deliverables
+from ..ai.rag import exports as rag_exports
 from ..ai.rag.guardrail_helpers import (
     GuardrailError,
     build_citations,
@@ -946,9 +976,18 @@ def _rebuild_hnsw_index(engine) -> None:
         ),
         text("ANALYZE passages (embedding)"),
     ]
-    with engine.begin() as connection:
+    ctx = engine.begin()
+    if hasattr(ctx, "__enter__") and hasattr(ctx, "__exit__"):
+        with ctx as connection:
+            for statement in statements:
+                connection.execute(statement)
+    else:
+        connection = ctx
         for statement in statements:
             connection.execute(statement)
+        closer = getattr(connection, "close", None)
+        if callable(closer):
+            closer()
 
 
 def _evaluate_hnsw_recall(
@@ -1187,6 +1226,7 @@ def build_deliverable(
         else:
             data = asset.content.encode("utf-8")
             asset_path.write_text(asset.content, encoding="utf-8")
+
         relative_path = f"/exports/{export_id}/{filename}"
         downloads.append(
             {

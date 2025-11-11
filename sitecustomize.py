@@ -8,14 +8,17 @@ from __future__ import annotations
 
 import builtins
 import importlib
+import importlib.util
 import os
 import sys
 import types
 from typing import Any
+from pathlib import Path
 
 _WORKERS_TASKS_MODULE = "theo.infrastructure.api.app.workers.tasks"
 _FASTAPI_MODULE = "fastapi"
 _FASTAPI_STATUS_MODULE = "fastapi.status"
+_CELERY_PLUGIN_MODULE = "celery.contrib.pytest"
 
 
 def _install_fastapi_stub() -> None:
@@ -86,15 +89,9 @@ def _register_workers_import_fallback() -> None:
         fromlist: tuple[str, ...] = (),
         level: int = 0,
     ) -> Any:
-        """Wrap __import__ to stub workers.tasks on ImportError."""
         try:
             return original_import(name, globals, locals, fromlist, level)
         except ImportError as exc:
-            # Only intercept workers.tasks imports specifically
-            if name != _WORKERS_TASKS_MODULE:
-                raise exc
-
-            # Build the set of all requested modules
             absolute = name
             if level > 0 and globals is not None:
                 package = globals.get("__package__")
@@ -115,6 +112,45 @@ def _register_workers_import_fallback() -> None:
                         continue
                     requested.add(f"{absolute}.{entry}")
 
+            if _CELERY_PLUGIN_MODULE in requested:
+                repo_root = Path(__file__).resolve().parent
+                if str(repo_root) not in sys.path:
+                    sys.path.insert(0, str(repo_root))
+                mod = sys.modules.get("celery")
+                if mod is not None and not hasattr(mod, "__path__"):
+                    del sys.modules["celery"]
+                try:
+                    return original_import(name, globals, locals, fromlist, level)
+                except ImportError:
+                    try:
+                        plugin_path = (repo_root / "celery" / "contrib" / "pytest.py").resolve()
+                        if plugin_path.exists():
+                            # Ensure parent package objects exist
+                            celery_pkg = sys.modules.get("celery")
+                            if celery_pkg is None:
+                                try:
+                                    celery_pkg = importlib.import_module("celery")
+                                except Exception:
+                                    celery_pkg = types.ModuleType("celery")
+                                    sys.modules["celery"] = celery_pkg
+                            contrib_name = "celery.contrib"
+                            contrib_mod = sys.modules.get(contrib_name)
+                            if contrib_mod is None:
+                                contrib_mod = types.ModuleType(contrib_name)
+                                setattr(celery_pkg, "contrib", contrib_mod)  # type: ignore[attr-defined]
+                                sys.modules[contrib_name] = contrib_mod
+                            spec = importlib.util.spec_from_file_location(
+                                "celery.contrib.pytest", str(plugin_path)
+                            )
+                            if spec and spec.loader:
+                                plugin_mod = importlib.util.module_from_spec(spec)
+                                sys.modules["celery.contrib.pytest"] = plugin_mod
+                                setattr(contrib_mod, "pytest", plugin_mod)  # type: ignore[attr-defined]
+                                spec.loader.exec_module(plugin_mod)
+                                return plugin_mod
+                    except Exception:
+                        pass
+
             if (
                 _WORKERS_TASKS_MODULE not in requested
                 or _WORKERS_TASKS_MODULE in sys.modules
@@ -129,11 +165,11 @@ def _register_workers_import_fallback() -> None:
     _register_workers_import_fallback._installed = True  # type: ignore[attr-defined]
 
 
+_register_workers_import_fallback()
+
 if _WORKERS_TASKS_MODULE not in sys.modules:  # pragma: no cover - import-time wiring only
     if _should_install_workers_stub():
         _install_workers_stub()
-    else:
-        _register_workers_import_fallback()
 try:
     importlib.import_module("theo.infrastructure.api.app.workers.tasks")
 except Exception:  # pragma: no cover - executed only when optional deps missing
