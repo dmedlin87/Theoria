@@ -180,7 +180,6 @@ def rebuild_embeddings_cmd(
     if not isinstance(service, EmbeddingRebuildService):
         raise click.ClickException("Embedding rebuild service unavailable")
 
-    batch_size = 64 if fast else 128
     config = EmbeddingRebuildConfig.for_mode(fast=fast)
     batch_size = config.initial_batch_size
     if no_cache:
