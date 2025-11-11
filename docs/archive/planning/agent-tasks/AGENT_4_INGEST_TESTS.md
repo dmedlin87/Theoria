@@ -266,7 +266,6 @@ python -m pytest tests/ingest/ -v -m slow
 # From fixtures/
 - fixtures/markdown/README.md
 - fixtures/html/sample_page.html
-- fixtures/case_builder/*.json
 ```
 
 ### Database Testing

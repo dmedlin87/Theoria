@@ -91,7 +91,7 @@ distro==1.9.0
     # via openai
 evaluate==0.4.6
     # via theoria (pyproject.toml)
-fastapi==0.120.0
+fastapi==0.121.1
     # via
     #   theoria (pyproject.toml)
     #   strawberry-graphql
@@ -175,7 +175,7 @@ jsonpointer==3.0.0
     # via jsonpatch
 kombu==5.5.4
     # via celery
-langchain==1.0.3
+langchain==1.0.5
     # via ragas
 langchain-classic==1.0.0
     # via langchain-community
@@ -242,8 +242,6 @@ mypy-extensions==1.1.0
     # via typing-inspect
 narwhals==2.9.0
     # via plotly
-neo4j==5.28.2
-    # via theoria (pyproject.toml)
 nest-asyncio==1.6.0
     # via ragas
 networkx==3.5
@@ -383,7 +381,6 @@ pythonbible==0.13.1
     # via theoria (pyproject.toml)
 pytz==2025.2
     # via
-    #   neo4j
     #   pandas
 pyyaml==6.0.3
     # via
@@ -432,7 +429,7 @@ scikit-learn==1.7.2
     #   pynndescent
     #   sentence-transformers
     #   umap-learn
-scipy==1.16.2
+scipy==1.16.3
     # via
     #   theoria (pyproject.toml)
     #   hdbscan
@@ -463,9 +460,9 @@ sqlalchemy==2.0.44
     #   theoria (pyproject.toml)
     #   langchain-classic
     #   langchain-community
-starlette==0.48.0
+starlette==0.49.1
     # via fastapi
-strawberry-graphql==0.220.0
+strawberry-graphql==0.285.0
     # via theoria (pyproject.toml)
 sympy==1.14.0
     # via torch

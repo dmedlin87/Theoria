@@ -8,7 +8,7 @@
 
 1. **API surface dominates the remaining gap.** `theo/infrastructure/api/app` covers 73.8% of its 23,426 executable lines yet still leaves 6,135 lines uncovered, accounting for almost two thirds of all missed lines.
 2. **Regression suites are missing from the run.** Every file under `theo/infrastructure/api/tests` reported 0% coverage (2,371 missing lines), indicating the coverage artifact was captured without executing the API regression suite.
-3. **Evidence tooling is untested.** The CLI, dossier/indexer pipeline, and utilities under `theo/evidence/` show 0% coverage across 734 executable lines, making them prime candidates for backfill.
+3. **Historical evidence tooling has been retired.** The previous CLI and dossier/indexer helpers under `theo/evidence/` were removed in favour of a lightweight script, so legacy coverage gaps should be ignored in future snapshots.
 4. **Core persistence models are healthy.** Critical data mappers such as `theo/adapters/persistence/models.py` retain ≥98% coverage over sizable modules, demonstrating that focused unit suites deliver consistent protection.
 
 ## Coverage distribution
@@ -17,12 +17,6 @@
 
 | Group | Coverage | Missing | Total | Files |
 | --- | ---: | ---: | ---: | ---: |
-| `theo/evidence/cli.py` | 0.0% | 171 | 171 | 1 |
-| `theo/evidence/dossier.py` | 0.0% | 118 | 118 | 1 |
-| `theo/evidence/indexer.py` | 0.0% | 63 | 63 | 1 |
-| `theo/evidence/models.py` | 0.0% | 80 | 80 | 1 |
-| `theo/evidence/utils.py` | 0.0% | 231 | 231 | 1 |
-| `theo/evidence/validator.py` | 0.0% | 51 | 51 | 1 |
 | `theo/infrastructure/api/tests` | 0.0% | 2,371 | 2,371 | 30 |
 | `theo/adapters/persistence/document_repository.py` | 22.6% | 113 | 146 | 1 |
 | `theo/adapters/persistence/embedding_repository.py` | 27.9% | 44 | 61 | 1 |
@@ -35,13 +29,8 @@
 | `theo/infrastructure/api/app` | 73.8% | 6,135 | 23,426 | 236 |
 | `theo/infrastructure/api/tests` | 0.0% | 2,371 | 2,371 | 30 |
 | `theo/application/services/cli` | 72.9% | 272 | 1,004 | 6 |
-| `theo/evidence/utils.py` | 0.0% | 231 | 231 | 1 |
-| `theo/evidence/cli.py` | 0.0% | 171 | 171 | 1 |
 | `theo/commands/embedding_rebuild.py` | 45.9% | 160 | 296 | 1 |
-| `theo/evidence/dossier.py` | 0.0% | 118 | 118 | 1 |
 | `theo/adapters/persistence/document_repository.py` | 22.6% | 113 | 146 | 1 |
-| `theo/evidence/models.py` | 0.0% | 80 | 80 | 1 |
-| `theo/evidence/indexer.py` | 0.0% | 63 | 63 | 1 |
 
 ### Well-covered groups with meaningful size (≥200 executable lines)
 
@@ -57,6 +46,6 @@
 ## Suggested follow-up actions
 
 - **Re-run coverage with the full API regression suite** to validate whether the 0% readings under `theo/infrastructure/api/tests` stem from omission or misconfiguration.
-- **Backfill unit tests for the evidence toolchain** (`theo/evidence/…`) so ingestion and curation helpers have at least smoke-level coverage.
+- **Re-baseline coverage metrics** after the evidence tooling removal to ensure retired modules no longer appear in automated reports.
 - **Target the CLI command gaps** (`theo/commands/embedding_rebuild.py`, `theo/application/services/cli`) with scenario-driven tests; these modules leave 432 lines uncovered combined.
 - **Track incremental improvements** by refreshing this snapshot after each substantial test addition, keeping the 3,723-line delta to the 80% baseline visible in review discussions.

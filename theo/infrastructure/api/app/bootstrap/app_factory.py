@@ -15,7 +15,6 @@ from theo.application.facades.runtime import (
 from theo.application.facades.settings import Settings, get_settings, get_settings_secret
 from theo.application.facades.telemetry import set_telemetry_provider
 
-from .. import events as _app_events  # noqa: F401  (ensure handlers register)
 from ..infra import router_registry as _router_registry  # noqa: F401
 from ..error_handlers import install_error_handlers
 from ..adapters.resilience import resilience_policy_factory
@@ -35,7 +34,6 @@ from .routes import (
     ROUTER_REGISTRATIONS,
     get_router_registrations,
     include_router_registrations,
-    mount_mcp,
     register_health_routes,
     register_metrics_endpoint,
 )
@@ -111,6 +109,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     logger.info("Registered API version 1.0 as default")
 
     register_metrics_endpoint(app)
-    mount_mcp(app, enabled=resolved_settings.mcp_tools_enabled)
 
     return app

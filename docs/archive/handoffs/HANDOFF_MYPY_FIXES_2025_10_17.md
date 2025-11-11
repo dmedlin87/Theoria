@@ -31,7 +31,6 @@ Complete overhaul of type stub files to match actual model implementations:
 - ✅ `TranscriptQuote`, `TranscriptQuoteVerse` - Quote models
 - ✅ `FeedbackEventAction` - Enum for feedback actions
 - ✅ `ContradictionSeed`, `HarmonySeed`, `CommentaryExcerptSeed` - Seed models
-- ✅ `CaseObjectType`, `CaseSource`, `CaseObject` - Case builder models
 
 #### `typings/theo/services/api/app/models/search.pyi`
 **Enhanced `HybridSearchRequest`:**
@@ -71,7 +70,6 @@ Complete overhaul of type stub files to match actual model implementations:
 - ✅ `theo/services/api/app/ingest/parsers.py` - HTMLParser overrides (3 methods)
 - ✅ `theo/services/api/app/ingest/network.py` - redirect_request override
 - ✅ `theo/services/api/app/ingest/pipeline.py` - _UrlDocumentPersister.persist
-- ✅ `theo/services/api/app/case_builder/ingest.py` - meta dict access
 
 ---
 
@@ -96,11 +94,6 @@ Complete overhaul of type stub files to match actual model implementations:
 
 **Helper Functions (`theo/services/api/app/ingest/stages/persisters.py`):**
 - `_set_chunk_metrics(context: Any, parser_result: Any) -> None`
-
-**Case Builder (`theo/services/api/app/case_builder/ingest.py`):**
-- `_passage_meta(passage: Passage) -> dict[str, Any] | None`
-- `_source_meta(document: Document) -> dict[str, Any] | None`
-- Added `from typing import Any`
 
 ---
 
@@ -225,7 +218,6 @@ Found 1678 errors in 69 files (checked 39 source files)
 10. `theo/services/api/app/ingest/network.py`
 11. `theo/services/api/app/ingest/pipeline.py`
 12. `theo/services/api/app/ingest/osis.py`
-13. `theo/services/api/app/case_builder/ingest.py`
 14. `theo/services/api/app/routes/export.py`
 
 ---

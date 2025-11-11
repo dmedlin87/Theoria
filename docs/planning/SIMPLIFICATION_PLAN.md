@@ -41,11 +41,11 @@ mcp_server/
 - Remove MCP-related environment variables from `.env.example`
 - Clean up any import references in main application
 
-### 2. Evidence System (MEDIUM PRIORITY)
-
+### 2. Evidence System (COMPLETED)
 **Path:** `theo/evidence/`
 **Complexity:** 10 specialized modules, complex citation/validation workflows
 **Rationale:** Specialized system that may be over-engineered for current research needs.
+**Outcome:** Package removed in favour of `scripts/evidence_tool.py`, a lightweight helper for JSON/JSONL datasets.
 
 **Files to Remove:**
 
@@ -87,21 +87,9 @@ theo/checkpoints.py
 - Replace with simpler state persistence (JSON files, database records)
 - Remove version migration complexity
 
-### 4. Platform Event System (LOW PRIORITY)
-
-**Path:** `theo/platform/`
-**Complexity:** Event-driven architecture abstraction
-**Rationale:** May be over-engineering; evaluate if simpler patterns suffice.
-
-**Files to Evaluate:**
-
-```
-theo/platform/
-├── __init__.py
-├── application.py (11K+ lines)
-├── bootstrap.py
-└── events/ (directory)
-```
+### 4. Platform Event System (COMPLETE)
+**Path:** previously `theo/platform/`
+**Outcome:** Replaced with `theo.application.services.bootstrap` and synchronous ingestion hooks, eliminating the custom event bus layer.
 
 ## Implementation Plan
 
@@ -119,18 +107,16 @@ theo/platform/
 ### Phase 2: Evidence System Evaluation & Removal (Week 1-2)
 
 **PR 2: Audit Evidence System Usage**
+- [x] Search codebase for evidence system imports
+- [x] Document current usage patterns
+- [x] Identify API endpoints using evidence features
+- [x] Plan migration path for essential functionality
 
-- [ ] Search codebase for evidence system imports
-- [ ] Document current usage patterns
-- [ ] Identify API endpoints using evidence features
-- [ ] Plan migration path for essential functionality
-
-**PR 3: Remove Evidence System** (if audit shows limited usage)
-
-- [ ] Delete `theo/evidence/` directory
-- [ ] Remove evidence-related routes/endpoints
-- [ ] Update documentation
-- [ ] Migrate essential citation functionality to simpler approach
+**PR 3: Remove Evidence System**
+- [x] Delete `theo/evidence/` directory
+- [x] Remove evidence-related routes/endpoints
+- [x] Update documentation
+- [x] Migrate essential citation functionality to simpler approach
 
 ### Phase 3: Checkpoint System Simplification (Week 2)
 
@@ -142,13 +128,13 @@ theo/platform/
 - [ ] Delete `theo/checkpoints.py`
 - [ ] Update embedding rebuild processes
 
-### Phase 4: Platform Events Evaluation (Future)
-
-**Future Consideration:**
-
-- Evaluate `theo/platform/` directory usage
-- Determine if event system provides value
-- Consider removal if simple function calls suffice
+### Phase 4: Platform Events Evaluation (Complete)
+**Outcome:**
+- `theo/platform/` removed with bootstrap logic consolidated under `theo/application/services/bootstrap.py`.
+- Ingestion notifications now call synchronous helpers instead of publishing to an event bus.
+- Future enhancements should document additional telemetry consumers if new hooks are introduced.
+- Architecture guardrails ensure the legacy namespace stays deleted and cannot
+  be re-imported accidentally.【F:tests/architecture/test_module_boundaries.py†L182-L218】
 
 ## Risk Mitigation
 

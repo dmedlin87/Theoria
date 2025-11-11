@@ -26,10 +26,7 @@ from .bootstrap.middleware import (
     register_trace_handlers as _register_trace_handlers_impl,
 )
 from .bootstrap.middleware import _attach_trace_headers as _attach_trace_headers_impl
-from .bootstrap.routes import (
-    mount_mcp as _mount_mcp_impl,
-    register_health_routes as _register_health_routes_impl,
-)
+from .bootstrap.routes import register_health_routes as _register_health_routes_impl
 from .bootstrap.routes import CONTENT_TYPE_LATEST as _DEFAULT_CONTENT_TYPE
 from .bootstrap.routes import generate_latest as _default_generate_latest
 from .bootstrap.runtime_checks import (
@@ -100,15 +97,6 @@ def _register_metrics_endpoint(app: FastAPI) -> None:
     def metrics_endpoint() -> PlainTextResponse:
         payload = metrics_generator()
         return PlainTextResponse(payload, media_type=content_type)
-
-
-def _mount_mcp(app: FastAPI, settings: Any) -> None:
-    """Mount the MCP server application when enabled in settings."""
-
-    enabled = bool(getattr(settings, "mcp_tools_enabled", False))
-    _mount_mcp_impl(app, enabled=enabled)
-
-
 def _enforce_authentication_requirements() -> None:
     """Validate authentication prerequisites using shared runtime checks."""
 

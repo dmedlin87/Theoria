@@ -36,7 +36,7 @@ def map_files_to_tests(changed_files: Sequence[str]) -> List[str]:
         if path.suffix != ".py":
             continue
 
-        if path.parts and path.parts[0] in {"theo", "mcp_server"}:
+        if path.parts and path.parts[0] == "theo":
             stem = path.stem
             patterns = [
                 f"tests/**/*test*{stem}*.py",

@@ -92,7 +92,7 @@ cryptography==46.0.3
     # via theoria (pyproject.toml)
 cyclonedx-bom==7.2.0
     # via theoria (pyproject.toml)
-cyclonedx-python-lib==11.4.0
+cyclonedx-python-lib==11.5.0
     # via cyclonedx-bom
 dataclasses-json==0.6.7
     # via langchain-community
@@ -119,7 +119,7 @@ evaluate==0.4.6
     # via theoria (pyproject.toml)
 execnet==2.1.1
     # via pytest-xdist
-fastapi==0.120.0
+fastapi==0.121.1
     # via
     #   theoria (pyproject.toml)
     #   strawberry-graphql
@@ -149,7 +149,7 @@ graphql-core==3.2.6
     # via strawberry-graphql
 greenlet==3.2.4
     # via sqlalchemy
-grimp==3.12
+grimp==3.13
     # via import-linter
 h11==0.16.0
     # via
@@ -179,7 +179,7 @@ huggingface-hub==0.36.0
     #   sentence-transformers
     #   tokenizers
     #   transformers
-hypothesis==6.142.4
+hypothesis==6.144.0
     # via theoria (pyproject.toml)
 idna==3.11
     # via
@@ -224,7 +224,7 @@ jsonschema-specifications==2025.9.1
     # via jsonschema
 kombu==5.5.4
     # via celery
-langchain==1.0.3
+langchain==1.0.5
     # via ragas
 langchain-classic==1.0.0
     # via langchain-community
@@ -260,7 +260,7 @@ langsmith==0.4.38
     #   langchain-classic
     #   langchain-community
     #   langchain-core
-lark==1.3.0
+lark==1.3.1
     # via rfc3987-syntax
 license-expression==30.4.4
     # via cyclonedx-python-lib
@@ -300,8 +300,6 @@ mypy-extensions==1.1.0
     #   typing-inspect
 narwhals==2.9.0
     # via plotly
-neo4j==5.28.2
-    # via theoria (pyproject.toml)
 nest-asyncio==1.6.0
     # via ragas
 networkx==3.5
@@ -391,7 +389,7 @@ pip==25.3
     # via pip-tools
 pip-requirements-parser==32.0.1
     # via cyclonedx-bom
-pip-tools==7.4.1
+pip-tools==7.5.1
     # via theoria (pyproject.toml)
 plotly==6.3.1
     # via bertopic
@@ -453,7 +451,7 @@ pyproject-hooks==1.2.0
     #   pip-tools
 pysbd==0.3.4
     # via ragas
-pytest==8.4.2
+pytest==9.0.0
     # via
     #   theoria (pyproject.toml)
     #   pytest-cov
@@ -493,7 +491,6 @@ pythonbible==0.13.1
     # via theoria (pyproject.toml)
 pytz==2025.2
     # via
-    #   neo4j
     #   pandas
 pywin32==311
     # via docker
@@ -562,7 +559,7 @@ scikit-learn==1.7.2
     #   pynndescent
     #   sentence-transformers
     #   umap-learn
-scipy==1.16.2
+scipy==1.16.3
     # via
     #   theoria (pyproject.toml)
     #   hdbscan
@@ -602,9 +599,9 @@ sqlalchemy==2.0.44
     #   theoria (pyproject.toml)
     #   langchain-classic
     #   langchain-community
-starlette==0.48.0
+starlette==0.49.1
     # via fastapi
-strawberry-graphql==0.220.0
+strawberry-graphql==0.285.0
     # via theoria (pyproject.toml)
 sympy==1.14.0
     # via torch

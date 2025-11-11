@@ -9,7 +9,7 @@ The existing codebase couples FastAPI controllers, Celery workers, and persisten
 
 ## Decision
 
-- Introduce new packages: `theo.domain`, `theo.application`, `theo.adapters`, `theo.platform`.
+- Introduce new packages: `theo.domain`, `theo.application`, `theo.adapters` (with bootstrap helpers in `theo.application.services`).
 - Define ports and facades in the application layer; domain exports value objects only.
 - Framework-specific code lives in adapters that depend on ports, never on the reverse.
 - Enforce layering via automated architecture tests.
