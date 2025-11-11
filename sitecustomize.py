@@ -15,6 +15,17 @@ import types
 from typing import Any
 from pathlib import Path
 
+_REPO_ROOT = Path(__file__).resolve().parent
+
+_existing_celery = sys.modules.get("celery")
+if _existing_celery is not None and not hasattr(_existing_celery, "__path__"):
+    try:
+        _existing_celery.__path__ = [  # type: ignore[attr-defined]
+            str(_REPO_ROOT / "celery")
+        ]
+    except Exception:
+        pass
+
 _WORKERS_TASKS_MODULE = "theo.infrastructure.api.app.workers.tasks"
 _FASTAPI_MODULE = "fastapi"
 _FASTAPI_STATUS_MODULE = "fastapi.status"
@@ -113,7 +124,7 @@ def _register_workers_import_fallback() -> None:
                     requested.add(f"{absolute}.{entry}")
 
             if _CELERY_PLUGIN_MODULE in requested:
-                repo_root = Path(__file__).resolve().parent
+                repo_root = _REPO_ROOT
                 if str(repo_root) not in sys.path:
                     sys.path.insert(0, str(repo_root))
                 mod = sys.modules.get("celery")
@@ -132,7 +143,18 @@ def _register_workers_import_fallback() -> None:
                                     celery_pkg = importlib.import_module("celery")
                                 except Exception:
                                     celery_pkg = types.ModuleType("celery")
+                                    # Ensure the stub behaves like a package so submodules
+                                    # such as ``celery.contrib`` import without raising the
+                                    # ``'celery' is not a package`` error observed on Windows
+                                    # test environments.
+                                    celery_pkg.__path__ = [  # type: ignore[attr-defined]
+                                        str(repo_root / "celery")
+                                    ]
                                     sys.modules["celery"] = celery_pkg
+                            elif not hasattr(celery_pkg, "__path__"):
+                                celery_pkg.__path__ = [  # type: ignore[attr-defined]
+                                    str(repo_root / "celery")
+                                ]
                             contrib_name = "celery.contrib"
                             contrib_mod = sys.modules.get(contrib_name)
                             if contrib_mod is None:

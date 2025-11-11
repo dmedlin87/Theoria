@@ -23,6 +23,53 @@ if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
 
 import pytest
 
+
+def _ensure_celery_pytest_plugin() -> None:
+    """Load the bundled Celery pytest plugin when the real dependency is absent."""
+
+    repo_root = Path(__file__).resolve().parents[1]
+    celery_module = sys.modules.get("celery")
+    if celery_module is not None and not hasattr(celery_module, "__path__"):
+        celery_module.__path__ = [str(repo_root / "celery")]  # type: ignore[attr-defined]
+
+    try:
+        importlib.import_module("celery.contrib.pytest")
+        return
+    except ModuleNotFoundError as exc:
+        missing = getattr(exc, "name", "celery.contrib.pytest")
+        if missing not in {"celery", "celery.contrib", "celery.contrib.pytest"}:
+            raise
+
+    plugin_path = repo_root / "celery" / "contrib" / "pytest.py"
+    if not plugin_path.exists():
+        return
+
+    celery_pkg = sys.modules.get("celery")
+    if celery_pkg is None:
+        celery_pkg = types.ModuleType("celery")
+        celery_pkg.__path__ = [str(repo_root / "celery")]  # type: ignore[attr-defined]
+        sys.modules["celery"] = celery_pkg
+    elif not hasattr(celery_pkg, "__path__"):
+        celery_pkg.__path__ = [str(repo_root / "celery")]  # type: ignore[attr-defined]
+
+    contrib_name = "celery.contrib"
+    contrib_mod = sys.modules.get(contrib_name)
+    if contrib_mod is None:
+        contrib_mod = types.ModuleType(contrib_name)
+        contrib_mod.__path__ = [str(repo_root / "celery" / "contrib")]  # type: ignore[attr-defined]
+        setattr(celery_pkg, "contrib", contrib_mod)  # type: ignore[attr-defined]
+        sys.modules[contrib_name] = contrib_mod
+
+    spec = importlib.util.spec_from_file_location("celery.contrib.pytest", str(plugin_path))
+    if spec and spec.loader:
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["celery.contrib.pytest"] = module
+        setattr(contrib_mod, "pytest", module)  # type: ignore[attr-defined]
+        spec.loader.exec_module(module)
+
+
+_ensure_celery_pytest_plugin()
+
 try:  # pragma: no cover - optional dependency
     import pydantic  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - lightweight CI environments
