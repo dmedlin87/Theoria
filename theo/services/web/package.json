@@ -44,7 +44,7 @@
     "@axe-core/playwright": "4.11.0",
     "@eslint/js": "^9.39.0",
     "@lhci/cli": "0.15.1",
-    "@next/bundle-analyzer": "15.5.4",
+    "@next/bundle-analyzer": "16.0.1",
     "@percy/cli": "^1.31.4",
     "@percy/playwright": "^1.0.9",
     "@playwright/test": "1.56.1",
