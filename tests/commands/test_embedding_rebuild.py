@@ -385,7 +385,7 @@ def test_rebuild_embeddings_writes_metrics_file(
     monkeypatch.setattr(
         embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
     )
-    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", lambda: _StubEmbeddingService())
+    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", _StubEmbeddingService)
     monkeypatch.setattr(
         embedding_rebuild.EmbeddingRebuildConfig,
         "for_mode",
