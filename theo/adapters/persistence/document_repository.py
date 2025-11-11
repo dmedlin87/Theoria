@@ -31,7 +31,7 @@ class SQLAlchemyDocumentRepository(BaseRepository[Document], DocumentRepository)
         *,
         embedding_service: PassageEmbeddingService | None = None,
     ) -> None:
-        self.session = session
+        super().__init__(session)
         if embedding_service is None:
             settings = get_settings()
             store = SQLAlchemyPassageEmbeddingStore(session)
