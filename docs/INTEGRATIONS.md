@@ -7,7 +7,7 @@ Theo Engine exposes first-class REST and CLI interfaces for automation. This gui
 * **Base URL:** `http://localhost:8000` in local development. Production deployments typically expose `/v1` versioned routes via the FastAPI service in `theo/infrastructure/api`.
 * **OpenAPI docs:** <http://localhost:8000/docs> lists every route with schema definitions. The Prometheus metrics endpoint remains available at `/metrics`.
 * **Reference documentation:** [`docs/API.md`](API.md) covers resource models, authentication requirements, and error handling semantics for REST clients.
-* **Authentication:** Configure API keys or JWT credentials via the `THEO_API_KEYS`/`THEO_AUTH_*` environment variables before issuing requests. See [`docs/authentication.md`](authentication.md) for guidance.
+* **Authentication:** Configure API keys or JWT credentials via the `THEO_API_KEYS`/`THEO_AUTH_*` environment variables before issuing requests. See [`SECURITY.md`](../SECURITY.md) for guidance.
 
 ## CLI Automations
 

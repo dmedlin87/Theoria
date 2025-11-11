@@ -60,7 +60,7 @@ theo/services/web/app/api/discoveries/
 ### Backend (FastAPI) - To Be Implemented
 
 ```python
-theo/services/api/app/routers/discoveries.py
+theo/infrastructure/api/app/routers/discoveries.py
 theo/domain/discoveries/
 ├── engine.py           # Discovery analysis engine
 ├── detectors/
@@ -240,10 +240,10 @@ CREATE INDEX idx_discoveries_viewed ON discoveries(user_id, viewed);
 
 #### 2.2 FastAPI Endpoints
 
-All routes defined in `theo/services/api/app/routes/discoveries.py` are live for pattern and contradiction discoveries. As additional detectors ship, extend the service layer to emit their results via these endpoints.
+All routes defined in `theo/infrastructure/api/app/routes/discoveries.py` are live for pattern and contradiction discoveries. As additional detectors ship, extend the service layer to emit their results via these endpoints.
 
 ```python
-# theo/services/api/app/routers/discoveries.py
+# theo/infrastructure/api/app/routers/discoveries.py
 
 @router.get("/discoveries")
 async def list_discoveries(
@@ -288,7 +288,7 @@ async def dismiss_discovery(
 #### 2.3 Background Analysis Job
 
 ```python
-# theo/services/api/app/background/discovery_analyzer.py
+# theo/infrastructure/api/app/background/discovery_analyzer.py
 
 async def analyze_corpus_for_discoveries(user_id: str):
     """

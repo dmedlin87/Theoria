@@ -85,12 +85,12 @@ npm run test:e2e
    - Impact: Unblocks frontend coverage reporting
 
 2. **Add Core Infrastructure Tests** (1-2 days)
-   - Package: `theo/services/api/app/core/` (0% → 80%)
+   - Package: `theo/infrastructure/api/app/core/` (0% → 80%)
    - Files: database.py, settings.py, runtime.py, secret_migration.py, settings_store.py, version.py
    - Create: `tests/api/core/test_core_infrastructure.py`
 
 3. **Add MCP Tests** (4-8 hours)
-   - Package: `theo/services/api/app/mcp/` (0% → 80%)
+   - Package: `theo/infrastructure/api/app/mcp/` (0% → 80%)
    - File: tools.py
    - Create: `tests/mcp_tools/test_api_mcp_integration.py`
 

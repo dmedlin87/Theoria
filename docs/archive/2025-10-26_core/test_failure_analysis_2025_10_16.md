@@ -34,7 +34,7 @@ This document summarizes the test failures and errors from the test run on Octob
 
 -   **Files Affected**:
     -   `tests/mcp_tools/test_api_mcp_integration.py`
-    -   `theo/services/api/app/mcp/tools.py`
+    -   `theo/infrastructure/api/app/mcp/tools.py`
 -   **Cause**:
     -   `TypeError`: The function `handle_note_write` no longer accepts the `resolve_document_osis` keyword argument, but tests are still passing it.
     -   `RecursionError`: The monkeypatch for `_resolve_document_osis` in `TestResolveDocumentOsis` is incorrectly implemented, causing the function to call itself endlessly.

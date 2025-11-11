@@ -91,7 +91,7 @@ read_metrics = read_policy.get_security_metrics()
 - `evidence_card_create` - OSIS, claim_summary, tags validation
 - `index_refresh` - Header validation
 
-### 4. Enhanced RAG Guardrails (`theo/services/api/app/ai/rag/guardrails.py`)
+### 4. Enhanced RAG Guardrails (`theo/infrastructure/api/app/ai/rag/guardrails.py`)
 
 **Expanded Safety Patterns (23 total, up from 7):**
 
@@ -241,7 +241,7 @@ pytest tests/mcp_tools/test_security_confinement.py --cov=mcp_server --cov-repor
    - `mcp_server/security.py` - Added ReadSecurityPolicy, security metrics, event logging
    - `mcp_server/tools/read.py` - Added validation and rate limiting to all read tools
    - `mcp_server/tools/write.py` - Enhanced validation in all write tools
-   - `theo/services/api/app/ai/rag/guardrails.py` - Expanded safety patterns from 7 to 23
+   - `theo/infrastructure/api/app/ai/rag/guardrails.py` - Expanded safety patterns from 7 to 23
 
 ## Impact Analysis
 

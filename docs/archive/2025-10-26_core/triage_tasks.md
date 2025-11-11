@@ -6,13 +6,13 @@
 - **Issue**: `_resolve_reranker` in the search route caches a failed load by setting `_RERANKER_FAILED = True`. Subsequent calls short-circuit whenever the model path/digest stay the same, so the reranker never retries even if the artifact becomes available later (for example after a delayed download or redeploy).
 - **Why it matters**: A temporary filesystem or checksum issue can permanently disable reranking until the API process restarts, degrading search quality.
 - **Proposed task**: Adjust the reranker cache to retry after failures—e.g., clear `_RERANKER_FAILED` once the underlying file changes or introduce a time-based backoff instead of a permanent latch.
-- **Context**: [`theo/services/api/app/routes/search.py`](../theo/services/api/app/routes/search.py) lines 46-76. 【F:theo/services/api/app/routes/search.py†L46-L136】
+- **Context**: [`theo/infrastructure/api/app/routes/search.py`](../theo/infrastructure/api/app/routes/search.py) lines 46-76. 【F:theo/infrastructure/api/app/routes/search.py†L46-L136】
 
 ## Update feature discovery documentation
 - **Issue**: The API guide shows `/features` returning only four keys, but the implementation exposes additional toggles (cross references, textual variants, morphology, verse timeline, etc.), so the example response is outdated.
 - **Why it matters**: Accurate examples help client developers understand which flags they can rely on without inspecting the source.
 - **Proposed task**: Refresh the example JSON in `docs/API.md` to reflect the full response (or note that additional keys may be present), and mention the newer flags.
-- **Context**: [`docs/API.md`](API.md) lines 658-665 vs. [`theo/services/api/app/routes/features.py`](../theo/services/api/app/routes/features.py) lines 9-33. 【F:docs/API.md†L647-L665】【F:theo/services/api/app/routes/features.py†L9-L33】
+- **Context**: [`docs/API.md`](API.md) lines 658-665 vs. [`theo/infrastructure/api/app/routes/features.py`](../theo/infrastructure/api/app/routes/features.py) lines 9-33. 【F:docs/API.md†L647-L665】【F:theo/infrastructure/api/app/routes/features.py†L9-L33】
 
 ## Strengthen feature flag tests
 - **Issue**: `test_features.py` only asserts that certain keys exist in the payloads. It does not validate that environment-driven flags (e.g., `contradictions_enabled`, `geo_enabled`) toggle the responses, leaving regressions undetected.

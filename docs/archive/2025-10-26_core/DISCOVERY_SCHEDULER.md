@@ -35,7 +35,7 @@ The Discovery Scheduler automatically generates discoveries for users in the bac
 
 ## Components
 
-### 1. Discovery Scheduler (`theo/services/api/app/workers/discovery_scheduler.py`)
+### 1. Discovery Scheduler (`theo/infrastructure/api/app/workers/discovery_scheduler.py`)
 
 **Purpose:** Manages periodic background discovery generation
 
@@ -55,7 +55,7 @@ scheduler.add_job(
 )
 ```
 
-### 2. Background Tasks (`theo/services/api/app/discoveries/tasks.py`)
+### 2. Background Tasks (`theo/infrastructure/api/app/discoveries/tasks.py`)
 
 **Purpose:** Execute discovery refresh in background after document uploads
 
@@ -68,7 +68,7 @@ scheduler.add_job(
 - Runs asynchronously without blocking response
 - Uses FastAPI BackgroundTasks
 
-### 3. Discovery Service (`theo/services/api/app/discoveries/service.py`)
+### 3. Discovery Service (`theo/infrastructure/api/app/discoveries/service.py`)
 
 **Purpose:** Core business logic for discovery generation
 

@@ -44,7 +44,7 @@ Theoria unifies your theological research library—papers, notes, transcripts, 
 | Experience | Modern Next.js UI, command palette (⌘K/CTRL+K), dark mode, WCAG 2.1 AA accessibility |
 | Integrations | REST API + CLI automation hooks for automation and orchestration |
 
-Additional feature deep-dives live in [`docs/archive/`](docs/archive/). The public roadmap and current areas of focus are tracked in [`NEXT_STEPS.md`](NEXT_STEPS.md).
+Additional feature deep-dives live in [`docs/archive/`](docs/archive/). Current initiatives and planning notes are captured in [`docs/INDEX.md`](docs/INDEX.md) and [`docs/planning/SIMPLIFICATION_PLAN.md`](docs/planning/SIMPLIFICATION_PLAN.md).
 
 ---
 
@@ -57,7 +57,7 @@ Additional feature deep-dives live in [`docs/archive/`](docs/archive/). The publ
 | CPU | 4 cores | 8+ cores | Parallel ingestion and evaluation suites scale with available cores. |
 | OS | macOS, Linux, Windows (WSL2) |  | Verified on macOS Sonoma, Ubuntu 22.04, and Windows 11 with WSL2. |
 
-GPU acceleration is optional. When available, configure the ML extras (see [`docs/ML_SETUP.md`](docs/ML_SETUP.md)) for accelerated embedding generation.
+GPU acceleration is optional. When available, configure the ML extras (see [`docs/INDEX.md`](docs/INDEX.md) for the latest ML guidance) for accelerated embedding generation.
 
 ---
 
@@ -112,7 +112,7 @@ The production constraint set also pins a CPU-only PyTorch wheel by embedding th
    export THEO_ALLOW_INSECURE_STARTUP=1
    export THEO_AUTH_ALLOW_ANONYMOUS=1
    ```
-   Additional authentication strategies (OIDC, session-based, API tokens) are documented in [`docs/authentication.md`](docs/authentication.md).
+   Additional authentication strategies (OIDC, session-based, API tokens) are documented in [`SECURITY.md`](SECURITY.md) and highlighted through [`docs/INDEX.md`](docs/INDEX.md).
 
    > **Production / staging:** Always configure API keys or JWT credentials. The
    > API exits during startup if anonymous access remains enabled when the
@@ -176,7 +176,7 @@ The production constraint set also pins a CPU-only PyTorch wheel by embedding th
 - **Automation Scripts**: `scripts/` (dev orchestration, reseeding, evaluation).
 - **Quality Gates**: `tests/` (unit, integration, ranking, UI smoke suites).
 
-For detailed architecture patterns, see the [System Blueprint](docs/BLUEPRINT.md) covering service boundaries, data flow, and scaling considerations. The [Architecture Overview](README_ARCHITECTURE_UPDATES.md) file captures ongoing platform investments at a glance, and additional ADRs live under [`docs/adr/`](docs/adr/).
+For detailed architecture patterns, see [`docs/architecture.md`](docs/architecture.md) for service boundaries, data flow, and scaling considerations. The [Architecture Overview](README_ARCHITECTURE_UPDATES.md) file captures ongoing platform investments at a glance, and additional ADRs live under [`docs/adr/`](docs/adr/).
 
 ---
 
@@ -221,7 +221,7 @@ Stop with `docker compose down`.
 
 ### Deployment options
 
-For staging and production scenarios—including container images, Fly.io, and bare-metal strategies—consult [`DEPLOYMENT.md`](DEPLOYMENT.md) and the infrastructure manifests under [`infra/`](infra/). Observability, scaling, and backup recommendations live in [`docs/operations/OPERATIONS_GUIDE.md`](docs/operations/OPERATIONS_GUIDE.md).
+For staging and production scenarios-including container images, Fly.io, and bare-metal strategies-consult [`DEPLOYMENT.md`](DEPLOYMENT.md) and the infrastructure manifests under [`infra/`](infra/). Observability, scaling, and backup recommendations live in [`docs/Repo-Health.md`](docs/Repo-Health.md).
 
 ---
 
@@ -230,7 +230,7 @@ For staging and production scenarios—including container images, Fly.io, and b
 - **PostgreSQL connection errors**: Ensure port 5432 is available or override `DATABASE_URL` to target your preferred instance.
 - **Node.js version conflicts**: Verify `node --version` returns 20.x or higher; use `nvm use` from `theo/services/web/.nvmrc` if installed.
 - **Missing Task runner**: Either install go-task (see above) or run the equivalent shell commands provided alongside each task.
-- **ML model downloads failing**: Confirm internet access and disk space, then rerun `pip install .[ml] -c constraints/prod.txt` or use the offline cache instructions in [`docs/ML_SETUP.md`](docs/ML_SETUP.md).
+- **ML model downloads failing**: Confirm internet access and disk space, then rerun `pip install .[ml] -c constraints/prod.txt` or follow the offline cache instructions referenced in [`docs/INDEX.md`](docs/INDEX.md).
 
 ---
 
@@ -238,10 +238,10 @@ For staging and production scenarios—including container images, Fly.io, and b
 
 | Category | Start Here |
 | --- | --- |
-| Architecture | [`docs/architecture.md`](docs/architecture.md), [`docs/architecture_review.md`](docs/architecture_review.md) |
+| Architecture | [`docs/architecture.md`](docs/architecture.md) |
 | API & Agents | [`docs/API.md`](docs/API.md), [`docs/theoria_instruction_prompt.md`](docs/theoria_instruction_prompt.md), [`docs/AGENT_CONFINEMENT.md`](docs/AGENT_CONFINEMENT.md) |
 | User Research | [`docs/research/adjacent_user_needs.md`](docs/research/adjacent_user_needs.md) |
-| Operations | [`docs/codebase_stabilization_plan.md`](docs/codebase_stabilization_plan.md), [`docs/Repo-Health.md`](docs/Repo-Health.md) |
+| Operations | [`docs/Repo-Health.md`](docs/Repo-Health.md) |
 | Documentation Index | [`docs/document_inventory.md`](docs/document_inventory.md), [`docs/INDEX.md`](docs/INDEX.md) |
 | Testing & Quality | [`docs/testing.md`](docs/testing.md), [`docs/testing/TEST_MAP.md`](docs/testing/TEST_MAP.md) |
 | Legacy Archive | [`docs/archive/2025-10-26_core/`](docs/archive/2025-10-26_core/), [`docs/archive/`](docs/archive/) |

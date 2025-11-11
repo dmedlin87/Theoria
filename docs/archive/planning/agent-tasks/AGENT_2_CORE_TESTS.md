@@ -16,7 +16,7 @@ Priority: CRITICAL - Core system functionality
 ```
 
 ## Files You Own (Exclusive)
-All files in: `theo/services/api/app/core/`
+All files in: `theo/infrastructure/api/app/core/`
 ```
 - database.py (547 bytes)
 - runtime.py (437 bytes)
@@ -31,7 +31,7 @@ Your test directory: `tests/api/core/` (create this)
 ## Tasks
 
 ### 1. Study the Core Modules
-Read each file in `theo/services/api/app/core/` to understand:
+Read each file in `theo/infrastructure/api/app/core/` to understand:
 - Database connection management
 - Settings loading and validation
 - Runtime environment detection
@@ -173,10 +173,10 @@ python -m pytest tests/api/core/ --cov=theo.services.api.app.core --cov-fail-und
 
 ## No Conflicts With
 - Agent 1: Working on frontend tests
-- Agent 3: Working on MCP (`theo/services/api/app/mcp/`)
-- Agent 4: Working on ingest (`theo/services/api/app/ingest/`)
-- Agent 5: Working on retriever (`theo/services/api/app/retriever/`)
-- Agent 6: Working on AI/RAG (`theo/services/api/app/ai/`)
+- Agent 3: Working on MCP (`theo/infrastructure/api/app/mcp/`)
+- Agent 4: Working on ingest (`theo/infrastructure/api/app/ingest/`)
+- Agent 5: Working on retriever (`theo/infrastructure/api/app/retriever/`)
+- Agent 6: Working on AI/RAG (`theo/infrastructure/api/app/ai/`)
 
 ## Report Format
 ```markdown

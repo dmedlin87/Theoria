@@ -23,10 +23,10 @@ Read the file: docs/agent-tasks/AGENT_2_CORE_TESTS.md
 Your mission: Create comprehensive tests for core infrastructure (database, settings, runtime) currently at 0% coverage.
 
 Working directory: tests/api/core/ (you will create this)
-Target: 80%+ coverage for theo/services/api/app/core/
+Target: 80%+ coverage for theo/infrastructure/api/app/core/
 Time: 1-2 days
 
-You own: theo/services/api/app/core/ (7 files)
+You own: theo/infrastructure/api/app/core/ (7 files)
 No conflicts with other agents.
 ```
 
@@ -37,10 +37,10 @@ Read the file: docs/agent-tasks/AGENT_3_MCP_TESTS.md
 Your mission: Create comprehensive tests for MCP API integration currently at 0% coverage.
 
 Working directory: tests/mcp_tools/
-Target: 80%+ coverage for theo/services/api/app/mcp/
+Target: 80%+ coverage for theo/infrastructure/api/app/mcp/
 Time: 4-8 hours
 
-You own: theo/services/api/app/mcp/ (2 files)
+You own: theo/infrastructure/api/app/mcp/ (2 files)
 No conflicts with other agents.
 ```
 
@@ -51,10 +51,10 @@ Read the file: docs/agent-tasks/AGENT_4_INGEST_TESTS.md
 Your mission: Boost ingest pipeline coverage from 16.2% to 70%+ by adding edge case, error recovery, and integration tests.
 
 Working directory: tests/ingest/ (expand existing)
-Target: 70%+ coverage for theo/services/api/app/ingest/
+Target: 70%+ coverage for theo/infrastructure/api/app/ingest/
 Time: 3-5 days
 
-You own: theo/services/api/app/ingest/ (13 files)
+You own: theo/infrastructure/api/app/ingest/ (13 files)
 No conflicts with other agents.
 ```
 
@@ -65,10 +65,10 @@ Read the file: docs/agent-tasks/AGENT_5_RETRIEVER_TESTS.md
 Your mission: Boost retriever/search coverage from 12.8% to 70%+ with comprehensive search functionality tests.
 
 Working directory: tests/api/retriever/ (you will create this)
-Target: 70%+ coverage for theo/services/api/app/retriever/
+Target: 70%+ coverage for theo/infrastructure/api/app/retriever/
 Time: 2-3 days
 
-You own: theo/services/api/app/retriever/ (8 files)
+You own: theo/infrastructure/api/app/retriever/ (8 files)
 No conflicts with other agents.
 ```
 
@@ -79,10 +79,10 @@ Read the file: docs/agent-tasks/AGENT_6_AI_RAG_TESTS.md
 Your mission: Boost AI/RAG coverage from 23-25% to 70%+ with RAG pipeline, context retrieval, and answer generation tests.
 
 Working directory: tests/api/ai/ (expand existing)
-Target: 70%+ coverage for theo/services/api/app/ai/ and ai/rag/
+Target: 70%+ coverage for theo/infrastructure/api/app/ai/ and ai/rag/
 Time: 4-6 days
 
-You own: theo/services/api/app/ai/ (9 files) and ai/rag/ (10 files)
+You own: theo/infrastructure/api/app/ai/ (9 files) and ai/rag/ (10 files)
 No conflicts with other agents.
 ```
 

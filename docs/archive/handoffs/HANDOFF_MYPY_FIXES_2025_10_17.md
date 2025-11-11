@@ -13,7 +13,7 @@
 
 Complete overhaul of type stub files to match actual model implementations:
 
-#### `typings/theo/services/api/app/db/models.pyi`
+#### `typings/theo/infrastructure/api/app/db/models.pyi`
 **Added missing attributes to `Document` class:**
 - `authors: list[str] | None`
 - `doi`, `venue`, `year`, `theological_tradition`, `topic_domains`
@@ -32,7 +32,7 @@ Complete overhaul of type stub files to match actual model implementations:
 - ✅ `FeedbackEventAction` - Enum for feedback actions
 - ✅ `ContradictionSeed`, `HarmonySeed`, `CommentaryExcerptSeed` - Seed models
 
-#### `typings/theo/services/api/app/models/search.pyi`
+#### `typings/theo/infrastructure/api/app/models/search.pyi`
 **Enhanced `HybridSearchRequest`:**
 - Added `cursor: str | None`
 - Added `limit: int | None`
@@ -47,7 +47,7 @@ Complete overhaul of type stub files to match actual model implementations:
 **Enhanced `HybridSearchFilters`:**
 - Added `model_dump()` method
 
-#### `typings/theo/services/api/app/models/verses.pyi`
+#### `typings/theo/infrastructure/api/app/models/verses.pyi`
 **Added missing verse-related models:**
 - ✅ `VerseMention` - Mention model with passage and context
 - ✅ `VerseGraphNode` - Graph node representation
@@ -62,14 +62,14 @@ Complete overhaul of type stub files to match actual model implementations:
 ### 2. Removed Unused Type: Ignore Comments (12 instances)
 
 **Files cleaned:**
-- ✅ `theo/services/api/app/ingest/stages/base.py` - telemetry import
-- ✅ `theo/services/api/app/ingest/stages/enrichers.py` - context parameter (2 classes)
-- ✅ `theo/services/api/app/ingest/stages/persisters.py` - context parameter (2 classes)
-- ✅ `theo/services/api/app/ingest/stages/parsers.py` - context parameter (4 classes)
-- ✅ `theo/services/api/app/ingest/stages/fetchers.py` - context parameter (3 classes)
-- ✅ `theo/services/api/app/ingest/parsers.py` - HTMLParser overrides (3 methods)
-- ✅ `theo/services/api/app/ingest/network.py` - redirect_request override
-- ✅ `theo/services/api/app/ingest/pipeline.py` - _UrlDocumentPersister.persist
+- ✅ `theo/infrastructure/api/app/ingest/stages/base.py` - telemetry import
+- ✅ `theo/infrastructure/api/app/ingest/stages/enrichers.py` - context parameter (2 classes)
+- ✅ `theo/infrastructure/api/app/ingest/stages/persisters.py` - context parameter (2 classes)
+- ✅ `theo/infrastructure/api/app/ingest/stages/parsers.py` - context parameter (4 classes)
+- ✅ `theo/infrastructure/api/app/ingest/stages/fetchers.py` - context parameter (3 classes)
+- ✅ `theo/infrastructure/api/app/ingest/parsers.py` - HTMLParser overrides (3 methods)
+- ✅ `theo/infrastructure/api/app/ingest/network.py` - redirect_request override
+- ✅ `theo/infrastructure/api/app/ingest/pipeline.py` - _UrlDocumentPersister.persist
 
 ---
 
@@ -80,26 +80,26 @@ Complete overhaul of type stub files to match actual model implementations:
 - Changed from `def method(self, *, context, state: dict[str, Any])` 
 - To: `def method(self, *, context: Any, state: dict[str, Any]) -> dict[str, Any]`
 
-**Network Module (`theo/services/api/app/ingest/network.py`):**
+**Network Module (`theo/infrastructure/api/app/ingest/network.py`):**
 - `ensure_url_allowed(settings: Any, url: str) -> None`
 - `ensure_resolved_addresses_allowed(settings: Any, addresses: tuple[IPAddress, ...]) -> None`
 - `fetch_web_document(settings: Any, url: str, *, opener_factory: Any = build_opener) -> tuple[str, dict[str, str | None]]`
 - `resolve_fixtures_dir(settings: Any) -> Path | None`
 - `LoopDetectingRedirectHandler.redirect_request(req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> Any`
 
-**HTML Parser (`theo/services/api/app/ingest/parsers.py`):**
+**HTML Parser (`theo/infrastructure/api/app/ingest/parsers.py`):**
 - `handle_starttag(tag: str, attrs: list[tuple[str, str | None]]) -> None`
 - `handle_endtag(tag: str) -> None`
 - `handle_data(data: str) -> None`
 
-**Helper Functions (`theo/services/api/app/ingest/stages/persisters.py`):**
+**Helper Functions (`theo/infrastructure/api/app/ingest/stages/persisters.py`):**
 - `_set_chunk_metrics(context: Any, parser_result: Any) -> None`
 
 ---
 
 ### 4. Fixed Module Export Issues
 
-**`theo/services/api/app/ingest/osis.py`:**
+**`theo/infrastructure/api/app/ingest/osis.py`:**
 ```python
 __all__ = [
     "expand_osis_reference",
@@ -115,7 +115,7 @@ __all__ = [
 ```
 - Fixed: `Module "theo.services.api.app.ingest.osis" does not explicitly export attribute "expand_osis_reference"`
 
-**`theo/services/api/app/routes/export.py`:**
+**`theo/infrastructure/api/app/routes/export.py`:**
 ```python
 __all__ = ["router", "api_router", "ExportError"]
 ```
@@ -126,9 +126,9 @@ __all__ = ["router", "api_router", "ExportError"]
 ### 5. Quick Wins Completed (Latest Session)
 
 **Files Modified:**
-- ✅ `theo/services/api/app/ai/reasoning/chain_of_thought.py` - Added `Any` import, typed 5 `dict` parameters to `dict[str, Any]`
-- ✅ `theo/services/api/app/enrich/metadata.py` - Removed unreachable code (2 instances), added `Settings` type annotation to `__init__`
-- ✅ `theo/services/api/app/db/verse_graph.py` - Added type annotations to `_range_condition()` function
+- ✅ `theo/infrastructure/api/app/ai/reasoning/chain_of_thought.py` - Added `Any` import, typed 5 `dict` parameters to `dict[str, Any]`
+- ✅ `theo/infrastructure/api/app/enrich/metadata.py` - Removed unreachable code (2 instances), added `Settings` type annotation to `__init__`
+- ✅ `theo/infrastructure/api/app/db/verse_graph.py` - Added type annotations to `_range_condition()` function
 
 **Dependency Installed:**
 - ✅ `types-cachetools` - Fixes 1 import-untyped error
@@ -159,7 +159,7 @@ Found 1678 errors in 69 files (checked 39 source files)
 
 1. **`no-any-return`** (~50+ instances)
    - Functions declared to return specific types but returning `Any`
-   - Primarily in: `theo/services/api/app/ai/clients.py`
+   - Primarily in: `theo/infrastructure/api/app/ai/clients.py`
    - Examples: Functions returning `str` but extracting from untyped JSON
 
 2. **`type-arg`** (~10 instances) ⬇️ _5 fixed_
@@ -171,25 +171,25 @@ Found 1678 errors in 69 files (checked 39 source files)
 
 3. **`unreachable`** (~3 instances) ⬇️ _2 fixed_
    - Unreachable code statements
-   - Remaining: Check `theo/services/api/app/ai/clients.py`
+   - Remaining: Check `theo/infrastructure/api/app/ai/clients.py`
 
 4. **`attr-defined`** (~10 instances)
    - Pydantic model methods not recognized (e.g., `model_dump`, `model_rebuild`)
    - Document construction issues
-   - Files: `theo/services/api/app/models/documents.py`, `theo/services/api/app/analytics/telemetry.py`
+   - Files: `theo/infrastructure/api/app/models/documents.py`, `theo/infrastructure/api/app/analytics/telemetry.py`
 
 5. **`name-defined`** (~3 instances)
    - Undefined names: `RAGAnswer`
-   - File: `theo/services/api/app/ai/rag/cache.py`
+   - File: `theo/infrastructure/api/app/ai/rag/cache.py`
 
 6. **`call-arg`** (~5 instances)
    - Unexpected keyword arguments
    - Document/model constructor mismatches
-   - Files: `theo/services/api/app/analytics/topics.py`, `theo/services/api/app/routes/export.py`
+   - Files: `theo/infrastructure/api/app/analytics/topics.py`, `theo/infrastructure/api/app/routes/export.py`
 
 7. **`no-untyped-def`** (~1 instance) ⬇️ _2 fixed_
    - Functions missing type annotations
-   - Remaining: Check `theo/services/api/app/infra/ingestion_service.py:288`
+   - Remaining: Check `theo/infrastructure/api/app/infra/ingestion_service.py:288`
 
 8. **`import-untyped`** ✅ _RESOLVED_
    - ~~Missing stub for `cachetools` library~~
@@ -197,37 +197,37 @@ Found 1678 errors in 69 files (checked 39 source files)
 
 9. **`assignment`** (~2 instances)
    - Incompatible type assignments
-   - File: `theo/services/api/app/ai/clients.py`
+   - File: `theo/infrastructure/api/app/ai/clients.py`
 
 ---
 
 ## 🗂️ Files Modified
 
 ### Type Stub Files (Complete Rewrites)
-1. `typings/theo/services/api/app/db/models.pyi` - **143 lines** (was 26 lines)
-2. `typings/theo/services/api/app/models/search.pyi` - Added attributes and methods
-3. `typings/theo/services/api/app/models/verses.pyi` - **83 lines** (was 13 lines)
+1. `typings/theo/infrastructure/api/app/db/models.pyi` - **143 lines** (was 26 lines)
+2. `typings/theo/infrastructure/api/app/models/search.pyi` - Added attributes and methods
+3. `typings/theo/infrastructure/api/app/models/verses.pyi` - **83 lines** (was 13 lines)
 
 ### Source Files (Type Annotations Added)
-4. `theo/services/api/app/ingest/stages/base.py`
-5. `theo/services/api/app/ingest/stages/enrichers.py`
-6. `theo/services/api/app/ingest/stages/persisters.py`
-7. `theo/services/api/app/ingest/stages/parsers.py`
-8. `theo/services/api/app/ingest/stages/fetchers.py`
-9. `theo/services/api/app/ingest/parsers.py`
-10. `theo/services/api/app/ingest/network.py`
-11. `theo/services/api/app/ingest/pipeline.py`
-12. `theo/services/api/app/ingest/osis.py`
-14. `theo/services/api/app/routes/export.py`
+4. `theo/infrastructure/api/app/ingest/stages/base.py`
+5. `theo/infrastructure/api/app/ingest/stages/enrichers.py`
+6. `theo/infrastructure/api/app/ingest/stages/persisters.py`
+7. `theo/infrastructure/api/app/ingest/stages/parsers.py`
+8. `theo/infrastructure/api/app/ingest/stages/fetchers.py`
+9. `theo/infrastructure/api/app/ingest/parsers.py`
+10. `theo/infrastructure/api/app/ingest/network.py`
+11. `theo/infrastructure/api/app/ingest/pipeline.py`
+12. `theo/infrastructure/api/app/ingest/osis.py`
+14. `theo/infrastructure/api/app/routes/export.py`
 
 ---
 
 ## 🗂️ Files Modified (This Session)
 
 ### Quick Wins Completed
-1. ✅ `theo/services/api/app/ai/reasoning/chain_of_thought.py` - Generic type parameters
-2. ✅ `theo/services/api/app/enrich/metadata.py` - Unreachable code removed, type annotations added
-3. ✅ `theo/services/api/app/db/verse_graph.py` - Function type annotations
+1. ✅ `theo/infrastructure/api/app/ai/reasoning/chain_of_thought.py` - Generic type parameters
+2. ✅ `theo/infrastructure/api/app/enrich/metadata.py` - Unreachable code removed, type annotations added
+3. ✅ `theo/infrastructure/api/app/db/verse_graph.py` - Function type annotations
 4. ✅ Installed: `types-cachetools`
 
 ---
@@ -241,16 +241,16 @@ Found 1678 errors in 69 files (checked 39 source files)
    - Focus on API modules under strict typing rules
 
 2. **Check Remaining Unreachable Code** (~3 errors)
-   - `theo/services/api/app/ai/clients.py` - may have remaining instances
+   - `theo/infrastructure/api/app/ai/clients.py` - may have remaining instances
 
 3. **Add Missing Function Annotation** (~1 error)
-   - `theo/services/api/app/infra/ingestion_service.py:288`
+   - `theo/infrastructure/api/app/infra/ingestion_service.py:288`
 
 ### Medium Priority (More Complex)
 
 5. **Fix `no-any-return` Errors** (~50 errors)
    - **Strategy:** Add explicit type casts or assertions
-   - **Primary file:** `theo/services/api/app/ai/clients.py`
+   - **Primary file:** `theo/infrastructure/api/app/ai/clients.py`
    - **Pattern:** Functions extracting from untyped JSON/dicts
    - **Solution examples:**
      ```python
@@ -268,22 +268,22 @@ Found 1678 errors in 69 files (checked 39 source files)
 
 6. **Fix Pydantic Model Issues** (~10 errors)
    - Update stub files or add `# type: ignore` for Pydantic magic methods
-   - Files: `theo/services/api/app/models/documents.py`, `theo/services/api/app/analytics/telemetry.py`
+   - Files: `theo/infrastructure/api/app/models/documents.py`, `theo/infrastructure/api/app/analytics/telemetry.py`
    - Issue: `model_dump`, `model_rebuild` not recognized on Pydantic models in stubs
 
 7. **Fix Document Constructor Calls** (~5 errors)
-   - `theo/services/api/app/analytics/topics.py:230` - Multiple unexpected keyword arguments
+   - `theo/infrastructure/api/app/analytics/topics.py:230` - Multiple unexpected keyword arguments
    - Need to check actual `Document` model vs stub definition for constructor
    - May need to update stub file `__init__` signature
 
 ### Low Priority (Documentation/Cleanup)
 
 8. **Define Missing Names**
-   - `RAGAnswer` in `theo/services/api/app/ai/rag/cache.py:129`
+   - `RAGAnswer` in `theo/infrastructure/api/app/ai/rag/cache.py:129`
    - Likely needs import or class definition
 
 9. **Fix Assignment Incompatibilities**
-   - `theo/services/api/app/ai/clients.py:838, 849`
+   - `theo/infrastructure/api/app/ai/clients.py:838, 849`
    - Assigning `str | None` to `str` variables
 
 ---

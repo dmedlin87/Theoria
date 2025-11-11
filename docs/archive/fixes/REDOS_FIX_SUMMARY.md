@@ -3,7 +3,7 @@
 ## Issue
 **CodeQL Alert**: Polynomial regular expression used on uncontrolled data  
 **Severity**: High  
-**Location**: `theo/services/api/app/ai/passage.py:133`
+**Location**: `theo/infrastructure/api/app/ai/passage.py:133`
 
 The regex pattern for parsing Bible passage references was vulnerable to Regular Expression Denial of Service (ReDoS) attacks. The pattern `(?P<book>[\d\w\s]+?)` could cause catastrophic backtracking when processing malicious input with many alternating word characters and spaces.
 

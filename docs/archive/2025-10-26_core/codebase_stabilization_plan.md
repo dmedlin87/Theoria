@@ -3,7 +3,7 @@
 # Codebase Stabilization Plan
 
 ## Validated Context
-- The `theo/services/api/app` package already spans adapters, analytics, ingest, research, transcripts, workers, and other feature slices, which makes the surface area difficult to keep in mind during day-to-day development.
+- The `theo/infrastructure/api/app` package already spans adapters, analytics, ingest, research, transcripts, workers, and other feature slices, which makes the surface area difficult to keep in mind during day-to-day development.
 - The pytest harness centralises extensive plugin registration, coverage shims, and database bootstrapping logic in `tests/conftest.py`, so even small changes can have wide-ranging side effects.
 - Optional dependency groups in `pyproject.toml` pin security-sensitive libraries such as Celery, cryptography, SQLAlchemy, and PyJWT to exact versions, limiting the ability to pick up security fixes or compatible performance improvements.
 
@@ -19,7 +19,7 @@
 
 ## Architectural Guardrails
 - Expand `importlinter.ini` with explicit boundaries between `theo.domain`, `theo.application`, and `theo.services.api` feature folders to prevent accidental cross-layer imports.
-- Introduce an internal ADR describing how modules inside `theo/services/api/app` should be grouped (core, interfaces, infrastructure, feature slices) and migrate modules incrementally to the agreed structure.
+- Introduce an internal ADR describing how modules inside `theo/infrastructure/api/app` should be grouped (core, interfaces, infrastructure, feature slices) and migrate modules incrementally to the agreed structure.
 - Track N+1 query remediation by adding SQLAlchemy profiler hooks to the ingest and ranking pipelines while bulk update helpers are introduced.
 
 ## Success Criteria

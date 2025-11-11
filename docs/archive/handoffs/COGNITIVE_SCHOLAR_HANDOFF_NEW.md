@@ -5,9 +5,9 @@
 - **Status**: Plan CRUD endpoints, chat response snapshots, and the Plan Panel UI are shipped. Streaming deltas are the remaining gap for real-time sync.
 
 ## Completed Work
-- **Plan DTO integration**: `ResearchLoopController` builds and persists `ResearchPlan` instances with helpers for enqueue/reorder/update/skip mutations (`theo/services/api/app/ai/research_loop.py`).
-- **Chat response enrichment**: `chat_turn()` and `_serialise_chat_session()` now include the active plan in `ChatSessionResponse.plan` / `ChatSessionState.plan` snapshots (`theo/services/api/app/routes/ai/workflows/chat.py`).
-- **Schema updates**: Optional `plan` fields have been added to API response models (`theo/services/api/app/models/ai.py`).
+- **Plan DTO integration**: `ResearchLoopController` builds and persists `ResearchPlan` instances with helpers for enqueue/reorder/update/skip mutations (`theo/infrastructure/api/app/ai/research_loop.py`).
+- **Chat response enrichment**: `chat_turn()` and `_serialise_chat_session()` now include the active plan in `ChatSessionResponse.plan` / `ChatSessionState.plan` snapshots (`theo/infrastructure/api/app/routes/ai/workflows/chat.py`).
+- **Schema updates**: Optional `plan` fields have been added to API response models (`theo/infrastructure/api/app/models/ai.py`).
 
 ## Outstanding Tasks
 - **Streaming updates**: Refactor `/ai/chat` streaming responses to emit incremental plan frames so the panel updates mid-loop.
@@ -24,9 +24,9 @@
 - Execute chat turn happy path to confirm `plan` snapshots return correctly.
 - Add streaming smoke test after NDJSON/SSE integration.
 
-- **Controller** `theo/services/api/app/ai/research_loop.py`: Plan lifecycle helpers and default sequence logic.
-- **Chat Routes** `theo/services/api/app/routes/ai/workflows/chat.py`: `/chat/{session_id}/plan` CRUD endpoints + plan snapshots in chat responses.
-- **API Models** `theo/services/api/app/models/ai.py`: `ResearchPlan` models and chat response fields.
+- **Controller** `theo/infrastructure/api/app/ai/research_loop.py`: Plan lifecycle helpers and default sequence logic.
+- **Chat Routes** `theo/infrastructure/api/app/routes/ai/workflows/chat.py`: `/chat/{session_id}/plan` CRUD endpoints + plan snapshots in chat responses.
+- **API Models** `theo/infrastructure/api/app/models/ai.py`: `ResearchPlan` models and chat response fields.
 - **Frontend** `theo/services/web/app/chat/ChatWorkspace.tsx`: Hydrates plan state, wires `PlanPanel`, and drives plan mutations.
 - **UI Component** `theo/services/web/app/components/PlanPanel.tsx`: Live plan panel with reorder/edit/skip controls.
 - **Client libraries** `theo/services/web/app/lib/{api-client,api-normalizers,chat-client}.ts`: Plan fetch/mutation helpers and streaming payloads.

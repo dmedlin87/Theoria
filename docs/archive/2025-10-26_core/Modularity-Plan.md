@@ -79,7 +79,7 @@
 - Add architecture tests & CI guardrails.
 
 ### Phase 2 – Extract Domain & Application
-- Move pure business logic from `theo/services/api/app/core/*` and `.../research/*` into `theo.domain`.
+- Move pure business logic from `theo/infrastructure/api/app/core/*` and `.../research/*` into `theo.domain`.
 - Replace direct SQLAlchemy imports with repository protocols implemented in `theo.adapters.persistence`.
 - Introduce DTO mappers between FastAPI schemas and domain aggregates.
 

@@ -21,7 +21,7 @@
 **Impact:** High - Critical system components  
 **Effort:** Medium (1-2 days)
 
-**Zero-coverage files in `theo/services/api/app/core/`:**
+**Zero-coverage files in `theo/infrastructure/api/app/core/`:**
 ```
 ✗ database.py         - Database connection/session management
 ✗ runtime.py          - Runtime configuration
@@ -46,7 +46,7 @@
 **Impact:** High - MCP functionality exposed via ADR  
 **Effort:** Low (4-8 hours)
 
-**Zero-coverage files in `theo/services/api/app/mcp/`:**
+**Zero-coverage files in `theo/infrastructure/api/app/mcp/`:**
 ```
 ✗ tools.py - MCP tool implementations (3,722 bytes)
 ```
@@ -70,7 +70,7 @@
 **Impact:** Very High - Core content processing  
 **Effort:** High (3-5 days)
 
-**Low-coverage files in `theo/services/api/app/ingest/` (13 files):**
+**Low-coverage files in `theo/infrastructure/api/app/ingest/` (13 files):**
 - Document parsing
 - Content extraction
 - Metadata enrichment
@@ -90,7 +90,7 @@
 **Impact:** Very High - Search functionality  
 **Effort:** Medium (2-3 days)
 
-**Low-coverage files in `theo/services/api/app/retriever/` (8 files):**
+**Low-coverage files in `theo/infrastructure/api/app/retriever/` (8 files):**
 - Query processing
 - Result ranking
 - Semantic search
@@ -109,13 +109,13 @@
 **Impact:** Very High - Core AI functionality  
 **Effort:** High (4-6 days)
 
-**Low-coverage in `theo/services/api/app/ai/` (9 files):**
+**Low-coverage in `theo/infrastructure/api/app/ai/` (9 files):**
 - Prompt engineering
 - Context management
 - Response generation
 - Guardrails
 
-**Low-coverage in `theo/services/api/app/ai/rag/` (10 files):**
+**Low-coverage in `theo/infrastructure/api/app/ai/rag/` (10 files):**
 - RAG pipeline
 - Context retrieval
 - Answer generation
@@ -140,7 +140,7 @@
 **Impact:** High - API surface  
 **Effort:** Medium (2-3 days)
 
-**Low-coverage in `theo/services/api/app/routes/` (15 files):**
+**Low-coverage in `theo/infrastructure/api/app/routes/` (15 files):**
 - Request validation
 - Response formatting
 - Error handling
@@ -157,7 +157,7 @@
 **Impact:** High - AI workflows  
 **Effort:** Medium (2-3 days)
 
-**Low-coverage in `theo/services/api/app/routes/ai/workflows/` (9 files):**
+**Low-coverage in `theo/infrastructure/api/app/routes/ai/workflows/` (9 files):**
 - Workflow execution
 - State management
 - Error recovery
@@ -173,7 +173,7 @@
 **Impact:** Medium - Observability  
 **Effort:** Low (1 day)
 
-**Low-coverage in `theo/services/api/app/analytics/` (4 files):**
+**Low-coverage in `theo/infrastructure/api/app/analytics/` (4 files):**
 - Event tracking
 - Metrics collection
 - Dashboard data
@@ -184,7 +184,7 @@
 **Impact:** Medium - User-facing feature  
 **Effort:** Low (1 day)
 
-**Low-coverage in `theo/services/api/app/export/` (3 files):**
+**Low-coverage in `theo/infrastructure/api/app/export/` (3 files):**
 - Document export
 - Citation formatting
 - Format conversion

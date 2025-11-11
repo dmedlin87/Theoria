@@ -37,7 +37,7 @@ Transform Theoria into an autonomous, context-aware "super-scholar" that forms, 
   - **Status**: Needs backend FastAPI endpoints
 
 ### Recent Changes
-- Created `theo/services/api/app/models/reasoning.py` with Timeline data structures
+- Created `theo/infrastructure/api/app/models/reasoning.py` with Timeline data structures
 - Archived TASK_001 (repository migration) as completed
 - Created TASK_005 with 16 Cognitive Scholar MVP tickets (CS-001 to CS-016)
 - Updated tasks README with phased execution order
@@ -60,13 +60,13 @@ Transform Theoria into an autonomous, context-aware "super-scholar" that forms, 
    - Add eager loading to search endpoint
    - Add monitoring decorators
    - Prepares for Retrieval Budgeter (CS-015)
-   - File: `theo/services/api/app/routes/search.py`
+   - File: `theo/infrastructure/api/app/routes/search.py`
 
 3. **TASK_002: Wire Gap Engine** (3-4hrs)
    - Integrate `GapDiscoveryEngine` into `DiscoveryService.refresh()`
    - Test with `theological_topics.yaml`
    - Verify gaps appear in Discovery Feed
-   - File: `theo/services/api/app/discoveries/service.py`
+   - File: `theo/infrastructure/api/app/discoveries/service.py`
 
 **Decision**: Can skip these and go straight to MVP if you want. They're nice-to-haves, not blockers.
 
@@ -77,9 +77,9 @@ Transform Theoria into an autonomous, context-aware "super-scholar" that forms, 
 ### Week 1: Control Surface + Timeline (CS-001 to CS-004)
 
 **CS-001: Reasoning Timeline UI** (6-8 hours) ✅ **COMPLETE**
-- **Backend**: `theo/services/api/app/models/reasoning.py` ✅ CREATED
+- **Backend**: `theo/infrastructure/api/app/models/reasoning.py` ✅ CREATED
 - **Frontend**: `theo/services/web/app/components/ReasoningTimeline.tsx` ✅ CREATED
-- **API**: `theo/services/api/app/routes/ai/workflows/chat.py` ✅ MODIFIED
+- **API**: `theo/infrastructure/api/app/routes/ai/workflows/chat.py` ✅ MODIFIED
 - **Goal**: Show 7 workflow steps (Understand → Gather → Tensions → Draft → Critique → Revise → Synthesize)
 - **Acceptance**: ✅ Timeline appears in chat response, steps are collapsible, shows citations
 - **See**: `CS-001_COMPLETE.md` for implementation details
@@ -168,7 +168,7 @@ data/seeds/theological_topics.yaml             # Reference taxonomy ✅
 ### New (To Create for MVP)
 ```
 # Week 1 - Timeline
-theo/services/api/app/models/reasoning.py      # Timeline models ✅ CREATED
+theo/infrastructure/api/app/models/reasoning.py      # Timeline models ✅ CREATED
 theo/services/web/app/components/ReasoningTimeline.tsx
 theo/services/web/app/components/LoopControls.tsx
 theo/services/web/app/components/PlanPanel.tsx
@@ -182,13 +182,13 @@ theo/services/web/app/components/ToulminZoom.tsx
 # Week 3 - Hypotheses
 theo/domain/hypotheses/models.py               # Hypothesis domain objects
 theo/adapters/persistence/hypothesis_repository.py
-theo/services/api/app/ai/debate.py
+theo/infrastructure/api/app/ai/debate.py
 theo/services/web/app/components/HypothesisCard.tsx
 
 # Week 4 - Research Loop
-theo/services/api/app/research/falsifier_operator.py
-theo/services/api/app/research/retrieval_budgeter.py
-theo/services/api/app/ai/research_loop.py      # Orchestrator
+theo/infrastructure/api/app/research/falsifier_operator.py
+theo/infrastructure/api/app/research/retrieval_budgeter.py
+theo/infrastructure/api/app/ai/research_loop.py      # Orchestrator
 ```
 
 ---
@@ -263,7 +263,7 @@ class SQLAlchemyHypothesisRepository(HypothesisRepository):
 ## ✅ Quick Start: CS-001 Implementation
 
 ### 1. Backend Models (DONE ✅)
-File: `theo/services/api/app/models/reasoning.py` created with:
+File: `theo/infrastructure/api/app/models/reasoning.py` created with:
 - `ReasoningStepType` enum
 - `ReasoningStep` model
 - `ReasoningTimeline` model
@@ -285,7 +285,7 @@ export function ReasoningTimeline({ timeline }: { timeline: ReasoningTimeline })
 ```
 
 ### 3. Wire into Chat (AFTER UI WORKS)
-Modify: `theo/services/api/app/routes/ai/workflows/chat.py`
+Modify: `theo/infrastructure/api/app/routes/ai/workflows/chat.py`
 
 Return timeline alongside answer:
 ```python

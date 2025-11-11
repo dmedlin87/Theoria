@@ -79,11 +79,11 @@ npm run test:vitest
 - Radix UI specific patterns
 
 ## No Conflicts With
-- Agent 2: Working on `theo/services/api/app/core/`
-- Agent 3: Working on `theo/services/api/app/mcp/`
-- Agent 4: Working on `theo/services/api/app/ingest/`
-- Agent 5: Working on `theo/services/api/app/retriever/`
-- Agent 6: Working on `theo/services/api/app/ai/`
+- Agent 2: Working on `theo/infrastructure/api/app/core/`
+- Agent 3: Working on `theo/infrastructure/api/app/mcp/`
+- Agent 4: Working on `theo/infrastructure/api/app/ingest/`
+- Agent 5: Working on `theo/infrastructure/api/app/retriever/`
+- Agent 6: Working on `theo/infrastructure/api/app/ai/`
 
 ## Report Format
 ```markdown

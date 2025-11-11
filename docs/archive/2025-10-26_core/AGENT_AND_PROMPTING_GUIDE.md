@@ -69,7 +69,7 @@ Theoria uses a **multi-layered agent architecture** that combines RAG (Retrieval
 ## Layer 1: RAG (Retrieval-Augmented Generation)
 
 ### Location
-- `theo/services/api/app/ai/rag/`
+- `theo/infrastructure/api/app/ai/rag/`
 
 ### Components
 
@@ -138,7 +138,7 @@ prompt = context.build_prompt("What did Paul teach about the law?")
 ## Layer 2: Reasoning Framework
 
 ### Location
-- `theo/services/api/app/ai/reasoning/`
+- `theo/infrastructure/api/app/ai/reasoning/`
 
 ### Components
 
@@ -459,7 +459,7 @@ for historical-critical theology. Your job is to:
 ## Layer 4: Agent Trails & Observability
 
 ### Location
-- `theo/services/api/app/ai/trails.py`
+- `theo/infrastructure/api/app/ai/trails.py`
 - Database: `agent_trails`, `agent_steps`, `reasoning_traces` tables
 
 ### Purpose
@@ -687,7 +687,7 @@ Sources:
 - **Settings** - `/settings` configures model preferences
 
 ### Backend (FastAPI)
-- **AI Router** - `theo/services/api/app/ai/router.py`
+- **AI Router** - `theo/infrastructure/api/app/ai/router.py`
   - `/ai/chat` - Simple RAG
   - `/ai/research` - Detective mode with reasoning
   - `/ai/critique` - Meta-cognitive review

@@ -23,14 +23,15 @@ This document distills the essential architecture, conventions, and active surfa
 4. **Document changes** by updating [`CHANGELOG.md`](CHANGELOG.md) and the archive directories when you complete a handoff or retire docs.
 
 ## Current Priorities
-- **Stabilize contradiction seed migrations, harden ingest error handling, and repair router inflight deduplication.** The concrete tasks and references are tracked in [`docs/next_steps_plan.md`](docs/next_steps_plan.md).
+- **Stabilize contradiction seed migrations, harden ingest error handling, and repair router inflight deduplication.** The concrete tasks and references are tracked in [`docs/planning/SIMPLIFICATION_PLAN.md`](docs/planning/SIMPLIFICATION_PLAN.md).
 - **Maintain documentation hygiene.** Any new handoff or summary should land under `docs/archive/handoffs/` while the canonical entry points stay in the repository root. Update [`docs/document_inventory.md`](docs/document_inventory.md) after every reorganization.
 
 ## Where to Dive Deeper
-- [`docs/INDEX.md`](docs/INDEX.md) – Global navigation by persona and domain area.
-- [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) – System blueprint with sequence diagrams and service maps.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) & [`HANDOFF_NEXT_PHASE.md`](docs/archive/handoffs/HANDOFF_NEXT_PHASE.md) – Strategic and tactical planning for Cognitive Scholar follow-ups.
-- [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) – Standards for naming, archiving, and maintaining documentation.
+- [`docs/INDEX.md`](docs/INDEX.md) - Global navigation by persona and domain area.
+- [`docs/architecture.md`](docs/architecture.md) - Current system architecture overview and diagrams.
+- [`docs/API.md`](docs/API.md) - REST and agent surface contracts.
+- [`docs/document_inventory.md`](docs/document_inventory.md) - Manifest of active docs and archive policies.
+- [`docs/Repo-Health.md`](docs/Repo-Health.md) - Operational dashboards, maintenance checklists, and runbooks.
 
 ---
 

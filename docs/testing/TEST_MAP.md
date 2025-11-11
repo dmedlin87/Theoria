@@ -2,7 +2,7 @@
 
 ## Inventory Overview
 
-### Backend Python Services (`theo/services/api/app`)
+### Backend Python Services (`theo/infrastructure/api/app`)
 
 - **Core settings & infrastructure**: `core.settings`, `core.settings_store`, `core.database`, `core.secret_migration`, `tracing`, `telemetry`.
 - **Database access**: SQLAlchemy models in `db.models`, utility types in `db.types`, migration runner `db.run_sql_migrations`, seed utilities `db.seeds`, feedback persistence `db.feedback`.

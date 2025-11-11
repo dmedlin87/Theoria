@@ -18,7 +18,7 @@ A comprehensive reasoning framework that transforms the Theoria agent from a rea
 ### File Structure
 
 ```
-theo/services/api/app/ai/reasoning/
+theo/infrastructure/api/app/ai/reasoning/
 ├── __init__.py                    # Module exports
 ├── fallacies.py                   # Logical fallacy detector
 ├── chain_of_thought.py            # CoT prompting & parsing
@@ -131,7 +131,7 @@ print(prompt)
 **Minimal integration** - Add fallacy detection to existing RAG pipeline:
 
 ```python
-# In theo/services/api/app/ai/rag/workflow.py
+# In theo/infrastructure/api/app/ai/rag/workflow.py
 
 from ..reasoning.fallacies import detect_fallacies
 
@@ -164,7 +164,7 @@ class GuardedAnswerPipeline:
 
 ### Extend Workflow with CoT
 
-Create `theo/services/api/app/ai/rag/workflow_enhanced.py`:
+Create `theo/infrastructure/api/app/ai/rag/workflow_enhanced.py`:
 
 ```python
 from ..reasoning.chain_of_thought import build_cot_prompt, parse_chain_of_thought
@@ -255,7 +255,7 @@ class ReasoningPipeline(GuardedAnswerPipeline):
 
 ### Add API Endpoint
 
-In `theo/services/api/app/ai/router.py`:
+In `theo/infrastructure/api/app/ai/router.py`:
 
 ```python
 @router.post("/chat/enhanced", response_model=EnhancedReasoningResponse)
@@ -348,7 +348,7 @@ export function ReasoningTrace({ steps, fallacyWarnings, critique }: ReasoningTr
 
 ### Implement Explorer Loop
 
-Create `theo/services/api/app/ai/agents/explorer.py`:
+Create `theo/infrastructure/api/app/ai/agents/explorer.py`:
 
 ```python
 from ..reasoning.hypotheses import HypothesisGenerator, test_hypothesis
@@ -634,7 +634,7 @@ At GPT-4 pricing (~$0.03/1K input, ~$0.06/1K output):
 ## Support & Questions
 
 - **Design doc:** `docs/AGENT_THINKING_ENHANCEMENT.md`
-- **Module code:** `theo/services/api/app/ai/reasoning/`
+- **Module code:** `theo/infrastructure/api/app/ai/reasoning/`
 - **Tests:** `tests/api/ai/test_reasoning_modules.py`
 - **Migration:** `docs/migrations/add_reasoning_tables.sql`
 

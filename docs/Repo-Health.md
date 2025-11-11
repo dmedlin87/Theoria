@@ -52,7 +52,7 @@
 
 ## Observability & Testing Coverage
 
-- Global coverage gate set to **80% project-wide** and **90% for `theo/services/api/app/core`** (see pytest configuration).
+- Global coverage gate set to **80% project-wide** and **90% for `theo/infrastructure/api/app/core`** (see pytest configuration).
 - Architecture guardrails fail CI on cross-module imports.
 - CodeQL + Pyre typed checks flagged as future enhancements for deeper dataflow coverage.
 

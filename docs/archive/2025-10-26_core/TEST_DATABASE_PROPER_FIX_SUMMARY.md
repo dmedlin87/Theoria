@@ -100,8 +100,8 @@ The test `tests/db/test_seeds.py::test_seeders_remove_stale_records` still fails
 ### For Model Changes
 
 **When adding/modifying columns:**
-1. Update the SQLAlchemy model in `theo/services/api/app/db/models.py`
-2. Create a migration file in `theo/services/api/app/db/migrations/`
+1. Update the SQLAlchemy model in `theo/infrastructure/api/app/db/models.py`
+2. Create a migration file in `theo/infrastructure/api/app/db/migrations/`
 3. Clear Python cache: `.\scripts\clear-python-cache.ps1`
 4. Run tests to verify
 
@@ -128,7 +128,7 @@ The test `tests/db/test_seeds.py::test_seeders_remove_stale_records` still fails
 
 1. `tests/conftest.py` - Added migrations to SQLite fixture
 2. `tests/api/conftest.py` - Simplified migration-disabling fixture
-3. `theo/services/api/app/db/run_sql_migrations.py` - Fixed missing regex pattern
+3. `theo/infrastructure/api/app/db/run_sql_migrations.py` - Fixed missing regex pattern
 4. `docs/TEST_DATABASE_SCHEMA_ISSUE.md` - Root cause documentation (created earlier)
 5. `scripts/clear-python-cache.ps1` - Cache clearing utility (created earlier)
 
@@ -137,7 +137,7 @@ The test `tests/db/test_seeds.py::test_seeders_remove_stale_records` still fails
 If this causes issues, revert commits to these three files:
 - `tests/conftest.py`
 - `tests/api/conftest.py`
-- `theo/services/api/app/db/run_sql_migrations.py`
+- `theo/infrastructure/api/app/db/run_sql_migrations.py`
 
 **DO NOT** revert `run_sql_migrations.py` without addressing the `_INGESTION_JOBS_TABLE_RE` bug differently.
 

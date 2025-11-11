@@ -21,7 +21,7 @@ new `# type: ignore` comments.
 - Audit the current mypy configuration (`mypy.ini` and `pyproject.toml`) and consolidate on
   a single source of truth for shared defaults (e.g., `ignore_missing_imports`,
   `warn_unused_configs`).
-- Inventory the existing `# type: ignore` usage across `theo/services/api/app` and produce
+- Inventory the existing `# type: ignore` usage across `theo/infrastructure/api/app` and produce
   a shared spreadsheet or issue tracker noting whether each ignore should be removed,
   replaced with a targeted error code, or temporarily grandfathered.
 - Fix import-time blockers that prevent strict mode from being applied (e.g., missing
@@ -32,11 +32,11 @@ new `# type: ignore` comments.
 
 ### Phase 1 – Core runtime modules (strict typing required)
 Focus on modules that influence request handling and domain serialization.
-- `theo/services/api/app/core`
-- `theo/services/api/app/models`
-- `theo/services/api/app/routes`
-- `theo/services/api/app/telemetry`
-- `theo/services/api/app/db`
+- `theo/infrastructure/api/app/core`
+- `theo/infrastructure/api/app/models`
+- `theo/infrastructure/api/app/routes`
+- `theo/infrastructure/api/app/telemetry`
+- `theo/infrastructure/api/app/db`
 
 Deliverables:
 - Remove or replace blanket ignores with targeted error-code suppressions.
@@ -48,12 +48,12 @@ Deliverables:
 
 ### Phase 2 – Ingest, export, and AI coordination modules
 Once the runtime core is stable, expand to the heavier business logic packages.
-- `theo/services/api/app/ingest`
-- `theo/services/api/app/export`
-- `theo/services/api/app/ai`
-- `theo/services/api/app/analytics`
-- `theo/services/api/app/retriever`
-- `theo/services/api/app/workers`
+- `theo/infrastructure/api/app/ingest`
+- `theo/infrastructure/api/app/export`
+- `theo/infrastructure/api/app/ai`
+- `theo/infrastructure/api/app/analytics`
+- `theo/infrastructure/api/app/retriever`
+- `theo/infrastructure/api/app/workers`
 
 Deliverables:
 - Apply the same strictness criteria as Phase 1.
@@ -66,7 +66,7 @@ Deliverables:
 
 ### Phase 3 – Remaining services and regression guardrails
 Complete coverage by addressing lower-risk modules and reinforcing automation.
-- Extend strictness to the remaining packages under `theo/services/api/app` (e.g.,
+- Extend strictness to the remaining packages under `theo/infrastructure/api/app` (e.g.,
   `intent`, `debug`, `mcp`, `ranking`, `research`, `transcripts`, `notebooks`, and
   `services`).
 - Bring `tests/export` and other test suites under the same strictness rules when they

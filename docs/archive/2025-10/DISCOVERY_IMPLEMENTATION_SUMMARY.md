@@ -190,7 +190,7 @@ docs/
 ### What Needs to Be Done
 
 1. **FastAPI Endpoints**
-   - Create `theo/services/api/app/routers/discoveries.py`
+   - Create `theo/infrastructure/api/app/routers/discoveries.py`
    - Implement GET, POST, DELETE handlers
    - Connect to database
 
@@ -223,7 +223,7 @@ docs/
 To get started quickly, implement just the database and basic endpoints:
 
 ```python
-# theo/services/api/app/routers/discoveries.py
+# theo/infrastructure/api/app/routers/discoveries.py
 
 @router.get("/discoveries")
 async def list_discoveries(db: Session = Depends(get_db)):

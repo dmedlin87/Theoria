@@ -16,7 +16,7 @@ Priority: CRITICAL - MCP functionality exposed via ADR
 ```
 
 ## Files You Own (Exclusive)
-All files in: `theo/services/api/app/mcp/`
+All files in: `theo/infrastructure/api/app/mcp/`
 ```
 - __init__.py (163 bytes)
 - tools.py (3,722 bytes) - MAIN FILE TO TEST
@@ -43,7 +43,7 @@ These test the MCP SERVER side. You need to test the API INTEGRATION side.
 
 ### 1. Study MCP API Integration
 Read thoroughly:
-- `theo/services/api/app/mcp/tools.py` - The code you're testing
+- `theo/infrastructure/api/app/mcp/tools.py` - The code you're testing
 - `mcp_server/tools/*.py` - Related MCP server tools
 - `docs/adr/0001-expose-theoengine-via-mcp.md` - Architecture decision
 
@@ -231,9 +231,9 @@ Study these for patterns:
 ## No Conflicts With
 - Agent 1: Working on frontend tests
 - Agent 2: Working on core (`tests/api/core/`)
-- Agent 4: Working on ingest (`theo/services/api/app/ingest/`)
-- Agent 5: Working on retriever (`theo/services/api/app/retriever/`)
-- Agent 6: Working on AI/RAG (`theo/services/api/app/ai/`)
+- Agent 4: Working on ingest (`theo/infrastructure/api/app/ingest/`)
+- Agent 5: Working on retriever (`theo/infrastructure/api/app/retriever/`)
+- Agent 6: Working on AI/RAG (`theo/infrastructure/api/app/ai/`)
 
 ## Report Format
 ```markdown

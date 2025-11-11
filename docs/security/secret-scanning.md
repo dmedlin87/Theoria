@@ -27,7 +27,7 @@
 
 ## False Positive Handling
 
-- **Expected credentials:** Postgres DSNs (`postgresql+psycopg://postgres:postgres@db:5432/theo`) and Redis URLs (`redis://redis:6379/0`) appear in `.env.example`, `infra/docker-compose.yml`, and `theo/services/api/app/core/settings.py` to document local defaults. They are not production secrets.
+- **Expected credentials:** Postgres DSNs (`postgresql+psycopg://postgres:postgres@db:5432/theo`) and Redis URLs (`redis://redis:6379/0`) appear in `.env.example`, `infra/docker-compose.yml`, and `theo/infrastructure/api/app/core/settings.py` to document local defaults. They are not production secrets.
 - **Suppressing noise:** After verifying a finding is a non-sensitive template value, add or update its record in `trufflehog-baseline.json` with the latest commit hash. Baseline entries store the commit path, reason, and string snippet so auditors can trace the exception.
 - **Escalation:** If a finding references any credential outside of the documented templates, treat it as a potential leak and follow the remediation steps in [`SECURITY.md`](../../SECURITY.md).
 

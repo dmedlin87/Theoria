@@ -18,7 +18,7 @@ This document outlines the removal of complex features that add maintenance over
 
 **Files to Remove:**
 
-```
+```text
 mcp_server/
 ├── server.py (10K+ lines)
 ├── schemas.py (22K+ lines)
@@ -42,6 +42,7 @@ mcp_server/
 - Clean up any import references in main application
 
 ### 2. Evidence System (COMPLETED)
+
 **Path:** `theo/evidence/`
 **Complexity:** 10 specialized modules, complex citation/validation workflows
 **Rationale:** Specialized system that may be over-engineered for current research needs.
@@ -49,7 +50,7 @@ mcp_server/
 
 **Files to Remove:**
 
-```
+```text
 theo/evidence/
 ├── __init__.py
 ├── citations.py
@@ -77,7 +78,7 @@ theo/evidence/
 
 **Files to Remove:**
 
-```
+```text
 theo/checkpoints.py
 ```
 
@@ -88,6 +89,7 @@ theo/checkpoints.py
 - Remove version migration complexity
 
 ### 4. Platform Event System (COMPLETE)
+
 **Path:** previously `theo/platform/`
 **Outcome:** Replaced with `theo.application.services.bootstrap` and synchronous ingestion hooks, eliminating the custom event bus layer.
 
@@ -95,7 +97,7 @@ theo/checkpoints.py
 
 ### Phase 1: MCP Server Removal (Week 1)
 
-**PR 1: Remove MCP Infrastructure**
+#### PR 1: Remove MCP Infrastructure
 
 - [ ] Delete entire `mcp_server/` directory
 - [ ] Remove MCP dependencies from `pyproject.toml`
@@ -106,13 +108,15 @@ theo/checkpoints.py
 
 ### Phase 2: Evidence System Evaluation & Removal (Week 1-2)
 
-**PR 2: Audit Evidence System Usage**
+#### PR 2: Audit Evidence System Usage
+
 - [x] Search codebase for evidence system imports
 - [x] Document current usage patterns
 - [x] Identify API endpoints using evidence features
 - [x] Plan migration path for essential functionality
 
-**PR 3: Remove Evidence System**
+#### PR 3: Remove Evidence System
+
 - [x] Delete `theo/evidence/` directory
 - [x] Remove evidence-related routes/endpoints
 - [x] Update documentation
@@ -120,7 +124,7 @@ theo/checkpoints.py
 
 ### Phase 3: Checkpoint System Simplification (Week 2)
 
-**PR 4: Simplify Checkpoints**
+#### PR 4: Simplify Checkpoints
 
 - [ ] Audit current checkpoint usage
 - [ ] Implement simpler state persistence
@@ -129,7 +133,9 @@ theo/checkpoints.py
 - [ ] Update embedding rebuild processes
 
 ### Phase 4: Platform Events Evaluation (Complete)
+
 **Outcome:**
+
 - `theo/platform/` removed with bootstrap logic consolidated under `theo/application/services/bootstrap.py`.
 - Ingestion notifications now call synchronous helpers instead of publishing to an event bus.
 - Future enhancements should document additional telemetry consumers if new hooks are introduced.

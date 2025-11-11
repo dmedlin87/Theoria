@@ -13,7 +13,7 @@
 **Files modified**:
 - `theo/application/repositories/document_repository.py` - Added `list_created_since()` method
 - `theo/adapters/persistence/document_repository.py` - Implemented `list_created_since()`
-- `theo/services/api/app/error_handlers.py` - Restored HTTP 422 content status mapping
+- `theo/infrastructure/api/app/error_handlers.py` - Restored HTTP 422 content status mapping
 
 **Outcome**: Repository pattern successfully implemented with DTOs and abstractions. Architecture foundation is now solid for Cognitive Scholar features.
 
@@ -178,7 +178,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
 ```
 
 ### 3. Update Use Case to Use Repositories
-**File**: `theo/services/api/app/use_cases/refresh_discoveries.py` (modify)
+**File**: `theo/infrastructure/api/app/use_cases/refresh_discoveries.py` (modify)
 
 Update the `execute()` method to accept repositories instead of raw documents:
 
@@ -201,7 +201,7 @@ def execute(
 ## 📝 Files to Modify
 
 ### 1. Update DiscoveryService
-**File**: `theo/services/api/app/discoveries/service.py`
+**File**: `theo/infrastructure/api/app/discoveries/service.py`
 
 **Changes needed**:
 1. Remove direct ORM imports (`Discovery`, `Document`, `Passage`)
@@ -242,7 +242,7 @@ class DiscoveryService:
 ```
 
 ### 2. Update Routes
-**File**: `theo/services/api/app/routes/discoveries.py`
+**File**: `theo/infrastructure/api/app/routes/discoveries.py`
 
 Add dependency injection for repositories:
 
@@ -385,7 +385,7 @@ print(f"Improvement: {((duration_before - duration_after) / duration_before) * 1
 
 ## 📚 References
 
-- **Pattern Reference**: `theo/services/api/app/routes/discoveries_v1.py`
+- **Pattern Reference**: `theo/infrastructure/api/app/routes/discoveries_v1.py`
 - **Migration Guide**: `docs/ARCHITECTURE_MIGRATION_EXAMPLE.md`
 - **Architecture Guide**: `docs/ARCHITECTURE_IMPROVEMENTS.md`
 - **Quick Start**: `QUICK_START_ARCHITECTURE.md`

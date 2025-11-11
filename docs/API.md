@@ -1,7 +1,7 @@
 # Theoria API
 
 Theoria exposes a FastAPI application located at
-`theo/services/api/app`. The service is designed around JSON responses and
+`theo/infrastructure/api/app`. The service is designed around JSON responses and
 multipart uploads for binary content.
 
 - **Base URL:** `/` (all paths below are relative to the FastAPI root)

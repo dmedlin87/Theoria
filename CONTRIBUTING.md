@@ -136,6 +136,6 @@ Keep the following workflow in mind:
 - Update documentation for any new fixtures, commands, or workflows.
 
 ## Getting Help
-- Review the architectural context in `docs/BLUEPRINT.md` and `docs/API.md`.
+- Review the architectural context in `docs/architecture.md` and `docs/API.md`.
 - For ingestion-specific questions, check `docs/OSIS.md` and `docs/Chunking.md`.
 - Reach out via the project Slack channel or open a GitHub discussion for design clarifications.

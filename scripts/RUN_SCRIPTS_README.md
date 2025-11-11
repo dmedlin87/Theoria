@@ -652,7 +652,7 @@ git log scripts/
 - **Main Documentation**: See `README.md` in project root
 - **API Documentation**: <http://127.0.0.1:8000/docs> (when running)
 - **UI Documentation**: `theo/services/web/UI_IMPROVEMENTS.md`
-- **Architecture**: `docs/BLUEPRINT.md`
+- **Architecture**: `docs/architecture.md`
 
 ---
 

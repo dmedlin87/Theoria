@@ -38,37 +38,37 @@ and architectural plans are organized under `docs/`.
   policies, and feature flags for topic digests. Shared LLM
   registry primitives (secret handling, bootstrap defaults) now live in
   `theo/application/ports/ai_registry.py`.
-- **API Composition** – `theo/services/api/app/main.py` builds the FastAPI app,
+- **API Composition** – `theo/infrastructure/api/app/main.py` builds the FastAPI app,
   registers routers from feature packages (ingestion, retrieval, analytics,
   creators, transcripts, MCP integrations), enables OpenAPI docs, and wires
   middleware for security, telemetry, and error handling.
-- **Data Model** – `theo/services/api/app/db/models.py` houses SQLAlchemy models
+- **Data Model** – `theo/infrastructure/api/app/db/models.py` houses SQLAlchemy models
   for documents, passages, annotations, chat sessions, case builder entities,
   ingestion jobs, and analytics tables. Vector columns leverage pgvector or
   SQLite fallbacks via custom `VectorType` definitions in
-  `theo/services/api/app/db/types.py`.
-- **Ingestion Pipeline** – `theo/services/api/app/ingest/pipeline.py` orchestrates
+  `theo/infrastructure/api/app/db/types.py`.
+- **Ingestion Pipeline** – `theo/infrastructure/api/app/ingest/pipeline.py` orchestrates
   source ingestion: normalizes content, chunks passages, generates embeddings,
   persists metadata, and emits Celery tasks for background enrichment. Web
   fetches honour configurable timeouts, size limits, and redirect caps from the
   settings facade.
-- **Hybrid Retrieval & Ranking** – `theo/services/api/app/retriever/hybrid.py`
+- **Hybrid Retrieval & Ranking** – `theo/infrastructure/api/app/retriever/hybrid.py`
   blends vector similarity with lexical scoring, annotation boosts, and OSIS
   reference alignment. Optional reranking is provided via
-  `theo/services/api/app/ranking/re_ranker.py`, which loads a local or external
+  `theo/infrastructure/api/app/ranking/re_ranker.py`, which loads a local or external
   reranker model when enabled in settings. Verse-specific retrieval helpers live
-  in `theo/services/api/app/retriever/verses.py` and integrate with the OSIS
-  normalisation utilities in `theo/services/api/app/ingest/osis.py`.
-- **Generative Workflows** – `theo/services/api/app/ai/rag.py` and the
+  in `theo/infrastructure/api/app/retriever/verses.py` and integrate with the OSIS
+  normalisation utilities in `theo/infrastructure/api/app/ingest/osis.py`.
+- **Generative Workflows** – `theo/infrastructure/api/app/ai/rag.py` and the
   `creators` package implement sermon prep, transcript synthesis, and
   verse-perspective outputs that keep citations anchored to passages. Guardrails
   enforce citation drift detection and compliance with anchored references.
-- **Background Jobs** – `theo/services/api/app/workers/tasks.py` configures a
+- **Background Jobs** – `theo/infrastructure/api/app/workers/tasks.py` configures a
   Celery app backed by Redis, schedules nightly HNSW refresh and citation audit
   jobs, validates cached chat citations, emits topic digests, and runs watchlist
   analytics. Workers resolve dependencies via the shared application container
   and operate against the same SQLAlchemy engine.
-- **Telemetry & Security** – `theo/services/api/app/telemetry.py` publishes key
+- **Telemetry & Security** – `theo/infrastructure/api/app/telemetry.py` publishes key
   workflow events (citation drift, ingest diagnostics) while `security.py`
   enforces API key and JWT auth strategies. OpenTelemetry tracing is threaded
   through retriever and ingestion paths for observability.
@@ -122,11 +122,11 @@ and architectural plans are organized under `docs/`.
 
 - **Database** – SQLAlchemy models back a Postgres (or SQLite) store with tables
   for documents, passages, OSIS verse graphs, ingestion jobs, analytics events,
-  and chat sessions. Migrations live in `theo/services/api/app/db/migrations` and
+  and chat sessions. Migrations live in `theo/infrastructure/api/app/db/migrations` and
   can be executed via `run_sql_migrations.py`.
 - **Vector Search** – `VectorType` columns map to pgvector in Postgres and
   fallback to JSON blobs for SQLite. Hybrid search loads embeddings from
-  `theo/services/api/app/ingest/embeddings.py`, caching vectors based on the
+  `theo/infrastructure/api/app/ingest/embeddings.py`, caching vectors based on the
   configured embedding model and dimension settings.
 - **Storage** – Persisted artifacts (normalized snapshots, transcripts, exports)
   are written under `storage_root`, with optional public URLs when configured.

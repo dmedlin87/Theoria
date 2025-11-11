@@ -138,7 +138,7 @@ v2.include_router(search_v2_router)  # → /api/v2/search
 ```
 
 ### Files Created
-- `theo/services/api/app/versioning.py` - Versioning infrastructure
+- `theo/infrastructure/api/app/versioning.py` - Versioning infrastructure
 
 ### Integration with main.py
 
@@ -214,7 +214,7 @@ if not document:
 
 ### Files Created
 - `theo/domain/errors.py` - Domain error hierarchy
-- `theo/services/api/app/error_handlers.py` - HTTP error mapping
+- `theo/infrastructure/api/app/error_handlers.py` - HTTP error mapping
 
 ### Error Status Mapping
 
@@ -274,7 +274,7 @@ def list_documents_with_passages(session, user_id):
 ```
 
 ### Files Created
-- `theo/services/api/app/db/query_optimizations.py` - Query helpers
+- `theo/infrastructure/api/app/db/query_optimizations.py` - Query helpers
 
 ### Optimization Techniques
 

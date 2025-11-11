@@ -97,29 +97,16 @@ Each archive directory includes a README explaining its contents and retention p
 
 ### 3. ✅ Branding Updated
 
-Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
+Updated "Theo Engine" / "TheoEngine" → "Theoria" across the current documentation, including canonical guides such as:
 
 - docs/API.md
 - docs/AGENT_CONFINEMENT.md
-- docs/BLUEPRINT.md
-- docs/SERVICE_MANAGEMENT.md
+- docs/architecture.md
+- docs/INTEGRATIONS.md
+- docs/Repo-Health.md
+- docs/testing.md
 - docs/theoria_instruction_prompt.md
-- docs/ui_overhaul_proposal.md
-- docs/performance.md
-- docs/debugging-guide.md
-- docs/AGENT_THINKING_ENHANCEMENT.md
-- docs/Chunking.md
-- docs/Frontmatter.md
-- docs/IMPLEMENTATION_GUIDE.md
-- docs/LIGHTHOUSE_ENHANCEMENTS.md
-- docs/OSIS.md
-- docs/authentication.md
-- docs/mcp_integration_guide.md
-- docs/production_readiness_gaps.md
-- docs/Modularity-Plan.md
-- docs/refactor_modularity_plan.md
-- docs/redteam.md
-- docs/telemetry.md
+- docs/theoria-evidence-cards.md
 - docs/document_inventory.md
 - docs/adr/0001-mcp-tools-and-apps-sdk.md
 
@@ -142,7 +129,7 @@ Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
 - DEPLOYMENT.md
 - THREATMODEL.md
 - START_HERE.md
-- test-ui-enhancements.md
+- docs/ (active documentation)
 - Configuration files (pyproject.toml, mypy.ini, etc.)
 - Scripts and utilities
 
@@ -152,28 +139,33 @@ Updated "Theo Engine" / "TheoEngine" → "Theoria" in 23 canonical documents:
 
 ```
 .
-├── README.md                    # Project overview
-├── CONTRIBUTING.md              # Contributor guide
-├── SECURITY.md                  # Security policy
-├── DEPLOYMENT.md                # Deployment guide
-├── THREATMODEL.md               # Threat model
-├── START_HERE.md                # Getting started
-└── docs/
-    ├── INDEX.md                 # ← NEW: Master navigation
-    ├── CASE_BUILDER.md          # ← NEW: Consolidated case builder spec
-    ├── API.md                   # API reference (updated branding)
-    ├── DISCOVERY_FEATURE.md     # Discovery feed spec
-    ├── BLUEPRINT.md             # System architecture
-    ├── AGENT_CONFINEMENT.md     # MCP security framework
-    ├── [... 80+ active docs]
-    └── archive/                 # ← NEW: Historical documentation
-        ├── README.md            # Archive overview
-        ├── 2025-10/            # October session summaries
-        ├── fixes/              # Resolved bug reports
-        ├── audits/             # Audit snapshots
-        ├── planning/           # Completed plans & agent tasks
-        └── ui-sessions/        # UI refactoring notes
+- README.md                    # Project overview
+- CONTRIBUTING.md              # Contributor guide
+- SECURITY.md                  # Security policy
+- DEPLOYMENT.md                # Deployment guide
+- THREATMODEL.md               # Threat model
+- START_HERE.md                # Getting started
+- docs/
+  - INDEX.md                   # Master navigation
+  - API.md                     # API reference (updated branding)
+  - AGENT_CONFINEMENT.md       # Guardrails and agent security
+  - architecture.md            # Platform architecture narrative
+  - INTEGRATIONS.md            # Integration and deployment guidance
+  - Repo-Health.md             # Repository reliability signals
+  - testing.md                 # Testing posture overview
+  - theoria_instruction_prompt.md # Agent prompt contract
+  - theoria-evidence-cards.md  # Evidence card heuristics
+  - testing/TEST_MAP.md        # Authoritative testing matrix
+  - coverage/90_PERCENT_STRATEGY.md # Coverage improvement plan
+  - archive/
+    - README.md                # Archive overview
+    - 2025-10/                # October session summaries
+    - fixes/                  # Resolved bug reports
+    - audits/                 # Audit snapshots
+    - planning/               # Completed plans & agent tasks
+    - ui-sessions/            # UI refactoring notes
 ```
+
 
 ## Benefits
 
@@ -203,19 +195,19 @@ All authoritative references remain current and accessible:
 - README.md, CONTRIBUTING.md, SECURITY.md, DEPLOYMENT.md, THREATMODEL.md, START_HERE.md
 
 **Development:**
-- API.md, CLI.md, Chunking.md, Frontmatter.md, OSIS.md, authentication.md
+- docs/API.md, docs/architecture.md, docs/INTEGRATIONS.md, docs/testing.md, docs/document_inventory.md
 
 **Features:**
-- DISCOVERY_FEATURE.md, DISCOVERY_QUICK_START.md, CASE_BUILDER.md, IMPLEMENTATION_GUIDE.md
+- docs/AGENT_CONFINEMENT.md, docs/theoria_instruction_prompt.md, docs/theoria-evidence-cards.md
 
 **Architecture:**
-- BLUEPRINT.md, CODEBASE_REVIEW.md, AGENT_CONFINEMENT.md, SERVICE_MANAGEMENT.md
+- docs/architecture.md, docs/INTEGRATIONS.md
 
 **Operations:**
-- performance.md, lighthouse-ci.md, debugging-guide.md, telemetry.md, runbooks/
+- docs/Repo-Health.md, docs/testing/TEST_MAP.md, docs/runbooks/
 
 **Testing:**
-- testing/TEST_MAP.md, ui-quality-gates.md, ui_guidelines.md, typing-standards.md
+- docs/testing.md, docs/testing/TEST_MAP.md, docs/coverage/90_PERCENT_STRATEGY.md
 
 ## Next Steps (Optional)
 
@@ -249,7 +241,7 @@ Select-String -Path docs\*.md -Pattern "Theo Engine|TheoEngine" | Where-Object {
 
 **New Documentation:**
 1. `docs/INDEX.md` - Master navigation index
-2. `docs/CASE_BUILDER.md` - Consolidated case builder spec
+2. `docs/document_inventory.md` - Live manifest of active documentation
 3. `docs/archive/README.md` - Archive overview
 4. `docs/archive/2025-10/README.md` - October summaries index
 5. `docs/archive/fixes/README.md` - Bug fixes index

@@ -4,9 +4,9 @@
 **Scope:** Core reasoning pipeline including metacognition, fallacy detection, and revision system  
 **Files Reviewed:**
 
-- `theo/services/api/app/ai/reasoning/metacognition.py`
-- `theo/services/api/app/ai/reasoning/fallacies.py`
-- `theo/services/api/app/ai/rag/workflow.py` (lines 400-500, 1483-1532)
+- `theo/infrastructure/api/app/ai/reasoning/metacognition.py`
+- `theo/infrastructure/api/app/ai/reasoning/fallacies.py`
+- `theo/infrastructure/api/app/ai/rag/workflow.py` (lines 400-500, 1483-1532)
 - `tests/api/ai/test_reasoning_modules.py`
 
 ---

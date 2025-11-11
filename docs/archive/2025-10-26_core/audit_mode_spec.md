@@ -183,7 +183,7 @@ All SLA clocks and state transitions surface in the reporting layer dashboards, 
 - **Audit-Web latency budget (resolved 2025-10-18)**: Audit-Web escalation overhead is capped at ≤3.0 s p95 to keep total response time within 3.5 s while respecting UX guardrails (heavy operations <5 s, primary content visible by 2.5 s).
 - **Audit-Web external API access (resolved 2025-10-21)**: External lookups target PubMed, arXiv, and ACL Anthology. PubMed uses service principal–scoped API keys (`THEO_AUDIT_PUBMED_API_KEY`), rotated every 90 days, injected via environment variables, and governed by `docs/security/secret-scanning.md` procedures.
 - **Monitoring & observability for external connectors (resolved 2025-10-21)**: Outbound requests emit structured metrics via `theo.services.api.app.ai.audit_logging`; alerts trigger on PubMed quota depletion (<20% hourly) or 5xx rates >2% over 5 minutes, supplemented by nightly heartbeat probes.
-- **Implementation follow-ups for `theo/services/api/app/ai/` connectors**: Extend `clients.py` with dedicated PubMed/Arxiv/AclAnthology clients, update `rag/retrieval.py` selection logic, wire configuration in `registry.py`, and add masked-auth tests under `theo/services/api/app/ai/tests/` with VCR fixtures.
+- **Implementation follow-ups for `theo/infrastructure/api/app/ai/` connectors**: Extend `clients.py` with dedicated PubMed/Arxiv/AclAnthology clients, update `rag/retrieval.py` selection logic, wire configuration in `registry.py`, and add masked-auth tests under `theo/infrastructure/api/app/ai/tests/` with VCR fixtures.
 
 ## 12. Success Metrics
 - ≥90% of audited claims labeled `SUPPORTED` without human intervention.

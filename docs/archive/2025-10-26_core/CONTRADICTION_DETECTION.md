@@ -47,7 +47,7 @@ Automatically inferred from shared topics:
 
 ### Integration
 - Modified `theo/domain/discoveries/__init__.py` - Export engine
-- Modified `theo/services/api/app/discoveries/service.py` - Integrate into refresh
+- Modified `theo/infrastructure/api/app/discoveries/service.py` - Integrate into refresh
 
 ### Dependencies
 - Added to `requirements.txt`:

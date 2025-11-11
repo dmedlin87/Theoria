@@ -41,7 +41,7 @@ in lockstep.
   - Implement repository/service layer APIs for CRUD and status transitions.
   - Backfill tests covering optimistic concurrency and soft-deletes.
 - **Cognitive Gate Service v0**
-  - Convert the prompt kernel into `theo/services/api/app/ai/gate/service.py`.
+  - Convert the prompt kernel into `theo/infrastructure/api/app/ai/gate/service.py`.
   - Implement score computation, policy thresholds, and audit logging.
   - Expose `/api/ai/gate/evaluate` endpoint with contract tests.
 - **Integration & Telemetry**
@@ -73,7 +73,7 @@ in lockstep.
 
 ### Tasks
 - **TMS Service Layer**
-  - Implement `theo/services/api/app/ai/tms/service.py` with session lifecycle management.
+  - Implement `theo/infrastructure/api/app/ai/tms/service.py` with session lifecycle management.
   - Persist step history including prompt, agent, gate verdict, and outcome.
   - Create retention policy jobs for pruning inactive sessions.
 - **Admin & Observability**

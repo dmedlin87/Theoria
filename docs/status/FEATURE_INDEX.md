@@ -5,12 +5,11 @@ Each entry lists the canonical document, owning group, last review date, and cur
 
 | Feature / Area | Canonical Doc | Owner | Last Reviewed | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Cognitive Scholar MVP (CS-002 → CS-016) | `COGNITIVE_SCHOLAR_HANDOFF_NEW.md` | Cognitive Scholar Team | 2025-10-19 | Active | Update after each CS ticket milestone |
-| Roadmap Overview | `docs/ROADMAP.md` | Product | 2025-10-19 | Active | Mirrors `HANDOFF_NEXT_PHASE.md` |
-| Next Steps Playbook | `NEXT_STEPS.md` | Cognitive Scholar Team | 2025-10-19 | Active | Refresh every 48h during MVP push |
-| Discovery Feature | `docs/DISCOVERY_FEATURE.md` | Discovery Squad | 2025-10-19 | Stable | Update when engines change behaviour |
-| Architecture Improvements | `docs/ARCHITECTURE_IMPROVEMENTS.md` | Platform | 2025-10-18 | Stable | Quarterly review |
-| Tasks Index | `docs/tasks/README.md` | PMO | 2025-10-18 | Stable | Sync with TASK_005 |
+| Platform Architecture | `docs/architecture.md` | Platform | 2025-11-11 | Active | Overview of service boundaries and data flow |
+| API Surface | `docs/API.md` | API Team | 2025-11-11 | Active | REST/CLI contracts and payload definitions |
+| Repository Health | `docs/Repo-Health.md` | Platform Ops | 2025-11-11 | Active | Observability, runbooks, and maintenance |
+| Documentation Index | `docs/INDEX.md` | Docs Team | 2025-11-11 | Active | Master navigation for all guidance |
+| Testing Matrix | `docs/testing/TEST_MAP.md` | QA | 2025-11-11 | Active | Coverage ownership and expectations |
 
 ## Governance Notes
 

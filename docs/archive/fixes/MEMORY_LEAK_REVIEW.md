@@ -23,7 +23,7 @@ The codebase demonstrates **generally good memory management practices** with pr
 
 ### 1. ❌ **HTTP Clients Not Closed in AI Client Wrappers**
 
-**Location:** `theo/services/api/app/ai/clients.py`
+**Location:** `theo/infrastructure/api/app/ai/clients.py`
 
 **Issue:** All AI client classes (`OpenAIClient`, `AzureOpenAIClient`, `AnthropicClient`, `VertexAIClient`, `LocalVLLMClient`) create `httpx.Client` instances but **never close them**. HTTP clients maintain connection pools that must be explicitly closed.
 
@@ -77,7 +77,7 @@ with OpenAIClient(config) as client:
 
 ### 2. ⚠️ **Unbounded Cache Growth in AI Clients**
 
-**Location:** `theo/services/api/app/ai/clients.py` (line 176)
+**Location:** `theo/infrastructure/api/app/ai/clients.py` (line 176)
 
 **Issue:** All AI client classes use an unbounded in-memory cache (`self._cache: dict[str, str] = {}`) that grows indefinitely with every unique `cache_key`.
 
@@ -147,7 +147,7 @@ def check_session_leaks():
 
 ### 4. 🔶 **Celery Task Engine References Retained**
 
-**Location:** `theo/services/api/app/workers/tasks.py`
+**Location:** `theo/infrastructure/api/app/workers/tasks.py`
 
 **Issue:** Tasks call `get_engine()` which creates/reuses a global engine singleton, but individual sessions are properly managed. The engine itself is never explicitly disposed during worker shutdown.
 
@@ -191,7 +191,7 @@ def cleanup_engine(sender, **kwargs):
 
 ### 6. 🔶 **URL Opener Not Explicitly Closed**
 
-**Location:** `theo/services/api/app/ingest/network.py` (line 212)
+**Location:** `theo/infrastructure/api/app/ingest/network.py` (line 212)
 
 **Issue:** `urllib.request.build_opener()` creates an opener that holds references, though CPython's garbage collector should handle it.
 

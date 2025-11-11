@@ -12,11 +12,10 @@ This index highlights the current source-of-truth documents for Theoria. Anythin
   - [CONTRIBUTING.md](../CONTRIBUTING.md) — Contribution workflow and tooling expectations.
 
 - **Architecture & Operations**
-  - [architecture.md](architecture.md) — High-level platform architecture.
-  - [architecture_review.md](architecture_review.md) — Latest architecture assessment and follow-up work.
-  - [codebase_stabilization_plan.md](codebase_stabilization_plan.md) — Live resilience and hardening plan.
-  - [Repo-Health.md](Repo-Health.md) — Signals and scorecard for repository maintenance.
-  - [runbooks/database_initialization.md](runbooks/database_initialization.md) — Database bootstrapping steps and required performance indexes.
+  - [architecture.md](architecture.md) - High-level platform architecture.
+  - [INTEGRATIONS.md](INTEGRATIONS.md) - External system and deployment integration guidance.
+  - [Repo-Health.md](Repo-Health.md) - Signals and scorecard for repository maintenance.
+  - [runbooks/database_initialization.md](runbooks/database_initialization.md) - Database bootstrapping steps and required performance indexes.
 
 - **API & Agent Surface**
   - [API.md](API.md) — REST surface area and integration requirements.

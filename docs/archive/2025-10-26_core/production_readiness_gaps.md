@@ -6,7 +6,7 @@ This document captures the highest-risk items currently blocking a production-re
 
 ## 1. Inflight ledger restart handling fails concurrency test
 - **Impact:** High – Deduplication ledger loses completed generations after a router restart. Waiters can block indefinitely and the shared output is never replayed, breaking request fan-out and causing user-visible timeouts.
-- **Evidence:** `pytest` suite fails on `test_wait_for_inflight_preserves_completed_output_after_restart_failure`, demonstrating that the preserved output is not observed once a restarted router recreates the inflight row.【8c5ff9†L1-L88】 The defect stems from `SharedLedger.wait_for_inflight`, which does not surface the preserved success payload when a `waiting` row is recreated after success.【F:theo/services/api/app/ai/ledger.py†L520-L870】
+- **Evidence:** `pytest` suite fails on `test_wait_for_inflight_preserves_completed_output_after_restart_failure`, demonstrating that the preserved output is not observed once a restarted router recreates the inflight row.【8c5ff9†L1-L88】 The defect stems from `SharedLedger.wait_for_inflight`, which does not surface the preserved success payload when a `waiting` row is recreated after success.【F:theo/infrastructure/api/app/ai/ledger.py†L520-L870】
 - **Remediation:** Fix `wait_for_inflight` so that any new `waiting` row that still carries a completed output immediately replays the preserved record to all waiting threads. Add regression coverage using the failing test to verify the fix.
 
 ## 2. Signed container releases ship without vulnerability scanning

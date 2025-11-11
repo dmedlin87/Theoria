@@ -113,7 +113,7 @@ export MCP_WRITE_ALLOWLIST="note_write=org-acme,org-seminary"
 export MCP_WRITE_ALLOWLIST="note_write=org-acme;index_refresh=admin-user"
 ```
 
-### 4. RAG Guardrails (`theo/services/api/app/ai/rag/guardrails.py`)
+### 4. RAG Guardrails (`theo/infrastructure/api/app/ai/rag/guardrails.py`)
 
 **Purpose:** Ensure AI-generated content is safe and properly grounded in source material.
 

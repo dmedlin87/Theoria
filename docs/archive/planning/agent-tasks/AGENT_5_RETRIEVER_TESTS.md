@@ -3,10 +3,10 @@
 ## Priority: HIGH | Time: 2-3 days | Owner: Agent 5
 
 ## Objective
-Boost `theo/services/api/app/retriever/` coverage from 12.8% to 70%+
+Boost `theo/infrastructure/api/app/retriever/` coverage from 12.8% to 70%+
 
 ## Your Files (Exclusive)
-- Directory: `theo/services/api/app/retriever/` (8 files)
+- Directory: `theo/infrastructure/api/app/retriever/` (8 files)
 - Tests: `tests/api/retriever/` (CREATE THIS)
 
 ## Tasks

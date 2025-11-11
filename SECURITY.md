@@ -39,7 +39,7 @@ Include the following:
 | V6 Stored Cryptography | Secrets encrypted-at-rest via registry migration utilities | `tests/api/test_ai_registry.py` |
 | V8 Data Protection | TLS terminated at ingress (deployment guide) + hashed keys | Deployment pipeline doc |
 | V10 Malicious Code | Pinned dependencies, CodeQL, Ruff static analysis | CI workflows, SARIF upload |
-| V14 Configuration | Pydantic Settings / environment validation, `.env` template | `docs/authentication.md`, coverage tests |
+| V14 Configuration | Pydantic Settings / environment validation, `.env` template | `README.md#phase-1-environment-setup`, coverage tests |
 
 ## Additional Practices
 

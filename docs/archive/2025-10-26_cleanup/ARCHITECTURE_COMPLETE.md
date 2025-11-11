@@ -27,15 +27,15 @@ Comprehensive architectural review conducted and **all high-priority improvement
 8. ✅ `theo/domain/errors.py` - Domain error hierarchy
 
 ### Service Layer (4 files)
-9. ✅ `theo/services/api/app/versioning.py` - API versioning system
-10. ✅ `theo/services/api/app/error_handlers.py` - Error handling middleware
-11. ✅ `theo/services/api/app/db/query_optimizations.py` - Query tools
-12. ✅ `theo/services/api/app/main.py` - Integrated error handlers & versioning
+9. ✅ `theo/infrastructure/api/app/versioning.py` - API versioning system
+10. ✅ `theo/infrastructure/api/app/error_handlers.py` - Error handling middleware
+11. ✅ `theo/infrastructure/api/app/db/query_optimizations.py` - Query tools
+12. ✅ `theo/infrastructure/api/app/main.py` - Integrated error handlers & versioning
 
 ### Reference Implementations (3 files)
-13. ✅ `theo/services/api/app/routes/discoveries_v1.py` - Clean v1 routes
-14. ✅ `theo/services/api/app/use_cases/__init__.py` - Use case package
-15. ✅ `theo/services/api/app/use_cases/refresh_discoveries.py` - Use case pattern
+13. ✅ `theo/infrastructure/api/app/routes/discoveries_v1.py` - Clean v1 routes
+14. ✅ `theo/infrastructure/api/app/use_cases/__init__.py` - Use case package
+15. ✅ `theo/infrastructure/api/app/use_cases/refresh_discoveries.py` - Use case pattern
 
 ### Documentation (5 files)
 16. ✅ `docs/ARCHITECTURE_IMPROVEMENTS.md` - Implementation guide (695 lines)
@@ -259,8 +259,8 @@ Tests verify:
 - **Summary**: `ARCHITECTURE_REVIEW_IMPLEMENTATION_SUMMARY.md`
 
 ### Code References
-- **Reference Route**: `theo/services/api/app/routes/discoveries_v1.py`
-- **Use Case Pattern**: `theo/services/api/app/use_cases/refresh_discoveries.py`
+- **Reference Route**: `theo/infrastructure/api/app/routes/discoveries_v1.py`
+- **Use Case Pattern**: `theo/infrastructure/api/app/use_cases/refresh_discoveries.py`
 - **Tests**: `tests/application/repositories/test_discovery_repository.py`
 
 ### Architecture Decision Records

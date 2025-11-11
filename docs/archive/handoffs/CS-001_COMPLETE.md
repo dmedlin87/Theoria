@@ -38,7 +38,7 @@
    - Implementation summary and handoff notes
 
 ### Modified (1 file):
-1. **`theo/services/api/app/routes/ai/workflows/chat.py`**
+1. **`theo/infrastructure/api/app/routes/ai/workflows/chat.py`**
    - Created `_create_mock_reasoning_timeline()` helper function
    - Populates existing `RAGAnswer.reasoning_trace` field with 7-step workflow
    - Uses existing `ReasoningTrace` format that frontend already displays
@@ -51,7 +51,7 @@
 ### Backend
 
 **Existing Infrastructure** (Discovered during testing):
-- `theo/services/api/app/ai/rag/models.py` contains:
+- `theo/infrastructure/api/app/ai/rag/models.py` contains:
   - `RAGAnswer` already has `reasoning_trace` field
   - `ReasoningTrace` model (summary, strategy, steps)
   - `ReasoningTraceStep` model (id, label, detail, outcome, status, citations, evidence, children)

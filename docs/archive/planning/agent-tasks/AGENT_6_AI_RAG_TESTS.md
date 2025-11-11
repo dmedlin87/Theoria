@@ -6,8 +6,8 @@
 Boost AI/RAG coverage from 23-25% to 70%+
 
 ## Your Files (Exclusive)
-- `theo/services/api/app/ai/` (9 files) - 25.5% coverage
-- `theo/services/api/app/ai/rag/` (10 files) - 23.4% coverage
+- `theo/infrastructure/api/app/ai/` (9 files) - 25.5% coverage
+- `theo/infrastructure/api/app/ai/rag/` (10 files) - 23.4% coverage
 - Tests: `tests/api/ai/` (EXPAND THIS)
 
 ## Existing Tests (Study First)

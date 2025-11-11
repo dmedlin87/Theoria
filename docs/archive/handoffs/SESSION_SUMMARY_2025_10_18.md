@@ -19,13 +19,13 @@ Conducted comprehensive architectural review of Theoria's hexagonal architecture
 2. ✅ `theo/application/repositories/` - Repository interfaces (2 files)
 3. ✅ `theo/adapters/persistence/` - Mappers + repositories (2 files)
 4. ✅ `theo/domain/errors.py` - Domain error hierarchy
-5. ✅ `theo/services/api/app/versioning.py` - API versioning
-6. ✅ `theo/services/api/app/error_handlers.py` - Error middleware
-7. ✅ `theo/services/api/app/db/query_optimizations.py` - Query tools
+5. ✅ `theo/infrastructure/api/app/versioning.py` - API versioning
+6. ✅ `theo/infrastructure/api/app/error_handlers.py` - Error middleware
+7. ✅ `theo/infrastructure/api/app/db/query_optimizations.py` - Query tools
 
 ### Reference Implementations (3 files)
-8. ✅ `theo/services/api/app/routes/discoveries_v1.py` - Clean v1 routes
-9. ✅ `theo/services/api/app/use_cases/` - Use case pattern (2 files)
+8. ✅ `theo/infrastructure/api/app/routes/discoveries_v1.py` - Clean v1 routes
+9. ✅ `theo/infrastructure/api/app/use_cases/` - Use case pattern (2 files)
 
 ### Tests (3 files)
 10. ✅ `tests/application/repositories/test_discovery_repository.py` - 16 unit tests

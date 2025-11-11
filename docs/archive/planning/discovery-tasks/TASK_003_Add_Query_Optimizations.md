@@ -16,7 +16,7 @@ Add eager loading and performance monitoring to high-traffic endpoints to elimin
 ## 📊 Target Endpoints
 
 ### 1. Search Endpoint
-**File**: `theo/services/api/app/routes/search.py`
+**File**: `theo/infrastructure/api/app/routes/search.py`
 
 **Current Issue**: N+1 queries loading documents + passages
 
@@ -36,12 +36,12 @@ def hybrid_search(...):
 ```
 
 ### 2. Document Detail Endpoint
-**File**: `theo/services/api/app/routes/documents.py`
+**File**: `theo/infrastructure/api/app/routes/documents.py`
 
 **Fix**: Eager load passages when retrieving single document
 
 ### 3. Discovery Listing
-**File**: `theo/services/api/app/routes/discoveries.py`
+**File**: `theo/infrastructure/api/app/routes/discoveries.py`
 
 **Fix**: Add pagination, limit to 100 per page
 

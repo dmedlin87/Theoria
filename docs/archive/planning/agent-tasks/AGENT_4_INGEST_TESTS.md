@@ -17,7 +17,7 @@ Existing tests: 68+ tests in 7 files
 ```
 
 ## Files You Own (Exclusive)
-All files in: `theo/services/api/app/ingest/` (13 files)
+All files in: `theo/infrastructure/api/app/ingest/` (13 files)
 
 Your test directory: `tests/ingest/` (existing, expand this)
 
@@ -53,7 +53,7 @@ python -m pytest tests/ingest/ \
 ```
 
 ### 2. Identify Untested Scenarios
-Read the source files in `theo/services/api/app/ingest/` and identify:
+Read the source files in `theo/infrastructure/api/app/ingest/` and identify:
 - Error handling code paths
 - Conditional branches
 - Exception handlers

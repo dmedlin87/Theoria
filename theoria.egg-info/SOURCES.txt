@@ -426,7 +426,7 @@ theo/infrastructure/api/tests/workers/test_discovery_scheduler.py
 theo/infrastructure/api/tests/workers/test_discovery_tasks.py
 theo/infrastructure/api/tests/workers/test_tasks_properties.py
 theo/services/__init__.py
-theo/services/api/app/db/migrations/20250501_passage_embeddings_table.py
+theo/infrastructure/api/app/db/migrations/20250501_passage_embeddings_table.py
 theo/services/web/node_modules/flatted/python/flatted.py
 theoria.egg-info/PKG-INFO
 theoria.egg-info/SOURCES.txt

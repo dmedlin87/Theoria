@@ -35,7 +35,7 @@ Transform the Theoria agent from a reactive RAG system into an autonomous theolo
 
 #### 1.1 Logical Fallacy Detector
 
-**Location:** `theo/services/api/app/ai/reasoning/fallacies.py`
+**Location:** `theo/infrastructure/api/app/ai/reasoning/fallacies.py`
 
 Detect 20+ common fallacies in theological arguments:
 
@@ -52,7 +52,7 @@ Detect 20+ common fallacies in theological arguments:
 
 #### 1.2 Chain-of-Thought Prompting
 
-**Location:** `theo/services/api/app/ai/reasoning/chain_of_thought.py`
+**Location:** `theo/infrastructure/api/app/ai/reasoning/chain_of_thought.py`
 
 Force explicit reasoning steps:
 
@@ -85,7 +85,7 @@ Let's reason through this:
 
 #### 1.3 Hypothesis Generation & Testing
 
-**Location:** `theo/services/api/app/ai/reasoning/hypotheses.py`
+**Location:** `theo/infrastructure/api/app/ai/reasoning/hypotheses.py`
 
 Enable agent to form/test theories:
 
@@ -120,7 +120,7 @@ def test_hypothesis(hyp: Hypothesis, session: Session) -> HypothesisTest:
 
 #### 2.1 Self-Directed Exploration
 
-**Location:** `theo/services/api/app/ai/agents/explorer.py`
+**Location:** `theo/infrastructure/api/app/ai/agents/explorer.py`
 
 Agent autonomously chases leads:
 
@@ -171,7 +171,7 @@ Generate 2-3 follow-up search queries to fill these gaps.
 
 #### 3.1 Self-Critique Module
 
-**Location:** `theo/services/api/app/ai/reasoning/metacognition.py`
+**Location:** `theo/infrastructure/api/app/ai/reasoning/metacognition.py`
 
 Agent critiques its own reasoning:
 
@@ -217,7 +217,7 @@ After critique, agent can revise:
 
 #### 4.1 Perspective Orchestrator
 
-**Location:** `theo/services/api/app/ai/reasoning/perspectives.py`
+**Location:** `theo/infrastructure/api/app/ai/reasoning/perspectives.py`
 
 Current system filters by perspective - enhancement synthesizes across them:
 
@@ -276,7 +276,7 @@ def enrich_with_contradictions(osis: str, session: Session) -> dict:
 
 #### 5.1 "Aha!" Moment Detector
 
-**Location:** `theo/services/api/app/ai/reasoning/insights.py`
+**Location:** `theo/infrastructure/api/app/ai/reasoning/insights.py`
 
 Detect when agent makes novel connections:
 
@@ -396,7 +396,7 @@ Before I research this, let me clarify:
 
 #### 7.1 Enhanced Workflow Pipeline
 
-**Location:** `theo/services/api/app/ai/rag/workflow_v2.py`
+**Location:** `theo/infrastructure/api/app/ai/rag/workflow_v2.py`
 
 ```python
 class ReasoningPipeline(GuardedAnswerPipeline):

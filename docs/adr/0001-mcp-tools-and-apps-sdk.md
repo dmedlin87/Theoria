@@ -14,30 +14,30 @@ existing business logic without bypassing server-side policy enforcement.
 ### Tooling Surface
 | Tool | Description | Backend entrypoint | Notes |
 | --- | --- | --- | --- |
-| `search` | Hybrid keyword+vector retrieval with optional reranking. | `GET /search` → `hybrid_search` | Reuses the existing request model and reranker cache from the FastAPI route. 【F:theo/services/api/app/routes/search.py†L42-L108】
-| `scripture_lookup` | Retrieve passages with translation metadata. | `GET /research/scripture` → `fetch_passage` | Returns validated verses via the existing research models. 【F:theo/services/api/app/routes/research.py†L41-L59】【F:theo/services/api/app/research/__init__.py†L1-L18】
-| `cross_references` | Locate cross references for a verse. | `GET /research/crossrefs` → `fetch_cross_references` | Limits are surfaced as tool arguments. 【F:theo/services/api/app/routes/research.py†L62-L76】【F:theo/services/api/app/research/__init__.py†L1-L18】
-| `variants_apparatus` | Retrieve textual variants for an OSIS range. | `GET /research/variants` → `variants_apparatus` | Exposes category filters and pagination. 【F:theo/services/api/app/routes/research.py†L79-L109】【F:theo/services/api/app/research/__init__.py†L14-L18】
-| `dss_links` | Fetch Dead Sea Scrolls parallels. | `GET /research/dss-links` → `fetch_dss_links` | Returns structured DSS links with counts. 【F:theo/services/api/app/routes/research.py†L112-L126】【F:theo/services/api/app/research/__init__.py†L16-L18】
-| `reliability_overview` | Summarise reliability bullets for a verse. | `GET /research/overview` → `build_reliability_overview` | Requires DB session injection in the tool shim. 【F:theo/services/api/app/routes/research.py†L129-L148】【F:theo/services/api/app/research/__init__.py†L11-L15】
-| `morphology` | Return morphology tokens. | `GET /research/morphology` → `fetch_morphology` | JSON schema derived from existing token model. 【F:theo/services/api/app/routes/research.py†L151-L162】【F:theo/services/api/app/research/__init__.py†L5-L9】
-| `research_notes` | CRUD operations for anchored research notes. | `GET/POST/PATCH/DELETE /research/notes` → `get_notes_for_osis`, `create_research_note`, `update_research_note`, `delete_research_note` | Tool set will provide `list`, `create`, `update`, and `delete` sub-commands aligned to the REST handlers. 【F:theo/services/api/app/routes/research.py†L165-L231】【F:theo/services/api/app/research/__init__.py†L5-L13】
-| `historicity_search` | Citation lookup with filters. | `GET /research/historicity` → `historicity_search` | Rejects invalid year ranges before delegating. 【F:theo/services/api/app/routes/research.py†L234-L258】【F:theo/services/api/app/research/__init__.py†L16-L18】
-| `fallacy_detector` | Run fallacy detection over narrative text. | `POST /research/fallacies` → `fallacy_detect` | Uses same validation as HTTP endpoint. 【F:theo/services/api/app/routes/research.py†L267-L287】【F:theo/services/api/app/research/__init__.py†L4-L6】
-| `research_report` | Assemble comprehensive research reports. | `POST /research/report` → `report_build` | Surface optional fallacy inclusion and limits. 【F:theo/services/api/app/routes/research.py†L290-L314】【F:theo/services/api/app/research/__init__.py†L12-L17】
-| `contradictions` | Enumerate contradictions by verse/topic. | `GET /research/contradictions` → `search_contradictions` | Honors existing feature toggle in settings. 【F:theo/services/api/app/routes/research.py†L317-L347】【F:theo/services/api/app/research/__init__.py†L2-L4】
-| `commentaries` | Retrieve commentary excerpts. | `GET /research/commentaries` → `search_commentaries` | Maintains OSIS anchoring semantics. 【F:theo/services/api/app/routes/research.py†L350-L378】【F:theo/services/api/app/research/__init__.py†L1-L3】
-| `geo_search` | Geographic lookup for place names. | `GET /research/geo/search` → `lookup_geo_places` | Conditional on geo feature flag. 【F:theo/services/api/app/routes/research.py†L381-L398】【F:theo/services/api/app/research/__init__.py†L4-L7】
-| `geo_for_verse` | Geographic lookup for verses. | `GET /research/geo/verse` → `places_for_osis` | Returns cached geo overlays when enabled. 【F:theo/services/api/app/routes/research.py†L401-L409】【F:theo/services/api/app/research/__init__.py†L4-L7】
-| `jobs_inspect` | Enumerate and inspect ingestion jobs. | `GET /jobs` / `GET /jobs/{job_id}` → `_serialize_job` | Surfaces job metadata and status. 【F:theo/services/api/app/routes/jobs.py†L70-L118】【F:theo/services/api/app/routes/jobs.py†L47-L68】
-| `jobs_enqueue` | Enqueue ingestion, enrichment, or maintenance tasks. | `/jobs/reparse`, `/jobs/enrich`, `/jobs/refresh-hnsw`, `/jobs/summaries`, `/jobs/topic_digest`, `/jobs/validate_citations`, `/jobs/enqueue` | Provides typed wrappers over Celery-backed tasks while preserving idempotency guarantees. 【F:theo/services/api/app/routes/jobs.py†L121-L402】
+| `search` | Hybrid keyword+vector retrieval with optional reranking. | `GET /search` → `hybrid_search` | Reuses the existing request model and reranker cache from the FastAPI route. 【F:theo/infrastructure/api/app/routes/search.py†L42-L108】
+| `scripture_lookup` | Retrieve passages with translation metadata. | `GET /research/scripture` → `fetch_passage` | Returns validated verses via the existing research models. 【F:theo/infrastructure/api/app/routes/research.py†L41-L59】【F:theo/infrastructure/api/app/research/__init__.py†L1-L18】
+| `cross_references` | Locate cross references for a verse. | `GET /research/crossrefs` → `fetch_cross_references` | Limits are surfaced as tool arguments. 【F:theo/infrastructure/api/app/routes/research.py†L62-L76】【F:theo/infrastructure/api/app/research/__init__.py†L1-L18】
+| `variants_apparatus` | Retrieve textual variants for an OSIS range. | `GET /research/variants` → `variants_apparatus` | Exposes category filters and pagination. 【F:theo/infrastructure/api/app/routes/research.py†L79-L109】【F:theo/infrastructure/api/app/research/__init__.py†L14-L18】
+| `dss_links` | Fetch Dead Sea Scrolls parallels. | `GET /research/dss-links` → `fetch_dss_links` | Returns structured DSS links with counts. 【F:theo/infrastructure/api/app/routes/research.py†L112-L126】【F:theo/infrastructure/api/app/research/__init__.py†L16-L18】
+| `reliability_overview` | Summarise reliability bullets for a verse. | `GET /research/overview` → `build_reliability_overview` | Requires DB session injection in the tool shim. 【F:theo/infrastructure/api/app/routes/research.py†L129-L148】【F:theo/infrastructure/api/app/research/__init__.py†L11-L15】
+| `morphology` | Return morphology tokens. | `GET /research/morphology` → `fetch_morphology` | JSON schema derived from existing token model. 【F:theo/infrastructure/api/app/routes/research.py†L151-L162】【F:theo/infrastructure/api/app/research/__init__.py†L5-L9】
+| `research_notes` | CRUD operations for anchored research notes. | `GET/POST/PATCH/DELETE /research/notes` → `get_notes_for_osis`, `create_research_note`, `update_research_note`, `delete_research_note` | Tool set will provide `list`, `create`, `update`, and `delete` sub-commands aligned to the REST handlers. 【F:theo/infrastructure/api/app/routes/research.py†L165-L231】【F:theo/infrastructure/api/app/research/__init__.py†L5-L13】
+| `historicity_search` | Citation lookup with filters. | `GET /research/historicity` → `historicity_search` | Rejects invalid year ranges before delegating. 【F:theo/infrastructure/api/app/routes/research.py†L234-L258】【F:theo/infrastructure/api/app/research/__init__.py†L16-L18】
+| `fallacy_detector` | Run fallacy detection over narrative text. | `POST /research/fallacies` → `fallacy_detect` | Uses same validation as HTTP endpoint. 【F:theo/infrastructure/api/app/routes/research.py†L267-L287】【F:theo/infrastructure/api/app/research/__init__.py†L4-L6】
+| `research_report` | Assemble comprehensive research reports. | `POST /research/report` → `report_build` | Surface optional fallacy inclusion and limits. 【F:theo/infrastructure/api/app/routes/research.py†L290-L314】【F:theo/infrastructure/api/app/research/__init__.py†L12-L17】
+| `contradictions` | Enumerate contradictions by verse/topic. | `GET /research/contradictions` → `search_contradictions` | Honors existing feature toggle in settings. 【F:theo/infrastructure/api/app/routes/research.py†L317-L347】【F:theo/infrastructure/api/app/research/__init__.py†L2-L4】
+| `commentaries` | Retrieve commentary excerpts. | `GET /research/commentaries` → `search_commentaries` | Maintains OSIS anchoring semantics. 【F:theo/infrastructure/api/app/routes/research.py†L350-L378】【F:theo/infrastructure/api/app/research/__init__.py†L1-L3】
+| `geo_search` | Geographic lookup for place names. | `GET /research/geo/search` → `lookup_geo_places` | Conditional on geo feature flag. 【F:theo/infrastructure/api/app/routes/research.py†L381-L398】【F:theo/infrastructure/api/app/research/__init__.py†L4-L7】
+| `geo_for_verse` | Geographic lookup for verses. | `GET /research/geo/verse` → `places_for_osis` | Returns cached geo overlays when enabled. 【F:theo/infrastructure/api/app/routes/research.py†L401-L409】【F:theo/infrastructure/api/app/research/__init__.py†L4-L7】
+| `jobs_inspect` | Enumerate and inspect ingestion jobs. | `GET /jobs` / `GET /jobs/{job_id}` → `_serialize_job` | Surfaces job metadata and status. 【F:theo/infrastructure/api/app/routes/jobs.py†L70-L118】【F:theo/infrastructure/api/app/routes/jobs.py†L47-L68】
+| `jobs_enqueue` | Enqueue ingestion, enrichment, or maintenance tasks. | `/jobs/reparse`, `/jobs/enrich`, `/jobs/refresh-hnsw`, `/jobs/summaries`, `/jobs/topic_digest`, `/jobs/validate_citations`, `/jobs/enqueue` | Provides typed wrappers over Celery-backed tasks while preserving idempotency guarantees. 【F:theo/infrastructure/api/app/routes/jobs.py†L121-L402】
 
 ### JSON Schemas
 All MCP tool input/output schemas will be generated from the existing
 Pydantic models used by the HTTP routes, guaranteeing parity with current
 validation rules. For example, `HybridSearchRequest`/`HybridSearchResponse` and
 `JobEnqueueRequest`/`JobStatus` already describe the payloads we need to
-surface. 【F:theo/services/api/app/models/search.py†L5-L39】【F:theo/services/api/app/models/jobs.py†L15-L114】
+surface. 【F:theo/infrastructure/api/app/models/search.py†L5-L39】【F:theo/infrastructure/api/app/models/jobs.py†L15-L114】
 
 ### Authentication Propagation
 MCP tool adapters will forward `end_user_id` and optional tenant metadata to the
@@ -49,12 +49,12 @@ FastAPI layer using the existing authentication strategy:
   resolved principal so that downstream functions (e.g., DB session filters) can
   apply tenant scoping before querying shared tables.
 * Reject requests without an `end_user_id` unless `auth_allow_anonymous` is true
-  in settings, mirroring current API behaviour. 【F:theo/services/api/app/core/settings.py†L52-L118】
+  in settings, mirroring current API behaviour. 【F:theo/infrastructure/api/app/core/settings.py†L52-L118】
 
 ### Logging and Redaction
 * Reuse the structured logging already wired into the FastAPI routes (e.g.
   `logging.getLogger(__name__)` in `search.py`) to capture tool invocations
-  without duplicating instrumentation. 【F:theo/services/api/app/routes/search.py†L23-L45】
+  without duplicating instrumentation. 【F:theo/infrastructure/api/app/routes/search.py†L23-L45】
 * Ensure tool adapters scrub sensitive fields (`body` for research notes,
   `narrative_text` for reports) before logging payloads. Redaction will occur in
   the tool layer so that only metadata (IDs, counts) enters central logs.
@@ -66,7 +66,7 @@ FastAPI layer using the existing authentication strategy:
    Apps SDK configuration so that we can dark-launch in staging.
 2. Respect existing service toggles (e.g., `contradictions_enabled`, `geo_enabled`)
    when wiring tools; the adapter must probe the FastAPI settings endpoint before
-   enabling optional tools in clients. 【F:theo/services/api/app/routes/research.py†L319-L398】
+   enabling optional tools in clients. 【F:theo/infrastructure/api/app/routes/research.py†L319-L398】
 3. Roll out in phases: search → research basics → advanced research → job
    management. Each phase will promote from internal dogfood to partner preview
    before GA, with telemetry monitored through the shared logger and job metrics.

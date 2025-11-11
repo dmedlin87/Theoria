@@ -40,7 +40,7 @@ structured API logs, emitted spans, and database records.
 > is enabled, and returns the `debug_report_id` to the caller when
 > `response_on_error=True`. The report payload is produced by
 > `build_debug_report`, which also records contextual fields for downstream
-> correlation.【F:theo/services/api/app/debug/middleware.py†L20-L114】【F:theo/services/api/app/debug/reporting.py†L15-L188】
+> correlation.【F:theo/infrastructure/api/app/debug/middleware.py†L20-L114】【F:theo/infrastructure/api/app/debug/reporting.py†L15-L188】
 
 ## 3. Follow the span and metrics trail
 
@@ -60,7 +60,7 @@ structured API logs, emitted spans, and database records.
 > **Where this comes from:** The telemetry helpers wrap each workflow, attach
 > serialised attributes to the active span, emit structured log records, and
 > update the Prometheus counters/histograms before returning control to the
-> caller.【F:theo/services/api/app/telemetry.py†L79-L207】
+> caller.【F:theo/infrastructure/api/app/telemetry.py†L79-L207】
 
 ## 4. Trace into the database
 
@@ -82,7 +82,7 @@ structured API logs, emitted spans, and database records.
 > **Where this comes from:** The SQLAlchemy models define the document, passage,
 > and ingestion job schemas that you can join against the context collected in
 > the debug report, while the telemetry module emits cache metrics labelled by
-> event status for deeper analysis.【F:theo/services/api/app/db/models.py†L1-L146】【F:theo/services/api/app/telemetry.py†L101-L214】
+> event status for deeper analysis.【F:theo/infrastructure/api/app/db/models.py†L1-L146】【F:theo/infrastructure/api/app/telemetry.py†L101-L214】
 
 ## 5. Recap
 

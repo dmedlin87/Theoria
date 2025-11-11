@@ -105,7 +105,7 @@ Your AI agents have everything they need to continue development:
 **2.1 Reasoning Mode Toggle** ⭐ HIGH PRIORITY
 - Add mode selector to chat UI
 - Modes: detective/critic/apologist/synthesizer
-- Files: `theo/services/web/app/chat/page.tsx`, `theo/services/api/app/ai/router.py`
+- Files: `theo/services/web/app/chat/page.tsx`, `theo/infrastructure/api/app/ai/router.py`
 
 **2.2 Display Reasoning Trace**
 - Show step-by-step reasoning
@@ -123,14 +123,14 @@ Your AI agents have everything they need to continue development:
 
 - Replace landing page
 - Quick stats, recent activity, discoveries
-- Files: `theo/services/web/app/page.tsx`, `theo/services/api/app/routes/dashboard.py`
+- Files: `theo/services/web/app/page.tsx`, `theo/infrastructure/api/app/routes/dashboard.py`
 
 ### Phase 4: Citation Manager
 
 - Export citations (APA/Chicago/SBL/BibTeX)
 - Bibliography builder
 - Zotero integration (optional)
-- Files: `theo/services/api/app/export/citations.py`, `theo/services/web/components/CitationExport.tsx`
+- Files: `theo/infrastructure/api/app/export/citations.py`, `theo/services/web/components/CitationExport.tsx`
 
 ---
 
@@ -139,7 +139,7 @@ Your AI agents have everything they need to continue development:
 ### Examples to Follow
 - `theo/domain/discoveries/engine.py` - Pattern detection (reference implementation)
 - `theo/domain/discoveries/contradiction_engine.py` - Just implemented (best example)
-- `theo/services/api/app/discoveries/service.py` - Integration point
+- `theo/infrastructure/api/app/discoveries/service.py` - Integration point
 
 ### Documentation
 - `docs/INDEX.md` - Master documentation index
@@ -149,8 +149,8 @@ Your AI agents have everything they need to continue development:
 - `docs/CONTRADICTION_DETECTION.md` - Contradiction implementation
 
 ### Existing Code
-- `theo/services/api/app/main.py` - FastAPI app with scheduler
-- `theo/services/api/app/routes/discoveries.py` - API endpoints
+- `theo/infrastructure/api/app/main.py` - FastAPI app with scheduler
+- `theo/infrastructure/api/app/routes/discoveries.py` - API endpoints
 - `theo/services/web/app/discoveries/page.tsx` - Frontend UI
 
 ---

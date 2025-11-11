@@ -6,7 +6,7 @@
 - **Proposed task**: Replace the fragment with "evidence on tap" (or add the closing hyphen) so the sentence reads naturally.
 
 ## Bug fix task
-- **Location**: `theo/services/api/app/routes/realtime.py`
+- **Location**: `theo/infrastructure/api/app/routes/realtime.py`
 - **Issue**: `NotebookEventBroker.disconnect` never removes empty connection sets because the guard `if connections and not connections` short-circuits once the set becomes empty, so notebook IDs linger in `_connections`.
 - **Proposed task**: Update the condition to drop the key when the set exists but is empty (e.g., `if connections is not None and not connections:`) so idle notebooks release resources.
 

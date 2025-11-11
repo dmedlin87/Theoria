@@ -40,7 +40,7 @@ theo/domain/
 
 ### Service Layer
 ```
-theo/services/api/app/
+theo/infrastructure/api/app/
 ├── versioning.py                   # NEW - API versioning
 ├── error_handlers.py               # NEW - Standardized errors
 ├── routes/
@@ -57,8 +57,8 @@ theo/services/api/app/
 
 **Use the v1 discovery route as your template:**
 ```bash
-cp theo/services/api/app/routes/discoveries_v1.py \
-   theo/services/api/app/routes/my_feature_v1.py
+cp theo/infrastructure/api/app/routes/discoveries_v1.py \
+   theo/infrastructure/api/app/routes/my_feature_v1.py
 ```
 
 Then adapt for your domain.

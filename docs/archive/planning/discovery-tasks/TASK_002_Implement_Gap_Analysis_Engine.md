@@ -21,7 +21,7 @@ Implement Gap Analysis discovery engine using BERTopic to identify under-represe
 3. `tests/domain/discoveries/test_gap_engine.py` - Unit tests
 
 ### Modify:
-1. `theo/services/api/app/discoveries/service.py` - Integrate gap engine
+1. `theo/infrastructure/api/app/discoveries/service.py` - Integrate gap engine
 2. `theo/domain/discoveries/__init__.py` - Export GapDiscovery
 
 ---
@@ -62,7 +62,7 @@ Implement Gap Analysis discovery engine using BERTopic to identify under-represe
 ## 📚 References
 
 - Pattern: `theo/domain/discoveries/engine.py` (PatternDiscoveryEngine)
-- Integration: `theo/services/api/app/use_cases/refresh_discoveries.py`
+- Integration: `theo/infrastructure/api/app/use_cases/refresh_discoveries.py`
 - Testing: `tests/domain/discoveries/test_pattern_engine.py`
 
 **Next Task**: TASK_003 (Query Optimization)

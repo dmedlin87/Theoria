@@ -174,7 +174,7 @@ theo/services/web/app/api/discoveries/
      CREATE TABLE discoveries (...);
      CREATE TABLE corpus_snapshots (...);
      ```
-   - Implement FastAPI endpoints in `theo/services/api/app/routers/discoveries.py`
+   - Implement FastAPI endpoints in `theo/infrastructure/api/app/routers/discoveries.py`
    - Replace mock data in Next.js API routes with real backend calls
 
 ### Short Term (Next 2 Weeks)
@@ -305,7 +305,7 @@ CREATE INDEX idx_discoveries_viewed ON discoveries(user_id, viewed);
 ### API Endpoints (FastAPI)
 
 ```python
-# theo/services/api/app/routers/discoveries.py
+# theo/infrastructure/api/app/routers/discoveries.py
 
 @router.get("/api/discoveries")
 async def list_discoveries(
@@ -337,7 +337,7 @@ async def dismiss_discovery(...) -> StatusResponse:
 ### Background Analysis Job
 
 ```python
-# theo/services/api/app/background/discovery_analyzer.py
+# theo/infrastructure/api/app/background/discovery_analyzer.py
 
 async def analyze_corpus_for_discoveries(user_id: str):
     """
@@ -477,7 +477,7 @@ Theoria/
 
    **Step 2**: FastAPI Endpoints
    ```python
-   # Create theo/services/api/app/routers/discoveries.py
+   # Create theo/infrastructure/api/app/routers/discoveries.py
    # Implement GET, POST, DELETE handlers
    ```
 

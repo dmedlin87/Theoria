@@ -7,7 +7,7 @@ This document demonstrates how to migrate existing code to use the new architect
 ## Before: Tightly Coupled Service
 
 ```python
-# theo/services/api/app/routes/discoveries_old.py (OLD PATTERN)
+# theo/infrastructure/api/app/routes/discoveries_old.py (OLD PATTERN)
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -69,7 +69,7 @@ def mark_viewed(
 ## After: Clean Hexagonal Architecture
 
 ```python
-# theo/services/api/app/routes/discoveries.py (NEW PATTERN)
+# theo/infrastructure/api/app/routes/discoveries.py (NEW PATTERN)
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session

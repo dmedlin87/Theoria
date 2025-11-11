@@ -9,8 +9,8 @@ This session implemented **background auto-discovery** and completed **Phase 1.1
 ## What Was Completed ✅
 
 ### 1. Background Discovery Scheduler
-- **File:** `theo/services/api/app/workers/discovery_scheduler.py`
-- **Integration:** `theo/services/api/app/main.py` (FastAPI lifecycle)
+- **File:** `theo/infrastructure/api/app/workers/discovery_scheduler.py`
+- **Integration:** `theo/infrastructure/api/app/main.py` (FastAPI lifecycle)
 - **Docs:** `docs/DISCOVERY_SCHEDULER.md`
 - **Dependency:** `apscheduler>=3.10,<4`
 
@@ -94,7 +94,7 @@ This session implemented **background auto-discovery** and completed **Phase 1.1
 **2.1 Reasoning Mode Toggle**
 - Modify: `theo/services/web/app/chat/page.tsx`
 - Add modes: detective/critic/apologist/synthesizer
-- Backend: `theo/services/api/app/ai/router.py`
+- Backend: `theo/infrastructure/api/app/ai/router.py`
 
 **2.2 Display Reasoning Trace**
 - Create: `theo/services/web/components/ReasoningTrace.tsx`
@@ -109,20 +109,20 @@ This session implemented **background auto-discovery** and completed **Phase 1.1
 ### Phase 3: Personalized Dashboard (Week 4)
 
 - Modify: `theo/services/web/app/page.tsx` (replace landing)
-- Create: `theo/services/api/app/routes/dashboard.py`
+- Create: `theo/infrastructure/api/app/routes/dashboard.py`
 - Sections: stats, activity, discoveries, quick actions
 
 ### Phase 4: Citation Manager (Week 5-6)
 
 **4.1 Citation Export**
-- Create: `theo/services/api/app/export/citations.py`
+- Create: `theo/infrastructure/api/app/export/citations.py`
 - Formats: APA, Chicago, SBL, BibTeX
 
 **4.2 Bibliography Builder**
 - Create: `theo/services/web/app/bibliography/page.tsx`
 
 **4.3 Zotero Integration** (optional)
-- Create: `theo/services/api/app/export/zotero.py`
+- Create: `theo/infrastructure/api/app/export/zotero.py`
 
 ---
 
@@ -155,7 +155,7 @@ tail -f logs/api.log | grep "Discovery scheduler"
 ## Key Files
 
 ### Created This Session
-- `theo/services/api/app/workers/discovery_scheduler.py`
+- `theo/infrastructure/api/app/workers/discovery_scheduler.py`
 - `theo/domain/discoveries/contradiction_engine.py`
 - `tests/domain/discoveries/test_contradiction_engine.py`
 - `docs/DISCOVERY_SCHEDULER.md`
@@ -165,16 +165,16 @@ tail -f logs/api.log | grep "Discovery scheduler"
 
 ### Modified This Session
 - `requirements.txt` (added apscheduler, transformers, torch, sentencepiece)
-- `theo/services/api/app/main.py` (scheduler lifecycle)
+- `theo/infrastructure/api/app/main.py` (scheduler lifecycle)
 - `theo/domain/discoveries/__init__.py` (export engine)
-- `theo/services/api/app/discoveries/service.py` (integrate contradiction detection)
+- `theo/infrastructure/api/app/discoveries/service.py` (integrate contradiction detection)
 - `docs/INDEX.md` (added links)
 
 ### Important Existing Files
 - `theo/domain/discoveries/engine.py` (pattern detection)
-- `theo/services/api/app/discoveries/service.py` (service layer)
-- `theo/services/api/app/discoveries/tasks.py` (background tasks)
-- `theo/services/api/app/routes/discoveries.py` (API endpoints)
+- `theo/infrastructure/api/app/discoveries/service.py` (service layer)
+- `theo/infrastructure/api/app/discoveries/tasks.py` (background tasks)
+- `theo/infrastructure/api/app/routes/discoveries.py` (API endpoints)
 - `theo/services/web/app/discoveries/page.tsx` (frontend)
 
 ---

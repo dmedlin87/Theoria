@@ -219,7 +219,7 @@ Theoria bundles a lightweight catalogue of verse-level tensions, harmonies, and 
 
 Perspective-aware fetchers in the web app call `/research/contradictions` and `/research/commentaries` with one query parameter per selected perspective. When no perspective is selected the panels intentionally short-circuit, preventing misleading "no data" states.
 
-All seed loaders live in `theo/services/api/app/db/seeds.py` and are idempotent; running them repeatedly keeps tables in sync with the bundled JSON/YAML without producing duplicates.
+All seed loaders live in `theo/infrastructure/api/app/db/seeds.py` and are idempotent; running them repeatedly keeps tables in sync with the bundled JSON/YAML without producing duplicates.
 
 ## 6) Chunking & Normalization (algorithms)
 

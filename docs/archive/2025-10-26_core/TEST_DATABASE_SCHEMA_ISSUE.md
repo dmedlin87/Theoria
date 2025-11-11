@@ -5,8 +5,8 @@
 ## Problem Summary
 
 Tests repeatedly fail with `sqlite3.OperationalError: no such column: contradiction_seeds.perspective` despite:
-- The `perspective` column being defined in `theo/services/api/app/db/models.py` (line 944)
-- A migration file existing at `theo/services/api/app/db/migrations/20250129_add_perspective_to_contradiction_seeds.sql`
+- The `perspective` column being defined in `theo/infrastructure/api/app/db/models.py` (line 944)
+- A migration file existing at `theo/infrastructure/api/app/db/migrations/20250129_add_perspective_to_contradiction_seeds.sql`
 - Multiple attempts to "fix" this issue
 
 ## Root Cause Analysis
@@ -38,7 +38,7 @@ Located in: `tests/conftest.py`
 
 The problem is **Python bytecode caching** combined with **partial test database initialization**:
 
-1. **Stale `.pyc` files**: When model definitions change, cached `.pyc` files in `theo/services/api/app/db/__pycache__/` may contain the OLD model definition without the `perspective` column
+1. **Stale `.pyc` files**: When model definitions change, cached `.pyc` files in `theo/infrastructure/api/app/db/__pycache__/` may contain the OLD model definition without the `perspective` column
 
 2. **Metadata registry caching**: SQLAlchemy's `Base.metadata` is built when modules are first imported. If an old model definition is imported and cached, subsequent calls to `Base.metadata.create_all()` use the stale schema
 
@@ -116,10 +116,10 @@ Before making ANY schema changes:
 
 ## Related Files
 
-- Model definition: `theo/services/api/app/db/models.py:909-953`
-- Migration file: `theo/services/api/app/db/migrations/20250129_add_perspective_to_contradiction_seeds.sql`
+- Model definition: `theo/infrastructure/api/app/db/models.py:909-953`
+- Migration file: `theo/infrastructure/api/app/db/migrations/20250129_add_perspective_to_contradiction_seeds.sql`
 - Test fixture workaround: `tests/api/conftest.py:48-238`
-- Migration runner: `theo/services/api/app/db/run_sql_migrations.py`
+- Migration runner: `theo/infrastructure/api/app/db/run_sql_migrations.py`
 - Failing tests: Any test that calls `seed_contradiction_claims()` or instantiates `ContradictionSeed`
 
 ## Summary for AI Agents
