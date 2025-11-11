@@ -460,7 +460,7 @@ sqlalchemy==2.0.44
     #   theoria (pyproject.toml)
     #   langchain-classic
     #   langchain-community
-starlette==0.49.1
+starlette==0.50.0
     # via fastapi
 strawberry-graphql==0.257.0
     # via theoria (pyproject.toml)
