@@ -127,16 +127,22 @@ def _register_workers_import_fallback() -> None:
                         if plugin_path.exists():
                             # Ensure parent package objects exist
                             celery_pkg = sys.modules.get("celery")
+                            celery_pkg_path = repo_root / "celery"
                             if celery_pkg is None:
                                 try:
                                     celery_pkg = importlib.import_module("celery")
                                 except Exception:
                                     celery_pkg = types.ModuleType("celery")
                                     sys.modules["celery"] = celery_pkg
+                            if not hasattr(celery_pkg, "__path__"):
+                                celery_pkg.__path__ = [str(celery_pkg_path)]  # type: ignore[attr-defined]
+                            setattr(celery_pkg, "__package__", "celery")
                             contrib_name = "celery.contrib"
                             contrib_mod = sys.modules.get(contrib_name)
                             if contrib_mod is None:
                                 contrib_mod = types.ModuleType(contrib_name)
+                                contrib_mod.__package__ = contrib_name  # type: ignore[attr-defined]
+                                contrib_mod.__path__ = [str(celery_pkg_path / "contrib")]  # type: ignore[attr-defined]
                                 setattr(celery_pkg, "contrib", contrib_mod)  # type: ignore[attr-defined]
                                 sys.modules[contrib_name] = contrib_mod
                             spec = importlib.util.spec_from_file_location(
