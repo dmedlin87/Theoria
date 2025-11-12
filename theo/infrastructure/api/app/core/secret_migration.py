@@ -12,7 +12,7 @@ import warnings
 from theo.application.facades import secret_migration as _facade
 
 warnings.warn(
-    "Importing 'theo.infrastructure.api.app.core.secret_migration' is deprecated. "
+    f"Importing '{__name__}' is deprecated. "
     "Use 'theo.application.facades.secret_migration' instead.",
     DeprecationWarning,
     stacklevel=2,

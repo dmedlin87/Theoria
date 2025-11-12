@@ -1,19 +1,22 @@
-"""Tests for the legacy version shim module."""
+"""Tests for the application version facade."""
 from __future__ import annotations
 
-from theo.application.facades import version as facades_version
+import types
 
-from tests.api.core import import_legacy_module
+import pytest
 
-
-MODULE_NAME = "theo.infrastructure.api.app.core.version"
-EXPECTED_EXPORTS = ["get_git_sha"]
+from tests.api.core import reload_facade
 
 
-def test_version_shim_warns_and_reexports_get_git_sha():
-    """Importing the shim should warn and expose the facade helper."""
-    module, warning = import_legacy_module(MODULE_NAME)
+def test_get_git_sha_invokes_git_binary(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = reload_facade("theo.application.facades.version")
+    module.get_git_sha.cache_clear()
 
-    assert "deprecated" in str(warning.message)
-    assert module.get_git_sha is facades_version.get_git_sha
-    assert module.__all__ == EXPECTED_EXPORTS
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/git")
+
+    def fake_run(*_args, **_kwargs):
+        return types.SimpleNamespace(stdout="deadbeef\n")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    assert module.get_git_sha() == "deadbeef"

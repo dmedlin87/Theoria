@@ -213,13 +213,13 @@ tests/commands/test_embedding_rebuild.py::*
    - Location: `theo\adapters\biblical_ai_processor.py:93`
    - Recommendation: Use `datetime.now(datetime.UTC)`
 
-3. **Module import deprecations** - Old import paths deprecated
-   - `theo.infrastructure.api.app.core.version` → `theo.application.facades.version`
-   - `theo.infrastructure.api.app.core.database` → `theo.application.facades.database`
-   - `theo.infrastructure.api.app.core.settings_store` → `theo.application.facades.settings_store`
-   - `theo.infrastructure.api.app.core.settings` → `theo.application.facades.settings`
-   - `theo.infrastructure.api.app.core.runtime` → `theo.application.facades.runtime`
-   - `theo.infrastructure.api.app.core.secret_migration` → `theo.application.facades.secret_migration`
+3. **Module import deprecations** - Import from `theo.application.facades.*`
+   - `theo.application.facades.version`
+   - `theo.application.facades.database`
+   - `theo.application.facades.settings_store`
+   - `theo.application.facades.settings`
+   - `theo.application.facades.runtime`
+   - `theo.application.facades.secret_migration`
 
 4. **pytest-celery warning**
    - `celery.contrib.pytest` module already imported, cannot be rewritten

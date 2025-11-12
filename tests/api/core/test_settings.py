@@ -1,21 +1,44 @@
-"""Tests for the legacy settings shim module."""
+"""Tests for the application settings facade."""
 from __future__ import annotations
 
-from theo.application.facades import settings as facades_settings
+import pytest
 
-from tests.api.core import import_legacy_module
-
-
-MODULE_NAME = "theo.infrastructure.api.app.core.settings"
-EXPECTED_EXPORTS = ["Settings", "get_settings", "get_settings_cipher"]
+from tests.api.core import reload_facade
 
 
-def test_settings_shim_warns_and_reexports_settings_facade():
-    """Importing the shim should warn and expose the facade settings helpers."""
-    module, warning = import_legacy_module(MODULE_NAME)
+def test_get_settings_uses_environment_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The settings facade should load values from environment variables."""
 
-    assert "deprecated" in str(warning.message)
-    assert module.Settings is facades_settings.Settings
-    assert module.get_settings is facades_settings.get_settings
-    assert module.get_settings_cipher is facades_settings.get_settings_cipher
-    assert module.__all__ == EXPECTED_EXPORTS
+    module = reload_facade("theo.application.facades.settings")
+    module.get_settings.cache_clear()
+
+    monkeypatch.setenv("THEO_CORS_ALLOWED_ORIGINS", "[\"https://example.com\"]")
+    monkeypatch.setenv("THEO_STORAGE_ROOT", "./data")
+
+    settings = module.get_settings()
+    assert settings.cors_allowed_origins == ["https://example.com"]
+    assert str(settings.storage_root) == "data"
+
+
+def test_get_settings_cipher_uses_insecure_fallback_when_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When insecure startup is permitted, the facade should create a fallback cipher."""
+
+    module = reload_facade("theo.application.facades.settings")
+    module.get_settings.cache_clear()
+    module.get_settings_secret.cache_clear()
+    module.get_settings_cipher.cache_clear()
+
+    monkeypatch.setattr(module, "allow_insecure_startup", lambda: True)
+
+    class DummyFernet:
+        def __init__(self, key: bytes) -> None:
+            self.key = key
+
+    monkeypatch.setattr(module, "Fernet", DummyFernet)
+
+    cipher = module.get_settings_cipher()
+    assert isinstance(cipher, DummyFernet)
