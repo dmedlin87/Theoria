@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from importlib import import_module
 from pathlib import Path
 import sys
 from typing import Iterator
@@ -30,15 +31,38 @@ from theo.infrastructure.api.app.routes.ai import watchlists as watchlists_modul
 from theo.infrastructure.api.app.routes.ai.watchlists import (  # noqa: E402
     WatchlistNotFoundError,
 )
+from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations  # noqa: E402
+from theo.infrastructure.api.app.db.seeds import seed_reference_data  # noqa: E402
 
 
+from contextlib import contextmanager
+
+@contextmanager
+def skip_performance_indexes():
+    migrations_module = import_module("theo.infrastructure.api.app.db.run_sql_migrations")
+    original = getattr(migrations_module, "_ensure_performance_indexes", None)
+    try:
+        if original is not None:
+            migrations_module._ensure_performance_indexes = lambda _engine: []
+        yield
+    finally:
+        if original is not None:
+            migrations_module._ensure_performance_indexes = original
+
+def _reset_watchlist_database(engine: Engine) -> None:
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    with skip_performance_indexes():
+        run_sql_migrations(engine)
+    with Session(engine) as session:
+        seed_reference_data(session)
+        session.commit()
 @pytest.fixture(scope="module")
 def _watchlist_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine]:
     database_path = tmp_path_factory.mktemp("watchlists") / "watchlists.db"
     configure_engine(f"sqlite:///{database_path}")
     engine = get_engine()
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    _reset_watchlist_database(engine)
     try:
         yield engine
     finally:
@@ -57,6 +81,7 @@ def _watchlist_test_client(_watchlist_engine: Engine) -> Iterator[TestClient]:
 def watchlist_client(
     _watchlist_test_client: TestClient, _watchlist_engine: Engine
 ) -> Iterator[tuple[TestClient, Engine]]:
+    _reset_watchlist_database(_watchlist_engine)
     session_factory = sessionmaker(
         bind=_watchlist_engine,
         autoflush=False,
@@ -78,9 +103,7 @@ def watchlist_client(
     finally:
         app.dependency_overrides.pop(get_session, None)
         app.dependency_overrides.pop(require_principal, None)
-        with _watchlist_engine.begin() as connection:
-            for table in reversed(Base.metadata.sorted_tables):
-                connection.execute(table.delete())
+        _reset_watchlist_database(_watchlist_engine)
 
 
 def _set_principal(subject: str) -> None:

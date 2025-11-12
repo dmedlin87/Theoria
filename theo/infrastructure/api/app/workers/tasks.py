@@ -39,8 +39,8 @@ except Exception:  # pragma: no cover - lean environments
     class _MissingRAGModule:
         def __getattr__(self, name: str) -> Any:
             raise AttributeError(
-                f"Optional AI dependencies are not installed; "
-                f"mock the 'rag' components for testing. (missing attribute: {name})"
+                "Optional AI dependencies are not installed; "
+                "mock the 'rag' components for testing."
             )
 
     rag_deliverables = _MissingRAGModule()
@@ -520,7 +520,7 @@ def _json_default(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, Path):
         return str(value)
-    return str(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 def _model_dump(obj: Any) -> dict[str, Any]:

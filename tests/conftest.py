@@ -6,14 +6,19 @@ from contextvars import ContextVar
 import gc
 import importlib
 import inspect
+import io
+import logging
 import os
+import socket
 import sys
 import types
 import warnings
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
+
+from urllib.request import OpenerDirector, Request
 
 if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
     from theo.adapters import AdapterRegistry
@@ -22,6 +27,156 @@ if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
     from testcontainers.postgres import PostgresContainer
 
 import pytest
+
+
+_EXAMPLE_COM_RESPONSES: dict[str, str] = {
+    "https://example.com/test": "<html><body>Test fixture</body></html>",
+    "https://example.com/job-test": "<html><body>Job fixture</body></html>",
+    "https://example.com/timing": "<html><body>Timing check</body></html>",
+    "https://example.com/benchmark": "<html><body>Benchmark check</body></html>",
+    "https://example.com/fixture": "<html><body>Retry fixture</body></html>",
+    "https://example.com/replay": "<html><body>Replay fixture</body></html>",
+}
+
+
+class _ExampleComHeaders(dict):
+    """Mimic the header API used by urllib responses."""
+
+    def get_content_charset(self) -> str | None:  # pragma: no cover - simple helper
+        content_type = self.get("Content-Type")
+        if not content_type:
+            return None
+        if "charset=" in content_type:
+            return content_type.split("charset=", 1)[1].split(";", 1)[0].strip()
+        return None
+
+
+class _ExampleComResponse:
+    """Deterministic HTTP response used to stub example.com fetches."""
+
+    def __init__(self, url: str, html: str) -> None:
+        self._url = url
+        self._body = html.encode("utf-8")
+        self._cursor = 0
+        self.headers = _ExampleComHeaders(
+            {
+                "Content-Length": str(len(self._body)),
+                "Content-Type": "text/html; charset=utf-8",
+            }
+        )
+
+    def read(self, size: int | None = -1) -> bytes:
+        if size is None or size < 0:
+            size = len(self._body) - self._cursor
+        if self._cursor >= len(self._body):
+            return b""
+        end = min(len(self._body), self._cursor + size)
+        chunk = self._body[self._cursor:end]
+        self._cursor = end
+        return bytes(chunk)
+
+    def geturl(self) -> str:
+        return self._url
+
+    def close(self) -> None:  # pragma: no cover - compatibility no-op
+        pass
+
+
+@pytest.fixture(autouse=True)
+def stub_example_com_requests(monkeypatch: pytest.MonkeyPatch):
+    """Stub out external network access for example.com URLs during tests."""
+
+    from urllib.error import HTTPError
+
+    original_open = OpenerDirector.open
+
+    def _open(self, fullurl, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):  # type: ignore[override]
+        url = fullurl
+        if isinstance(fullurl, Request):
+            url = fullurl.full_url
+        elif hasattr(fullurl, "full_url"):
+            url = fullurl.full_url
+
+        if isinstance(url, bytes):
+            url = url.decode("utf-8", errors="ignore")
+
+        if isinstance(url, str) and url.startswith("https://example.com/"):
+            html = _EXAMPLE_COM_RESPONSES.get(url)
+            if html is None:
+                raise HTTPError(url, 404, "Not Found", {}, None)
+            return _ExampleComResponse(url, html)
+
+        return original_open(self, fullurl, data, timeout)
+
+    monkeypatch.setattr(OpenerDirector, "open", _open)
+    yield
+
+
+class _DowngradeIngestionErrorFilter(logging.Filter):
+    """Re-label expected ingestion errors as warnings for clearer test output."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # pragma: no cover - logging glue
+        if record.getMessage().startswith("Failed to process URL ingestion"):
+            record.levelno = logging.WARNING
+            record.levelname = "WARNING"
+        return True
+
+
+@pytest.fixture(autouse=True)
+def downgrade_ingestion_error_logs():
+    """Suppress noisy ingestion failure errors emitted during retry scenarios."""
+
+    logger = logging.getLogger("theo.infrastructure.api.app.workers.tasks")
+    flt = _DowngradeIngestionErrorFilter()
+    logger.addFilter(flt)
+    try:
+        yield
+    finally:
+        logger.removeFilter(flt)
+class _BootstrapEmbeddingServiceStub:
+    """Lightweight embedding backend used in bootstrap-oriented tests."""
+
+    def __init__(self) -> None:
+        from theo.application.facades.settings import get_settings
+
+        settings = get_settings()
+        self._dimension = settings.embedding_dim
+        self.embed_calls: list[tuple[tuple[str, ...], int]] = []
+        self.clear_cache_calls = 0
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def embed(self, texts: Iterable[str], *, batch_size: int) -> list[list[float]]:
+        normalised = tuple(str(text) for text in texts)
+        self.embed_calls.append((normalised, batch_size))
+        return [
+            [float(index + 1)] * self._dimension for index, _ in enumerate(normalised)
+        ]
+
+    def clear_cache(self) -> None:
+        self.clear_cache_calls += 1
+
+
+@pytest.fixture(autouse=True)
+def _bootstrap_embedding_service_stub(monkeypatch: pytest.MonkeyPatch):
+    """Patch bootstrap to provide a deterministic embedding service stub."""
+
+    from theo.infrastructure.api.app.ingest import embeddings as embeddings_module
+
+    stub = _BootstrapEmbeddingServiceStub()
+    monkeypatch.setattr(embeddings_module, "get_embedding_service", lambda: stub)
+    yield stub
+
+
+@pytest.fixture
+def bootstrap_embedding_service_stub(
+    _bootstrap_embedding_service_stub: _BootstrapEmbeddingServiceStub,
+) -> _BootstrapEmbeddingServiceStub:
+    """Return the bootstrap embedding service stub for explicit assertions."""
+
+    return _bootstrap_embedding_service_stub
 
 
 def _ensure_celery_pytest_plugin() -> None:
@@ -130,16 +285,34 @@ if "pydantic_settings" not in sys.modules:  # pragma: no cover - lightweight CI 
         sys.modules["pydantic_settings"] = pydantic_settings
 
 try:  # pragma: no cover - optional dependency for integration fixtures
+    import sqlalchemy
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import Connection, Engine
     from sqlalchemy.orm import Session, sessionmaker
-except ModuleNotFoundError:  # pragma: no cover - allows running lightweight suites
+    try:
+        event = sqlalchemy.event
+    except AttributeError:  # pragma: no cover - minimal SQLAlchemy stubs
+        event = importlib.import_module("sqlalchemy.event")
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - allows running lightweight suites
     create_engine = None  # type: ignore[assignment]
     text = None  # type: ignore[assignment]
     Connection = object  # type: ignore[assignment]
     Engine = object  # type: ignore[assignment]
     Session = object  # type: ignore[assignment]
     sessionmaker = None  # type: ignore[assignment]
+    class _EventStub:  # pragma: no cover - lightweight environments skip DB tests
+        @staticmethod
+        def listens_for(*_args: object, **_kwargs: object):
+            def _decorator(func):
+                return func
+
+            return _decorator
+
+        @staticmethod
+        def remove(*_args: object, **_kwargs: object) -> None:
+            return None
+
+    event = _EventStub()  # type: ignore[assignment]
 
 try:  # pragma: no cover - factory depends on optional domain extras
     from tests.factories.application import isolated_application_container
@@ -688,7 +861,23 @@ def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[s
         # First create all tables from models
         Base.metadata.create_all(bind=engine)
         # Then run migrations to ensure schema is up-to-date
-        run_sql_migrations(engine)
+        migrations_module = importlib.import_module(
+            "theo.infrastructure.api.app.db.run_sql_migrations"
+        )
+        original_index_helper = getattr(
+            migrations_module, "_ensure_performance_indexes", None
+        )
+        try:
+            if original_index_helper is not None:
+                migrations_module._ensure_performance_indexes = (  # type: ignore[attr-defined]
+                    lambda _engine: []
+                )
+            run_sql_migrations(engine)
+        finally:
+            if original_index_helper is not None:
+                migrations_module._ensure_performance_indexes = (  # type: ignore[attr-defined]
+                    original_index_helper
+                )
         yield url
     finally:
         engine.dispose()
@@ -788,10 +977,22 @@ def integration_session(request: pytest.FixtureRequest) -> Generator[Session, No
 
     SessionFactory = sessionmaker(bind=connection, future=True)  # type: ignore[arg-type]
     session = SessionFactory()
+    nested = session.begin_nested()
+
+    @event.listens_for(session, "after_transaction_end")
+    def _restart_savepoint(sess: Session, transaction) -> None:  # type: ignore[no-redef]
+        if transaction.nested and not transaction._parent.nested:  # pragma: no branch - mirrored from SQLAlchemy recipe
+            sess.begin_nested()
+
     try:
         yield session
-        session.flush()
     finally:
+        try:
+            if nested.is_active:
+                nested.rollback()
+        except Exception:  # pragma: no cover - defensive cleanup
+            pass
+        event.remove(session, "after_transaction_end", _restart_savepoint)
         session.close()
 
 

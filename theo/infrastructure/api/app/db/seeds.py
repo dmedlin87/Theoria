@@ -112,11 +112,11 @@ def _verse_bounds(reference: str | None) -> tuple[int | None, int | None]:
 
 
 @lru_cache(maxsize=32)
-def _cached_seed_entries(paths_key: tuple[str, ...]) -> tuple[dict, ...]:
+def _cached_seed_entries(paths_key: tuple[tuple[str, int], ...]) -> tuple[dict, ...]:
     """Load structured seed payloads once per unique path set."""
 
     entries: list[dict] = []
-    for raw_path in paths_key:
+    for raw_path, _mtime in paths_key:
         path = Path(raw_path)
         if not path.exists():
             continue
@@ -127,8 +127,16 @@ def _cached_seed_entries(paths_key: tuple[str, ...]) -> tuple[dict, ...]:
 def _iter_seed_entries(*paths: Path) -> list[dict]:
     """Return seed records, caching disk reads for repeat calls."""
 
-    normalized = tuple(Path(path).resolve(strict=False).as_posix() for path in paths)
-    return list(_cached_seed_entries(normalized))
+    normalized: list[tuple[str, int]] = []
+    for path in paths:
+        resolved = Path(path).resolve(strict=False)
+        try:
+            mtime = resolved.stat().st_mtime_ns
+        except FileNotFoundError:
+            mtime = 0
+        normalized.append((resolved.as_posix(), int(mtime)))
+    key = tuple(normalized)
+    return list(_cached_seed_entries(key))
 
 
 def _verse_range(reference: str | None) -> tuple[int, int] | None:
