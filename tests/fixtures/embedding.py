@@ -52,8 +52,7 @@ class EmbeddingServicePatch:
 
         self.clear_cache_calls.clear()
         self.factory_calls.clear()
-
-
+        self._service_factory = None
 _MODULE_NAME = "theo.infrastructure.api.app.ingest.embeddings"
 
 
