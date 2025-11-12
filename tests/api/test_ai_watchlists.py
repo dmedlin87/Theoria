@@ -35,23 +35,28 @@ from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
 from theo.infrastructure.api.app.db.seeds import seed_reference_data  # noqa: E402
 
 
+from contextlib import contextmanager
+
+@contextmanager
+def skip_performance_indexes():
+    migrations_module = import_module("theo.infrastructure.api.app.db.run_sql_migrations")
+    original = getattr(migrations_module, "_ensure_performance_indexes", None)
+    try:
+        if original is not None:
+            migrations_module._ensure_performance_indexes = lambda _engine: []
+        yield
+    finally:
+        if original is not None:
+            migrations_module._ensure_performance_indexes = original
+
 def _reset_watchlist_database(engine: Engine) -> None:
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    migrations_module = import_module("theo.infrastructure.api.app.db.run_sql_migrations")
-    original_index_helper = getattr(migrations_module, "_ensure_performance_indexes", None)
-    try:
-        if original_index_helper is not None:
-            migrations_module._ensure_performance_indexes = lambda _engine: []  # type: ignore[attr-defined, assignment]
+    with skip_performance_indexes():
         run_sql_migrations(engine)
-    finally:
-        if original_index_helper is not None:
-            migrations_module._ensure_performance_indexes = original_index_helper  # type: ignore[attr-defined]
     with Session(engine) as session:
         seed_reference_data(session)
         session.commit()
-
-
 @pytest.fixture(scope="module")
 def _watchlist_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine]:
     database_path = tmp_path_factory.mktemp("watchlists") / "watchlists.db"
