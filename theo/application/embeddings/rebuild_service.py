@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Mapping, Protocol
 
-from theo.application.dtos import EmbeddingUpdate, Metadata, PassageForEmbedding
+from theo.application.dtos import EmbeddingUpdate, PassageForEmbedding
 from theo.application.interfaces import SessionProtocol
 from theo.application.repositories.embedding_repository import PassageEmbeddingRepository
 
