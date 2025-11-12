@@ -168,7 +168,7 @@ def install_celery_stub() -> None:
 
 
 def install_audio_stubs() -> None:
-    """Provide deterministic Whisper/transfomer replacements for tests."""
+    """Provide deterministic Whisper/transformer replacements for tests."""
 
     if "whisper" not in sys.modules:
         whisper_module = types.ModuleType("whisper")
