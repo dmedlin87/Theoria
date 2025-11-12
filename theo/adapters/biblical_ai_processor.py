@@ -2,7 +2,7 @@
 
 import json
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 
 from theo.domain.biblical_texts import (
@@ -90,7 +90,7 @@ class BiblicalAIProcessor:
         confidence_scores = self._calculate_confidence_scores(morphology, semantic_analysis)
         
         ai_analysis = AIAnalysis(
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(UTC),
             model_version=self.model_name,
             confidence_scores=confidence_scores
         )

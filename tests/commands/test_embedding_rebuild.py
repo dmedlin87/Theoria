@@ -12,6 +12,11 @@ import pytest
 import click
 from click.testing import CliRunner
 
+from tests.fixtures.embedding import (
+    embedding_service_patch,
+    install_embedding_service_patch,
+)
+
 if "fastapi" not in sys.modules:
     fastapi_stub = types.ModuleType("fastapi")
     fastapi_stub.status = types.SimpleNamespace()
@@ -47,6 +52,9 @@ except ModuleNotFoundError:  # pragma: no cover - testing fallback
     sqlalchemy_stub = types.ModuleType("sqlalchemy")
     sqlalchemy_stub.__path__ = ["sqlalchemy"]
     sqlalchemy_stub.__package__ = "sqlalchemy"
+    sqlalchemy_spec = importlib_machinery.ModuleSpec("sqlalchemy", loader=None)
+    sqlalchemy_spec.submodule_search_locations = ["sqlalchemy"]
+    sqlalchemy_stub.__spec__ = sqlalchemy_spec
 
     class _FuncProxy:
         def __getattr__(self, name: str) -> Any:
@@ -85,8 +93,14 @@ except ModuleNotFoundError:  # pragma: no cover - testing fallback
     ext_module = types.ModuleType("sqlalchemy.ext")
     ext_module.__path__ = ["sqlalchemy.ext"]
     ext_module.__package__ = "sqlalchemy.ext"
+    ext_spec = importlib_machinery.ModuleSpec("sqlalchemy.ext", loader=None)
+    ext_spec.submodule_search_locations = ["sqlalchemy.ext"]
+    ext_module.__spec__ = ext_spec
     hybrid_module = types.ModuleType("sqlalchemy.ext.hybrid")
     hybrid_module.__package__ = "sqlalchemy.ext"
+    hybrid_spec = importlib_machinery.ModuleSpec("sqlalchemy.ext.hybrid", loader=None)
+    hybrid_spec.submodule_search_locations = ["sqlalchemy.ext.hybrid"]
+    hybrid_module.__spec__ = hybrid_spec
 
     def hybrid_property(func: Any | None = None, **_kwargs: object):
         if func is None:
@@ -110,6 +124,10 @@ except ModuleNotFoundError:  # pragma: no cover - testing fallback
     elements_module.ClauseElement = ClauseElement
     sql_module.elements = elements_module
     sqlalchemy_stub.sql = sql_module
+    sqlalchemy_stub.exc = exc_module
+    sqlalchemy_stub.orm = orm_module
+    sqlalchemy_stub.engine = engine_module
+    sqlalchemy_stub.ext = ext_module
 
     sys.modules["sqlalchemy"] = sqlalchemy_stub
     sys.modules["sqlalchemy.exc"] = exc_module
@@ -120,34 +138,7 @@ except ModuleNotFoundError:  # pragma: no cover - testing fallback
     sys.modules["sqlalchemy.sql"] = sql_module
     sys.modules["sqlalchemy.sql.elements"] = elements_module
 
-embeddings_stub = types.ModuleType("theo.infrastructure.api.app.ingest.embeddings")
-
-
-def _stub_clear_cache() -> None:
-    return None
-
-
-def _stub_get_service() -> Any:
-    raise RuntimeError("embedding service stub should be patched")
-
-
-def _stub_lexical_representation(*_args: object, **_kwargs: object) -> str:
-    raise RuntimeError("lexical_representation stub should not be used at import time")
-
-
-class _StubEmbeddingService:  # pragma: no cover - placeholder for discovery
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        raise RuntimeError("EmbeddingService stub should not be instantiated")
-
-
-embeddings_stub.clear_embedding_cache = _stub_clear_cache
-embeddings_stub.get_embedding_service = _stub_get_service
-embeddings_stub.lexical_representation = _stub_lexical_representation
-embeddings_stub.EmbeddingService = _StubEmbeddingService
-from theo.application.facades.resilience import ResilienceError as _RealResilienceError
-
-embeddings_stub.ResilienceError = _RealResilienceError
-sys.modules["theo.infrastructure.api.app.ingest.embeddings"] = embeddings_stub
+install_embedding_service_patch()
 
 sanitizer_stub = types.ModuleType("theo.infrastructure.api.app.ingest.sanitizer")
 sanitizer_stub.sanitize_passage_text = lambda text: text
@@ -258,26 +249,6 @@ def test_commit_with_retry_raises_after_exhaustion() -> None:
         _commit_with_retry(session, max_attempts=1, backoff=0)
 
 
-class _StubRegistry:
-    def __init__(self, service: object, engine: object) -> None:
-        self._service = service
-        self._engine = engine
-        self.resolved: list[str] = []
-
-    def resolve(self, name: str) -> object:
-        self.resolved.append(name)
-        if name == "embedding_rebuild_service":
-            return self._service
-        if name == "engine":
-            return self._engine
-        raise KeyError(name)
-
-
-class _StubEmbeddingService:
-    def embed(self, texts: list[str], *, batch_size: int) -> list[list[float]]:
-        return [[float(index)] for index, _ in enumerate(texts)]
-
-
 class _StubConfig:
     def __init__(self, batch_size: int) -> None:
         self.initial_batch_size = batch_size
@@ -325,8 +296,17 @@ def _reset_telemetry_flag() -> None:
     embedding_rebuild._TELEMETRY_READY = False
 
 
+@pytest.fixture(autouse=True)
+def _reset_embedding_cli_dependencies() -> None:
+    embedding_rebuild.configure_embedding_rebuild_cli()
+    yield
+    embedding_rebuild.configure_embedding_rebuild_cli()
+
+
 def test_rebuild_embeddings_invokes_service_with_expected_options(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    embedding_service_patch,
 ) -> None:
     ids_path = tmp_path / "ids.txt"
     ids_path.write_text("a\na\nb\n", encoding="utf-8")
@@ -335,14 +315,12 @@ def test_rebuild_embeddings_invokes_service_with_expected_options(
         processed=0, total=0, duration=0.1, missing_ids=[], metadata={}
     )
     service = _RecordingService(service_result)
-    registry = _StubRegistry(service, engine=object())
-
+    monkeypatch.setattr(embedding_rebuild, "_SERVICE_PROVIDER", lambda: service)
     monkeypatch.setattr(
-        embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
+        embedding_rebuild,
+        "_CLEAR_CACHE",
+        embedding_service_patch.module.clear_embedding_cache,
     )
-    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", lambda: _StubEmbeddingService())
-    cache_calls: list[bool] = []
-    monkeypatch.setattr(embedding_rebuild, "clear_embedding_cache", lambda: cache_calls.append(True))
     monkeypatch.setattr(
         embedding_rebuild.EmbeddingRebuildConfig,
         "for_mode",
@@ -358,17 +336,18 @@ def test_rebuild_embeddings_invokes_service_with_expected_options(
 
     assert result.exit_code == 1
     assert "No passages matched the specified criteria" in result.output
-    assert cache_calls == [True]
     assert isinstance(service.received_options, embedding_rebuild.EmbeddingRebuildOptions)
     assert service.received_options.fast is True
     assert service.received_options.clear_cache is True
     assert service.received_options.batch_size == 32
     assert service.received_options.ids == ["a", "b"]
-    assert registry.resolved == ["embedding_rebuild_service", "engine"]
+    assert embedding_service_patch.clear_cache_calls == [((), {})]
 
 
 def test_rebuild_embeddings_writes_metrics_file(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    embedding_service_patch,
 ) -> None:
     metrics_path = tmp_path / "metrics" / "summary.json"
 
@@ -380,12 +359,12 @@ def test_rebuild_embeddings_writes_metrics_file(
         metadata={"source": "unit-test"},
     )
     service = _RecordingService(service_result)
-    registry = _StubRegistry(service, engine=object())
-
+    monkeypatch.setattr(embedding_rebuild, "_SERVICE_PROVIDER", lambda: service)
     monkeypatch.setattr(
-        embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
+        embedding_rebuild,
+        "_CLEAR_CACHE",
+        embedding_service_patch.module.clear_embedding_cache,
     )
-    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", _StubEmbeddingService)
     monkeypatch.setattr(
         embedding_rebuild.EmbeddingRebuildConfig,
         "for_mode",
@@ -411,7 +390,10 @@ def test_rebuild_embeddings_writes_metrics_file(
     assert f"Metrics written to {metrics_path}" in result.output
 
 
-def test_rebuild_embeddings_handles_service_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_rebuild_embeddings_handles_service_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    embedding_service_patch,
+) -> None:
     class _FailingService(embedding_rebuild.EmbeddingRebuildService):  # type: ignore[misc]
         def __init__(self) -> None:
             pass
@@ -420,11 +402,7 @@ def test_rebuild_embeddings_handles_service_failure(monkeypatch: pytest.MonkeyPa
             raise embedding_rebuild.EmbeddingRebuildError("boom")
 
     service = _FailingService()
-    registry = _StubRegistry(service, engine=object())
-    monkeypatch.setattr(
-        embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
-    )
-    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", lambda: _StubEmbeddingService())
+    monkeypatch.setattr(embedding_rebuild, "_SERVICE_PROVIDER", lambda: service)
     monkeypatch.setattr(
         embedding_rebuild.EmbeddingRebuildConfig,
         "for_mode",
@@ -439,7 +417,9 @@ def test_rebuild_embeddings_handles_service_failure(monkeypatch: pytest.MonkeyPa
 
 
 def test_rebuild_embeddings_invalid_checkpoint_resume_lenient_mode(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    embedding_service_patch,
 ) -> None:
     """Test that invalid checkpoint in lenient mode (default) continues without error."""
     checkpoint = tmp_path / "checkpoint.json"
@@ -448,11 +428,7 @@ def test_rebuild_embeddings_invalid_checkpoint_resume_lenient_mode(
     service = _RecordingService(
         EmbeddingRebuildResult(processed=0, total=0, duration=0.1, missing_ids=[], metadata={})
     )
-    registry = _StubRegistry(service, engine=object())
-    monkeypatch.setattr(
-        embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
-    )
-    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", lambda: _StubEmbeddingService())
+    monkeypatch.setattr(embedding_rebuild, "_SERVICE_PROVIDER", lambda: service)
     monkeypatch.setattr(
         embedding_rebuild.EmbeddingRebuildConfig,
         "for_mode",
@@ -472,7 +448,9 @@ def test_rebuild_embeddings_invalid_checkpoint_resume_lenient_mode(
 
 
 def test_rebuild_embeddings_invalid_checkpoint_resume_strict_mode(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    embedding_service_patch,
 ) -> None:
     """Test that invalid checkpoint in strict mode fails with proper error."""
     checkpoint = tmp_path / "checkpoint.json"
@@ -490,11 +468,7 @@ def test_rebuild_embeddings_invalid_checkpoint_resume_strict_mode(
     service = _RecordingService(
         EmbeddingRebuildResult(processed=0, total=0, duration=0.1, missing_ids=[], metadata={})
     )
-    registry = _StubRegistry(service, engine=object())
-    monkeypatch.setattr(
-        embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
-    )
-    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", lambda: _StubEmbeddingService())
+    monkeypatch.setattr(embedding_rebuild, "_SERVICE_PROVIDER", lambda: service)
     monkeypatch.setattr(
         embedding_rebuild.EmbeddingRebuildConfig,
         "for_mode",
@@ -514,7 +488,9 @@ def test_rebuild_embeddings_invalid_checkpoint_resume_strict_mode(
 
 
 def test_rebuild_embeddings_missing_checkpoint_strict_mode(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    embedding_service_patch,
 ) -> None:
     """Test that missing checkpoint in strict mode fails with proper error."""
     checkpoint = tmp_path / "missing_checkpoint.json"
@@ -523,11 +499,7 @@ def test_rebuild_embeddings_missing_checkpoint_strict_mode(
     service = _RecordingService(
         EmbeddingRebuildResult(processed=0, total=0, duration=0.1, missing_ids=[], metadata={})
     )
-    registry = _StubRegistry(service, engine=object())
-    monkeypatch.setattr(
-        embedding_rebuild, "resolve_application", lambda: (registry._engine, registry)
-    )
-    monkeypatch.setattr(embedding_rebuild, "get_embedding_service", lambda: _StubEmbeddingService())
+    monkeypatch.setattr(embedding_rebuild, "_SERVICE_PROVIDER", lambda: service)
     monkeypatch.setattr(
         embedding_rebuild.EmbeddingRebuildConfig,
         "for_mode",
