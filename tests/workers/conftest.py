@@ -12,13 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
-try:  # pragma: no cover - SQLAlchemy module path changed across releases
-    from sqlalchemy.pool import StaticPool
-except (ImportError, AttributeError):  # pragma: no cover
-    from sqlalchemy import pool as _sa_pool
-
-    StaticPool = _sa_pool.StaticPool  # type: ignore[attr-defined]
-
+from sqlalchemy.pool import StaticPool
 from theo.adapters.persistence.models import Document
 from theo.application.facades.database import Base, configure_engine, get_engine
 from theo.infrastructure.api.app.workers import tasks
