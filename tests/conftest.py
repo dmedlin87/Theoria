@@ -65,7 +65,7 @@ class _ExampleComResponse:
             }
         )
 
-    def read(self, size: int = -1) -> bytes:
+    def read(self, size: int | None = -1) -> bytes:
         if size is None or size < 0:
             size = len(self._body) - self._cursor
         if self._cursor >= len(self._body):
