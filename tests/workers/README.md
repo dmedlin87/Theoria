@@ -10,7 +10,7 @@ To keep the stubs effective:
 * Always import task callables via `theo.infrastructure.api.app.workers.tasks`
   after calling `configure_worker_dependencies` in the tests. This ensures tasks
   use the fake clients instead of real services.
-* Prefer serializable structures (plain dicts or dataclasses with `model_dump`)
+* Prefer serialisable structures (plain dicts or dataclasses with `model_dump`)
   when constructing chat memories or citations. The helper `_json_default`
   normalises deliverable manifests and cached citations for snapshot-style
   assertions.
