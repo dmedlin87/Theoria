@@ -103,7 +103,7 @@ def stub_example_com_requests(monkeypatch: pytest.MonkeyPatch):
         if isinstance(url, str) and url.startswith("https://example.com/"):
             html = _EXAMPLE_COM_RESPONSES.get(url)
             if html is None:
-                raise HTTPError(url, 404, "Not Found", hdrs=None, fp=io.BytesIO(b""))
+                raise HTTPError(url, 404, "Not Found", {}, None)
             return _ExampleComResponse(url, html)
 
         return original_open(self, fullurl, data, timeout)
