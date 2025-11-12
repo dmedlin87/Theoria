@@ -54,10 +54,10 @@ class _BootstrapEmbeddingServiceStub:
 def _bootstrap_embedding_service_stub(monkeypatch: pytest.MonkeyPatch):
     """Patch bootstrap to provide a deterministic embedding service stub."""
 
-    from theo.application.services import bootstrap as bootstrap_module
+    from theo.infrastructure.api.app.ingest import embeddings as embeddings_module
 
     stub = _BootstrapEmbeddingServiceStub()
-    monkeypatch.setattr(bootstrap_module, "get_embedding_service", lambda: stub)
+    monkeypatch.setattr(embeddings_module, "get_embedding_service", lambda: stub)
     yield stub
 
 
