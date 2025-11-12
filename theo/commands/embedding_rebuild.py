@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypeVar
 
 import click
 
@@ -37,7 +40,7 @@ from theo.infrastructure.api.app.ingest.embeddings import clear_embedding_cache
 from theo.application.services.bootstrap import resolve_application
 from theo.domain.services.embeddings import EmbeddingRebuildConfig
 
-__all__ = ["register_commands", "rebuild_embeddings_cmd"]
+__all__ = ["register_commands", "rebuild_embeddings_cmd", "_batched", "_commit_with_retry"]
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,6 +52,58 @@ def _normalise_timestamp(value: datetime | None) -> datetime | None:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+_T = TypeVar("_T")
+
+
+def _batched(iterator: Iterable[_T], size: int) -> Iterable[list[_T]]:
+    """Yield successive batches from iterator."""
+    if size <= 0:
+        raise ValueError("Batch size must be positive")
+    while True:
+        batch = list(itertools.islice(iterator, size))
+        if not batch:
+            break
+        yield batch
+
+
+def _commit_with_retry(
+    session: object,
+    *,
+    max_attempts: int = 3,
+    backoff: float = 0.5,
+) -> float:
+    """Attempt to commit a session with exponential backoff retry.
+
+    Args:
+        session: A session-like object with commit() and rollback() methods
+        max_attempts: Maximum number of commit attempts
+        backoff: Base delay in seconds between retries
+
+    Returns:
+        Duration of successful commit in seconds
+
+    Raises:
+        click.ClickException: If commit fails after max_attempts
+    """
+    from sqlalchemy.exc import SQLAlchemyError
+
+    start = time.perf_counter()
+    for attempt in range(1, max_attempts + 1):
+        try:
+            session.commit()  # type: ignore[attr-defined]
+            return time.perf_counter() - start
+        except SQLAlchemyError as exc:
+            if hasattr(session, "rollback"):
+                session.rollback()  # type: ignore[attr-defined]
+            if attempt == max_attempts:
+                raise click.ClickException(
+                    f"Database commit failed after {attempt} attempt(s): {exc}"
+                ) from exc
+            time.sleep(backoff * attempt)
+    # Should never reach here, but for type checker
+    return time.perf_counter() - start  # pragma: no cover
 
 
 def _load_ids(path: Path) -> list[str]:

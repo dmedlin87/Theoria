@@ -1,36 +1,3 @@
-def generate_sermon_prep_outline(
-    session,
-    *,
-    topic,
-    osis=None,
-    filters=None,
-    model_name=None,
-    recorder=None,
-    outline_template=None,
-    key_points_limit=4,
-):
-    return rag_deliverables.generate_sermon_prep_outline(
-        session,
-        topic=topic,
-        osis=osis,
-        filters=filters,
-        model_name=model_name,
-        recorder=recorder,
-        outline_template=outline_template,
-        key_points_limit=key_points_limit,
-    )
-
-
-def build_sermon_deliverable(response, *, formats, filters):
-    return rag_exports.build_sermon_deliverable(
-        response, formats=formats, filters=filters
-    )
-
-
-def build_transcript_deliverable(session, document_id, *, formats):
-    return rag_exports.build_transcript_deliverable(
-        session, document_id, formats=formats
-    )
 """Celery tasks for asynchronous ingestion."""
 
 from __future__ import annotations
@@ -102,6 +69,9 @@ settings = _ADAPTER_REGISTRY.resolve("settings")
 
 def get_engine():  # pragma: no cover - transitional wiring helper
     return _ADAPTER_REGISTRY.resolve("engine")
+
+def get_settings():  # pragma: no cover - settings accessor
+    return settings
 
 logger = get_task_logger(__name__)
 
@@ -1101,6 +1071,44 @@ def run_watchlist_alert(watchlist_id: str) -> None:
 
 
 run_watchlist_alert_task = cast(CeleryTask, run_watchlist_alert)
+
+
+def generate_sermon_prep_outline(
+    session,
+    *,
+    topic,
+    osis=None,
+    filters=None,
+    model_name=None,
+    recorder=None,
+    outline_template=None,
+    key_points_limit=4,
+):
+    """Wrapper for generating sermon prep outlines."""
+    return rag_deliverables.generate_sermon_prep_outline(
+        session,
+        topic=topic,
+        osis=osis,
+        filters=filters,
+        model_name=model_name,
+        recorder=recorder,
+        outline_template=outline_template,
+        key_points_limit=key_points_limit,
+    )
+
+
+def build_sermon_deliverable(response, *, formats, filters):
+    """Wrapper for building sermon deliverables."""
+    return rag_exports.build_sermon_deliverable(
+        response, formats=formats, filters=filters
+    )
+
+
+def build_transcript_deliverable(session, document_id, *, formats):
+    """Wrapper for building transcript deliverables."""
+    return rag_exports.build_transcript_deliverable(
+        session, document_id, formats=formats
+    )
 
 
 @celery.task(name="tasks.build_deliverable")
