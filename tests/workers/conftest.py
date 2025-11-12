@@ -401,17 +401,11 @@ class WorkerStubContext:
                 tasks.configure_worker_dependencies(**resets)
 
 
-@pytest.fixture(autouse=True)
-def _install_worker_stubs(monkeypatch: pytest.MonkeyPatch):
+@pytest.fixture
+def worker_stubs(monkeypatch: pytest.MonkeyPatch) -> WorkerStubContext:
+    """Expose the worker stub context to tests that need fine-grained control."""
     context = WorkerStubContext(monkeypatch)
     try:
         yield context
     finally:
         context.restore()
-
-
-@pytest.fixture
-def worker_stubs(_install_worker_stubs: WorkerStubContext) -> WorkerStubContext:
-    """Expose the worker stub context to tests that need fine-grained control."""
-
-    return _install_worker_stubs
