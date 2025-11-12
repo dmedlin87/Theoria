@@ -18,6 +18,8 @@ from celery.app.task import Task
 
 pytest_plugins = ("celery.contrib.pytest",)
 
+pytestmark = pytest.mark.usefixtures("worker_stubs")
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -58,13 +60,21 @@ except ModuleNotFoundError:
         @classmethod
         def model_validate(cls, payload: dict[str, Any]) -> "ChatMemoryEntry":
             return cls(**payload)
-            
+
         def model_dump(self, **kwargs) -> dict[str, Any]:
+            citation_payloads = []
+            for citation in self.citations or []:
+                if hasattr(citation, "model_dump"):
+                    citation_payloads.append(citation.model_dump())
+                elif hasattr(citation, "__dict__"):
+                    citation_payloads.append({k: v for k, v in citation.__dict__.items() if not k.startswith("_")})
+                else:
+                    citation_payloads.append(citation)
             return {
                 "question": self.question,
                 "answer": self.answer,
                 "answer_summary": self.answer_summary,
-                "citations": self.citations or [],
+                "citations": citation_payloads,
                 "document_ids": self.document_ids or [],
                 "created_at": self.created_at.isoformat() if self.created_at else None
             }
@@ -121,23 +131,6 @@ class TestWorkerTasksOptimized:
     @pytest.fixture(autouse=True)
     def setup_mocks(self, monkeypatch):
         """Setup common mocks for all tests."""
-        # Mock heavy pipeline operations
-        mock_document = Document(
-            id="test-doc",
-            title="Test Document",
-            collection="Test Collection",
-            source_type="test"
-        )
-        
-        monkeypatch.setattr(
-            "theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_url",
-            MagicMock(return_value=mock_document)
-        )
-        monkeypatch.setattr(
-            "theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_file", 
-            MagicMock(return_value=mock_document)
-        )
-        
         # Mock enrichment operations
         monkeypatch.setattr(
             "theo.infrastructure.api.app.enrich.MetadataEnricher.enrich_document",
@@ -165,36 +158,30 @@ class TestWorkerTasksOptimized:
         )
         
         monkeypatch.setattr(
-            "theo.infrastructure.api.app.ai.rag.deliverables.generate_sermon_prep_outline",
+            tasks,
+            "generate_sermon_prep_outline",
             MagicMock(return_value={})
         )
         monkeypatch.setattr(
-            "theo.infrastructure.api.app.ai.rag.exports.build_sermon_deliverable",
+            tasks,
+            "build_sermon_deliverable",
             MagicMock(return_value=mock_package)
         )
         
-    def test_process_url_basic_functionality(self, worker_engine):
+    def test_process_url_basic_functionality(self, worker_engine, worker_stubs):
         """Test URL processing with minimal database operations."""
-        with patch('theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_url') as mock_pipeline:
-            mock_doc = Document(
-                id="url-test",
-                title="URL Test Doc", 
-                collection="Test",
-                channel="Test Channel"
-            )
-            mock_pipeline.return_value = mock_doc
+        _task(tasks.process_url).run(
+            "doc-123",
+            "https://example.com/test",
+            frontmatter={"title": "Test"}
+        )
+
+        assert worker_stubs.pipeline_calls
+        last_call = worker_stubs.pipeline_calls[-1]
+        assert last_call["kind"] == "url"
+        assert last_call["url"] == "https://example.com/test"
             
-            # Execute task
-            _task(tasks.process_url).run(
-                "doc-123",
-                "https://example.com/test",
-                frontmatter={"title": "Test"}
-            )
-            
-            # Verify pipeline was called
-            assert mock_pipeline.called
-            
-    def test_process_url_with_job_tracking(self, worker_engine):
+    def test_process_url_with_job_tracking(self, worker_engine, worker_stubs):
         """Test job status updates during URL processing."""
         # Create test job
         with Session(worker_engine) as session:
@@ -202,23 +189,26 @@ class TestWorkerTasksOptimized:
             session.add(job)
             session.commit()
             job_id = job.id
-        
-        with patch('theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_url') as mock_pipeline:
-            mock_doc = Document(id="job-test", title="Job Test")
-            mock_pipeline.return_value = mock_doc
-            
-            _task(tasks.process_url).run(
-                "doc-job-123",
-                "https://example.com/job-test", 
-                job_id=job_id
-            )
-            
+
+        _task(tasks.process_url).run(
+            "doc-job-123",
+            "https://example.com/job-test",
+            job_id=job_id
+        )
+
         # Verify job completion
         with Session(worker_engine) as session:
             updated_job = session.get(IngestionJob, job_id)
             assert updated_job.status == "completed"
+
+        job_events = [
+            update["status"]
+            for update in worker_stubs.job_status_updates
+            if update["job_id"] == job_id
+        ]
+        assert job_events[-1] == "completed"
             
-    def test_validate_citations_fast(self, worker_engine, monkeypatch):
+    def test_validate_citations_fast(self, worker_engine, monkeypatch, worker_stubs):
         """Fast citation validation test with minimal setup."""
         # Setup test data efficiently
         now = datetime.now(UTC)
@@ -231,10 +221,17 @@ class TestWorkerTasksOptimized:
         )
         
         with Session(worker_engine) as session:
+            snippet = entry.model_dump()
+            snippet["citations"] = [
+                citation if isinstance(citation, dict) else getattr(citation, "model_dump", lambda: citation.__dict__)()
+                for citation in snippet.get("citations", [])
+            ]
+            if isinstance(snippet.get("created_at"), datetime):
+                snippet["created_at"] = snippet["created_at"].isoformat()
             chat_session = ChatSession(
                 id="test-session",
-                user_id="test-user", 
-                memory_snippets=[entry.model_dump()],
+                user_id="test-user",
+                memory_snippets=[snippet],
                 created_at=now,
                 updated_at=now,
                 last_interaction_at=now
@@ -243,17 +240,16 @@ class TestWorkerTasksOptimized:
             session.commit()
             
         # Mock search to return matching results
-        def mock_search(session, request):
-            return [HybridSearchResult(
+        results = [HybridSearchResult(
                 id="passage-1",
                 document_id="doc-1",
                 text="Test passage",
                 osis_ref="John.3.16",
                 page_no=1
             )]
-            
-        monkeypatch.setattr("theo.infrastructure.api.app.workers.tasks.hybrid_search", mock_search)
-        
+
+        worker_stubs.set_hybrid_results(results)
+
         # Run validation
         result = _task(tasks.validate_citations).run(limit=1)
         

@@ -22,6 +22,8 @@ from theo.application.facades.database import Base
 from theo.adapters.persistence.models import Document, IngestionJob, Passage, ChatSession
 from theo.infrastructure.api.app.workers import tasks
 
+pytestmark = pytest.mark.usefixtures("worker_stubs")
+
 # Performance optimization fixtures
 @pytest.fixture(scope="session")
 def fast_test_engine():
@@ -66,23 +68,6 @@ def mock_expensive_operations(monkeypatch):
     monkeypatch.setattr("pathlib.Path.read_text", Mock(return_value="mock content"))
     monkeypatch.setattr("pathlib.Path.exists", Mock(return_value=True))
     monkeypatch.setattr("pathlib.Path.is_file", Mock(return_value=True))
-    
-    # Mock heavy pipeline operations
-    mock_doc = Document(
-        id="mock-doc",
-        title="Mock Document", 
-        collection="Mock Collection",
-        source_type="test"
-    )
-    
-    monkeypatch.setattr(
-        "theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_url",
-        Mock(return_value=mock_doc)
-    )
-    monkeypatch.setattr(
-        "theo.infrastructure.api.app.ingest.pipeline.run_pipeline_for_file",
-        Mock(return_value=mock_doc)
-    )
     
     # Mock analytics operations
     mock_snapshot = Mock()
@@ -196,7 +181,7 @@ class TestWorkerPerformance:
             optimized_session.refresh(job)
             assert job.status == "completed"
     
-    def test_validate_citations_fast(self, optimized_session):
+    def test_validate_citations_fast(self, optimized_session, worker_stubs):
         """Fast citation validation test."""
         # Create minimal test data
         chat_session = ChatSession(
@@ -222,18 +207,19 @@ class TestWorkerPerformance:
         optimized_session.add(chat_session)
         optimized_session.commit()
         
-        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_engine, \
-             patch('theo.infrastructure.api.app.workers.tasks.hybrid_search') as mock_search:
-            
+        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_engine:
+
             mock_engine.return_value = optimized_session.bind
-            mock_search.return_value = [Mock(
-                id="passage-1",
-                document_id="doc-1", 
-                text="Test passage",
-                osis_ref="John.3.16",
-                page_no=1
-            )]
-            
+            worker_stubs.set_hybrid_results([
+                Mock(
+                    id="passage-1",
+                    document_id="doc-1",
+                    text="Test passage",
+                    osis_ref="John.3.16",
+                    page_no=1
+                )
+            ])
+
             result = tasks.validate_citations(limit=1)
             
             assert result["sessions"] == 1
