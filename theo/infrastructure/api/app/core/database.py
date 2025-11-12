@@ -1,10 +1,10 @@
 """Legacy compatibility layer for :mod:`theo.application.facades.database`.
 
-The services API used to expose database helpers directly from
-``theo.infrastructure.api.app.core.database``.  The code base now routes all
-callers through :mod:`theo.application.facades.database`; this module
-re-exports those helpers while emitting a deprecation warning on first
-import so existing integrations keep working.
+The services API historically exposed database helpers from the legacy core
+namespace.  The code base now routes all callers through
+:mod:`theo.application.facades.database`; this module re-exports those helpers
+while emitting a deprecation warning on first import so existing integrations
+keep working.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import warnings
 from theo.application.facades import database as _facade
 
 warnings.warn(
-    "Importing 'theo.infrastructure.api.app.core.database' is deprecated. "
+    f"Importing '{__name__}' is deprecated. "
     "Use 'theo.application.facades.database' instead.",
     DeprecationWarning,
     stacklevel=2,

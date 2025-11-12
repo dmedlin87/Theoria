@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, date
 from pathlib import Path
-from typing import Any, Iterable, Sequence, cast
+from typing import Any, Callable, Iterable, Sequence, cast
+
+from dataclasses import dataclass, replace
 
 import httpx
 from celery import Celery
@@ -29,14 +32,47 @@ from theo.application.dtos import ChatSessionDTO
 from theo.infrastructure.api.app.persistence_models import Document, Passage
 from theo.application.services.bootstrap import resolve_application
 
-from ..ai.rag import deliverables as rag_deliverables
-from ..ai.rag import exports as rag_exports
-from ..ai.rag.guardrail_helpers import (
-    GuardrailError,
-    build_citations,
-    validate_model_completion,
-)
-from ..ai.rag.models import RAGCitation
+try:  # pragma: no cover - optional AI deliverables dependency
+    from ..ai.rag import deliverables as rag_deliverables
+    from ..ai.rag import exports as rag_exports
+except Exception:  # pragma: no cover - lean environments
+    class _MissingRAGModule:
+        def __getattr__(self, name: str) -> Any:
+            raise AttributeError(
+                "Optional AI dependencies are not installed; "
+                "mock the 'rag' components for testing."
+            )
+
+    rag_deliverables = _MissingRAGModule()
+    rag_exports = _MissingRAGModule()
+try:  # pragma: no cover - optional guardrail dependency
+    from ..ai.rag.guardrail_helpers import (
+        GuardrailError,
+        build_citations,
+        validate_model_completion,
+    )
+except Exception:  # pragma: no cover - lean environments
+    class GuardrailError(RuntimeError):
+        """Fallback guardrail error when AI dependencies are unavailable."""
+
+    def build_citations(_results: Sequence[Any]) -> list[RAGCitation]:
+        return []
+
+    def validate_model_completion(_completion: str, _citations: Sequence[RAGCitation]) -> None:
+        return None
+try:  # pragma: no cover - optional AI dependency
+    from ..ai.rag.models import RAGCitation
+except Exception:  # pragma: no cover - lean environments
+    @dataclass(slots=True)
+    class RAGCitation:  # type: ignore[override]
+        index: int
+        osis: str
+        anchor: str
+        passage_id: str | None = None
+        document_id: str | None = None
+        document_title: str | None = None
+        snippet: str | None = None
+        source_url: str | None = None
 from ..analytics.openalex_enrichment import enrich_document_openalex_details
 from ..analytics.topic_map import TopicMapBuilder
 from ..analytics.topics import (
@@ -51,11 +87,28 @@ from ..analytics.watchlists import (
 )
 from ..creators.verse_perspectives import CreatorVersePerspectiveService
 from ..enrich import MetadataEnricher
-from ..ingest.pipeline import (
-    PipelineDependencies,
-    run_pipeline_for_file,
-    run_pipeline_for_url,
-)
+try:  # pragma: no cover - optional ingestion dependency
+    from ..ingest.pipeline import (
+        PipelineDependencies,
+        run_pipeline_for_file,
+        run_pipeline_for_url,
+    )
+except Exception:  # pragma: no cover - lean environments
+    class PipelineDependencies:  # type: ignore[override]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self.settings = kwargs.get("settings")
+
+    def run_pipeline_for_file(*_args: Any, **_kwargs: Any) -> Document:
+        raise ModuleNotFoundError(
+            "Optional ingestion dependencies are not installed; "
+            "provide a stub via configure_worker_dependencies."
+        )
+
+    def run_pipeline_for_url(*_args: Any, **_kwargs: Any) -> Document:
+        raise ModuleNotFoundError(
+            "Optional ingestion dependencies are not installed; "
+            "provide a stub via configure_worker_dependencies."
+        )
 from ..models.ai import ChatMemoryEntry
 from ..models.export import DeliverableDownload
 from ..models.search import HybridSearchFilters, HybridSearchRequest
@@ -135,6 +188,37 @@ _CITATION_VALIDATION_TOP_K = 8
 _DEFAULT_CITATION_SESSION_LIMIT = 25
 
 
+@dataclass(frozen=True)
+class _WorkerDependencies:
+    run_pipeline_for_file: Callable[..., Document]
+    run_pipeline_for_url: Callable[..., Document]
+    hybrid_search: Callable[[Session, HybridSearchRequest], Sequence[object]]
+    build_citations: Callable[[Sequence[object]], Sequence[RAGCitation]]
+    validate_model_completion: Callable[[str, Sequence[RAGCitation]], None]
+
+
+_worker_dependencies = _WorkerDependencies(
+    run_pipeline_for_file=run_pipeline_for_file,
+    run_pipeline_for_url=run_pipeline_for_url,
+    hybrid_search=hybrid_search,
+    build_citations=build_citations,
+    validate_model_completion=validate_model_completion,
+)
+
+
+def configure_worker_dependencies(**overrides: object) -> None:
+    """Apply dependency overrides for unit testing and instrumentation."""
+
+    global _worker_dependencies
+    _worker_dependencies = replace(_worker_dependencies, **overrides)
+
+
+def get_worker_dependencies() -> _WorkerDependencies:
+    """Return the currently configured worker dependency bundle."""
+
+    return _worker_dependencies
+
+
 def _compute_retry_delay(retry_count: int | None) -> int:
     """Compute an exponential backoff window capped at one minute."""
 
@@ -163,6 +247,11 @@ def _normalise_cached_citations(
 ) -> list[RAGCitation]:
     normalised: list[RAGCitation] = []
     for citation in citations:
+        if isinstance(citation, dict):
+            try:
+                citation = RAGCitation(**citation)
+            except Exception:  # pragma: no cover - malformed citation payload
+                continue
         if not isinstance(citation.index, int):
             return []
         if not citation.osis or not citation.anchor:
@@ -208,6 +297,7 @@ def validate_citations(
     discrepancies: list[dict[str, Any]] = []
 
     engine = get_engine()
+    deps = get_worker_dependencies()
 
     if job_id:
         with Session(engine) as session:
@@ -253,7 +343,7 @@ def validate_citations(
                             filters=HybridSearchFilters(),
                             k=_CITATION_VALIDATION_TOP_K,
                         )
-                        results = hybrid_search(session, request)
+                        results = deps.hybrid_search(session, request)
                     except Exception as exc:  # pragma: no cover - defensive logging
                         error_message = str(exc)
                         logger.warning(
@@ -272,7 +362,7 @@ def validate_citations(
                         CITATION_DRIFT_EVENTS.labels(status="failed").inc()
                         continue
 
-                    expected_citations = build_citations(results)
+                    expected_citations = deps.build_citations(results)
                     if not expected_citations:
                         logger.warning(
                             "Citation validation missing retrieval citations",
@@ -293,7 +383,7 @@ def validate_citations(
                     completion = _compose_cached_completion(entry, cached_citations)
 
                     try:
-                        validate_model_completion(completion, expected_citations)
+                        deps.validate_model_completion(completion, expected_citations)
                     except GuardrailError as exc:
                         error_message = str(exc)
                         logger.warning(
@@ -425,6 +515,43 @@ def plan_deliverable_outputs(
     return downloads
 
 
+def _json_default(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Path):
+        return str(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def _model_dump(obj: Any) -> dict[str, Any]:
+    if hasattr(obj, "model_dump"):
+        try:
+            return obj.model_dump(mode="json")  # type: ignore[call-arg]
+        except TypeError:  # pragma: no cover - different Pydantic signatures
+            return obj.model_dump()  # type: ignore[call-arg]
+    if hasattr(obj, "dict"):
+        return obj.dict()  # type: ignore[call-arg]
+    if hasattr(obj, "__dict__"):
+        return {
+            key: value
+            for key, value in obj.__dict__.items()
+            if not key.startswith("_")
+        }
+    return {}
+
+
+def _update_manifest_export_id(manifest: Any, export_id: str) -> Any:
+    if hasattr(manifest, "model_copy"):
+        return manifest.model_copy(update={"export_id": export_id})
+    manifest_data = _model_dump(manifest)
+    manifest_data["export_id"] = export_id
+    manifest_cls = type(manifest)
+    try:
+        return manifest_cls(**manifest_data)
+    except Exception:  # pragma: no cover - fallback to dict
+        return manifest_data
+
+
 def _update_job_status(
     session: Session,
     job_id: str,
@@ -457,12 +584,14 @@ def process_file(
     """Process a file in the background via the ingestion pipeline."""
 
     engine = get_engine()
+    deps = get_worker_dependencies()
+
     with Session(engine) as session:
         if job_id:
             _update_job_status(session, job_id, status="processing")
             session.commit()
         try:
-            document = run_pipeline_for_file(
+            document = deps.run_pipeline_for_file(
                 session,
                 Path(path),
                 frontmatter,
@@ -493,13 +622,14 @@ def process_url(
     """Process a URL in the background via the ingestion pipeline."""
 
     engine = get_engine()
+    deps = get_worker_dependencies()
 
     try:
         with Session(engine) as session:
             if job_id:
                 _update_job_status(session, job_id, status="processing")
                 session.commit()
-            document = run_pipeline_for_url(
+            document = deps.run_pipeline_for_url(
                 session,
                 url,
                 source_type=source_type,
@@ -773,6 +903,8 @@ send_topic_digest_notification_task = cast(
     CeleryTask, send_topic_digest_notification
 )
 
+topic_digest_notifier = send_topic_digest_notification_task
+
 
 @celery.task(name="tasks.refresh_topic_map")
 def refresh_topic_map(scope: str = "global") -> dict[str, object]:
@@ -847,7 +979,7 @@ def topic_digest(
                     "window_start": window_start.isoformat(),
                     "topics": [cluster.topic for cluster in digest.topics],
                 }
-                send_topic_digest_notification_task.delay(
+                topic_digest_notifier.delay(
                     digest_document.id, notify, context
                 )
                 logger.info(
@@ -1072,6 +1204,8 @@ def run_watchlist_alert(watchlist_id: str) -> None:
 
 run_watchlist_alert_task = cast(CeleryTask, run_watchlist_alert)
 
+watchlist_alert_queue = run_watchlist_alert_task
+
 
 def generate_sermon_prep_outline(
     session,
@@ -1158,16 +1292,18 @@ def build_deliverable(
 
     manifest = package.manifest
     if export_id:
-        manifest = manifest.model_copy(update={"export_id": export_id})
-    export_id = manifest.export_id
+        manifest = _update_manifest_export_id(manifest, export_id)
+
+    manifest_payload = _model_dump(manifest)
+    export_id = (manifest_payload.get("export_id") or export_id or "export").strip()
 
     export_dir = settings.storage_root / "exports" / export_id
     export_dir.mkdir(parents=True, exist_ok=True)
 
-    manifest_payload = manifest.model_dump(mode="json")
     manifest_path = export_dir / "manifest.json"
-    manifest_json = manifest.model_dump_json(indent=2, exclude_none=True)
+    manifest_json = json.dumps(manifest_payload, indent=2, default=_json_default)
     manifest_path.write_text(manifest_json, encoding="utf-8")
+    manifest_payload = json.loads(manifest_json)
 
     downloads: list[dict[str, Any]] = []
     for asset in package.assets:
@@ -1211,7 +1347,7 @@ def schedule_watchlist_alerts() -> None:
     now = datetime.now(UTC)
     with Session(engine) as session:
         for watchlist in iter_due_watchlists(session, now):
-            run_watchlist_alert_task.delay(watchlist.id)
+            watchlist_alert_queue.delay(watchlist.id)
             scheduled += 1
     logger.info(
         "Scheduled watchlist alerts",

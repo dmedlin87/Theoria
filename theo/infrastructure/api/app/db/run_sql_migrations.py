@@ -86,6 +86,13 @@ _PERFORMANCE_INDEXES_GENERIC = (
 )
 
 
+def _sqlite_table_columns(connection, table: str) -> set[str]:
+    """Return the set of column names for *table* in a SQLite database."""
+
+    rows = connection.exec_driver_sql(f"PRAGMA table_info('{table}')").fetchall()
+    return {row[1] for row in rows if len(row) > 1}
+
+
 def _ensure_performance_indexes(engine: Engine) -> list[str]:
     """Ensure critical query indexes exist across supported dialects."""
 
@@ -131,6 +138,15 @@ def _ensure_performance_indexes(engine: Engine) -> list[str]:
                         "Skipping index %s; table %s missing", index_name, table_name
                     )
                     continue
+                if table_name == "passages":
+                    columns = _sqlite_table_columns(connection, table_name)
+                    if "embedding" not in columns:
+                        logger.debug(
+                            "Skipping index %s; column embedding missing on %s",
+                            index_name,
+                            table_name,
+                        )
+                        continue
                 exists = connection.execute(
                     text(
                         "SELECT 1 FROM sqlite_master "

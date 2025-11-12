@@ -1,29 +1,83 @@
-"""Tests for the legacy settings store shim module."""
+"""Tests for the application settings store facade."""
 from __future__ import annotations
 
-from theo.application.facades import settings_store as facades_settings_store
+from dataclasses import dataclass
+from typing import Any
 
-from tests.api.core import import_legacy_module
+import pytest
 
-
-MODULE_NAME = "theo.infrastructure.api.app.core.settings_store"
-EXPECTED_EXPORTS = [
-    "SETTINGS_NAMESPACE",
-    "SettingNotFoundError",
-    "load_setting",
-    "require_setting",
-    "save_setting",
-]
+from tests.api.core import reload_facade
 
 
-def test_settings_store_shim_warns_and_reexports_store_facade():
-    """Importing the shim should warn and expose the facade store helpers."""
-    module, warning = import_legacy_module(MODULE_NAME)
+@dataclass
+class MemoryAppSetting:
+    key: str
+    value: Any
 
-    assert "deprecated" in str(warning.message)
-    assert module.SETTINGS_NAMESPACE is facades_settings_store.SETTINGS_NAMESPACE
-    assert module.SettingNotFoundError is facades_settings_store.SettingNotFoundError
-    assert module.load_setting is facades_settings_store.load_setting
-    assert module.require_setting is facades_settings_store.require_setting
-    assert module.save_setting is facades_settings_store.save_setting
-    assert module.__all__ == EXPECTED_EXPORTS
+
+class MemorySession:
+    def __init__(self) -> None:
+        self.storage: dict[str, MemoryAppSetting] = {}
+        self.commits = 0
+
+    def get(self, _model: Any, key: str) -> MemoryAppSetting | None:
+        return self.storage.get(key)
+
+    def add(self, record: MemoryAppSetting) -> None:
+        self.storage[record.key] = record
+
+    def commit(self) -> None:
+        self.commits += 1
+
+
+class FakeCipher:
+    def __init__(self) -> None:
+        self.encrypted: list[str] = []
+
+    def encrypt(self, payload: bytes) -> bytes:
+        token = f"enc:{payload.decode('utf-8')}"
+        self.encrypted.append(token)
+        return token.encode("utf-8")
+
+    def decrypt(self, token: bytes) -> bytes:
+        value = token.decode("utf-8")
+        assert value.startswith("enc:")
+        return value[len("enc:") :].encode("utf-8")
+
+
+def _load_store(monkeypatch: pytest.MonkeyPatch):
+    module = reload_facade("theo.application.facades.settings_store")
+    monkeypatch.setattr(module, "AppSetting", MemoryAppSetting)
+    return module
+
+
+def test_save_and_load_setting_round_trips_encrypted_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_store(monkeypatch)
+    cipher = FakeCipher()
+    monkeypatch.setattr(module, "get_settings_cipher", lambda: cipher)
+
+    session = MemorySession()
+    module.save_setting(session, "provider.credentials", {"api_key": "secret"})
+
+    qualified = f"{module.SETTINGS_NAMESPACE}:provider.credentials"
+    record = session.storage[qualified]
+    assert "__encrypted__" in record.value
+
+    loaded = module.load_setting(session, "provider.credentials")
+    assert loaded == {"api_key": "secret"}
+    required = module.require_setting(session, "provider.credentials")
+    assert required == {"api_key": "secret"}
+    assert session.commits == 1
+
+
+def test_save_setting_requires_cipher_for_sensitive_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_store(monkeypatch)
+    monkeypatch.setattr(module, "get_settings_cipher", lambda: None)
+
+    session = MemorySession()
+    with pytest.raises(RuntimeError):
+        module.save_setting(session, "provider.credentials", {"api_key": "secret"})

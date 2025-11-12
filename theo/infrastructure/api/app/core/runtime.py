@@ -14,7 +14,7 @@ import warnings
 from theo.application.facades import runtime as _facade
 
 warnings.warn(
-    "Importing 'theo.infrastructure.api.app.core.runtime' is deprecated. "
+    f"Importing '{__name__}' is deprecated. "
     "Use 'theo.application.facades.runtime' instead.",
     DeprecationWarning,
     stacklevel=2,
