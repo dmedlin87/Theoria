@@ -158,13 +158,11 @@ class TestWorkerTasksOptimized:
         )
         
         monkeypatch.setattr(
-            tasks,
-            "generate_sermon_prep_outline",
+            "theo.infrastructure.api.app.workers.tasks.generate_sermon_prep_outline",
             MagicMock(return_value={})
         )
         monkeypatch.setattr(
-            tasks,
-            "build_sermon_deliverable",
+            "theo.infrastructure.api.app.workers.tasks.build_sermon_deliverable",
             MagicMock(return_value=mock_package)
         )
         
