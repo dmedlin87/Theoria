@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from dataclasses import replace
 
-from theo.adapters.persistence import Base
+import pytest
+from sqlalchemy.orm import Session
+
 from theo.adapters.persistence.models import NoteEvidence, ResearchNote as ResearchNoteModel
 from theo.adapters.research.sqlalchemy import SqlAlchemyResearchNoteRepository
 from theo.domain.research import (
@@ -14,44 +14,10 @@ from theo.domain.research import (
 )
 
 
-@pytest.fixture()
-def session() -> Session:
-    engine = create_engine("sqlite:///:memory:", future=True)
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine, future=True, expire_on_commit=False)
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        engine.dispose()
+def _with(base: ResearchNoteDraft, **overrides: object) -> ResearchNoteDraft:
+    """Return a copy of *base* with the provided overrides applied."""
 
-
-def _draft(**overrides) -> ResearchNoteDraft:
-    base = dict(
-        osis="John.3.16",
-        body="God so loved the world",
-        title="Love",
-        stance="supporting",
-        claim_type="doctrine",
-        confidence=0.9,
-        tags=("love", "grace"),
-        evidences=(
-            ResearchNoteEvidenceDraft(
-                source_type="scripture",
-                source_ref="John 3:16",
-                osis_refs=("John.3.16",),
-                citation="John 3:16",
-                snippet="For God so loved the world",
-                meta={"translation": "ESV"},
-            ),
-        ),
-        request_id="req-1",
-        end_user_id="user-1",
-        tenant_id="tenant-1",
-    )
-    base.update(overrides)
-    return ResearchNoteDraft(**base)
+    return replace(base, **overrides)
 
 
 def _refresh_model(session: Session, note_id: str) -> ResearchNoteModel:
@@ -59,37 +25,44 @@ def _refresh_model(session: Session, note_id: str) -> ResearchNoteModel:
     return session.get(ResearchNoteModel, note_id)
 
 
-def test_create_persists_note_and_evidences(session: Session) -> None:
-    repo = SqlAlchemyResearchNoteRepository(session)
+def test_create_persists_note_and_evidences(
+    research_session: Session, research_note_draft: ResearchNoteDraft
+) -> None:
+    repo = SqlAlchemyResearchNoteRepository(research_session)
 
-    result = repo.create(_draft())
+    result = repo.create(research_note_draft)
 
-    assert result.title == "Love"
-    assert result.tags == ("love", "grace")
+    assert result.title == research_note_draft.title
+    assert result.tags == research_note_draft.tags
     assert len(result.evidences) == 1
 
-    stored = session.query(ResearchNoteModel).one()
-    assert stored.request_id == "req-1"
-    assert stored.tags == ["love", "grace"]
+    stored = research_session.query(ResearchNoteModel).one()
+    assert stored.request_id == research_note_draft.request_id
+    assert stored.tags == list(research_note_draft.tags or [])
     assert len(stored.evidences) == 1
     evidence = stored.evidences[0]
-    assert evidence.source_ref == "John 3:16"
-    assert evidence.meta == {"translation": "ESV"}
+    assert evidence.source_ref == result.evidences[0].source_ref
+    assert evidence.meta == result.evidences[0].meta
 
 
-def test_preview_rolls_back_transaction(session: Session) -> None:
-    repo = SqlAlchemyResearchNoteRepository(session)
+def test_preview_rolls_back_transaction(
+    research_session: Session, research_note_draft: ResearchNoteDraft
+) -> None:
+    repo = SqlAlchemyResearchNoteRepository(research_session)
 
-    preview = repo.preview(_draft())
+    preview = repo.preview(research_note_draft)
 
     assert preview.id is not None
-    assert session.query(ResearchNoteModel).count() == 0
+    assert research_session.query(ResearchNoteModel).count() == 0
 
 
-def test_list_for_osis_applies_filters(session: Session) -> None:
-    repo = SqlAlchemyResearchNoteRepository(session)
+def test_list_for_osis_applies_filters(
+    research_session: Session, research_note_draft: ResearchNoteDraft
+) -> None:
+    repo = SqlAlchemyResearchNoteRepository(research_session)
     recent = repo.create(
-        _draft(
+        _with(
+            research_note_draft,
             osis="Rom.8.1",
             stance="supporting",
             claim_type="theology",
@@ -98,7 +71,8 @@ def test_list_for_osis_applies_filters(session: Session) -> None:
         )
     )
     repo.create(
-        _draft(
+        _with(
+            research_note_draft,
             osis="Rom.8.1",
             stance="opposing",
             claim_type="doctrine",
@@ -119,9 +93,11 @@ def test_list_for_osis_applies_filters(session: Session) -> None:
     assert results[0].tags == ("freedom", "spirit")
 
 
-def test_update_replaces_evidences(session: Session) -> None:
-    repo = SqlAlchemyResearchNoteRepository(session)
-    created = repo.create(_draft())
+def test_update_replaces_evidences(
+    research_session: Session, research_note_draft: ResearchNoteDraft
+) -> None:
+    repo = SqlAlchemyResearchNoteRepository(research_session)
+    created = repo.create(research_note_draft)
 
     new_evidence = ResearchNoteEvidenceDraft(
         source_type="commentary",
@@ -140,25 +116,27 @@ def test_update_replaces_evidences(session: Session) -> None:
     assert len(updated.evidences) == 1
     assert updated.evidences[0].source_type == "commentary"
 
-    stored = _refresh_model(session, created.id)
+    stored = _refresh_model(research_session, created.id)
     assert stored.title == "Renewed"
     assert stored.tags == ["renewed", "love"]
     assert len(stored.evidences) == 1
     assert stored.evidences[0].source_ref == "Matthew Henry"
 
 
-def test_delete_removes_note_and_evidence(session: Session) -> None:
-    repo = SqlAlchemyResearchNoteRepository(session)
-    created = repo.create(_draft())
+def test_delete_removes_note_and_evidence(
+    research_session: Session, research_note_draft: ResearchNoteDraft
+) -> None:
+    repo = SqlAlchemyResearchNoteRepository(research_session)
+    created = repo.create(research_note_draft)
 
     repo.delete(created.id)
 
-    assert session.get(ResearchNoteModel, created.id) is None
-    assert session.query(NoteEvidence).count() == 0
+    assert research_session.get(ResearchNoteModel, created.id) is None
+    assert research_session.query(NoteEvidence).count() == 0
 
 
-def test_update_missing_note_raises(session: Session) -> None:
-    repo = SqlAlchemyResearchNoteRepository(session)
+def test_update_missing_note_raises(research_session: Session) -> None:
+    repo = SqlAlchemyResearchNoteRepository(research_session)
 
     with pytest.raises(ResearchNoteNotFoundError):
         repo.update("missing", {"title": "Nope"})
