@@ -10,7 +10,7 @@ import os
 import sys
 import types
 import warnings
-from collections.abc import Callable, Generator, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
@@ -39,7 +39,7 @@ class _BootstrapEmbeddingServiceStub:
     def dimension(self) -> int:
         return self._dimension
 
-    def embed(self, texts: Iterable[str], *, batch_size: int) -> list[list[float]]:
+    def embed(self, texts: Sequence[str], *, batch_size: int) -> list[list[float]]:
         normalised = tuple(str(text) for text in texts)
         self.embed_calls.append((normalised, batch_size))
         return [
