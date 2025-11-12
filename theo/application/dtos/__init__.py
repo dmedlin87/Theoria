@@ -16,6 +16,7 @@ from .document import (
     DocumentSummaryDTO,
     PassageDTO,
 )
+from .embedding import EmbeddingUpdate, Metadata, PassageForEmbedding
 from .transcript import TranscriptSegmentDTO, TranscriptVideoDTO
 
 __all__ = [
@@ -25,7 +26,10 @@ __all__ = [
     "DiscoveryListFilters",
     "DocumentDTO",
     "DocumentSummaryDTO",
+    "EmbeddingUpdate",
+    "Metadata",
     "PassageDTO",
+    "PassageForEmbedding",
     "TranscriptSegmentDTO",
     "TranscriptVideoDTO",
 ]

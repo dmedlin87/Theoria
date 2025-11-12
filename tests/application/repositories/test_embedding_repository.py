@@ -12,7 +12,7 @@ from theo.adapters.persistence.embedding_repository import (
     SQLAlchemyPassageEmbeddingRepository,
 )
 from theo.adapters.persistence.models import Document, Passage, PassageEmbedding
-from theo.application.repositories.embedding_repository import EmbeddingUpdate
+from theo.application.dtos import EmbeddingUpdate
 
 pytestmark = pytest.mark.db
 

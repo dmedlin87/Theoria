@@ -13,7 +13,7 @@ Theo Engine exposes first-class REST and CLI interfaces for automation. This gui
 
 Theo ships with Python-based CLI commands under `theo/application/services/cli` and supporting scripts in [`scripts/`](../scripts/). Highlights include:
 
-* `python -m theo.application.services.cli.code_quality` — orchestrates linting, pytest, and type-checking gates. Defaults now target the main `theo/` package and `tests/` tree.
+* `python -m theo.infrastructure.cli.code_quality` — orchestrates linting, pytest, and type-checking gates. Defaults now target the main `theo/` package and `tests/` tree.
 * `./scripts/reset_reseed_smoke.py` — reseeds demo content for smoke testing.
 * `./scripts/perf/incremental_test_runner.py` — runs pytest against files impacted by recent Git changes.
 

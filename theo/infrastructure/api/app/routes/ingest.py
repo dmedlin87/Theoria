@@ -41,7 +41,7 @@ from ..adapters.security import require_principal
 from ..infra.ingestion_service import IngestionService, get_ingestion_service
 from ..utils.imports import LazyImportModule
 
-cli_ingest = LazyImportModule("theo.application.services.cli.ingest_folder")
+cli_ingest = LazyImportModule("theo.infrastructure.cli.ingest_folder")
 
 # Backwards-compatible shims that mirror the previous direct pipeline imports.
 # Older tests and extensions reach into ``routes.ingest`` and replace these

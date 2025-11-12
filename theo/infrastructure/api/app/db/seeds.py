@@ -27,7 +27,7 @@ from theo.infrastructure.api.app.persistence_models import (
     GeoPlace,
     HarmonySeed,
 )
-from theo.application.services.geo import seed_openbible_geo
+from theo.infrastructure.geo import seed_openbible_geo
 
 from ..ingest.osis import expand_osis_reference
 

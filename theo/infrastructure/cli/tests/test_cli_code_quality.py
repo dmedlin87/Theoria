@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:  # pragma: no branch - defensive guard
 
 import pytest
 
-from theo.application.services.cli import code_quality
+from theo.infrastructure.cli import code_quality
 
 
 def test_execute_rejects_commands_outside_allowlist() -> None:

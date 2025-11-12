@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 
 if TYPE_CHECKING:  # pragma: no cover - only needed for type checkers
+    from theo.application.dtos import DocumentDTO as _DocumentDTO  # noqa: F401
     from sqlalchemy.sql import Executable, Select
     from sqlalchemy.engine import Result, ScalarResult
 else:  # pragma: no cover - runtime fallback for SQLAlchemy < 1.4

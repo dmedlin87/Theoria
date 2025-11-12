@@ -42,7 +42,7 @@ Domain→Application→Infrastructure layering enforced elsewhere in the codebas
 
 - Update imports by replacing `theo.services.api` with
   `theo.infrastructure.api`, `theo.services.cli` with
-  `theo.application.services.cli`, and `theo.services.embeddings` with
+  `theo.infrastructure.cli`, and `theo.services.embeddings` with
   `theo.domain.services.embeddings`.
 - CLI entry points should resolve application state via
   `theo.application.services.bootstrap.resolve_application`.

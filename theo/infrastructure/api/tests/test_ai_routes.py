@@ -14,7 +14,7 @@ from theo.application.facades.database import configure_engine, get_engine, get_
 from theo.adapters.persistence.models import AgentTrail, ChatSession, Document, Passage
 from theo.infrastructure.api.app.main import app
 from theo.infrastructure.api.app.workers import tasks as worker_tasks
-from theo.application.services.cli.batch_intel import main as batch_intel_main
+from theo.infrastructure.cli.batch_intel import main as batch_intel_main
 
 @contextmanager
 def _api_client():

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from theo.application.services.cli.ingest_folder import IngestItem, _ingest_batch_via_api
+from theo.infrastructure.cli.ingest_folder import IngestItem, _ingest_batch_via_api
 
 
 class DummySession:
@@ -23,7 +23,7 @@ class DummySession:
 @pytest.fixture()
 def patched_ingest_environment(monkeypatch: pytest.MonkeyPatch):
     engine = object()
-    monkeypatch.setattr("theo.application.services.cli.ingest_folder.get_engine", lambda: engine)
+    monkeypatch.setattr("theo.infrastructure.cli.ingest_folder.get_engine", lambda: engine)
 
     session_records: list[DummySession] = []
 
@@ -32,7 +32,7 @@ def patched_ingest_environment(monkeypatch: pytest.MonkeyPatch):
         session_records.append(session)
         return session
 
-    monkeypatch.setattr("theo.application.services.cli.ingest_folder.Session", session_factory)
+    monkeypatch.setattr("theo.infrastructure.cli.ingest_folder.Session", session_factory)
 
     file_calls: list[tuple[object, Path, dict[str, object], object]] = []
     url_calls: list[tuple[object, str, str, dict[str, object], object]] = []
@@ -45,12 +45,12 @@ def patched_ingest_environment(monkeypatch: pytest.MonkeyPatch):
         url_calls.append((session, url, source_type, dict(frontmatter), dependencies))
         return SimpleNamespace(id=f"url:{url}")
 
-    monkeypatch.setattr("theo.application.services.cli.ingest_folder.run_pipeline_for_file", fake_file)
-    monkeypatch.setattr("theo.application.services.cli.ingest_folder.run_pipeline_for_url", fake_url)
+    monkeypatch.setattr("theo.infrastructure.cli.ingest_folder.run_pipeline_for_file", fake_file)
+    monkeypatch.setattr("theo.infrastructure.cli.ingest_folder.run_pipeline_for_url", fake_url)
 
     post_calls: list[tuple[object, list[str]]] = []
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.POST_BATCH_HANDLERS",
+        "theo.infrastructure.cli.ingest_folder.POST_BATCH_HANDLERS",
         {"tags": lambda session, documents: post_calls.append((session, list(documents)))}
     )
 

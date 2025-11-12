@@ -33,7 +33,7 @@ from ..models.documents import SimpleIngestRequest
 from theo.application.facades.telemetry import log_workflow_event
 from ..utils.imports import LazyImportModule
 
-cli_ingest = LazyImportModule("theo.application.services.cli.ingest_folder")
+cli_ingest = LazyImportModule("theo.infrastructure.cli.ingest_folder")
 
 DocumentLike = Any
 
@@ -55,7 +55,7 @@ def _load_cli_ingest_module() -> ModuleType:
     if _CLI_INGEST_MODULE is not None:
         return _CLI_INGEST_MODULE
 
-    module = importlib.import_module("theo.application.services.cli.ingest_folder")
+    module = importlib.import_module("theo.infrastructure.cli.ingest_folder")
     _CLI_INGEST_MODULE = module
     return module
 

@@ -32,8 +32,8 @@ def refresh_cli_module(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setitem(
         sys.modules, "theo.infrastructure.api.app.workers.tasks", fake_tasks_module
     )
-    monkeypatch.delitem(sys.modules, "theo.application.services.cli.refresh_hnsw", raising=False)
-    module = importlib.import_module("theo.application.services.cli.refresh_hnsw")
+    monkeypatch.delitem(sys.modules, "theo.infrastructure.cli.refresh_hnsw", raising=False)
+    module = importlib.import_module("theo.infrastructure.cli.refresh_hnsw")
     return module
 
 

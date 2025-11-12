@@ -9,11 +9,8 @@ from typing import Sequence
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from theo.application.repositories.embedding_repository import (
-    EmbeddingUpdate,
-    PassageEmbeddingRepository,
-    PassageForEmbedding,
-)
+from theo.application.dtos import EmbeddingUpdate, PassageForEmbedding
+from theo.application.repositories.embedding_repository import PassageEmbeddingRepository
 
 from .models import Document, Passage, PassageEmbedding
 from .base_repository import BaseRepository

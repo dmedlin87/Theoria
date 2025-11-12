@@ -350,8 +350,8 @@
     "theo.infrastructure.api.tests.workers.test_discovery_tasks",
     "theo.infrastructure.api.tests.workers.test_tasks_properties",
     "theo.application.services.bootstrap",
-    "theo.application.services.geo",
-    "theo.application.services.geo.seed_openbible_geo"
+    "theo.infrastructure.geo",
+    "theo.infrastructure.geo.seed_openbible_geo"
   ],
   "edges": [
     {
@@ -4099,19 +4099,19 @@
       "imported": "theo.platform.application"
     },
     {
-      "importer": "theo.application.services.geo",
-      "imported": "theo.application.services.geo.seed_openbible_geo"
+      "importer": "theo.infrastructure.geo",
+      "imported": "theo.infrastructure.geo.seed_openbible_geo"
     },
     {
-      "importer": "theo.application.services.geo.seed_openbible_geo",
+      "importer": "theo.infrastructure.geo.seed_openbible_geo",
       "imported": "theo.adapters.persistence.models"
     },
     {
-      "importer": "theo.application.services.geo.seed_openbible_geo",
+      "importer": "theo.infrastructure.geo.seed_openbible_geo",
       "imported": "theo.application.facades.settings_store"
     },
     {
-      "importer": "theo.application.services.geo.seed_openbible_geo",
+      "importer": "theo.infrastructure.geo.seed_openbible_geo",
       "imported": "theo.domain.research.osis"
     }
   ]
