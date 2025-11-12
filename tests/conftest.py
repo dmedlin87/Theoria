@@ -130,16 +130,36 @@ if "pydantic_settings" not in sys.modules:  # pragma: no cover - lightweight CI 
         sys.modules["pydantic_settings"] = pydantic_settings
 
 try:  # pragma: no cover - optional dependency for integration fixtures
+    import importlib
+    import sqlalchemy
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import Connection, Engine
     from sqlalchemy.orm import Session, sessionmaker
-except ModuleNotFoundError:  # pragma: no cover - allows running lightweight suites
+    try:
+        event = sqlalchemy.event
+    except AttributeError:  # pragma: no cover - minimal SQLAlchemy stubs
+        event = importlib.import_module("sqlalchemy.event")
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - allows running lightweight suites
     create_engine = None  # type: ignore[assignment]
     text = None  # type: ignore[assignment]
     Connection = object  # type: ignore[assignment]
     Engine = object  # type: ignore[assignment]
     Session = object  # type: ignore[assignment]
     sessionmaker = None  # type: ignore[assignment]
+    
+    class _EventStub:  # pragma: no cover - lightweight environments skip DB tests
+        @staticmethod
+        def listens_for(*_args: object, **_kwargs: object):
+            def _decorator(func):
+                return func
+
+            return _decorator
+
+        @staticmethod
+        def remove(*_args: object, **_kwargs: object) -> None:
+            return None
+
+    event = _EventStub()  # type: ignore[assignment]
 
 try:  # pragma: no cover - factory depends on optional domain extras
     from tests.factories.application import isolated_application_container
@@ -688,7 +708,23 @@ def _sqlite_database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[s
         # First create all tables from models
         Base.metadata.create_all(bind=engine)
         # Then run migrations to ensure schema is up-to-date
-        run_sql_migrations(engine)
+        migrations_module = importlib.import_module(
+            "theo.infrastructure.api.app.db.run_sql_migrations"
+        )
+        original_index_helper = getattr(
+            migrations_module, "_ensure_performance_indexes", None
+        )
+        try:
+            if original_index_helper is not None:
+                migrations_module._ensure_performance_indexes = (  # type: ignore[attr-defined]
+                    lambda _engine: []
+                )
+            run_sql_migrations(engine)
+        finally:
+            if original_index_helper is not None:
+                migrations_module._ensure_performance_indexes = (  # type: ignore[attr-defined]
+                    original_index_helper
+                )
         yield url
     finally:
         engine.dispose()
@@ -788,10 +824,22 @@ def integration_session(request: pytest.FixtureRequest) -> Generator[Session, No
 
     SessionFactory = sessionmaker(bind=connection, future=True)  # type: ignore[arg-type]
     session = SessionFactory()
+    nested = session.begin_nested()
+
+    @event.listens_for(session, "after_transaction_end")
+    def _restart_savepoint(sess: Session, transaction) -> None:  # type: ignore[no-redef]
+        if transaction.nested and not transaction._parent.nested:  # pragma: no branch - mirrored from SQLAlchemy recipe
+            sess.begin_nested()
+
     try:
         yield session
-        session.flush()
     finally:
+        try:
+            if nested.is_active:
+                nested.rollback()
+        except Exception:  # pragma: no cover - defensive cleanup
+            pass
+        event.remove(session, "after_transaction_end", _restart_savepoint)
         session.close()
 
 
