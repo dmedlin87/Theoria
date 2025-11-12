@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.orm import Session
 
+from theo.application.embeddings.rebuild_service import EmbeddingRebuildService
 from theo.adapters import AdapterRegistry
 from theo.application import ApplicationContainer
 from theo.application.facades.database import Base, configure_engine, get_engine
@@ -40,6 +41,7 @@ def test_resolve_application_returns_container_and_registry(
     sample_document,
     database,
     application_container_factory,
+    bootstrap_embedding_service_stub,
 ):
     with application_container_factory():
         container, registry = resolve_application()
@@ -53,8 +55,21 @@ def test_resolve_application_returns_container_and_registry(
             "research_notes_repository_factory",
             "hypotheses_repository_factory",
             "research_service_factory",
+            "embedding_rebuild_service",
         }
         assert expected_ports.issubset(registry.factories.keys())
+
+        rebuild_service = registry.resolve("embedding_rebuild_service")
+        assert isinstance(rebuild_service, EmbeddingRebuildService)
+        assert (
+            rebuild_service._embedding_service is bootstrap_embedding_service_stub
+        )
+
+        sample_vectors = rebuild_service._embedding_service.embed(
+            ["Doc 1"], batch_size=1
+        )
+        assert bootstrap_embedding_service_stub.embed_calls[-1] == (("Doc 1",), 1)
+        assert len(sample_vectors[0]) == bootstrap_embedding_service_stub.dimension
 
         command = container.bind_command()
         retire = container.bind_retire()
