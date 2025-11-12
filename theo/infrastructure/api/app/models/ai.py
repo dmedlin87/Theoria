@@ -196,18 +196,26 @@ class ChatSessionRequest(ModeAliasMixin, APIModel):
     @model_validator(mode="after")
     def _validate_reasoning_mode(self) -> "ChatSessionRequest":
         if self.mode_id and self.mode_id not in REASONING_MODE_IDS:
-            raise ValueError(f"Unknown reasoning mode id '{self.mode_id}'")
+            allowed_modes = ", ".join(sorted(REASONING_MODE_IDS))
+            raise ValueError(
+                "Unknown reasoning mode id "
+                f"'{self.mode_id}'. Allowed values: {allowed_modes}"
+            )
         return self
 
     @model_validator(mode="after")
     def _enforce_message_lengths(self) -> "ChatSessionRequest":
-        for message in self.messages:
+        for index, message in enumerate(self.messages, start=1):
             if message.role != "user":
                 continue
 
-            if len(message.content) > MAX_CHAT_MESSAGE_CONTENT_LENGTH:
+            length = len(message.content)
+            if length > MAX_CHAT_MESSAGE_CONTENT_LENGTH:
                 raise ValueError(
-                    "Chat message content exceeds the maximum allowed length"
+                    "User message at position "
+                    f"{index} exceeds the maximum allowed length of "
+                    f"{MAX_CHAT_MESSAGE_CONTENT_LENGTH} characters "
+                    f"(received {length})."
                 )
         return self
 

@@ -20,6 +20,12 @@ from typing import Any, Callable
 import pytest
 
 
+pytest_plugins = [
+    "tests.fixtures.research",
+    "tests.fixtures.verses",
+]
+
+
 def _build_sqlalchemy_stub_modules() -> dict[str, types.ModuleType]:
     sqlalchemy_stub = types.ModuleType("sqlalchemy")
 
