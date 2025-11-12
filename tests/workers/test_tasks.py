@@ -17,6 +17,8 @@ from celery.app.task import Task
 
 pytest_plugins = ("celery.contrib.pytest",)
 
+pytestmark = pytest.mark.usefixtures("worker_stubs")
+
 
 @pytest.fixture
 def celery_app():  # type: ignore[override]
@@ -97,6 +99,24 @@ except ModuleNotFoundError:  # pragma: no cover - minimal fallback for lean envi
         @classmethod
         def model_validate(cls, payload: dict[str, Any]) -> "ChatMemoryEntry":
             return cls(**payload)
+
+        def model_dump(self, mode: str | None = None) -> dict[str, Any]:
+            citations: list[dict[str, Any]] = []
+            for citation in getattr(self, "citations", []) or []:
+                if hasattr(citation, "model_dump"):
+                    citations.append(citation.model_dump())
+                elif hasattr(citation, "__dict__"):
+                    citations.append({k: v for k, v in citation.__dict__.items() if not k.startswith("_")})
+                else:
+                    citations.append(citation)
+            return {
+                "question": self.question,
+                "answer": self.answer,
+                "answer_summary": self.answer_summary,
+                "citations": citations,
+                "document_ids": getattr(self, "document_ids", []) or [],
+                "created_at": None,
+            }
 
 try:  # noqa: E402 - optional dependency fallback for lightweight profiling
     from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchResult
@@ -185,7 +205,9 @@ def test_process_url_ingests_fixture_url(tmp_path, worker_engine) -> None:
     assert document.channel == "Theo Channel"
 
 
-def test_process_url_updates_job_status_and_document_id(tmp_path, worker_engine) -> None:
+def test_process_url_updates_job_status_and_document_id(
+    tmp_path, worker_engine, worker_stubs
+) -> None:
     """URL ingestion jobs transition status and persist the ingested document."""
 
     settings = get_settings()
@@ -202,28 +224,8 @@ def test_process_url_updates_job_status_and_document_id(tmp_path, worker_engine)
         session.commit()
         job_id = job.id
 
-    status_transitions: list[str] = []
-    original_update = tasks._update_job_status
     process_url_task = _task(tasks.process_url)
     original_retry = cast(Any, process_url_task.retry)
-
-    def tracking_update(
-        session: Session,
-        job_id_param: str,
-        *,
-        status: str,
-        error: str | None = None,
-        document_id: str | None = None,
-    ) -> None:
-        if job_id_param == job_id:
-            status_transitions.append(status)
-        original_update(
-            session,
-            job_id_param,
-            status=status,
-            error=error,
-            document_id=document_id,
-        )
 
     retry_calls: list[tuple[tuple, dict]] = []
 
@@ -231,7 +233,6 @@ def test_process_url_updates_job_status_and_document_id(tmp_path, worker_engine)
         retry_calls.append((args, kwargs))
         raise AssertionError("process_url.retry should not be called during successful ingestion")
 
-    tasks._update_job_status = tracking_update
     setattr(process_url_task, "retry", fail_retry)
 
     try:
@@ -246,7 +247,6 @@ def test_process_url_updates_job_status_and_document_id(tmp_path, worker_engine)
             job_id=job_id,
         )
     finally:
-        tasks._update_job_status = original_update
         setattr(process_url_task, "retry", original_retry)
         settings.storage_root = original_storage
 
@@ -256,8 +256,13 @@ def test_process_url_updates_job_status_and_document_id(tmp_path, worker_engine)
         document_id = job_record.document_id
         document = session.get(Document, document_id) if document_id else None
 
-    assert status_transitions[:1] == ["processing"]
-    assert status_transitions[-1:] == ["completed"]
+    job_events = [
+        update["status"]
+        for update in worker_stubs.job_status_updates
+        if update["job_id"] == job_id
+    ]
+    assert job_events[:1] == ["processing"]
+    assert job_events[-1:] == ["completed"]
     assert job_record.status == "completed"
     assert job_record.document_id is not None
     assert document is not None
@@ -266,7 +271,7 @@ def test_process_url_updates_job_status_and_document_id(tmp_path, worker_engine)
 
 
 def test_process_url_retries_with_backoff(
-    monkeypatch: pytest.MonkeyPatch, worker_engine, celery_app
+    monkeypatch: pytest.MonkeyPatch, worker_engine, celery_app, worker_stubs
 ) -> None:
     """Transient failures should trigger Celery retry with exponential backoff."""
 
@@ -289,14 +294,14 @@ def test_process_url_retries_with_backoff(
         raise httpx.HTTPStatusError("boom", request=request, response=response)
 
     monkeypatch.setattr(tasks, "_compute_retry_delay", fake_compute_delay)
-    monkeypatch.setattr(tasks, "run_pipeline_for_url", failing_pipeline)
 
-    process_task = _task(tasks.process_url)
-    with pytest.raises(Retry) as excinfo:
-        process_task.apply(
-            args=("doc-retry", "https://example.com/fixture"),
-            kwargs={"job_id": job_id},
-        )
+    with worker_stubs.override_dependencies(run_pipeline_for_url=failing_pipeline):
+        process_task = _task(tasks.process_url)
+        with pytest.raises(Retry) as excinfo:
+            process_task.apply(
+                args=("doc-retry", "https://example.com/fixture"),
+                kwargs={"job_id": job_id},
+            )
 
     retry_exc = excinfo.value
     assert retry_exc.when == 42
@@ -312,7 +317,7 @@ def test_process_url_retries_with_backoff(
 
 
 def test_process_url_idempotent_completion(
-    monkeypatch: pytest.MonkeyPatch, worker_engine, celery_app
+    monkeypatch: pytest.MonkeyPatch, worker_engine, celery_app, worker_stubs
 ) -> None:
     """Successful retries should keep job metadata stable."""
 
@@ -324,7 +329,14 @@ def test_process_url_idempotent_completion(
 
     call_counter = 0
 
-    def stable_pipeline(session: Session, *_: Any, **__: Any) -> Document:
+    def stable_pipeline(
+        session: Session,
+        url: str,
+        *,
+        source_type: str | None = None,
+        frontmatter: dict[str, Any] | None = None,
+        dependencies: Any = None,
+    ) -> Document:
         nonlocal call_counter
         call_counter += 1
         document = session.get(Document, "doc-stable")
@@ -338,17 +350,16 @@ def test_process_url_idempotent_completion(
             session.flush()
         return document
 
-    monkeypatch.setattr(tasks, "run_pipeline_for_url", stable_pipeline)
-
-    process_task = _task(tasks.process_url)
-    first = process_task.apply(
-        args=("doc-stable", "https://example.com/replay"),
-        kwargs={"job_id": job_id},
-    )
-    second = process_task.apply(
-        args=("doc-stable", "https://example.com/replay"),
-        kwargs={"job_id": job_id},
-    )
+    with worker_stubs.override_dependencies(run_pipeline_for_url=stable_pipeline):
+        process_task = _task(tasks.process_url)
+        first = process_task.apply(
+            args=("doc-stable", "https://example.com/replay"),
+            kwargs={"job_id": job_id},
+        )
+        second = process_task.apply(
+            args=("doc-stable", "https://example.com/replay"),
+            kwargs={"job_id": job_id},
+        )
 
     assert first.result is None
     assert second.result is None
@@ -493,7 +504,9 @@ def test_enrich_document_missing_document_marks_job_failed(worker_engine, caplog
     )
 
 
-def test_topic_digest_worker_updates_job_status(tmp_path, worker_engine) -> None:
+def test_topic_digest_worker_updates_job_status(
+    tmp_path, worker_engine, worker_stubs
+) -> None:
     with Session(worker_engine) as session:
         source = Document(
             id="source-doc",
@@ -507,22 +520,7 @@ def test_topic_digest_worker_updates_job_status(tmp_path, worker_engine) -> None
         session.commit()
         job_id = job.id
 
-    captured: dict[str, Any] = {}
-
-    def fake_delay(
-        document_id: str, recipients: list[str], context: dict[str, Any] | None = None
-    ):
-        captured["document_id"] = document_id
-        captured["recipients"] = recipients
-        captured["context"] = context or {}
-
-    notification_task = _task(tasks.send_topic_digest_notification)
-    original_delay = cast(Any, notification_task.delay)
-    setattr(notification_task, "delay", fake_delay)
-    try:
-        _task(tasks.topic_digest).run(hours=1, job_id=job_id, notify=["alerts@example.com"])
-    finally:
-        setattr(notification_task, "delay", original_delay)
+    _task(tasks.topic_digest).run(hours=1, job_id=job_id, notify=["alerts@example.com"])
 
     with Session(worker_engine) as session:
         updated = session.get(IngestionJob, job_id)
@@ -540,9 +538,15 @@ def test_topic_digest_worker_updates_job_status(tmp_path, worker_engine) -> None
     assert digest_document.topics and "Digest Topic" in digest_document.topics
     assert digest_document.bib_json is not None
     assert digest_document.bib_json["clusters"][0]["document_ids"] == ["source-doc"]
-    assert captured["recipients"] == ["alerts@example.com"]
-    assert captured["document_id"] == digest_doc.id
-    assert "Digest Topic" in captured["context"].get("topics", [])
+    assert worker_stubs.notification_calls
+    last_notification = worker_stubs.notification_calls[-1]
+    assert last_notification["args"][0] == digest_doc.id
+    assert last_notification["args"][1] == ["alerts@example.com"]
+    notification_context = last_notification["kwargs"].get("context")
+    if notification_context is None and len(last_notification["args"]) >= 3:
+        notification_context = last_notification["args"][2]
+    assert notification_context is not None
+    assert "Digest Topic" in notification_context.get("topics", [])
 
 
 def test_generate_document_summary_creates_summary_document(worker_engine) -> None:
@@ -636,7 +640,9 @@ def test_refresh_hnsw_executes_rebuild_sql(monkeypatch) -> None:
     assert any("ANALYZE passages" in statement for statement in executed)
     assert metrics["sample_size"] == 0
 
-def test_validate_citations_passes_and_updates_job(monkeypatch, worker_engine) -> None:
+def test_validate_citations_passes_and_updates_job(
+    monkeypatch, worker_engine, worker_stubs
+) -> None:
     now = datetime.now(UTC)
     citation = RAGCitation(
         index=1,
@@ -658,12 +664,20 @@ def test_validate_citations_passes_and_updates_job(monkeypatch, worker_engine) -
     )
 
     with Session(worker_engine) as session:
+        snippet = entry.model_dump(mode="json")
+        snippet["citations"] = [
+            citation if isinstance(citation, dict) else getattr(citation, "model_dump", lambda: citation.__dict__)()
+            for citation in snippet.get("citations", [])
+        ]
+        if isinstance(snippet.get("created_at"), datetime):
+            snippet["created_at"] = snippet["created_at"].isoformat()
+
         session_record = ChatSession(
             id="session-success",
             user_id="user-1",
             stance=None,
             summary=entry.answer_summary,
-            memory_snippets=[entry.model_dump(mode="json")],
+            memory_snippets=[snippet],
             document_ids=entry.document_ids,
             preferences=None,
             created_at=now,
@@ -697,8 +711,8 @@ def test_validate_citations_passes_and_updates_job(monkeypatch, worker_engine) -
         ]
 
     metric = _FakeMetric()
+    worker_stubs.set_hybrid_results(fake_hybrid_search(None, None))
     monkeypatch.setattr(tasks, "CITATION_DRIFT_EVENTS", metric)
-    monkeypatch.setattr(tasks, "hybrid_search", fake_hybrid_search)
 
     result = _task(tasks.validate_citations).run(job_id=job_id, limit=1)
 
@@ -716,7 +730,9 @@ def test_validate_citations_passes_and_updates_job(monkeypatch, worker_engine) -
         assert job_record.payload.get("limit") == 1
 
 
-def test_validate_citations_logs_mismatch(monkeypatch, worker_engine, caplog) -> None:
+def test_validate_citations_logs_mismatch(
+    monkeypatch, worker_engine, caplog, worker_stubs
+) -> None:
     now = datetime.now(UTC)
     citation = RAGCitation(
         index=1,
@@ -737,12 +753,20 @@ def test_validate_citations_logs_mismatch(monkeypatch, worker_engine, caplog) ->
     )
 
     with Session(worker_engine) as session:
+        snippet = entry.model_dump(mode="json")
+        snippet["citations"] = [
+            citation if isinstance(citation, dict) else getattr(citation, "model_dump", lambda: citation.__dict__)()
+            for citation in snippet.get("citations", [])
+        ]
+        if isinstance(snippet.get("created_at"), datetime):
+            snippet["created_at"] = snippet["created_at"].isoformat()
+
         session_record = ChatSession(
             id="session-failure",
             user_id="user-2",
             stance=None,
             summary=entry.answer,
-            memory_snippets=[entry.model_dump(mode="json")],
+            memory_snippets=[snippet],
             document_ids=entry.document_ids,
             preferences=None,
             created_at=now,
@@ -774,8 +798,8 @@ def test_validate_citations_logs_mismatch(monkeypatch, worker_engine, caplog) ->
         ]
 
     metric = _FakeMetric()
+    worker_stubs.set_hybrid_results(mismatched_search(None, None))
     monkeypatch.setattr(tasks, "CITATION_DRIFT_EVENTS", metric)
-    monkeypatch.setattr(tasks, "hybrid_search", mismatched_search)
 
     caplog.set_level("WARNING")
     result = _task(tasks.validate_citations).run(limit=1)
