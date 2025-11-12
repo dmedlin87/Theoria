@@ -130,7 +130,6 @@ if "pydantic_settings" not in sys.modules:  # pragma: no cover - lightweight CI 
         sys.modules["pydantic_settings"] = pydantic_settings
 
 try:  # pragma: no cover - optional dependency for integration fixtures
-    import importlib
     import sqlalchemy
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import Connection, Engine
