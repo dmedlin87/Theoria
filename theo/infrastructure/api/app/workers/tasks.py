@@ -1303,8 +1303,6 @@ def build_deliverable(
     manifest_path = export_dir / "manifest.json"
     manifest_json = json.dumps(manifest_payload, indent=2, default=_json_default)
     manifest_path.write_text(manifest_json, encoding="utf-8")
-    manifest_payload = json.loads(manifest_json)
-
     downloads: list[dict[str, Any]] = []
     for asset in package.assets:
         filename = asset.filename
