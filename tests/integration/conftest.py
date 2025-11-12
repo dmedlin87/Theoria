@@ -4,14 +4,21 @@ from collections.abc import Generator, Iterator
 
 import pytest
 
-from tests.integration._stubs import install_celery_stub, install_sklearn_stub
+from tests.integration._db import ensure_duplicate_detection_baseline
+from tests.integration._stubs import (
+    install_audio_stubs,
+    install_celery_stub,
+    install_duplicate_detection_stub,
+    install_openai_stub,
+    install_sklearn_stub,
+)
 
 try:  # pragma: no cover - optional SQLAlchemy dependency
     from sqlalchemy import create_engine
     from sqlalchemy.engine import Engine
     from sqlalchemy.orm import Session, sessionmaker
     from sqlalchemy.pool import StaticPool
-except ModuleNotFoundError:  # pragma: no cover - allow lightweight environments
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - allow lightweight environments
     create_engine = None  # type: ignore[assignment]
     Engine = Session = object  # type: ignore[assignment]
     sessionmaker = StaticPool = None  # type: ignore[assignment]
@@ -22,12 +29,15 @@ else:
 
     try:  # pragma: no cover - migrations optional in light environments
         from theo.infrastructure.api.app.db.run_sql_migrations import run_sql_migrations
-    except ModuleNotFoundError:  # pragma: no cover - lightweight test runs
+    except (ModuleNotFoundError, ImportError):  # pragma: no cover - lightweight test runs
         run_sql_migrations = None  # type: ignore[assignment]
 
 
 install_sklearn_stub()
 install_celery_stub()
+install_audio_stubs()
+install_openai_stub()
+install_duplicate_detection_stub()
 
 
 @pytest.fixture(scope="session")
@@ -63,6 +73,7 @@ def sqlite_session(sqlite_memory_engine: Engine) -> Generator[Session, None, Non
     transaction = connection.begin()
     SessionLocal = sessionmaker(bind=connection, future=True)
     session = SessionLocal()
+    ensure_duplicate_detection_baseline(session)
     try:
         yield session
     finally:
@@ -86,6 +97,7 @@ def baseline_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("THEO_ALLOW_INSECURE_STARTUP", "1")
     monkeypatch.setenv("THEORIA_ENVIRONMENT", "test")
     monkeypatch.setenv("THEO_FORCE_EMBEDDING_FALLBACK", "1")
+    monkeypatch.setenv("CREATOR_VERSE_ROLLUPS_ASYNC_REFRESH", "0")
     get_settings.cache_clear()
     monkeypatch.setattr(query_optimizations, "record_histogram", lambda *_, **__: None)
     monkeypatch.setattr(query_optimizations, "record_counter", lambda *_, **__: None)

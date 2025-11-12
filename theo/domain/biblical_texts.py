@@ -1,5 +1,6 @@
 """Domain models for biblical texts with morphological and semantic analysis."""
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -214,9 +215,20 @@ class BibleVersion:
         return None
 
 
+_HEBREW_DIACRITICS_RE = re.compile(r"[\u0591-\u05C7]")
+
+
+def _normalize_hebrew_text(value: Optional[str]) -> str:
+    """Return ``value`` without cantillation or vowel marks for comparisons."""
+
+    if not value:
+        return ""
+    return _HEBREW_DIACRITICS_RE.sub("", value)
+
+
 class TheologicalTermTracker:
     """Utility class for tracking theological terms across versions."""
-    
+
     @staticmethod
     def find_elohim_singular_verbs(version: BibleVersion) -> List[BiblicalVerse]:
         """Find verses where אלהים appears with singular verbs."""
@@ -225,28 +237,32 @@ class TheologicalTermTracker:
             for verse in book.verses.values():
                 has_elohim = False
                 has_singular_verb = False
-                
+
                 for tag in verse.morphology:
-                    lemma = getattr(tag, "lemma", None)
-                    number = getattr(tag, "number", None)
+                    lemma = _normalize_hebrew_text(getattr(tag, "lemma", None))
+                    raw_number = getattr(tag, "number", None)
+                    number = str(raw_number).strip().lower() if raw_number else None
                     person = getattr(tag, "person", None)
                     raw_pos = getattr(tag, "pos", None)
                     pos_value = raw_pos.value if isinstance(raw_pos, POS) else raw_pos
+                    pos_normalized = str(pos_value).strip().lower() if pos_value else ""
+                    notes = getattr(tag, "theological_notes", None) or []
+                    normalised_notes = {str(note).strip().lower() for note in notes}
 
                     # Check for אלהים (plural form)
-                    if lemma == "אלהים" and number == "plural":
+                    if (lemma == "אלהים" or "divine_name" in normalised_notes) and number == "plural":
                         has_elohim = True
 
                     # Check for singular verb with null-safety
                     if (
-                        pos_value and pos_value == POS.VERB.value
+                        pos_normalized == POS.VERB.value
                         and number == "singular"
                         and person == 3
                     ):
                         has_singular_verb = True
                 if has_elohim and has_singular_verb:
                     results.append(verse)
-                    
+
         return results
     
     @staticmethod
