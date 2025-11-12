@@ -28,6 +28,8 @@ if TYPE_CHECKING:  # pragma: no cover - imported only for type checking
 
 import pytest
 
+def _prepare_celery_pytest_plugin() -> None:
+    """Ensure the Celery pytest plugin can be imported by pytest."""
 
 _EXAMPLE_COM_RESPONSES: dict[str, str] = {
     "https://example.com/test": "<html><body>Test fixture</body></html>",
@@ -188,12 +190,12 @@ def _ensure_celery_pytest_plugin() -> None:
         celery_module.__path__ = [str(repo_root / "celery")]  # type: ignore[attr-defined]
 
     try:
-        importlib.import_module("celery.contrib.pytest")
+        spec = importlib.util.find_spec("celery.contrib.pytest")
+    except ModuleNotFoundError:
+        spec = None
+
+    if spec is not None:
         return
-    except ModuleNotFoundError as exc:
-        missing = getattr(exc, "name", "celery.contrib.pytest")
-        if missing not in {"celery", "celery.contrib", "celery.contrib.pytest"}:
-            raise
 
     plugin_path = repo_root / "celery" / "contrib" / "pytest.py"
     if not plugin_path.exists():
@@ -215,15 +217,8 @@ def _ensure_celery_pytest_plugin() -> None:
         setattr(celery_pkg, "contrib", contrib_mod)  # type: ignore[attr-defined]
         sys.modules[contrib_name] = contrib_mod
 
-    spec = importlib.util.spec_from_file_location("celery.contrib.pytest", str(plugin_path))
-    if spec and spec.loader:
-        module = importlib.util.module_from_spec(spec)
-        sys.modules["celery.contrib.pytest"] = module
-        setattr(contrib_mod, "pytest", module)  # type: ignore[attr-defined]
-        spec.loader.exec_module(module)
 
-
-_ensure_celery_pytest_plugin()
+_prepare_celery_pytest_plugin()
 
 try:  # pragma: no cover - optional dependency
     import pydantic  # type: ignore
@@ -344,6 +339,8 @@ def _require_application_factory() -> None:
         reason = _APPLICATION_FACTORY_IMPORT_ERROR or ModuleNotFoundError("pythonbible")
         pytest.skip(f"application factory unavailable: {reason}")
 
+pytest_plugins: list[str] = ["celery.contrib.pytest"]
+
 if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE"}:
     try:
         import pydantic  # type: ignore  # noqa: F401
@@ -352,11 +349,8 @@ if os.environ.get("THEORIA_SKIP_HEAVY_FIXTURES", "0") not in {"1", "true", "TRUE
             "pydantic not installed; skipping heavy pytest fixtures that depend on it.",
             RuntimeWarning,
         )
-        pytest_plugins = []
     else:
-        pytest_plugins = ["tests.fixtures.mocks"]
-else:  # pragma: no cover - exercised in lightweight CI and profiling flows
-    pytest_plugins: list[str] = []
+        pytest_plugins.append("tests.fixtures.mocks")
 
 try:  # pragma: no cover - optional dependency in local test harness
     import pytest_cov  # type: ignore  # noqa: F401

@@ -170,7 +170,11 @@ def _build_sqlalchemy_stub_modules() -> dict[str, types.ModuleType]:
     class NullPool:  # pragma: no cover - placeholder
         pass
 
+    class StaticPool:  # pragma: no cover - placeholder
+        pass
+
     pool_module.NullPool = NullPool
+    pool_module.StaticPool = StaticPool
 
     return {
         "sqlalchemy": sqlalchemy_stub,
