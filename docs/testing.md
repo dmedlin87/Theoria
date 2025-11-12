@@ -74,6 +74,8 @@ Some regression tests opt into database fixtures that can target either SQLite o
   must be running locally and the `testcontainers[postgresql]` dependency installed. Override the base image with
   `PYTEST_PGVECTOR_IMAGE` when necessary. 【F:tests/conftest.py†L103-L465】
 * The fixture ensures the `vector` and `pg_trgm` extensions are present before yielding the connection string. 【F:tests/conftest.py†L423-L430】
+* Postgres readiness is handled with `LogMessageWaitStrategy("database system is ready to accept connections")` so new
+  `testcontainers` releases work without the deprecated `@wait_container_is_ready` decorator. 【F:tests/fixtures/pgvector.py†L18-L29】【F:tests/fixtures/pgvector.py†L183-L194】
 * See `docs/testing/pytest_performance.md` for guidance on profiling the heavy marker suites and reviewing baseline timings.
 
 To run the schema-aware slow suite against Postgres:

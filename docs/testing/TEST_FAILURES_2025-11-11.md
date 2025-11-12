@@ -205,9 +205,10 @@ tests/commands/test_embedding_rebuild.py::*
 
 ### Deprecation Warnings
 
-1. **testcontainers** - `@wait_container_is_ready` decorator deprecated
+1. **testcontainers** - `@wait_container_is_ready` decorator deprecated *(resolved)*
    - Location: `.venv\Lib\site-packages\testcontainers\core\waiting_utils.py:215`
-   - Recommendation: Use structured wait strategies
+   - Resolution: Attach `LogMessageWaitStrategy("database system is ready to accept connections")`
+     when provisioning the Postgres Testcontainer (`tests/fixtures/pgvector.py`).
 
 2. **datetime.utcnow()** deprecated
    - Location: `theo\adapters\biblical_ai_processor.py:93`
@@ -271,7 +272,7 @@ tests/commands/test_embedding_rebuild.py::*
 
 ### Low Priority (P3)
 6. **Update testcontainers usage**
-   - Migrate to structured wait strategies
+   - ✅ Structured wait strategies applied in `tests/fixtures/pgvector.py`
 
 7. **Clean up import deprecation warnings**
    - Already using facade pattern, may be from test imports
