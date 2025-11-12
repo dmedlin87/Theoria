@@ -9,7 +9,7 @@ import time
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TypeVar
+from typing import Callable, TypeVar
 
 import click
 
@@ -44,6 +44,42 @@ __all__ = ["register_commands", "rebuild_embeddings_cmd", "_batched", "_commit_w
 
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _default_service_provider() -> EmbeddingRebuildService:
+    """Resolve the embedding rebuild service from the application container."""
+
+    try:
+        _engine, registry = resolve_application()
+    except Exception as exc:  # pragma: no cover - defensive
+        raise click.ClickException(f"Failed to resolve application: {exc}") from exc
+
+    service = registry.resolve("embedding_rebuild_service")
+    if not isinstance(service, EmbeddingRebuildService):
+        raise click.ClickException("Embedding rebuild service unavailable")
+    return service
+
+
+_SERVICE_PROVIDER: Callable[[], EmbeddingRebuildService] = _default_service_provider
+_CLEAR_CACHE: Callable[[], None] = clear_embedding_cache
+
+
+def configure_embedding_rebuild_cli(
+    *,
+    service_provider: Callable[[], EmbeddingRebuildService] | None = None,
+    cache_clearer: Callable[[], None] | None = None,
+) -> None:
+    """Override dependencies used by the CLI for testability."""
+
+    global _SERVICE_PROVIDER, _CLEAR_CACHE
+    if service_provider is None and cache_clearer is None:
+        _SERVICE_PROVIDER = _default_service_provider
+        _CLEAR_CACHE = clear_embedding_cache
+        return
+    if service_provider is not None:
+        _SERVICE_PROVIDER = service_provider
+    if cache_clearer is not None:
+        _CLEAR_CACHE = cache_clearer
 
 
 def _normalise_timestamp(value: datetime | None) -> datetime | None:
@@ -226,19 +262,12 @@ def rebuild_embeddings_cmd(
 
     _ensure_cli_telemetry()
 
-    try:
-        _, registry = resolve_application()
-        service = registry.resolve("embedding_rebuild_service")
-    except Exception as exc:  # pragma: no cover - defensive
-        raise click.ClickException(f"Failed to resolve application: {exc}") from exc
-
-    if not isinstance(service, EmbeddingRebuildService):
-        raise click.ClickException("Embedding rebuild service unavailable")
+    service = _SERVICE_PROVIDER()
 
     config = EmbeddingRebuildConfig.for_mode(fast=fast)
     batch_size = config.initial_batch_size
     if no_cache:
-        clear_embedding_cache()
+        _CLEAR_CACHE()
 
     normalized_changed_since = _normalise_timestamp(changed_since)
     ids: Sequence[str] | None = None

@@ -13,7 +13,7 @@ import socket
 import sys
 import types
 import warnings
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
@@ -133,6 +133,50 @@ def downgrade_ingestion_error_logs():
         yield
     finally:
         logger.removeFilter(flt)
+class _BootstrapEmbeddingServiceStub:
+    """Lightweight embedding backend used in bootstrap-oriented tests."""
+
+    def __init__(self) -> None:
+        from theo.application.facades.settings import get_settings
+
+        settings = get_settings()
+        self._dimension = settings.embedding_dim
+        self.embed_calls: list[tuple[tuple[str, ...], int]] = []
+        self.clear_cache_calls = 0
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def embed(self, texts: Iterable[str], *, batch_size: int) -> list[list[float]]:
+        normalised = tuple(str(text) for text in texts)
+        self.embed_calls.append((normalised, batch_size))
+        return [
+            [float(index + 1)] * self._dimension for index, _ in enumerate(normalised)
+        ]
+
+    def clear_cache(self) -> None:
+        self.clear_cache_calls += 1
+
+
+@pytest.fixture(autouse=True)
+def _bootstrap_embedding_service_stub(monkeypatch: pytest.MonkeyPatch):
+    """Patch bootstrap to provide a deterministic embedding service stub."""
+
+    from theo.infrastructure.api.app.ingest import embeddings as embeddings_module
+
+    stub = _BootstrapEmbeddingServiceStub()
+    monkeypatch.setattr(embeddings_module, "get_embedding_service", lambda: stub)
+    yield stub
+
+
+@pytest.fixture
+def bootstrap_embedding_service_stub(
+    _bootstrap_embedding_service_stub: _BootstrapEmbeddingServiceStub,
+) -> _BootstrapEmbeddingServiceStub:
+    """Return the bootstrap embedding service stub for explicit assertions."""
+
+    return _bootstrap_embedding_service_stub
 
 
 def _ensure_celery_pytest_plugin() -> None:
