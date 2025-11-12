@@ -38,7 +38,7 @@ try:  # pragma: no cover - optional AI deliverables dependency
 except Exception:  # pragma: no cover - lean environments
     class _MissingRAGModule:
         def __getattr__(self, name: str) -> Any:
-            raise ModuleNotFoundError(
+            raise AttributeError(
                 "Optional AI dependencies are not installed; "
                 "mock the 'rag' components for testing."
             )
