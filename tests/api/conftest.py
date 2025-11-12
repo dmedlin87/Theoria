@@ -1,10 +1,14 @@
 """Shared test configuration for API-level tests."""
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import sys
 import types
+from collections.abc import Iterator
+
+os.environ.setdefault("THEORIA_ALLOW_REAL_FASTAPI", "1")
 
 os.environ.setdefault("SETTINGS_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("THEO_API_KEYS", '["pytest-default-key"]')
@@ -32,6 +36,87 @@ class _StubFlagModel:
 flag_module = types.ModuleType("FlagEmbedding")
 flag_module.FlagModel = _StubFlagModel  # type: ignore[attr-defined]
 sys.modules.setdefault("FlagEmbedding", flag_module)
+
+
+def _register_pypdf_stub() -> None:
+    """Provide a lightweight :mod:`pypdf` substitute for test environments."""
+
+    if "pypdf" in sys.modules:
+        return
+
+    pypdf_module = types.ModuleType("pypdf")
+
+    class _StubPage:
+        def extract_text(self):  # pragma: no cover - trivial stand-in
+            return ""
+
+    class _StubPdfReader:
+        def __init__(self, *_args, **_kwargs):
+            self.pages = []
+            self.is_encrypted = False
+
+        def decrypt(self, *_args, **_kwargs):  # pragma: no cover - simple stub
+            self.is_encrypted = False
+
+    pypdf_module.PdfReader = _StubPdfReader  # type: ignore[attr-defined]
+
+    errors_module = types.ModuleType("pypdf.errors")
+
+    class _StubPdfReadError(Exception):
+        pass
+
+    class _StubFileNotDecryptedError(Exception):
+        pass
+
+    errors_module.PdfReadError = _StubPdfReadError  # type: ignore[attr-defined]
+    errors_module.FileNotDecryptedError = _StubFileNotDecryptedError  # type: ignore[attr-defined]
+
+    sys.modules.setdefault("pypdf", pypdf_module)
+    sys.modules.setdefault("pypdf.errors", errors_module)
+
+
+_register_pypdf_stub()
+
+
+def _register_opentelemetry_stub() -> None:
+    """Install a minimal :mod:`opentelemetry` facade used in workflow tests."""
+
+    if "opentelemetry" in sys.modules:
+        return
+
+    otel_module = types.ModuleType("opentelemetry")
+    trace_module = types.ModuleType("opentelemetry.trace")
+    otel_module.__path__ = []  # type: ignore[attr-defined]
+
+    class _StubSpan:
+        def __init__(self):
+            self.attributes: dict[str, object] = {}
+
+        def set_attribute(self, key: str, value: object) -> None:  # pragma: no cover - simple stub
+            self.attributes[key] = value
+
+    class _StubTracer:
+        def start_as_current_span(self, name: str, **attributes: object):
+            @contextlib.contextmanager
+            def _manager():
+                span = _StubSpan()
+                for key, value in attributes.items():
+                    span.set_attribute(key, value)
+                yield span
+
+            return _manager()
+
+    def _get_tracer(_name: str = "theoria") -> _StubTracer:  # pragma: no cover - helper
+        return _StubTracer()
+
+    trace_module.get_tracer = _get_tracer  # type: ignore[attr-defined]
+    otel_module.trace = trace_module  # type: ignore[attr-defined]
+
+    sys.modules.setdefault("opentelemetry", otel_module)
+    sys.modules.setdefault("opentelemetry.trace", trace_module)
+
+
+_register_opentelemetry_stub()
 
 
 def _register_sklearn_stubs() -> None:
@@ -176,6 +261,8 @@ def _register_sklearn_stubs() -> None:
 
 _register_sklearn_stubs()
 
+
+
 from pathlib import Path
 
 import pytest
@@ -194,6 +281,74 @@ from theo.infrastructure.api.app.db import run_sql_migrations as migrations_modu
 from theo.application.facades import database as database_module
 from theo.application.facades.database import Base, configure_engine, get_engine
 from theo.infrastructure.api.app.adapters.security import require_principal
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _stub_external_integrations() -> Iterator[None]:
+    """Replace external integrations with deterministic test doubles."""
+
+    monkeypatch = pytest.MonkeyPatch()
+    from theo.infrastructure.api.app.export import zotero as _zotero_module
+
+    def _fake_zotero_export(sources, csl_entries, api_key, **kwargs):  # pragma: no cover - simple stub
+        total = len(sources or [])
+        return {
+            "success": True,
+            "exported_count": total,
+            "failed_count": 0,
+            "errors": [],
+            "items": [],
+        }
+
+    monkeypatch.setattr(
+        _zotero_module,
+        "export_to_zotero",
+        _fake_zotero_export,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        _zotero_module,
+        "verify_zotero_credentials",
+        lambda *a, **kw: True,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.routes.realtime.publish_notebook_update",
+        lambda *a, **kw: None,
+        raising=False,
+    )
+
+    def _instrument_stub(*_args, **_kwargs):
+        @contextlib.contextmanager
+        def _manager():
+            yield types.SimpleNamespace(set_attribute=lambda *a, **kw: None)
+
+        return _manager()
+
+    monkeypatch.setattr(
+        "theo.application.facades.telemetry.instrument_workflow",
+        _instrument_stub,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.application.facades.telemetry.set_span_attribute",
+        lambda *_a, **_kw: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.ai.trails._compute_input_hash",
+        lambda input_payload, tool, action: str(
+            (tool or "", action or "", repr(input_payload))
+        ),
+        raising=False,
+    )
+
+    try:
+        yield
+    finally:
+        monkeypatch.undo()
+
 
 @pytest.fixture(autouse=True)
 def _bypass_authentication(request: pytest.FixtureRequest):

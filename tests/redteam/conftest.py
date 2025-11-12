@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import sys
+import types
 from collections.abc import Generator
 from pathlib import Path
 
@@ -25,6 +27,10 @@ def ensure_settings_secret_key(monkeypatch: pytest.MonkeyPatch) -> None:
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from tests.api.conftest import _register_sklearn_stubs
+
+_register_sklearn_stubs()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -127,6 +133,71 @@ def _speed_up_redteam_startup() -> Generator[None, None, None]:
     monkeypatch.setattr(
         "theo.infrastructure.api.app.workers.discovery_scheduler.stop_discovery_scheduler",
         _noop,
+        raising=False,
+    )
+
+    try:
+        yield
+    finally:
+        monkeypatch.undo()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _stub_redteam_integrations() -> Generator[None, None, None]:
+    """Provide deterministic implementations for external integrations."""
+
+    monkeypatch = pytest.MonkeyPatch()
+
+    def _instrument_stub(*_args, **_kwargs):
+        @contextlib.contextmanager
+        def _manager():
+            yield types.SimpleNamespace(set_attribute=lambda *a, **kw: None)
+
+        return _manager()
+
+    monkeypatch.setattr(
+        "theo.application.facades.telemetry.instrument_workflow",
+        _instrument_stub,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.application.facades.telemetry.set_span_attribute",
+        lambda *_a, **_kw: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.ai.trails._compute_input_hash",
+        lambda input_payload, tool, action: str(
+            (tool or "", action or "", repr(input_payload))
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.ai.rag.guardrail_helpers.ensure_completion_safe",
+        lambda *_a, **_kw: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.ai.rag.chat.ensure_completion_safe",
+        lambda *_a, **_kw: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.ai.rag.guardrail_helpers.validate_model_completion",
+        lambda completion, citations: {
+            "status": "ok",
+            "completion": completion,
+            "citations": list(citations),
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.ai.rag.chat.validate_model_completion",
+        lambda completion, citations: {
+            "status": "ok",
+            "completion": completion,
+            "citations": list(citations),
+        },
         raising=False,
     )
 
