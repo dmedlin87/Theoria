@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from theo.application.embeddings.rebuild_service import EmbeddingRebuildService
 from theo.adapters import AdapterRegistry
 from theo.domain import Document, DocumentId, DocumentMetadata
 from theo.application.services import bootstrap as bootstrap_module
@@ -33,7 +34,10 @@ def _reset_singletons():
     bootstrap_module.resolve_application.cache_clear()
 
 
-def test_resolve_application_wires_container(monkeypatch):
+def test_resolve_application_wires_container(
+    monkeypatch: pytest.MonkeyPatch,
+    bootstrap_embedding_service_stub,
+):
     fake_registry_calls = {}
 
     def fake_ingest(registry, document):
@@ -105,6 +109,10 @@ def test_resolve_application_wires_container(monkeypatch):
     assert "settings" in registry.factories
     assert "engine" in registry.factories
 
+    rebuild_service = registry.resolve("embedding_rebuild_service")
+    assert isinstance(rebuild_service, EmbeddingRebuildService)
+    assert rebuild_service._embedding_service is bootstrap_embedding_service_stub
+
 
 def test_resolve_application_caches_results():
     first_container, first_registry = bootstrap_module.resolve_application()
@@ -126,6 +134,23 @@ def test_resolve_application_registers_environment_adapters(monkeypatch):
     assert registry.resolve("settings") is settings_instance
     assert registry.resolve("engine") is engine_instance
     assert callable(container.list_documents)
+
+
+def test_resolve_application_exposes_embedding_rebuild_service(
+    bootstrap_embedding_service_stub,
+):
+    container, registry = bootstrap_module.resolve_application()
+
+    rebuild_service = registry.resolve("embedding_rebuild_service")
+    assert isinstance(rebuild_service, EmbeddingRebuildService)
+    assert rebuild_service._embedding_service is bootstrap_embedding_service_stub
+
+    sample_vectors = rebuild_service._embedding_service.embed(
+        ["Genesis 1:1"], batch_size=1
+    )
+    assert bootstrap_embedding_service_stub.embed_calls[-1] == (("Genesis 1:1",), 1)
+    assert len(sample_vectors) == 1
+    assert len(sample_vectors[0]) == bootstrap_embedding_service_stub.dimension
 
 
 def test_restart_reinitializes_bootstrap():
