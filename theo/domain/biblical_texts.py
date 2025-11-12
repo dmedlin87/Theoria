@@ -250,7 +250,7 @@ class TheologicalTermTracker:
                     normalised_notes = {str(note).strip().lower() for note in notes}
 
                     # Check for אלהים (plural form)
-                    if (lemma == "אלהים" or "divine_name" in normalised_notes) and number == "plural":
+                    if (lemma == _normalize_hebrew_text("אלהים") or "divine_name" in normalised_notes) and number == "plural":
                         has_elohim = True
 
                     # Check for singular verb with null-safety
