@@ -6,7 +6,7 @@ import json
 
 import click
 
-from typing import cast
+from typing import Callable, cast
 
 from celery.app.task import Task
 from importlib import import_module
@@ -14,13 +14,38 @@ from importlib import import_module
 from theo.application.services.bootstrap import resolve_application
 
 
-resolve_application()
+def _bootstrap_application() -> None:
+    """Initialise application services for the CLI invocation."""
+
+    resolve_application()
 
 
 def _load_refresh_task() -> Task:
     module = import_module("theo.infrastructure.api.app.workers.tasks")
     task = getattr(module, "refresh_hnsw")
     return cast(Task, task)
+
+
+_BOOTSTRAP: Callable[[], None] = _bootstrap_application
+_TASK_LOADER: Callable[[], Task] = _load_refresh_task
+
+
+def configure_refresh_hnsw_cli(
+    *,
+    bootstrapper: Callable[[], None] | None = None,
+    task_loader: Callable[[], Task] | None = None,
+) -> None:
+    """Configure dependency hooks used by the refresh CLI."""
+
+    global _BOOTSTRAP, _TASK_LOADER
+    if bootstrapper is None and task_loader is None:
+        _BOOTSTRAP = _bootstrap_application
+        _TASK_LOADER = _load_refresh_task
+        return
+    if bootstrapper is not None:
+        _BOOTSTRAP = bootstrapper
+    if task_loader is not None:
+        _TASK_LOADER = task_loader
 
 
 @click.command()
@@ -48,7 +73,8 @@ def _load_refresh_task() -> Task:
 def main(sample_queries: int, top_k: int, enqueue: bool) -> None:
     """Trigger the background refresh job or run it inline."""
 
-    task = _load_refresh_task()
+    _BOOTSTRAP()
+    task = _TASK_LOADER()
 
     if enqueue:
         async_result = task.delay(
