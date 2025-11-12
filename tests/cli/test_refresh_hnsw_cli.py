@@ -7,14 +7,15 @@ from types import ModuleType, SimpleNamespace
 import pytest
 from click.testing import CliRunner
 
+from tests.fixtures.embedding import embedding_service_patch
+
 
 @pytest.fixture()
-def refresh_cli_module(monkeypatch: pytest.MonkeyPatch):
+def refresh_cli_module(
+    monkeypatch: pytest.MonkeyPatch, embedding_service_patch
+):
     """Import the refresh_hnsw CLI module with bootstrap patched out."""
 
-    monkeypatch.setattr(
-        "theo.application.services.bootstrap.resolve_application", lambda: None
-    )
     celery_module = ModuleType("celery")
     celery_app_module = ModuleType("celery.app")
     celery_task_module = ModuleType("celery.app.task")
@@ -32,9 +33,16 @@ def refresh_cli_module(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setitem(
         sys.modules, "theo.infrastructure.api.app.workers.tasks", fake_tasks_module
     )
-    monkeypatch.delitem(sys.modules, "theo.application.services.cli.refresh_hnsw", raising=False)
+    monkeypatch.delitem(
+        sys.modules, "theo.application.services.cli.refresh_hnsw", raising=False
+    )
     module = importlib.import_module("theo.application.services.cli.refresh_hnsw")
-    return module
+    module = importlib.reload(module)
+    module.configure_refresh_hnsw_cli(bootstrapper=lambda: None)
+    try:
+        yield module
+    finally:
+        module.configure_refresh_hnsw_cli()
 
 
 @pytest.fixture()
@@ -57,10 +65,12 @@ class _FakeTask:
 
 
 def test_main_enqueues_task_by_default(
-    refresh_cli_module, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    refresh_cli_module, runner: CliRunner
 ) -> None:
     fake_task = _FakeTask()
-    monkeypatch.setattr(refresh_cli_module, "refresh_hnsw", fake_task)
+    refresh_cli_module.configure_refresh_hnsw_cli(
+        bootstrapper=lambda: None, task_loader=lambda: fake_task
+    )
 
     result = runner.invoke(refresh_cli_module.main, [])
 
@@ -71,10 +81,12 @@ def test_main_enqueues_task_by_default(
 
 
 def test_main_runs_task_inline_when_requested(
-    refresh_cli_module, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    refresh_cli_module, runner: CliRunner
 ) -> None:
     fake_task = _FakeTask()
-    monkeypatch.setattr(refresh_cli_module, "refresh_hnsw", fake_task)
+    refresh_cli_module.configure_refresh_hnsw_cli(
+        bootstrapper=lambda: None, task_loader=lambda: fake_task
+    )
 
     result = runner.invoke(
         refresh_cli_module.main,
@@ -89,7 +101,7 @@ def test_main_runs_task_inline_when_requested(
 
 
 def test_main_enqueues_task_without_identifier(
-    refresh_cli_module, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    refresh_cli_module, runner: CliRunner
 ) -> None:
     class _ResultWithoutId:
         def __init__(self) -> None:
@@ -100,7 +112,9 @@ def test_main_enqueues_task_without_identifier(
             return self
 
     fake_task = _ResultWithoutId()
-    monkeypatch.setattr(refresh_cli_module, "refresh_hnsw", fake_task)
+    refresh_cli_module.configure_refresh_hnsw_cli(
+        bootstrapper=lambda: None, task_loader=lambda: fake_task
+    )
 
     result = runner.invoke(
         refresh_cli_module.main,

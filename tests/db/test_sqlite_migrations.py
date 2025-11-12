@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from theo.infrastructure.api.app.db.run_sql_migrations import (
+    MIGRATIONS_PATH,
     _SQLITE_PERSPECTIVE_MIGRATION,
     _split_sql_statements,
     run_sql_migrations,
@@ -193,16 +194,7 @@ def test_run_sql_migrations_skips_existing_sqlite_column(tmp_path) -> None:
     sqlite_migrations = tmp_path / "migrations"
     sqlite_migrations.mkdir()
 
-    migration_path = (
-        Path(__file__).resolve().parents[2]
-        / "theo"
-        / "services"
-        / "api"
-        / "app"
-        / "db"
-        / "migrations"
-        / _SQLITE_PERSPECTIVE_MIGRATION
-    )
+    migration_path = MIGRATIONS_PATH / _SQLITE_PERSPECTIVE_MIGRATION
     sqlite_migrations.joinpath(_SQLITE_PERSPECTIVE_MIGRATION).write_text(
         migration_path.read_text(encoding="utf-8"),
         encoding="utf-8",
@@ -256,16 +248,7 @@ def test_run_sql_migrations_reapplies_when_ledger_stale(tmp_path) -> None:
     sqlite_migrations = tmp_path / "migrations"
     sqlite_migrations.mkdir()
 
-    migration_path = (
-        Path(__file__).resolve().parents[2]
-        / "theo"
-        / "services"
-        / "api"
-        / "app"
-        / "db"
-        / "migrations"
-        / _SQLITE_PERSPECTIVE_MIGRATION
-    )
+    migration_path = MIGRATIONS_PATH / _SQLITE_PERSPECTIVE_MIGRATION
     sqlite_migrations.joinpath(_SQLITE_PERSPECTIVE_MIGRATION).write_text(
         migration_path.read_text(encoding="utf-8"),
         encoding="utf-8",
