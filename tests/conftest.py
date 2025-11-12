@@ -146,7 +146,6 @@ except (ModuleNotFoundError, ImportError):  # pragma: no cover - allows running 
     Engine = object  # type: ignore[assignment]
     Session = object  # type: ignore[assignment]
     sessionmaker = None  # type: ignore[assignment]
-    
     class _EventStub:  # pragma: no cover - lightweight environments skip DB tests
         @staticmethod
         def listens_for(*_args: object, **_kwargs: object):
