@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 THRESHOLDS = {
-    "theo.infrastructure.api.app.core": 0.90,
+    "theo.application.facades": 0.90,
     "theo.domain": 0.90,
     "theo.application": 0.90,
     "theo.services.api.app.ingest": 0.90,

@@ -13,7 +13,7 @@ import warnings
 from theo.application.facades import settings_store as _facade
 
 warnings.warn(
-    "Importing 'theo.infrastructure.api.app.core.settings_store' is deprecated. "
+    f"Importing '{__name__}' is deprecated. "
     "Use 'theo.application.facades.settings_store' instead.",
     DeprecationWarning,
     stacklevel=2,

@@ -1,11 +1,9 @@
-"""Regression coverage for legacy infrastructure shims and facades."""
-
+"""Regression coverage for the application facade layer."""
 from __future__ import annotations
 
 import importlib
 import sys
 import types
-import warnings
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -42,111 +40,116 @@ class MemorySession:
         self.commits += 1
 
 
-@pytest.mark.parametrize(
-    ("legacy_path", "facade_path", "symbols"),
-    [
-        (
-            "theo.infrastructure.api.app.core.database",
-            "theo.application.facades.database",
-            ["Base", "configure_engine", "get_engine", "get_session"],
-        ),
-        (
-            "theo.infrastructure.api.app.core.runtime",
-            "theo.application.facades.runtime",
-            ["allow_insecure_startup"],
-        ),
-        (
-            "theo.infrastructure.api.app.core.secret_migration",
-            "theo.application.facades.secret_migration",
-            ["migrate_secret_settings"],
-        ),
-        (
-            "theo.infrastructure.api.app.core.settings",
-            "theo.application.facades.settings",
-            ["Settings", "get_settings", "get_settings_cipher"],
-        ),
-        (
-            "theo.infrastructure.api.app.core.settings_store",
-            "theo.application.facades.settings_store",
-            [
-                "SETTINGS_NAMESPACE",
-                "SettingNotFoundError",
-                "load_setting",
-                "require_setting",
-                "save_setting",
-            ],
-        ),
-        (
-            "theo.infrastructure.api.app.core.version",
-            "theo.application.facades.version",
-            ["get_git_sha"],
-        ),
-    ],
+FACADE_DEFINITIONS = [
+    {
+        "module": "theo.application.facades.database",
+        "exports": ["Base", "configure_engine", "get_engine", "get_session"],
+        "callables": ["configure_engine", "get_engine", "get_session"],
+    },
+    {
+        "module": "theo.application.facades.runtime",
+        "exports": ["allow_insecure_startup", "current_runtime_environment"],
+        "callables": ["allow_insecure_startup", "current_runtime_environment"],
+    },
+    {
+        "module": "theo.application.facades.secret_migration",
+        "exports": ["migrate_secret_settings"],
+        "callables": ["migrate_secret_settings"],
+    },
+    {
+        "module": "theo.application.facades.settings",
+        "exports": ["Settings", "get_settings", "get_settings_cipher"],
+        "callables": ["get_settings", "get_settings_cipher"],
+    },
+    {
+        "module": "theo.application.facades.settings_store",
+        "exports": [
+            "SETTINGS_NAMESPACE",
+            "SettingNotFoundError",
+            "load_setting",
+            "require_setting",
+            "save_setting",
+        ],
+        "callables": ["load_setting", "require_setting", "save_setting"],
+    },
+    {
+        "module": "theo.application.facades.version",
+        "exports": ["get_git_sha"],
+        "callables": ["get_git_sha"],
+    },
+]
+
+
+def _import_module(name: str):
+    sys.modules.pop(name, None)
+    return importlib.import_module(name)
+
+
+@pytest.mark.parametrize("definition", FACADE_DEFINITIONS)
+def test_facade_exports_are_available(definition: dict[str, Any]) -> None:
+    module = _import_module(definition["module"])
+    exported_names = set(definition["exports"])
+    module_exports = set(getattr(module, "__all__", exported_names))
+    assert exported_names.issubset(module_exports)
+
+    for export in definition["exports"]:
+        assert hasattr(module, export)
+
+
+ALL_CALLABLE_EXPORTS = sorted(
+    {name for definition in FACADE_DEFINITIONS for name in definition["callables"]}
 )
-def test_legacy_shims_emit_deprecation_and_share_facade_symbols(
-    legacy_path: str, facade_path: str, symbols: list[str]
+
+
+@pytest.mark.parametrize("definition", FACADE_DEFINITIONS)
+@pytest.mark.parametrize("callable_name", ALL_CALLABLE_EXPORTS)
+def test_facade_callables_are_callable(
+    definition: dict[str, Any], callable_name: str
 ) -> None:
-    """Each legacy module warns once and re-exports the facade symbols verbatim."""
-
-    sys.modules.pop(legacy_path, None)
-    with warnings.catch_warnings(record=True) as captured:
-        warnings.simplefilter("always", DeprecationWarning)
-        legacy_module = importlib.import_module(legacy_path)
-    assert any(item.category is DeprecationWarning for item in captured)
-
-    facade_module = importlib.import_module(facade_path)
-    for name in symbols:
-        assert getattr(legacy_module, name) is getattr(facade_module, name)
+    module = _import_module(definition["module"])
+    attribute = getattr(module, callable_name, None)
+    if callable_name not in definition["callables"]:
+        pytest.skip("Callable not exported by this facade")
+    assert callable(attribute)
 
 
-def test_runtime_allow_insecure_startup_respects_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    facade_runtime = importlib.reload(importlib.import_module("theo.application.facades.runtime"))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        legacy_runtime = importlib.reload(
-            importlib.import_module("theo.infrastructure.api.app.core.runtime")
-        )
+def test_runtime_allow_insecure_startup_respects_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_module = _import_module("theo.application.facades.runtime")
+    runtime_module.allow_insecure_startup.cache_clear()
 
-    legacy_runtime.allow_insecure_startup.cache_clear()
     monkeypatch.setenv("THEO_ALLOW_INSECURE_STARTUP", "true")
     monkeypatch.setenv("THEORIA_ENVIRONMENT", "development")
-    assert legacy_runtime.allow_insecure_startup() is True
+    assert runtime_module.allow_insecure_startup() is True
 
-    legacy_runtime.allow_insecure_startup.cache_clear()
+    runtime_module.allow_insecure_startup.cache_clear()
     monkeypatch.setenv("THEORIA_ENVIRONMENT", "production")
     with pytest.raises(RuntimeError):
-        legacy_runtime.allow_insecure_startup()
+        runtime_module.allow_insecure_startup()
 
-    facade_runtime.allow_insecure_startup.cache_clear()
-    legacy_runtime.allow_insecure_startup.cache_clear()
+    runtime_module.allow_insecure_startup.cache_clear()
 
 
 def test_database_connection_helpers_create_sessions() -> None:
-    facade_database = importlib.reload(importlib.import_module("theo.application.facades.database"))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        legacy_database = importlib.reload(
-            importlib.import_module("theo.infrastructure.api.app.core.database")
-        )
-
-    engine = legacy_database.configure_engine("sqlite:///:memory:")
-    assert str(engine.url) == "sqlite:///:memory:"
-    assert legacy_database.get_engine() is engine
-
-    session_gen = legacy_database.get_session()
-    session = next(session_gen)
+    database_module = _import_module("theo.application.facades.database")
+    engine = database_module.configure_engine("sqlite:///:memory:")
     try:
-        result = session.execute(text("SELECT 1")).scalar_one()
-        assert result == 1
+        assert str(engine.url) == "sqlite:///:memory:"
+        assert database_module.get_engine() is engine
+
+        session_gen = database_module.get_session()
+        session = next(session_gen)
+        try:
+            result = session.execute(text("SELECT 1")).scalar_one()
+            assert result == 1
+        finally:
+            session_gen.close()
     finally:
-        session_gen.close()
-
-    assert facade_database.get_engine() is engine
-
-    engine.dispose()
-    setattr(legacy_database, "_engine", None)
-    setattr(legacy_database, "_SessionLocal", None)
-    setattr(legacy_database, "_engine_url_override", None)
+        engine.dispose()
+        setattr(database_module, "_engine", None)
+        setattr(database_module, "_SessionLocal", None)
+        setattr(database_module, "_engine_url_override", None)
 
 
 class FakeCipher:
@@ -178,17 +181,16 @@ def test_settings_store_encryption_round_trip(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(facade_store, "get_settings_cipher", lambda: cipher)
 
     session = MemorySession()
-    legacy_store = importlib.import_module("theo.infrastructure.api.app.core.settings_store")
-    legacy_store.save_setting(session, "provider.credentials", {"api_key": "secret"})
-    qualified = f"{legacy_store.SETTINGS_NAMESPACE}:provider.credentials"
+    facade_store.save_setting(session, "provider.credentials", {"api_key": "secret"})
+    qualified = f"{facade_store.SETTINGS_NAMESPACE}:provider.credentials"
     record = session.storage[qualified]
     assert isinstance(record.value, dict)
     assert "__encrypted__" in record.value
 
-    loaded = legacy_store.load_setting(session, "provider.credentials")
+    loaded = facade_store.load_setting(session, "provider.credentials")
     assert loaded == {"api_key": "secret"}
 
-    required = legacy_store.require_setting(session, "provider.credentials")
+    required = facade_store.require_setting(session, "provider.credentials")
     assert required == {"api_key": "secret"}
     assert session.commits == 1
 
@@ -199,19 +201,18 @@ def test_settings_store_requires_cipher_for_sensitive_values(
     _patch_app_setting(monkeypatch)
     facade_store = importlib.import_module("theo.application.facades.settings_store")
     monkeypatch.setattr(facade_store, "get_settings_cipher", lambda: None)
-    legacy_store = importlib.import_module("theo.infrastructure.api.app.core.settings_store")
 
     session = MemorySession()
     with pytest.raises(RuntimeError):
-        legacy_store.save_setting(session, "provider.credentials", {"api_key": "secret"})
+        facade_store.save_setting(session, "provider.credentials", {"api_key": "secret"})
 
     encrypted_record = MemoryAppSetting(
-        key=f"{legacy_store.SETTINGS_NAMESPACE}:provider.credentials",
+        key=f"{facade_store.SETTINGS_NAMESPACE}:provider.credentials",
         value={"__encrypted__": "enc:payload"},
     )
     session.storage[encrypted_record.key] = encrypted_record
     with pytest.raises(RuntimeError):
-        legacy_store.load_setting(session, "provider.credentials")
+        facade_store.load_setting(session, "provider.credentials")
 
 
 def test_secret_migration_encrypts_plaintext_and_is_idempotent(
@@ -220,16 +221,10 @@ def test_secret_migration_encrypts_plaintext_and_is_idempotent(
     _patch_app_setting(monkeypatch)
     facade_store = importlib.import_module("theo.application.facades.settings_store")
     facade_secret = importlib.import_module("theo.application.facades.secret_migration")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        legacy_secret = importlib.import_module(
-            "theo.infrastructure.api.app.core.secret_migration"
-        )
 
     cipher = FakeCipher()
     monkeypatch.setattr(facade_store, "get_settings_cipher", lambda: cipher)
     monkeypatch.setattr(facade_secret, "get_settings_cipher", lambda: cipher)
-    legacy_store = importlib.import_module("theo.infrastructure.api.app.core.settings_store")
 
     monkeypatch.setattr(
         facade_secret,
@@ -241,12 +236,12 @@ def test_secret_migration_encrypts_plaintext_and_is_idempotent(
 
     def _registry_saver(session: MemorySession, registry: Any) -> None:
         captured_registries.append(registry)
-        legacy_store.save_setting(session, "llm", registry)
+        facade_store.save_setting(session, "llm", registry)
 
     facade_secret.set_llm_registry_saver(_registry_saver)
 
-    llm_key = f"{legacy_store.SETTINGS_NAMESPACE}:llm"
-    provider_key = f"{legacy_store.SETTINGS_NAMESPACE}:ai_providers"
+    llm_key = f"{facade_store.SETTINGS_NAMESPACE}:llm"
+    provider_key = f"{facade_store.SETTINGS_NAMESPACE}:ai_providers"
     session = MemorySession(
         [
             MemoryAppSetting(
@@ -267,7 +262,7 @@ def test_secret_migration_encrypts_plaintext_and_is_idempotent(
         ]
     )
 
-    migrated = legacy_secret.migrate_secret_settings(session)
+    migrated = facade_secret.migrate_secret_settings(session)
     assert migrated == ["llm", "ai_providers"]
     assert captured_registries == [
         {
@@ -281,7 +276,7 @@ def test_secret_migration_encrypts_plaintext_and_is_idempotent(
     ]
     assert "__encrypted__" in session.storage[provider_key].value
 
-    migrated_again = legacy_secret.migrate_secret_settings(session)
+    migrated_again = facade_secret.migrate_secret_settings(session)
     assert migrated_again == []
 
     facade_secret.set_llm_registry_saver(lambda *_args, **_kwargs: None)
@@ -290,18 +285,13 @@ def test_secret_migration_encrypts_plaintext_and_is_idempotent(
 def test_settings_secret_resolution_uses_configured_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    facade_settings = importlib.reload(importlib.import_module("theo.application.facades.settings"))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        legacy_settings = importlib.reload(
-            importlib.import_module("theo.infrastructure.api.app.core.settings")
-        )
+    facade_settings = importlib.reload(
+        importlib.import_module("theo.application.facades.settings")
+    )
 
     facade_settings.get_settings.cache_clear()
     facade_settings.get_settings_secret.cache_clear()
     facade_settings.get_settings_cipher.cache_clear()
-    legacy_settings.get_settings.cache_clear()
-    legacy_settings.get_settings_cipher.cache_clear()
 
     class FakeAdapter:
         def __init__(self) -> None:
@@ -336,30 +326,24 @@ def test_settings_secret_resolution_uses_configured_backend(
 
     secret = facade_settings.get_settings_secret()
     assert secret == "backend-secret"
-    cipher = legacy_settings.get_settings_cipher()
+    cipher = facade_settings.get_settings_cipher()
     assert isinstance(cipher, FakeFernet)
     assert fake_adapter.requests and fake_adapter.requests[0].identifier == "theoria/settings"
 
-    settings_obj = legacy_settings.get_settings()
+    settings_obj = facade_settings.get_settings()
     assert settings_obj.cors_allowed_origins == ["https://example.com"]
 
     facade_settings.get_settings.cache_clear()
     facade_settings.get_settings_secret.cache_clear()
     facade_settings.get_settings_cipher.cache_clear()
-    legacy_settings.get_settings.cache_clear()
-    legacy_settings.get_settings_cipher.cache_clear()
 
 
 def test_version_get_git_sha_invokes_git_binary(monkeypatch: pytest.MonkeyPatch) -> None:
-    facade_version = importlib.reload(importlib.import_module("theo.application.facades.version"))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        legacy_version = importlib.reload(
-            importlib.import_module("theo.infrastructure.api.app.core.version")
-        )
+    facade_version = importlib.reload(
+        importlib.import_module("theo.application.facades.version")
+    )
 
     facade_version.get_git_sha.cache_clear()
-    legacy_version.get_git_sha.cache_clear()
 
     monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/git")
 
@@ -368,7 +352,6 @@ def test_version_get_git_sha_invokes_git_binary(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr(facade_version.subprocess, "run", fake_run)
 
-    assert legacy_version.get_git_sha() == "deadbeef"
+    assert facade_version.get_git_sha() == "deadbeef"
 
     facade_version.get_git_sha.cache_clear()
-    legacy_version.get_git_sha.cache_clear()

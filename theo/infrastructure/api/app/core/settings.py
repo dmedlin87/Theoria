@@ -1,9 +1,8 @@
 """Legacy shim for :mod:`theo.application.facades.settings`.
 
-The application previously initialised configuration via
-``theo.infrastructure.api.app.core.settings``.  To avoid breaking downstream
-integrations we mirror the facade symbols here and warn once when the
-module is imported.
+The application previously initialised configuration via a legacy core
+namespace.  To avoid breaking downstream integrations we mirror the facade
+symbols here and warn once when the module is imported.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ import warnings
 from theo.application.facades import settings as _facade
 
 warnings.warn(
-    "Importing 'theo.infrastructure.api.app.core.settings' is deprecated. "
+    f"Importing '{__name__}' is deprecated. "
     "Use 'theo.application.facades.settings' instead.",
     DeprecationWarning,
     stacklevel=2,

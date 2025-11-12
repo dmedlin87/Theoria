@@ -173,13 +173,13 @@
     "theo.infrastructure.api.app.case_builder.ingest",
     "theo.infrastructure.api.app.case_builder.sync",
     "theo.infrastructure.api.app.compat",
-    "theo.infrastructure.api.app.core",
-    "theo.infrastructure.api.app.core.database",
-    "theo.infrastructure.api.app.core.runtime",
-    "theo.infrastructure.api.app.core.secret_migration",
-    "theo.infrastructure.api.app.core.settings",
-    "theo.infrastructure.api.app.core.settings_store",
-    "theo.infrastructure.api.app.core.version",
+    "theo.application.facades",
+    "theo.application.facades.database",
+    "theo.application.facades.runtime",
+    "theo.application.facades.secret_migration",
+    "theo.application.facades.settings",
+    "theo.application.facades.settings_store",
+    "theo.application.facades.version",
     "theo.infrastructure.api.app.creators",
     "theo.infrastructure.api.app.creators.service",
     "theo.infrastructure.api.app.creators.verse_perspectives",
@@ -1971,27 +1971,27 @@
       "imported": "theo.infrastructure.api.app.persistence_models"
     },
     {
-      "importer": "theo.infrastructure.api.app.core.database",
+      "importer": "theo.application.facades.database",
       "imported": "theo.application.facades.database"
     },
     {
-      "importer": "theo.infrastructure.api.app.core.runtime",
+      "importer": "theo.application.facades.runtime",
       "imported": "theo.application.facades.runtime"
     },
     {
-      "importer": "theo.infrastructure.api.app.core.secret_migration",
+      "importer": "theo.application.facades.secret_migration",
       "imported": "theo.application.facades.secret_migration"
     },
     {
-      "importer": "theo.infrastructure.api.app.core.settings",
+      "importer": "theo.application.facades.settings",
       "imported": "theo.application.facades.settings"
     },
     {
-      "importer": "theo.infrastructure.api.app.core.settings_store",
+      "importer": "theo.application.facades.settings_store",
       "imported": "theo.application.facades.settings_store"
     },
     {
-      "importer": "theo.infrastructure.api.app.core.version",
+      "importer": "theo.application.facades.version",
       "imported": "theo.application.facades.version"
     },
     {

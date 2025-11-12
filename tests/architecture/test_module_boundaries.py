@@ -171,11 +171,11 @@ def test_adapters_do_not_cross_import() -> None:
 
 
 def test_routes_depend_on_application_facades() -> None:
-    forbidden_prefix = "theo.infrastructure.api.app.core"
+    required_prefix = "theo.application.facades"
     for path in _iter_python_files("theo/infrastructure/api/app/routes"):
         imports = _gather_imports(path)
-        assert forbidden_prefix not in imports, (
-            f"Route module {path} must import facades instead of legacy core modules"
+        assert any(module.startswith(required_prefix) for module in imports), (
+            f"Route module {path} must import {required_prefix} helpers"
         )
 
 

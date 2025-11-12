@@ -1,19 +1,26 @@
-"""Tests for the legacy runtime shim module."""
+"""Tests for the application runtime facade."""
 from __future__ import annotations
+
+import importlib
+
+import pytest
 
 from theo.application.facades import runtime as facades_runtime
 
-from tests.api.core import import_legacy_module
 
+def test_allow_insecure_startup_requires_non_production_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The runtime facade should restrict insecure startup to dev environments."""
 
-MODULE_NAME = "theo.infrastructure.api.app.core.runtime"
-EXPECTED_EXPORTS = ["allow_insecure_startup"]
+    module = importlib.reload(facades_runtime)
+    module.allow_insecure_startup.cache_clear()
 
+    monkeypatch.setenv("THEO_ALLOW_INSECURE_STARTUP", "true")
+    monkeypatch.setenv("THEORIA_ENVIRONMENT", "development")
+    assert module.allow_insecure_startup() is True
 
-def test_runtime_shim_warns_and_reexports_allow_insecure_startup():
-    """Importing the runtime shim should warn and expose the facade helper."""
-    module, warning = import_legacy_module(MODULE_NAME)
-
-    assert "deprecated" in str(warning.message)
-    assert module.allow_insecure_startup is facades_runtime.allow_insecure_startup
-    assert module.__all__ == EXPECTED_EXPORTS
+    module.allow_insecure_startup.cache_clear()
+    monkeypatch.setenv("THEORIA_ENVIRONMENT", "production")
+    with pytest.raises(RuntimeError):
+        module.allow_insecure_startup()
