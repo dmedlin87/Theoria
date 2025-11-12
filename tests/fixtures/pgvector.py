@@ -13,14 +13,18 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 try:  # pragma: no cover - optional dependency in lightweight environments
+    from testcontainers.core.wait_strategies import LogMessageWaitStrategy
     from testcontainers.postgres import PostgresContainer
 except ModuleNotFoundError as exc:  # pragma: no cover - surfaces in light CI runs
     PostgresContainer = None  # type: ignore[assignment]
+    LogMessageWaitStrategy = None  # type: ignore[assignment]
     _TESTCONTAINERS_IMPORT_ERROR: ModuleNotFoundError | None = exc
 else:
     _TESTCONTAINERS_IMPORT_ERROR = None
 
 DEFAULT_IMAGE = os.environ.get("PYTEST_PGVECTOR_IMAGE", "pgvector/pgvector:pg15")
+POSTGRES_READY_LOG_LINE = "database system is ready to accept connections"
+POSTGRES_STARTUP_TIMEOUT = 120
 _VALID_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -181,6 +185,15 @@ def provision_pgvector_database(
 
     selected_image = image or DEFAULT_IMAGE
     container = PostgresContainer(image=selected_image)
+    if LogMessageWaitStrategy is not None:  # pragma: no branch - mirrors Postgres import
+        # ``@wait_container_is_ready`` was removed in testcontainers 4.6+. Attach
+        # the structured log wait so the fixture remains compatible with newer
+        # releases while still supporting older ones that ignore additional waits.
+        container.waiting_for(
+            LogMessageWaitStrategy(POSTGRES_READY_LOG_LINE).with_startup_timeout(
+                POSTGRES_STARTUP_TIMEOUT
+            )
+        )
     container.with_env("POSTGRES_DB", "theo_template")
     container.with_env("POSTGRES_USER", "postgres")
     container.with_env("POSTGRES_PASSWORD", "postgres")
