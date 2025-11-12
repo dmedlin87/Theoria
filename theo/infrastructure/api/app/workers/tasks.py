@@ -45,6 +45,19 @@ except Exception:  # pragma: no cover - lean environments
 
     rag_deliverables = _MissingRAGModule()
     rag_exports = _MissingRAGModule()
+try:  # pragma: no cover - optional AI dependency
+    from ..ai.rag.models import RAGCitation
+except Exception:  # pragma: no cover - lean environments
+    @dataclass(slots=True)
+    class RAGCitation:  # type: ignore[override]
+        index: int
+        osis: str
+        anchor: str
+        passage_id: str | None = None
+        document_id: str | None = None
+        document_title: str | None = None
+        snippet: str | None = None
+        source_url: str | None = None
 try:  # pragma: no cover - optional guardrail dependency
     from ..ai.rag.guardrail_helpers import (
         GuardrailError,
@@ -60,19 +73,6 @@ except Exception:  # pragma: no cover - lean environments
 
     def validate_model_completion(_completion: str, _citations: Sequence[RAGCitation]) -> None:
         return None
-try:  # pragma: no cover - optional AI dependency
-    from ..ai.rag.models import RAGCitation
-except Exception:  # pragma: no cover - lean environments
-    @dataclass(slots=True)
-    class RAGCitation:  # type: ignore[override]
-        index: int
-        osis: str
-        anchor: str
-        passage_id: str | None = None
-        document_id: str | None = None
-        document_title: str | None = None
-        snippet: str | None = None
-        source_url: str | None = None
 from ..analytics.openalex_enrichment import enrich_document_openalex_details
 from ..analytics.topic_map import TopicMapBuilder
 from ..analytics.topics import (
