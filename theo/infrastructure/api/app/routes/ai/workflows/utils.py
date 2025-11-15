@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from theo.application.facades import telemetry  # noqa: F401
+
 from theo.infrastructure.api.app.models.search import HybridSearchFilters
 
 

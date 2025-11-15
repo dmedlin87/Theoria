@@ -6,6 +6,8 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Sequence
 
+from theo.application.dtos import DocumentDTO
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 

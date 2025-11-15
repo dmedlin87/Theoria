@@ -91,8 +91,8 @@ def test_duplicate_file_ingest_returns_400(ingest_client, monkeypatch):
 
     monkeypatch.setattr(
         ingest_events,
-        "_dispatch_neighborhood_event",
-        lambda payload: None,
+        "emit_document_persisted_event",
+        lambda **_: None,
     )
 
     before = list(storage_root.iterdir())
@@ -127,8 +127,8 @@ def test_duplicate_url_ingest_returns_400(ingest_client, monkeypatch):
 
     monkeypatch.setattr(
         ingest_events,
-        "_dispatch_neighborhood_event",
-        lambda payload: None,
+        "emit_document_persisted_event",
+        lambda **_: None,
     )
 
     def _fake_fetch(settings, url: str):

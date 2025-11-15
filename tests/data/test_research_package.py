@@ -57,7 +57,7 @@ def test_open_text_respects_encoding() -> None:
         payload = json.load(handle)
 
     verse = payload["SBLGNT"]["John.1.1"]["text"]
-    expected_prefix = "\u1f18\u03bd \u1f00\u03c1\u03c7\u1fc6 \u1f26\u03bd \u1f41 \u039b\u03cc\u03b3\u03bf\u03c2"
+    expected_prefix = "\u1f18\u03bd \u1f00\u03c1\u03c7\u1fc7 \u1f26\u03bd \u1f41 \u039b\u03cc\u03b3\u03bf\u03c2"
     assert verse.startswith(expected_prefix)
 
 

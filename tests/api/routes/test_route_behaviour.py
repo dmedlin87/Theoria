@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import Iterator
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -69,10 +70,11 @@ def sqlite_client() -> Iterator[TestClient]:
 
     engine = create_engine("sqlite:///:memory:", future=True)
     with _override_session(engine, create_schema=True):
-        with TestClient(app) as client:
+        with TestClient(app, raise_server_exceptions=False) as client:
             yield client
 
 
+@pytest.mark.no_auth_override
 def test_watchlist_requires_authentication(sqlite_client: TestClient) -> None:
     """POST /ai/digest/watchlists should enforce authentication."""
 
@@ -92,7 +94,7 @@ def test_watchlist_requires_authentication(sqlite_client: TestClient) -> None:
 def test_watchlist_forbidden_without_subject(sqlite_client: TestClient) -> None:
     """A resolved principal without a subject should raise a domain error."""
 
-    async def _principal_override(request):  # type: ignore[override]
+    async def _principal_override(request: Request):  # type: ignore[override]
         principal = {
             "method": "override",
             "subject": None,
@@ -138,13 +140,16 @@ def test_search_unexpected_error_returns_internal_error(
 ) -> None:
     """Unhandled exceptions should be transformed into a 500 response."""
 
-    class _FailingRetrievalService:
-        def search(self, *_args, **_kwargs):
-            raise RuntimeError("boom")
+    def _raise_search(self, *_args, **_kwargs):
+        raise RuntimeError("boom")
 
     monkeypatch.setattr(
-        "theo.infrastructure.api.app.routes.search.get_retrieval_service",
-        lambda *_args, **_kwargs: _FailingRetrievalService(),
+        "theo.infrastructure.api.app.routes.search.RetrievalService.search",
+        _raise_search,
+    )
+    monkeypatch.setattr(
+        "theo.infrastructure.api.app.bootstrap.middleware.get_current_trace_headers",
+        lambda: {TRACE_ID_HEADER_NAME: "trace-test"},
     )
 
     response = sqlite_client.get(

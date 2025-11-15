@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import types
+import importlib
 import importlib.machinery as importlib_machinery
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -13,7 +14,7 @@ import click
 from click.testing import CliRunner
 
 from tests.fixtures.embedding import (
-    embedding_service_patch,
+    EmbeddingServicePatch,
     install_embedding_service_patch,
 )
 
@@ -138,8 +139,6 @@ except ModuleNotFoundError:  # pragma: no cover - testing fallback
     sys.modules["sqlalchemy.sql"] = sql_module
     sys.modules["sqlalchemy.sql.elements"] = elements_module
 
-install_embedding_service_patch()
-
 sanitizer_stub = types.ModuleType("theo.infrastructure.api.app.ingest.sanitizer")
 sanitizer_stub.sanitize_passage_text = lambda text: text
 sys.modules["theo.infrastructure.api.app.ingest.sanitizer"] = sanitizer_stub
@@ -158,6 +157,30 @@ from theo.commands.embedding_rebuild import (
     _write_checkpoint,
     rebuild_embeddings_cmd,
 )
+
+
+_EMBEDDING_MODULE_NAME = "theo.infrastructure.api.app.ingest.embeddings"
+
+
+@pytest.fixture(scope="module")
+def embedding_service_patch() -> EmbeddingServicePatch:
+    original_module = sys.modules.get(_EMBEDDING_MODULE_NAME)
+    patch = install_embedding_service_patch()
+    importlib.reload(embedding_rebuild)
+    yield patch
+    patch.reset()
+    if original_module is None:
+        sys.modules.pop(_EMBEDDING_MODULE_NAME, None)
+    else:
+        sys.modules[_EMBEDDING_MODULE_NAME] = original_module
+    importlib.reload(embedding_rebuild)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _activate_embedding_service_patch(
+    embedding_service_patch: EmbeddingServicePatch,
+) -> None:
+    yield
 
 
 class _FlakySession:

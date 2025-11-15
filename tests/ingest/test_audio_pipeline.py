@@ -53,7 +53,7 @@ def test_audio_pipeline_full(mock_persist, mock_parse, mock_fetch, sample_audio_
         "transcript_segments": [{"start": 0, "end": 10, "text": "Sample"}]
     }
     
-    mock_persist.return_value = MagicMock(id="doc_123")
+    mock_persist.return_value = {"document": MagicMock(id="doc_123")}
     
     # Run pipeline
     document = run_pipeline_for_audio(

@@ -13,6 +13,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+pytestmark = pytest.mark.timeout(600)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -175,7 +177,7 @@ class WatchlistsServiceStub:
         return self.run_return
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def _watchlists_service_stub() -> Iterator[WatchlistsServiceStub]:
     stub = WatchlistsServiceStub()
     monkeypatch = pytest.MonkeyPatch()

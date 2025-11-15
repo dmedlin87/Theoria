@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`theo.application.services.cli.export_data` helpers."""
+"""Unit tests for :mod:`theo.services.cli.export_data` helpers."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class _StubRegistry:
 def export_module(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> ModuleType:
     """Import the CLI module with its bootstrap patched for testing."""
 
-    module_name = "theo.application.services.cli.export_data"
+    module_name = "theo.services.cli.export_data"
 
     registry = _StubRegistry()
     monkeypatch.setattr(

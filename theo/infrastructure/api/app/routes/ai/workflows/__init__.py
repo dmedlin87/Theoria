@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from theo.application.facades import telemetry  # noqa: F401
+
 from . import chat, exports, features, flows, llm, perspectives, settings
 from .guardrails import (
     DEFAULT_REFUSAL_MESSAGE,

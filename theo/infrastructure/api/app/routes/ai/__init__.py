@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from theo.application.facades import telemetry  # noqa: F401
+
 from ...ai.registry import get_llm_registry
 from ...analytics.topics import (
     TopicDigest,

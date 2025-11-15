@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from theo.application.dtos import DocumentDTO
+
 from sqlalchemy.orm import Session
 
 

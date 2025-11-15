@@ -11,11 +11,14 @@ from typing import Any
 from contextlib import contextmanager
 
 import pythonbible as pb
-from sqlalchemy import delete, tuple_
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+from theo.adapters.persistence.sqlalchemy_support import (
+    SQLAlchemyError,
+    Session,
+    delete,
+    pg_insert,
+    sqlite_insert,
+    tuple_,
+)
 
 from theo.application.facades.settings_store import save_setting
 from theo.adapters.persistence.models import (

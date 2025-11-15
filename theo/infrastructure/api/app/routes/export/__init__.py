@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from theo.application.facades import telemetry  # noqa: F401
+
 from ...errors import ExportError
 from ...export.formatters import build_search_export, render_bundle
 from ...retriever.export import export_search_results

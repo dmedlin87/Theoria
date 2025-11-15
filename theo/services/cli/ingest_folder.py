@@ -490,7 +490,7 @@ def ingest_folder(
                 batch, overrides, normalized_post_batch
             )
             for item, doc_id in zip(batch, document_ids):
-                click.echo(f"   Processed {item.label} → document {doc_id}")
+                click.echo(f"   Processed {item.label} -> document {doc_id}")
                 log_workflow_event(
                     "cli.ingest.processed",
                     workflow="cli.ingest_folder",
@@ -504,7 +504,7 @@ def ingest_folder(
                 click.echo("   Post-batch steps require API mode; skipping.")
             task_ids = _queue_batch_via_worker(batch, overrides)
             for item, task_id in zip(batch, task_ids):
-                click.echo(f"   Queued {item.label} → task {task_id}")
+                click.echo(f"   Queued {item.label} -> task {task_id}")
                 log_workflow_event(
                     "cli.ingest.queued",
                     workflow="cli.ingest_folder",

@@ -253,7 +253,7 @@ def code_quality(
 
     outcomes: list[CheckOutcome] = []
     for check in checks:
-        click.echo(f"→ Running {check.label}: {_format_command(check.command)}")
+        click.echo(f"[run] Running {check.label}: {_format_command(check.command)}")
         outcome = _execute(check)
         outcomes.append(outcome)
         if outcome.stdout:
@@ -269,11 +269,11 @@ def code_quality(
     click.echo("\nSummary:")
     for outcome in outcomes:
         if outcome.succeeded:
-            icon = "✅"
+            icon = "[pass]"
         elif outcome.request.optional and not strict:
-            icon = "⚠️"
+            icon = "[warn]"
         else:
-            icon = "❌"
+            icon = "[fail]"
         click.echo(f"{icon} {outcome.request.label}")
         if not outcome.succeeded:
             if outcome.request.optional and not strict:

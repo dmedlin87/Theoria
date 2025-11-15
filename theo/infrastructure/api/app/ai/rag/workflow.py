@@ -129,7 +129,7 @@ class _WorkflowModule(types.ModuleType):
 
     def __setattr__(self, name: str, value: Any) -> None:
         if hasattr(_chat_module, name):
-            setattr(_chat_module, name, value)
+            _chat_module.__dict__[name] = value
         if name == "log_workflow_event":
             _propagate_log_workflow_event(value)
         super().__setattr__(name, value)

@@ -11,7 +11,31 @@ from theo.infrastructure.api.app.adapters.security import require_principal
 
 
 @pytest.fixture()
-def notebook_client(api_engine) -> Generator[tuple[TestClient, sessionmaker], None, None]:
+def allow_anonymous_env(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Generator[None, None, None]:
+    """Ensure anonymous access is configured for selected tests."""
+
+    if request.node.get_closest_marker("no_auth_override"):
+        from theo.application.facades import settings as settings_module
+
+        monkeypatch.setenv("THEO_AUTH_ALLOW_ANONYMOUS", "true")
+        monkeypatch.setenv("THEO_ALLOW_INSECURE_STARTUP", "1")
+        monkeypatch.setenv("THEO_API_KEYS", "[]")
+        settings_module.get_settings.cache_clear()
+        try:
+            yield
+        finally:
+            settings_module.get_settings.cache_clear()
+        return
+
+    yield
+
+
+@pytest.fixture()
+def notebook_client(
+    api_engine, allow_anonymous_env
+) -> Generator[tuple[TestClient, sessionmaker], None, None]:
     engine = api_engine
     factory = sessionmaker(
         bind=engine,
@@ -165,36 +189,27 @@ def test_list_notebooks_anonymous_only_public(
 ) -> None:
     client, session_factory = notebook_client
 
-    from theo.application.facades import settings as settings_module
+    with session_factory() as session:
+        public_notebook = Notebook(
+            title="Public",
+            created_by="owner-1",
+            is_public=True,
+        )
+        private_notebook = Notebook(
+            title="Private",
+            created_by="owner-2",
+            is_public=False,
+        )
+        session.add_all([public_notebook, private_notebook])
+        session.commit()
 
-    monkeypatch.setenv("THEO_AUTH_ALLOW_ANONYMOUS", "true")
-    monkeypatch.setenv("THEO_API_KEYS", "[]")
-    settings_module.get_settings.cache_clear()
+        public_id = public_notebook.id
+        private_id = private_notebook.id
 
-    try:
-        with session_factory() as session:
-            public_notebook = Notebook(
-                title="Public",
-                created_by="owner-1",
-                is_public=True,
-            )
-            private_notebook = Notebook(
-                title="Private",
-                created_by="owner-2",
-                is_public=False,
-            )
-            session.add_all([public_notebook, private_notebook])
-            session.commit()
+    response = client.get("/notebooks/")
+    assert response.status_code == 200
 
-            public_id = public_notebook.id
-            private_id = private_notebook.id
-
-        response = client.get("/notebooks/")
-        assert response.status_code == 200
-
-        payload = response.json()
-        returned_ids = [notebook["id"] for notebook in payload["notebooks"]]
-        assert returned_ids == [public_id]
-        assert private_id not in returned_ids
-    finally:
-        settings_module.get_settings.cache_clear()
+    payload = response.json()
+    returned_ids = [notebook["id"] for notebook in payload["notebooks"]]
+    assert returned_ids == [public_id]
+    assert private_id not in returned_ids

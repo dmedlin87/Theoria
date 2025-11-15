@@ -17,7 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:  # pragma: no branch - defensive guard
 
 from theo.application.facades import settings as settings_module
 from theo.application.facades.database import Base, configure_engine
-from theo.application.services.cli.ingest_folder import ingest_folder
+from theo.services.cli.ingest_folder import ingest_folder
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +60,7 @@ def test_dry_run_lists_supported_files(tmp_path, monkeypatch):
         )
 
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.run_pipeline_for_file", _fail_if_called
+        "theo.services.cli.ingest_folder.run_pipeline_for_file", _fail_if_called
     )
 
     runner = CliRunner()
@@ -100,7 +100,7 @@ def test_api_mode_processes_batches_with_overrides(tmp_path, monkeypatch):
         )
 
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.run_pipeline_for_file", _fake_run_pipeline
+        "theo.services.cli.ingest_folder.run_pipeline_for_file", _fake_run_pipeline
     )
 
     runner = CliRunner()
@@ -140,7 +140,7 @@ def test_worker_mode_enqueues_tasks(tmp_path, monkeypatch):
             return _FakeAsyncResult(f"task-{len(queued)}")
 
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.worker_tasks.process_file",
+        "theo.services.cli.ingest_folder.worker_tasks.process_file",
         _FakeProcessFile(),
     )
 
@@ -148,7 +148,7 @@ def test_worker_mode_enqueues_tasks(tmp_path, monkeypatch):
         raise AssertionError("Should not call API mode")
 
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.run_pipeline_for_file", _unexpected
+        "theo.services.cli.ingest_folder.run_pipeline_for_file", _unexpected
     )
 
     runner = CliRunner()
@@ -186,7 +186,7 @@ def test_post_batch_tags_runs_enricher(tmp_path, monkeypatch):
             return True
 
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.MetadataEnricher", _FakeEnricher
+        "theo.services.cli.ingest_folder.MetadataEnricher", _FakeEnricher
     )
 
     runner = CliRunner()
@@ -236,13 +236,13 @@ def test_post_batch_multiple_steps_dispatches_followups(tmp_path, monkeypatch):
             return SimpleNamespace(status_code=202, text="accepted")
 
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.MetadataEnricher", _FakeEnricher
+        "theo.services.cli.ingest_folder.MetadataEnricher", _FakeEnricher
     )
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.worker_tasks.enrich_document",
+        "theo.services.cli.ingest_folder.worker_tasks.enrich_document",
         _FakeEnrichTask(),
     )
-    monkeypatch.setattr("theo.application.services.cli.ingest_folder.httpx.Client", _FakeClient)
+    monkeypatch.setattr("theo.services.cli.ingest_folder.httpx.Client", _FakeClient)
     monkeypatch.setenv("API_BASE_URL", "http://api.test")
 
     runner = CliRunner()
@@ -280,17 +280,17 @@ def test_post_batch_skipped_for_worker_mode(tmp_path, monkeypatch):
 
     fake_worker = _FakeProcessFile()
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.worker_tasks.process_file",
+        "theo.services.cli.ingest_folder.worker_tasks.process_file",
         fake_worker,
     )
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.run_pipeline_for_file",
+        "theo.services.cli.ingest_folder.run_pipeline_for_file",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("API mode should not run")
         ),
     )
     monkeypatch.setattr(
-        "theo.application.services.cli.ingest_folder.MetadataEnricher",
+        "theo.services.cli.ingest_folder.MetadataEnricher",
         lambda: (_ for _ in ()).throw(AssertionError("Post-batch should be skipped")),
     )
 

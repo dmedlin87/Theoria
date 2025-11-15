@@ -32,7 +32,7 @@ class RAGAnswer(APIModel):
     fallacy_warnings: list["FallacyWarningModel"] = Field(default_factory=list)
     critique: "ReasoningCritique | None" = None
     revision: "RevisionDetails | None" = None
-    reasoning_trace: "ReasoningTrace | None" = None
+    reasoning_trace: "ReasoningTrace | str | None" = None
 
     @model_serializer(mode="wrap")
     def _include_guardrail_profile(self, handler):

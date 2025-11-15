@@ -24,7 +24,7 @@ from theo.infrastructure.api.app.ingest.pipeline import (  # noqa: E402
     PipelineDependencies,
     import_osis_commentary,
 )
-from theo.application.services.cli import ingest_osis as cli  # noqa: E402
+from theo.services.cli import ingest_osis as cli  # noqa: E402
 
 
 pytestmark = pytest.mark.pgvector

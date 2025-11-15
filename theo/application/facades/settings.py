@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+import os
 import re
 from collections.abc import Callable
 from functools import lru_cache
@@ -24,7 +25,14 @@ except ModuleNotFoundError:  # pragma: no cover - provide lazy failure for optio
             raise ModuleNotFoundError(
                 "cryptography is required for Fernet secrets support"
             )
-from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..ports.secrets import SecretRequest, SecretRetrievalError, build_secrets_adapter
@@ -77,6 +85,27 @@ EventSink = Annotated[KafkaEventSink | RedisStreamEventSink, Field(discriminator
 class Settings(BaseSettings):
     """Runtime configuration loaded from environment variables."""
 
+    _explicit_storage_root: Path | None = PrivateAttr(default=None)
+
+    def __init__(self, **data: Any) -> None:
+        explicit_storage_root = data.get("storage_root")
+        env_overrides: dict[str, str | None] = {}
+        if explicit_storage_root is not None:
+            override_value = str(explicit_storage_root)
+            for env_key in ("THEO_STORAGE_ROOT", "STORAGE_ROOT"):
+                env_overrides[env_key] = os.environ.get(env_key)
+                os.environ[env_key] = override_value
+        try:
+            super().__init__(**data)
+        finally:
+            if explicit_storage_root is not None:
+                for env_key, previous in env_overrides.items():
+                    if previous is None:
+                        os.environ.pop(env_key, None)
+                    else:
+                        os.environ[env_key] = previous
+        object.__setattr__(self, "_explicit_storage_root", explicit_storage_root)
+
     model_config = SettingsConfigDict(
         env_prefix="",
         env_file=".env",
@@ -91,7 +120,9 @@ class Settings(BaseSettings):
         default="redis://redis:6379/0", description="Celery broker URL"
     )
     storage_root: Path = Field(
-        default=Path("./storage"), description="Location for persisted artifacts"
+        default=Path("./storage"),
+        validation_alias=AliasChoices("THEO_STORAGE_ROOT", "STORAGE_ROOT"),
+        description="Location for persisted artifacts",
     )
     storage_public_base_url: str | None = Field(
         default=None,
@@ -491,7 +522,8 @@ class Settings(BaseSettings):
                 )
             return self
 
-        allowed_root = (self.storage_root / "rerankers").resolve()
+        storage_root_base = self._explicit_storage_root or self.storage_root
+        allowed_root = (storage_root_base / "rerankers").resolve()
         resolved_path = self.reranker_model_path
         if not resolved_path.is_absolute():
             resolved_path = (allowed_root / resolved_path).resolve()

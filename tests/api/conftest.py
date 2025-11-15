@@ -332,11 +332,6 @@ def _stub_external_integrations() -> Iterator[None]:
         raising=False,
     )
     monkeypatch.setattr(
-        "theo.application.facades.telemetry.set_span_attribute",
-        lambda *_a, **_kw: None,
-        raising=False,
-    )
-    monkeypatch.setattr(
         "theo.infrastructure.api.app.ai.trails._compute_input_hash",
         lambda input_payload, tool, action: str(
             (tool or "", action or "", repr(input_payload))

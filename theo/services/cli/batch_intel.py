@@ -51,7 +51,7 @@ def _summarise_document(session: Session, document: Document) -> tuple[str, list
         .all()
     )
     text = " ".join(passage.text for passage in passages) or (document.abstract or "")
-    summary = (text[:380] + "…") if len(text) > 380 else text
+    summary = (text[:380] + "...") if len(text) > 380 else text
     tags: list[str] = []
     if document.bib_json and isinstance(document.bib_json, dict):
         primary = document.bib_json.get("primary_topic")
@@ -67,7 +67,7 @@ def _persist_summary(
     session: Session, document: Document, summary: str, tags: list[str]
 ) -> Document:
     ai_doc = Document(
-        title=f"AI Summary · {document.title or document.id}",
+        title=f"AI Summary - {document.title or document.id}",
         authors=document.authors,
         collection=document.collection,
         source_type="ai_summary",
@@ -109,14 +109,14 @@ def main(hours: int, dry_run: bool) -> None:
         for document in documents:
             summary, tags = _summarise_document(session, document)
             click.echo(
-                f"Summarising {document.title or document.id} → tags: {', '.join(tags) or 'n/a'}"
+                f"Summarising {document.title or document.id} -> tags: {', '.join(tags) or 'n/a'}"
             )
             if dry_run:
                 continue
             ai_doc = _persist_summary(session, document, summary, tags)
             click.echo(f"  Saved ai_summary document {ai_doc.id}")
 
-        click.echo("Generating weekly topic digest…")
+        click.echo("Generating weekly topic digest...")
         digest = generate_topic_digest(session)
         if dry_run:
             click.echo(

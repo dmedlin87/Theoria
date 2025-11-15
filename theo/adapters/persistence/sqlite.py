@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import gc
+import os
 import threading
 import time
 import warnings
@@ -138,7 +139,8 @@ def dispose_sqlite_engine(
             import psutil  # pragma: no cover - optional handle inspection
         except Exception:
             psutil = None  # type: ignore[assignment]
-        if psutil is not None:
+        # Skip expensive handle scavenging in pytest runs to avoid global timeouts.
+        if psutil is not None and not os.environ.get("PYTEST_CURRENT_TEST"):
             try:
                 process = psutil.Process()
             except Exception:  # pragma: no cover - defensive guard

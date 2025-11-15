@@ -10,8 +10,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Mapping, Protocol
 
-from sqlalchemy.exc import SQLAlchemyError
-
 from theo.application.interfaces import SessionProtocol
 from theo.application.repositories.embedding_repository import (
     EmbeddingUpdate,
@@ -257,7 +255,7 @@ class EmbeddingRebuildService:
         for attempt in range(1, self._commit_attempts + 1):
             try:
                 session.commit()
-            except SQLAlchemyError as exc:  # pragma: no cover - defensive retry path
+            except Exception as exc:  # pragma: no cover - defensive retry path
                 rollback = getattr(session, "rollback", None)
                 if callable(rollback):
                     try:

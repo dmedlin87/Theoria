@@ -10,6 +10,8 @@ from fastapi import status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from theo.application.facades import telemetry  # noqa: F401
+
 from theo.infrastructure.api.app.ai.rag import (
     GuardrailError,
     RAGAnswer,

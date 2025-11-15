@@ -6,8 +6,9 @@ from contextlib import contextmanager
 from functools import lru_cache
 from typing import Tuple
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from importlib import import_module
+
+from theo.adapters.persistence.sqlalchemy_support import Session, select
 
 from theo.adapters import AdapterRegistry
 from theo.adapters.persistence.embedding_repository import (
@@ -247,11 +248,17 @@ def resolve_application() -> Tuple[ApplicationContainer, AdapterRegistry]:
     registry.register("research_service_factory", _build_research_service_factory)
 
     def _build_embedding_rebuild_service() -> EmbeddingRebuildService:
-        from theo.infrastructure.api.app.ingest.embeddings import (
-            clear_embedding_cache,
-            get_embedding_service,
+        embeddings_module = import_module(
+            "theo.infrastructure.api.app.ingest.embeddings"
         )
-        from theo.infrastructure.api.app.ingest.sanitizer import sanitize_passage_text
+        clear_embedding_cache = getattr(embeddings_module, "clear_embedding_cache")
+        get_embedding_service = getattr(embeddings_module, "get_embedding_service")
+        sanitizer_module = import_module(
+            "theo.infrastructure.api.app.ingest.sanitizer"
+        )
+        sanitize_passage_text = getattr(
+            sanitizer_module, "sanitize_passage_text"
+        )
 
         embedding_service = get_embedding_service()
 

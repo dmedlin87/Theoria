@@ -113,6 +113,9 @@ try:  # pragma: no cover - prefer importing the full implementation
                 _corpus_module,
                 _verse_module,
             ):
+                if candidate is _workflow_module:
+                    candidate.__dict__[name] = value
+                    continue
                 if hasattr(candidate, name):
                     setattr(candidate, name, value)
             super().__setattr__(name, value)

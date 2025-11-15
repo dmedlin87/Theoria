@@ -19,7 +19,7 @@ DEFAULT_TRACE_PATH = Path("data/eval/production_traces.jsonl")
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run theo.application.services.cli.rag_eval and record comparison artefacts.",
+        description="Run theo.services.cli.rag_eval and record comparison artefacts.",
     )
     parser.add_argument(
         "--modules",
@@ -95,7 +95,7 @@ def _invoke_rag_eval(
     command = [
         python_executable,
         "-m",
-        "theo.application.services.cli.rag_eval",
+        "theo.services.cli.rag_eval",
         "--dev-path",
         str(dev_path),
         "--trace-path",

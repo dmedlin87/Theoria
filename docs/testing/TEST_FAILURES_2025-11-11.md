@@ -11,12 +11,14 @@
 **Impact**: High - Breaks 7+ bootstrap and application initialization tests
 
 **Root Cause**:
+
 - `resolve_application()` in `theo/application/services/bootstrap.py:273` calls `_build_embedding_rebuild_service()`
 - This invokes `get_embedding_service()` at line 256
 - The stub at `tests/commands/test_embedding_rebuild.py:131` raises `RuntimeError: embedding service stub should be patched`
 - Tests are not properly mocking this service before calling `resolve_application()`
 
 **Affected Tests**:
+
 ```
 tests/application/services/test_bootstrap.py::test_resolve_application_registers_environment_adapters
 tests/application/services/test_bootstrap.py::test_resolve_application_wires_container
@@ -28,6 +30,7 @@ tests/services/test_services_bootstrap.py::test_resolve_application_returns_cont
 ```
 
 **Stack Trace**:
+
 ```python
 theo\application\services\bootstrap.py:273: in resolve_application
     embedding_rebuild_service = _build_embedding_rebuild_service()
@@ -40,6 +43,7 @@ tests\commands\test_embedding_rebuild.py:131: RuntimeError
 ```
 
 **Recommended Fix**:
+
 - Add fixture or setup to patch `get_embedding_service()` in all bootstrap tests
 - Consider making embedding service optional in `resolve_application()`
 - Or inject embedding service as a dependency rather than calling global function
@@ -51,10 +55,12 @@ tests\commands\test_embedding_rebuild.py:131: RuntimeError
 **Impact**: Medium - Expected behavior but logged as errors in test runs
 
 **Root Cause**:
+
 - Tests attempting to fetch `https://example.com/test` receive HTTP 404
 - `fetch_web_document()` in `theo/infrastructure/api/app/ingest/network.py:234` catches and wraps as `UnsupportedSourceError`
 
 **Error Flow**:
+
 ```
 urllib.request.py:639 → HTTPError: HTTP Error 404
   ↓
@@ -66,6 +72,7 @@ workers/tasks.py:502 → Logged at task level
 ```
 
 **Stack Trace**:
+
 ```python
 File "network.py", line 213, in fetch_web_document
     response = opener.open(request, timeout=timeout)
@@ -80,12 +87,14 @@ File "network.py", line 234, in fetch_web_document
 ```
 
 **Affected Code Paths**:
+
 - `theo/infrastructure/api/app/ingest/network.py:213-234`
 - `theo/infrastructure/api/app/ingest/pipeline.py:190`
 - `theo/infrastructure/api/app/ingest/stages/fetchers.py:113`
 - `theo/infrastructure/api/app/workers/tasks.py:502,516`
 
 **Recommendation**:
+
 - This appears to be working as designed (error handling is correct)
 - Consider using mock HTTP responses in tests to avoid real network calls
 - Suppress expected error logs in test environment
@@ -97,6 +106,7 @@ File "network.py", line 234, in fetch_web_document
 ### Category A: Database/SQLAlchemy Issues (18 failures)
 
 **Tests**:
+
 ```
 - test_run_sql_migrations_skips_existing_sqlite_column
 - test_run_sql_migrations_reapplies_when_ledger_stale
@@ -116,6 +126,7 @@ File "network.py", line 234, in fetch_web_document
 ### Category B: Worker Task Failures (13 failures)
 
 **Tests**:
+
 ```
 tests/workers/test_tasks.py::*
 tests/workers/test_tasks_optimized.py::*
@@ -123,6 +134,7 @@ tests/workers/test_tasks_perf_patch.py::*
 ```
 
 **Common Issues**:
+
 - Job tracking/status updates
 - Document ingestion pipeline
 - Citation validation
@@ -133,6 +145,7 @@ tests/workers/test_tasks_perf_patch.py::*
 ### Category C: API Route Errors (100+ errors)
 
 **Major Areas**:
+
 - AI error responses (`tests/api/test_ai_error_responses.py` - 4 errors)
 - Citation export (`tests/api/test_ai_citation_export.py` - 9 errors)
 - Notebooks (`tests/api/test_notebooks.py` - 5 errors)
@@ -149,6 +162,7 @@ tests/workers/test_tasks_perf_patch.py::*
 ### Category D: Architecture Boundary Violations (7 failures)
 
 **Tests**:
+
 ```
 tests/application/test_application_boundaries.py::test_application_layer_does_not_depend_on_services[module_path44-55]
 tests/architecture/test_module_boundaries.py::test_platform_package_removed
@@ -158,6 +172,7 @@ tests/architecture/test_dto_boundaries.py::*
 **Issue**: Application layer importing from infrastructure/services layers
 
 **Affected Modules** (from test parameters):
+
 - `module_path44`, `module_path46`, `module_path47`, `module_path48`, `module_path49`, `module_path51`, `module_path55`
 
 ---
@@ -165,6 +180,7 @@ tests/architecture/test_dto_boundaries.py::*
 ### Category E: Evidence/Research Domain (5 failures)
 
 **Tests**:
+
 ```
 - test_get_verse_graph_builds_nodes_edges_and_filters
 - test_preview_evidence_card_rolls_back
@@ -179,6 +195,7 @@ tests/architecture/test_dto_boundaries.py::*
 ### Category F: CLI/Command Failures (4 failures)
 
 **Tests**:
+
 ```
 tests/cli/test_refresh_hnsw_cli.py::*
 tests/commands/test_embedding_rebuild.py::*
@@ -191,6 +208,7 @@ tests/commands/test_embedding_rebuild.py::*
 ### Category G: Integration Test Failures (4 failures)
 
 **Tests**:
+
 ```
 - test_biblical_analysis_workflow_end_to_end
 - test_audio_pipeline_full
@@ -229,7 +247,7 @@ tests/commands/test_embedding_rebuild.py::*
 
 ## Skipped Tests (126 total)
 
-### By Category:
+### By Category
 
 - **Contract tests** (@contract marker): 15 skipped
   - Requires `--contract` opt-in flag
@@ -249,11 +267,13 @@ tests/commands/test_embedding_rebuild.py::*
 ## Priority Actions
 
 ### Immediate (P0)
+
 1. **Fix embedding service stub patching** in bootstrap tests
    - Add global fixture or conftest setup
    - Patch `get_embedding_service()` before any `resolve_application()` calls
 
 ### High Priority (P1)
+
 2. **Resolve architecture boundary violations** (7 failures)
    - Audit application layer imports
    - Move violating code to appropriate layers
@@ -263,6 +283,7 @@ tests/commands/test_embedding_rebuild.py::*
    - Ensure job tracking is properly mocked
 
 ### Medium Priority (P2)
+
 4. **Address API route test errors** (100 errors)
    - Likely cascading from bootstrap issues
    - May auto-resolve after P0 fix
@@ -271,6 +292,7 @@ tests/commands/test_embedding_rebuild.py::*
    - Replace `datetime.utcnow()` with `datetime.now(datetime.UTC)`
 
 ### Low Priority (P3)
+
 6. **Update testcontainers usage**
    - ✅ Structured wait strategies applied in `tests/fixtures/pgvector.py`
 
@@ -289,6 +311,7 @@ tests/commands/test_embedding_rebuild.py::*
 - **Runtime**: 422.27s (7 minutes 2 seconds)
 
 ### Slowest Tests (>100s)
+
 - `test_sqlite_startup_restores_missing_perspective_column`: 130.74s
 - `test_router_shared_spend_across_processes`: 19.52s
 - `test_router_shared_latency_across_processes`: 19.36s
@@ -316,6 +339,7 @@ tests/commands/test_embedding_rebuild.py::*
 ## Related Files
 
 ### Source Files
+
 - `theo/application/services/bootstrap.py:256,273`
 - `theo/infrastructure/api/app/ingest/network.py:213,234`
 - `theo/infrastructure/api/app/ingest/pipeline.py:190,206`
@@ -323,6 +347,7 @@ tests/commands/test_embedding_rebuild.py::*
 - `theo/adapters/biblical_ai_processor.py:93`
 
 ### Test Files
+
 - `tests/commands/test_embedding_rebuild.py:131`
 - `tests/application/services/test_bootstrap.py`
 - `tests/services/test_services_bootstrap.py`

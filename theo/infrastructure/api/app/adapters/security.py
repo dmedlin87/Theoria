@@ -54,14 +54,10 @@ class FastAPIPrincipalResolver(PrincipalResolver):
     # Internal helpers -----------------------------------------------------------
 
     def _resolve_settings_with_credentials(self) -> tuple[Settings, bool]:
+        self._refresh_settings_cache_if_stale()
         settings = get_settings()
         credentials_configured = self._auth_configured(settings)
-        if credentials_configured:
-            return settings, credentials_configured
-
-        self._refresh_settings_cache_if_stale()
-        refreshed_settings = get_settings()
-        return refreshed_settings, self._auth_configured(refreshed_settings)
+        return settings, credentials_configured
 
     def _refresh_settings_cache_if_stale(self) -> None:
         now = time.monotonic()
@@ -194,11 +190,15 @@ async def require_principal(
     )
 
 
-def configure_principal_resolver() -> None:
-    """Register the FastAPI resolver with the application facade."""
+def configure_principal_resolver(config: str | None = None, key: str | None = None) -> None:
+    """Register the FastAPI resolver with the application facade.
 
+    ``config`` and ``key`` parameters are accepted for compatibility with
+    existing integration tests that monkeypatch this function, but they are
+    ignored by the default implementation.
+    """
+    del config, key  # parameters are currently unused
     set_principal_resolver(FastAPIPrincipalResolver())
 
 
 __all__ = ["FastAPIPrincipalResolver", "configure_principal_resolver", "require_principal"]
-

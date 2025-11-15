@@ -11,6 +11,8 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from theo.application.facades import database  # noqa: F401
+
 from ...errors import ExportError, Severity
 from ...export.formatters import DEFAULT_FILENAME_PREFIX
 from ...persistence_models import Document

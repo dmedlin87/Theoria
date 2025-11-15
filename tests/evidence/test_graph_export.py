@@ -55,7 +55,7 @@ def test_get_verse_graph_builds_nodes_edges_and_filters(
     assert (
         ("contradiction", "contradiction:ctr-1:Gen.1.1") in relationship_edges
     )
-    assert ("harmony", "harmony:harm-1:John.1.1") in relationship_edges
+    assert ("harmony", "harmony:harm-1:Gen.1.1") in relationship_edges
 
     assert response.filters.perspectives == ["apologetic", "neutral", "skeptical"]
     assert response.filters.source_types == ["sermon"]

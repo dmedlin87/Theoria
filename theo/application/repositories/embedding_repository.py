@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, Mapping, Protocol, Sequence
+from typing import Iterable, Mapping, Sequence
 
 
 @dataclass(slots=True)
@@ -25,9 +26,10 @@ class EmbeddingUpdate:
     embedding: Sequence[float]
 
 
-class PassageEmbeddingRepository(Protocol):
+class PassageEmbeddingRepository(ABC):
     """Abstraction over persistence required for embedding rebuilds."""
 
+    @abstractmethod
     def count_candidates(
         self,
         *,
@@ -37,9 +39,11 @@ class PassageEmbeddingRepository(Protocol):
     ) -> int:
         """Return number of passages matching the rebuild criteria."""
 
+    @abstractmethod
     def existing_ids(self, ids: Sequence[str]) -> set[str]:
         """Return the subset of *ids* that exist in persistence."""
 
+    @abstractmethod
     def iter_candidates(
         self,
         *,
@@ -50,6 +54,7 @@ class PassageEmbeddingRepository(Protocol):
     ) -> Iterable[PassageForEmbedding]:
         """Yield passages requiring embedding updates in deterministic order."""
 
+    @abstractmethod
     def update_embeddings(self, updates: Sequence[EmbeddingUpdate]) -> None:
         """Persist the provided embedding vectors for each passage."""
 

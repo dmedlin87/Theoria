@@ -13,8 +13,8 @@ class RouterRegistration:
     """Metadata describing a router to mount on the API application."""
 
     router: APIRouter
-    prefix: str | None
-    tags: Sequence[str]
+    prefix: str | None = None
+    tags: Sequence[str] = ()
     requires_security: bool = True
 
 

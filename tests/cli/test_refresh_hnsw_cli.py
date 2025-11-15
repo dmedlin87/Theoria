@@ -34,9 +34,9 @@ def refresh_cli_module(
         sys.modules, "theo.infrastructure.api.app.workers.tasks", fake_tasks_module
     )
     monkeypatch.delitem(
-        sys.modules, "theo.application.services.cli.refresh_hnsw", raising=False
+        sys.modules, "theo.services.cli.refresh_hnsw", raising=False
     )
-    module = importlib.import_module("theo.application.services.cli.refresh_hnsw")
+    module = importlib.import_module("theo.services.cli.refresh_hnsw")
     module = importlib.reload(module)
     module.configure_refresh_hnsw_cli(bootstrapper=lambda: None)
     try:

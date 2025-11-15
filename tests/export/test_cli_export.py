@@ -24,7 +24,7 @@ from theo.infrastructure.api.app.models.export import (
     SearchExportRow,
 )
 from theo.infrastructure.api.app.models.search import HybridSearchFilters, HybridSearchRequest
-from theo.application.services.cli import export_data as cli  # noqa: E402
+from theo.services.cli import export_data as cli  # noqa: E402
 
 
 @contextmanager

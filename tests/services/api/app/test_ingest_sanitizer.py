@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from theo.infrastructure.api.app.ingest.sanitizer import sanitize_passage_text
+from importlib import import_module
+import sys
+
+sys.modules.pop("theo.infrastructure.api.app.ingest.sanitizer", None)
+sanitize_passage_text = import_module(
+    "theo.infrastructure.api.app.ingest.sanitizer"
+).sanitize_passage_text
 
 
 @pytest.mark.parametrize(

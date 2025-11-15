@@ -94,26 +94,31 @@ class _StubTrailService:
     @contextmanager
     def start_trail(self, **kwargs: Any) -> Iterator[_StubRecorder]:
         self.start_calls.append(kwargs)
-        yield self.recorder
+        with self.recorder as recorder:
+            yield recorder
 
     @contextmanager
     def resume_trail(self, trail_id: str, **kwargs: Any) -> Iterator[_StubRecorder]:
         payload = dict(kwargs)
         payload["trail_id"] = trail_id
         self.resume_calls.append(payload)
-        yield self.recorder
+        with self.recorder as recorder:
+            yield recorder
 
 
 class _StubAuditWriter:
+    calls: list[dict[str, Any]] = []
+
     def __init__(self) -> None:
-        self.calls: list[dict[str, Any]] = []
+        self.instance_calls: list[dict[str, Any]] = []
 
     @classmethod
     def from_session(cls, _session: object) -> "_StubAuditWriter":
         return cls()
 
     def log(self, **kwargs: Any) -> None:  # noqa: D401 - logger protocol stub
-        self.calls.append(kwargs)
+        self.instance_calls.append(kwargs)
+        self.__class__.calls.append(kwargs)
 class _StubLoopController:
     def __init__(self) -> None:
         self.initialised: list[dict[str, Any]] = []

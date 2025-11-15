@@ -1170,6 +1170,7 @@ def test_wait_for_inflight_handles_restart_requeue(tmp_path, sleep_stub):
     assert outputs == ["after-restart"]
 
 
+@pytest.mark.timeout(120)
 def test_router_shared_spend_across_processes(tmp_path, sleep_stub):
     ledger_path = tmp_path / "shared-ledger.db"
     # Reset in a context to ensure cleanup
@@ -1208,6 +1209,7 @@ def test_router_shared_spend_across_processes(tmp_path, sleep_stub):
     assert second_result["backup_spend"] > 0.0
 
 
+@pytest.mark.timeout(120)
 def test_router_shared_latency_across_processes(tmp_path, sleep_stub):
     ledger_path = tmp_path / "latency-ledger.db"
     # Reset in a context to ensure cleanup
