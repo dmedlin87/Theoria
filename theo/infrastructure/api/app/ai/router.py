@@ -328,7 +328,7 @@ class LLMRouterService:
                     workflow=workflow,
                 )
                 try:
-                    self._ledger.wait_for_inflight(
+                    record = self._ledger.wait_for_inflight(
                         cache_key, observed_updated_at=wait_observed_updated_at, timeout=self._inflight_timeout
                     )
                 except GenerationError:
@@ -341,6 +341,16 @@ class LLMRouterService:
                     )
                     pass
                 else:
+                    if stale_status == "error":
+                        _record_router_ledger_event(
+                            "stale_row_wait_complete",
+                            cache_key=cache_key,
+                            status=stale_status,
+                            model=model.name,
+                            workflow=workflow,
+                        )
+                        span.set_attribute("llm.cache_status", "wait")
+                        return self._record_to_generation(record)
                     _record_router_ledger_event(
                         "stale_row_wait_complete",
                         cache_key=cache_key,

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from theo.application.observability import trace_repository_call
@@ -38,18 +39,35 @@ class SQLAlchemyIngestionJobRepository(
             "update_status",
             attributes={"job_id": job_id, "status": status},
         ) as trace:
-            job = self.get(IngestionJob, job_id)
-            trace.set_attribute("exists", job is not None)
-            if job is None:
-                trace.record_result_count(0)
-                return
-            job.status = status
+            assignments = [
+                "status = :status",
+                "updated_at = :updated_at",
+            ]
+            params = {
+                "status": status,
+                "updated_at": datetime.now(UTC),
+                "job_id": job_id,
+            }
+
             if error is not None:
-                job.error = error
+                assignments.append("error = :error")
+                params["error"] = error
             if document_id is not None:
-                job.document_id = document_id
-            job.updated_at = datetime.now(UTC)
-            trace.record_result_count(1)
+                assignments.append("document_id = :document_id")
+                params["document_id"] = document_id
+
+            stmt = text(
+                f"""
+                UPDATE ingestion_jobs
+                SET {', '.join(assignments)}
+                WHERE id = :job_id
+                """
+            )
+            connection = self._session.connection()
+            result = connection.execute(stmt, params)
+            rowcount = result.rowcount or 0
+            trace.set_attribute("exists", rowcount > 0)
+            trace.record_result_count(rowcount)
 
     def set_payload(self, job_id: str, payload: dict[str, Any]) -> None:
         with trace_repository_call(

@@ -14,17 +14,12 @@ def _normalize_tags(tags: Iterable[str] | None) -> list[str] | None:
     if tags is None:
         return None
     normalized: list[str] = []
-    seen: set[str] = set()
     for tag in tags:
         if not isinstance(tag, str):
             continue
         stripped = tag.strip()
         if not stripped:
             continue
-        lower = stripped.lower()
-        if lower in seen:
-            continue
-        seen.add(lower)
         normalized.append(stripped)
     return sorted(normalized) if normalized else None
 

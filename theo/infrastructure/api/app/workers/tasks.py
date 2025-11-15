@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence, cast
 
 from dataclasses import dataclass, replace
+from types import SimpleNamespace
 
 import httpx
 from celery import Celery
@@ -231,13 +232,33 @@ def _load_chat_entries(record: ChatSessionDTO) -> list[ChatMemoryEntry]:
     entries: list[ChatMemoryEntry] = []
     raw_entries = record.memory_snippets or []
     for raw in raw_entries:
-        try:
-            entry = ChatMemoryEntry.model_validate(raw)
-        except Exception:  # pragma: no cover - defensive parsing
+        if isinstance(raw, ChatMemoryEntry):
+            entries.append(raw)
+            continue
+
+        if not isinstance(raw, dict):
             logger.debug(
-                "Invalid chat memory entry for session %s", record.id, exc_info=True
+                "Skipping non-dict chat memory entry for session %s", record.id
             )
             continue
+
+        try:
+            entry = ChatMemoryEntry.model_validate(raw)
+        except Exception:  # pragma: no cover - defensive parsing and fallback
+            logger.debug(
+                "Invalid chat memory entry for session %s; falling back to shim",  # noqa: E501
+                record.id,
+                exc_info=True,
+            )
+            entry = cast(
+                ChatMemoryEntry,
+                SimpleNamespace(
+                    question=raw.get("question"),
+                    answer=raw.get("answer", ""),
+                    answer_summary=raw.get("answer_summary"),
+                    citations=raw.get("citations") or [],
+                ),
+            )
         entries.append(entry)
     return entries
 

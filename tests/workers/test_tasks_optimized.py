@@ -112,7 +112,7 @@ except ModuleNotFoundError:
         t_start: float | None = None
         t_end: float | None = None
         meta: dict = None
-        
+
         def __post_init__(self):
             if self.meta is None:
                 self.meta = {}
@@ -127,7 +127,7 @@ def _task(obj: Any) -> Task:
 
 class TestWorkerTasksOptimized:
     """Optimized test class for worker tasks."""
-    
+
     @pytest.fixture(autouse=True)
     def setup_mocks(self, monkeypatch):
         """Setup common mocks for all tests."""
@@ -136,7 +136,7 @@ class TestWorkerTasksOptimized:
             "theo.infrastructure.api.app.enrich.MetadataEnricher.enrich_document",
             MagicMock(return_value=True)
         )
-        
+
         # Mock deliverable building
         from theo.infrastructure.api.app.models.export import DeliverablePackage, DeliverableManifest, DeliverableAsset
         mock_manifest = DeliverableManifest(
@@ -148,7 +148,7 @@ class TestWorkerTasksOptimized:
         )
         mock_asset = DeliverableAsset(
             format="markdown",
-            filename="test.md", 
+            filename="test.md",
             media_type="text/markdown",
             content="test content"
         )
@@ -156,7 +156,7 @@ class TestWorkerTasksOptimized:
             manifest=mock_manifest,
             assets=[mock_asset]
         )
-        
+
         monkeypatch.setattr(
             tasks,
             "generate_sermon_prep_outline",
@@ -167,7 +167,7 @@ class TestWorkerTasksOptimized:
             "build_sermon_deliverable",
             MagicMock(return_value=mock_package)
         )
-        
+
     def test_process_url_basic_functionality(self, worker_engine, worker_stubs):
         """Test URL processing with minimal database operations."""
         _task(tasks.process_url).run(
@@ -180,7 +180,7 @@ class TestWorkerTasksOptimized:
         last_call = worker_stubs.pipeline_calls[-1]
         assert last_call["kind"] == "url"
         assert last_call["url"] == "https://example.com/test"
-            
+
     def test_process_url_with_job_tracking(self, worker_engine, worker_stubs):
         """Test job status updates during URL processing."""
         # Create test job
@@ -207,19 +207,26 @@ class TestWorkerTasksOptimized:
             if update["job_id"] == job_id
         ]
         assert job_events[-1] == "completed"
-            
+
     def test_validate_citations_fast(self, worker_engine, monkeypatch, worker_stubs):
         """Fast citation validation test with minimal setup."""
         # Setup test data efficiently
         now = datetime.now(UTC)
-        citation = RAGCitation(index=1, osis="John.3.16", anchor="page 1")
+        citation = RAGCitation(
+            index=1,
+            osis="John.3.16",
+            anchor="page 1",
+            passage_id="passage-1",
+            document_id="doc-1",
+            snippet="Test passage snippet",
+        )
         entry = ChatMemoryEntry(
             question="Test question?",
             answer="Test answer",
             citations=[citation],
             created_at=now
         )
-        
+
         with Session(worker_engine) as session:
             snippet = entry.model_dump()
             snippet["citations"] = [
@@ -238,73 +245,75 @@ class TestWorkerTasksOptimized:
             )
             session.add(chat_session)
             session.commit()
-            
+
         # Mock search to return matching results
         results = [HybridSearchResult(
                 id="passage-1",
                 document_id="doc-1",
                 text="Test passage",
                 osis_ref="John.3.16",
-                page_no=1
+                page_no=1,
+                snippet="Test passage snippet",
+                rank=1
             )]
 
         worker_stubs.set_hybrid_results(results)
 
         # Run validation
         result = _task(tasks.validate_citations).run(limit=1)
-        
+
         assert result["sessions"] == 1
         assert result["entries"] >= 1
-        
+
     def test_refresh_hnsw_mocked(self, monkeypatch):
         """Test HNSW refresh with database operations mocked."""
         executed_statements = []
-        
+
         class MockConnection:
             def execute(self, statement):
                 executed_statements.append(str(statement))
                 return MagicMock(scalars=lambda: MagicMock(all=lambda: []))
-                
+
         class MockEngine:
             def begin(self):
                 return MockConnection()
-                
+
         monkeypatch.setattr(tasks, "get_engine", lambda: MockEngine())
         monkeypatch.setattr(
-            tasks, "_evaluate_hnsw_recall", 
+            tasks, "_evaluate_hnsw_recall",
             lambda *args, **kwargs: {"sample_size": 5, "avg_recall": 0.95}
         )
-        
+
         result = _task(tasks.refresh_hnsw).run()
-        
+
         # Verify SQL execution
         assert any("DROP INDEX" in stmt for stmt in executed_statements)
-        assert any("CREATE INDEX" in stmt for stmt in executed_statements) 
+        assert any("CREATE INDEX" in stmt for stmt in executed_statements)
         assert any("ANALYZE" in stmt for stmt in executed_statements)
         assert result["sample_size"] == 5
-        
+
     def test_build_deliverable_minimal(self, tmp_path, monkeypatch):
         """Test deliverable building with minimal file I/O."""
         # Mock settings
         mock_settings = MagicMock()
         mock_settings.storage_root = tmp_path
         monkeypatch.setattr(tasks, "settings", mock_settings)
-        
+
         # Mock file operations
         with patch('pathlib.Path.mkdir') as mock_mkdir, \
              patch('pathlib.Path.write_text') as mock_write_text:
-            
+
             result = _task(tasks.build_deliverable).run(
                 export_type="sermon",
                 formats=["markdown"],
                 export_id="test-export",
                 topic="Test Topic"
             )
-            
+
             assert result["export_id"] == "test-export"
             assert result["status"] == "completed"
             assert len(result["assets"]) >= 1
-            
+
             # Verify file operations were called
             assert mock_mkdir.called
             assert mock_write_text.called

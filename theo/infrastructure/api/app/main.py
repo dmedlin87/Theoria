@@ -94,7 +94,7 @@ def _register_metrics_endpoint(app: FastAPI) -> None:
     content_type = str(CONTENT_TYPE_LATEST or "text/plain; version=0.0.4")
 
     @app.get("/metrics", tags=["telemetry"])
-    def metrics_endpoint() -> PlainTextResponse:
+    def metrics_endpoint():
         payload = metrics_generator()
         return PlainTextResponse(payload, media_type=content_type)
 def _enforce_authentication_requirements() -> None:

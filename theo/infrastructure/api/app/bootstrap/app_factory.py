@@ -423,6 +423,6 @@ def register_metrics_endpoint(app: FastAPI) -> None:
     from fastapi.responses import PlainTextResponse
 
     @app.get("/metrics", tags=["telemetry"])
-    def metrics_endpoint() -> PlainTextResponse:  # pragma: no cover - thin wrapper
+    def metrics_endpoint():  # pragma: no cover - thin wrapper
         payload = PrometheusMetrics.emit()
         return PlainTextResponse(payload, media_type="text/plain")

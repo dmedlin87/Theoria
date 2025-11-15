@@ -385,6 +385,12 @@ class GuardedAnswerPipeline:
                     model_name = candidate.name
                     if cache_status == "stale":
                         cache_status = "refresh"
+                    elif (
+                        cache_status == "miss"
+                        and cache_key
+                        and validation_result
+                    ):
+                        cache_status = "refresh"
                     set_final_cache_status(span, cache_status)
                     break
             except GenerationError as exc:
