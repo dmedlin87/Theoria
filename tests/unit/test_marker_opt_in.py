@@ -85,11 +85,18 @@ def test_pgvector_fixture_runs_with_cli(pytester: pytest.Pytester) -> None:
 
             from tests import conftest as parent_conftest
 
-            # Explicitly assign pytest hooks to ensure they're recognized
-            pytest_addoption = parent_conftest.pytest_addoption
-            pytest_configure = parent_conftest.pytest_configure
-            pytest_collection_modifyitems = parent_conftest.pytest_collection_modifyitems
-            pytest_load_initial_conftests = parent_conftest.pytest_load_initial_conftests
+            # Define pytest hooks as proper functions to ensure they're recognized
+            def pytest_addoption(parser):
+                return parent_conftest.pytest_addoption(parser)
+
+            def pytest_configure(config):
+                return parent_conftest.pytest_configure(config)
+
+            def pytest_collection_modifyitems(config, items):
+                return parent_conftest.pytest_collection_modifyitems(config, items)
+
+            def pytest_load_initial_conftests(early_config, parser, args):
+                return parent_conftest.pytest_load_initial_conftests(early_config, parser, args)
 
             # Import fixtures and other helpers
             from tests.conftest import *  # noqa: F401,F403
