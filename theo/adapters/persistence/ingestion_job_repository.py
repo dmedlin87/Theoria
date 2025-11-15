@@ -85,6 +85,11 @@ class SQLAlchemyIngestionJobRepository(
             rowcount = result.rowcount or 0
             trace.set_attribute("exists", rowcount > 0)
             trace.record_result_count(rowcount)
+            if rowcount > 0:
+                # Ensure ORM identity state is refreshed so callers see updated fields
+                job = self._session.get(IngestionJob, job_id)
+                if job is not None:
+                    self._session.expire(job)
 
     def set_payload(self, job_id: str, payload: dict[str, Any]) -> None:
         with trace_repository_call(
