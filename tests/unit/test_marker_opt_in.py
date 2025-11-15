@@ -83,6 +83,15 @@ def test_pgvector_fixture_runs_with_cli(pytester: pytest.Pytester) -> None:
             if str(PROJECT_ROOT) not in sys.path:
                 sys.path.insert(0, str(PROJECT_ROOT))
 
+            from tests import conftest as parent_conftest
+
+            # Explicitly assign pytest hooks to ensure they're recognized
+            pytest_addoption = parent_conftest.pytest_addoption
+            pytest_configure = parent_conftest.pytest_configure
+            pytest_collection_modifyitems = parent_conftest.pytest_collection_modifyitems
+            pytest_load_initial_conftests = parent_conftest.pytest_load_initial_conftests
+
+            # Import fixtures and other helpers
             from tests.conftest import *  # noqa: F401,F403
 
             import tests.fixtures.pgvector as pgvector_module
