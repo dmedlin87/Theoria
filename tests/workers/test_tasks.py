@@ -801,7 +801,7 @@ def test_validate_citations_logs_mismatch(
     worker_stubs.set_hybrid_results(mismatched_search(None, None))
     monkeypatch.setattr(tasks, "CITATION_DRIFT_EVENTS", metric)
 
-    caplog.set_level("WARNING")
+    caplog.set_level("WARNING", logger="theo.infrastructure.api.app.workers.tasks")
     result = _task(tasks.validate_citations).run(limit=1)
 
     assert result["failed"] == 1

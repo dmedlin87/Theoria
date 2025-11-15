@@ -130,11 +130,17 @@ def get_settings():  # pragma: no cover - settings accessor
     return settings
 
 logger = get_task_logger(__name__)
-logger.propagate = False
+# Enable propagation for pytest caplog to capture logs during tests
+# In production, Celery's get_task_logger already handles log routing
 if not logger.handlers:
     _handler = logging.StreamHandler()
     _handler.setFormatter(logging.Formatter("%(message)s"))
     logger.addHandler(_handler)
+    # Only disable propagation if we added a handler (production mode)
+    logger.propagate = False
+else:
+    # In test mode, handlers are already configured - keep propagation enabled
+    logger.propagate = True
 
 
 def _safe_log_exception(
@@ -479,7 +485,9 @@ def validate_citations(
                     error=str(exc),
                 )
                 session.commit()
-        raise
+        # Avoid passing complex exception objects to prevent RecursionError
+        # during billiard serialization; error details are already logged
+        raise type(exc)(str(exc)) from None
 
     metrics["discrepancies"] = discrepancies
 
@@ -651,7 +659,9 @@ def process_file(
             if job_id:
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
-            raise
+            # Avoid passing complex exception objects to prevent RecursionError
+            # during billiard serialization; error details are already logged
+            raise type(exc)(str(exc)) from None
 
 
 @celery.task(name="tasks.process_url", bind=True, max_retries=3)
@@ -714,14 +724,19 @@ def process_url(
                 eta=None,
                 retries=retries,
             )
+            # Avoid passing complex exception objects to prevent RecursionError
+            # during billiard serialization; error details are already logged
+            simple_exc = Exception(str(exc))
             raise CeleryRetry(
-                message="Task can be retried",
-                exc=exc,
+                message=f"Task can be retried: {type(exc).__name__}",
+                exc=simple_exc,
                 when=retry_delay,
                 is_eager=True,
                 sig=signature,
             )
-        raise self.retry(exc=exc, countdown=retry_delay)
+        # Avoid passing complex exception objects to prevent RecursionError
+        # during billiard serialization; error details are already logged
+        raise self.retry(exc=Exception(str(exc)), countdown=retry_delay)
 
 
 @celery.task(name="tasks.enrich_document")
@@ -786,7 +801,9 @@ def enrich_document(document_id: str, job_id: str | None = None) -> None:
                         error="enrichment failed",
                     )
                     retry_session.commit()
-            raise
+            # Avoid passing complex exception objects to prevent RecursionError
+            # during billiard serialization; error details are already logged
+            raise type(exc)(str(exc)) from None
 
 
 def _summarise_document(session: Session, document: Document) -> tuple[str, list[str]]:
@@ -887,7 +904,9 @@ def generate_document_summary(document_id: str, job_id: str | None = None) -> No
                         error="summary generation failed",
                     )
                     retry_session.commit()
-            raise
+            # Avoid passing complex exception objects to prevent RecursionError
+            # during billiard serialization; error details are already logged
+            raise type(exc)(str(exc)) from None
 
 
 @celery.task(name="tasks.send_topic_digest_notification")
@@ -1049,7 +1068,9 @@ def topic_digest(
             if job_id:
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
-            raise
+            # Avoid passing complex exception objects to prevent RecursionError
+            # during billiard serialization; error details are already logged
+            raise type(exc)(str(exc)) from None
 
 
 HNSW_INDEX_NAME = "ix_passages_embedding_hnsw"
@@ -1194,7 +1215,9 @@ def refresh_hnsw(
             with Session(engine) as session:
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
-        raise
+        # Avoid passing complex exception objects to prevent RecursionError
+        # during billiard serialization; error details are already logged
+        raise type(exc)(str(exc)) from None
 
     if job_id:
         with Session(engine) as session:
@@ -1247,7 +1270,9 @@ def run_watchlist_alert(watchlist_id: str) -> None:
                 exc,
                 extra={"watchlist_id": watchlist_id},
             )
-            raise
+            # Avoid passing complex exception objects to prevent RecursionError
+            # during billiard serialization; error details are already logged
+            raise type(exc)(str(exc)) from None
 
 
 run_watchlist_alert_task = cast(CeleryTask, run_watchlist_alert)
