@@ -25,7 +25,7 @@ def test_register_commands_adds_embedding_command(
 
     assert calls == [group]
     assert "rebuild_embeddings" in group.commands
-    assert group.get_command(None, "rebuild_embeddings") is rebuild_embeddings_cmd
+    assert group.commands["rebuild_embeddings"] is rebuild_embeddings_cmd
 
 
 def test_database_ops_register_commands_noop() -> None:
