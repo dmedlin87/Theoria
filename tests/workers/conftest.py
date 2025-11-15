@@ -428,9 +428,10 @@ class WorkerStubContext:
         try:
             yield
         finally:
+            # Use list() to avoid "dictionary changed size during iteration" errors
             resets = {
                 key: self._dependency_stubs[key]
-                for key in overrides
+                for key in list(overrides.keys())
                 if key in self._dependency_stubs
             }
             if resets:
