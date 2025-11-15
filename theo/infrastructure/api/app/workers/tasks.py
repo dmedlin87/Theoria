@@ -252,7 +252,7 @@ def get_worker_dependencies() -> _WorkerDependencies:
 def _compute_retry_delay(retry_count: int | None) -> int:
     """Compute an exponential backoff window capped at one minute."""
 
-    if not retry_count or retry_count <= 0:
+    if retry_count is None or retry_count < 0:
         return 1
     return min(2**retry_count, 60)
 
