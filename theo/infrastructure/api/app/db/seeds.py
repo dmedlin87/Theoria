@@ -338,15 +338,30 @@ def _recreate_seed_table_if_missing_column(
         engine = bind if isinstance(bind, Engine) else None
 
     if connection is None:
+        metadata_bind = getattr(table, "metadata", None)
+        metadata_bind = getattr(metadata_bind, "bind", None)
         if isinstance(bind, Engine):
             connection = bind.connect()
             should_close = True
+            used_session_connection = False
             if engine is None:
                 engine = bind
         elif isinstance(bind, Connection):
             connection = bind
             should_close = False
             used_session_connection = True
+        elif isinstance(metadata_bind, Engine):
+            connection = metadata_bind.connect()
+            should_close = True
+            used_session_connection = False
+            if engine is None:
+                engine = metadata_bind
+        elif isinstance(metadata_bind, Connection):
+            connection = metadata_bind
+            should_close = False
+            used_session_connection = False
+            if engine is None:
+                engine = getattr(metadata_bind, "engine", None)
         else:
             return (False, False)
 
@@ -425,20 +440,54 @@ def _ensure_perspective_column(
 
     dependencies = tuple(required_columns or ())
     required = ("perspective", *dependencies)
-    missing = [
-        column
-        for column in required
-        if not _table_has_column(session, table.name, column, schema=table.schema)
-    ]
+
+    def _missing_columns() -> list[str]:
+        return [
+            column
+            for column in required
+            if not _table_has_column(
+                session, table.name, column, schema=table.schema
+            )
+        ]
+
+    missing = _missing_columns()
     if "perspective" in missing:
         session.rollback()
-        logger.warning(
-            "Skipping %s seeds because 'perspective' column is missing",
-            dataset_label,
-        )
-        return False
+        table_exists = _table_exists(session, table.name, schema=table.schema)
+        rebuilt = False
+        try:
+            rebuilt, _ = _recreate_seed_table_if_missing_column(
+                session,
+                table,
+                "perspective",
+                dataset_label=dataset_label,
+                force=not table_exists or allow_repair,
+            )
+        except OperationalError:
+            rebuilt = False
+        if rebuilt:
+            if not table_exists:
+                logger.info(
+                    "Created %s table before seeding %s seeds",
+                    table.name,
+                    dataset_label,
+                )
+            else:
+                logger.info(
+                    "Rebuilt %s table missing 'perspective' column before seeding %s seeds",
+                    table.name,
+                    dataset_label,
+                )
+        missing = _missing_columns()
+        if "perspective" in missing:
+            logger.warning(
+                "Skipping %s seeds because 'perspective' column is missing",
+                dataset_label,
+            )
+            return False
 
-    if not missing:
+    remaining = [column for column in missing if column != "perspective"]
+    if not remaining:
         return True
 
     if allow_repair:
@@ -449,16 +498,13 @@ def _ensure_perspective_column(
             log_suffix=f"retrying {dataset_label} seeds",
             force=True,
         )
-        missing = [
-            column
-            for column in required
-            if not _table_has_column(session, table.name, column, schema=table.schema)
-        ]
-        if not missing:
+        missing = _missing_columns()
+        remaining = [column for column in missing if column != "perspective"]
+        if not remaining:
             return True
 
     session.rollback()
-    formatted = ", ".join(sorted(missing))
+    formatted = ", ".join(sorted(remaining))
     logger.warning(
         "Skipping %s seeds because required column(s) are missing: %s",
         dataset_label,

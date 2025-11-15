@@ -63,7 +63,24 @@ class SQLAlchemyIngestionJobRepository(
                 WHERE id = :job_id
                 """
             )
-            connection = self._session.connection()
+            try:
+                connection = self._session.connection()
+            except RecursionError:
+                trace.set_attribute("fallback", "orm_update")
+                job = self.get(IngestionJob, job_id)
+                trace.set_attribute("exists", job is not None)
+                if job is None:
+                    trace.record_result_count(0)
+                    return
+                job.status = status
+                job.updated_at = params["updated_at"]
+                if error is not None:
+                    job.error = error
+                if document_id is not None:
+                    job.document_id = document_id
+                trace.record_result_count(1)
+                return
+
             result = connection.execute(stmt, params)
             rowcount = result.rowcount or 0
             trace.set_attribute("exists", rowcount > 0)

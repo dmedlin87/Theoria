@@ -25,14 +25,47 @@ except ModuleNotFoundError:  # pragma: no cover - provide lazy failure for optio
             raise ModuleNotFoundError(
                 "cryptography is required for Fernet secrets support"
             )
-from pydantic import (
-    AliasChoices,
-    BaseModel,
-    Field,
-    PrivateAttr,
-    field_validator,
-    model_validator,
-)
+# NOTE: ``PrivateAttr`` was introduced in Pydantic 1.8 and is also present in
+# Pydantic v2. Some of our lightweight test environments only ship with the
+# minimal ``pydantic`` stubs used for type-checking, which omit the runtime
+# implementation.  To keep the settings facade importable in those scenarios we
+# provide a very small shim that mimics the behaviour we rely on (a descriptor
+# storing a private attribute).  The shim is only used when the import fails and
+# intentionally mirrors the public API of :func:`pydantic.PrivateAttr`.
+try:  # pragma: no cover - exercised indirectly in tests when dependency exists
+    from pydantic import (
+        AliasChoices,
+        BaseModel,
+        Field,
+        PrivateAttr,
+        field_validator,
+        model_validator,
+    )
+except ImportError:  # pragma: no cover - executed in lightweight test envs
+    from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
+
+    class _PrivateAttribute:
+        """Minimal descriptor replicating the ``PrivateAttr`` contract."""
+
+        def __init__(self, *, default: Any = None) -> None:
+            self._default = default
+            self._name: str | None = None
+
+        def __set_name__(self, owner: object, name: str) -> None:
+            self._name = f"__private_{name}"
+
+        def __get__(self, instance: Any, owner: object | None = None) -> Any:
+            if instance is None:
+                return self
+            assert self._name is not None
+            return instance.__dict__.get(self._name, self._default)
+
+        def __set__(self, instance: Any, value: Any) -> None:
+            assert self._name is not None
+            instance.__dict__[self._name] = value
+
+    def PrivateAttr(*, default: Any = None) -> _PrivateAttribute:  # type: ignore[misc]
+        return _PrivateAttribute(default=default)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..ports.secrets import SecretRequest, SecretRetrievalError, build_secrets_adapter

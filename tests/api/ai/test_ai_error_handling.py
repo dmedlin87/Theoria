@@ -62,7 +62,6 @@ def test_guarded_answer_or_refusal_uses_fallback_results(monkeypatch: pytest.Mon
         filters=None,
         memory_context=None,
         osis="John.3.16",
-        allow_fallback=True,
     )
 
     assert answer.summary == "s"

@@ -312,10 +312,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     dependency_container = create_dependency_container()
     # If tests monkeypatch create_dependency_container, ensure the registry
-    # hook still fires by falling back to the container itself when no
-    # registry has been recorded yet.
-    if get_registry() is None:
+    # hook still fires even when a previous registry has already been
+    # recorded. Capture the current registry before invoking the saver so we
+    # can restore it after notifying observers with the fresh container.
+    recorded_registry = get_registry()
+    if recorded_registry is None:
         set_registry(dependency_container)  # type: ignore[arg-type]
+    else:
+        set_registry(dependency_container)  # type: ignore[arg-type]
+        if recorded_registry is not dependency_container:
+            set_registry(recorded_registry)
 
     set_application_resolver(lambda: dependency_container)
     set_llm_registry_saver(save_llm_registry)

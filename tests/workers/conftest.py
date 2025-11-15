@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import UTC, datetime
+import sqlite3
 from types import SimpleNamespace
 from typing import Any, Iterable, Sequence
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import sys
 
 import pytest
 from sqlalchemy.orm import Session
@@ -25,18 +28,28 @@ from theo.infrastructure.api.app.workers import tasks
 
 
 @pytest.fixture(scope="session")
-def fast_worker_engine():
-    """Create an in-memory SQLite engine for fast worker tests."""
-    # Use in-memory SQLite with connection pooling for maximum speed
-    engine = create_engine(
-        "sqlite:///:memory:", 
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        echo=False  # Disable SQL logging for speed
-    )
+def fast_worker_engine(tmp_path_factory: pytest.TempPathFactory):
+    """Create a SQLite engine optimised for the current platform."""
+    if sys.platform.startswith("win"):
+        db_dir = tmp_path_factory.mktemp("worker-fast-db")
+        db_path = Path(db_dir) / "worker.db"
+        database_url = f"sqlite:///{db_path}"
+        engine = create_engine(
+            database_url,
+            connect_args={"check_same_thread": False},
+            pool_pre_ping=True,
+        )
+    else:
+        engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+            echo=False,
+        )
     Base.metadata.create_all(engine)
     yield engine
     Base.metadata.drop_all(engine)
+    engine.dispose()
 
 
 @pytest.fixture(scope="module")
@@ -142,8 +155,14 @@ def _bind_worker_engine(worker_engine, monkeypatch):
 class WorkerStubContext:
     """Provide deterministic stand-ins for external worker dependencies."""
 
-    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, worker_engine) -> None:
         self._monkeypatch = monkeypatch
+        self._engine = worker_engine
+        self._db_path = (
+            Path(worker_engine.url.database).resolve()
+            if worker_engine.url.database
+            else None
+        )
         self._original_deps = tasks.get_worker_dependencies()
         self._dependency_stubs: dict[str, Any] = {
             "run_pipeline_for_file": self._run_pipeline_for_file,
@@ -357,7 +376,7 @@ class WorkerStubContext:
 
     def _track_job_status(
         self,
-        session: Session,
+        _session: Session,
         job_id: str,
         *,
         status: str,
@@ -372,13 +391,30 @@ class WorkerStubContext:
                 "document_id": document_id,
             }
         )
-        self._original_update_job_status(
-            session,
-            job_id,
-            status=status,
-            error=error,
-            document_id=document_id,
-        )
+        if self._db_path is not None:
+            assignments = ["status = ?", "updated_at = ?"]
+            params: list[Any] = [status, datetime.now(UTC).isoformat()]
+            if error is not None:
+                assignments.append("error = ?")
+                params.append(error)
+            if document_id is not None:
+                assignments.append("document_id = ?")
+                params.append(document_id)
+            params.append(job_id)
+            statement = f"UPDATE ingestion_jobs SET {', '.join(assignments)} WHERE id = ?"
+            with sqlite3.connect(self._db_path, check_same_thread=False) as conn:
+                conn.execute(statement, params)
+                conn.commit()
+            return
+
+        with Session(self._engine) as session:
+            self._original_update_job_status(
+                session,
+                job_id,
+                status=status,
+                error=error,
+                document_id=document_id,
+            )
 
     def _record_notification(self, *args: Any, **kwargs: Any) -> None:
         self.notification_calls.append({"args": args, "kwargs": kwargs})
@@ -402,9 +438,11 @@ class WorkerStubContext:
 
 
 @pytest.fixture
-def worker_stubs(monkeypatch: pytest.MonkeyPatch) -> WorkerStubContext:
+def worker_stubs(
+    monkeypatch: pytest.MonkeyPatch, worker_engine
+) -> WorkerStubContext:
     """Expose the worker stub context to tests that need fine-grained control."""
-    context = WorkerStubContext(monkeypatch)
+    context = WorkerStubContext(monkeypatch, worker_engine)
     try:
         yield context
     finally:

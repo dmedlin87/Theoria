@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import sys
 import time
 from datetime import UTC, datetime, timedelta, date
 from pathlib import Path
@@ -128,6 +130,27 @@ def get_settings():  # pragma: no cover - settings accessor
     return settings
 
 logger = get_task_logger(__name__)
+logger.propagate = False
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(_handler)
+
+
+def _safe_log_exception(
+    message: str, exc: BaseException, *, extra: dict[str, Any] | None = None
+) -> None:
+    """Log exceptions without letting formatter recursion crash Celery tasks."""
+
+    try:
+        logger.exception(message, extra=extra)
+    except RecursionError:
+        fallback_extra = dict(extra or {})
+        fallback_extra.setdefault("exception_message", str(exc))
+        sys.stderr.write(
+            f"[worker-task] {message} (traceback omitted: recursion error during formatting) "
+            f"{fallback_extra}\n"
+        )
 
 
 class _CounterProxy:
@@ -664,8 +687,9 @@ def process_url(
                 )
                 session.commit()
     except Exception as exc:  # pragma: no cover - exercised indirectly via retry logic
-        logger.exception(
+        _safe_log_exception(
             "Failed to process URL ingestion",
+            exc,
             extra={"doc_id": doc_id, "url": url, "source_type": source_type},
         )
         if job_id:
@@ -748,10 +772,10 @@ def enrich_document(document_id: str, job_id: str | None = None) -> None:
                     session, job_id, status="completed", document_id=document_id
                 )
                 session.commit()
-        except Exception:  # pragma: no cover - defensive logging
+        except Exception as exc:  # pragma: no cover - defensive logging
             session.rollback()
-            logger.exception(
-                "Failed to enrich document", extra={"document_id": document_id}
+            _safe_log_exception(
+                "Failed to enrich document", exc, extra={"document_id": document_id}
             )
             if job_id:
                 with Session(engine) as retry_session:
@@ -847,10 +871,11 @@ def generate_document_summary(document_id: str, job_id: str | None = None) -> No
                     session, job_id, status="completed", document_id=summary_doc.id
                 )
                 session.commit()
-        except Exception:  # pragma: no cover - defensive logging
+        except Exception as exc:  # pragma: no cover - defensive logging
             session.rollback()
-            logger.exception(
+            _safe_log_exception(
                 "Failed to generate document summary",
+                exc,
                 extra={"document_id": document_id},
             )
             if job_id:
@@ -912,9 +937,10 @@ def send_topic_digest_notification(
             timeout=settings.notification_timeout_seconds,
         )
         response.raise_for_status()
-    except httpx.HTTPError:
-        logger.exception(
+    except httpx.HTTPError as exc:
+        _safe_log_exception(
             "Failed to dispatch topic digest notification",
+            exc,
             extra={"document_id": digest_document_id, "webhook_url": webhook_url},
         )
         raise
@@ -1163,7 +1189,7 @@ def refresh_hnsw(
             engine, sample_queries=sample_queries, top_k=top_k
         )
     except Exception as exc:  # pragma: no cover - defensive logging
-        logger.exception("HNSW refresh failed")
+        _safe_log_exception("HNSW refresh failed", exc)
         if job_id:
             with Session(engine) as session:
                 _update_job_status(session, job_id, status="failed", error=str(exc))
@@ -1214,10 +1240,11 @@ def run_watchlist_alert(watchlist_id: str) -> None:
                     "document_ids": result.document_ids,
                 },
             )
-        except Exception:
+        except Exception as exc:
             session.rollback()
-            logger.exception(
+            _safe_log_exception(
                 "Failed to execute watchlist run",
+                exc,
                 extra={"watchlist_id": watchlist_id},
             )
             raise

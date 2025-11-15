@@ -600,12 +600,18 @@ def _guarded_answer_or_refusal(
     original_results = list(results)
     filtered_results = [result for result in original_results if result.osis_ref]
     fallback_results: list[HybridSearchResult] = []
+    fallback_used = False
     if not filtered_results and osis:
         fallback_results = load_passages_for_osis(session, osis)
         if fallback_results:
             filtered_results = fallback_results
+            fallback_used = True
     candidate_results = filtered_results or original_results
-    enable_fallback = allow_fallback if allow_fallback is not None else False
+    enable_fallback = (
+        allow_fallback
+        if allow_fallback is not None
+        else fallback_used
+    )
 
     try:
         return _guarded_answer(

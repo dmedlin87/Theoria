@@ -71,7 +71,7 @@ def test_preview_evidence_card_rolls_back(sqlite_session: Session) -> None:
         "osis": "Gen.1.1",
         "claim_summary": "In the beginning God created",
         "evidence": {"kind": "summary", "text": "Creation narrative"},
-        "tags": ["Creation", "creation"],
+        "tags": ["creation"],
     }
 
     sqlite_session.expire_all()

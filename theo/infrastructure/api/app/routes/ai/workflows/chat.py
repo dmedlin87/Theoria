@@ -981,7 +981,7 @@ def apply_research_loop_action(
         )
     controller = _get_loop_controller(session)
     try:
-        state = controller.apply_action(session_id, payload.action, step_id=payload.step_id)
+        controller.apply_action(session_id, payload.action, step_id=payload.step_id)
     except LookupError as exc:
         raise AIWorkflowError(
             str(exc),
@@ -994,6 +994,9 @@ def apply_research_loop_action(
             code="AI_CHAT_LOOP_INVALID_ACTION",
             status_code=status.HTTP_400_BAD_REQUEST,
         ) from exc
+    # Re-fetch the loop state so the response always reflects the committed
+    # snapshot after applying the control action.
+    state = controller.get_state(session_id)
     response: dict[str, object] = {"state": _serialise_loop_state(state)}
     if state.partial_answer:
         response["partial_answer"] = state.partial_answer

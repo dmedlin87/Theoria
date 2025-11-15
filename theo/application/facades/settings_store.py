@@ -28,7 +28,18 @@ except ModuleNotFoundError:  # pragma: no cover - provide sentinel fallbacks
                 "cryptography is required for Fernet secrets support"
             )
 
-from theo.adapters.persistence.models import AppSetting
+# ``AppSetting`` lives in the SQLAlchemy-backed persistence module.  During unit
+# tests we avoid requiring the full dependency graph by providing a very small
+# fallback definition when SQLAlchemy (or the compiled C extensions it depends
+# on) are absent.  The facade only needs ``key`` and ``value`` attributes, so the
+# stub keeps imports lightweight without affecting production behaviour.
+try:  # pragma: no cover - real dependency when SQLAlchemy installed
+    from theo.adapters.persistence.models import AppSetting
+except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
+    class AppSetting:  # type: ignore[no-redef]
+        def __init__(self, *, key: str, value: Any | None) -> None:
+            self.key = key
+            self.value = value
 from theo.application.facades.settings import get_settings_cipher
 from theo.application.interfaces import SessionProtocol
 

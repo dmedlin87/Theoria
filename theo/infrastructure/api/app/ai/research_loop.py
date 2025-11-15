@@ -542,7 +542,10 @@ class ResearchLoopController:
         state.last_action = LoopControlAction.STEP.value
         state.updated_at = _now()
         self._sync_plan_progress(state)
-        return self._store_state(session_id, state, commit=True)
+        self._store_state(session_id, state, commit=True)
+        # Reload the state to ensure the committed snapshot (including the
+        # incremented index) is returned to callers relying on persisted data.
+        return self.require_state(session_id)
 
     def apply_action(
         self,
