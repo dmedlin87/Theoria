@@ -73,7 +73,7 @@ def test_pgvector_marker_enforcement(pytester: pytest.Pytester, test_body, args,
 def test_pgvector_fixture_runs_with_cli(pytester: pytest.Pytester) -> None:
     pytester.makeconftest(
         textwrap.dedent(
-            """
+            f"""
             import contextlib
             import sys
             from types import SimpleNamespace
