@@ -1,0 +1,247 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║           THEORIA TEST COVERAGE COMPREHENSIVE ANALYSIS - SUMMARY               ║
+║                         Generated: 2025-11-15                                  ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─ OVERALL METRICS ─────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  Total Source Files:              423                                         │
+│  Total Test Files:                332                                         │
+│  Test Functions:                  1,414                                       │
+│  Classes in Code:                 697                                         │
+│  Methods in Code:                 1,052                                       │
+│  Test-to-Method Ratio:            1.35:1 (adequate overall, poor distribution)
+│  Lines of Test Code:              ~48,215                                     │
+│                                                                                │
+│  OVERALL GRADE:                   B- (Good volume, uneven distribution)        │
+│                                                                                │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TEST COVERAGE BY AREA ──────────────────────────────────────────────────────┐
+│                                                                               │
+│  CRITICAL GAPS (0-25% coverage):                                             │
+│  ================================                                             │
+│                                                                               │
+│  [F] API Routes              ██░░░░░░░░░░░░░░░░░░  10%   2-3 tests         │
+│      20+ route files, barely any dedicated tests                             │
+│                                                                               │
+│  [F] MCP Server              ░░░░░░░░░░░░░░░░░░░░   0%   0 tests           │
+│      Critical integration point with ZERO tests                              │
+│                                                                               │
+│  [D] Frontend Components     ███░░░░░░░░░░░░░░░░░  17%   33 tests          │
+│      191 TSX files, mostly untested                                          │
+│                                                                               │
+│  [F] Model Validation        ░░░░░░░░░░░░░░░░░░░░   5%   2,647 LOC untested │
+│      Infrastructure models are data contracts                                │
+│                                                                               │
+│  UNDER-TESTED (25-50% coverage):                                             │
+│  ===============================                                              │
+│                                                                               │
+│  [C] Infrastructure Layer    ██████░░░░░░░░░░░░░░  30%   285 files         │
+│  [C] Adapters Layer          ███████░░░░░░░░░░░░░  40%   31 files          │
+│  [B] Application Layer       █████████░░░░░░░░░░░  53%   49 files          │
+│  [C] GraphQL                 ████████░░░░░░░░░░░░  40%   5 files           │
+│  [C+] Event Handling         ██████████░░░░░░░░░░  60%   Limited coverage  │
+│                                                                               │
+│  WELL-TESTED (65%+ coverage):                                                │
+│  ============================                                                 │
+│                                                                               │
+│  [A-] Domain Layer           ██████████████░░░░░░  70%   34 files          │
+│  [A-] Ingestion Pipeline     ██████████████░░░░░░  70%   13 tests          │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ CRITICAL GAPS REQUIRING IMMEDIATE ATTENTION ─────────────────────────────────┐
+│                                                                               │
+│  PRIORITY 1: Security & Auth (ZERO TESTS)                                   │
+│  ──────────────────────────────────────────────────────────────────────────  │
+│  • API route authentication/authorization                                    │
+│  • JWT/API key validation in routes                                          │
+│  • Permission enforcement across all endpoints                               │
+│  • MCP server protocol compliance                                            │
+│                                                                               │
+│  PRIORITY 2: API Routes (10% coverage)                                      │
+│  ────────────────────────────────────────────────────────────────────────── │
+│  Files with ZERO test coverage:                                              │
+│    - routes/creators.py                                                     │
+│    - routes/jobs.py                                                         │
+│    - routes/trails.py                                                       │
+│    - routes/features.py                                                     │
+│    - routes/export/zotero.py (Zotero integration)                           │
+│  Files with MINIMAL coverage:                                                │
+│    - routes/research.py                                                     │
+│    - routes/notebooks.py                                                    │
+│    - routes/analytics.py                                                    │
+│                                                                               │
+│  PRIORITY 3: Data Model Validation (5% coverage)                            │
+│  ────────────────────────────────────────────────────────────────────────── │
+│  2,647 lines of Pydantic model code, barely tested:                          │
+│    - models/ai.py (NO tests)                                                │
+│    - models/reasoning.py (NO tests)                                         │
+│    - models/analytics.py (NO tests)                                         │
+│    - models/research_plan.py (NO tests)                                     │
+│    - models/watchlists.py (NO tests)                                        │
+│  Missing: Type validation, coercion, serialization tests                     │
+│                                                                               │
+│  PRIORITY 4: Frontend Components (17% coverage)                             │
+│  ────────────────────────────────────────────────────────────────────────── │
+│  191 TSX files, only 33 test files:                                          │
+│    - Research workspace UI (untested)                                       │
+│    - Notebook editor (few tests)                                            │
+│    - Copilot integration (minimal tests)                                    │
+│    - GraphQL admin interface (untested)                                     │
+│    - Most dashboard components (some tests)                                 │
+│  Missing: Integration tests, E2E workflows, a11y tests                        │
+│                                                                               │
+│  PRIORITY 5: MCP Server (0% coverage)                                       │
+│  ────────────────────────────────────────────────────────────────────────── │
+│  Critical integration point with ZERO tests:                                 │
+│    - mcp_server/__main__.py (0 tests)                                       │
+│    - mcp_server/__init__.py (0 tests)                                       │
+│  Missing: Protocol compliance, error handling, middleware tests              │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TEST QUALITY ISSUES ───────────────────────────────────────────────────────┐
+│                                                                              │
+│  1. Edge Case Coverage                                                      │
+│     ❌ Null/None inputs often not tested                                    │
+│     ❌ Empty collections not validated                                      │
+│     ❌ Boundary conditions rarely tested                                    │
+│     ❌ Unicode/encoding special cases ignored                               │
+│     ❌ Concurrency/race conditions untested                                 │
+│                                                                              │
+│  2. Error Path Testing (59% of exception files have partial coverage)       │
+│     ❌ HTTPException paths not comprehensive                                │
+│     ❌ Error message formatting not validated                               │
+│     ❌ Custom error codes not tested                                        │
+│     ❌ Error recovery scenarios untested                                    │
+│                                                                              │
+│  3. Performance Testing (Minimal)                                            │
+│     ❌ Only 1 file in tests/perf/                                           │
+│     ❌ No load testing                                                      │
+│     ❌ No benchmark regression detection                                    │
+│     ❌ Vector search performance untested                                   │
+│                                                                              │
+│  4. Frontend Testing Approach                                                │
+│     ❌ Limited unit test coverage (33/191 files)                            │
+│     ❌ Few integration tests                                                │
+│     ❌ No visual regression testing                                         │
+│     ❌ Accessibility testing minimal                                        │
+│                                                                              │
+│  5. External Service Integration                                             │
+│     ❌ OpenAI integration tests minimal                                      │
+│     ❌ OpenAlex enrichment untested                                         │
+│     ❌ Zotero sync failures not tested                                      │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ RECOMMENDED ACTION PLAN ─────────────────────────────────────────────────────┐
+│                                                                               │
+│  CRITICAL (Implement Immediately) - Est. 55-75 hours                        │
+│  ─────────────────────────────────────────────────────                      │
+│                                                                               │
+│  1. Add API Route Tests                      ███░░░░░░░░░░░  (20-30 hrs)   │
+│     → Create tests/api/routes/test_*.py for each route                      │
+│     → Cover auth, authorization, validation, error paths                    │
+│                                                                               │
+│  2. Add MCP Protocol Tests                   ██░░░░░░░░░░░░  (10-15 hrs)   │
+│     → Unit tests for config parsing                                         │
+│     → Integration tests for protocol compliance                             │
+│     → Middleware and error handling tests                                   │
+│                                                                               │
+│  3. Add Data Model Validation Tests          ███░░░░░░░░░░░  (15-20 hrs)   │
+│     → Test each Pydantic model                                              │
+│     → Validate type coercion and serialization                              │
+│     → Add invalid input tests                                               │
+│                                                                               │
+│  4. Increase Frontend Test Coverage          █████░░░░░░░░░  (30-50 hrs)   │
+│     → Focus on critical workflows                                           │
+│     → Add integration tests for complex features                            │
+│     → Add accessibility compliance tests                                    │
+│                                                                               │
+│  HIGH (This Sprint) - Est. 26-45 hours                                      │
+│  ──────────────────────────────────                                         │
+│                                                                               │
+│  5. Add GraphQL Resolver Tests               ██░░░░░░░░░░░░  (8-10 hrs)    │
+│  6. Add Error Handling Tests                 ██░░░░░░░░░░░░  (10-15 hrs)   │
+│  7. Add Event Handler Tests                  ██░░░░░░░░░░░░  (8-10 hrs)    │
+│                                                                               │
+│  MEDIUM (Next Sprint) - Est. 30-45 hours                                    │
+│  ──────────────────────────────────────                                     │
+│                                                                               │
+│  8. Add Integration Tests                    ███░░░░░░░░░░░  (15-20 hrs)   │
+│  9. Expand Edge Case Coverage                ██░░░░░░░░░░░░  (10-15 hrs)   │
+│  10. Add Contract/Schema Tests               ██░░░░░░░░░░░░  (5-8 hrs)     │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ FILES REQUIRING IMMEDIATE ATTENTION ──────────────────────────────────────────┐
+│                                                                               │
+│  ZERO TEST COVERAGE (11 files):                                             │
+│  ──────────────────                                                          │
+│  • mcp_server/__main__.py                                                   │
+│  • mcp_server/__init__.py                                                   │
+│  • theo/infrastructure/api/app/routes/creators.py                           │
+│  • theo/infrastructure/api/app/routes/jobs.py                               │
+│  • theo/infrastructure/api/app/routes/trails.py                             │
+│  • theo/infrastructure/api/app/routes/features.py                           │
+│  • theo/infrastructure/api/app/models/ai.py                                 │
+│  • theo/infrastructure/api/app/models/reasoning.py                          │
+│  • theo/infrastructure/api/app/models/analytics.py                          │
+│  • theo/infrastructure/api/app/models/research_plan.py                      │
+│  • theo/infrastructure/api/app/models/watchlists.py                         │
+│                                                                               │
+│  <25% COVERAGE (11 files):                                                  │
+│  ────────────────────────                                                    │
+│  • theo/adapters/events/redis.py                                            │
+│  • theo/adapters/events/kafka.py                                            │
+│  • theo/adapters/graph/* (all graph adapters)                               │
+│  • theo/adapters/secrets/vault.py                                           │
+│  • theo/adapters/secrets/aws.py                                             │
+│  • theo/infrastructure/api/app/routes/export/zotero.py                      │
+│  • theo/infrastructure/api/app/graphql/* (partial)                          │
+│  • theo/infrastructure/api/app/mcp/* (partial)                              │
+│  • theo/infrastructure/api/app/error_handlers.py                            │
+│  • theo/infrastructure/api/app/versioning.py                                │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TEST INFRASTRUCTURE STATUS ──────────────────────────────────────────────────┐
+│                                                                              │
+│  STRENGTHS:                                                                  │
+│  ✅ Well-organized test directory structure                                 │
+│  ✅ Comprehensive conftest.py with fixtures                                 │
+│  ✅ Good use of factories for test data                                     │
+│  ✅ Pytest plugins and markers available                                    │
+│  ✅ Coverage reporting configured                                           │
+│  ✅ Integration test support (testcontainers)                               │
+│                                                                              │
+│  WEAKNESSES:                                                                 │
+│  ❌ Coverage reports not regularly reviewed                                 │
+│  ❌ No coverage threshold enforcement                                       │
+│  ❌ Limited CI/CD visibility into coverage gaps                             │
+│  ❌ No coverage trend tracking                                              │
+│  ❌ Frontend testing setup minimal                                          │
+│  ❌ No contract testing automation                                          │
+│  ❌ Performance testing infrastructure sparse                               │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ ESTIMATED EFFORT SUMMARY ────────────────────────────────────────────────────┐
+│                                                                              │
+│  Total Estimated Hours:           145-165 hours (4-5 weeks at 40 hrs/week)  │
+│                                                                              │
+│  Critical Path:                   55-75 hours (1.5 weeks)                   │
+│  High Priority:                   26-45 hours (1 week)                      │
+│  Medium Priority:                 30-45 hours (1 week)                      │
+│                                                                              │
+│  Recommended Team Size:           2-3 developers                             │
+│  Recommended Completion Date:     5-6 weeks from start                      │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+END OF SUMMARY
+═════════════════════════════════════════════════════════════════════════════════
+
+Full detailed report available in: test_coverage_comprehensive_analysis.md
