@@ -25,23 +25,11 @@ from theo.infrastructure.api.app.workers import tasks
 pytestmark = pytest.mark.usefixtures("worker_stubs")
 
 # Performance optimization fixtures
-@pytest.fixture(scope="session")
-def fast_test_engine():
-    """Ultra-fast in-memory SQLite engine for testing."""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        echo=False  # Critical: disable SQL logging
-    )
-    Base.metadata.create_all(engine)
-    yield engine
-    Base.metadata.drop_all(engine)
-
+# Use the worker_engine from conftest.py to ensure database coordination
 @pytest.fixture
-def optimized_session(fast_test_engine):
+def optimized_session(worker_engine):
     """Optimized database session with automatic rollback."""
-    SessionLocal = sessionmaker(bind=fast_test_engine)
+    SessionLocal = sessionmaker(bind=worker_engine)
     session = SessionLocal()
     try:
         yield session
@@ -150,40 +138,37 @@ class TestWorkerPerformance:
     
     def test_process_url_fast(self, optimized_session):
         """Fast URL processing test."""
-        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_engine:
-            mock_engine.return_value = optimized_session.bind
-            
-            # This should complete in <100ms instead of several seconds
-            result = tasks.process_url(
-                "doc-123",
-                "https://example.com/test",
-                frontmatter={"title": "Fast Test"}
-            )
-            
-            # Verify it ran without errors
-            assert result is None  # Task completed successfully
+        # No need to patch get_engine - worker_engine autouse fixture handles it
+
+        # This should complete in <100ms instead of several seconds
+        result = tasks.process_url(
+            "doc-123",
+            "https://example.com/test",
+            frontmatter={"title": "Fast Test"}
+        )
+
+        # Verify it ran without errors
+        assert result is None  # Task completed successfully
     
     def test_process_url_with_job_fast(self, optimized_session):
         """Fast job tracking test."""
         job = create_test_job(optimized_session, "url_ingest")
         optimized_session.commit()
-        
-        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_engine:
-            mock_engine.return_value = optimized_session.bind
-            
-            tasks.process_url(
-                "doc-job-123",
-                "https://example.com/job-test",
-                job_id=job.id
-            )
-            
-            # Verify job was updated
-            optimized_session.refresh(job)
-            assert job.status == "completed"
+
+        # No need to patch get_engine - worker_engine autouse fixture handles it
+        tasks.process_url(
+            "doc-job-123",
+            "https://example.com/job-test",
+            job_id=job.id
+        )
+
+        # Verify job was updated
+        optimized_session.refresh(job)
+        assert job.status == "completed"
     
     def test_validate_citations_fast(self, optimized_session, worker_stubs):
         """Fast citation validation test."""
-        # Create minimal test data
+        # Create minimal test data with proper citation structure
         chat_session = ChatSession(
             id="fast-session",
             user_id="test-user",
@@ -194,8 +179,13 @@ class TestWorkerPerformance:
                     "citations": [
                         {
                             "index": 1,
-                            "osis": "John.3.16", 
-                            "anchor": "page 1"
+                            "osis": "John.3.16",
+                            "anchor": "page 1",
+                            "passage_id": "passage-1",
+                            "document_id": "doc-1",
+                            "document_title": "Test Doc",
+                            "snippet": "Test passage",
+                            "source_url": "/doc/doc-1#passage-passage-1"
                         }
                     ]
                 }
@@ -206,24 +196,24 @@ class TestWorkerPerformance:
         )
         optimized_session.add(chat_session)
         optimized_session.commit()
-        
-        with patch('theo.infrastructure.api.app.workers.tasks.get_engine') as mock_engine:
 
-            mock_engine.return_value = optimized_session.bind
-            worker_stubs.set_hybrid_results([
-                Mock(
-                    id="passage-1",
-                    document_id="doc-1",
-                    text="Test passage",
-                    osis_ref="John.3.16",
-                    page_no=1
-                )
-            ])
+        # No need to patch get_engine - worker_engine autouse fixture handles it
+        worker_stubs.set_hybrid_results([
+            Mock(
+                id="passage-1",
+                document_id="doc-1",
+                text="Test passage",
+                osis_ref="John.3.16",
+                page_no=1,
+                document_title="Test Doc",
+                snippet="Test passage"
+            )
+        ])
 
-            result = tasks.validate_citations(limit=1)
-            
-            assert result["sessions"] == 1
-            assert result["entries"] >= 1
+        result = tasks.validate_citations(limit=1)
+
+        assert result["sessions"] == 1
+        assert result["entries"] >= 1
     
     def test_refresh_hnsw_fast(self):
         """Fast HNSW refresh test with complete mocking."""
