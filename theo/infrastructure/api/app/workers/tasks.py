@@ -7,6 +7,7 @@ import logging
 import sys
 import time
 from datetime import UTC, datetime, timedelta, date
+import sqlite3
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence, cast
 
@@ -83,6 +84,7 @@ from ..analytics.topics import (
     store_topic_digest,
     upsert_digest_document,
 )
+from ..db.seeds import _run_with_sqlite_lock_retry
 from ..analytics.watchlists import (
     get_watchlist,
     iter_due_watchlists,
@@ -706,37 +708,58 @@ def process_url(
             with Session(engine) as session:
                 _update_job_status(session, job_id, status="failed", error=str(exc))
                 session.commit()
+
         retry_count = getattr(self.request, "retries", 0)
         retry_delay = _compute_retry_delay(retry_count)
+
+        # Avoid passing complex exception objects to prevent RecursionError
+        # during billiard serialization; error details are already logged
+        simple_exc = Exception(str(exc))
+
         is_eager = (
             getattr(self.request, "is_eager", False)
             or getattr(self.request, "called_directly", False)
             or getattr(self.app.conf, "task_always_eager", False)
         )
+
         if is_eager:
-            retries = retry_count + 1
-            setattr(self.request, "retries", retries)
-            signature = self.signature_from_request(
-                self.request,
-                None,
-                None,
-                countdown=retry_delay,
-                eta=None,
-                retries=retries,
-            )
-            # Avoid passing complex exception objects to prevent RecursionError
-            # during billiard serialization; error details are already logged
-            simple_exc = Exception(str(exc))
+            # In eager mode, raise a Retry instance directly with a small
+            # signature object so tests can assert on "when" and kwargs
+            # without triggering Celery's full scheduling machinery.
+            from celery.exceptions import Retry as CeleryRetry  # type: ignore
+
+            class _EagerRetrySignature:
+                __slots__ = ("kwargs", "_when", "_exc", "_exc_type")
+
+                def __init__(self, kwargs: dict[str, object], when: int, exc: Exception) -> None:
+                    self.kwargs = kwargs
+                    self._when = when
+                    self._exc = exc
+                    self._exc_type = type(exc).__name__
+
+                def apply(self, retries: int = 0):  # type: ignore[override]
+                    raise CeleryRetry(
+                        message=f"Task can be retried: {self._exc_type}",
+                        exc=self._exc,
+                        when=self._when,
+                        is_eager=True,
+                        sig=self,
+                    )
+
+            sig_kwargs = dict(getattr(self.request, "kwargs", {}) or {})
+            sig = _EagerRetrySignature(sig_kwargs, retry_delay, simple_exc)
+
             raise CeleryRetry(
                 message=f"Task can be retried: {type(exc).__name__}",
                 exc=simple_exc,
                 when=retry_delay,
                 is_eager=True,
-                sig=signature,
+                sig=sig,
             )
-        # Avoid passing complex exception objects to prevent RecursionError
-        # during billiard serialization; error details are already logged
-        raise self.retry(exc=Exception(str(exc)), countdown=retry_delay)
+
+        # In non-eager mode, delegate to Celery's retry to schedule a
+        # new attempt with the computed backoff.
+        raise self.retry(exc=simple_exc, countdown=retry_delay)
 
 
 @celery.task(name="tasks.enrich_document")
@@ -1031,15 +1054,28 @@ def topic_digest(
             session.commit()
 
         try:
-            digest = generate_topic_digest(session, window_start)
-            digest_document = upsert_digest_document(session, digest)
-            store_topic_digest(session, digest)
+            digest = None
+            digest_document = None
+
+            def _persist_digest(target_session: Session) -> None:
+                nonlocal digest, digest_document
+                digest = generate_topic_digest(target_session, window_start)
+                digest_document = upsert_digest_document(target_session, digest)
+                store_topic_digest(target_session, digest)
+
+            ok = _run_with_sqlite_lock_retry(
+                session,
+                "topic_digest",
+                _persist_digest,
+            )
+            if not ok:
+                raise RuntimeError("topic_digest commit failed after SQLite lock retries")
 
             if job_id:
                 _update_job_status(session, job_id, status="completed")
                 session.commit()
 
-            if notify:
+            if notify and digest is not None and digest_document is not None:
                 context = {
                     "generated_at": digest.generated_at.isoformat(),
                     "window_start": window_start.isoformat(),
@@ -1056,13 +1092,14 @@ def topic_digest(
                         "document_id": digest_document.id,
                     },
                 )
-            logger.info(
-                "Generated topic digest",
-                extra={
-                    "topics": [cluster.topic for cluster in digest.topics],
-                    "since": window_start.isoformat(),
-                },
-            )
+            if digest is not None:
+                logger.info(
+                    "Generated topic digest",
+                    extra={
+                        "topics": [cluster.topic for cluster in digest.topics],
+                        "since": window_start.isoformat(),
+                    },
+                )
         except Exception as exc:  # pragma: no cover - defensive logging
             session.rollback()
             if job_id:

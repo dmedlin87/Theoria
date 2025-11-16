@@ -497,9 +497,7 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "memcheck: enable the manage_memory fixture for targeted leak hunts.",
     )
-
-    if config.getoption("pgvector") and not config.getoption("schema"):
-        config.option.schema = True
+    _apply_suite_implications(config)
 
 
 def pytest_load_initial_conftests(
@@ -628,30 +626,77 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-_FIXTURE_MARKER_REQUIREMENTS: dict[str, set[str]] = {
+_HEAVY_SUITES: dict[str, dict[str, Any]] = {
     "pgvector": {
-        "ingest_engine",
-        "pgvector_db",
-        "pgvector_container",
-        "pgvector_database_url",
-        "pgvector_engine",
-        "pgvector_migrated_database_url",
-        "pipeline_engine",
-        "pipeline_session_factory",
+        "marker": "pgvector",
+        "cli_option": "pgvector",
+        "fixtures": {
+            "ingest_engine",
+            "pgvector_db",
+            "pgvector_container",
+            "pgvector_database_url",
+            "pgvector_engine",
+            "pgvector_migrated_database_url",
+            "pipeline_engine",
+            "pipeline_session_factory",
+            "pgvector_pipeline_engine",
+            "pgvector_pipeline_session_factory",
+        },
+        "implies": ["schema"],
+        "deprecated_aliases": ["use-pgvector"],
     },
     "schema": {
-        "integration_database_url",
-        "integration_engine",
+        "marker": "schema",
+        "cli_option": "schema",
+        "fixtures": {
+            "integration_database_url",
+            "integration_engine",
+        },
+        "implies": [],
+        "deprecated_aliases": [],
     },
+    "contract": {
+        "marker": "contract",
+        "cli_option": "contract",
+        "fixtures": set(),
+        "implies": [],
+        "deprecated_aliases": [],
+    },
+    "gpu": {
+        "marker": "gpu",
+        "cli_option": "gpu",
+        "fixtures": set(),
+        "implies": [],
+        "deprecated_aliases": [],
+    },
+}
+
+
+_FIXTURE_MARKER_REQUIREMENTS: dict[str, set[str]] = {
+    suite["marker"]: set(suite["fixtures"])
+    for suite in _HEAVY_SUITES.values()
+    if suite["fixtures"]
 }
 
 
 _MARKER_OPTIONS: dict[str, str] = {
-    "pgvector": "pgvector",
-    "schema": "schema",
-    "contract": "contract",
-    "gpu": "gpu",
+    suite["marker"]: suite["cli_option"] for suite in _HEAVY_SUITES.values()
 }
+
+
+def _apply_suite_implications(config: pytest.Config) -> None:
+    for suite_name, suite in _HEAVY_SUITES.items():
+        option_name = suite["cli_option"]
+        if not config.getoption(option_name):
+            continue
+
+        for implied_name in suite.get("implies", ()):  # type: ignore[arg-type]
+            implied_suite = _HEAVY_SUITES.get(implied_name)
+            if implied_suite is None:
+                continue
+            implied_option = implied_suite["cli_option"]
+            if not config.getoption(implied_option):
+                setattr(config.option, implied_option, True)
 
 
 def _resolve_xdist_group(item: pytest.Item) -> str | None:
@@ -908,12 +953,19 @@ def integration_database_url(
     request: pytest.FixtureRequest,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[str]:
-    """Return a database URL backed by Postgres+pgvector when requested.
+    """Return a database URL for integration tests using schema migrations.
 
-    Tests can opt in to a full pgvector-backed database via ``--use-pgvector``.
-    Otherwise a throwaway SQLite database is created under the session's
-    temporary directory. The fixture yields SQLAlchemy-compatible URLs so test
-    suites can ``create_engine`` with minimal boilerplate.
+    This fixture is guarded by the ``schema`` opt-in:
+
+    * When ``--schema`` (or ``--pgvector``, which implies ``--schema``) is not
+      provided, the fixture is skipped.
+    * When ``--schema`` is enabled without ``--pgvector``, a throwaway SQLite
+      database is created under the session's temporary directory.
+    * When ``--pgvector`` is enabled, the URL of the migrated pgvector
+      database is returned via ``pgvector_migrated_database_url``.
+
+    The fixture yields SQLAlchemy-compatible URLs so that test suites can
+    ``create_engine`` with minimal boilerplate.
     """
 
     if not request.config.getoption("schema"):

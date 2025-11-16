@@ -64,6 +64,10 @@ def pgvector_pipeline_engine(
 
     engine = create_engine(pgvector_database_url, future=True)
     run_sql_migrations(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 @pytest.fixture()
 def ingest_engine(pgvector_db: PGVectorDatabase) -> Iterator[Engine]:
     """Yield an isolated Postgres engine cloned from the seeded pgvector template."""
@@ -101,7 +105,6 @@ def pgvector_pipeline_session_factory(
             session.close()
         transaction.rollback()
         connection.close()
-        pgvector_db.drop_clone(clone)
 
 
 @pytest.fixture(autouse=True)
