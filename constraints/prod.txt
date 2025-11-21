@@ -181,7 +181,7 @@ langchain-classic==1.0.0
     # via langchain-community
 langchain-community==0.4.1
     # via ragas
-langchain-core==1.0.2
+langchain-core==1.0.7
     # via
     #   langchain
     #   langchain-classic
