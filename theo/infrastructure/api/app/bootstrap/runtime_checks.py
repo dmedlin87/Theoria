@@ -17,6 +17,11 @@ class _GetEnvironmentLabel(Protocol):
         ...
 
 
+class _GenerateEphemeralDevKey(Protocol):
+    def __call__(self) -> str | None:  # pragma: no cover - protocol definition
+        ...
+
+
 class _ConsoleTracer(Protocol):
     def __call__(self) -> None:  # pragma: no cover - protocol definition
         ...
@@ -52,9 +57,14 @@ def enforce_authentication_requirements(
     *,
     allow_insecure_startup: _AllowInsecureStartup,
     get_environment_label: _GetEnvironmentLabel,
+    generate_ephemeral_dev_key: _GenerateEphemeralDevKey | None = None,
     logger: logging.Logger,
 ) -> None:
-    """Validate the authentication configuration prior to boot."""
+    """Validate the authentication configuration prior to boot.
+
+    In development environments without configured API keys, this function will
+    automatically generate an ephemeral dev key and add it to the settings.
+    """
 
     insecure_ok = allow_insecure_startup()
     auth_allow_anonymous = getattr(settings, "auth_allow_anonymous", False)
@@ -84,6 +94,17 @@ def enforce_authentication_requirements(
     if api_keys or has_jwt():
         return
 
+    # In development environments, auto-generate an ephemeral API key
+    if allows_anonymous and generate_ephemeral_dev_key is not None:
+        generated_key = generate_ephemeral_dev_key()
+        if generated_key:
+            # Update settings with the generated key
+            current_keys = list(getattr(settings, "api_keys", []))
+            current_keys.append(generated_key)
+            # Settings allows mutation since it's not frozen
+            object.__setattr__(settings, "api_keys", current_keys)
+            return
+
     if insecure_ok:
         logger.warning(
             "Starting without API credentials because THEO_ALLOW_INSECURE_STARTUP is"
@@ -94,8 +115,7 @@ def enforce_authentication_requirements(
 
     message = (
         "API authentication is not configured. Set THEO_API_KEYS or JWT settings"
-        " before starting the service, or enable THEO_ALLOW_INSECURE_STARTUP=1 for"
-        " local testing."
+        " before starting the service."
     )
     logger.critical(message)
     raise RuntimeError(message)
