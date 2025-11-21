@@ -42,9 +42,9 @@ Theo Engine ingests theological content, normalizes scripture references, and ex
 
 ## Residual Risks
 
-- Reliance on third-party LLM providers introduces potential data retention beyond our control; mitigate via provider agreements and anonymization.
-- Local deployments may disable authentication; ensure documentation warns this is dev-only.
-- No automated DAST yet; baseline scan scheduled post-hardening.
+- Reliance on third-party LLM providers introduces potential data retention beyond our control; mitigate via provider agreements, anonymization, and local LLM alternatives (see Priority 5 in `docs/planning/PROJECT_IMPROVEMENTS_ROADMAP.md`).
+- Local deployments may disable authentication; ensure documentation warns this is dev-only and prefer auto-generated dev keys over fully disabled auth.
+- DAST coverage is limited to baseline scans; deeper authenticated scanning and API fuzzing are planned enhancements.
 
 ## Mitigation Tracking
 
