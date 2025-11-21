@@ -206,6 +206,36 @@ def discovery_to_dto(model: Discovery) -> DiscoveryDTO:
     return DiscoveryDTO(id=model.id, user_id=model.user_id, ...)
 ```
 
+### Pragmatic Clean Architecture Guidelines
+
+While Theoria enforces strict hexagonal architecture via `import-linter`, overly rigid adherence can create "Pass-Through Hell" where simple operations require excessive DTO mapping. Follow these guidelines to balance purity with velocity:
+
+**When to Use Full DTO Mapping**
+- External API contracts that require versioning independent of domain models
+- Complex mutations that aggregate data from multiple sources
+- Cross-boundary operations where input/output shapes differ significantly
+- Data that needs transformation or validation before persistence
+
+**When to Allow Domain Entities Directly**
+- Read-only queries returning data in its natural shape
+- Internal service-to-service communication within trust boundaries
+- Simple CRUD operations where DTO adds no value
+- Performance-critical paths where mapping overhead is measurable
+
+**Example: Pragmatic Read Operation**
+```python
+# Instead of mapping to DTO for simple reads:
+@router.get("/discoveries/{id}")
+def get_discovery(id: int, session: Session = Depends(get_session)):
+    # OK to return domain entity for simple reads
+    discovery = session.get(Discovery, id)
+    if not discovery:
+        raise NotFoundError(f"Discovery {id}")
+    return DiscoveryResponse.model_validate(discovery)  # Pydantic handles conversion
+```
+
+**See Also**: `docs/adr/0006-local-llm-first-architecture.md` for privacy-first patterns
+
 ---
 
 ## Codebase Structure
