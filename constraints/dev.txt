@@ -230,7 +230,7 @@ langchain-classic==1.0.0
     # via langchain-community
 langchain-community==0.4.1
     # via ragas
-langchain-core==1.0.2
+langchain-core==1.0.7
     # via
     #   langchain
     #   langchain-classic
@@ -601,7 +601,7 @@ sqlalchemy==2.0.44
     #   langchain-community
 starlette==0.49.1
     # via fastapi
-strawberry-graphql==0.285.0
+strawberry-graphql==0.286.0
     # via theoria (pyproject.toml)
 sympy==1.14.0
     # via torch
