@@ -15,20 +15,23 @@ from starlette.responses import Response
 from theo.application.facades.runtime import (
     allow_insecure_startup,
     current_runtime_environment,
+    generate_ephemeral_dev_key,
 )
 from theo.application.facades.settings import get_settings, get_settings_secret
 
 from .bootstrap import ROUTER_REGISTRATIONS, create_app
 from .bootstrap.lifecycle import lifespan
 from .bootstrap.middleware import (
+    _attach_trace_headers as _attach_trace_headers_impl,
     configure_cors as _configure_cors_impl,
     install_error_reporting as _install_error_reporting,
     register_trace_handlers as _register_trace_handlers_impl,
 )
-from .bootstrap.middleware import _attach_trace_headers as _attach_trace_headers_impl
-from .bootstrap.routes import register_health_routes as _register_health_routes_impl
-from .bootstrap.routes import CONTENT_TYPE_LATEST as _DEFAULT_CONTENT_TYPE
-from .bootstrap.routes import generate_latest as _default_generate_latest
+from .bootstrap.routes import (
+    CONTENT_TYPE_LATEST as _DEFAULT_CONTENT_TYPE,
+    generate_latest as _default_generate_latest,
+    register_health_routes as _register_health_routes_impl,
+)
 from .bootstrap.runtime_checks import (
     configure_console_traces as _configure_console_traces_impl,
     enforce_authentication_requirements as _enforce_authentication_requirements_impl,
@@ -105,6 +108,7 @@ def _enforce_authentication_requirements() -> None:
         settings,
         allow_insecure_startup=allow_insecure_startup,
         get_environment_label=current_runtime_environment,
+        generate_ephemeral_dev_key=generate_ephemeral_dev_key,
         logger=logger,
     )
 
