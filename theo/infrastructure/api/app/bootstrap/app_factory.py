@@ -9,22 +9,26 @@ from typing import Optional
 from fastapi import FastAPI
 
 from theo.adapters import AdapterRegistry
-from theo.application.facades.resilience import set_resilience_policy_factory
 from theo.application.facades.research import set_application_resolver
-from theo.application.facades.secret_migration import set_llm_registry_saver
+from theo.application.facades.resilience import set_resilience_policy_factory
 from theo.application.facades.runtime import (
     allow_insecure_startup,
     current_runtime_environment,
+    generate_ephemeral_dev_key,
 )
-from theo.application.facades.settings import Settings, get_settings, get_settings_secret
-from theo.application.facades.telemetry import set_telemetry_provider
+from theo.application.facades.secret_migration import set_llm_registry_saver
 from theo.application.facades.security import (
     set_principal_resolver as _set_principal_resolver,
 )
+from theo.application.facades.settings import (
+    Settings,
+    get_settings,
+    get_settings_secret,
+)
+from theo.application.facades.telemetry import set_telemetry_provider
 from theo.application.services import ApplicationContainer
+from theo.application.services.bootstrap import resolve_application
 
-from ..infra import router_registry as _router_registry  # noqa: F401
-from ..error_handlers import install_error_handlers
 from ..adapters.resilience import resilience_policy_factory
 from ..adapters.security import (
     FastAPIPrincipalResolver,
@@ -32,8 +36,9 @@ from ..adapters.security import (
 )
 from ..adapters.telemetry import ApiTelemetryProvider
 from ..ai.registry import save_llm_registry
+from ..error_handlers import install_error_handlers
+from ..infra import router_registry as _router_registry  # noqa: F401
 from ..versioning import get_version_manager
-from theo.application.services.bootstrap import resolve_application
 from .lifecycle import lifespan
 from .middleware import (
     configure_cors,
@@ -276,6 +281,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         resolved_settings,
         allow_insecure_startup=allow_insecure_startup,
         get_environment_label=current_runtime_environment,
+        generate_ephemeral_dev_key=generate_ephemeral_dev_key,
         logger=logger,
     )
     enforce_secret_requirements(

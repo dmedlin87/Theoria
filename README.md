@@ -103,22 +103,24 @@ The production constraint set also pins a CPU-only PyTorch wheel by embedding th
    cd -
    ```
 
-3. **Configure authentication** (choose one)
-   ```bash
-   # API key-based auth (recommended)
-   export THEO_API_KEYS='["local-dev-key"]'
+3. **Configure authentication**
 
-   # or temporarily allow unauthenticated requests (development only)
-   export THEO_ALLOW_INSECURE_STARTUP=1
-   export THEO_AUTH_ALLOW_ANONYMOUS=1
+   In development mode (`THEORIA_ENVIRONMENT=development`), the API auto-generates an ephemeral API key when none is configured and prints it to the console. Just start the server and copy the key from the output.
+
+   For persistent or production keys:
+   ```bash
+   # API key-based auth
+   export THEO_API_KEYS='["my-api-key"]'
+
+   # or JWT-based auth
+   export THEO_AUTH_JWT_SECRET=your-secret-key
    ```
+
    Additional authentication strategies (OIDC, session-based, API tokens) are documented in [`SECURITY.md`](SECURITY.md) and highlighted through [`docs/INDEX.md`](docs/INDEX.md).
 
    > **Production / staging:** Always configure API keys or JWT credentials. The
-   > API exits during startup if anonymous access remains enabled when the
-   > runtime environment is anything other than development/testing. Set
-   > `THEO_LOCAL_INSECURE_OVERRIDES=0` when you want local scripts to exercise
-   > the same production guards.
+   > API exits during startup if authentication is not configured when the
+   > runtime environment is anything other than development/testing.
 
 ### Phase 2: Launch Services
 
