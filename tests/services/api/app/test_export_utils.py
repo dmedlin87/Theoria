@@ -1,10 +1,6 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-import importlib.util
-from pathlib import Path
-import sys
-import types
 
 import pytest
 from sqlalchemy import create_engine, event
@@ -12,31 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from theo.adapters.persistence import Base
 from theo.adapters.persistence.models import Document, Passage
-
-_MODULE_PATH = (
-    Path(__file__).resolve().parents[4]
-    / "theo"
-    / "infrastructure"
-    / "api"
-    / "app"
-    / "routes"
-    / "export"
-    / "utils.py"
-)
-_EXPORT_PACKAGE = "theo.infrastructure.api.app.routes.export"
-if _EXPORT_PACKAGE not in sys.modules:
-    export_module = types.ModuleType(_EXPORT_PACKAGE)
-    export_module.__path__ = [str(_MODULE_PATH.parent)]  # type: ignore[attr-defined]
-    sys.modules[_EXPORT_PACKAGE] = export_module
-
-_SPEC = importlib.util.spec_from_file_location(
-    f"{_EXPORT_PACKAGE}.utils", _MODULE_PATH
-)
-assert _SPEC and _SPEC.loader is not None
-_EXPORT_UTILS = importlib.util.module_from_spec(_SPEC)
-sys.modules[_SPEC.name] = _EXPORT_UTILS
-_SPEC.loader.exec_module(_EXPORT_UTILS)
-fetch_documents_by_ids = _EXPORT_UTILS.fetch_documents_by_ids
+from theo.infrastructure.api.app.routes.export.utils import fetch_documents_by_ids
 
 
 @pytest.fixture()
