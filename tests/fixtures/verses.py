@@ -5,18 +5,16 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+import importlib.util
 import pytest
 
 VERSE_DEPENDENCIES_AVAILABLE = True
 VERSE_IMPORT_ERROR: Exception | None = None
 
 try:  # pragma: no cover - optional dependency wiring
-    from theo.infrastructure.api.app.db.verse_graph import (
-        CommentarySeedRecord,
-        PairSeedRecord,
-        VerseSeedRelationships,
-    )
-    from theo.infrastructure.api.app.models.base import Passage
+    theo_spec = importlib.util.find_spec("theo")
+    if theo_spec is None:
+        raise ModuleNotFoundError("verse graph dependencies unavailable")
 except (ModuleNotFoundError, ImportError) as exc:  # pragma: no cover - dependency missing
     VERSE_DEPENDENCIES_AVAILABLE = False
     VERSE_IMPORT_ERROR = exc
@@ -41,6 +39,8 @@ def verse_graph_passage():
     """Return a representative passage record for verse graph tests."""
 
     _require_dependencies()
+
+    from theo.infrastructure.api.app.models.base import Passage
 
     return Passage(
         id="passage-1",
@@ -71,6 +71,12 @@ def verse_seed_relationships() -> VerseSeedRelationshipsType:
     """Provide canonical seed relationships used by verse graph tests."""
 
     _require_dependencies()
+
+    from theo.infrastructure.api.app.db.verse_graph import (
+        CommentarySeedRecord,
+        PairSeedRecord,
+        VerseSeedRelationships,
+    )
 
     return VerseSeedRelationships(
         contradictions=[

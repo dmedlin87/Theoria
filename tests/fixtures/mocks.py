@@ -29,15 +29,23 @@ def optimize_mocks() -> None:
             async_client_patch.return_value = async_client
 
         try:
-            celery_patch = stack.enter_context(
-                patch("theo.infrastructure.api.app.workers.tasks.celery")
-            )
-        except (ModuleNotFoundError, AttributeError, SyntaxError):
-            celery_patch = None
+            from celery import Celery as CeleryClass
+        except ModuleNotFoundError:
+            celery_init_patch = None
         else:
-            celery_patch.conf.task_always_eager = True
-            celery_patch.conf.task_ignore_result = True
-            if hasattr(celery_patch.conf, "task_store_eager_result"):
-                celery_patch.conf.task_store_eager_result = False
+            original_init = CeleryClass.__init__
+
+            def _patched_init(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+                original_init(self, *args, **kwargs)
+                conf = getattr(self, "conf", None)
+                if conf is not None:
+                    conf.task_always_eager = True
+                    conf.task_ignore_result = True
+                    if hasattr(conf, "task_store_eager_result"):
+                        conf.task_store_eager_result = False
+
+            celery_init_patch = stack.enter_context(
+                patch.object(CeleryClass, "__init__", _patched_init)
+            )
 
         yield

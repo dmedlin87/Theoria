@@ -497,7 +497,8 @@ def _install_optional_dependency_stubs() -> None:
             sys.modules.setdefault(name, module)
 
 
-_install_optional_dependency_stubs()
+if os.environ.get("THEORIA_LIGHTWEIGHT_TESTS") == "1":
+    _install_optional_dependency_stubs()
 
 
 @contextmanager
